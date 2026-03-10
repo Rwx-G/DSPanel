@@ -22,7 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - User lookup with debounced search, property grid detail, group membership list (1.10)
 - Health check badge evaluating 9 account flags with severity levels (1.11)
 - Computer lookup with search, detail view, and ping/DNS commands (1.12)
-- 217 unit tests covering all services, ViewModels, and controls
+- Application settings service (IAppSettingsService) with JSON persistence in LocalAppData
+- 224 unit tests covering all services, ViewModels, and controls
 
 ## [0.0.2] - 2026-03-10
 

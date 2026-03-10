@@ -9,6 +9,7 @@ using DSPanel.Services.Health;
 using DSPanel.Services.Navigation;
 using DSPanel.Services.Notifications;
 using DSPanel.Services.Permissions;
+using DSPanel.Services.Settings;
 using DSPanel.Services.Theme;
 using DSPanel.ViewModels;
 using DSPanel.Views.Pages;
@@ -49,6 +50,9 @@ public partial class App : Application
                 // Permissions
                 services.Configure<PermissionOptions>(context.Configuration.GetSection("Permissions"));
                 services.AddSingleton<IPermissionService, PermissionService>();
+
+                // Settings
+                services.AddSingleton<IAppSettingsService, AppSettingsService>();
 
                 // Theme
                 services.AddSingleton<IThemeService, ThemeService>();
