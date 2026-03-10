@@ -1,0 +1,23 @@
+# DSPanel Product Requirements Document (PRD)
+
+## Table of Contents
+
+- [DSPanel Product Requirements Document (PRD)](#table-of-contents)
+  - [Goals and Background Context](#goals-and-background-context)
+  - [Requirements](#requirements)
+  - [User Interface Design Goals](#user-interface-design-goals)
+  - [Technical Assumptions](#technical-assumptions)
+  - [Epic List](#epic-list)
+  - [Epic 1: Foundation and Core Lookup](#epic-1-foundation-and-core-lookup)
+  - [Epic 2: Support Actions and Account Management](#epic-2-support-actions-and-account-management)
+  - [Epic 3: Comparison and Permissions Audit](#epic-3-comparison-and-permissions-audit)
+  - [Epic 4: Group Management and Bulk Operations](#epic-4-group-management-and-bulk-operations)
+  - [Epic 5: Presets, Onboarding and Offboarding Workflows](#epic-5-presets-onboarding-and-offboarding-workflows)
+  - [Epic 6: Exchange Diagnostics](#epic-6-exchange-diagnostics)
+  - [Epic 7: Administration and Object Management](#epic-7-administration-and-object-management)
+  - [Epic 8: Infrastructure Health and Monitoring](#epic-8-infrastructure-health-and-monitoring)
+  - [Epic 9: Security, Risk Scoring and Attack Detection](#epic-9-security-risk-scoring-and-attack-detection)
+  - [Epic 10: Reports, Export and Compliance](#epic-10-reports-export-and-compliance)
+  - [Epic 11: Audit, Automation and Extensibility](#epic-11-audit-automation-and-extensibility)
+  - [Epic 12: RBAC, Settings and Polish](#epic-12-rbac-settings-and-polish)
+  - [Next Steps](#next-steps)

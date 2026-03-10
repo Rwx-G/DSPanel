@@ -1,0 +1,213 @@
+# Source Tree
+
+```
+DSPanel/
+  .github/
+    workflows/
+      build.yml                      # CI: build + test on push/PR
+      release.yml                    # CD: build MSIX + portable on tag
+    ISSUE_TEMPLATE/
+      bug_report.md
+      feature_request.md
+  docs/
+    brainstorming-session-results.md
+    brief.md
+    prd.md
+    architecture.md                  # This document
+    architecture/                    # Sharded architecture docs
+      01-tech-stack.md
+      02-data-models.md
+      03-components.md
+      04-source-tree.md
+      05-coding-standards.md
+    stories/                         # User stories for development
+  src/
+    DSPanel/
+      App.xaml
+      App.xaml.cs
+      MainWindow.xaml
+      MainWindow.xaml.cs
+      DSPanel.csproj
+      Converters/                    # WPF value converters
+        BoolToVisibilityConverter.cs
+        PermissionLevelConverter.cs
+        HealthStatusToColorConverter.cs
+      Helpers/                       # Utility classes
+        LdapHelpers.cs
+        DnParser.cs
+      Models/                        # Domain models (POCOs)
+        DirectoryUser.cs
+        DirectoryComputer.cs
+        DirectoryGroup.cs
+        ExchangeMailboxInfo.cs
+        AccountHealthStatus.cs
+        Preset.cs
+        AuditLogEntry.cs
+        ObjectSnapshot.cs
+        AutomationRule.cs
+        RiskScoreReport.cs
+        SecurityAlert.cs
+      Services/                      # Business logic services
+        Directory/
+          IDirectoryProvider.cs
+          LdapDirectoryProvider.cs
+          GraphDirectoryProvider.cs
+          DirectoryProviderFactory.cs
+        Exchange/
+          IExchangeService.cs
+          ExchangeService.cs
+        Permissions/
+          IPermissionService.cs
+          PermissionService.cs
+          PermissionLevel.cs
+        Presets/
+          IPresetService.cs
+          PresetService.cs
+          PresetValidator.cs
+        Audit/
+          IAuditService.cs
+          AuditService.cs
+        Snapshots/
+          ISnapshotService.cs
+          SnapshotService.cs
+        Health/
+          IHealthCheckService.cs
+          HealthCheckService.cs
+        Security/
+          ISecurityAnalysisService.cs
+          SecurityAnalysisService.cs
+          RiskScoreCalculator.cs
+          AttackDetector.cs
+        Ntfs/
+          INtfsPermissionService.cs
+          NtfsPermissionService.cs
+        Monitoring/
+          IWmiMonitoringService.cs
+          WmiMonitoringService.cs
+        Reports/
+          IReportService.cs
+          ReportService.cs
+        Export/
+          IExportService.cs
+          CsvExportService.cs
+          PdfExportService.cs
+        Notifications/
+          INotificationService.cs
+          NotificationService.cs
+          WebhookSender.cs
+        Scripts/
+          IScriptExecutionService.cs
+          ScriptExecutionService.cs
+        Navigation/
+          INavigationService.cs
+          NavigationService.cs
+        Update/
+          IUpdateService.cs
+          UpdateService.cs
+        Mfa/
+          IMfaService.cs
+          TotpMfaService.cs
+        Password/
+          IPasswordService.cs
+          PasswordGenerator.cs
+          HibpClient.cs
+      ViewModels/                    # MVVM ViewModels
+        MainViewModel.cs
+        UserLookupViewModel.cs
+        ComputerLookupViewModel.cs
+        ComparisonViewModel.cs
+        GroupManagementViewModel.cs
+        PresetManagementViewModel.cs
+        OnboardingWizardViewModel.cs
+        OffboardingViewModel.cs
+        InfrastructureHealthViewModel.cs
+        SecurityDashboardViewModel.cs
+        ReportsViewModel.cs
+        AuditLogViewModel.cs
+        SettingsViewModel.cs
+        Dialogs/
+          PasswordResetDialogViewModel.cs
+          MfaDialogViewModel.cs
+          DryRunPreviewDialogViewModel.cs
+          PresetEditorDialogViewModel.cs
+      Views/                         # WPF Views (XAML)
+        MainWindow.xaml(.cs)
+        Controls/
+          SearchBar.xaml(.cs)
+          HealthBadge.xaml(.cs)
+          PermissionGate.xaml(.cs)
+          GroupTreeView.xaml(.cs)
+          DiffViewer.xaml(.cs)
+        Pages/
+          UserLookupView.xaml(.cs)
+          ComputerLookupView.xaml(.cs)
+          ComparisonView.xaml(.cs)
+          GroupManagementView.xaml(.cs)
+          PresetManagementView.xaml(.cs)
+          OnboardingWizardView.xaml(.cs)
+          OffboardingView.xaml(.cs)
+          InfrastructureHealthView.xaml(.cs)
+          SecurityDashboardView.xaml(.cs)
+          ReportsView.xaml(.cs)
+          AuditLogView.xaml(.cs)
+          SettingsView.xaml(.cs)
+        Dialogs/
+          PasswordResetDialog.xaml(.cs)
+          MfaDialog.xaml(.cs)
+          DryRunPreviewDialog.xaml(.cs)
+          PresetEditorDialog.xaml(.cs)
+      Resources/
+        Styles/
+          Colors.xaml
+          DarkTheme.xaml
+          LightTheme.xaml
+          Controls.xaml
+        Icons/
+          dspanel.ico
+      Data/                          # SQLite database access
+        DatabaseInitializer.cs
+        AuditRepository.cs
+        SnapshotRepository.cs
+        SettingsRepository.cs
+    DSPanel.Tests/
+      DSPanel.Tests.csproj
+      Services/
+        Directory/
+          LdapDirectoryProviderTests.cs
+          GraphDirectoryProviderTests.cs
+        Permissions/
+          PermissionServiceTests.cs
+        Presets/
+          PresetServiceTests.cs
+          PresetValidatorTests.cs
+        Health/
+          HealthCheckServiceTests.cs
+        Security/
+          RiskScoreCalculatorTests.cs
+          AttackDetectorTests.cs
+        Ntfs/
+          NtfsPermissionServiceTests.cs
+        Password/
+          PasswordGeneratorTests.cs
+          HibpClientTests.cs
+        Export/
+          CsvExportServiceTests.cs
+      ViewModels/
+        UserLookupViewModelTests.cs
+        ComparisonViewModelTests.cs
+        GroupManagementViewModelTests.cs
+      Helpers/
+        DnParserTests.cs
+      TestHelpers/
+        MockDirectoryProvider.cs
+        TestDataBuilder.cs
+  .gitignore
+  .editorconfig
+  CHANGELOG.md
+  LICENSE
+  README.md
+  DSPanel.sln
+```
+
+---
+
