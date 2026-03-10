@@ -131,26 +131,7 @@
             <ItemsControl.ItemTemplate>
               <DataTemplate DataType="{x:Type models:SidebarItem}">
                 <Grid Margin="6,1">
-                  <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="3"/>
-                    <ColumnDefinition Width="*"/>
-                  </Grid.ColumnDefinitions>
-
-                  <!-- Active indicator bar -->
-                  <Border Grid.Column="0"
-                          Background="{DynamicResource BrushPrimary}"
-                          CornerRadius="1.5"
-                          Margin="0,4">
-                    <Border.Visibility>
-                      <MultiBinding Converter="{StaticResource EqualityToVisibility}">
-                        <Binding Path="Key"/>
-                        <Binding Path="DataContext.ActiveTabKey" RelativeSource="{RelativeSource AncestorType=Window}"/>
-                      </MultiBinding>
-                    </Border.Visibility>
-                  </Border>
-
-                  <Button Grid.Column="1"
-                          Style="{StaticResource GhostButton}"
+                  <Button Style="{StaticResource GhostButton}"
                           Command="{Binding DataContext.NavigateCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                           CommandParameter="{Binding Key}"
                           AutomationProperties.Name="{Binding Label}"
@@ -171,6 +152,21 @@
                                  Visibility="{Binding DataContext.IsSidebarExpanded, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVisibility}}"/>
                     </StackPanel>
                   </Button>
+
+                  <!-- Active indicator bar (overlaid on left edge) -->
+                  <Border Width="3"
+                          HorizontalAlignment="Left"
+                          Background="{DynamicResource BrushPrimary}"
+                          CornerRadius="1.5"
+                          Margin="0,6"
+                          IsHitTestVisible="False">
+                    <Border.Visibility>
+                      <MultiBinding Converter="{StaticResource EqualityToVisibility}">
+                        <Binding Path="Key"/>
+                        <Binding Path="DataContext.ActiveTabKey" RelativeSource="{RelativeSource AncestorType=Window}"/>
+                      </MultiBinding>
+                    </Border.Visibility>
+                  </Border>
                 </Grid>
               </DataTemplate>
             </ItemsControl.ItemTemplate>
