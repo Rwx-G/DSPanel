@@ -1,0 +1,54 @@
+schema: 1
+story: "1.8"
+story_title: "Form Controls, Validation and Input Patterns"
+gate: CONCERNS
+status_reason: "FormField and styled TextBox are implemented. PasswordBox toggle, searchable ComboBox, OUPicker, GroupPicker, DateTimePicker, ValidationSummary, and dirty tracking are not yet implemented. These are not blocking for Epic 1 lookup features but will be needed in Epic 2+."
+reviewer: "Quinn (Test Architect)"
+updated: "2026-03-10T00:00:00Z"
+
+waiver: { active: false }
+top_issues:
+  - id: "FORM-001"
+    severity: medium
+    finding: "OUPicker (AC5) and GroupPicker (AC6) not implemented - will be needed for Epic 2 (password reset, group management)"
+    suggested_action: "Implement before Epic 2 stories that require them"
+    suggested_owner: dev
+  - id: "FORM-002"
+    severity: medium
+    finding: "PasswordBox with show/hide toggle (AC3) not implemented - needed for password reset (Story 2.1)"
+    suggested_action: "Implement before Story 2.1"
+    suggested_owner: dev
+  - id: "FORM-003"
+    severity: low
+    finding: "ValidationSummary (AC9) and dirty tracking (AC10) not implemented"
+    suggested_action: "Implement when edit forms are introduced"
+    suggested_owner: dev
+  - id: "FORM-004"
+    severity: low
+    finding: "No unit tests for form controls"
+    suggested_action: "Add validation attribute and dirty tracking tests"
+    suggested_owner: dev
+
+quality_score: 30
+expires: "2026-03-24T00:00:00Z"
+
+evidence:
+  tests_reviewed: 0
+  risks_identified: 4
+  trace:
+    ac_covered: [1, 2, 8, 11]
+    ac_gaps: [3, 4, 5, 6, 7, 9, 10, 12]
+
+nfr_validation:
+  security: { status: PASS, notes: "" }
+  performance: { status: PASS, notes: "" }
+  reliability: { status: CONCERNS, notes: "Missing validation framework may lead to inconsistent error handling." }
+  maintainability: { status: CONCERNS, notes: "No standardized form pattern yet." }
+
+recommendations:
+  immediate: []
+  future:
+    - action: "Implement PasswordBox, OUPicker, GroupPicker before Epic 2"
+      refs: ["Views/Controls/"]
+    - action: "Implement ObservableValidator base pattern and ValidationSummary"
+      refs: ["ViewModels/"]

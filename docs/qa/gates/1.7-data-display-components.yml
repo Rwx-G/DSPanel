@@ -1,0 +1,64 @@
+schema: 1
+story: "1.7"
+story_title: "Data Display Components"
+gate: CONCERNS
+status_reason: "Only PropertyGrid and basic DataGrid styling are implemented. FilterBar, Pagination, TreeView, DiffViewer, and CSV export are missing. VirtualizingStackPanel is used on lookup ListBoxes but no dedicated VirtualizedList control exists."
+reviewer: "Quinn (Test Architect)"
+updated: "2026-03-10T00:00:00Z"
+
+waiver: { active: false }
+top_issues:
+  - id: "DATA-001"
+    severity: medium
+    finding: "FilterBar control (AC2) not implemented"
+    suggested_action: "Implement FilterBar or defer to story that needs it"
+    suggested_owner: dev
+  - id: "DATA-002"
+    severity: medium
+    finding: "Pagination control (AC3) not implemented"
+    suggested_action: "Implement Pagination or defer to story that needs it"
+    suggested_owner: dev
+  - id: "DATA-003"
+    severity: medium
+    finding: "DiffViewer control (AC7) not implemented"
+    suggested_action: "Implement DiffViewer or defer to story 3.4 (state-in-time)"
+    suggested_owner: dev
+  - id: "DATA-004"
+    severity: low
+    finding: "TreeView styling (AC6) not implemented"
+    suggested_action: "Implement when OUPicker or group browser needs it"
+    suggested_owner: dev
+  - id: "DATA-005"
+    severity: low
+    finding: "CSV export (AC10) not implemented"
+    suggested_action: "Add context menu export on DataGrid"
+    suggested_owner: dev
+  - id: "DATA-006"
+    severity: low
+    finding: "No unit tests for data display components"
+    suggested_action: "Add tests for PropertyGrid and future controls"
+    suggested_owner: dev
+
+quality_score: 30
+expires: "2026-03-24T00:00:00Z"
+
+evidence:
+  tests_reviewed: 0
+  risks_identified: 6
+  trace:
+    ac_covered: [1, 4, 5, 8]
+    ac_gaps: [2, 3, 6, 7, 9, 10]
+
+nfr_validation:
+  security: { status: PASS, notes: "" }
+  performance: { status: PASS, notes: "VirtualizingStackPanel used where needed." }
+  reliability: { status: CONCERNS, notes: "Missing controls may be needed by dependent stories." }
+  maintainability: { status: CONCERNS, notes: "No tests for implemented components." }
+
+recommendations:
+  immediate: []
+  future:
+    - action: "Implement FilterBar, Pagination, TreeView, DiffViewer as needed by dependent stories"
+      refs: ["Views/Controls/"]
+    - action: "Add CSV export to DataGrid context menu"
+      refs: ["Resources/Styles/Controls.xaml"]

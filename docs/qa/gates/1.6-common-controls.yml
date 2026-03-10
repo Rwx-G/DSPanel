@@ -1,0 +1,52 @@
+schema: 1
+story: "1.6"
+story_title: "Common Reusable Controls"
+gate: CONCERNS
+status_reason: "7 of 9 controls implemented (SearchBar, PermissionGate, StatusBadge, LoadingSpinner, EmptyState, CopyButton, plus FormField from 1.8). Missing Avatar, TagChip, InfoCard. Tests cover SearchBar debounce only."
+reviewer: "Quinn (Test Architect)"
+updated: "2026-03-10T00:00:00Z"
+
+waiver: { active: false }
+top_issues:
+  - id: "CTRL-001"
+    severity: medium
+    finding: "Avatar control (AC4) not implemented - needed for user display in later epics"
+    suggested_action: "Implement Avatar with initials fallback"
+    suggested_owner: dev
+  - id: "CTRL-002"
+    severity: medium
+    finding: "TagChip control (AC5) not implemented - needed for group memberships and filters"
+    suggested_action: "Implement TagChip with removable tag pattern"
+    suggested_owner: dev
+  - id: "CTRL-003"
+    severity: medium
+    finding: "InfoCard control (AC8) not implemented - needed for detail views"
+    suggested_action: "Implement InfoCard with collapsible content"
+    suggested_owner: dev
+  - id: "CTRL-004"
+    severity: low
+    finding: "Missing unit tests for PermissionGate and CopyButton logic"
+    suggested_action: "Add tests for permission checks and clipboard behavior"
+    suggested_owner: dev
+
+quality_score: 50
+expires: "2026-03-24T00:00:00Z"
+
+evidence:
+  tests_reviewed: 6
+  risks_identified: 4
+  trace:
+    ac_covered: [1, 2, 3, 6, 7, 9, 10]
+    ac_gaps: [4, 5, 8, 11, 12]
+
+nfr_validation:
+  security: { status: PASS, notes: "PermissionGate correctly gates content." }
+  performance: { status: PASS, notes: "SearchBar debounce prevents excessive queries." }
+  reliability: { status: PASS, notes: "" }
+  maintainability: { status: CONCERNS, notes: "Missing controls will need to be added before dependent stories." }
+
+recommendations:
+  immediate: []
+  future:
+    - action: "Implement Avatar, TagChip, InfoCard before Epic 2"
+      refs: ["Views/Controls/"]
