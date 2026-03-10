@@ -41,7 +41,7 @@
   <!-- Border -->
   <Color x:Key="ColorBorderDefault">#374151</Color>
   <Color x:Key="ColorBorderStrong">#4B5563</Color>
-  <Color x:Key="ColorBorderSubtle">#1F2937</Color>
+  <Color x:Key="ColorBorderSubtle">#2D3748</Color>
   <Color x:Key="ColorBorderFocus">#3B82F6</Color>
 
   <!-- DataGrid -->

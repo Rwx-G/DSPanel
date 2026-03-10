@@ -99,7 +99,7 @@ public partial class MainViewModel : ObservableObject
 
     // ---- Status bar ----
 
-    public string DomainName => _directoryProvider.DomainName ?? "Not connected";
+    public string DomainName => _directoryProvider.DomainName ?? "-";
 
     public string ConnectedDc => _directoryProvider.ConnectedDc ?? "-";
 

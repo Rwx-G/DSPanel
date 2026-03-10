@@ -18,6 +18,7 @@
                         Text="{Binding SearchText, Mode=TwoWay}"
                         SearchCommand="{Binding SearchCommand}"
                         PlaceholderText="Search computers by name or DNS host name..."
+                        AutomationProperties.Name="Search computers"
                         Margin="0,0,0,12"/>
 
     <!-- Two-panel layout -->
@@ -61,6 +62,8 @@
           <!-- Results list -->
           <ListBox ItemsSource="{Binding SearchResults}"
                    SelectedItem="{Binding SelectedComputer, Mode=TwoWay}"
+                   VirtualizingStackPanel.IsVirtualizing="True"
+                   VirtualizingStackPanel.VirtualizationMode="Recycling"
                    Background="Transparent"
                    BorderThickness="0"
                    ScrollViewer.HorizontalScrollBarVisibility="Disabled">

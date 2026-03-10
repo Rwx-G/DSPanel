@@ -86,11 +86,37 @@
                   Background="{TemplateBinding Background}"
                   CornerRadius="{StaticResource BorderRadiusSm}"
                   Padding="{TemplateBinding Padding}">
-            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="Center"/>
           </Border>
           <ControlTemplate.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
               <Setter TargetName="border" Property="Background" Value="{DynamicResource BrushRowHover}"/>
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+  </Style>
+
+  <!-- Button: Close (tab close, small with visible hover) -->
+  <Style x:Key="CloseButton" TargetType="Button">
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="BorderThickness" Value="0"/>
+    <Setter Property="Cursor" Value="Hand"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Border x:Name="border"
+                  Background="{TemplateBinding Background}"
+                  CornerRadius="{StaticResource BorderRadiusSm}"
+                  Width="{TemplateBinding Width}"
+                  Height="{TemplateBinding Height}">
+            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="border" Property="Background" Value="{DynamicResource BrushBorderDefault}"/>
             </Trigger>
           </ControlTemplate.Triggers>
         </ControlTemplate>
@@ -225,22 +251,68 @@
     <Setter Property="Background" Value="{DynamicResource BrushSurfaceBackground}"/>
     <Setter Property="BorderThickness" Value="0"/>
     <Setter Property="Padding" Value="0"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="TabControl">
+          <Grid>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto"/>
+              <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <!-- Tab strip with bottom border -->
+            <Border Grid.Row="0"
+                    Background="{DynamicResource BrushSurfaceCard}"
+                    BorderBrush="{DynamicResource BrushBorderSubtle}"
+                    BorderThickness="0,0,0,1">
+              <TabPanel IsItemsHost="True" Margin="8,0,0,0"/>
+            </Border>
+            <!-- Content area -->
+            <ContentPresenter Grid.Row="1"
+                              ContentSource="SelectedContent"
+                              Margin="{TemplateBinding Padding}"/>
+          </Grid>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
   </Style>
 
   <Style TargetType="TabItem">
     <Setter Property="Background" Value="Transparent"/>
     <Setter Property="Foreground" Value="{DynamicResource BrushTextSecondary}"/>
-    <Setter Property="FontSize" Value="14"/>
-    <Setter Property="Padding" Value="16,8"/>
+    <Setter Property="FontSize" Value="13"/>
+    <Setter Property="FontFamily" Value="Segoe UI"/>
     <Setter Property="Cursor" Value="Hand"/>
-    <Style.Triggers>
-      <Trigger Property="IsSelected" Value="True">
-        <Setter Property="Foreground" Value="{DynamicResource BrushPrimary}"/>
-      </Trigger>
-      <Trigger Property="IsMouseOver" Value="True">
-        <Setter Property="Foreground" Value="{DynamicResource BrushTextPrimary}"/>
-      </Trigger>
-    </Style.Triggers>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="TabItem">
+          <Border x:Name="tabBorder"
+                  Background="Transparent"
+                  Padding="16,10"
+                  BorderThickness="0,0,0,2"
+                  BorderBrush="Transparent"
+                  Margin="0,0,2,0">
+            <ContentPresenter ContentSource="Header"
+                              HorizontalAlignment="Center"
+                              VerticalAlignment="Center"/>
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsSelected" Value="True">
+              <Setter TargetName="tabBorder" Property="BorderBrush" Value="{DynamicResource BrushPrimary}"/>
+              <Setter Property="Foreground" Value="{DynamicResource BrushTextPrimary}"/>
+              <Setter Property="FontWeight" Value="SemiBold"/>
+            </Trigger>
+            <MultiTrigger>
+              <MultiTrigger.Conditions>
+                <Condition Property="IsMouseOver" Value="True"/>
+                <Condition Property="IsSelected" Value="False"/>
+              </MultiTrigger.Conditions>
+              <Setter TargetName="tabBorder" Property="Background" Value="{DynamicResource BrushRowHover}"/>
+              <Setter Property="Foreground" Value="{DynamicResource BrushTextPrimary}"/>
+            </MultiTrigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
   </Style>
 
 </ResourceDictionary>
