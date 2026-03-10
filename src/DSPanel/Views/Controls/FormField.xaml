@@ -1,0 +1,49 @@
+<ContentControl x:Class="DSPanel.Views.Controls.FormField"
+               xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+               xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+               xmlns:converters="clr-namespace:DSPanel.Converters">
+  <ContentControl.Resources>
+    <converters:NonEmptyStringToVisibilityConverter x:Key="NonEmptyStringToVisibility"/>
+  </ContentControl.Resources>
+
+  <ContentControl.Template>
+    <ControlTemplate TargetType="ContentControl">
+      <StackPanel>
+        <!-- Label row -->
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+          <TextBlock Text="{Binding Label, RelativeSource={RelativeSource AncestorType=ContentControl}}"
+                     Style="{StaticResource Caption}"
+                     Foreground="{DynamicResource BrushTextPrimary}"
+                     FontWeight="SemiBold"/>
+          <!-- Red asterisk for required fields -->
+          <TextBlock Text=" *"
+                     Foreground="{DynamicResource BrushError}"
+                     FontWeight="Bold"
+                     FontSize="12">
+            <TextBlock.Style>
+              <Style TargetType="TextBlock">
+                <Setter Property="Visibility" Value="Collapsed"/>
+                <Style.Triggers>
+                  <DataTrigger Binding="{Binding IsRequired, RelativeSource={RelativeSource AncestorType=ContentControl}}" Value="True">
+                    <Setter Property="Visibility" Value="Visible"/>
+                  </DataTrigger>
+                </Style.Triggers>
+              </Style>
+            </TextBlock.Style>
+          </TextBlock>
+        </StackPanel>
+
+        <!-- Wrapped content (the actual input control) -->
+        <ContentPresenter/>
+
+        <!-- Error message -->
+        <TextBlock Text="{Binding ErrorMessage, RelativeSource={RelativeSource AncestorType=ContentControl}}"
+                   Foreground="{DynamicResource BrushError}"
+                   FontSize="11"
+                   Margin="0,4,0,0"
+                   TextWrapping="Wrap"
+                   Visibility="{Binding ErrorMessage, RelativeSource={RelativeSource AncestorType=ContentControl}, Converter={StaticResource NonEmptyStringToVisibility}}"/>
+      </StackPanel>
+    </ControlTemplate>
+  </ContentControl.Template>
+</ContentControl>

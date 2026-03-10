@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using Serilog;
 using Serilog.Events;
+using DSPanel.Services.Dialog;
 using DSPanel.Services.Directory;
 using DSPanel.Services.Navigation;
 using DSPanel.Services.Permissions;
@@ -27,6 +28,7 @@ public class BootstrapTests
             })
             .ConfigureServices((context, services) =>
             {
+                services.AddSingleton<IDialogService>(new Mock<IDialogService>().Object);
                 services.AddSingleton<INavigationService, NavigationService>();
                 services.AddSingleton<IPermissionService>(new Mock<IPermissionService>().Object);
                 services.AddSingleton<IThemeService>(new Mock<IThemeService>().Object);

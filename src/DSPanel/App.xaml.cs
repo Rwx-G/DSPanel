@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Serilog;
 using Serilog.Events;
+using DSPanel.Services.Dialog;
 using DSPanel.Services.Directory;
 using DSPanel.Services.Navigation;
 using DSPanel.Services.Permissions;
@@ -14,6 +15,12 @@ namespace DSPanel;
 public partial class App : Application
 {
     private IHost? _host;
+
+    /// <summary>
+    /// Provides access to the DI service provider for controls that need to
+    /// resolve services outside of constructor injection (e.g. UserControls).
+    /// </summary>
+    public static IServiceProvider? ServiceProvider { get; private set; }
 
     protected override async void OnStartup(StartupEventArgs e)
     {
@@ -43,6 +50,9 @@ public partial class App : Application
                 // Theme
                 services.AddSingleton<IThemeService, ThemeService>();
 
+                // Dialog
+                services.AddSingleton<IDialogService, DialogService>();
+
                 // Navigation
                 services.AddSingleton<INavigationService, NavigationService>();
 
@@ -55,6 +65,7 @@ public partial class App : Application
             .Build();
 
         await _host.StartAsync();
+        ServiceProvider = _host.Services;
 
         Log.Information("DSPanel starting");
 
