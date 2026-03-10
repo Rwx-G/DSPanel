@@ -2,8 +2,10 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DSPanel.Models;
+using DSPanel.Services.Dialog;
 using DSPanel.Services.Directory;
 using DSPanel.Services.Navigation;
+using DSPanel.Services.Notifications;
 using DSPanel.Services.Permissions;
 using DSPanel.Services.Theme;
 
@@ -15,17 +17,23 @@ public partial class MainViewModel : ObservableObject
     private readonly IPermissionService _permissionService;
     private readonly IThemeService _themeService;
     private readonly IDirectoryProvider _directoryProvider;
+    private readonly IDialogService _dialogService;
+    private readonly INotificationService _notificationService;
 
     public MainViewModel(
         INavigationService navigationService,
         IPermissionService permissionService,
         IThemeService themeService,
-        IDirectoryProvider directoryProvider)
+        IDirectoryProvider directoryProvider,
+        IDialogService dialogService,
+        INotificationService notificationService)
     {
         _navigationService = navigationService;
         _permissionService = permissionService;
         _themeService = themeService;
         _directoryProvider = directoryProvider;
+        _dialogService = dialogService;
+        _notificationService = notificationService;
 
         BuildSidebarItems();
     }

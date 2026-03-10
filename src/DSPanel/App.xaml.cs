@@ -7,6 +7,7 @@ using DSPanel.Services.Dialog;
 using DSPanel.Services.Directory;
 using DSPanel.Services.Health;
 using DSPanel.Services.Navigation;
+using DSPanel.Services.Notifications;
 using DSPanel.Services.Permissions;
 using DSPanel.Services.Theme;
 using DSPanel.ViewModels;
@@ -60,6 +61,9 @@ public partial class App : Application
 
                 // Health
                 services.AddSingleton<IHealthCheckService, HealthCheckService>();
+
+                // Notifications
+                services.AddSingleton<INotificationService, NotificationService>();
 
                 // ViewModels
                 services.AddTransient<MainViewModel>();

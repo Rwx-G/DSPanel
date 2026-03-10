@@ -17,12 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Application shell with collapsible sidebar, tab navigation, status bar (1.5)
 - Reusable UI controls: SearchBar, PermissionGate, StatusBadge, LoadingSpinner, EmptyState (1.6)
 - Data display components: CopyButton, PropertyGrid (1.7)
-- Form controls: FormField with label and validation wrapper (1.8)
-- Dialog service with confirmation, error, and warning modals (1.9)
+- Form controls: FormField with label and validation wrapper, PasswordInput with show/hide toggle (1.8)
+- Dialog service with styled ConfirmationDialog (severity icons, details expander), toast notification system with auto-dismiss (1.9)
 - User lookup with debounced search, property grid detail, group membership list (1.10)
 - Health check badge evaluating 9 account flags with severity levels (1.11)
 - Computer lookup with search, detail view, and ping/DNS commands (1.12)
-- 207 unit tests covering all services, ViewModels, and controls
+- 217 unit tests covering all services, ViewModels, and controls
 
 ## [0.0.2] - 2026-03-10
 

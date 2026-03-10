@@ -8,6 +8,7 @@ using Serilog.Events;
 using DSPanel.Services.Dialog;
 using DSPanel.Services.Directory;
 using DSPanel.Services.Navigation;
+using DSPanel.Services.Notifications;
 using DSPanel.Services.Permissions;
 using DSPanel.Services.Theme;
 using DSPanel.ViewModels;
@@ -33,6 +34,7 @@ public class BootstrapTests
                 services.AddSingleton<IPermissionService>(new Mock<IPermissionService>().Object);
                 services.AddSingleton<IThemeService>(new Mock<IThemeService>().Object);
                 services.AddSingleton<IDirectoryProvider>(new Mock<IDirectoryProvider>().Object);
+                services.AddSingleton<INotificationService>(new Mock<INotificationService>().Object);
                 services.AddTransient<MainViewModel>();
             })
             .Build();

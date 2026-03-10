@@ -1,47 +1,41 @@
 using System.Windows;
+using DSPanel.Views.Dialogs;
 
 namespace DSPanel.Services.Dialog;
 
 /// <summary>
-/// Simple dialog service implementation using WPF MessageBox.
-/// Will be replaced with custom styled dialogs in a future story.
+/// Dialog service using custom styled dialogs.
 /// </summary>
 public class DialogService : IDialogService
 {
     public Task<bool> ShowConfirmationAsync(string title, string message, string? details = null)
     {
-        var fullMessage = details is not null
-            ? $"{message}\n\n{details}"
-            : message;
-
-        var result = MessageBox.Show(
-            fullMessage,
-            title,
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Question);
-
-        return Task.FromResult(result == MessageBoxResult.Yes);
+        var dialog = CreateDialog(title, message, details, DialogSeverity.Question);
+        var result = dialog.ShowDialog() == true;
+        return Task.FromResult(result);
     }
 
     public Task ShowErrorAsync(string title, string message)
     {
-        MessageBox.Show(
-            message,
-            title,
-            MessageBoxButton.OK,
-            MessageBoxImage.Error);
-
+        var dialog = CreateDialog(title, message, null, DialogSeverity.Error);
+        dialog.ShowDialog();
         return Task.CompletedTask;
     }
 
     public Task ShowWarningAsync(string title, string message)
     {
-        MessageBox.Show(
-            message,
-            title,
-            MessageBoxButton.OK,
-            MessageBoxImage.Warning);
-
+        var dialog = CreateDialog(title, message, null, DialogSeverity.Warning);
+        dialog.ShowDialog();
         return Task.CompletedTask;
+    }
+
+    private static ConfirmationDialog CreateDialog(
+        string title, string message, string? details, DialogSeverity severity)
+    {
+        var dialog = new ConfirmationDialog(title, message, details, severity)
+        {
+            Owner = Application.Current.MainWindow
+        };
+        return dialog;
     }
 }

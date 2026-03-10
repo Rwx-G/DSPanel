@@ -2,48 +2,36 @@ schema: 1
 story: "1.9"
 story_title: "Dialogs, Notifications and Feedback System"
 gate: CONCERNS
-status_reason: "IDialogService interface and DialogService class exist and are registered in DI. However, no dialog window UIs (Views/Dialogs/ is empty), no toast notification system, no progress dialog, and no inline progress indicator are implemented."
+status_reason: "IDialogService with styled ConfirmationDialog (severity icons, details expander) and INotificationService with toast overlay (NotificationHost, auto-dismiss, 4 severity levels) are fully implemented with tests. Progress dialog and inline progress indicator are not yet implemented."
 reviewer: "Quinn (Test Architect)"
 updated: "2026-03-10T00:00:00Z"
 
 waiver: { active: false }
 top_issues:
   - id: "DLG-001"
-    severity: medium
-    finding: "No dialog window UIs implemented (AC2, AC3) - Views/Dialogs/ directory is empty"
-    suggested_action: "Implement ConfirmationDialog and DryRunPreviewDialog before features that need them"
-    suggested_owner: dev
-  - id: "DLG-002"
-    severity: medium
-    finding: "Toast notification system (AC4) not implemented"
-    suggested_action: "Implement NotificationHost and INotificationService"
-    suggested_owner: dev
-  - id: "DLG-003"
     severity: low
     finding: "Progress dialog (AC5) and inline progress (AC6) not implemented"
     suggested_action: "Implement before long-running operations are introduced"
     suggested_owner: dev
 
-quality_score: 40
+quality_score: 75
 expires: "2026-03-24T00:00:00Z"
 
 evidence:
-  tests_reviewed: 6
-  risks_identified: 3
+  tests_reviewed: 10
+  risks_identified: 1
   trace:
-    ac_covered: [1, 9]
-    ac_gaps: [2, 3, 4, 5, 6, 7, 8]
+    ac_covered: [1, 2, 3, 4, 7, 8, 9]
+    ac_gaps: [5, 6]
 
 nfr_validation:
   security: { status: PASS, notes: "" }
-  performance: { status: PASS, notes: "" }
-  reliability: { status: CONCERNS, notes: "No user feedback for errors beyond logging." }
-  maintainability: { status: PASS, notes: "IDialogService is mockable for testing." }
+  performance: { status: PASS, notes: "Toast auto-dismiss via DispatcherTimer." }
+  reliability: { status: PASS, notes: "Toast and dialog provide user feedback for all operations." }
+  maintainability: { status: PASS, notes: "IDialogService and INotificationService are mockable for testing." }
 
 recommendations:
-  immediate:
-    - action: "Implement ConfirmationDialog UI - needed before any destructive operation (password reset, unlock)"
-      refs: ["Views/Dialogs/"]
+  immediate: []
   future:
-    - action: "Implement toast notifications and progress dialogs"
-      refs: ["Views/Controls/", "Views/Dialogs/"]
+    - action: "Implement progress dialogs for long-running operations"
+      refs: ["Views/Dialogs/"]
