@@ -1,0 +1,55 @@
+<UserControl x:Class="DSPanel.Views.Controls.FilterBar"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+    <!-- Text filter -->
+    <TextBox x:Name="PART_FilterInput"
+             Width="200"
+             Padding="8,6"
+             TextChanged="OnFilterTextChanged"/>
+
+    <!-- Active filter chips -->
+    <ItemsControl x:Name="PART_Chips"
+                  Margin="8,0,0,0"
+                  VerticalAlignment="Center">
+      <ItemsControl.ItemsPanel>
+        <ItemsPanelTemplate>
+          <StackPanel Orientation="Horizontal"/>
+        </ItemsPanelTemplate>
+      </ItemsControl.ItemsPanel>
+      <ItemsControl.ItemTemplate>
+        <DataTemplate>
+          <Border Background="{DynamicResource BrushPrimaryLight}"
+                  CornerRadius="{StaticResource BorderRadiusSm}"
+                  Padding="8,4"
+                  Margin="0,0,4,0">
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Text="{Binding Label}"
+                         Style="{StaticResource Caption}"
+                         VerticalAlignment="Center"
+                         Margin="0,0,6,0"/>
+              <Button Style="{StaticResource GhostButton}"
+                      Padding="0" Width="16" Height="16"
+                      Click="OnRemoveChip"
+                      Tag="{Binding}"
+                      ToolTip="Remove filter">
+                <Path Data="{StaticResource IconClose}"
+                      Width="8" Height="8"
+                      Stretch="Uniform"
+                      Fill="{DynamicResource BrushTextSecondary}"/>
+              </Button>
+            </StackPanel>
+          </Border>
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+
+    <!-- Clear all -->
+    <Button x:Name="PART_ClearAll"
+            Style="{StaticResource GhostButton}"
+            Content="Clear all"
+            Margin="8,0,0,0"
+            Visibility="Collapsed"
+            Click="OnClearAll"/>
+  </StackPanel>
+</UserControl>

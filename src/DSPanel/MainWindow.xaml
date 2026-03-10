@@ -204,9 +204,9 @@
     <!-- ==================== CONTENT AREA ==================== -->
     <Grid Grid.Column="1" Grid.Row="0">
       <!-- Default status dashboard when no tabs are open -->
-      <Border Padding="32">
-        <Border.Style>
-          <Style TargetType="Border">
+      <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <ScrollViewer.Style>
+          <Style TargetType="ScrollViewer">
             <Setter Property="Visibility" Value="Collapsed"/>
             <Style.Triggers>
               <DataTrigger Binding="{Binding Tabs.Count}" Value="0">
@@ -214,7 +214,8 @@
               </DataTrigger>
             </Style.Triggers>
           </Style>
-        </Border.Style>
+        </ScrollViewer.Style>
+        <Border Padding="32">
         <StackPanel VerticalAlignment="Top" MaxWidth="600" HorizontalAlignment="Left">
           <TextBlock Text="Status" Style="{StaticResource Heading1}" Margin="0,0,0,24"/>
 
@@ -297,8 +298,10 @@
               </Grid>
             </StackPanel>
           </Border>
+
         </StackPanel>
       </Border>
+      </ScrollViewer>
 
       <!-- Tab control -->
       <TabControl x:Name="TabHost"

@@ -80,4 +80,13 @@
   <SolidColorBrush x:Key="BrushRowHover" Color="{StaticResource ColorRowHover}"/>
   <SolidColorBrush x:Key="BrushRowSelected" Color="{StaticResource ColorRowSelected}"/>
 
+  <!-- Diff -->
+  <SolidColorBrush x:Key="BrushDiffAdded" Color="#0D2818"/>
+  <SolidColorBrush x:Key="BrushDiffRemoved" Color="#2D1215"/>
+  <SolidColorBrush x:Key="BrushDiffAddedText" Color="#86EFAC"/>
+  <SolidColorBrush x:Key="BrushDiffRemovedText" Color="#FCA5A5"/>
+
+  <!-- TreeView parent node -->
+  <SolidColorBrush x:Key="BrushTreeParent" Color="#1E293B"/>
+
 </ResourceDictionary>

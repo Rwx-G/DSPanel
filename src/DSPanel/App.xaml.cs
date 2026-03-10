@@ -5,6 +5,7 @@ using Serilog;
 using Serilog.Events;
 using DSPanel.Services.Dialog;
 using DSPanel.Services.Directory;
+using DSPanel.Services.Export;
 using DSPanel.Services.Health;
 using DSPanel.Services.Navigation;
 using DSPanel.Services.Notifications;
@@ -56,6 +57,9 @@ public partial class App : Application
 
                 // Theme
                 services.AddSingleton<IThemeService, ThemeService>();
+
+                // Export
+                services.AddSingleton<ICsvExportService, CsvExportService>();
 
                 // Dialog
                 services.AddSingleton<IDialogService, DialogService>();
