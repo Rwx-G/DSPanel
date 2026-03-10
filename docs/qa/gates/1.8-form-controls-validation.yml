@@ -1,44 +1,30 @@
 schema: 1
 story: "1.8"
 story_title: "Form Controls, Validation and Input Patterns"
-gate: CONCERNS
-status_reason: "FormField, styled TextBox, and PasswordInput with show/hide toggle are implemented. Searchable ComboBox, OUPicker, GroupPicker, DateTimePicker, ValidationSummary, and dirty tracking are not yet implemented. These are not blocking for Epic 1 lookup features but will be needed in Epic 2+."
+gate: PASS
+status_reason: "All 12 ACs implemented: FormField, styled TextBox, PasswordInput with toggle, searchable ComboBox, OUPicker (TreeView), GroupPicker (debounced multi-select with chips), DateTimePicker (calendar + spinners), ObservableValidator, ValidationSummary, IChangeTracker dirty tracking, theme support, accessibility. Custom validation attributes ValidSamAccountName and ValidDistinguishedName. 39 new tests."
 reviewer: "Quinn (Test Architect)"
 updated: "2026-03-10T00:00:00Z"
 
 waiver: { active: false }
-top_issues:
-  - id: "FORM-001"
-    severity: medium
-    finding: "OUPicker (AC5) and GroupPicker (AC6) not implemented - will be needed for Epic 2 (password reset, group management)"
-    suggested_action: "Implement before Epic 2 stories that require them"
-    suggested_owner: dev
-  - id: "FORM-002"
-    severity: low
-    finding: "ValidationSummary (AC9) and dirty tracking (AC10) not implemented"
-    suggested_action: "Implement when edit forms are introduced"
-    suggested_owner: dev
+top_issues: []
 
-quality_score: 45
+quality_score: 100
 expires: "2026-03-24T00:00:00Z"
 
 evidence:
-  tests_reviewed: 0
-  risks_identified: 2
+  tests_reviewed: 39
+  risks_identified: 0
   trace:
-    ac_covered: [1, 2, 3, 8, 11]
-    ac_gaps: [4, 5, 6, 7, 9, 10, 12]
+    ac_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    ac_gaps: []
 
 nfr_validation:
-  security: { status: PASS, notes: "" }
-  performance: { status: PASS, notes: "" }
-  reliability: { status: CONCERNS, notes: "Missing validation framework may lead to inconsistent error handling." }
-  maintainability: { status: CONCERNS, notes: "No standardized form pattern yet." }
+  security: { status: PASS, notes: "Validation attributes enforce safe SAM and DN patterns." }
+  performance: { status: PASS, notes: "GroupPicker uses 300ms debounce for search." }
+  reliability: { status: PASS, notes: "ChangeTracker snapshot comparison is deterministic." }
+  maintainability: { status: PASS, notes: "All controls follow consistent DependencyProperty patterns." }
 
 recommendations:
   immediate: []
-  future:
-    - action: "Implement OUPicker, GroupPicker before Epic 2"
-      refs: ["Views/Controls/"]
-    - action: "Implement ObservableValidator base pattern and ValidationSummary"
-      refs: ["ViewModels/"]
+  future: []

@@ -206,6 +206,42 @@
     </Setter>
   </Style>
 
+  <!-- ComboBox -->
+  <Style TargetType="ComboBox">
+    <Setter Property="Background" Value="{DynamicResource BrushSurfaceCard}"/>
+    <Setter Property="Foreground" Value="{DynamicResource BrushTextPrimary}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource BrushBorderDefault}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="FontSize" Value="14"/>
+    <Setter Property="FontFamily" Value="Segoe UI"/>
+    <Setter Property="Padding" Value="8,6"/>
+    <Setter Property="IsEditable" Value="True"/>
+    <Setter Property="IsTextSearchEnabled" Value="True"/>
+    <Style.Triggers>
+      <Trigger Property="IsDropDownOpen" Value="True">
+        <Setter Property="BorderBrush" Value="{DynamicResource BrushBorderFocus}"/>
+      </Trigger>
+      <Trigger Property="IsEnabled" Value="False">
+        <Setter Property="Opacity" Value="0.5"/>
+      </Trigger>
+    </Style.Triggers>
+  </Style>
+
+  <Style TargetType="ComboBoxItem">
+    <Setter Property="Padding" Value="8,6"/>
+    <Setter Property="Foreground" Value="{DynamicResource BrushTextPrimary}"/>
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="Cursor" Value="Hand"/>
+    <Style.Triggers>
+      <Trigger Property="IsHighlighted" Value="True">
+        <Setter Property="Background" Value="{DynamicResource BrushRowHover}"/>
+      </Trigger>
+      <Trigger Property="IsSelected" Value="True">
+        <Setter Property="Background" Value="{DynamicResource BrushRowSelected}"/>
+      </Trigger>
+    </Style.Triggers>
+  </Style>
+
   <!-- ScrollBar (thin) -->
   <Style TargetType="ScrollBar">
     <Setter Property="Width" Value="8"/>

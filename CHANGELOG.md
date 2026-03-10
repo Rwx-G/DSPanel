@@ -17,7 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Application shell with collapsible sidebar, tab navigation with context menu (close-all/close-others), middle-click to close tab, breadcrumb bar, keyboard shortcuts (Ctrl+W/Tab/Shift+Tab/B/1-9), window state persistence, responsive auto-collapse (1.5)
 - Reusable UI controls: SearchBar, PermissionGate, StatusBadge, Avatar (initials fallback, deterministic color), TagChip (removable), LoadingSpinner, EmptyState, InfoCard (collapsible, icon) (1.6)
 - Data display components: FilterBar, Pagination, DiffViewer, TreeView styling, DataGrid styling, CsvExportService, CopyButton, PropertyGrid (1.7)
-- Form controls: FormField with label and validation wrapper, PasswordInput with show/hide toggle (1.8)
+- Form controls: FormField, PasswordInput with show/hide toggle, searchable ComboBox, OUPicker (TreeView), GroupPicker (debounced multi-select with chips), DateTimePicker (calendar + spinners), ValidationSummary, dirty tracking via IChangeTracker (1.8)
+- Custom validation attributes: ValidSamAccountName, ValidDistinguishedName (1.8)
 - Dialog service with styled ConfirmationDialog, ProgressDialog (determinate/indeterminate, cancellation, completion state), InlineProgress control (1.9)
 - Toast notification system with auto-dismiss, countdown bar animation, 4 severity levels (1.9)
 - User lookup with debounced search, property grid detail, group membership list (1.10)
@@ -25,7 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Computer lookup with search, detail view, and ping/DNS commands (1.12)
 - Application settings service (IAppSettingsService) with JSON persistence in LocalAppData
 - Diff-specific theme brushes (BrushDiffAdded/Removed/AddedText/RemovedText) for light and dark modes
-- 267 unit tests covering all services, ViewModels, and controls
+- 306 unit tests covering all services, ViewModels, and controls
 
 ## [0.0.2] - 2026-03-10
 

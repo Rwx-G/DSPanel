@@ -234,6 +234,74 @@ public sealed class LdapDirectoryProvider : IDirectoryProvider, IDisposable
         });
     }
 
+    public Task<IReadOnlyList<Models.OrganizationalUnit>> GetOUTreeAsync()
+    {
+        return Task.Run<IReadOnlyList<Models.OrganizationalUnit>>(() =>
+        {
+            if (!IsConnected || BaseDn is null)
+                return [];
+
+            try
+            {
+                var request = new SearchRequest(
+                    BaseDn,
+                    "(objectClass=organizationalUnit)",
+                    SearchScope.Subtree,
+                    "distinguishedName", "name");
+
+                SearchResponse response;
+                lock (_lock)
+                {
+                    if (_connection is null) return [];
+                    response = (SearchResponse)_connection.SendRequest(request);
+                }
+
+                var allOUs = new Dictionary<string, Models.OrganizationalUnit>();
+                foreach (SearchResultEntry entry in response.Entries)
+                {
+                    var dn = entry.DistinguishedName;
+                    var name = entry.Attributes.Contains("name")
+                        ? entry.Attributes["name"][0]?.ToString() ?? dn
+                        : dn;
+
+                    allOUs[dn] = new Models.OrganizationalUnit
+                    {
+                        Name = name,
+                        DistinguishedName = dn
+                    };
+                }
+
+                // Build tree by matching parent DNs
+                var roots = new List<Models.OrganizationalUnit>();
+                foreach (var ou in allOUs.Values)
+                {
+                    var parentDn = GetParentDn(ou.DistinguishedName);
+                    if (parentDn is not null && allOUs.TryGetValue(parentDn, out var parent))
+                    {
+                        parent.Children.Add(ou);
+                    }
+                    else
+                    {
+                        roots.Add(ou);
+                    }
+                }
+
+                return roots;
+            }
+            catch (LdapException ex)
+            {
+                _logger.LogError(ex, "Failed to retrieve OU tree");
+                return [];
+            }
+        });
+    }
+
+    private static string? GetParentDn(string dn)
+    {
+        var commaIndex = dn.IndexOf(',');
+        return commaIndex >= 0 ? dn[(commaIndex + 1)..] : null;
+    }
+
     private Task<IReadOnlyList<DirectoryEntry>> SearchAsync(
         string ldapFilter, int maxResults, params string[] attributes)
     {

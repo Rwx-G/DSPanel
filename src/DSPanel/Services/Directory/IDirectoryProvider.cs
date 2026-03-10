@@ -26,4 +26,6 @@ public interface IDirectoryProvider
         string groupDn, int maxResults = 200);
 
     Task<IReadOnlyList<string>> GetUserGroupsAsync(string userDn);
+
+    Task<IReadOnlyList<Models.OrganizationalUnit>> GetOUTreeAsync();
 }
