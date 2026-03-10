@@ -2,8 +2,13 @@ using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Moq;
 using Serilog;
 using Serilog.Events;
+using DSPanel.Services.Directory;
+using DSPanel.Services.Navigation;
+using DSPanel.Services.Permissions;
+using DSPanel.Services.Theme;
 using DSPanel.ViewModels;
 
 namespace DSPanel.Tests;
@@ -22,6 +27,10 @@ public class BootstrapTests
             })
             .ConfigureServices((context, services) =>
             {
+                services.AddSingleton<INavigationService, NavigationService>();
+                services.AddSingleton<IPermissionService>(new Mock<IPermissionService>().Object);
+                services.AddSingleton<IThemeService>(new Mock<IThemeService>().Object);
+                services.AddSingleton<IDirectoryProvider>(new Mock<IDirectoryProvider>().Object);
                 services.AddTransient<MainViewModel>();
             })
             .Build();

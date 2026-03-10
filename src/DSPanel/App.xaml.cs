@@ -4,6 +4,7 @@ using Microsoft.Extensions.Hosting;
 using Serilog;
 using Serilog.Events;
 using DSPanel.Services.Directory;
+using DSPanel.Services.Navigation;
 using DSPanel.Services.Permissions;
 using DSPanel.Services.Theme;
 using DSPanel.ViewModels;
@@ -41,6 +42,9 @@ public partial class App : Application
 
                 // Theme
                 services.AddSingleton<IThemeService, ThemeService>();
+
+                // Navigation
+                services.AddSingleton<INavigationService, NavigationService>();
 
                 // ViewModels
                 services.AddTransient<MainViewModel>();
