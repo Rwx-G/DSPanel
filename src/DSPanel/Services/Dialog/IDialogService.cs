@@ -1,3 +1,5 @@
+using DSPanel.Models;
+
 namespace DSPanel.Services.Dialog;
 
 /// <summary>
@@ -20,4 +22,11 @@ public interface IDialogService
     /// Shows a warning dialog with a message.
     /// </summary>
     Task ShowWarningAsync(string title, string message);
+
+    /// <summary>
+    /// Shows a progress dialog that tracks a long-running operation.
+    /// Supports determinate/indeterminate modes and cancellation.
+    /// Returns true if completed successfully, false if cancelled.
+    /// </summary>
+    Task<bool> ShowProgressAsync(string title, Func<IProgress<ProgressInfo>, CancellationToken, Task> work);
 }

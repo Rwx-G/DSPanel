@@ -97,6 +97,10 @@ public partial class App : Application
             return view;
         });
 
+        // Restore persisted theme
+        var themeService = _host.Services.GetRequiredService<IThemeService>();
+        themeService.ApplyTheme(themeService.CurrentTheme);
+
         Log.Information("DSPanel starting");
 
         // Connect to AD and detect permissions

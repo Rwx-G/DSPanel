@@ -19,31 +19,38 @@
     </ItemsControl.ItemsPanel>
     <ItemsControl.ItemTemplate>
       <DataTemplate>
-        <Border Background="{DynamicResource BrushSurfaceElevated}"
-                BorderBrush="{Binding Severity, Converter={StaticResource SeverityToBrush}}"
-                BorderThickness="0,0,0,3"
-                CornerRadius="6"
-                Padding="16,12"
-                Margin="0,8,0,0"
-                Width="360"
-                IsHitTestVisible="True"
-                >
-          <Border.Effect>
-            <DropShadowEffect BlurRadius="16" ShadowDepth="2" Opacity="0.25" Direction="270"/>
-          </Border.Effect>
-          <StackPanel Orientation="Horizontal">
-            <Path Data="{Binding Severity, Converter={StaticResource SeverityToIcon}}"
-                  Fill="{Binding Severity, Converter={StaticResource SeverityToBrush}}"
-                  Width="18" Height="18"
-                  Stretch="Uniform"
-                  Margin="0,0,10,0"
-                  VerticalAlignment="Center"/>
-            <TextBlock Text="{Binding Message}"
-                       Style="{StaticResource Body}"
-                       TextWrapping="Wrap"
-                       VerticalAlignment="Center"/>
-          </StackPanel>
-        </Border>
+        <Grid Width="360" Margin="0,8,0,0" IsHitTestVisible="True">
+          <!-- Main toast body -->
+          <Border Background="{DynamicResource BrushSurfaceElevated}"
+                  CornerRadius="6"
+                  Padding="16,12,16,15">
+            <Border.Effect>
+              <DropShadowEffect BlurRadius="16" ShadowDepth="2" Opacity="0.25" Direction="270"/>
+            </Border.Effect>
+            <StackPanel Orientation="Horizontal">
+              <Path Data="{Binding Severity, Converter={StaticResource SeverityToIcon}}"
+                    Fill="{Binding Severity, Converter={StaticResource SeverityToBrush}}"
+                    Width="18" Height="18"
+                    Stretch="Uniform"
+                    Margin="0,0,10,0"
+                    VerticalAlignment="Center"/>
+              <TextBlock Text="{Binding Message}"
+                         Style="{StaticResource Body}"
+                         TextWrapping="Wrap"
+                         VerticalAlignment="Center"/>
+            </StackPanel>
+          </Border>
+
+          <!-- Countdown bar at bottom -->
+          <Border x:Name="CountdownBar"
+                  Height="3"
+                  VerticalAlignment="Bottom"
+                  HorizontalAlignment="Left"
+                  CornerRadius="0,0,6,6"
+                  Background="{Binding Severity, Converter={StaticResource SeverityToBrush}}"
+                  Width="360"
+                  Loaded="CountdownBar_Loaded"/>
+        </Grid>
       </DataTemplate>
     </ItemsControl.ItemTemplate>
   </ItemsControl>

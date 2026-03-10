@@ -1,4 +1,5 @@
 using System.Windows;
+using DSPanel.Models;
 using DSPanel.Views.Dialogs;
 
 namespace DSPanel.Services.Dialog;
@@ -27,6 +28,17 @@ public class DialogService : IDialogService
         var dialog = CreateDialog(title, message, null, DialogSeverity.Warning);
         dialog.ShowDialog();
         return Task.CompletedTask;
+    }
+
+    public async Task<bool> ShowProgressAsync(
+        string title, Func<IProgress<ProgressInfo>, CancellationToken, Task> work)
+    {
+        var dialog = new ProgressDialog(title)
+        {
+            Owner = Application.Current.MainWindow
+        };
+        await dialog.RunAsync(work);
+        return dialog.WasSuccessful;
     }
 
     private static ConfirmationDialog CreateDialog(

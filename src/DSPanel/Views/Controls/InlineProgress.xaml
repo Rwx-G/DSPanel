@@ -1,0 +1,17 @@
+<UserControl x:Class="DSPanel.Views.Controls.InlineProgress"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+    <ProgressBar x:Name="PART_ProgressBar"
+                 Width="120" Height="4"
+                 IsIndeterminate="True"
+                 Foreground="{DynamicResource BrushPrimary}"
+                 Background="{DynamicResource BrushSurfaceBackground}"
+                 VerticalAlignment="Center"/>
+    <TextBlock x:Name="PART_StatusText"
+               Style="{StaticResource Caption}"
+               Foreground="{DynamicResource BrushTextSecondary}"
+               Margin="8,0,0,0"
+               VerticalAlignment="Center"/>
+  </StackPanel>
+</UserControl>
