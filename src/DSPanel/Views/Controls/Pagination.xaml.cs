@@ -1,8 +1,11 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Windows;
 using System.Windows.Controls;
+using DSPanel.Helpers;
 
 namespace DSPanel.Views.Controls;
 
+[ExcludeFromCodeCoverage]
 public partial class Pagination : UserControl
 {
     public static readonly DependencyProperty CurrentPageProperty =
@@ -39,7 +42,7 @@ public partial class Pagination : UserControl
         set => SetValue(TotalItemsProperty, value);
     }
 
-    public int TotalPages => TotalItems <= 0 ? 1 : (int)Math.Ceiling((double)TotalItems / PageSize);
+    public int TotalPages => PaginationHelper.CalculateTotalPages(TotalItems, PageSize);
 
     public event RoutedEventHandler PageChanged
     {
@@ -61,14 +64,9 @@ public partial class Pagination : UserControl
     private void UpdateDisplay()
     {
         var total = TotalPages;
-        var page = Math.Clamp(CurrentPage, 1, total);
-        var start = Math.Min((page - 1) * PageSize + 1, TotalItems);
-        var end = Math.Min(page * PageSize, TotalItems);
+        var page = PaginationHelper.ClampPage(CurrentPage, total);
 
-        PART_InfoLabel.Text = TotalItems == 0
-            ? "No items"
-            : $"Showing {start}-{end} of {TotalItems}";
-
+        PART_InfoLabel.Text = PaginationHelper.FormatDisplayRange(CurrentPage, PageSize, TotalItems);
         PART_PageLabel.Text = $"{page} / {total}";
 
         PART_First.IsEnabled = page > 1;

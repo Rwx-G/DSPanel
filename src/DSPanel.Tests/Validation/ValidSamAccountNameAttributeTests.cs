@@ -49,4 +49,10 @@ public class ValidSamAccountNameAttributeTests
     {
         Validate(value).Should().NotBe(ValidationResult.Success);
     }
+
+    [Fact]
+    public void NonStringValue_ReturnsError()
+    {
+        Validate(42).Should().NotBe(ValidationResult.Success);
+    }
 }

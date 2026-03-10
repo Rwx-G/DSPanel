@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -9,6 +10,7 @@ namespace DSPanel.Views.Controls;
 /// Displays a colored dot/pill indicating the health status of an account.
 /// Shows a tooltip listing all active health flags.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public partial class HealthBadge : UserControl
 {
     public static readonly DependencyProperty HealthStatusProperty =

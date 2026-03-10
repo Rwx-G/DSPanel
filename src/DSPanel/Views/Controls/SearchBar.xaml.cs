@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -8,6 +9,7 @@ namespace DSPanel.Views.Controls;
 /// <summary>
 /// Search bar with debounced search command execution.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public partial class SearchBar : UserControl
 {
     private readonly DispatcherTimer _debounceTimer;

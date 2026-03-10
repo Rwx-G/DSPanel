@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Windows;
 using System.Windows.Controls;
 using DSPanel.Services.Permissions;
@@ -9,6 +10,7 @@ namespace DSPanel.Views.Controls;
 /// ContentControl wrapper that shows or collapses its content
 /// based on the current user's permission level.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public partial class PermissionGate : ContentControl
 {
     public static readonly DependencyProperty RequiredLevelProperty =

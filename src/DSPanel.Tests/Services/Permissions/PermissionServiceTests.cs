@@ -189,4 +189,103 @@ public class PermissionServiceTests
         service.UserGroups.Should().Contain("DSPanel-HelpDesk");
         service.UserGroups.Should().Contain("SomeOtherGroup");
     }
+
+    [Fact]
+    public async Task DetectPermissionsAsync_WhenGetUserByIdentityThrows_DefaultsToReadOnly()
+    {
+        _directoryProvider.Setup(p => p.IsConnected).Returns(true);
+        _directoryProvider
+            .Setup(p => p.GetUserByIdentityAsync(It.IsAny<string>()))
+            .ThrowsAsync(new InvalidOperationException("LDAP connection failed"));
+        var service = CreateService();
+
+        await service.DetectPermissionsAsync();
+
+        service.CurrentLevel.Should().Be(PermissionLevel.ReadOnly);
+    }
+
+    [Fact]
+    public async Task DetectPermissionsAsync_WhenGetUserGroupsThrows_DefaultsToReadOnly()
+    {
+        _directoryProvider.Setup(p => p.IsConnected).Returns(true);
+        _directoryProvider
+            .Setup(p => p.GetUserByIdentityAsync(It.IsAny<string>()))
+            .ReturnsAsync(new DirectoryEntry
+            {
+                DistinguishedName = "CN=TestUser,DC=test,DC=com"
+            });
+        _directoryProvider
+            .Setup(p => p.GetUserGroupsAsync(It.IsAny<string>()))
+            .ThrowsAsync(new InvalidOperationException("Group query failed"));
+        var service = CreateService();
+
+        await service.DetectPermissionsAsync();
+
+        service.CurrentLevel.Should().Be(PermissionLevel.ReadOnly);
+    }
+
+    [Fact]
+    public void BuildMappings_WithInvalidPermissionLevelValue_IgnoresMapping()
+    {
+        var customMappings = new Dictionary<string, string>
+        {
+            ["ValidGroup"] = "HelpDesk",
+            ["BogusGroup"] = "Bogus"
+        };
+        SetupUserWithGroups("BogusGroup");
+        var service = CreateService(customMappings);
+
+        // The service should be created without error, but BogusGroup mapping is ignored
+        service.CurrentLevel.Should().Be(PermissionLevel.ReadOnly);
+    }
+
+    [Fact]
+    public async Task ExtractCn_WithDnWithoutComma_ReturnsFullCnValue()
+    {
+        _directoryProvider.Setup(p => p.IsConnected).Returns(true);
+        _directoryProvider
+            .Setup(p => p.GetUserByIdentityAsync(It.IsAny<string>()))
+            .ReturnsAsync(new DirectoryEntry
+            {
+                DistinguishedName = "CN=TestUser,DC=test,DC=com"
+            });
+        // Return a DN that has no comma - "CN=OnlyName"
+        _directoryProvider
+            .Setup(p => p.GetUserGroupsAsync(It.IsAny<string>()))
+            .ReturnsAsync(new List<string> { "CN=OnlyName" });
+        var service = CreateService();
+
+        await service.DetectPermissionsAsync();
+
+        service.UserGroups.Should().Contain("OnlyName");
+    }
+
+    [Fact]
+    public async Task ExtractCn_WithDnNotStartingWithCn_ReturnsNullAndFiltersGroup()
+    {
+        _directoryProvider.Setup(p => p.IsConnected).Returns(true);
+        _directoryProvider
+            .Setup(p => p.GetUserByIdentityAsync(It.IsAny<string>()))
+            .ReturnsAsync(new DirectoryEntry
+            {
+                DistinguishedName = "CN=TestUser,DC=test,DC=com"
+            });
+        // Return a DN that does not start with "CN="
+        _directoryProvider
+            .Setup(p => p.GetUserGroupsAsync(It.IsAny<string>()))
+            .ReturnsAsync(new List<string> { "OU=SomeGroup,DC=test,DC=com" });
+        var service = CreateService();
+
+        await service.DetectPermissionsAsync();
+
+        service.UserGroups.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void UserGroups_BeforeDetection_IsEmpty()
+    {
+        var service = CreateService();
+
+        service.UserGroups.Should().BeEmpty();
+    }
 }

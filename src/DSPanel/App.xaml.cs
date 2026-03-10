@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Windows;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -8,6 +9,7 @@ using DSPanel.Services.Directory;
 using DSPanel.Services.Export;
 using DSPanel.Services.Health;
 using DSPanel.Services.Navigation;
+using DSPanel.Services.Network;
 using DSPanel.Services.Notifications;
 using DSPanel.Services.Permissions;
 using DSPanel.Services.Settings;
@@ -17,6 +19,7 @@ using DSPanel.Views.Pages;
 
 namespace DSPanel;
 
+[ExcludeFromCodeCoverage]
 public partial class App : Application
 {
     private IHost? _host;
@@ -62,16 +65,23 @@ public partial class App : Application
                 services.AddSingleton<ICsvExportService, CsvExportService>();
 
                 // Dialog
+                services.AddSingleton<IFileDialogService, FileDialogService>();
                 services.AddSingleton<IDialogService, DialogService>();
 
                 // Navigation
                 services.AddSingleton<INavigationService, NavigationService>();
 
+                // Network
+                services.AddSingleton<INetworkService, NetworkService>();
+
                 // Health
                 services.AddSingleton<IHealthCheckService, HealthCheckService>();
 
                 // Notifications
-                services.AddSingleton<INotificationService, NotificationService>();
+                services.AddSingleton<INotificationService>(sp =>
+                    new NotificationService(
+                        sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<NotificationService>>(),
+                        action => System.Windows.Threading.Dispatcher.CurrentDispatcher.Invoke(action)));
 
                 // ViewModels
                 services.AddTransient<MainViewModel>();

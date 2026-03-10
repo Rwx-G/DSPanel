@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.DirectoryServices.Protocols;
 using DSPanel.Helpers;
 using DSPanel.Models;
@@ -5,6 +6,7 @@ using Microsoft.Extensions.Logging;
 
 namespace DSPanel.Services.Directory;
 
+[ExcludeFromCodeCoverage]
 public sealed class LdapDirectoryProvider : IDirectoryProvider, IDisposable
 {
     private readonly ILdapConnectionFactory _connectionFactory;

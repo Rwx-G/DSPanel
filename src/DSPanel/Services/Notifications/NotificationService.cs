@@ -1,5 +1,4 @@
 using System.Collections.ObjectModel;
-using System.Windows.Threading;
 using Microsoft.Extensions.Logging;
 
 namespace DSPanel.Services.Notifications;
@@ -7,14 +6,19 @@ namespace DSPanel.Services.Notifications;
 public class NotificationService : INotificationService
 {
     private readonly ILogger<NotificationService> _logger;
-    private readonly Dispatcher _dispatcher;
+    private readonly Action<Action> _dispatcher;
+    private readonly Func<int, CancellationToken, Task> _delayFunc;
 
     public ObservableCollection<NotificationItem> Notifications { get; } = [];
 
-    public NotificationService(ILogger<NotificationService> logger)
+    public NotificationService(
+        ILogger<NotificationService> logger,
+        Action<Action>? dispatcher = null,
+        Func<int, CancellationToken, Task>? delayFunc = null)
     {
         _logger = logger;
-        _dispatcher = Dispatcher.CurrentDispatcher;
+        _dispatcher = dispatcher ?? (action => action());
+        _delayFunc = delayFunc ?? Task.Delay;
     }
 
     public void Show(string message, NotificationSeverity severity = NotificationSeverity.Info, int durationMs = 5000)
@@ -26,26 +30,30 @@ public class NotificationService : INotificationService
             DurationMs = durationMs
         };
 
-        _dispatcher.Invoke(() => Notifications.Add(item));
+        _dispatcher(() => Notifications.Add(item));
         _logger.LogDebug("Toast shown: [{Severity}] {Message}", severity, message);
 
         if (durationMs > 0)
         {
-            var timer = new DispatcherTimer(DispatcherPriority.Normal, _dispatcher)
-            {
-                Interval = TimeSpan.FromMilliseconds(durationMs)
-            };
-            timer.Tick += (_, _) =>
-            {
-                timer.Stop();
-                Dismiss(item);
-            };
-            timer.Start();
+            _ = AutoDismissAsync(item, durationMs);
         }
     }
 
     public void Dismiss(NotificationItem item)
     {
-        _dispatcher.Invoke(() => Notifications.Remove(item));
+        _dispatcher(() => Notifications.Remove(item));
+    }
+
+    private async Task AutoDismissAsync(NotificationItem item, int durationMs)
+    {
+        try
+        {
+            await _delayFunc(durationMs, CancellationToken.None);
+            Dismiss(item);
+        }
+        catch (TaskCanceledException)
+        {
+            // Ignore cancellation during shutdown
+        }
     }
 }

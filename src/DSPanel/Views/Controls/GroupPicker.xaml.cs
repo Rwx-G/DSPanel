@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics.CodeAnalysis;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
@@ -9,6 +10,7 @@ namespace DSPanel.Views.Controls;
 /// <summary>
 /// Searchable multi-select group picker with chip display for selected groups.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public partial class GroupPicker : UserControl
 {
     private readonly DispatcherTimer _debounceTimer;
@@ -142,6 +144,7 @@ public partial class GroupPicker : UserControl
 /// <summary>
 /// Item model for group picker search results with selection state.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public partial class GroupPickerItem : ObservableObject
 {
     [ObservableProperty]

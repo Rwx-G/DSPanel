@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
@@ -7,6 +8,7 @@ namespace DSPanel.Views.Controls;
 /// <summary>
 /// Button that copies text to the clipboard and shows a brief checkmark confirmation.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public partial class CopyButton : UserControl
 {
     private readonly DispatcherTimer _feedbackTimer;

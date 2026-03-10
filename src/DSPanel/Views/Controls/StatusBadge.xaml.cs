@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -19,6 +20,7 @@ public enum BadgeSeverity
 /// <summary>
 /// Colored pill/chip that displays a text label with a severity-based color.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public partial class StatusBadge : UserControl
 {
     public static readonly DependencyProperty TextProperty =

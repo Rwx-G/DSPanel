@@ -1,8 +1,10 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Windows;
 using System.Windows.Controls;
 
 namespace DSPanel.Views.Controls;
 
+[ExcludeFromCodeCoverage]
 public partial class InlineProgress : UserControl
 {
     public static readonly DependencyProperty IsActiveProperty =

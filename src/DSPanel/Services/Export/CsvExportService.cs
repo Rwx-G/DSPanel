@@ -1,41 +1,38 @@
 using System.IO;
 using System.Text;
+using DSPanel.Services.Dialog;
 using Microsoft.Extensions.Logging;
-using Microsoft.Win32;
 
 namespace DSPanel.Services.Export;
 
 public sealed class CsvExportService : ICsvExportService
 {
     private readonly ILogger<CsvExportService> _logger;
+    private readonly IFileDialogService _fileDialog;
 
-    public CsvExportService(ILogger<CsvExportService> logger)
+    public CsvExportService(ILogger<CsvExportService> logger, IFileDialogService fileDialog)
     {
         _logger = logger;
+        _fileDialog = fileDialog;
     }
 
     public bool ExportToCsv(IReadOnlyList<string> headers, IReadOnlyList<IReadOnlyList<string>> rows)
     {
-        var dialog = new SaveFileDialog
-        {
-            Filter = "CSV files (*.csv)|*.csv",
-            DefaultExt = ".csv",
-            FileName = "export.csv"
-        };
+        var path = _fileDialog.ShowSaveFileDialog("CSV files (*.csv)|*.csv", ".csv", "export.csv");
 
-        if (dialog.ShowDialog() != true)
+        if (path is null)
             return false;
 
         try
         {
             var csv = FormatCsv(headers, rows);
-            File.WriteAllText(dialog.FileName, csv, Encoding.UTF8);
-            _logger.LogInformation("CSV exported to {Path} ({Rows} rows)", dialog.FileName, rows.Count);
+            File.WriteAllText(path, csv, Encoding.UTF8);
+            _logger.LogInformation("CSV exported to {Path} ({Rows} rows)", path, rows.Count);
             return true;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to export CSV to {Path}", dialog.FileName);
+            _logger.LogError(ex, "Failed to export CSV to {Path}", path);
             return false;
         }
     }

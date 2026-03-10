@@ -3,6 +3,9 @@ bin/
 obj/
 *.user
 *.suo
+
+# Local notes (not tracked)
+quality-scoring.md
 *.userosscache
 *.sln.docstates
 

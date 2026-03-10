@@ -1,10 +1,9 @@
 using System.Collections.ObjectModel;
-using System.Net;
-using System.Net.NetworkInformation;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DSPanel.Models;
 using DSPanel.Services.Directory;
+using DSPanel.Services.Network;
 
 namespace DSPanel.ViewModels;
 
@@ -15,10 +14,14 @@ namespace DSPanel.ViewModels;
 public partial class ComputerLookupViewModel : ObservableObject
 {
     private readonly IDirectoryProvider _directoryProvider;
+    private readonly INetworkService _networkService;
 
-    public ComputerLookupViewModel(IDirectoryProvider directoryProvider)
+    public ComputerLookupViewModel(
+        IDirectoryProvider directoryProvider,
+        INetworkService networkService)
     {
         _directoryProvider = directoryProvider;
+        _networkService = networkService;
     }
 
     [ObservableProperty]
@@ -152,19 +155,14 @@ public partial class ComputerLookupViewModel : ObservableObject
         PingResult = null;
         try
         {
-            using var ping = new Ping();
-            var reply = await ping.SendPingAsync(hostName, 3000);
-            PingResult = reply.Status == IPStatus.Success
-                ? $"Reply from {reply.Address} - {reply.RoundtripTime}ms"
-                : $"Ping failed - {reply.Status}";
-        }
-        catch (PingException ex)
-        {
-            PingResult = $"Ping error - {ex.InnerException?.Message ?? ex.Message}";
+            var result = await _networkService.PingAsync(hostName);
+            PingResult = result.Success
+                ? $"Reply from {result.Address} - {result.RoundtripTime}ms"
+                : $"Ping failed - {result.Status}";
         }
         catch (Exception ex)
         {
-            PingResult = $"Error - {ex.Message}";
+            PingResult = $"Ping error - {ex.InnerException?.Message ?? ex.Message}";
         }
         finally
         {
@@ -186,9 +184,9 @@ public partial class ComputerLookupViewModel : ObservableObject
         DnsResult = null;
         try
         {
-            var addresses = await Dns.GetHostAddressesAsync(hostName);
+            var addresses = await _networkService.DnsResolveAsync(hostName);
             DnsResult = addresses.Length > 0
-                ? string.Join(", ", addresses.Select(a => a.ToString()))
+                ? string.Join(", ", addresses)
                 : "No addresses found";
         }
         catch (Exception ex)

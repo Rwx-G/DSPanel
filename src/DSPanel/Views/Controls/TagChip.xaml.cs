@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -7,6 +8,7 @@ namespace DSPanel.Views.Controls;
 /// <summary>
 /// Small rounded chip displaying a text label with an optional remove button.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public partial class TagChip : UserControl
 {
     public static readonly DependencyProperty TextProperty =

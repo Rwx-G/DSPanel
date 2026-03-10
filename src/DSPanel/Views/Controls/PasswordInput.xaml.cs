@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -5,6 +6,7 @@ using System.Windows.Shapes;
 
 namespace DSPanel.Views.Controls;
 
+[ExcludeFromCodeCoverage]
 public partial class PasswordInput : UserControl
 {
     private bool _isPasswordVisible;

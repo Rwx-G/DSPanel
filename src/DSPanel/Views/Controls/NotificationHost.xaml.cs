@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media.Animation;
@@ -5,6 +6,7 @@ using DSPanel.Services.Notifications;
 
 namespace DSPanel.Views.Controls;
 
+[ExcludeFromCodeCoverage]
 public partial class NotificationHost : UserControl
 {
     public NotificationHost()

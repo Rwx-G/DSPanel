@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -5,6 +6,7 @@ using DSPanel.Models;
 
 namespace DSPanel.Views.Dialogs;
 
+[ExcludeFromCodeCoverage]
 public partial class ProgressDialog : Window
 {
     private CancellationTokenSource? _cts;

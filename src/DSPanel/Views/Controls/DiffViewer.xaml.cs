@@ -1,10 +1,13 @@
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Windows;
 using System.Windows.Controls;
+using DSPanel.Helpers;
 using DSPanel.Models;
 
 namespace DSPanel.Views.Controls;
 
+[ExcludeFromCodeCoverage]
 public partial class DiffViewer : UserControl
 {
     private bool _isSideBySide;
@@ -37,18 +40,7 @@ public partial class DiffViewer : UserControl
         lines ??= [];
         PART_InlineItems.ItemsSource = lines;
 
-        // Side-by-side: left shows old (Removed + Unchanged), right shows new (Added + Unchanged)
-        var left = new List<DiffLine>();
-        var right = new List<DiffLine>();
-
-        foreach (var line in lines)
-        {
-            if (line.Type is DiffLineType.Removed or DiffLineType.Unchanged)
-                left.Add(line);
-            if (line.Type is DiffLineType.Added or DiffLineType.Unchanged)
-                right.Add(line);
-        }
-
+        var (left, right) = DiffHelper.SplitForSideBySide(lines);
         PART_LeftItems.ItemsSource = left;
         PART_RightItems.ItemsSource = right;
     }

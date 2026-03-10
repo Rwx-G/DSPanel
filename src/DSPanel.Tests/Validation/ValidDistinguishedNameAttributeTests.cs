@@ -52,4 +52,26 @@ public class ValidDistinguishedNameAttributeTests
     {
         ValidDistinguishedNameAttribute.IsValidDn("  ").Should().BeFalse();
     }
+
+    [Fact]
+    public void NonStringValue_ReturnsError()
+    {
+        Validate(42).Should().NotBe(ValidationResult.Success);
+    }
+
+    [Fact]
+    public void IsValidDn_EmptyComponentValue_ReturnsFalse()
+    {
+        // "CN=" has eq at the end, should fail
+        ValidDistinguishedNameAttribute.IsValidDn("CN=,DC=test").Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData("O=Org,DC=test")]
+    [InlineData("L=City,ST=State,C=US,DC=test")]
+    [InlineData("UID=user,DC=test")]
+    public void IsValidDn_AllSupportedKeys_ReturnsTrue(string dn)
+    {
+        ValidDistinguishedNameAttribute.IsValidDn(dn).Should().BeTrue();
+    }
 }

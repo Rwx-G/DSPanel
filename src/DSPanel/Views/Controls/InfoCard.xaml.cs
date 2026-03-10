@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -7,6 +8,7 @@ namespace DSPanel.Views.Controls;
 /// <summary>
 /// Card with a header, optional icon, and collapsible content area.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public partial class InfoCard : UserControl
 {
     public static readonly DependencyProperty HeaderProperty =

@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -8,6 +9,7 @@ namespace DSPanel.Views.Controls;
 /// <summary>
 /// Placeholder display for empty data states with an optional icon and action button.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public partial class EmptyState : UserControl
 {
     public static readonly DependencyProperty MessageProperty =

@@ -1,10 +1,12 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics.CodeAnalysis;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
 
 namespace DSPanel.Views.Controls;
 
+[ExcludeFromCodeCoverage]
 public partial class FilterBar : UserControl
 {
     private readonly DispatcherTimer _debounce;
@@ -93,4 +95,5 @@ public partial class FilterBar : UserControl
     }
 }
 
+[ExcludeFromCodeCoverage]
 public sealed record FilterChip(string Key, string Label);

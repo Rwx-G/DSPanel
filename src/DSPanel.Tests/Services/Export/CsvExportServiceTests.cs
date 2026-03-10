@@ -1,11 +1,41 @@
+using System.IO;
+using System.Text;
+using DSPanel.Services.Dialog;
 using DSPanel.Services.Export;
+using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
+using Moq;
 
 namespace DSPanel.Tests.Services.Export;
 
-public sealed class CsvExportServiceTests
+public sealed class CsvExportServiceTests : IDisposable
 {
-    private readonly CsvExportService _sut = new(NullLogger<CsvExportService>.Instance);
+    private readonly Mock<IFileDialogService> _fileDialogMock = new();
+    private readonly CsvExportService _sut;
+    private readonly List<string> _tempFiles = new();
+
+    public CsvExportServiceTests()
+    {
+        _sut = new CsvExportService(NullLogger<CsvExportService>.Instance, _fileDialogMock.Object);
+    }
+
+    public void Dispose()
+    {
+        foreach (var file in _tempFiles)
+        {
+            if (File.Exists(file))
+                File.Delete(file);
+        }
+    }
+
+    private string CreateTempFile()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"csv_test_{Guid.NewGuid()}.csv");
+        _tempFiles.Add(path);
+        return path;
+    }
+
+    // --- FormatCsv tests (existing, migrated to FluentAssertions) ---
 
     [Fact]
     public void FormatCsv_SimpleHeaders_ProducesCorrectOutput()
@@ -20,10 +50,10 @@ public sealed class CsvExportServiceTests
         var csv = _sut.FormatCsv(headers, rows);
 
         var lines = csv.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
-        Assert.Equal(3, lines.Length);
-        Assert.Equal("Name,Age,City", lines[0]);
-        Assert.Equal("Alice,30,Paris", lines[1]);
-        Assert.Equal("Bob,25,Lyon", lines[2]);
+        lines.Should().HaveCount(3);
+        lines[0].Should().Be("Name,Age,City");
+        lines[1].Should().Be("Alice,30,Paris");
+        lines[2].Should().Be("Bob,25,Lyon");
     }
 
     [Fact]
@@ -34,7 +64,7 @@ public sealed class CsvExportServiceTests
 
         var csv = _sut.FormatCsv(headers, rows);
 
-        Assert.Contains("\"Doe, John\"", csv);
+        csv.Should().Contain("\"Doe, John\"");
     }
 
     [Fact]
@@ -45,7 +75,7 @@ public sealed class CsvExportServiceTests
 
         var csv = _sut.FormatCsv(headers, rows);
 
-        Assert.Contains("\"He said \"\"hello\"\"\"", csv);
+        csv.Should().Contain("\"He said \"\"hello\"\"\"");
     }
 
     [Fact]
@@ -56,7 +86,7 @@ public sealed class CsvExportServiceTests
 
         var csv = _sut.FormatCsv(headers, rows);
 
-        Assert.Contains("\"line1\nline2\"", csv);
+        csv.Should().Contain("\"line1\nline2\"");
     }
 
     [Fact]
@@ -68,8 +98,8 @@ public sealed class CsvExportServiceTests
         var csv = _sut.FormatCsv(headers, rows);
 
         var lines = csv.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
-        Assert.Single(lines);
-        Assert.Equal("A,B", lines[0]);
+        lines.Should().ContainSingle();
+        lines[0].Should().Be("A,B");
     }
 
     [Fact]
@@ -81,6 +111,89 @@ public sealed class CsvExportServiceTests
         var csv = _sut.FormatCsv(headers, rows);
 
         var lines = csv.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
-        Assert.Equal("Alice", lines[1]);
+        lines[1].Should().Be("Alice");
+    }
+
+    // --- ExportToCsv tests ---
+
+    [Fact]
+    public void ExportToCsv_DialogCancelled_ReturnsFalse()
+    {
+        _fileDialogMock
+            .Setup(d => d.ShowSaveFileDialog(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
+            .Returns((string?)null);
+
+        var headers = new[] { "A" };
+        var rows = new[] { (IReadOnlyList<string>)new[] { "1" } };
+
+        var result = _sut.ExportToCsv(headers, rows);
+
+        result.Should().BeFalse();
+    }
+
+    [Fact]
+    public void ExportToCsv_DialogConfirmed_WritesFileAndReturnsTrue()
+    {
+        var tempPath = CreateTempFile();
+
+        _fileDialogMock
+            .Setup(d => d.ShowSaveFileDialog(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
+            .Returns(tempPath);
+
+        var headers = new[] { "Name", "Value" };
+        var rows = new[]
+        {
+            (IReadOnlyList<string>)new[] { "key1", "val1" },
+            new[] { "key2", "val2" }
+        };
+
+        var result = _sut.ExportToCsv(headers, rows);
+
+        result.Should().BeTrue();
+        File.Exists(tempPath).Should().BeTrue();
+
+        var content = File.ReadAllText(tempPath, Encoding.UTF8);
+        var lines = content.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
+        lines.Should().HaveCount(3);
+        lines[0].Should().Be("Name,Value");
+        lines[1].Should().Be("key1,val1");
+        lines[2].Should().Be("key2,val2");
+    }
+
+    [Fact]
+    public void ExportToCsv_FileWriteThrows_ReturnsFalse()
+    {
+        // Use an invalid path that will cause File.WriteAllText to throw
+        var invalidPath = Path.Combine(Path.GetTempPath(), $"nonexistent_{Guid.NewGuid()}", "file.csv");
+
+        _fileDialogMock
+            .Setup(d => d.ShowSaveFileDialog(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
+            .Returns(invalidPath);
+
+        var headers = new[] { "A" };
+        var rows = new[] { (IReadOnlyList<string>)new[] { "1" } };
+
+        var result = _sut.ExportToCsv(headers, rows);
+
+        result.Should().BeFalse();
+    }
+
+    [Fact]
+    public void ExportToCsv_DialogConfirmed_PassesCorrectFilterParameters()
+    {
+        var tempPath = CreateTempFile();
+
+        _fileDialogMock
+            .Setup(d => d.ShowSaveFileDialog("CSV files (*.csv)|*.csv", ".csv", "export.csv"))
+            .Returns(tempPath);
+
+        var headers = new[] { "A" };
+        var rows = new[] { (IReadOnlyList<string>)new[] { "1" } };
+
+        _sut.ExportToCsv(headers, rows);
+
+        _fileDialogMock.Verify(
+            d => d.ShowSaveFileDialog("CSV files (*.csv)|*.csv", ".csv", "export.csv"),
+            Times.Once);
     }
 }

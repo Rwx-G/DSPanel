@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Windows;
 using DSPanel.Models;
 using DSPanel.Views.Dialogs;
@@ -7,6 +8,7 @@ namespace DSPanel.Services.Dialog;
 /// <summary>
 /// Dialog service using custom styled dialogs.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public class DialogService : IDialogService
 {
     public Task<bool> ShowConfirmationAsync(string title, string message, string? details = null)

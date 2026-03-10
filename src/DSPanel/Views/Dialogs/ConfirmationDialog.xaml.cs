@@ -1,8 +1,10 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Windows;
 using System.Windows.Media;
 
 namespace DSPanel.Views.Dialogs;
 
+[ExcludeFromCodeCoverage]
 public partial class ConfirmationDialog : Window
 {
     public ConfirmationDialog(string title, string message, string? details, DialogSeverity severity)

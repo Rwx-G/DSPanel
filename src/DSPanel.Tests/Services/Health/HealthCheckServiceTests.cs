@@ -22,19 +22,22 @@ public class HealthCheckServiceTests
         bool passwordNeverExpires = false,
         DateTime? lastLogon = null,
         DateTime? whenCreated = null,
-        bool setLastLogon = true)
+        bool setLastLogon = true,
+        bool setAccountExpires = true,
+        bool setPasswordLastSet = true,
+        bool setWhenCreated = true)
     {
         return new DirectoryUser
         {
             SamAccountName = "jdoe",
             Enabled = enabled,
             LockedOut = lockedOut,
-            AccountExpires = accountExpires ?? DateTime.UtcNow.AddYears(1),
-            PasswordLastSet = passwordLastSet ?? DateTime.UtcNow.AddDays(-10),
+            AccountExpires = setAccountExpires ? (accountExpires ?? DateTime.UtcNow.AddYears(1)) : null,
+            PasswordLastSet = setPasswordLastSet ? (passwordLastSet ?? DateTime.UtcNow.AddDays(-10)) : null,
             PasswordExpired = passwordExpired,
             PasswordNeverExpires = passwordNeverExpires,
             LastLogon = setLastLogon ? (lastLogon ?? DateTime.UtcNow.AddHours(-1)) : null,
-            WhenCreated = whenCreated ?? DateTime.UtcNow.AddYears(-1),
+            WhenCreated = setWhenCreated ? (whenCreated ?? DateTime.UtcNow.AddYears(-1)) : null,
             WhenChanged = DateTime.UtcNow.AddDays(-1)
         };
     }
@@ -175,5 +178,103 @@ public class HealthCheckServiceTests
         result.ActiveFlags.Should().Contain(f => f.Name == "Disabled");
         result.ActiveFlags.Should().Contain(f => f.Name == "LockedOut");
         result.ActiveFlags.Should().Contain(f => f.Name == "PasswordExpired");
+    }
+
+    [Fact]
+    public void Evaluate_EnabledUser_PasswordLastSetNull_WhenCreatedHasValue_FlagsPasswordNeverChanged()
+    {
+        var user = CreateUser(
+            enabled: true,
+            setPasswordLastSet: false,
+            whenCreated: DateTime.UtcNow.AddDays(-30));
+
+        var result = _service.Evaluate(user);
+
+        result.ActiveFlags.Should().Contain(f => f.Name == "PasswordNeverChanged");
+    }
+
+    [Fact]
+    public void Evaluate_EnabledUser_WhenCreatedNull_NoPasswordNeverChangedFlag()
+    {
+        var user = CreateUser(
+            enabled: true,
+            setPasswordLastSet: false,
+            setWhenCreated: false);
+
+        var result = _service.Evaluate(user);
+
+        result.ActiveFlags.Should().NotContain(f => f.Name == "PasswordNeverChanged");
+    }
+
+    [Fact]
+    public void Evaluate_DisabledUser_LastLogonNull_NoNeverLoggedOnFlag()
+    {
+        var user = CreateUser(enabled: false, setLastLogon: false);
+
+        var result = _service.Evaluate(user);
+
+        result.ActiveFlags.Should().NotContain(f => f.Name == "NeverLoggedOn");
+    }
+
+    [Fact]
+    public void Evaluate_AccountExpiresNull_NoAccountExpiredFlag()
+    {
+        var user = CreateUser(setAccountExpires: false);
+
+        var result = _service.Evaluate(user);
+
+        result.ActiveFlags.Should().NotContain(f => f.Name == "AccountExpired");
+    }
+
+    [Fact]
+    public void Evaluate_ExactlyThirtyDaysInactive_FlagsInactive30Days()
+    {
+        var user = CreateUser(lastLogon: DateTime.UtcNow.AddDays(-30));
+
+        var result = _service.Evaluate(user);
+
+        result.ActiveFlags.Should().Contain(f => f.Name == "Inactive30Days");
+        result.ActiveFlags.Should().NotContain(f => f.Name == "Inactive90Days");
+    }
+
+    [Fact]
+    public void Evaluate_PasswordLastSetNotNull_WhenCreatedNull_NoPasswordNeverChangedFlag()
+    {
+        // PasswordLastSet has a value, WhenCreated is null:
+        // the compound condition short-circuits on WhenCreated.HasValue -> false
+        var user = CreateUser(
+            enabled: true,
+            passwordLastSet: DateTime.UtcNow.AddDays(-10),
+            setWhenCreated: false);
+
+        var result = _service.Evaluate(user);
+
+        result.ActiveFlags.Should().NotContain(f => f.Name == "PasswordNeverChanged");
+    }
+
+    [Fact]
+    public void Evaluate_PasswordChangedSignificantly_NoPasswordNeverChangedFlag()
+    {
+        // PasswordLastSet and WhenCreated both set, but diff > 5 minutes
+        var created = DateTime.UtcNow.AddDays(-30);
+        var user = CreateUser(
+            enabled: true,
+            whenCreated: created,
+            passwordLastSet: created.AddDays(5));
+
+        var result = _service.Evaluate(user);
+
+        result.ActiveFlags.Should().NotContain(f => f.Name == "PasswordNeverChanged");
+    }
+
+    [Fact]
+    public void Evaluate_ExactlyNinetyDaysInactive_FlagsInactive90Days()
+    {
+        var user = CreateUser(lastLogon: DateTime.UtcNow.AddDays(-90));
+
+        var result = _service.Evaluate(user);
+
+        result.ActiveFlags.Should().Contain(f => f.Name == "Inactive90Days");
+        result.ActiveFlags.Should().NotContain(f => f.Name == "Inactive30Days");
     }
 }

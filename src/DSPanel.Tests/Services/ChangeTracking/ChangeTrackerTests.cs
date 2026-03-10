@@ -77,4 +77,39 @@ public class ChangeTrackerTests
         tracker.Snapshot["Name"].Should().Be("Alice");
         tracker.Snapshot["Age"].Should().Be(30);
     }
+
+    [Fact]
+    public void IsDirty_WhenSnapshotKeyDisappearsFromCurrent_ReturnsTrue()
+    {
+        var values = new Dictionary<string, object?>
+        {
+            ["Name"] = "Alice",
+            ["Age"] = 30
+        };
+        var tracker = new ChangeTracker(() => new Dictionary<string, object?>(values));
+        tracker.MarkClean();
+
+        values.Remove("Name");
+
+        tracker.IsDirty.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Reset_DoesNotThrow()
+    {
+        var tracker = CreateTracker();
+        tracker.MarkClean();
+
+        var act = () => tracker.Reset();
+
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void Snapshot_BeforeMarkClean_IsEmpty()
+    {
+        var tracker = CreateTracker();
+
+        tracker.Snapshot.Should().BeEmpty();
+    }
 }

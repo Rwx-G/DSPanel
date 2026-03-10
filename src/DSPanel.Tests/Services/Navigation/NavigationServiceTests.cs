@@ -276,4 +276,198 @@ public class NavigationServiceTests
         service.Tabs[0].Key.Should().Be("groups");
         service.Tabs[1].Key.Should().Be("users");
     }
+
+    [Fact]
+    public void MoveTab_WithNegativeFromIndex_DoesNothing()
+    {
+        var service = CreateService();
+        service.OpenTab("users", "Users", "c1");
+        service.OpenTab("groups", "Groups", "c2");
+
+        service.MoveTab(-1, 1);
+
+        service.Tabs[0].Key.Should().Be("users");
+        service.Tabs[1].Key.Should().Be("groups");
+    }
+
+    [Fact]
+    public void MoveTab_WithFromIndexExceedingCount_DoesNothing()
+    {
+        var service = CreateService();
+        service.OpenTab("users", "Users", "c1");
+        service.OpenTab("groups", "Groups", "c2");
+
+        service.MoveTab(5, 0);
+
+        service.Tabs[0].Key.Should().Be("users");
+        service.Tabs[1].Key.Should().Be("groups");
+    }
+
+    [Fact]
+    public void MoveTab_WithNegativeToIndex_DoesNothing()
+    {
+        var service = CreateService();
+        service.OpenTab("users", "Users", "c1");
+        service.OpenTab("groups", "Groups", "c2");
+
+        service.MoveTab(0, -1);
+
+        service.Tabs[0].Key.Should().Be("users");
+        service.Tabs[1].Key.Should().Be("groups");
+    }
+
+    [Fact]
+    public void MoveTab_WithToIndexExceedingCount_DoesNothing()
+    {
+        var service = CreateService();
+        service.OpenTab("users", "Users", "c1");
+        service.OpenTab("groups", "Groups", "c2");
+
+        service.MoveTab(0, 5);
+
+        service.Tabs[0].Key.Should().Be("users");
+        service.Tabs[1].Key.Should().Be("groups");
+    }
+
+    [Fact]
+    public void MoveTab_WithSameFromAndToIndex_DoesNothing()
+    {
+        var service = CreateService();
+        service.OpenTab("users", "Users", "c1");
+        service.OpenTab("groups", "Groups", "c2");
+
+        service.MoveTab(0, 0);
+
+        service.Tabs[0].Key.Should().Be("users");
+        service.Tabs[1].Key.Should().Be("groups");
+    }
+
+    [Fact]
+    public void ActivateNextTab_WithNoTabs_DoesNothing()
+    {
+        var service = CreateService();
+
+        service.ActivateNextTab();
+
+        service.ActiveTabKey.Should().BeNull();
+    }
+
+    [Fact]
+    public void ActivatePreviousTab_WithNoTabs_DoesNothing()
+    {
+        var service = CreateService();
+
+        service.ActivatePreviousTab();
+
+        service.ActiveTabKey.Should().BeNull();
+    }
+
+    [Fact]
+    public void ActivateNextTab_WhenActiveTabKeyIsNull_ActivatesFirstTab()
+    {
+        var service = CreateService();
+        service.OpenTab("users", "Users", "c1");
+        service.OpenTab("groups", "Groups", "c2");
+        // Force ActiveTabKey to null without clearing tabs
+        service.Tabs[0].IsActive = false;
+        service.Tabs[1].IsActive = false;
+
+        // Use reflection to bypass the setter guard and set _activeTabKey to null
+        var field = typeof(NavigationService).GetField("_activeTabKey",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+        field.SetValue(service, null);
+
+        service.ActivateNextTab();
+
+        // When ActiveTabKey is null, index resolves to -1, so next = (-1 + 1) % 2 = 0
+        service.ActiveTabKey.Should().Be("users");
+    }
+
+    [Fact]
+    public void CloseTab_InactiveTab_KeepsCurrentActiveTab()
+    {
+        var service = CreateService();
+        service.OpenTab("users", "Users", "c1");
+        service.OpenTab("groups", "Groups", "c2");
+        service.OpenTab("computers", "Computers", "c3");
+        service.ActiveTabKey = "users";
+
+        service.CloseTab("groups");
+
+        service.Tabs.Should().HaveCount(2);
+        service.ActiveTabKey.Should().Be("users");
+    }
+
+    [Fact]
+    public void CloseAllTabs_WithNonClosableTabs_KeepsThoseTabs()
+    {
+        var service = CreateService();
+        service.OpenTab("dashboard", "Dashboard", "c1");
+        service.Tabs[0].CanClose = false;
+        service.OpenTab("users", "Users", "c2");
+        service.OpenTab("groups", "Groups", "c3");
+
+        service.CloseAllTabs();
+
+        service.Tabs.Should().HaveCount(1);
+        service.Tabs[0].Key.Should().Be("dashboard");
+        service.ActiveTabKey.Should().Be("dashboard");
+    }
+
+    [Fact]
+    public void ActiveTabKey_SetToSameValue_DoesNotReprocess()
+    {
+        var service = CreateService();
+        service.OpenTab("users", "Users", "c1");
+        service.ActiveTabKey = "users";
+
+        // Setting the same value again should early return
+        service.ActiveTabKey = "users";
+
+        service.ActiveTabKey.Should().Be("users");
+        service.Tabs[0].IsActive.Should().BeTrue();
+    }
+
+    [Fact]
+    public void NavigateTo_WithRegisteredViewFactory_UsesFactoryContent()
+    {
+        var service = CreateService();
+        var expectedContent = new object();
+        service.RegisterViewFactory("users", () => expectedContent);
+
+        service.NavigateTo("users");
+
+        service.Tabs.Should().HaveCount(1);
+        service.Tabs[0].Content.Should().BeSameAs(expectedContent);
+    }
+
+    [Fact]
+    public void ActivatePreviousTab_WhenActiveTabKeyIsNull_ActivatesFirstTab()
+    {
+        var service = CreateService();
+        service.OpenTab("users", "Users", "c1");
+        service.OpenTab("groups", "Groups", "c2");
+
+        // Force ActiveTabKey to null via reflection
+        var field = typeof(NavigationService).GetField("_activeTabKey",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+        field.SetValue(service, null);
+
+        service.ActivatePreviousTab();
+
+        // When ActiveTabKey is null, index resolves to 0, so prev = (0 - 1 + 2) % 2 = 1
+        service.ActiveTabKey.Should().Be("groups");
+    }
+
+    [Fact]
+    public void ActivateTabByIndex_WithNegativeIndex_DoesNothing()
+    {
+        var service = CreateService();
+        service.OpenTab("users", "Users", "c1");
+        service.ActiveTabKey = "users";
+
+        service.ActivateTabByIndex(-1);
+
+        service.ActiveTabKey.Should().Be("users");
+    }
 }

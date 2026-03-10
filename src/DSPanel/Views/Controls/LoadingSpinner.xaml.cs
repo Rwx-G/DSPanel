@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Windows;
 using System.Windows.Controls;
 
@@ -6,6 +7,7 @@ namespace DSPanel.Views.Controls;
 /// <summary>
 /// Animated spinning overlay with optional loading message.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public partial class LoadingSpinner : UserControl
 {
     public static readonly DependencyProperty IsActiveProperty =

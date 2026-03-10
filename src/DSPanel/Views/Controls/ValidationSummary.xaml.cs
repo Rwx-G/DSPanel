@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Diagnostics.CodeAnalysis;
 using System.Windows;
 using System.Windows.Controls;
 
@@ -9,6 +10,7 @@ namespace DSPanel.Views.Controls;
 /// Aggregates and displays all validation errors from a bound ViewModel
 /// implementing <see cref="INotifyDataErrorInfo"/>.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public partial class ValidationSummary : UserControl
 {
     private INotifyDataErrorInfo? _currentSource;

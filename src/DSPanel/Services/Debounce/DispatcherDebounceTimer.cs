@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Windows.Threading;
 
 namespace DSPanel.Services.Debounce;
@@ -5,6 +6,7 @@ namespace DSPanel.Services.Debounce;
 /// <summary>
 /// Production debounce timer backed by WPF DispatcherTimer.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public class DispatcherDebounceTimer : IDebounceTimer
 {
     private readonly DispatcherTimer _timer = new();

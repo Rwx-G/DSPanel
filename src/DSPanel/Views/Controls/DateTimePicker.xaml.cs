@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Windows;
 using System.Windows.Controls;
 
@@ -6,6 +7,7 @@ namespace DSPanel.Views.Controls;
 /// <summary>
 /// Combined date and time picker with calendar popup and hour/minute spinners.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public partial class DateTimePicker : UserControl
 {
     private bool _suppressUpdate;

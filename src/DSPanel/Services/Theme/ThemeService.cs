@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using DSPanel.Services.Settings;
@@ -5,6 +6,7 @@ using Microsoft.Extensions.Logging;
 
 namespace DSPanel.Services.Theme;
 
+[ExcludeFromCodeCoverage]
 public partial class ThemeService : ObservableObject, IThemeService
 {
     private const int ThemeDictionaryIndex = 1;

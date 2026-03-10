@@ -91,4 +91,38 @@ public class AppSettingsServiceTests : IDisposable
 
         sut2.Current.PresetsPath.Should().Be(@"C:\Presets\config.yaml");
     }
+
+    [Fact]
+    public void Load_CorruptedJsonFile_ReturnsDefaultSettings()
+    {
+        File.WriteAllText(_tempPath, "{{not valid json!!!");
+
+        var sut = CreateSut();
+
+        sut.Current.Should().NotBeNull();
+        sut.Current.Theme.Should().Be("Light");
+    }
+
+    [Fact]
+    public void Load_LiteralNullJson_ReturnsDefaultSettings()
+    {
+        File.WriteAllText(_tempPath, "null");
+
+        var sut = CreateSut();
+
+        sut.Current.Should().NotBeNull();
+        sut.Current.Theme.Should().Be("Light");
+    }
+
+    [Fact]
+    public void Save_ToInvalidPath_DoesNotThrow()
+    {
+        // Use a path that cannot be written to (invalid directory characters or non-existent root)
+        var invalidPath = Path.Combine("Z:", "nonexistent", "deeply", "nested", "settings.json");
+        var sut = new AppSettingsService(_logger.Object, invalidPath);
+
+        var act = () => sut.Save();
+
+        act.Should().NotThrow();
+    }
 }

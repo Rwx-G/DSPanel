@@ -40,6 +40,28 @@ public class UserLookupViewModelTests
         };
     }
 
+    private static DirectoryEntry CreateUserEntryWithMemberOf(string[] memberOf)
+    {
+        return new DirectoryEntry
+        {
+            DistinguishedName = "CN=John Doe,OU=Users,DC=contoso,DC=com",
+            SamAccountName = "jdoe",
+            DisplayName = "John Doe",
+            ObjectClass = "user",
+            Attributes = new Dictionary<string, string[]>
+            {
+                ["sAMAccountName"] = ["jdoe"],
+                ["displayName"] = ["John Doe"],
+                ["department"] = ["IT"],
+                ["userAccountControl"] = ["512"],
+                ["givenName"] = ["John"],
+                ["sn"] = ["Doe"],
+                ["mail"] = ["jdoe@contoso.com"],
+                ["memberOf"] = memberOf
+            }
+        };
+    }
+
     [Fact]
     public async Task SearchCommand_PopulatesSearchResults()
     {
@@ -148,5 +170,217 @@ public class UserLookupViewModelTests
         vm.SelectUserCommand.Execute(user);
 
         vm.HasSelectedUser.Should().BeTrue();
+    }
+
+    // ---- SearchAsync with null query uses SearchText ----
+
+    [Fact]
+    public async Task SearchAsync_NullQuery_UsesSearchTextTrim()
+    {
+        _directoryProvider.Setup(p => p.IsConnected).Returns(true);
+        _directoryProvider.Setup(p => p.SearchUsersAsync("alice", 50))
+            .ReturnsAsync(new List<DirectoryEntry> { CreateUserEntry("alice", "Alice") });
+
+        var vm = CreateViewModel();
+        vm.SearchText = "  alice  ";
+
+        await vm.SearchCommand.ExecuteAsync(null);
+
+        vm.SearchResults.Should().HaveCount(1);
+        vm.SearchResults[0].SamAccountName.Should().Be("alice");
+    }
+
+    // ---- DetailItems when SelectedUser is null ----
+
+    [Fact]
+    public void DetailItems_ReturnsEmptyList_WhenNoUserSelected()
+    {
+        var vm = CreateViewModel();
+        vm.DetailItems.Should().BeEmpty();
+    }
+
+    // ---- UserGroups when SelectedUser is null ----
+
+    [Fact]
+    public void UserGroups_ReturnsEmptyList_WhenNoUserSelected()
+    {
+        var vm = CreateViewModel();
+        vm.UserGroups.Should().BeEmpty();
+    }
+
+    // ---- HealthStatus when SelectedUser is null ----
+
+    [Fact]
+    public void HealthStatus_ReturnsNull_WhenNoUserSelected()
+    {
+        var vm = CreateViewModel();
+        vm.HealthStatus.Should().BeNull();
+    }
+
+    // ---- UserGroups edge cases in ExtractCnFromDn ----
+
+    [Fact]
+    public void UserGroups_FiltersOutEmptyDn()
+    {
+        _healthCheckService.Setup(h => h.Evaluate(It.IsAny<DirectoryUser>()))
+            .Returns(new AccountHealthStatus());
+
+        var entry = CreateUserEntryWithMemberOf([
+            "CN=Domain Users,OU=Groups,DC=contoso,DC=com",
+            "",
+            "   "
+        ]);
+
+        var vm = CreateViewModel();
+        var user = DirectoryUser.FromDirectoryEntry(entry);
+        vm.SelectUserCommand.Execute(user);
+
+        vm.UserGroups.Should().Contain("Domain Users");
+        vm.UserGroups.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public void UserGroups_DnWithoutCnPrefix_ReturnsFullDn()
+    {
+        _healthCheckService.Setup(h => h.Evaluate(It.IsAny<DirectoryUser>()))
+            .Returns(new AccountHealthStatus());
+
+        var entry = CreateUserEntryWithMemberOf([
+            "OU=SomeGroup,DC=contoso,DC=com"
+        ]);
+
+        var vm = CreateViewModel();
+        var user = DirectoryUser.FromDirectoryEntry(entry);
+        vm.SelectUserCommand.Execute(user);
+
+        vm.UserGroups.Should().Contain("OU=SomeGroup,DC=contoso,DC=com");
+    }
+
+    [Fact]
+    public void UserGroups_CnWithoutComma_ReturnsEntireCnValue()
+    {
+        _healthCheckService.Setup(h => h.Evaluate(It.IsAny<DirectoryUser>()))
+            .Returns(new AccountHealthStatus());
+
+        var entry = CreateUserEntryWithMemberOf([
+            "CN=SimpleGroup"
+        ]);
+
+        var vm = CreateViewModel();
+        var user = DirectoryUser.FromDirectoryEntry(entry);
+        vm.SelectUserCommand.Execute(user);
+
+        vm.UserGroups.Should().Contain("SimpleGroup");
+    }
+
+    // ---- DetailItems covers all ternary branches ----
+
+    [Fact]
+    public void DetailItems_DisabledLockedExpired_CoversOppositeBranches()
+    {
+        _healthCheckService.Setup(h => h.Evaluate(It.IsAny<DirectoryUser>()))
+            .Returns(new AccountHealthStatus());
+
+        var entry = new DirectoryEntry
+        {
+            DistinguishedName = "CN=Test,OU=Users,DC=contoso,DC=com",
+            SamAccountName = "test",
+            DisplayName = "Test",
+            ObjectClass = "user",
+            Attributes = new Dictionary<string, string[]>
+            {
+                ["userAccountControl"] = ["514"], // disabled
+                ["lockoutTime"] = ["133515648000000000"], // locked
+                ["memberOf"] = []
+            }
+        };
+        var user = DirectoryUser.FromDirectoryEntry(entry);
+
+        var vm = CreateViewModel();
+        vm.SelectUserCommand.Execute(user);
+
+        // Cover the "No" branches for Enabled, and "Yes" for LockedOut
+        vm.DetailItems.Should().Contain(i => i.Label == "Enabled" && i.Value == "No");
+        vm.DetailItems.Should().Contain(i => i.Label == "Locked Out" && i.Value == "Yes");
+    }
+
+    [Fact]
+    public void DetailItems_PasswordExpiredAndNeverExpires_CoversYesBranches()
+    {
+        _healthCheckService.Setup(h => h.Evaluate(It.IsAny<DirectoryUser>()))
+            .Returns(new AccountHealthStatus());
+
+        var entry = new DirectoryEntry
+        {
+            DistinguishedName = "CN=Test,OU=Users,DC=contoso,DC=com",
+            SamAccountName = "test",
+            DisplayName = "Test",
+            ObjectClass = "user",
+            Attributes = new Dictionary<string, string[]>
+            {
+                // 512 + 65536 (DONT_EXPIRE) + 8388608 (PASSWORD_EXPIRED)
+                ["userAccountControl"] = ["8454656"],
+                ["memberOf"] = []
+            }
+        };
+        var user = DirectoryUser.FromDirectoryEntry(entry);
+
+        var vm = CreateViewModel();
+        vm.SelectUserCommand.Execute(user);
+
+        vm.DetailItems.Should().Contain(i => i.Label == "Password Expired" && i.Value == "Yes");
+        vm.DetailItems.Should().Contain(i => i.Label == "Password Never Expires" && i.Value == "Yes");
+    }
+
+    [Fact]
+    public void DetailItems_NullDates_ShowDash()
+    {
+        _healthCheckService.Setup(h => h.Evaluate(It.IsAny<DirectoryUser>()))
+            .Returns(new AccountHealthStatus());
+
+        // User with no date attributes -> all FormatDate calls return "-"
+        var entry = new DirectoryEntry
+        {
+            DistinguishedName = "CN=Test,OU=Users,DC=contoso,DC=com",
+            SamAccountName = "test",
+            DisplayName = "Test",
+            ObjectClass = "user",
+            Attributes = new Dictionary<string, string[]>
+            {
+                ["userAccountControl"] = ["512"],
+                ["memberOf"] = []
+            }
+        };
+        var user = DirectoryUser.FromDirectoryEntry(entry);
+
+        var vm = CreateViewModel();
+        vm.SelectUserCommand.Execute(user);
+
+        vm.DetailItems.Should().Contain(i => i.Label == "Account Expires" && i.Value == "-");
+        vm.DetailItems.Should().Contain(i => i.Label == "Last Logon" && i.Value == "-");
+        vm.DetailItems.Should().Contain(i => i.Label == "Created" && i.Value == "-");
+        vm.DetailItems.Should().Contain(i => i.Label == "Last Modified" && i.Value == "-");
+    }
+
+    // ---- SelectUser with null ----
+
+    [Fact]
+    public void SelectUser_WithNull_ClearsSelection()
+    {
+        _healthCheckService.Setup(h => h.Evaluate(It.IsAny<DirectoryUser>()))
+            .Returns(new AccountHealthStatus());
+
+        var vm = CreateViewModel();
+        var user = DirectoryUser.FromDirectoryEntry(CreateUserEntry());
+        vm.SelectUserCommand.Execute(user);
+        vm.SelectedUser.Should().NotBeNull();
+
+        vm.SelectUserCommand.Execute(null);
+
+        vm.SelectedUser.Should().BeNull();
+        vm.HasSelectedUser.Should().BeFalse();
+        vm.DetailItems.Should().BeEmpty();
+        vm.UserGroups.Should().BeEmpty();
+        vm.HealthStatus.Should().BeNull();
     }
 }

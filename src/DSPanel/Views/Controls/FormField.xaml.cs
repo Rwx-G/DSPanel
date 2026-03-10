@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Windows;
 using System.Windows.Controls;
 
@@ -7,6 +8,7 @@ namespace DSPanel.Views.Controls;
 /// Wraps any input control with a label above and an error message below.
 /// Shows a red asterisk when the field is required.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public partial class FormField : ContentControl
 {
     public static readonly DependencyProperty LabelProperty =

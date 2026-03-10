@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics.CodeAnalysis;
 using System.Windows;
 using System.Windows.Controls;
 using DSPanel.Models;
@@ -9,6 +10,7 @@ namespace DSPanel.Views.Controls;
 /// TreeView-based picker for selecting an Active Directory Organizational Unit.
 /// Bind <see cref="OUItems"/> to populate and read <see cref="SelectedOU"/> for the selection.
 /// </summary>
+[ExcludeFromCodeCoverage]
 public partial class OUPicker : UserControl
 {
     public static readonly DependencyProperty OUItemsProperty =
