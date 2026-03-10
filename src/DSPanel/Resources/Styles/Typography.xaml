@@ -1,0 +1,75 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+
+  <!-- Spacing scale (4px base unit) -->
+  <sys:Double x:Key="SpaceXs">4</sys:Double>
+  <sys:Double x:Key="SpaceSm">8</sys:Double>
+  <sys:Double x:Key="SpaceMd">12</sys:Double>
+  <sys:Double x:Key="SpaceLg">16</sys:Double>
+  <sys:Double x:Key="SpaceXl">24</sys:Double>
+  <sys:Double x:Key="Space2xl">32</sys:Double>
+  <sys:Double x:Key="Space3xl">48</sys:Double>
+
+  <!-- Border radius -->
+  <CornerRadius x:Key="BorderRadiusSm">2</CornerRadius>
+  <CornerRadius x:Key="BorderRadiusMd">4</CornerRadius>
+  <CornerRadius x:Key="BorderRadiusLg">8</CornerRadius>
+  <CornerRadius x:Key="BorderRadiusXl">12</CornerRadius>
+
+  <!-- Elevation shadows -->
+  <DropShadowEffect x:Key="ShadowCard" BlurRadius="8" ShadowDepth="2" Opacity="0.12" Color="Black"/>
+  <DropShadowEffect x:Key="ShadowDialog" BlurRadius="24" ShadowDepth="8" Opacity="0.2" Color="Black"/>
+  <DropShadowEffect x:Key="ShadowPopover" BlurRadius="16" ShadowDepth="4" Opacity="0.16" Color="Black"/>
+
+  <!-- Typography -->
+  <Style x:Key="Heading1" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="Segoe UI"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+    <Setter Property="FontSize" Value="28"/>
+    <Setter Property="Foreground" Value="{DynamicResource BrushTextPrimary}"/>
+  </Style>
+
+  <Style x:Key="Heading2" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="Segoe UI"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+    <Setter Property="FontSize" Value="22"/>
+    <Setter Property="Foreground" Value="{DynamicResource BrushTextPrimary}"/>
+  </Style>
+
+  <Style x:Key="Heading3" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="Segoe UI"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+    <Setter Property="FontSize" Value="18"/>
+    <Setter Property="Foreground" Value="{DynamicResource BrushTextPrimary}"/>
+  </Style>
+
+  <Style x:Key="Heading4" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="Segoe UI"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+    <Setter Property="FontSize" Value="15"/>
+    <Setter Property="Foreground" Value="{DynamicResource BrushTextPrimary}"/>
+  </Style>
+
+  <Style x:Key="Body" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="Segoe UI"/>
+    <Setter Property="FontWeight" Value="Normal"/>
+    <Setter Property="FontSize" Value="14"/>
+    <Setter Property="Foreground" Value="{DynamicResource BrushTextPrimary}"/>
+  </Style>
+
+  <Style x:Key="Caption" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="Segoe UI"/>
+    <Setter Property="FontWeight" Value="Normal"/>
+    <Setter Property="FontSize" Value="12"/>
+    <Setter Property="Foreground" Value="{DynamicResource BrushTextSecondary}"/>
+  </Style>
+
+  <Style x:Key="Mono" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="Cascadia Code, Consolas"/>
+    <Setter Property="FontWeight" Value="Normal"/>
+    <Setter Property="FontSize" Value="13"/>
+    <Setter Property="Foreground" Value="{DynamicResource BrushTextPrimary}"/>
+  </Style>
+
+</ResourceDictionary>

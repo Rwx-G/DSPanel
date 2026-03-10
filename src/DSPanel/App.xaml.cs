@@ -5,6 +5,7 @@ using Serilog;
 using Serilog.Events;
 using DSPanel.Services.Directory;
 using DSPanel.Services.Permissions;
+using DSPanel.Services.Theme;
 using DSPanel.ViewModels;
 
 namespace DSPanel;
@@ -37,6 +38,9 @@ public partial class App : Application
                 // Permissions
                 services.Configure<PermissionOptions>(context.Configuration.GetSection("Permissions"));
                 services.AddSingleton<IPermissionService, PermissionService>();
+
+                // Theme
+                services.AddSingleton<IThemeService, ThemeService>();
 
                 // ViewModels
                 services.AddTransient<MainViewModel>();

@@ -3,5 +3,20 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              ShutdownMode="OnMainWindowClose">
   <Application.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <!-- Base tokens: spacing, typography, elevation -->
+        <ResourceDictionary Source="Resources/Styles/Typography.xaml"/>
+
+        <!-- Theme (index 1 - swapped at runtime by ThemeService) -->
+        <ResourceDictionary Source="Resources/Styles/LightTheme.xaml"/>
+
+        <!-- Icons -->
+        <ResourceDictionary Source="Resources/Icons/IconPaths.xaml"/>
+
+        <!-- Control styles (reference theme colors) -->
+        <ResourceDictionary Source="Resources/Styles/Controls.xaml"/>
+      </ResourceDictionary.MergedDictionaries>
+    </ResourceDictionary>
   </Application.Resources>
 </Application>

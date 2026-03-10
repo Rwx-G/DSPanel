@@ -1,0 +1,83 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- Primary -->
+  <Color x:Key="ColorPrimary">#3B82F6</Color>
+  <Color x:Key="ColorPrimaryHover">#60A5FA</Color>
+  <Color x:Key="ColorPrimaryPressed">#2563EB</Color>
+  <Color x:Key="ColorPrimaryLight">#1E3A5F</Color>
+
+  <!-- Secondary -->
+  <Color x:Key="ColorSecondary">#9CA3AF</Color>
+  <Color x:Key="ColorSecondaryHover">#D1D5DB</Color>
+
+  <!-- Accent -->
+  <Color x:Key="ColorAccent">#A78BFA</Color>
+  <Color x:Key="ColorAccentHover">#C4B5FD</Color>
+
+  <!-- Semantic -->
+  <Color x:Key="ColorSuccess">#22C55E</Color>
+  <Color x:Key="ColorSuccessLight">#14532D</Color>
+  <Color x:Key="ColorWarning">#F59E0B</Color>
+  <Color x:Key="ColorWarningLight">#78350F</Color>
+  <Color x:Key="ColorError">#EF4444</Color>
+  <Color x:Key="ColorErrorLight">#7F1D1D</Color>
+  <Color x:Key="ColorInfo">#3B82F6</Color>
+  <Color x:Key="ColorInfoLight">#1E3A5F</Color>
+
+  <!-- Surface -->
+  <Color x:Key="ColorSurfaceBackground">#111827</Color>
+  <Color x:Key="ColorSurfaceCard">#1F2937</Color>
+  <Color x:Key="ColorSurfaceElevated">#374151</Color>
+  <Color x:Key="ColorSurfaceOverlay">#00000080</Color>
+
+  <!-- Text -->
+  <Color x:Key="ColorTextPrimary">#F9FAFB</Color>
+  <Color x:Key="ColorTextSecondary">#9CA3AF</Color>
+  <Color x:Key="ColorTextDisabled">#4B5563</Color>
+  <Color x:Key="ColorTextInverse">#111827</Color>
+  <Color x:Key="ColorTextLink">#60A5FA</Color>
+
+  <!-- Border -->
+  <Color x:Key="ColorBorderDefault">#374151</Color>
+  <Color x:Key="ColorBorderStrong">#4B5563</Color>
+  <Color x:Key="ColorBorderSubtle">#1F2937</Color>
+  <Color x:Key="ColorBorderFocus">#3B82F6</Color>
+
+  <!-- DataGrid -->
+  <Color x:Key="ColorRowAlternate">#1F2937</Color>
+  <Color x:Key="ColorRowHover">#374151</Color>
+  <Color x:Key="ColorRowSelected">#1E3A5F</Color>
+
+  <!-- SolidColorBrushes -->
+  <SolidColorBrush x:Key="BrushPrimary" Color="{StaticResource ColorPrimary}"/>
+  <SolidColorBrush x:Key="BrushPrimaryHover" Color="{StaticResource ColorPrimaryHover}"/>
+  <SolidColorBrush x:Key="BrushPrimaryPressed" Color="{StaticResource ColorPrimaryPressed}"/>
+  <SolidColorBrush x:Key="BrushPrimaryLight" Color="{StaticResource ColorPrimaryLight}"/>
+  <SolidColorBrush x:Key="BrushSecondary" Color="{StaticResource ColorSecondary}"/>
+  <SolidColorBrush x:Key="BrushAccent" Color="{StaticResource ColorAccent}"/>
+  <SolidColorBrush x:Key="BrushSuccess" Color="{StaticResource ColorSuccess}"/>
+  <SolidColorBrush x:Key="BrushSuccessLight" Color="{StaticResource ColorSuccessLight}"/>
+  <SolidColorBrush x:Key="BrushWarning" Color="{StaticResource ColorWarning}"/>
+  <SolidColorBrush x:Key="BrushWarningLight" Color="{StaticResource ColorWarningLight}"/>
+  <SolidColorBrush x:Key="BrushError" Color="{StaticResource ColorError}"/>
+  <SolidColorBrush x:Key="BrushErrorLight" Color="{StaticResource ColorErrorLight}"/>
+  <SolidColorBrush x:Key="BrushInfo" Color="{StaticResource ColorInfo}"/>
+  <SolidColorBrush x:Key="BrushInfoLight" Color="{StaticResource ColorInfoLight}"/>
+  <SolidColorBrush x:Key="BrushSurfaceBackground" Color="{StaticResource ColorSurfaceBackground}"/>
+  <SolidColorBrush x:Key="BrushSurfaceCard" Color="{StaticResource ColorSurfaceCard}"/>
+  <SolidColorBrush x:Key="BrushSurfaceElevated" Color="{StaticResource ColorSurfaceElevated}"/>
+  <SolidColorBrush x:Key="BrushTextPrimary" Color="{StaticResource ColorTextPrimary}"/>
+  <SolidColorBrush x:Key="BrushTextSecondary" Color="{StaticResource ColorTextSecondary}"/>
+  <SolidColorBrush x:Key="BrushTextDisabled" Color="{StaticResource ColorTextDisabled}"/>
+  <SolidColorBrush x:Key="BrushTextInverse" Color="{StaticResource ColorTextInverse}"/>
+  <SolidColorBrush x:Key="BrushTextLink" Color="{StaticResource ColorTextLink}"/>
+  <SolidColorBrush x:Key="BrushBorderDefault" Color="{StaticResource ColorBorderDefault}"/>
+  <SolidColorBrush x:Key="BrushBorderStrong" Color="{StaticResource ColorBorderStrong}"/>
+  <SolidColorBrush x:Key="BrushBorderSubtle" Color="{StaticResource ColorBorderSubtle}"/>
+  <SolidColorBrush x:Key="BrushBorderFocus" Color="{StaticResource ColorBorderFocus}"/>
+  <SolidColorBrush x:Key="BrushRowAlternate" Color="{StaticResource ColorRowAlternate}"/>
+  <SolidColorBrush x:Key="BrushRowHover" Color="{StaticResource ColorRowHover}"/>
+  <SolidColorBrush x:Key="BrushRowSelected" Color="{StaticResource ColorRowSelected}"/>
+
+</ResourceDictionary>
