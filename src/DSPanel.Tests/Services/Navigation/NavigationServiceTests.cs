@@ -185,4 +185,95 @@ public class NavigationServiceTests
 
         service.Tabs[0].CanClose.Should().BeTrue();
     }
+
+    [Fact]
+    public void CloseAllTabs_RemovesAllClosableTabs()
+    {
+        var service = CreateService();
+        service.OpenTab("users", "Users", "c1");
+        service.OpenTab("groups", "Groups", "c2");
+
+        service.CloseAllTabs();
+
+        service.Tabs.Should().BeEmpty();
+        service.ActiveTabKey.Should().BeNull();
+    }
+
+    [Fact]
+    public void CloseOtherTabs_KeepsOnlySpecifiedTab()
+    {
+        var service = CreateService();
+        service.OpenTab("users", "Users", "c1");
+        service.OpenTab("groups", "Groups", "c2");
+        service.OpenTab("computers", "Computers", "c3");
+
+        service.CloseOtherTabs("groups");
+
+        service.Tabs.Should().HaveCount(1);
+        service.Tabs[0].Key.Should().Be("groups");
+        service.ActiveTabKey.Should().Be("groups");
+    }
+
+    [Fact]
+    public void ActivateNextTab_WrapsAround()
+    {
+        var service = CreateService();
+        service.OpenTab("users", "Users", "c1");
+        service.OpenTab("groups", "Groups", "c2");
+        service.ActiveTabKey = "groups";
+
+        service.ActivateNextTab();
+
+        service.ActiveTabKey.Should().Be("users");
+    }
+
+    [Fact]
+    public void ActivatePreviousTab_WrapsAround()
+    {
+        var service = CreateService();
+        service.OpenTab("users", "Users", "c1");
+        service.OpenTab("groups", "Groups", "c2");
+        service.ActiveTabKey = "users";
+
+        service.ActivatePreviousTab();
+
+        service.ActiveTabKey.Should().Be("groups");
+    }
+
+    [Fact]
+    public void ActivateTabByIndex_ValidIndex_ActivatesTab()
+    {
+        var service = CreateService();
+        service.OpenTab("users", "Users", "c1");
+        service.OpenTab("groups", "Groups", "c2");
+
+        service.ActivateTabByIndex(1);
+
+        service.ActiveTabKey.Should().Be("groups");
+    }
+
+    [Fact]
+    public void ActivateTabByIndex_InvalidIndex_DoesNothing()
+    {
+        var service = CreateService();
+        service.OpenTab("users", "Users", "c1");
+        service.ActiveTabKey = "users";
+
+        service.ActivateTabByIndex(5);
+
+        service.ActiveTabKey.Should().Be("users");
+    }
+
+    [Fact]
+    public void MoveTab_SwapsTabPositions()
+    {
+        var service = CreateService();
+        service.OpenTab("users", "Users", "c1");
+        service.OpenTab("groups", "Groups", "c2");
+
+        service.MoveTab(0, 1);
+
+        service.Tabs[0].Key.Should().Be("groups");
+        service.Tabs[1].Key.Should().Be("users");
+    }
 }

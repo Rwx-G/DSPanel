@@ -75,8 +75,12 @@ public partial class MainViewModel : ObservableObject
                 return;
             _navigationService.ActiveTabKey = value;
             OnPropertyChanged();
+            OnPropertyChanged(nameof(ActiveTabTitle));
         }
     }
+
+    public string? ActiveTabTitle =>
+        Tabs.FirstOrDefault(t => t.Key == ActiveTabKey)?.Title;
 
     /// <summary>
     /// Index of the selected tab, for two-way binding with TabControl.SelectedIndex.
@@ -133,21 +137,61 @@ public partial class MainViewModel : ObservableObject
     private void Navigate(string key)
     {
         _navigationService.NavigateTo(key);
-        OnPropertyChanged(nameof(ActiveTabKey));
-        OnPropertyChanged(nameof(SelectedTabIndex));
+        NotifyTabChanged();
     }
 
     [RelayCommand]
     private void CloseTab(string key)
     {
         _navigationService.CloseTab(key);
-        OnPropertyChanged(nameof(ActiveTabKey));
-        OnPropertyChanged(nameof(SelectedTabIndex));
+        NotifyTabChanged();
+    }
+
+    [RelayCommand]
+    private void CloseAllTabs()
+    {
+        _navigationService.CloseAllTabs();
+        NotifyTabChanged();
+    }
+
+    [RelayCommand]
+    private void CloseOtherTabs(string key)
+    {
+        _navigationService.CloseOtherTabs(key);
+        NotifyTabChanged();
+    }
+
+    [RelayCommand]
+    private void NextTab()
+    {
+        _navigationService.ActivateNextTab();
+        NotifyTabChanged();
+    }
+
+    [RelayCommand]
+    private void PreviousTab()
+    {
+        _navigationService.ActivatePreviousTab();
+        NotifyTabChanged();
+    }
+
+    [RelayCommand]
+    private void ActivateTabByIndex(int index)
+    {
+        _navigationService.ActivateTabByIndex(index);
+        NotifyTabChanged();
     }
 
     public void MoveTab(int fromIndex, int toIndex)
     {
         _navigationService.MoveTab(fromIndex, toIndex);
+        OnPropertyChanged(nameof(SelectedTabIndex));
+    }
+
+    private void NotifyTabChanged()
+    {
+        OnPropertyChanged(nameof(ActiveTabKey));
+        OnPropertyChanged(nameof(ActiveTabTitle));
         OnPropertyChanged(nameof(SelectedTabIndex));
     }
 

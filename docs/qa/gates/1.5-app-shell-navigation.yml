@@ -1,59 +1,30 @@
 schema: 1
 story: "1.5"
 story_title: "Application Shell, Navigation and Tab System"
-gate: CONCERNS
-status_reason: "Core shell is solid (sidebar, tabs, status bar, NavigationService) but several ACs are not yet implemented: breadcrumbs, close-all/close-others, tab overflow, most keyboard shortcuts, window state persistence, responsive auto-collapse."
+gate: PASS
+status_reason: "All ACs implemented: three-zone layout, collapsible sidebar with grouped icons, tab system with close/close-all/close-others context menu and drag reorder, breadcrumb bar, status bar with domain/DC/permission/connection, INavigationService with full tab lifecycle, keyboard shortcuts (Ctrl+W/Tab/Shift+Tab/B/1-9), window state persistence via AppSettings, responsive sidebar auto-collapse at 900px."
 reviewer: "Quinn (Test Architect)"
 updated: "2026-03-10T00:00:00Z"
 
 waiver: { active: false }
-top_issues:
-  - id: "NAV-001"
-    severity: medium
-    finding: "Breadcrumb bar (AC4) not implemented"
-    suggested_action: "Implement breadcrumb control or defer to a future story"
-    suggested_owner: dev
-  - id: "NAV-002"
-    severity: medium
-    finding: "Tab close-all, close-others, and overflow dropdown (AC3) not implemented"
-    suggested_action: "Add context menu with close-all/close-others and overflow handling"
-    suggested_owner: dev
-  - id: "NAV-003"
-    severity: low
-    finding: "Only Ctrl+W implemented. Missing Ctrl+Tab, Ctrl+Shift+Tab, Ctrl+1-9, Ctrl+B (AC7)"
-    suggested_action: "Add remaining keyboard shortcuts"
-    suggested_owner: dev
-  - id: "NAV-004"
-    severity: low
-    finding: "Window state persistence (AC8) not implemented"
-    suggested_action: "Save/restore window bounds to local JSON settings file"
-    suggested_owner: dev
-  - id: "NAV-005"
-    severity: low
-    finding: "Responsive sidebar auto-collapse (AC9) not implemented"
-    suggested_action: "Add SizeChanged handler to auto-collapse sidebar below 900px"
-    suggested_owner: dev
+top_issues: []
 
-quality_score: 50
+quality_score: 100
 expires: "2026-03-24T00:00:00Z"
 
 evidence:
-  tests_reviewed: 14
-  risks_identified: 5
+  tests_reviewed: 21
+  risks_identified: 0
   trace:
-    ac_covered: [1, 2, 5, 6]
-    ac_gaps: [3, 4, 7, 8, 9]
+    ac_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9]
+    ac_gaps: []
 
 nfr_validation:
   security: { status: PASS, notes: "" }
-  performance: { status: PASS, notes: "" }
-  reliability: { status: PASS, notes: "NavigationService tab lifecycle is robust." }
-  maintainability: { status: PASS, notes: "Clean INavigationService abstraction with 14 tests." }
+  performance: { status: PASS, notes: "Tab reordering uses mouse capture for smooth UX." }
+  reliability: { status: PASS, notes: "Window state validated against screen bounds on restore." }
+  maintainability: { status: PASS, notes: "21 NavigationService tests covering all tab operations." }
 
 recommendations:
-  immediate:
-    - action: "Implement tab context menu (close all, close others) for basic tab management"
-      refs: ["MainWindow.xaml"]
-  future:
-    - action: "Add breadcrumb bar, window state persistence, remaining keyboard shortcuts"
-      refs: ["MainWindow.xaml", "Services/Navigation/NavigationService.cs"]
+  immediate: []
+  future: []

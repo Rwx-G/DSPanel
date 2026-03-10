@@ -203,8 +203,38 @@
 
     <!-- ==================== CONTENT AREA ==================== -->
     <Grid Grid.Column="1" Grid.Row="0">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="*"/>
+      </Grid.RowDefinitions>
+
+      <!-- Breadcrumb bar -->
+      <Border Grid.Row="0"
+              Background="{DynamicResource BrushSurfaceCard}"
+              BorderBrush="{DynamicResource BrushBorderSubtle}"
+              BorderThickness="0,0,0,1"
+              Padding="16,6">
+        <Border.Style>
+          <Style TargetType="Border">
+            <Setter Property="Visibility" Value="Visible"/>
+            <Style.Triggers>
+              <DataTrigger Binding="{Binding Tabs.Count}" Value="0">
+                <Setter Property="Visibility" Value="Collapsed"/>
+              </DataTrigger>
+            </Style.Triggers>
+          </Style>
+        </Border.Style>
+        <TextBlock Style="{StaticResource Caption}"
+                   Foreground="{DynamicResource BrushTextSecondary}">
+          <Run Text="Home"/>
+          <Run Text="  /  " Foreground="{DynamicResource BrushTextDisabled}"/>
+          <Run Text="{Binding ActiveTabTitle, FallbackValue='', Mode=OneWay}"
+               Foreground="{DynamicResource BrushTextPrimary}"/>
+        </TextBlock>
+      </Border>
+
       <!-- Default status dashboard when no tabs are open -->
-      <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+      <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
         <ScrollViewer.Style>
           <Style TargetType="ScrollViewer">
             <Setter Property="Visibility" Value="Collapsed"/>
@@ -304,12 +334,13 @@
       </ScrollViewer>
 
       <!-- Tab control -->
-      <TabControl x:Name="TabHost"
+      <TabControl Grid.Row="1" x:Name="TabHost"
                   ItemsSource="{Binding Tabs}"
                   SelectedIndex="{Binding SelectedTabIndex, Mode=TwoWay}"
                   PreviewMouseLeftButtonDown="TabHost_PreviewMouseLeftButtonDown"
                   PreviewMouseMove="TabHost_PreviewMouseMove"
-                  PreviewMouseLeftButtonUp="TabHost_PreviewMouseLeftButtonUp">
+                  PreviewMouseLeftButtonUp="TabHost_PreviewMouseLeftButtonUp"
+                  PreviewMouseDown="TabHost_PreviewMouseDown">
         <TabControl.Style>
           <Style TargetType="TabControl" BasedOn="{StaticResource {x:Type TabControl}}">
             <Style.Triggers>
@@ -322,6 +353,18 @@
         <TabControl.ItemTemplate>
           <DataTemplate DataType="{x:Type models:TabItem}">
             <StackPanel Orientation="Horizontal">
+              <StackPanel.ContextMenu>
+                <ContextMenu>
+                  <MenuItem Header="Close"
+                            Command="{Binding DataContext.CloseTabCommand, Source={x:Reference TabHost}}"
+                            CommandParameter="{Binding Key}"/>
+                  <MenuItem Header="Close others"
+                            Command="{Binding DataContext.CloseOtherTabsCommand, Source={x:Reference TabHost}}"
+                            CommandParameter="{Binding Key}"/>
+                  <MenuItem Header="Close all"
+                            Command="{Binding DataContext.CloseAllTabsCommand, Source={x:Reference TabHost}}"/>
+                </ContextMenu>
+              </StackPanel.ContextMenu>
               <!-- Hidden bold text to reserve max width and prevent layout shift -->
               <Grid>
                 <TextBlock Text="{Binding Title}" FontWeight="SemiBold" Visibility="Hidden"/>

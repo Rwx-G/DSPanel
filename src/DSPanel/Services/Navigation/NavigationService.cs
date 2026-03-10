@@ -131,4 +131,54 @@ public class NavigationService : INavigationService
         Tabs.Move(fromIndex, toIndex);
         _logger.LogDebug("Moved tab from index {From} to {To}", fromIndex, toIndex);
     }
+
+    public void CloseAllTabs()
+    {
+        var closable = Tabs.Where(t => t.CanClose).ToList();
+        foreach (var tab in closable)
+            Tabs.Remove(tab);
+
+        if (Tabs.Count > 0)
+            ActiveTabKey = Tabs[^1].Key;
+        else
+            ActiveTabKey = null;
+
+        _logger.LogDebug("Closed all closable tabs ({Count})", closable.Count);
+    }
+
+    public void CloseOtherTabs(string key)
+    {
+        var closable = Tabs.Where(t => t.CanClose && !string.Equals(t.Key, key, StringComparison.OrdinalIgnoreCase)).ToList();
+        foreach (var tab in closable)
+            Tabs.Remove(tab);
+
+        ActiveTabKey = key;
+        _logger.LogDebug("Closed {Count} other tabs, kept {TabKey}", closable.Count, key);
+    }
+
+    public void ActivateNextTab()
+    {
+        if (Tabs.Count == 0) return;
+        var index = ActiveTabKey is not null
+            ? Tabs.IndexOf(Tabs.First(t => t.Key == ActiveTabKey))
+            : -1;
+        var next = (index + 1) % Tabs.Count;
+        ActiveTabKey = Tabs[next].Key;
+    }
+
+    public void ActivatePreviousTab()
+    {
+        if (Tabs.Count == 0) return;
+        var index = ActiveTabKey is not null
+            ? Tabs.IndexOf(Tabs.First(t => t.Key == ActiveTabKey))
+            : 0;
+        var prev = (index - 1 + Tabs.Count) % Tabs.Count;
+        ActiveTabKey = Tabs[prev].Key;
+    }
+
+    public void ActivateTabByIndex(int index)
+    {
+        if (index >= 0 && index < Tabs.Count)
+            ActiveTabKey = Tabs[index].Key;
+    }
 }

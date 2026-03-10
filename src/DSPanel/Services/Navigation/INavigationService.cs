@@ -44,4 +44,29 @@ public interface INavigationService
     /// Moves a tab from one index to another.
     /// </summary>
     void MoveTab(int fromIndex, int toIndex);
+
+    /// <summary>
+    /// Closes all closable tabs.
+    /// </summary>
+    void CloseAllTabs();
+
+    /// <summary>
+    /// Closes all closable tabs except the one identified by key.
+    /// </summary>
+    void CloseOtherTabs(string key);
+
+    /// <summary>
+    /// Activates the next tab (wraps around).
+    /// </summary>
+    void ActivateNextTab();
+
+    /// <summary>
+    /// Activates the previous tab (wraps around).
+    /// </summary>
+    void ActivatePreviousTab();
+
+    /// <summary>
+    /// Activates the tab at the given 0-based index.
+    /// </summary>
+    void ActivateTabByIndex(int index);
 }
