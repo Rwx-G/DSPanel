@@ -300,8 +300,12 @@
       </Border>
 
       <!-- Tab control -->
-      <TabControl ItemsSource="{Binding Tabs}"
-                  SelectedIndex="{Binding SelectedTabIndex, Mode=TwoWay}">
+      <TabControl x:Name="TabHost"
+                  ItemsSource="{Binding Tabs}"
+                  SelectedIndex="{Binding SelectedTabIndex, Mode=TwoWay}"
+                  PreviewMouseLeftButtonDown="TabHost_PreviewMouseLeftButtonDown"
+                  PreviewMouseMove="TabHost_PreviewMouseMove"
+                  PreviewMouseLeftButtonUp="TabHost_PreviewMouseLeftButtonUp">
         <TabControl.Style>
           <Style TargetType="TabControl" BasedOn="{StaticResource {x:Type TabControl}}">
             <Style.Triggers>
@@ -338,7 +342,8 @@
         </TabControl.ItemTemplate>
         <TabControl.ContentTemplate>
           <DataTemplate DataType="{x:Type models:TabItem}">
-            <Border Padding="24" Background="{DynamicResource BrushSurfaceBackground}">
+            <Border Padding="24" Background="{DynamicResource BrushSurfaceBackground}"
+                    TextElement.Foreground="{DynamicResource BrushTextPrimary}">
               <ContentPresenter Content="{Binding Content}"/>
             </Border>
           </DataTemplate>

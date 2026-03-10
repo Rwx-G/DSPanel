@@ -6,7 +6,8 @@
     <converters:NonEmptyStringToVisibilityConverter x:Key="NonEmptyStringToVisibility"/>
   </UserControl.Resources>
 
-  <Border Background="{DynamicResource BrushSurfaceCard}"
+  <Border x:Name="PART_Border"
+          Background="{DynamicResource BrushSurfaceCard}"
           BorderBrush="{DynamicResource BrushBorderDefault}"
           BorderThickness="1"
           CornerRadius="{StaticResource BorderRadiusMd}"
@@ -35,7 +36,10 @@
                BorderThickness="0"
                VerticalAlignment="Center"
                FontSize="14"
-               Padding="0,6"/>
+               Padding="2,6"
+               GotFocus="OnSearchBoxGotFocus"
+               LostFocus="OnSearchBoxLostFocus"
+               KeyDown="OnSearchBoxKeyDown"/>
 
       <!-- Placeholder text -->
       <TextBlock Grid.Column="1"
@@ -44,7 +48,8 @@
                  VerticalAlignment="Center"
                  IsHitTestVisible="False"
                  FontSize="14"
-                 Padding="0,6">
+                 Padding="2,6"
+                 Margin="1,0,0,0">
         <TextBlock.Style>
           <Style TargetType="TextBlock">
             <Setter Property="Visibility" Value="Collapsed"/>

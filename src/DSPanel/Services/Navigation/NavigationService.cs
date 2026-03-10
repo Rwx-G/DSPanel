@@ -120,4 +120,15 @@ public class NavigationService : INavigationService
             ActiveTabKey = null;
         }
     }
+
+    public void MoveTab(int fromIndex, int toIndex)
+    {
+        if (fromIndex < 0 || fromIndex >= Tabs.Count ||
+            toIndex < 0 || toIndex >= Tabs.Count ||
+            fromIndex == toIndex)
+            return;
+
+        Tabs.Move(fromIndex, toIndex);
+        _logger.LogDebug("Moved tab from index {From} to {To}", fromIndex, toIndex);
+    }
 }

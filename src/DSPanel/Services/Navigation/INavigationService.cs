@@ -39,4 +39,9 @@ public interface INavigationService
     /// When <see cref="NavigateTo"/> is called, the factory is invoked to produce the tab content.
     /// </summary>
     void RegisterViewFactory(string key, Func<object> factory);
+
+    /// <summary>
+    /// Moves a tab from one index to another.
+    /// </summary>
+    void MoveTab(int fromIndex, int toIndex);
 }

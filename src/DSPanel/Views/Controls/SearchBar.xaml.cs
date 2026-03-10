@@ -115,4 +115,25 @@ public partial class SearchBar : UserControl
     {
         Text = string.Empty;
     }
+
+    private void OnSearchBoxGotFocus(object sender, RoutedEventArgs e)
+    {
+        PART_Border.BorderBrush = (System.Windows.Media.Brush)FindResource("BrushBorderFocus");
+    }
+
+    private void OnSearchBoxLostFocus(object sender, RoutedEventArgs e)
+    {
+        PART_Border.BorderBrush = (System.Windows.Media.Brush)FindResource("BrushBorderDefault");
+    }
+
+    private void OnSearchBoxKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Escape)
+        {
+            // Move focus away from the search box
+            Keyboard.ClearFocus();
+            FocusManager.SetFocusedElement(FocusManager.GetFocusScope(this), null);
+            e.Handled = true;
+        }
+    }
 }

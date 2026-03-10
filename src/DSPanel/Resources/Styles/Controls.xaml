@@ -148,7 +148,6 @@
           <ControlTemplate.Triggers>
             <Trigger Property="IsFocused" Value="True">
               <Setter TargetName="border" Property="BorderBrush" Value="{DynamicResource BrushBorderFocus}"/>
-              <Setter TargetName="border" Property="BorderThickness" Value="2"/>
             </Trigger>
             <Trigger Property="IsEnabled" Value="False">
               <Setter TargetName="border" Property="Opacity" Value="0.5"/>

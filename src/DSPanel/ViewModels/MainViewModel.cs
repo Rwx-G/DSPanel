@@ -137,6 +137,12 @@ public partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(SelectedTabIndex));
     }
 
+    public void MoveTab(int fromIndex, int toIndex)
+    {
+        _navigationService.MoveTab(fromIndex, toIndex);
+        OnPropertyChanged(nameof(SelectedTabIndex));
+    }
+
     // ---- Private helpers ----
 
     private void BuildSidebarItems()
