@@ -33,4 +33,10 @@ public interface INavigationService
     /// Closes the tab identified by key.
     /// </summary>
     void CloseTab(string key);
+
+    /// <summary>
+    /// Registers a factory function that creates the view content for a given module key.
+    /// When <see cref="NavigateTo"/> is called, the factory is invoked to produce the tab content.
+    /// </summary>
+    void RegisterViewFactory(string key, Func<object> factory);
 }

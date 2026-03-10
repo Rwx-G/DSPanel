@@ -5,10 +5,12 @@ using Serilog;
 using Serilog.Events;
 using DSPanel.Services.Dialog;
 using DSPanel.Services.Directory;
+using DSPanel.Services.Health;
 using DSPanel.Services.Navigation;
 using DSPanel.Services.Permissions;
 using DSPanel.Services.Theme;
 using DSPanel.ViewModels;
+using DSPanel.Views.Pages;
 
 namespace DSPanel;
 
@@ -56,8 +58,13 @@ public partial class App : Application
                 // Navigation
                 services.AddSingleton<INavigationService, NavigationService>();
 
+                // Health
+                services.AddSingleton<IHealthCheckService, HealthCheckService>();
+
                 // ViewModels
                 services.AddTransient<MainViewModel>();
+                services.AddTransient<UserLookupViewModel>();
+                services.AddTransient<ComputerLookupViewModel>();
 
                 // Windows
                 services.AddSingleton<MainWindow>();
@@ -66,6 +73,21 @@ public partial class App : Application
 
         await _host.StartAsync();
         ServiceProvider = _host.Services;
+
+        // Register view factories for module navigation
+        var navigationService = _host.Services.GetRequiredService<INavigationService>();
+        navigationService.RegisterViewFactory("users", () =>
+        {
+            var view = new UserLookupView();
+            view.DataContext = _host.Services.GetRequiredService<UserLookupViewModel>();
+            return view;
+        });
+        navigationService.RegisterViewFactory("computers", () =>
+        {
+            var view = new ComputerLookupView();
+            view.DataContext = _host.Services.GetRequiredService<ComputerLookupViewModel>();
+            return view;
+        });
 
         Log.Information("DSPanel starting");
 

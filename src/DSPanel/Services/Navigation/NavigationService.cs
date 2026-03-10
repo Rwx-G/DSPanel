@@ -49,14 +49,23 @@ public class NavigationService : INavigationService
         ["settings"] = "Settings"
     };
 
+    private readonly Dictionary<string, Func<object>> _viewFactories = new(StringComparer.OrdinalIgnoreCase);
+
+    public void RegisterViewFactory(string key, Func<object> factory)
+    {
+        _viewFactories[key] = factory;
+    }
+
     public void NavigateTo(string moduleKey)
     {
         var title = ModuleTitles.TryGetValue(moduleKey, out var t)
             ? t
             : moduleKey;
 
-        // Placeholder content - modules will provide their own views later
-        var content = $"Module: {title}";
+        // Use registered factory if available, otherwise fall back to placeholder
+        var content = _viewFactories.TryGetValue(moduleKey, out var factory)
+            ? factory()
+            : (object)$"Module: {title}";
 
         OpenTab(moduleKey, title, content);
         _logger.LogDebug("Navigated to module {ModuleKey}", moduleKey);
