@@ -1,6 +1,6 @@
 using System.IO;
-using System.Windows.Markup;
 using System.Windows;
+using System.Windows.Markup;
 using FluentAssertions;
 
 namespace DSPanel.Tests.Services.Theme;

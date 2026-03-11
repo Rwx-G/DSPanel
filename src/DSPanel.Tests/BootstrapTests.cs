@@ -1,10 +1,3 @@
-using FluentAssertions;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
-using Moq;
-using Serilog;
-using Serilog.Events;
 using DSPanel.Services.Dialog;
 using DSPanel.Services.Directory;
 using DSPanel.Services.Navigation;
@@ -12,6 +5,13 @@ using DSPanel.Services.Notifications;
 using DSPanel.Services.Permissions;
 using DSPanel.Services.Theme;
 using DSPanel.ViewModels;
+using FluentAssertions;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Moq;
+using Serilog;
+using Serilog.Events;
 
 namespace DSPanel.Tests;
 

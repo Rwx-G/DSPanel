@@ -1,9 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Windows;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Serilog;
-using Serilog.Events;
 using DSPanel.Services.Dialog;
 using DSPanel.Services.Directory;
 using DSPanel.Services.Export;
@@ -16,6 +12,10 @@ using DSPanel.Services.Settings;
 using DSPanel.Services.Theme;
 using DSPanel.ViewModels;
 using DSPanel.Views.Pages;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Serilog;
+using Serilog.Events;
 
 namespace DSPanel;
 
