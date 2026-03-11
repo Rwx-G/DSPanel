@@ -1,0 +1,26 @@
+{
+  "stryker-config": {
+    "project-info": {
+      "name": "DSPanel"
+    },
+    "solution": "DSPanel.slnx",
+    "mutation-level": "Standard",
+    "reporters": ["html", "progress", "cleartext"],
+    "thresholds": {
+      "high": 80,
+      "low": 60,
+      "break": 40
+    },
+    "mutate": [
+      "src/DSPanel/**/*.cs",
+      "!src/DSPanel/obj/**/*",
+      "!src/DSPanel/Views/**/*.xaml.cs",
+      "!src/DSPanel/**/AssemblyInfo.cs"
+    ],
+    "ignore-mutations": [
+      "string",
+      "linq"
+    ],
+    "concurrency": 4
+  }
+}
