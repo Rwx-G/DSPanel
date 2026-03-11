@@ -78,5 +78,8 @@ appsettings.*.json
 # Serilog log files
 logs/
 
+# Stryker mutation testing
+StrykerOutput/
+
 # Claude Code
 .claude/memory/

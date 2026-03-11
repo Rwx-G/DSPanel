@@ -18,6 +18,9 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
+      - name: Restore tools
+        run: dotnet tool restore
+
       - name: Restore dependencies
         run: dotnet restore
 
@@ -27,10 +30,47 @@ jobs:
       - name: Build
         run: dotnet build --no-restore --configuration Release
 
-      - name: Test
-        run: dotnet test --no-build --configuration Release --verbosity normal
+      - name: Test with coverage
+        run: >
+          dotnet test --no-build --configuration Release
+          --verbosity normal
+          --collect:"XPlat Code Coverage"
+          --settings coverlet.runsettings
+          --results-directory TestResults
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: TestResults/**/coverage.cobertura.xml
+          retention-days: 14
 
       - name: Check for vulnerable packages
-        run: dotnet list package --vulnerable --include-transitive 2>&1 | tee vulnerable.txt; if Select-String -Path vulnerable.txt -Pattern "has the following vulnerable packages"; then exit 1; fi
+        run: |
+          $output = dotnet list package --vulnerable --include-transitive 2>&1
+          $output | Write-Host
+          if ($output -match "has the following vulnerable packages") {
+            Write-Warning "Vulnerable packages detected"
+            exit 1
+          }
         shell: pwsh
         continue-on-error: true
+
+      - name: Publish self-contained exe
+        if: github.ref == 'refs/heads/main'
+        run: >
+          dotnet publish src/DSPanel/DSPanel.csproj
+          --configuration Release
+          --output publish/win-x64
+          --self-contained true
+          --runtime win-x64
+          -p:PublishSingleFile=true
+
+      - name: Upload build artifact
+        if: github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: DSPanel-win-x64
+          path: publish/win-x64/
+          retention-days: 30
