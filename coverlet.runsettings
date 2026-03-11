@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RunSettings>
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="XPlat Code Coverage">
+        <Configuration>
+          <Format>cobertura</Format>
+          <!-- Exclude classes decorated with these attributes -->
+          <ExcludeByAttribute>ExcludeFromCodeCoverage,GeneratedCodeAttribute,CompilerGeneratedAttribute</ExcludeByAttribute>
+          <!-- Exclude auto-generated XAML and regex source files -->
+          <ExcludeByFile>**/*.g.cs,**/*.g.i.cs</ExcludeByFile>
+          <!-- Exclude XAML-generated internal helper and auto-generated namespaces -->
+          <Exclude>[DSPanel]XamlGeneratedNamespace.*</Exclude>
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+</RunSettings>

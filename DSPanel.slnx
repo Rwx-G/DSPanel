@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/DSPanel.Tests/DSPanel.Tests.csproj" />
+    <Project Path="src/DSPanel/DSPanel.csproj" />
+  </Folder>
+</Solution>

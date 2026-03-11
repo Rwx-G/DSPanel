@@ -1,0 +1,40 @@
+<UserControl x:Class="DSPanel.Views.Controls.Pagination"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+    <!-- Page size selector -->
+    <TextBlock Text="Show"
+               Style="{StaticResource Caption}"
+               VerticalAlignment="Center"
+               Margin="0,0,6,0"/>
+    <ComboBox x:Name="PART_PageSize"
+              Width="65"
+              VerticalContentAlignment="Center"
+              SelectedIndex="0"
+              SelectionChanged="OnPageSizeChanged">
+      <ComboBoxItem Content="25"/>
+      <ComboBoxItem Content="50"/>
+      <ComboBoxItem Content="100"/>
+    </ComboBox>
+
+    <!-- Info label - fixed width to prevent layout shift -->
+    <TextBlock x:Name="PART_InfoLabel"
+               Style="{StaticResource Caption}"
+               Foreground="{DynamicResource BrushTextSecondary}"
+               VerticalAlignment="Center"
+               MinWidth="160"
+               Margin="16,0"/>
+
+    <!-- Navigation buttons -->
+    <Button x:Name="PART_First" Style="{StaticResource GhostButton}" Content="&#x23EE;" Padding="6,4" Click="OnFirst" ToolTip="First page"/>
+    <Button x:Name="PART_Prev" Style="{StaticResource GhostButton}" Content="&#x25C0;" Padding="6,4" Click="OnPrev" ToolTip="Previous page"/>
+    <TextBlock x:Name="PART_PageLabel"
+               Style="{StaticResource Caption}"
+               VerticalAlignment="Center"
+               TextAlignment="Center"
+               MinWidth="60"
+               Margin="8,0"/>
+    <Button x:Name="PART_Next" Style="{StaticResource GhostButton}" Content="&#x25B6;" Padding="6,4" Click="OnNext" ToolTip="Next page"/>
+    <Button x:Name="PART_Last" Style="{StaticResource GhostButton}" Content="&#x23ED;" Padding="6,4" Click="OnLast" ToolTip="Last page"/>
+  </StackPanel>
+</UserControl>

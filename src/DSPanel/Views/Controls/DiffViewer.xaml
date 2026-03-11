@@ -1,0 +1,191 @@
+<UserControl x:Class="DSPanel.Views.Controls.DiffViewer"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="*"/>
+    </Grid.RowDefinitions>
+
+    <!-- Toolbar -->
+    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
+      <Button x:Name="PART_ToggleMode"
+              Style="{StaticResource GhostButton}"
+              Content="Side by side"
+              Click="OnToggleMode"/>
+    </StackPanel>
+
+    <!-- Inline mode -->
+    <ScrollViewer x:Name="PART_InlineView" Grid.Row="1"
+                  VerticalScrollBarVisibility="Disabled"
+                  HorizontalScrollBarVisibility="Auto">
+      <ItemsControl x:Name="PART_InlineItems">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate>
+            <Border Padding="4,1">
+              <Border.Style>
+                <Style TargetType="Border">
+                  <Setter Property="Background" Value="Transparent"/>
+                  <Style.Triggers>
+                    <DataTrigger Binding="{Binding Type}" Value="Added">
+                      <Setter Property="Background" Value="{DynamicResource BrushDiffAdded}"/>
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding Type}" Value="Removed">
+                      <Setter Property="Background" Value="{DynamicResource BrushDiffRemoved}"/>
+                    </DataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </Border.Style>
+              <StackPanel Orientation="Horizontal">
+                <TextBlock Text="{Binding OldLineNumber, StringFormat='{}{0,4}'}"
+                           FontFamily="Cascadia Code, Consolas"
+                           FontSize="12"
+                           Foreground="{DynamicResource BrushTextDisabled}"
+                           Width="36"/>
+                <TextBlock Text="{Binding NewLineNumber, StringFormat='{}{0,4}'}"
+                           FontFamily="Cascadia Code, Consolas"
+                           FontSize="12"
+                           Foreground="{DynamicResource BrushTextDisabled}"
+                           Width="36"/>
+                <TextBlock Text="{Binding Content}"
+                           FontFamily="Cascadia Code, Consolas"
+                           FontSize="12"
+                           Margin="8,0,0,0">
+                  <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                      <Setter Property="Foreground" Value="{DynamicResource BrushTextPrimary}"/>
+                      <Style.Triggers>
+                        <DataTrigger Binding="{Binding Type}" Value="Added">
+                          <Setter Property="Foreground" Value="{DynamicResource BrushDiffAddedText}"/>
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding Type}" Value="Removed">
+                          <Setter Property="Foreground" Value="{DynamicResource BrushDiffRemovedText}"/>
+                        </DataTrigger>
+                      </Style.Triggers>
+                    </Style>
+                  </TextBlock.Style>
+                </TextBlock>
+              </StackPanel>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </ScrollViewer>
+
+    <!-- Side-by-side mode -->
+    <Grid x:Name="PART_SideBySideView" Grid.Row="1" Visibility="Collapsed">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*"/>
+        <ColumnDefinition Width="1"/>
+        <ColumnDefinition Width="*"/>
+      </Grid.ColumnDefinitions>
+
+      <ScrollViewer x:Name="PART_LeftScroll" Grid.Column="0"
+                    VerticalScrollBarVisibility="Disabled"
+                    HorizontalScrollBarVisibility="Auto"
+                    ScrollChanged="OnLeftScrollChanged">
+        <ItemsControl x:Name="PART_LeftItems">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <Border Padding="4,1">
+                <Border.Style>
+                  <Style TargetType="Border">
+                    <Setter Property="Background" Value="Transparent"/>
+                    <Style.Triggers>
+                      <DataTrigger Binding="{Binding Type}" Value="Added">
+                        <Setter Property="Background" Value="{DynamicResource BrushDiffAdded}"/>
+                      </DataTrigger>
+                      <DataTrigger Binding="{Binding Type}" Value="Removed">
+                        <Setter Property="Background" Value="{DynamicResource BrushDiffRemoved}"/>
+                      </DataTrigger>
+                    </Style.Triggers>
+                  </Style>
+                </Border.Style>
+                <StackPanel Orientation="Horizontal">
+                  <TextBlock Text="{Binding OldLineNumber, StringFormat='{}{0,4}'}"
+                             FontFamily="Cascadia Code, Consolas"
+                             FontSize="12"
+                             Foreground="{DynamicResource BrushTextDisabled}"
+                             Width="36"/>
+                  <TextBlock Text="{Binding Content}"
+                             FontFamily="Cascadia Code, Consolas"
+                             FontSize="12"
+                             Margin="8,0,0,0">
+                    <TextBlock.Style>
+                      <Style TargetType="TextBlock">
+                        <Setter Property="Foreground" Value="{DynamicResource BrushTextPrimary}"/>
+                        <Style.Triggers>
+                          <DataTrigger Binding="{Binding Type}" Value="Added">
+                            <Setter Property="Foreground" Value="{DynamicResource BrushDiffAddedText}"/>
+                          </DataTrigger>
+                          <DataTrigger Binding="{Binding Type}" Value="Removed">
+                            <Setter Property="Foreground" Value="{DynamicResource BrushDiffRemovedText}"/>
+                          </DataTrigger>
+                        </Style.Triggers>
+                      </Style>
+                    </TextBlock.Style>
+                  </TextBlock>
+                </StackPanel>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+
+      <Border Grid.Column="1" Background="{DynamicResource BrushBorderDefault}"/>
+
+      <ScrollViewer x:Name="PART_RightScroll" Grid.Column="2"
+                    VerticalScrollBarVisibility="Disabled"
+                    HorizontalScrollBarVisibility="Auto"
+                    ScrollChanged="OnRightScrollChanged">
+        <ItemsControl x:Name="PART_RightItems">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <Border Padding="4,1">
+                <Border.Style>
+                  <Style TargetType="Border">
+                    <Setter Property="Background" Value="Transparent"/>
+                    <Style.Triggers>
+                      <DataTrigger Binding="{Binding Type}" Value="Added">
+                        <Setter Property="Background" Value="{DynamicResource BrushDiffAdded}"/>
+                      </DataTrigger>
+                      <DataTrigger Binding="{Binding Type}" Value="Removed">
+                        <Setter Property="Background" Value="{DynamicResource BrushDiffRemoved}"/>
+                      </DataTrigger>
+                    </Style.Triggers>
+                  </Style>
+                </Border.Style>
+                <StackPanel Orientation="Horizontal">
+                  <TextBlock Text="{Binding NewLineNumber, StringFormat='{}{0,4}'}"
+                             FontFamily="Cascadia Code, Consolas"
+                             FontSize="12"
+                             Foreground="{DynamicResource BrushTextDisabled}"
+                             Width="36"/>
+                  <TextBlock Text="{Binding Content}"
+                             FontFamily="Cascadia Code, Consolas"
+                             FontSize="12"
+                             Margin="8,0,0,0">
+                    <TextBlock.Style>
+                      <Style TargetType="TextBlock">
+                        <Setter Property="Foreground" Value="{DynamicResource BrushTextPrimary}"/>
+                        <Style.Triggers>
+                          <DataTrigger Binding="{Binding Type}" Value="Added">
+                            <Setter Property="Foreground" Value="{DynamicResource BrushDiffAddedText}"/>
+                          </DataTrigger>
+                          <DataTrigger Binding="{Binding Type}" Value="Removed">
+                            <Setter Property="Foreground" Value="{DynamicResource BrushDiffRemovedText}"/>
+                          </DataTrigger>
+                        </Style.Triggers>
+                      </Style>
+                    </TextBlock.Style>
+                  </TextBlock>
+                </StackPanel>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+    </Grid>
+  </Grid>
+</UserControl>

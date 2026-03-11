@@ -3,6 +3,9 @@ bin/
 obj/
 *.user
 *.suo
+
+# Local notes (not tracked)
+quality-scoring.md
 *.userosscache
 *.sln.docstates
 
@@ -74,6 +77,9 @@ appsettings.*.json
 
 # Serilog log files
 logs/
+
+# Stryker mutation testing
+StrykerOutput/
 
 # Claude Code
 .claude/memory/

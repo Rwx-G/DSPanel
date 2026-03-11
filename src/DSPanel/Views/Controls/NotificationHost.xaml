@@ -1,0 +1,57 @@
+<UserControl x:Class="DSPanel.Views.Controls.NotificationHost"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:converters="clr-namespace:DSPanel.Converters"
+             IsHitTestVisible="False">
+  <UserControl.Resources>
+    <converters:NotificationSeverityToBrushConverter x:Key="SeverityToBrush"/>
+    <converters:NotificationSeverityToIconConverter x:Key="SeverityToIcon"/>
+  </UserControl.Resources>
+
+  <ItemsControl x:Name="PART_Items"
+                VerticalAlignment="Bottom"
+                HorizontalAlignment="Right"
+                Margin="0,0,16,16">
+    <ItemsControl.ItemsPanel>
+      <ItemsPanelTemplate>
+        <StackPanel/>
+      </ItemsPanelTemplate>
+    </ItemsControl.ItemsPanel>
+    <ItemsControl.ItemTemplate>
+      <DataTemplate>
+        <Grid Width="360" Margin="0,8,0,0" IsHitTestVisible="True">
+          <!-- Main toast body -->
+          <Border Background="{DynamicResource BrushSurfaceElevated}"
+                  CornerRadius="6"
+                  Padding="16,12,16,15">
+            <Border.Effect>
+              <DropShadowEffect BlurRadius="16" ShadowDepth="2" Opacity="0.25" Direction="270"/>
+            </Border.Effect>
+            <StackPanel Orientation="Horizontal">
+              <Path Data="{Binding Severity, Converter={StaticResource SeverityToIcon}}"
+                    Fill="{Binding Severity, Converter={StaticResource SeverityToBrush}}"
+                    Width="18" Height="18"
+                    Stretch="Uniform"
+                    Margin="0,0,10,0"
+                    VerticalAlignment="Center"/>
+              <TextBlock Text="{Binding Message}"
+                         Style="{StaticResource Body}"
+                         TextWrapping="Wrap"
+                         VerticalAlignment="Center"/>
+            </StackPanel>
+          </Border>
+
+          <!-- Countdown bar at bottom -->
+          <Border x:Name="CountdownBar"
+                  Height="3"
+                  VerticalAlignment="Bottom"
+                  HorizontalAlignment="Left"
+                  CornerRadius="0,0,6,6"
+                  Background="{Binding Severity, Converter={StaticResource SeverityToBrush}}"
+                  Width="360"
+                  Loaded="CountdownBar_Loaded"/>
+        </Grid>
+      </DataTemplate>
+    </ItemsControl.ItemTemplate>
+  </ItemsControl>
+</UserControl>

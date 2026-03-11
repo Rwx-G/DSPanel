@@ -7,7 +7,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License"></a>
   <img src="https://img.shields.io/badge/.NET-10.0-purple.svg" alt=".NET">
   <img src="https://img.shields.io/badge/Platform-Windows-0078D6.svg" alt="Platform">
-  <img src="https://img.shields.io/badge/Status-v0.0.2_Documentation-yellow.svg" alt="Status">
+  <img src="https://img.shields.io/badge/Status-v0.1.0-brightgreen.svg" alt="Status">
   <img src="https://img.shields.io/badge/Coverage%20Target->90%25-brightgreen.svg" alt="Coverage">
 </p>
 
