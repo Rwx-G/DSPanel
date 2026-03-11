@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using DSPanel.Helpers;
 using DSPanel.Models;
 using DSPanel.Services.Directory;
 using DSPanel.Services.Network;
@@ -102,8 +103,8 @@ public partial class ComputerLookupViewModel : ObservableObject
     [RelayCommand]
     private async Task SearchAsync(string? query)
     {
-        var filter = query?.Trim() ?? SearchText.Trim();
-        if (string.IsNullOrEmpty(filter))
+        var filter = LdapFilterHelper.ValidateSearchInput(query ?? SearchText);
+        if (filter is null)
         {
             SearchResults.Clear();
             SelectedComputer = null;
