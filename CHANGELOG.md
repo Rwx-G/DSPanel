@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-03-11
+
 ### Added
 
 - Epic 1 implementation: Foundation and Core Lookup (Stories 1.1-1.12)
@@ -26,7 +28,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Computer lookup with search, detail view, and ping/DNS commands (1.12)
 - Application settings service (IAppSettingsService) with JSON persistence in LocalAppData
 - Diff-specific theme brushes (BrushDiffAdded/Removed/AddedText/RemovedText) for light and dark modes
-- 306 unit tests covering all services, ViewModels, and controls
+- LdapFilterHelper with RFC 4515 escaping and input validation (defense-in-depth against LDAP injection)
+- XamlBindingValidator for static XAML binding verification against ViewModels via reflection
+- Stryker.NET mutation testing setup (tool + config ready, blocked by Buildalyzer/WPF/.NET 10 upstream)
+- 668 unit tests covering all services, ViewModels, controls, security, and XAML bindings (99.7% line coverage)
+
+### Changed
+
+- GitHub Actions CI enhanced: format check, Coverlet/Cobertura coverage, vulnerability check, self-contained publish (128 MB exe)
+- User and Computer lookup ViewModels hardened with LdapFilterHelper input validation
 
 ## [0.0.2] - 2026-03-10
 
