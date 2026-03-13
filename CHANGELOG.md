@@ -34,7 +34,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Healthcheck badge with 9 account flags: Disabled, Locked, Expired, PasswordExpired, PasswordNeverExpires, Inactive30/90Days, NeverLoggedOn, PasswordNeverChanged (Story 1.11)
 - evaluateHealth() pure function with injectable clock for deterministic testing
 - HealthBadge component with severity colors, icons, and hover tooltip showing all active flags
-- 481 frontend tests + 103 Rust tests = 584 total tests
+- Computer account lookup page with search, results list, detail panel, group memberships DataTable (Story 1.12)
+- Tauri commands: search_computers, ping_host (system ping), resolve_dns (tokio lookup_host)
+- DirectoryComputer type with mapEntryToComputer mapping
+- ComputerLookup detail: Identity, Status, Location, Network sections with ping button and DNS auto-resolution
+- 502 frontend tests + 103 Rust tests = 605 total tests
 
 ### Changed
 
