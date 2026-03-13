@@ -1,30 +1,73 @@
-schema: 1
-story: "1.9"
-story_title: "Dialogs, Notifications and Feedback System"
 gate: PASS
-status_reason: "All 9 ACs met. IDialogService with styled ConfirmationDialog (severity icons, details expander, keyboard support), ProgressDialog (determinate/indeterminate, cancellation, completion state), InlineProgress control, INotificationService with toast overlay (auto-dismiss, countdown bar animation, 4 severity levels). All registered in DI and mockable."
-reviewer: "Quinn (Test Architect)"
-updated: "2026-03-10T00:00:00Z"
-
-waiver: { active: false }
-top_issues: []
-
+story: "1.9"
+title: "Dialogs, Notifications and Feedback System"
+reviewed_by: "Romain G."
+review_date: "2026-03-13"
 quality_score: 100
-expires: "2026-03-24T00:00:00Z"
+status: "Done"
 
-evidence:
-  tests_reviewed: 10
-  risks_identified: 0
-  trace:
-    ac_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9]
-    ac_gaps: []
+summary: |
+  All 9 acceptance criteria are met with solid implementation. The dialog
+  system uses Promise-based resolution via React context, toast notifications
+  support all required severity levels with auto-dismiss, and progress
+  components cover both determinate and indeterminate modes. showCustomDialog
+  implemented with render-callback pattern. Test coverage is comprehensive.
 
-nfr_validation:
-  security: { status: PASS, notes: "" }
-  performance: { status: PASS, notes: "Toast auto-dismiss via DispatcherTimer, countdown bar via WPF animation." }
-  reliability: { status: PASS, notes: "Progress dialog stays open until user acknowledges, toast provides secondary feedback." }
-  maintainability: { status: PASS, notes: "IDialogService and INotificationService are mockable for testing." }
+criteria:
+  - id: AC1
+    description: "useDialog hook exposes required methods"
+    status: PASS
+    notes: "DialogContext exports useDialog with showConfirmation, showWarning, showError, showDryRunPreview, showCustomDialog."
 
-recommendations:
-  immediate: []
-  future: []
+  - id: AC2
+    description: "Confirmation dialog with title, message, detail, buttons"
+    status: PASS
+    notes: "ConfirmationDialog supports title, message, expandable detail via <details>, configurable button labels."
+
+  - id: AC3
+    description: "DryRunPreview dialog with scrollable changes"
+    status: PASS
+    notes: "DryRunPreviewDialog renders scrollable list with color-coded icons per change type, Cancel and Execute buttons."
+
+  - id: AC4
+    description: "Toast notifications bottom-right, auto-dismiss, severity, action"
+    status: PASS
+    notes: "NotificationHost positioned fixed bottom-right, auto-dismiss 5s default, severity icons, optional action button."
+
+  - id: AC5
+    description: "Progress dialog determinate/indeterminate with cancellation"
+    status: PASS
+    notes: "ProgressDialog supports percentage mode with clamping and indeterminate with animate-pulse. Cancel and Escape support."
+
+  - id: AC6
+    description: "Inline progress indicator"
+    status: PASS
+    notes: "InlineProgress component with active, progress, statusMessage props."
+
+  - id: AC7
+    description: "Light and dark theme support"
+    status: PASS
+    notes: "All components use CSS custom properties - no hardcoded colors."
+
+  - id: AC8
+    description: "Keyboard interaction (Enter/Escape)"
+    status: PASS
+    notes: "ConfirmationDialog: Enter confirms, Escape cancels. DryRunPreview: Escape cancels. ProgressDialog: Escape cancels when cancellable."
+
+  - id: AC9
+    description: "Context-based, testable via mocks"
+    status: PASS
+    notes: "Both DialogContext and NotificationContext fully tested across all components."
+
+test_coverage:
+  frontend_tests: 66
+  rust_tests: 0
+  assessment: "Comprehensive. All components and contexts have dedicated test suites."
+
+issues:
+  - id: DLG-001
+    severity: low
+    status: resolved
+    description: "showCustomDialog not implemented - added render-callback pattern with Promise-based resolution"
+
+recommendations: []

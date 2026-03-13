@@ -1,21 +1,21 @@
 <p align="center">
   <h1 align="center">DSPanel</h1>
-  <p align="center">Active Directory support and administration tool for Windows environments.</p>
+  <p align="center">Active Directory support and administration tool for Windows, macOS, and Linux.</p>
 </p>
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License"></a>
-  <img src="https://img.shields.io/badge/.NET-10.0-purple.svg" alt=".NET">
-  <img src="https://img.shields.io/badge/Platform-Windows-0078D6.svg" alt="Platform">
+  <img src="https://img.shields.io/badge/Rust-2021-orange.svg" alt="Rust">
+  <img src="https://img.shields.io/badge/Tauri-v2-blue.svg" alt="Tauri">
+  <img src="https://img.shields.io/badge/Platform-Windows%20|%20macOS%20|%20Linux-0078D6.svg" alt="Platform">
   <img src="https://img.shields.io/badge/Status-v0.1.0-brightgreen.svg" alt="Status">
-  <img src="https://img.shields.io/badge/Coverage%20Target->90%25-brightgreen.svg" alt="Coverage">
 </p>
 
 ---
 
 ## Overview
 
-DSPanel is an open source Windows desktop application (WPF/.NET 10) that unifies the entire Active Directory support chain into a single tool. It dynamically adapts its interface based on the AD permissions of the current Windows user, covering everything from read-only lookups to full domain administration.
+DSPanel is an open source cross-platform desktop application (Rust/Tauri v2) that unifies the entire Active Directory support chain into a single tool. It dynamically adapts its interface based on the AD permissions of the current user, covering everything from read-only lookups to full domain administration.
 
 ### Key Features
 
@@ -45,78 +45,70 @@ The UI adapts dynamically based on the running user's AD group memberships:
 
 ### Hybrid Support
 
-- **AD on-prem** via LDAP (System.DirectoryServices.Protocols)
-- **Entra ID** via Microsoft Graph SDK
+- **AD on-prem** via LDAP
+- **Entra ID** via Microsoft Graph API
 - **Exchange on-prem** via LDAP attributes (msExch*)
 - **Exchange Online** via Microsoft Graph API
 
-Automatic context detection at startup via the `IDirectoryProvider` adapter pattern.
-
 ## Requirements
 
-- Windows 10/11 (x64)
-- .NET 10.0 Runtime
+- Windows 10/11, macOS 12+, or Linux (x64)
 - Network access to an Active Directory domain
 - (Optional) Azure AD App Registration for Entra ID / Exchange Online features
 
 ## Installation
 
-### Portable
+### Portable (Windows)
 
 Download the latest release from [GitHub Releases](https://github.com/Rwx-G/DSPanel/releases), extract, and run `DSPanel.exe`.
 
-### MSIX
+### Installers
 
-Download the `.msix` package from [GitHub Releases](https://github.com/Rwx-G/DSPanel/releases) and install.
+- **Windows**: `.msi` or `.exe` installer
+- **macOS**: `.dmg`
+- **Linux**: `.deb`, `.AppImage`, `.rpm`
 
 ## Building from Source
 
 ### Prerequisites
 
-- [.NET 10.0 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
-- Windows 10/11 with WPF support
-- (Optional) Visual Studio 2022 or Rider
+- [Rust](https://rustup.rs/) (latest stable)
+- [Node.js](https://nodejs.org/) (v20+) with [pnpm](https://pnpm.io/)
+- OS-specific dependencies (see [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/))
 
 ### Build
 
 ```bash
 git clone https://github.com/Rwx-G/DSPanel.git
 cd DSPanel
-dotnet restore
-dotnet build
+pnpm install
+pnpm tauri build
 ```
 
-### Run
+### Dev mode
 
 ```bash
-dotnet run --project src/DSPanel
-```
-
-### Test
-
-```bash
-dotnet test
+pnpm tauri dev
 ```
 
 ## Project Structure
 
 ```
 DSPanel/
-  docs/           # Project documentation (brief, PRD, architecture)
-  src/
-    DSPanel/      # Main WPF application
-    DSPanel.Tests/ # xUnit test project
-  .github/        # CI/CD workflows, issue templates
+  src/              # Frontend (React + TypeScript)
+  src-tauri/        # Backend (Rust + Tauri v2)
+    src/            # Rust source code
+    Cargo.toml      # Rust dependencies
+    tauri.conf.json # Tauri configuration
+  docs/             # Project documentation
+  .github/          # CI/CD workflows, issue templates
 ```
-
-See [Architecture Document](docs/architecture.md) for detailed source tree and component design.
 
 ## Documentation
 
 - [Project Brief](docs/brief.md) - Vision, problem statement, target users
 - [Product Requirements (PRD)](docs/prd.md) - Functional/non-functional requirements, epics, stories
 - [Architecture](docs/architecture.md) - Tech stack, data models, components, workflows
-- [Brainstorming Results](docs/brainstorming-session-results.md) - Feature discovery and competitive analysis
 
 ## Contributing
 
@@ -125,8 +117,3 @@ Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) before
 ## License
 
 This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- Inspired by various AD administration tools and the needs of IT support teams
-- Built with [CommunityToolkit.Mvvm](https://github.com/CommunityToolkit/dotnet), [Serilog](https://serilog.net/), [QuestPDF](https://www.questpdf.com/)

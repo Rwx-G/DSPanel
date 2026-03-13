@@ -1,0 +1,330 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Common controls - visual snapshots > Avatar renders with initials fallback 1`] = `
+<div
+  class="flex shrink-0 items-center justify-center overflow-hidden rounded-full text-[var(--color-text-inverse)] font-medium"
+  data-testid="avatar"
+  style="width: 40px; height: 40px; font-size: 16px; background-color: rgb(52, 178, 108);"
+  title="John Doe"
+>
+  <span
+    data-testid="avatar-initials"
+  >
+    JD
+  </span>
+</div>
+`;
+
+exports[`Common controls - visual snapshots > CopyButton renders idle state 1`] = `
+<button
+  aria-label="Copy to clipboard"
+  class="rounded-sm p-1 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors"
+  data-testid="copy-button"
+>
+  <svg
+    aria-hidden="true"
+    class="lucide lucide-copy"
+    fill="none"
+    height="14"
+    stroke="currentColor"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    stroke-width="2"
+    viewBox="0 0 24 24"
+    width="14"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <rect
+      height="14"
+      rx="2"
+      ry="2"
+      width="14"
+      x="8"
+      y="8"
+    />
+    <path
+      d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"
+    />
+  </svg>
+</button>
+`;
+
+exports[`Common controls - visual snapshots > EmptyState renders with icon and action 1`] = `
+<div
+  class="flex flex-col items-center justify-center gap-3 py-12 text-center"
+  data-testid="empty-state"
+>
+  <div
+    class="text-[var(--color-text-secondary)]"
+    data-testid="empty-state-icon"
+  >
+    <span>
+      icon
+    </span>
+  </div>
+  <h3
+    class="text-body font-medium text-[var(--color-text-primary)]"
+    data-testid="empty-state-title"
+  >
+    No results
+  </h3>
+  <p
+    class="max-w-sm text-caption text-[var(--color-text-secondary)]"
+    data-testid="empty-state-description"
+  >
+    Try a different search query.
+  </p>
+  <button
+    class="btn-primary mt-2"
+    data-testid="empty-state-action"
+  >
+    Retry
+  </button>
+</div>
+`;
+
+exports[`Common controls - visual snapshots > InfoCard renders collapsed 1`] = `
+<div
+  class="overflow-hidden rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)]"
+  data-testid="info-card"
+>
+  <button
+    aria-expanded="false"
+    aria-label="Expand Details"
+    class="flex w-full items-center gap-2 px-3 py-2 text-left text-body font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors"
+    data-testid="info-card-header"
+  >
+    <svg
+      aria-hidden="true"
+      class="lucide lucide-chevron-right"
+      fill="none"
+      height="16"
+      stroke="currentColor"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      stroke-width="2"
+      viewBox="0 0 24 24"
+      width="16"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="m9 18 6-6-6-6"
+      />
+    </svg>
+    <span>
+      Details
+    </span>
+  </button>
+</div>
+`;
+
+exports[`Common controls - visual snapshots > InfoCard renders expanded 1`] = `
+<div
+  class="overflow-hidden rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)]"
+  data-testid="info-card"
+>
+  <button
+    aria-expanded="true"
+    aria-label="Collapse Details"
+    class="flex w-full items-center gap-2 px-3 py-2 text-left text-body font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors"
+    data-testid="info-card-header"
+  >
+    <svg
+      aria-hidden="true"
+      class="lucide lucide-chevron-down"
+      fill="none"
+      height="16"
+      stroke="currentColor"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      stroke-width="2"
+      viewBox="0 0 24 24"
+      width="16"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="m6 9 6 6 6-6"
+      />
+    </svg>
+    <span>
+      Details
+    </span>
+  </button>
+  <div
+    class="border-t border-[var(--color-border-subtle)] px-3 py-2"
+    data-testid="info-card-content"
+  >
+    <p>
+      Card content here
+    </p>
+  </div>
+</div>
+`;
+
+exports[`Common controls - visual snapshots > LoadingSpinner renders with message 1`] = `
+<div
+  class="flex flex-col items-center justify-center gap-2"
+  data-testid="loading-spinner"
+>
+  <div
+    aria-label="Loading"
+    class="animate-spin rounded-full border-2 border-[var(--color-border-default)] border-t-[var(--color-primary)]"
+    role="status"
+    style="width: 24px; height: 24px;"
+  />
+  <p
+    class="text-caption text-[var(--color-text-secondary)]"
+    data-testid="loading-message"
+  >
+    Loading data...
+  </p>
+</div>
+`;
+
+exports[`Common controls - visual snapshots > SearchBar renders correctly 1`] = `
+<div
+  class="flex items-center gap-2 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5"
+  data-testid="search-bar"
+>
+  <svg
+    aria-hidden="true"
+    class="lucide lucide-search shrink-0 text-[var(--color-text-secondary)]"
+    fill="none"
+    height="16"
+    stroke="currentColor"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    stroke-width="2"
+    viewBox="0 0 24 24"
+    width="16"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path
+      d="m21 21-4.34-4.34"
+    />
+    <circle
+      cx="11"
+      cy="11"
+      r="8"
+    />
+  </svg>
+  <input
+    aria-label="Search users..."
+    class="flex-1 bg-transparent text-body text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-secondary)]"
+    data-testid="search-input"
+    placeholder="Search users..."
+    type="text"
+    value="test query"
+  />
+  <button
+    aria-label="Clear search"
+    class="rounded-sm p-0.5 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
+    data-testid="search-clear"
+  >
+    <svg
+      aria-hidden="true"
+      class="lucide lucide-x"
+      fill="none"
+      height="14"
+      stroke="currentColor"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      stroke-width="2"
+      viewBox="0 0 24 24"
+      width="14"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M18 6 6 18"
+      />
+      <path
+        d="m6 6 12 12"
+      />
+    </svg>
+  </button>
+</div>
+`;
+
+exports[`Common controls - visual snapshots > StatusBadge renders all variants 1`] = `
+<div>
+  <span
+    class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-[var(--color-success)]/10 text-[var(--color-success)]"
+    data-testid="status-badge"
+    data-variant="success"
+  >
+    success
+  </span>
+  <span
+    class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-[var(--color-warning)]/10 text-[var(--color-warning)]"
+    data-testid="status-badge"
+    data-variant="warning"
+  >
+    warning
+  </span>
+  <span
+    class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-[var(--color-error)]/10 text-[var(--color-error)]"
+    data-testid="status-badge"
+    data-variant="error"
+  >
+    error
+  </span>
+  <span
+    class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-[var(--color-info)]/10 text-[var(--color-info)]"
+    data-testid="status-badge"
+    data-variant="info"
+  >
+    info
+  </span>
+  <span
+    class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-[var(--color-surface-hover)] text-[var(--color-text-primary)]"
+    data-testid="status-badge"
+    data-variant="neutral"
+  >
+    neutral
+  </span>
+</div>
+`;
+
+exports[`Common controls - visual snapshots > TagChip renders with remove button 1`] = `
+<span
+  class="inline-flex items-center gap-1 rounded-md bg-[var(--color-surface-hover)] px-2 py-0.5 text-caption text-[var(--color-text-primary)]"
+  data-testid="tag-chip"
+>
+  Admin
+  <button
+    aria-label="Remove Admin"
+    class="rounded-sm p-0.5 hover:bg-[var(--color-surface-card)] transition-colors"
+    data-testid="tag-chip-remove"
+  >
+    <svg
+      aria-hidden="true"
+      class="lucide lucide-x"
+      fill="none"
+      height="10"
+      stroke="currentColor"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      stroke-width="2"
+      viewBox="0 0 24 24"
+      width="10"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        d="M18 6 6 18"
+      />
+      <path
+        d="m6 6 12 12"
+      />
+    </svg>
+  </button>
+</span>
+`;
+
+exports[`Common controls - visual snapshots > TagChip renders without remove button 1`] = `
+<span
+  class="inline-flex items-center gap-1 rounded-md bg-[var(--color-surface-hover)] px-2 py-0.5 text-caption text-[var(--color-text-primary)]"
+  data-testid="tag-chip"
+>
+  ReadOnly
+</span>
+`;

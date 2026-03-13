@@ -1,0 +1,72 @@
+/* Light Theme - Slate-based professional palette */
+
+[data-theme="light"] {
+  /* Primary - professional blue */
+  --color-primary: #3b82f6;
+  --color-primary-hover: #2563eb;
+  --color-primary-pressed: #1d4ed8;
+  --color-primary-subtle: rgba(59, 130, 246, 0.08);
+
+  /* Secondary */
+  --color-secondary: #475569;
+  --color-secondary-hover: #334155;
+
+  /* Accent */
+  --color-accent: #7c3aed;
+  --color-accent-hover: #6d28d9;
+
+  /* Surfaces - elevation via white layering */
+  --color-surface-bg: #f8fafc;
+  --color-surface-card: #ffffff;
+  --color-surface-elevated: #ffffff;
+  --color-surface-overlay: rgba(15, 23, 42, 0.5);
+  --color-surface-hover: rgba(15, 23, 42, 0.04);
+  --color-surface-selected: rgba(59, 130, 246, 0.08);
+  --color-surface-ancestor: rgba(15, 23, 42, 0.06);
+
+  /* Sidebar */
+  --color-sidebar-bg: #f1f5f9;
+  --color-sidebar-item-hover: rgba(15, 23, 42, 0.06);
+  --color-sidebar-item-active: rgba(59, 130, 246, 0.1);
+  --color-sidebar-group-label: #94a3b8;
+
+  /* Text */
+  --color-text-primary: #0f172a;
+  --color-text-secondary: #64748b;
+  --color-text-disabled: #cbd5e1;
+  --color-text-inverse: #ffffff;
+  --color-text-link: #3b82f6;
+
+  /* Borders */
+  --color-border-default: #e2e8f0;
+  --color-border-strong: #94a3b8;
+  --color-border-subtle: #f1f5f9;
+  --color-border-focus: #3b82f6;
+
+  /* Semantic */
+  --color-success: #22c55e;
+  --color-success-bg: rgba(34, 197, 94, 0.1);
+  --color-warning: #f59e0b;
+  --color-warning-bg: rgba(245, 158, 11, 0.1);
+  --color-error: #ef4444;
+  --color-error-bg: rgba(239, 68, 68, 0.1);
+  --color-info: #3b82f6;
+  --color-info-bg: rgba(59, 130, 246, 0.1);
+
+  /* Permission level colors */
+  --color-perm-readonly: #94a3b8;
+  --color-perm-helpdesk: #3b82f6;
+  --color-perm-accountops: #f59e0b;
+  --color-perm-domainadmin: #ef4444;
+
+  /* Diff */
+  --color-diff-added-bg: rgba(34, 197, 94, 0.1);
+  --color-diff-added-text: #16a34a;
+  --color-diff-removed-bg: rgba(239, 68, 68, 0.1);
+  --color-diff-removed-text: #dc2626;
+
+  /* Scrollbar */
+  --color-scrollbar-track: transparent;
+  --color-scrollbar-thumb: #cbd5e1;
+  --color-scrollbar-thumb-hover: #94a3b8;
+}

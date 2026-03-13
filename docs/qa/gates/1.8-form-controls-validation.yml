@@ -2,29 +2,54 @@ schema: 1
 story: "1.8"
 story_title: "Form Controls, Validation and Input Patterns"
 gate: PASS
-status_reason: "All 12 ACs implemented: FormField, styled TextBox, PasswordInput with toggle, searchable ComboBox, OUPicker (TreeView), GroupPicker (debounced multi-select with chips), DateTimePicker (calendar + spinners), ObservableValidator, ValidationSummary, IChangeTracker dirty tracking, theme support, accessibility. Custom validation attributes ValidSamAccountName and ValidDistinguishedName. 39 new tests."
-reviewer: "Quinn (Test Architect)"
-updated: "2026-03-10T00:00:00Z"
+status_reason: "All 12 ACs met. OUPicker, GroupPicker, DateTimePicker created with full test coverage. Data-driven design ready for Tauri command integration."
+reviewer: "Romain G."
+updated: "2026-03-13T18:40:00Z"
 
 waiver: { active: false }
+
 top_issues: []
 
 quality_score: 100
-expires: "2026-03-24T00:00:00Z"
+expires: "2026-03-27T00:00:00Z"
 
 evidence:
-  tests_reviewed: 39
+  tests_reviewed: 93
   risks_identified: 0
   trace:
     ac_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
     ac_gaps: []
 
 nfr_validation:
-  security: { status: PASS, notes: "Validation attributes enforce safe SAM and DN patterns." }
-  performance: { status: PASS, notes: "GroupPicker uses 300ms debounce for search." }
-  reliability: { status: PASS, notes: "ChangeTracker snapshot comparison is deterministic." }
-  maintainability: { status: PASS, notes: "All controls follow consistent DependencyProperty patterns." }
+  security:
+    status: PASS
+    notes: "Password input defaults to masked. Validators use safe regex. No sensitive data persisted."
+  performance:
+    status: PASS
+    notes: "GroupPicker debounces search. DateTimePicker calendar grid is lightweight."
+  reliability:
+    status: PASS
+    notes: "All components handle disabled, error, and empty states"
+  maintainability:
+    status: PASS
+    notes: "Consistent patterns, forwardRef usage, custom hooks for validation and dirty tracking"
 
 recommendations:
   immediate: []
-  future: []
+  future:
+    - action: "Wire OUPicker to Tauri get_ou_tree command when available"
+      refs: ["src/components/form/OUPicker.tsx"]
+    - action: "Wire GroupPicker to Tauri search_groups command when available"
+      refs: ["src/components/form/GroupPicker.tsx"]
+    - action: "Add aria-describedby linking errors to inputs"
+      refs: ["src/components/form/FormField.tsx"]
+    - action: "Highlight matching search text in ComboBox dropdown"
+      refs: ["src/components/form/ComboBox.tsx"]
+
+history:
+  - at: "2026-03-13T17:57:00Z"
+    gate: CONCERNS
+    note: "Initial review - OUPicker, GroupPicker, DateTimePicker missing"
+  - at: "2026-03-13T18:40:00Z"
+    gate: PASS
+    note: "All 3 components created with tests. Story checkboxes updated."

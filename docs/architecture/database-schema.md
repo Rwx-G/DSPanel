@@ -1,6 +1,6 @@
 # Database Schema
 
-DSPanel uses SQLite for local-only storage (audit log, snapshots, settings). No server database.
+DSPanel uses SQLite (via the rusqlite crate) for local-only storage (audit log, snapshots, settings). No server database. Database migrations are managed in `src-tauri/src/db/migrations.rs` and run at application startup.
 
 ```sql
 -- Audit Log
@@ -36,7 +36,7 @@ CREATE INDEX idx_snapshot_timestamp ON object_snapshots(timestamp);
 
 -- Scheduled Reports
 CREATE TABLE scheduled_reports (
-    id TEXT PRIMARY KEY,  -- GUID
+    id TEXT PRIMARY KEY,  -- UUID
     name TEXT NOT NULL,
     report_type TEXT NOT NULL,
     parameters TEXT NOT NULL,  -- JSON
@@ -51,7 +51,7 @@ CREATE TABLE scheduled_reports (
 
 -- Automation Rules
 CREATE TABLE automation_rules (
-    id TEXT PRIMARY KEY,  -- GUID
+    id TEXT PRIMARY KEY,  -- UUID
     name TEXT NOT NULL,
     is_enabled INTEGER NOT NULL DEFAULT 1,
     trigger_type TEXT NOT NULL,
@@ -63,7 +63,7 @@ CREATE TABLE automation_rules (
 
 -- Notification Channels
 CREATE TABLE notification_channels (
-    id TEXT PRIMARY KEY,  -- GUID
+    id TEXT PRIMARY KEY,  -- UUID
     name TEXT NOT NULL,
     channel_type TEXT NOT NULL,  -- Webhook, SMTP
     configuration TEXT NOT NULL,  -- JSON (URL, credentials)
@@ -80,4 +80,3 @@ CREATE TABLE risk_score_history (
 ```
 
 ---
-

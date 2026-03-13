@@ -7,7 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.1.0] - 2026-03-11
+## [0.1.0] - 2026-03-13
+
+Epic 1 - Foundation and Core Lookup. Full rewrite from C#/WPF to Rust/Tauri v2 + React/TypeScript.
+Cross-platform (Windows, macOS, Linux), lightweight native binary (~8.5 MB).
+
+Code quality pass across Rust backend and React frontend: accessibility (WCAG focus traps,
+ARIA live regions, skip-to-main link), error resilience (per-user health checks, stale request
+cancellation, explicit error logging), performance (React.memo, concurrency-limited batch ops),
+and maintainability (shared hooks and components to eliminate duplication).
+
+### Added
+
+- Project skeleton: Tauri v2 + React/TS, tracing logging, panic hook (1.1)
+- DirectoryProvider trait with LDAP implementation, Kerberos auth (1.2)
+- Permission detection from AD groups: ReadOnly/HelpDesk/AccountOperator/DomainAdmin (1.3)
+- Theme system with design tokens, dark/light modes, CSS architecture (1.4)
+- Application shell: sidebar, tab bar (drag, context menu, scroll), breadcrumbs, status bar, keyboard shortcuts (1.5)
+- Common controls: SearchBar, PermissionGate, StatusBadge, Avatar, TagChip, LoadingSpinner, EmptyState, InfoCard, CopyButton (1.6)
+- Data display: DataTable, FilterBar, Pagination, PropertyGrid, TreeView, DiffViewer, VirtualizedList, CSV export (1.7)
+- Form controls: FormField, TextInput, PasswordInput, ComboBox, OUPicker, GroupPicker, DateTimePicker, ValidationSummary, useFormValidation, useChangeTracker (1.8)
+- Dialogs and notifications: ConfirmationDialog, DryRunPreviewDialog, ProgressDialog, DialogContext, NotificationContext, InlineProgress (1.9)
+- User account lookup: search, detail panel, group memberships, DN parsing (1.10)
+- Healthcheck badge: 9 account flags with severity levels, Rust backend evaluate_health (1.11)
+- Computer account lookup: search, detail, ping, DNS resolution (1.12)
+- Error handling: DirectoryError, retry with backoff, circuit breaker, ResilientDirectoryProvider, ErrorBoundary, useErrorHandler (1.13)
+- ARIA accessibility across all components
+- All documentation migrated to Rust/Tauri v2 stack (~45 files)
+- CI workflows for cargo/pnpm/tauri
+- 840 tests (632 frontend + 208 Rust), 78% Rust line coverage
+
+### Removed
+
+- All C#/WPF source code (tagged as `v0.1.0-csharp` for reference)
+
+## [0.1.0-csharp] - 2026-03-11 (archived, see tag `v0.1.0-csharp`)
 
 ### Added
 

@@ -40,13 +40,13 @@ The application shall meet WCAG AA standards for accessibility: keyboard navigat
 - Clean, modern Windows desktop aesthetic - consistent with Windows 11 design language
 - Color scheme: dark/light theme support with a professional blue accent palette
 - Application icon: shield with directory tree motif
-- No heavy custom styling - leverage WPF default controls with minimal theming for maintainability
+- No heavy custom styling - leverage standard HTML/CSS controls with a lightweight design system for maintainability
 
 ### Target Device and Platforms: Desktop Only
 
 - Windows 10/11 (x64) desktop application
-- WPF (.NET 10+)
-- No web, no mobile (potential future expansion noted in brief)
+- Tauri v2 (Rust backend) + React/TypeScript frontend (rendered in webview)
+- No mobile (potential future expansion noted in brief)
 
 ---
 

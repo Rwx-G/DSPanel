@@ -1,30 +1,110 @@
-schema: 1
-story: "1.4"
-story_title: "Theme System, Design Tokens and Resource Architecture"
 gate: PASS
-status_reason: "All 9 ACs met. Color tokens, dark/light switching, typography, spacing, elevation, icons, control styles, resource tests, and theme persistence via IAppSettingsService (settings.json in LocalAppData)."
-reviewer: "Quinn (Test Architect)"
-updated: "2026-03-10T00:00:00Z"
-
-waiver: { active: false }
-top_issues: []
-
 quality_score: 100
-expires: "2026-03-24T00:00:00Z"
+story: "1.4"
+slug: theme-system
+review_date: "2026-03-13"
+reviewer: "Romain G."
+author: "Romain G."
 
-evidence:
-  tests_reviewed: 123
-  risks_identified: 0
-  trace:
-    ac_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9]
-    ac_gaps: []
+summary: >
+  Story 1.4 is comprehensively implemented. CSS architecture with
+  tokens, light/dark themes, typography, spacing, elevation, icon
+  system, and all base component styles are in place. Theme switching
+  via useTheme hook with localStorage persistence and system preference
+  detection works correctly. Test coverage is thorough.
 
-nfr_validation:
-  security: { status: PASS, notes: "" }
-  performance: { status: PASS, notes: "DynamicResource for runtime switching." }
-  reliability: { status: PASS, notes: "Both themes validated with 123 test cases." }
-  maintainability: { status: PASS, notes: "Clean token architecture with semantic naming." }
+acceptance_criteria:
+  ac1_css_custom_properties:
+    status: PASS
+    evidence: >
+      tokens.css defines spacing (--space-xs through --space-3xl),
+      typography (--font-size-h1 through --font-size-mono, weights,
+      line-heights), border radius, shadows, transitions, z-index scale.
+      theme-light.css and theme-dark.css define all color tokens under
+      [data-theme] selectors.
+  ac2_dark_light_switchable:
+    status: PASS
+    evidence: >
+      useTheme hook in hooks/useTheme.ts implements applyTheme() and
+      toggleTheme(). Sets data-theme attribute on document.documentElement.
+      Both theme files define identical token keys with different values.
+      No app restart needed.
+  ac3_typography_scale:
+    status: PASS
+    evidence: >
+      components.css defines .text-h1 through .text-h4, .text-body,
+      .text-caption, .text-mono classes using token variables.
+      Font sizes defined in tokens.css. JetBrains Mono / Cascadia Code
+      for mono font family.
+  ac4_spacing_scale:
+    status: PASS
+    evidence: >
+      tokens.css defines --space-xs (4px), --space-sm (8px),
+      --space-md (12px), --space-lg (16px), --space-xl (24px),
+      --space-2xl (32px), --space-3xl (48px). 4px base confirmed.
+  ac5_elevation_tokens:
+    status: PASS
+    evidence: >
+      tokens.css defines --radius-sm/md/lg/xl/full and
+      --shadow-sm/md/lg/xl. Both themes define border color tokens
+      for layered UI depth.
+  ac6_icon_system:
+    status: PASS
+    evidence: >
+      lucide-react package in dependencies. Icon.tsx wrapper component
+      at components/common/Icon.tsx accepts LucideIcon type, size, and
+      className props. Default size 16px.
+  ac7_base_component_styles:
+    status: PASS
+    evidence: >
+      components.css defines complete styles for Button (primary,
+      secondary, outline, ghost + sm/lg variants with hover/active/
+      disabled/focus-visible states), Input (focus, disabled, error),
+      Select, Checkbox, Table (th/td/hover), Tabs (active state),
+      List (hover, active), Scrollbar (webkit custom, 6px thin).
+  ac8_theme_persisted:
+    status: PASS
+    evidence: >
+      useTheme saves to localStorage key "dspanel-theme". On init,
+      getSavedTheme() checks localStorage first, falls back to
+      getSystemTheme() via prefers-color-scheme media query.
+  ac9_unit_tests:
+    status: PASS
+    evidence: >
+      useTheme.test.ts has 9 tests covering system preference detection
+      (light/dark), saved theme from localStorage, data-theme attribute
+      setting, applyTheme switching, toggleTheme, persistence to
+      localStorage on both apply and toggle, round-trip restore, and
+      invalid localStorage value handling.
 
-recommendations:
-  immediate: []
-  future: []
+test_coverage:
+  frontend_tests: 9
+  assessment: >
+    Strong coverage of useTheme hook behavior including edge cases.
+    Tests properly mock matchMedia and localStorage. The round-trip
+    persistence test ensures save/restore works end-to-end.
+
+issues: []
+
+improvements:
+  - id: IMP-1.4-01
+    severity: low
+    description: >
+      Typography heading sizes in tokens.css (24/20/18/15) differ
+      slightly from the story spec (28/22/18/15). h1 and h2 are 4px
+      and 2px smaller respectively. Verify this is an intentional
+      design refinement.
+  - id: IMP-1.4-02
+    severity: low
+    description: >
+      No dedicated utilities.css file was created (mentioned in the
+      CSS architecture section of the story). The utility classes
+      are handled by Tailwind CSS instead, which is a valid
+      architectural choice.
+  - id: IMP-1.4-03
+    severity: low
+    description: >
+      The import order in main.tsx uses index.css as a single entry
+      point rather than importing individual CSS files directly as
+      shown in the story's Dev Notes. The index.css file handles the
+      import chain internally, which is actually cleaner.

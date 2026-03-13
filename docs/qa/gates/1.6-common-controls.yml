@@ -1,30 +1,41 @@
-schema: 1
 story: "1.6"
-story_title: "Common Reusable Controls"
+title: "Common Reusable Controls"
+reviewer: "Romain G."
+date: "2026-03-13"
 gate: PASS
-status_reason: "All 9 controls implemented: SearchBar, PermissionGate, StatusBadge, Avatar (initials fallback + deterministic color), TagChip (removable), LoadingSpinner, EmptyState, InfoCard (collapsible + icon), CopyButton. 24 tests covering control logic."
-reviewer: "Quinn (Test Architect)"
-updated: "2026-03-10T00:00:00Z"
-
-waiver: { active: false }
-top_issues: []
-
 quality_score: 100
-expires: "2026-03-24T00:00:00Z"
 
-evidence:
-  tests_reviewed: 24
-  risks_identified: 0
-  trace:
-    ac_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
-    ac_gaps: []
+summary: >
+  All 9 common reusable components are implemented with consistent
+  patterns, proper theming via CSS custom properties, and comprehensive
+  unit tests. Components include SearchBar, PermissionGate, StatusBadge,
+  Avatar, TagChip, LoadingSpinner, EmptyState, InfoCard, and CopyButton.
+  Visual snapshot tests are deferred pending Storybook setup.
 
-nfr_validation:
-  security: { status: PASS, notes: "PermissionGate correctly gates content." }
-  performance: { status: PASS, notes: "SearchBar debounce prevents excessive queries." }
-  reliability: { status: PASS, notes: "" }
-  maintainability: { status: PASS, notes: "All controls implemented with tests." }
+tests:
+  total: 81+
+  passing: all
+  failing: 0
+  coverage_notes: >
+    All 9 component test files plus avatar utility tests and debounce
+    hook tests. All pass.
+
+acceptance_criteria:
+  ac1_searchbar: PASS
+  ac2_permission_gate: PASS
+  ac3_status_badge: PASS
+  ac4_avatar: PASS
+  ac5_tag_chip: PASS
+  ac6_loading_spinner: PASS
+  ac7_empty_state: PASS
+  ac8_info_card: PASS
+  ac9_copy_button: PASS
+  ac10_theme_support: PASS
+  ac11_visual_tests: DEFERRED
+  ac12_unit_tests: PASS
+
+issues: []
 
 recommendations:
-  immediate: []
-  future: []
+  - "Set up Storybook or visual regression testing"
+  - "Verify StatusBadge Tailwind /10 opacity modifier works with CSS variables at runtime"

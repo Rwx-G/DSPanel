@@ -139,12 +139,12 @@ The dynamic permission system adapts the UI based on the Windows account running
 
 | Context | Technology | Detection |
 |---------|-----------|-----------|
-| **AD on-prem** | LDAP via System.DirectoryServices.Protocols | Auto-detection at startup |
-| **Entra ID (Azure AD)** | Microsoft Graph SDK | Auto-detection at startup |
+| **AD on-prem** | LDAP via ldap3 crate (Rust) | Auto-detection at startup |
+| **Entra ID (Azure AD)** | Microsoft Graph API via reqwest (Rust) | Auto-detection at startup |
 | **Exchange on-prem** | LDAP attributes msExch* + Remote PowerShell (optional) | Detection of Exchange attributes presence |
-| **Exchange Online** | Microsoft Graph API | O365 tenant detection |
+| **Exchange Online** | Microsoft Graph API via reqwest (Rust) | O365 tenant detection |
 
-`IDirectoryProvider` adapter pattern for context abstraction.
+`DirectoryProvider` trait (Rust adapter pattern) for context abstraction.
 
 ---
 
@@ -172,6 +172,6 @@ The dynamic permission system adapts the UI based on the Windows account running
 
 - **Ambitious scope (57 features)** - will require phased prioritization during PRD creation
 - **Key differentiation**: free open source tool offering features typically found only in paid solutions (NTFS analyzer, risk score, attack detection)
-- **Architecture**: the `IDirectoryProvider` pattern (AD on-prem / Entra ID) is essential from the start to support both contexts
+- **Architecture**: the `DirectoryProvider` trait pattern (AD on-prem / Entra ID) is essential from the start to support both contexts
 - **UX**: dynamic UI adaptation based on permissions is the core UX principle
 - **Next steps**: Project Brief, PRD, Technical Architecture

@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-**DSPanel** is an open source Windows desktop tool (WPF/.NET 10) that unifies Active Directory support and administration into a single application. It replaces and surpasses aging, fragmented internal tools while adding modern features typically reserved for commercial solutions (NTFS permissions analysis, risk scoring, AD attack detection).
+**DSPanel** is an open source Windows desktop tool (Tauri v2 / React / TypeScript with a Rust backend) that unifies Active Directory support and administration into a single application. It replaces and surpasses aging, fragmented internal tools while adding modern features typically reserved for commercial solutions (NTFS permissions analysis, risk scoring, AD attack detection).
 
 **Core problem**: the Windows/AD support chain is currently fragmented across multiple tools (RSAT, PowerShell, in-house utilities, Exchange consoles), with no integrated permission management - each support level uses different tools, increasing error risk and wasting time.
 
@@ -224,27 +224,30 @@ DSPanel becomes the open source reference for desktop AD administration, positio
 ### Platform Requirements
 
 - **Target Platform**: Windows 10/11 (x64)
-- **Runtime**: .NET 10+ (LTS)
-- **UI Framework**: WPF (Windows Presentation Foundation)
+- **Backend Runtime**: Rust (compiled native binary via Tauri v2)
+- **UI Framework**: React + TypeScript (Vite bundler, rendered in Tauri webview)
 - **Performance**: startup < 3s, AD search < 1s on local network, UI responsive even on large domains (100k+ objects)
 
 ### Technology Preferences
 
-- **UI**: WPF + CommunityToolkit.Mvvm (MVVM pattern)
-- **AD on-prem**: System.DirectoryServices.Protocols (LDAP)
-- **Entra ID / Exchange Online**: Microsoft.Graph SDK
-- **DI/IoC**: Microsoft.Extensions.DependencyInjection + Hosting
+- **Frontend**: React 19 + TypeScript, Vite, CSS Modules
+- **Backend**: Rust with Tauri v2 for desktop shell and system integration
+- **AD on-prem**: ldap3 crate (Rust LDAP client)
+- **HTTP client**: reqwest crate (for Graph API, HaveIBeenPwned, etc.)
+- **Serialization**: serde + serde_json
 - **Preset storage**: JSON/YAML on configurable network share
-- **Logging**: Serilog
-- **Testing**: xUnit + Moq
+- **Logging**: tracing crate (Rust structured logging)
+- **Error handling**: thiserror crate (Rust typed errors)
+- **Frontend testing**: Vitest + React Testing Library
+- **Backend testing**: Rust built-in test framework (cargo test)
 
 ### Architecture Considerations
 
-- **Repository**: monorepo, single solution
-- **Key pattern**: `IDirectoryProvider` (adapter pattern) for AD on-prem vs Entra ID abstraction - automatic context detection at startup
+- **Repository**: monorepo (src-tauri/ for Rust backend, src/ for React frontend)
+- **Key pattern**: DirectoryProvider trait (adapter pattern) for AD on-prem vs Entra ID abstraction - automatic context detection at startup
 - **Permissions**: detect current Windows account's AD groups at launch, map to PermissionLevel (ReadOnly, HelpDesk, AccountOperator, DomainAdmin)
 - **Security**: no sensitive data stored locally, optional MFA before critical actions, audit log of all actions
-- **Distribution**: MSIX (Microsoft Store / sideload) + portable exe (zip)
+- **Distribution**: NSIS installer + portable exe (zip) via Tauri bundler
 
 ---
 
@@ -255,7 +258,7 @@ DSPanel becomes the open source reference for desktop AD administration, positio
 - **Budget**: none - open source project, developed on personal time
 - **Timeline**: no imposed deadline, incremental delivery
 - **Resources**: single lead developer + community contributions over time
-- **Technical**: dependency on Windows SDK (WPF = Windows only), requires an AD environment for real testing
+- **Technical**: Tauri webview requires Windows WebView2 runtime (pre-installed on Windows 10/11), requires an AD environment for real testing
 
 ### Key Assumptions
 
@@ -291,8 +294,8 @@ DSPanel becomes the open source reference for desktop AD administration, positio
 
 - Technical feasibility of AD attack detection (Golden Ticket, DCSync) from a desktop tool without an agent
 - Microsoft Graph APIs available for Exchange Online in read-only mode (quotas, delegations, forwarding)
-- Performance comparison: System.DirectoryServices.Protocols vs System.DirectoryServices.AccountManagement vs Novell.Directory.Ldap
-- Existing .NET libraries for remote NTFS/ACL analysis
+- Performance comparison: ldap3 crate vs alternative Rust LDAP clients
+- Rust crates for remote NTFS/ACL analysis (windows-rs for Win32 API access)
 - Compliance report standards (GDPR, SOX) - format and content expected by auditors
 
 ---
@@ -331,7 +334,7 @@ DSPanel becomes the open source reference for desktop AD administration, positio
 1. Validate this Project Brief
 2. Write the PRD (Product Requirements Document) with phased prioritization (MVP, V2, V3, V4)
 3. Define the detailed technical architecture (architecture document)
-4. Set up the .NET 10 + WPF solution skeleton
+4. Set up the Tauri v2 + React + Rust project skeleton
 5. Create the GitHub repo with base structure, CI/CD, and issue templates
 
 ### PM Handoff

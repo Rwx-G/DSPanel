@@ -1,213 +1,186 @@
 # Components
 
-### PermissionService
+### permission module
 
-**Responsibility**: Detect current user's AD group memberships at startup and map to a PermissionLevel. Provide HasPermission() for UI binding.
+**Responsibility**: Detect current user's AD group memberships at startup and map to a PermissionLevel. Provide permission checking for both Rust commands and React UI binding.
 
-**Key Interfaces:**
-- IPermissionService.CurrentLevel: PermissionLevel
-- IPermissionService.HasPermission(PermissionLevel required): bool
-- IPermissionService.DetectPermissionLevelAsync(): Task
+**Key Functions (Rust):**
+- `get_current_level() -> PermissionLevel`
+- `has_permission(required: PermissionLevel) -> bool`
+- `detect_permission_level() -> Result<PermissionLevel>`
 
-**Dependencies**: IDirectoryProvider (to query current user's groups)
+**Frontend**: `usePermission()` hook + `PermissionContext` provider
 
-**Technology Stack**: Pure C# service, no external dependencies
+**Dependencies**: DirectoryProvider trait (to query current user's groups)
 
 ### DirectoryProviders
 
-**Responsibility**: Abstract all directory operations behind IDirectoryProvider. Two implementations: LdapDirectoryProvider (on-prem) and GraphDirectoryProvider (Entra ID).
+**Responsibility**: Abstract all directory operations behind the `DirectoryProvider` trait. Two implementations: `LdapDirectoryProvider` (on-prem) and `GraphDirectoryProvider` (Entra ID).
 
-**Key Interfaces:**
-- IDirectoryProvider.SearchUsersAsync(string query): Task<List<DirectoryUser>>
-- IDirectoryProvider.SearchComputersAsync(string query): Task<List<DirectoryComputer>>
-- IDirectoryProvider.GetGroupsAsync(): Task<List<DirectoryGroup>>
-- IDirectoryProvider.GetGroupMembersAsync(string groupDN): Task<List<string>>
-- IDirectoryProvider.ModifyGroupMembershipAsync(string groupDN, string memberDN, MembershipAction action): Task
-- IDirectoryProvider.ResetPasswordAsync(string userDN, string newPassword, bool mustChange): Task
-- IDirectoryProvider.UnlockAccountAsync(string userDN): Task
-- IDirectoryProvider.SetAccountEnabledAsync(string userDN, bool enabled): Task
-- IDirectoryProvider.MoveObjectAsync(string objectDN, string targetOU): Task
-- IDirectoryProvider.GetObjectAttributesAsync(string objectDN): Task<Dictionary<string, object>>
-- IDirectoryProvider.SetObjectAttributesAsync(string objectDN, Dictionary<string, object> attributes): Task
-- IDirectoryProvider.GetDeletedObjectsAsync(): Task<List<DeletedObject>>
-- IDirectoryProvider.RestoreDeletedObjectAsync(string objectDN, string targetOU): Task
-- ProviderType: DirectoryProviderType (OnPrem, Cloud, Hybrid)
+**Key Trait Methods (Rust):**
+- `search_users(query: &str) -> Result<Vec<DirectoryUser>>`
+- `search_computers(query: &str) -> Result<Vec<DirectoryComputer>>`
+- `get_groups() -> Result<Vec<DirectoryGroup>>`
+- `get_group_members(group_dn: &str) -> Result<Vec<String>>`
+- `modify_group_membership(group_dn: &str, member_dn: &str, action: MembershipAction) -> Result<()>`
+- `reset_password(user_dn: &str, new_password: &str, must_change: bool) -> Result<()>`
+- `unlock_account(user_dn: &str) -> Result<()>`
+- `set_account_enabled(user_dn: &str, enabled: bool) -> Result<()>`
+- `move_object(object_dn: &str, target_ou: &str) -> Result<()>`
+- `get_object_attributes(object_dn: &str) -> Result<HashMap<String, serde_json::Value>>`
+- `set_object_attributes(object_dn: &str, attributes: HashMap<String, serde_json::Value>) -> Result<()>`
+- `get_deleted_objects() -> Result<Vec<DeletedObject>>`
+- `restore_deleted_object(object_dn: &str, target_ou: &str) -> Result<()>`
+- `provider_type() -> DirectoryProviderType`
 
-**Dependencies**: System.DirectoryServices.Protocols (LDAP), Microsoft.Graph (Graph)
+**Dependencies**: ldap3 crate (LDAP), reqwest (Graph API)
 
-### ExchangeService
+### exchange module
 
 **Responsibility**: Query Exchange mailbox information in read-only mode. Delegates to LDAP msExch* attributes (on-prem) or Graph API (online).
 
-**Key Interfaces:**
-- IExchangeService.GetMailboxInfoAsync(string userDN): Task<ExchangeMailboxInfo?>
-- IExchangeService.IsExchangeAvailable: bool
+**Key Functions (Rust):**
+- `get_mailbox_info(user_dn: &str) -> Result<Option<ExchangeMailboxInfo>>`
+- `is_exchange_available() -> bool`
 
-**Dependencies**: IDirectoryProvider (for LDAP attributes), Microsoft.Graph (for Exchange Online)
+**Dependencies**: DirectoryProvider trait (for LDAP attributes), reqwest (for Exchange Online)
 
-### PresetService
+### preset module
 
 **Responsibility**: Load, validate, save, and execute presets from the configured network share.
 
-**Key Interfaces:**
-- IPresetService.GetPresetsAsync(): Task<List<Preset>>
-- IPresetService.SavePresetAsync(Preset preset): Task
-- IPresetService.DeletePresetAsync(Guid presetId): Task
-- IPresetService.PreviewPresetAsync(Preset preset, DirectoryUser targetUser): Task<PresetDiff>
-- IPresetService.ApplyPresetAsync(Preset preset, DirectoryUser targetUser): Task<PresetResult>
+**Key Functions (Rust):**
+- `get_presets() -> Result<Vec<Preset>>`
+- `save_preset(preset: &Preset) -> Result<()>`
+- `delete_preset(preset_id: Uuid) -> Result<()>`
+- `preview_preset(preset: &Preset, target_user: &DirectoryUser) -> Result<PresetDiff>`
+- `apply_preset(preset: &Preset, target_user: &DirectoryUser) -> Result<PresetResult>`
 
-**Dependencies**: IDirectoryProvider, file system access to network share
+**Dependencies**: DirectoryProvider trait, file system access to network share
 
-### AuditService
+### audit module
 
 **Responsibility**: Log all DSPanel actions to local SQLite database. Provide query/search/export capabilities.
 
-**Key Interfaces:**
-- IAuditService.LogAsync(AuditLogEntry entry): Task
-- IAuditService.SearchAsync(AuditSearchCriteria criteria): Task<List<AuditLogEntry>>
-- IAuditService.ExportAsync(AuditSearchCriteria criteria, ExportFormat format): Task<byte[]>
+**Key Functions (Rust):**
+- `log(entry: &AuditLogEntry) -> Result<()>`
+- `search(criteria: &AuditSearchCriteria) -> Result<Vec<AuditLogEntry>>`
+- `export(criteria: &AuditSearchCriteria, format: ExportFormat) -> Result<Vec<u8>>`
 
-**Dependencies**: Microsoft.Data.Sqlite, Dapper
+**Dependencies**: rusqlite
 
-### SnapshotService
+### snapshot module
 
 **Responsibility**: Capture AD object state before modifications and restore from snapshots.
 
-**Key Interfaces:**
-- ISnapshotService.CaptureAsync(string objectDN, string operationType): Task<ObjectSnapshot>
-- ISnapshotService.GetSnapshotsAsync(string objectDN): Task<List<ObjectSnapshot>>
-- ISnapshotService.RestoreAsync(long snapshotId): Task
-- ISnapshotService.CleanupAsync(int retentionDays): Task
+**Key Functions (Rust):**
+- `capture(object_dn: &str, operation_type: &str) -> Result<ObjectSnapshot>`
+- `get_snapshots(object_dn: &str) -> Result<Vec<ObjectSnapshot>>`
+- `restore(snapshot_id: i64) -> Result<()>`
+- `cleanup(retention_days: i32) -> Result<()>`
 
-**Dependencies**: IDirectoryProvider, Microsoft.Data.Sqlite
+**Dependencies**: DirectoryProvider trait, rusqlite
 
-### HealthCheckService
+### health module
 
 **Responsibility**: Compute account healthcheck badges and domain-wide health status.
 
-**Key Interfaces:**
-- IHealthCheckService.ComputeUserHealth(DirectoryUser user): AccountHealthStatus
-- IHealthCheckService.GetDCHealthAsync(): Task<List<DCHealthStatus>>
-- IHealthCheckService.GetReplicationStatusAsync(): Task<List<ReplicationStatus>>
-- IHealthCheckService.CheckDnsHealthAsync(): Task<DnsHealthReport>
-- IHealthCheckService.CheckKerberosClockAsync(): Task<ClockSkewReport>
+**Key Functions (Rust):**
+- `compute_user_health(user: &DirectoryUser) -> AccountHealthStatus`
+- `get_dc_health() -> Result<Vec<DCHealthStatus>>`
+- `get_replication_status() -> Result<Vec<ReplicationStatus>>`
+- `check_dns_health() -> Result<DnsHealthReport>`
+- `check_kerberos_clock() -> Result<ClockSkewReport>`
 
-**Dependencies**: IDirectoryProvider, DNS resolver, WMI provider
+**Dependencies**: DirectoryProvider trait, DNS resolver
 
-### SecurityAnalysisService
+### security module
 
 **Responsibility**: Compute domain risk score, detect AD attacks from event logs, and analyze privilege escalation paths.
 
-**Key Interfaces:**
-- ISecurityAnalysisService.ComputeRiskScoreAsync(): Task<RiskScoreReport>
-- ISecurityAnalysisService.GetPrivilegedAccountsAsync(): Task<List<PrivilegedAccountInfo>>
-- ISecurityAnalysisService.DetectAttacksAsync(): Task<List<SecurityAlert>>
-- ISecurityAnalysisService.GetEscalationPathsAsync(): Task<EscalationGraph>
+**Key Functions (Rust):**
+- `compute_risk_score() -> Result<RiskScoreReport>`
+- `get_privileged_accounts() -> Result<Vec<PrivilegedAccountInfo>>`
+- `detect_attacks() -> Result<Vec<SecurityAlert>>`
+- `get_escalation_paths() -> Result<EscalationGraph>`
 
-**Dependencies**: IDirectoryProvider, EventLogProvider
+**Dependencies**: DirectoryProvider trait
 
-### NtfsPermissionService
-
-**Responsibility**: Resolve NTFS ACLs on UNC paths and cross-reference with AD group memberships.
-
-**Key Interfaces:**
-- INtfsPermissionService.GetPermissionsAsync(string uncPath): Task<List<AclEntry>>
-- INtfsPermissionService.AnalyzeUserAccessAsync(string uncPath, string userDN): Task<AccessAnalysis>
-- INtfsPermissionService.CompareUserAccessAsync(string uncPath, string userDN1, string userDN2): Task<AccessComparison>
-
-**Dependencies**: System.Security.AccessControl, IDirectoryProvider
-
-### WmiMonitoringService
-
-**Responsibility**: Query remote workstation status via WMI/CIM.
-
-**Key Interfaces:**
-- IWmiMonitoringService.GetSystemInfoAsync(string computerName): Task<SystemInfo>
-- IWmiMonitoringService.GetRunningServicesAsync(string computerName): Task<List<ServiceInfo>>
-- IWmiMonitoringService.GetActiveSessionsAsync(string computerName): Task<List<SessionInfo>>
-
-**Dependencies**: System.Management
-
-### ReportService
+### report module
 
 **Responsibility**: Generate scheduled and on-demand reports.
 
-**Key Interfaces:**
-- IReportService.GenerateReportAsync(ReportType type, ReportParameters parameters): Task<ReportResult>
-- IReportService.ScheduleReportAsync(ScheduledReport schedule): Task
-- IReportService.GetScheduledReportsAsync(): Task<List<ScheduledReport>>
+**Key Functions (Rust):**
+- `generate_report(report_type: ReportType, parameters: &ReportParameters) -> Result<ReportResult>`
+- `schedule_report(schedule: &ScheduledReport) -> Result<()>`
+- `get_scheduled_reports() -> Result<Vec<ScheduledReport>>`
 
-**Dependencies**: IDirectoryProvider, ExportService
+**Dependencies**: DirectoryProvider trait, export module
 
-### ExportService
+### export module
 
 **Responsibility**: Export data to CSV and PDF formats.
 
-**Key Interfaces:**
-- IExportService.ExportToCsvAsync<T>(IEnumerable<T> data, string filePath): Task
-- IExportService.ExportToPdfAsync(ReportResult report, string filePath): Task
+**Key Functions (Rust):**
+- `export_to_csv<T: Serialize>(data: &[T], file_path: &Path) -> Result<()>`
+- `export_to_pdf(report: &ReportResult, file_path: &Path) -> Result<()>`
 
-**Dependencies**: CsvHelper, QuestPDF
+**Dependencies**: csv crate, printpdf/genpdf crate
 
-### NotificationService
+### notification module
 
 **Responsibility**: Send webhook notifications to Teams, Slack, or email.
 
-**Key Interfaces:**
-- INotificationService.SendAsync(NotificationEvent event): Task
-- INotificationService.TestChannelAsync(NotificationChannel channel): Task<bool>
+**Key Functions (Rust):**
+- `send(event: &NotificationEvent) -> Result<()>`
+- `test_channel(channel: &NotificationChannel) -> Result<bool>`
 
-**Dependencies**: HttpClient
+**Dependencies**: reqwest
 
-### NavigationService
+### Frontend Navigation
 
-**Responsibility**: Manage view navigation in the WPF shell (sidebar, tabs, dialogs).
+**Responsibility**: Manage page navigation in the React app shell (sidebar, tabs, dialogs).
 
-**Key Interfaces:**
-- INavigationService.NavigateTo<TViewModel>(object? parameter): void
-- INavigationService.OpenTab<TViewModel>(object? parameter): void
-- INavigationService.ShowDialog<TViewModel>(object? parameter): Task<bool?>
+**Implementation**: React Router + custom navigation context
 
-**Dependencies**: WPF Dispatcher, DI container
+**Key Hooks:**
+- `useNavigation().navigateTo(path: string, params?: object)`
+- `useNavigation().openTab(path: string, params?: object)`
+- `useDialog().showDialog(component: ReactNode)`
 
 ### Component Diagram
 
 ```mermaid
 graph LR
-    subgraph ViewModels
-        UserLookupVM --> PermissionSvc
-        UserLookupVM --> DirProvider
-        UserLookupVM --> ExchangeSvc
-        UserLookupVM --> HealthCheckSvc
-        ComparisonVM --> DirProvider
-        ComparisonVM --> NtfsSvc
-        GroupMgmtVM --> DirProvider
-        PresetVM --> PresetSvc2[PresetSvc]
-        SecurityVM --> SecuritySvc2[SecuritySvc]
-        InfraVM --> HealthCheckSvc
-        ReportVM --> ReportSvc2[ReportSvc]
-        AuditVM --> AuditSvc2[AuditSvc]
+    subgraph ReactComponents["React Pages/Components"]
+        UserLookupPage --> usePermission
+        UserLookupPage --> invoke_dir["invoke('search_users')"]
+        UserLookupPage --> invoke_health["invoke('compute_health')"]
+        ComparisonPage --> invoke_dir2["invoke('search_users')"]
+        GroupMgmtPage --> invoke_dir3["invoke('get_groups')"]
+        PresetPage --> invoke_preset["invoke('get_presets')"]
+        SecurityPage --> invoke_sec["invoke('compute_risk')"]
+        InfraPage --> invoke_health2["invoke('get_dc_health')"]
+        ReportPage --> invoke_report["invoke('generate_report')"]
+        AuditPage --> invoke_audit["invoke('search_audit')"]
     end
 
-    subgraph Services
-        PermissionSvc[PermissionService]
-        ExchangeSvc[ExchangeService]
-        HealthCheckSvc[HealthCheckService]
-        NtfsSvc[NtfsPermissionService]
-        PresetSvc2
-        SecuritySvc2
-        ReportSvc2
-        AuditSvc2
+    subgraph RustBackend["Rust Command Handlers"]
+        PermMod["permission module"]
+        DirProvider["DirectoryProvider trait"]
+        HealthMod["health module"]
+        PresetMod["preset module"]
+        SecMod["security module"]
+        ReportMod["report module"]
+        AuditMod["audit module"]
     end
 
     subgraph Providers
-        DirProvider[IDirectoryProvider]
-        LdapProv[LdapProvider]
-        GraphProv[GraphProvider]
+        LdapProv["LdapProvider"]
+        GraphProv["GraphProvider"]
         DirProvider -.-> LdapProv
         DirProvider -.-> GraphProv
     end
 ```
 
 ---
-

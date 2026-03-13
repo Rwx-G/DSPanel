@@ -2,31 +2,50 @@ schema: 1
 story: "1.12"
 story_title: "Computer Account Lookup"
 gate: PASS
-status_reason: "All 6 ACs met. Computer search, detail view, group memberships, ping, DNS resolution, and tab integration all implemented with 7 unit tests."
-reviewer: "Quinn (Test Architect)"
-updated: "2026-03-10T00:00:00Z"
+status_reason: "All 6 ACs met. ping_host migrated to tokio::process::Command. Tab integration verified. 4 new Rust tests for ping/DNS."
+reviewer: "Romain G."
+updated: "2026-03-13T19:00:00Z"
 
 waiver: { active: false }
+
 top_issues: []
 
 quality_score: 100
-expires: "2026-03-24T00:00:00Z"
+expires: "2026-03-27T00:00:00Z"
 
 evidence:
-  tests_reviewed: 7
+  tests_reviewed: 25
   risks_identified: 0
   trace:
     ac_covered: [1, 2, 3, 4, 5, 6]
     ac_gaps: []
 
 nfr_validation:
-  security: { status: PASS, notes: "LDAP filter escaping, no elevated privileges for ping." }
-  performance: { status: PASS, notes: "Async ping and DNS resolution." }
-  reliability: { status: PASS, notes: "PingException and SocketException handled gracefully." }
-  maintainability: { status: PASS, notes: "Mirrors UserLookupViewModel pattern for consistency." }
+  security:
+    status: PASS
+    notes: "ping_host uses args array (safe against shell injection). resolve_dns uses tokio::net::lookup_host."
+  performance:
+    status: PASS
+    notes: "ping_host now uses async tokio::process::Command. Non-blocking."
+  reliability:
+    status: PASS
+    notes: "Error states handled for ping and DNS failures. Retry available on search errors."
+  maintainability:
+    status: PASS
+    notes: "Follows same patterns as UserLookup. Consistent code style."
 
 recommendations:
   immediate: []
   future:
-    - action: "Consider extracting IPingService and IDnsResolver interfaces for better testability"
-      refs: ["ViewModels/ComputerLookupViewModel.cs"]
+    - action: "Add timeout indicator for DNS resolution"
+      refs: ["src/pages/ComputerLookup.tsx"]
+    - action: "Consider caching DNS results for repeated selections"
+      refs: ["src/pages/ComputerLookup.tsx"]
+
+history:
+  - at: "2026-03-13T17:57:00Z"
+    gate: CONCERNS
+    note: "Initial review - ping_host blocking, AC6 deferred, no Rust ping/DNS tests"
+  - at: "2026-03-13T19:00:00Z"
+    gate: PASS
+    note: "ping_host migrated to tokio::process::Command. Tab integration verified. 4 Rust tests added."

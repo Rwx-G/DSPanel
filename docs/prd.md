@@ -99,12 +99,12 @@ Existing commercial solutions (ManageEngine, Quest, Netwrix) cover parts of the 
 - **NFR4**: The application shall handle large domains (100k+ objects) efficiently using LDAP pagination and result caching.
 - **NFR5**: No sensitive data (passwords, tokens) shall be stored locally on disk.
 - **NFR6**: All AD communication shall use secure protocols (LDAPS / Kerberos).
-- **NFR7**: The application shall follow MVVM pattern (CommunityToolkit.Mvvm) for clean separation of concerns.
-- **NFR8**: The codebase shall target .NET 10+ (LTS) with WPF for Windows desktop.
-- **NFR9**: The application shall be distributable as both MSIX package and portable exe (zip).
+- **NFR7**: The application shall follow a clean Rust backend / React frontend separation via Tauri IPC commands.
+- **NFR8**: The codebase shall use Rust (Tauri v2) for the backend and React/TypeScript (Vite) for the frontend.
+- **NFR9**: The application shall be distributable as NSIS installer (Windows), .dmg (macOS), and .AppImage/.deb (Linux).
 - **NFR10**: The application shall support auto-update notification (check for new GitHub releases at startup).
 - **NFR11**: All user-facing strings shall be externalizable for future localization (English default, French planned).
-- **NFR12**: The application shall log operations and errors using structured logging (Serilog) with configurable log levels.
+- **NFR12**: The application shall log operations and errors using structured logging (tracing crate) with configurable log levels.
 - **NFR13**: Unit test coverage shall target 90%+ on core services (directory providers, permission service, preset engine).
 - **NFR14**: The application shall gracefully degrade when features are unavailable (e.g., no Exchange attributes found - hide Exchange panel, no Entra ID - disable cloud features).
 
@@ -152,12 +152,12 @@ The application shall meet WCAG AA standards for accessibility: keyboard navigat
 - Clean, modern Windows desktop aesthetic - consistent with Windows 11 design language
 - Color scheme: dark/light theme support with a professional blue accent palette
 - Application icon: shield with directory tree motif
-- No heavy custom styling - leverage WPF default controls with minimal theming for maintainability
+- No heavy custom styling - leverage standard HTML/CSS controls with minimal theming for maintainability
 
 ### Target Device and Platforms: Desktop Only
 
-- Windows 10/11 (x64) desktop application
-- WPF (.NET 10+)
+- Windows 10/11 (x64) desktop application, with macOS and Linux support via Tauri
+- Tauri v2 (Rust backend) + React/TypeScript frontend (Vite)
 - No web, no mobile (potential future expansion noted in brief)
 
 ---
@@ -166,49 +166,50 @@ The application shall meet WCAG AA standards for accessibility: keyboard navigat
 
 ### Repository Structure: Monorepo
 
-Single repository containing the WPF application project, test project, and documentation. Structure:
+Single repository containing the Tauri application, React frontend, and documentation. Structure:
 
 ```
 DSPanel/
   docs/                    # PRD, architecture, stories, brainstorming
-  src/
-    DSPanel/               # Main WPF application
-    DSPanel.Tests/          # xUnit test project
+  src/                     # React/TypeScript frontend
+  src-tauri/               # Rust backend (Tauri v2)
   .github/                 # CI/CD workflows
-  DSPanel.sln              # Solution file
+  package.json             # Frontend dependencies
+  Cargo.toml               # Workspace (if applicable)
 ```
 
 ### Service Architecture
 
-Desktop monolith with internal modular architecture:
+Tauri v2 hybrid app with Rust backend and React frontend:
 
-- **Presentation layer**: WPF Views + ViewModels (MVVM via CommunityToolkit.Mvvm)
-- **Service layer**: business logic services injected via Microsoft.Extensions.DependencyInjection
-- **Provider layer**: IDirectoryProvider abstraction with LdapDirectoryProvider (on-prem) and GraphDirectoryProvider (Entra ID) implementations
-- **Data layer**: no local database - all data comes from AD/Graph/NTFS at query time. Presets stored as JSON/YAML on network share. Audit log stored locally (SQLite or structured log file).
+- **Frontend layer**: React components with TypeScript, communicating with backend via Tauri `invoke()` IPC
+- **Backend layer**: Rust command handlers exposing business logic as Tauri commands
+- **Provider layer**: `DirectoryProvider` trait with `LdapDirectoryProvider` (on-prem) and `GraphDirectoryProvider` (Entra ID) implementations
+- **Data layer**: no local database - all data comes from AD/Graph/NTFS at query time. Presets stored as JSON/YAML on network share. Audit log stored locally (SQLite via rusqlite or structured log file).
 
 ### Testing Requirements
 
-- **Unit tests**: xUnit + Moq for all core services (directory providers, permission service, preset engine, risk scoring)
+- **Rust unit tests**: `cargo test` with `mockall` for all core services (directory providers, permission service, preset engine, risk scoring)
+- **Frontend tests**: vitest + React Testing Library for components and hooks
 - **Integration tests**: against a test AD environment (optional, not required for CI)
-- **UI tests**: manual testing for WPF views (automated UI testing deferred)
+- **UI tests**: manual testing (automated E2E testing deferred)
 - **Target coverage**: 90%+ on core services
-- **Test convention**: mirror source tree (src/DSPanel/Services/Foo.cs -> src/DSPanel.Tests/Services/FooTests.cs)
+- **Test convention**: Rust tests in `src-tauri/tests/` mirroring `src-tauri/src/`, frontend tests in `src/__tests__/`
 
 ### Additional Technical Assumptions and Requests
 
-- **LDAP library**: System.DirectoryServices.Protocols for AD on-prem queries (lightweight, cross-platform capable within .NET)
-- **Graph SDK**: Microsoft.Graph SDK for Entra ID and Exchange Online queries
-- **MVVM toolkit**: CommunityToolkit.Mvvm 8.x for ObservableObject, RelayCommand, source generators
-- **DI container**: Microsoft.Extensions.DependencyInjection + Microsoft.Extensions.Hosting for app lifecycle
-- **Logging**: Serilog with console + file sinks, structured logging
-- **Preset format**: JSON as default format (widely supported, schema-validatable), YAML as optional alternative
-- **Password check**: HaveIBeenPwned API (k-anonymity model - only first 5 chars of SHA1 hash sent)
-- **NTFS permissions**: System.Security.AccessControl + System.IO for ACL resolution on UNC paths
-- **Remote monitoring**: WMI/CIM (System.Management) for remote workstation CPU/RAM/services
-- **Event logs**: Windows Event Log API for login/logout and lockout event retrieval
-- **Auto-update**: check GitHub Releases API at startup, notify user if newer version available
-- **Localization**: .resx resource files, English default, French planned for V2
+- **LDAP library**: `ldap3` crate for AD on-prem queries (async, cross-platform)
+- **Graph SDK**: `reqwest` crate for Entra ID and Exchange Online REST API queries
+- **State management**: React hooks + context for frontend state, Tauri managed state for backend
+- **DI pattern**: Rust trait-based dependency injection, Tauri state management for shared services
+- **Logging**: `tracing` crate with console + file subscribers, structured logging
+- **Preset format**: JSON as default format (widely supported, schema-validatable), YAML as optional alternative via `serde_yaml`
+- **Password check**: HaveIBeenPwned API (k-anonymity model - only first 5 chars of SHA1 hash sent) via `reqwest`
+- **NTFS permissions**: `windows-rs` crate for ACL resolution on UNC paths
+- **Remote monitoring**: WMI via `wmi` crate for remote workstation CPU/RAM/services
+- **Event logs**: Windows Event Log via `windows-rs` for login/logout and lockout event retrieval
+- **Auto-update**: Tauri updater plugin or check GitHub Releases API at startup
+- **Localization**: i18next with JSON resource files, English default, French planned for V2
 
 ---
 
@@ -242,28 +243,28 @@ Desktop monolith with internal modular architecture:
 
 ## Epic 1: Foundation and Core Lookup
 
-**Goal**: Establish the project skeleton with DI, MVVM navigation, the IDirectoryProvider abstraction, and permission-level detection. Deliver the first user-facing value: searching for a user or computer account and displaying detailed information with a healthcheck badge. This epic proves the architecture end-to-end.
+**Goal**: Establish the project skeleton with Tauri v2, React navigation, the DirectoryProvider trait abstraction, and permission-level detection. Deliver the first user-facing value: searching for a user or computer account and displaying detailed information with a healthcheck badge. This epic proves the architecture end-to-end.
 
 ### Story 1.1: Project Skeleton and Navigation Shell
 
 As a developer,
-I want a working WPF application with DI, MVVM infrastructure, and a navigation shell,
+I want a working Tauri v2 application with React frontend, Rust backend, and a navigation shell,
 so that all future features plug into a consistent architecture.
 
 #### Acceptance Criteria
-1. Solution builds and runs with .NET 10 WPF project + xUnit test project
-2. Microsoft.Extensions.Hosting bootstraps the application with DI container
-3. CommunityToolkit.Mvvm is configured with source generators
+1. Project builds and runs with `cargo tauri dev` (Rust backend + React frontend)
+2. Tauri managed state is configured for shared backend services
+3. React with TypeScript is configured with Vite bundler
 4. Main window displays a left sidebar with placeholder module buttons and a content area
-5. Navigation service allows switching views in the content area
+5. Navigation service (React Router or context-based) allows switching views in the content area
 6. Bottom status bar shows placeholder text for domain name, DC, and permission level
-7. Serilog is configured with console + file sinks
+7. `tracing` crate is configured with console + file subscribers
 8. Project follows the source tree convention defined in architecture docs
 
 ### Story 1.2: IDirectoryProvider and AD On-Prem Connection
 
 As a developer,
-I want an IDirectoryProvider interface with an LDAP implementation that auto-detects the current domain,
+I want a DirectoryProvider trait with an LDAP implementation that auto-detects the current domain,
 so that all AD queries go through a consistent abstraction.
 
 #### Acceptance Criteria
@@ -332,6 +333,23 @@ so that I can diagnose workstation issues.
 4. Ping button sends ICMP ping and displays result (reachable/unreachable + latency)
 5. DNS resolution displays the computer's IP address
 6. Results open in the same tab system as user lookups
+
+### Story 1.13: Error Handling Foundation
+
+As a developer,
+I want a unified error handling and network resilience layer,
+so that all AD write operations (starting in Epic 2) fail gracefully with clear user feedback, automatic retry, and structured audit logging.
+
+#### Acceptance Criteria
+1. Typed error hierarchy exists: `DsPanelError`, `DirectoryError`, `NetworkError`, `PermissionDeniedError`
+2. All `DirectoryProvider` trait LDAP operations wrap raw errors into typed `DirectoryError` with user-friendly messages
+3. Transient LDAP/network failures are retried with exponential backoff (1s, 2s, 4s, max 3 attempts)
+4. A circuit breaker disables a provider after 5 consecutive failures and shows a warning in the notification bar
+5. LDAP connections auto-reconnect after a transient failure without user intervention
+6. All operations that fail surface a user-friendly error via notification service (not raw error messages)
+7. A global unhandled error handler catches unexpected errors, logs them, and shows a generic error notification
+8. Timeout configuration is centralized: LDAP 30s, Graph API 15s, HIBP 5s, WMI 10s
+9. Unit tests cover retry logic, circuit breaker state transitions, error mapping, and reconnection
 
 ---
 
@@ -1078,8 +1096,8 @@ so that it inspires confidence for daily production use.
 
 ### UX Expert Prompt
 
-Review the DSPanel PRD (docs/prd.md) and create a detailed front-end specification for the WPF desktop application. Focus on the navigation shell, core screen layouts (13 views), component hierarchy, theming system (dark/light), and interaction patterns (search-first, drag-and-drop, dry-run previews). The application is WPF/.NET 10 with CommunityToolkit.Mvvm.
+Review the DSPanel PRD (docs/prd.md) and create a detailed front-end specification for the Tauri v2 desktop application. Focus on the navigation shell, core screen layouts (13 views), component hierarchy, theming system (dark/light), and interaction patterns (search-first, drag-and-drop, dry-run previews). The application uses React/TypeScript with Vite for the frontend.
 
 ### Architect Prompt
 
-Review the DSPanel PRD (docs/prd.md) and create the technical architecture document. Key decisions to address: IDirectoryProvider abstraction (LDAP vs Graph), permission detection system, preset engine (JSON on network share), audit log storage (SQLite), NTFS/ACL resolution, WMI remote monitoring, event log analysis for attack detection, and the MVVM/DI structure. Target stack: WPF, .NET 10, System.DirectoryServices.Protocols, Microsoft.Graph SDK, CommunityToolkit.Mvvm, Serilog, xUnit.
+Review the DSPanel PRD (docs/prd.md) and create the technical architecture document. Key decisions to address: DirectoryProvider trait abstraction (LDAP vs Graph), permission detection system, preset engine (JSON on network share), audit log storage (SQLite), NTFS/ACL resolution, WMI remote monitoring, event log analysis for attack detection, and the Tauri IPC/React component structure. Target stack: Rust (Tauri v2), React/TypeScript, ldap3, reqwest, tracing, cargo test, vitest.

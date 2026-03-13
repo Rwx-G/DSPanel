@@ -4,17 +4,18 @@
 
 This document outlines the overall project architecture for DSPanel, including the application structure, services, data models, and non-UI specific concerns. Its primary goal is to serve as the guiding architectural blueprint for AI-driven development, ensuring consistency and adherence to chosen patterns and technologies.
 
-DSPanel is a desktop-only WPF application. There is no separate frontend architecture document - the UI layer is part of this monolithic desktop application and is covered within this document.
+DSPanel is a cross-platform desktop application built with Tauri v2 (Rust backend) and React/TypeScript (frontend). The Rust backend handles all system-level operations (LDAP, file I/O, database) while the React frontend provides the user interface, communicating via Tauri's IPC command system.
 
 ### Starter Template or Existing Project
 
-N/A - This is a greenfield project built from scratch using the standard `dotnet new wpf` template with .NET 10. No starter template or existing codebase is used as foundation.
+N/A - This is a greenfield project scaffolded with `cargo create-tauri-app` using the React/TypeScript template with Vite bundler. No starter template or existing codebase is used as foundation.
 
 ### Change Log
 
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
 | 2026-03-10 | 0.1 | Initial architecture document | Romain G. |
+| 2026-03-13 | 0.2 | Migration to Rust/Tauri v2 + React/TypeScript | Romain G. |
 
 ---
 
@@ -22,50 +23,55 @@ N/A - This is a greenfield project built from scratch using the standard `dotnet
 
 ### Technical Summary
 
-DSPanel is a Windows desktop monolith built with WPF and .NET 10, following the MVVM pattern via CommunityToolkit.Mvvm. The application connects to Active Directory on-prem (via LDAP using System.DirectoryServices.Protocols) and optionally to Entra ID / Exchange Online (via Microsoft Graph SDK), abstracted behind an `IDirectoryProvider` adapter pattern. A permission system detects the current Windows user's AD group memberships at startup and dynamically controls UI visibility. Local storage is limited to audit logs (SQLite), user settings, and object snapshots. Presets are stored externally as JSON files on a configurable network share.
+DSPanel is a cross-platform desktop application built with Tauri v2, using a Rust backend and a React/TypeScript frontend. The Rust backend connects to Active Directory on-prem (via LDAP using the ldap3 crate) and optionally to Entra ID / Exchange Online (via Microsoft Graph REST API using reqwest), abstracted behind a `DirectoryProvider` trait. A permission system detects the current user's AD group memberships at startup and dynamically controls UI visibility via React context. Local storage is limited to audit logs (SQLite via rusqlite), user settings, and object snapshots. Presets are stored externally as JSON files on a configurable network share.
 
 ### High Level Overview
 
-1. **Architectural style**: Desktop monolith with internal modular layering (Presentation / Service / Provider)
-2. **Repository structure**: Monorepo - single solution containing the WPF app project, test project, and documentation
-3. **Service architecture**: Layered architecture within a single process - ViewModels call Services, Services call Providers
+1. **Architectural style**: Tauri hybrid app with Rust backend (system operations) and React frontend (UI), connected via IPC commands
+2. **Repository structure**: Monorepo - `src-tauri/` for Rust backend, `src/` for React/TypeScript frontend, and documentation
+3. **Service architecture**: Frontend components invoke Tauri commands, which delegate to Rust service modules and provider traits
 4. **Primary user flow**: User launches app - permission level detected - UI adapts - user searches AD objects - views details - performs actions (gated by permission level) - all actions logged
-5. **Key decisions**: Adapter pattern for directory abstraction (on-prem vs cloud), permission-based UI gating, external preset storage, local SQLite for audit
+5. **Key decisions**: Trait-based adapter pattern for directory abstraction (on-prem vs cloud), permission-based UI gating, external preset storage, local SQLite for audit
 
 ### High Level Project Diagram
 
 ```mermaid
 graph TB
     subgraph DSPanel["DSPanel Desktop Application"]
-        subgraph Presentation["Presentation Layer"]
-            Views["WPF Views"]
-            ViewModels["ViewModels (MVVM)"]
+        subgraph Frontend["Frontend (React/TypeScript)"]
+            Pages["React Pages"]
+            Components["React Components"]
+            Hooks["Custom Hooks"]
+            Context["React Context (state)"]
         end
 
-        subgraph Services["Service Layer"]
-            PermissionSvc["Permission Service"]
-            PresetSvc["Preset Service"]
-            AuditSvc["Audit Service"]
-            HealthSvc["Health Check Service"]
-            SecuritySvc["Security Analysis Service"]
-            ReportSvc["Report Service"]
-            ExportSvc["Export Service"]
-            NotificationSvc["Notification Service"]
-            ScriptSvc["Script Execution Service"]
+        subgraph TauriIPC["Tauri IPC Bridge"]
+            Commands["Tauri Commands (invoke)"]
+            Events["Tauri Events (emit/listen)"]
         end
 
-        subgraph Providers["Provider Layer"]
-            IDP["IDirectoryProvider"]
+        subgraph Backend["Backend (Rust)"]
+            CmdHandlers["Command Handlers"]
+            ServiceLayer["Service Modules"]
+            PermissionMod["permission module"]
+            PresetMod["preset module"]
+            AuditMod["audit module"]
+            HealthMod["health module"]
+            SecurityMod["security module"]
+            ReportMod["report module"]
+            ExportMod["export module"]
+            NotificationMod["notification module"]
+        end
+
+        subgraph Providers["Provider Layer (Rust traits)"]
+            DirTrait["DirectoryProvider trait"]
             LdapProvider["LdapDirectoryProvider"]
             GraphProvider["GraphDirectoryProvider"]
-            NtfsProvider["NtfsPermissionProvider"]
-            WmiProvider["WmiMonitoringProvider"]
-            EventLogProvider["EventLogProvider"]
         end
 
         subgraph LocalStorage["Local Storage"]
-            SQLite["SQLite (Audit Log)"]
-            Settings["User Settings"]
+            SQLite["SQLite (rusqlite)"]
+            Settings["User Settings (JSON)"]
             Snapshots["Object Snapshots"]
         end
     end
@@ -75,44 +81,41 @@ graph TB
         EntraID["Entra ID (Graph API)"]
         ExchangeOnPrem["Exchange On-Prem (LDAP)"]
         ExchangeOnline["Exchange Online (Graph)"]
-        NTFS["NTFS File Shares"]
-        RemoteWMI["Remote WMI/CIM"]
-        EventLogs["Windows Event Logs"]
         HIBP["HaveIBeenPwned API"]
         GitHubAPI["GitHub Releases API"]
         Webhooks["Webhooks (Teams/Slack)"]
         PresetShare["Network Share (Presets)"]
     end
 
-    Views --> ViewModels
-    ViewModels --> Services
-    Services --> Providers
-    Services --> LocalStorage
+    Pages --> Components
+    Components --> Hooks
+    Hooks --> Commands
+    Commands --> CmdHandlers
+    CmdHandlers --> ServiceLayer
+    ServiceLayer --> Providers
+    ServiceLayer --> LocalStorage
 
     LdapProvider --> AD
     LdapProvider --> ExchangeOnPrem
     GraphProvider --> EntraID
     GraphProvider --> ExchangeOnline
-    NtfsProvider --> NTFS
-    WmiProvider --> RemoteWMI
-    EventLogProvider --> EventLogs
-    SecuritySvc --> HIBP
-    NotificationSvc --> Webhooks
-    PresetSvc --> PresetShare
-    Services --> GitHubAPI
+    SecurityMod --> HIBP
+    NotificationMod --> Webhooks
+    PresetMod --> PresetShare
+    ServiceLayer --> GitHubAPI
 ```
 
 ### Architectural and Design Patterns
 
-- **MVVM (Model-View-ViewModel)**: CommunityToolkit.Mvvm with source generators for ObservableObject and RelayCommand. Rationale: standard WPF pattern, clean separation of UI and logic, enables unit testing of ViewModels without UI.
+- **Component Architecture + Tauri Commands**: React components with hooks for state management, invoking Rust backend via Tauri's `invoke()` IPC. Rationale: clean separation of UI and system logic, type-safe IPC boundary, enables independent testing of both layers.
 
-- **Adapter Pattern (IDirectoryProvider)**: Abstract interface for all directory operations with concrete implementations for LDAP (on-prem) and Graph (cloud). Rationale: enables seamless hybrid support and testability via mocking.
+- **Adapter Pattern (DirectoryProvider trait)**: Rust trait for all directory operations with concrete implementations for LDAP (on-prem) and Graph (cloud). Rationale: enables seamless hybrid support and testability via mock implementations.
 
-- **Dependency Injection**: Microsoft.Extensions.DependencyInjection with Hosting for app lifecycle. Rationale: standard .NET DI, enables testability, clean service registration, aligns with IDirectoryProvider pattern.
+- **Dependency Injection (Rust state)**: Tauri's managed state (`app.manage()`) for sharing service instances across commands. Rationale: simple, built-in to Tauri, no external DI framework needed.
 
-- **Repository Pattern (for local storage)**: SQLite access for audit logs and snapshots abstracted behind interfaces. Rationale: keeps data access testable and swappable.
+- **Repository Pattern (for local storage)**: SQLite access for audit logs and snapshots abstracted behind Rust traits. Rationale: keeps data access testable and swappable.
 
-- **Observer Pattern (for permissions)**: UI elements bind to permission-level observable properties that trigger visibility/enabled state changes. Rationale: reactive UI adaptation without polling or manual refresh.
+- **Observer Pattern (for permissions)**: React context provides permission level to the component tree, triggering re-renders when permissions change. Rationale: reactive UI adaptation without polling or manual refresh.
 
 - **Strategy Pattern (for presets)**: Preset engine selects the appropriate onboarding/offboarding strategy based on preset type. Rationale: extensible workflow execution.
 
@@ -126,68 +129,74 @@ graph TB
 
 - **Provider**: N/A - Desktop application, no cloud hosting required
 - **Key Services**: Azure AD App Registration (for Microsoft Graph access to Entra ID / Exchange Online)
-- **Deployment**: GitHub Releases (MSIX + portable exe)
+- **Deployment**: GitHub Releases (.msi for Windows, .dmg for macOS, .AppImage/.deb for Linux)
 
 ### Technology Stack Table
 
 | Category | Technology | Version | Purpose | Rationale |
 |----------|-----------|---------|---------|-----------|
-| **Language** | C# | 13 | Primary development language | Modern C# features (primary constructors, collection expressions, params collections), strong typing, WPF native |
-| **Runtime** | .NET | 10.0 (LTS) | Application runtime | Long-term support (Nov 2025 - Nov 2028), Windows desktop support, latest APIs |
-| **UI Framework** | WPF | .NET 10 built-in | Desktop UI | Windows-native, rich controls, data binding, MVVM support |
-| **MVVM Toolkit** | CommunityToolkit.Mvvm | 8.4.0 | MVVM infrastructure | Source generators, ObservableObject, RelayCommand, Messenger |
-| **DI Container** | Microsoft.Extensions.DependencyInjection | 10.0.3 | Dependency injection | Standard .NET DI, lightweight, well-integrated |
-| **App Hosting** | Microsoft.Extensions.Hosting | 10.0.3 | Application lifecycle | Startup/shutdown, configuration, logging integration |
-| **LDAP** | System.DirectoryServices.Protocols | 10.0.3 | AD on-prem queries | Low-level LDAP control, pagination support, performant |
-| **Graph SDK** | Microsoft.Graph | 5.x | Entra ID + Exchange Online | Official Microsoft SDK, typed models, batch support |
-| **Graph Auth** | Azure.Identity | 1.13.x | Graph authentication | MSAL integration, device code flow, token caching |
-| **Logging** | Serilog | 4.3.1 | Structured logging | Structured output, multiple sinks, enrichers |
-| **Logging Sink** | Serilog.Sinks.File | 7.0.0 | File logging | Rolling files, size limits |
-| **Logging Sink** | Serilog.Sinks.Console | 6.1.1 | Console logging (debug) | Development diagnostics |
-| **Local DB** | Microsoft.Data.Sqlite | 10.0.3 | Audit log + snapshots storage | Lightweight, embedded, no server needed |
-| **ORM** | Dapper | 2.1.72 | SQLite data access | Lightweight, fast, minimal abstraction |
-| **JSON** | System.Text.Json | Built-in | Preset serialization, settings | Built-in, performant, source generators |
-| **PDF Export** | QuestPDF | 2026.2.3 | PDF report generation | Open source (MIT), fluent API, no external dependencies |
-| **CSV Export** | CsvHelper | 33.1.0 | CSV export | Robust, handles edge cases (encoding, escaping) |
-| **Password Hash** | System.Security.Cryptography | Built-in | SHA1 for HIBP k-anonymity | Built-in, no external dependency needed |
-| **HTTP Client** | System.Net.Http | Built-in | HIBP API, GitHub API, webhooks | Built-in HttpClient with IHttpClientFactory pattern |
-| **WMI/CIM** | System.Management | 10.0.3 | Remote workstation monitoring | WMI queries for CPU, RAM, services, disks |
-| **ACL** | System.Security.AccessControl | Built-in | NTFS permission analysis | Built-in ACL resolution |
-| **Testing** | xUnit | 2.9.3 | Unit + integration tests | Modern, extensible, good .NET integration |
-| **Mocking** | Moq | 4.20.72 | Test mocking | Interface mocking, setup verification |
-| **Test Assertions** | FluentAssertions | 8.8.0 | Readable test assertions | Expressive syntax, better error messages |
-| **Code Analysis** | .NET Analyzers | Built-in | Static code analysis | Built-in, catches common issues |
+| **Backend Language** | Rust | 1.85+ (stable) | Backend logic, system operations | Memory safety, performance, strong type system, no GC |
+| **Frontend Language** | TypeScript | 5.x | Frontend UI development | Type safety, excellent React integration, developer tooling |
+| **Desktop Framework** | Tauri | 2.x | Desktop app shell, IPC bridge | Small binary size, native webview, Rust backend, cross-platform |
+| **UI Framework** | React | 18.x | Frontend component framework | Component model, hooks, large ecosystem, mature tooling |
+| **Bundler** | Vite | 6.x | Frontend build tool | Fast HMR, native ESM, optimized builds |
+| **LDAP** | ldap3 | 0.11.x | AD on-prem queries (Rust) | Pure Rust LDAP client, async, TLS support |
+| **HTTP Client** | reqwest | 0.12.x | Graph API, HIBP, GitHub API, webhooks (Rust) | Async HTTP, TLS, connection pooling, widely used |
+| **Logging** | tracing | 0.1.x | Structured logging (Rust) | Structured spans, multiple subscribers, async-aware |
+| **Logging Subscriber** | tracing-subscriber | 0.3.x | Log output formatting (Rust) | File + console output, filtering, JSON format |
+| **Logging File** | tracing-appender | 0.2.x | Rolling file logs (Rust) | Non-blocking file appender, daily rotation |
+| **Serialization** | serde + serde_json | 1.x | JSON serialization (Rust) | De facto Rust serialization, derive macros, performant |
+| **Local DB** | rusqlite | 0.32.x | Audit log + snapshots storage (Rust) | Lightweight SQLite binding, bundled SQLite |
+| **Error Handling** | thiserror + anyhow | 1.x / 1.x | Typed + ad-hoc errors (Rust) | Ergonomic error types, context chaining |
+| **Password Hash** | sha1 | 0.10.x | SHA1 for HIBP k-anonymity (Rust) | Lightweight, pure Rust |
+| **PDF Export** | printpdf or genpdf | latest | PDF report generation (Rust) | Pure Rust, no external dependencies |
+| **CSV Export** | csv | 1.x | CSV export (Rust) | Fast, RFC 4180 compliant, serde integration |
+| **State Management** | React Context + hooks | built-in | Frontend state management | Simple, built-in, sufficient for desktop app state |
+| **Styling** | Tailwind CSS | 4.x | Utility-first CSS framework | Rapid UI development, consistent design, small bundle |
+| **Rust Testing** | cargo test | built-in | Rust unit + integration tests | Built-in test framework, no external dependency |
+| **Frontend Testing** | vitest | 3.x | Frontend unit + component tests | Vite-native, fast, Jest-compatible API |
+| **Component Testing** | React Testing Library | 16.x | React component tests | User-centric testing, widely adopted |
+| **Rust Linting** | clippy | built-in | Rust static analysis | Comprehensive lints, idiomatic Rust enforcement |
+| **Rust Formatting** | rustfmt | built-in | Rust code formatting | Standard formatting, zero config |
+| **Frontend Linting** | ESLint | 9.x | TypeScript/React linting | Configurable rules, React-specific plugins |
+| **Frontend Formatting** | Prettier | 3.x | Frontend code formatting | Opinionated, consistent formatting |
+| **Package Manager (Rust)** | cargo | built-in | Rust dependency management | Built-in, crates.io ecosystem |
+| **Package Manager (JS)** | pnpm | 10.x | Frontend dependency management | Fast, disk-efficient, strict dependency resolution |
 
 ---
 
 ## Data Models
+
+### Rust Structs (Backend)
+
+All backend data models are Rust structs with `serde::Serialize` and `serde::Deserialize` derives for IPC serialization.
 
 ### DirectoryUser
 
 **Purpose**: Represents an Active Directory user account with all attributes needed for lookup, healthcheck, comparison, and actions.
 
 **Key Attributes:**
-- SamAccountName: string - Primary login identifier
-- UserPrincipalName: string - UPN (user@domain.com)
-- DisplayName: string - Full display name
-- FirstName / LastName: string - Given name and surname
-- Email: string - Primary email address
-- Department: string - Organizational department
-- Title: string - Job title
-- DistinguishedName: string - Full DN in AD
-- OrganizationalUnit: string - Parent OU path
-- IsEnabled: bool - Account enabled/disabled state
-- IsLockedOut: bool - Lockout state
-- LastLogon: DateTime? - Last authentication timestamp
-- LastLogonWorkstation: string? - Last machine name
-- PasswordLastSet: DateTime? - Last password change
-- AccountExpires: DateTime? - Account expiration date
-- PasswordNeverExpires: bool - Password policy flag
-- PasswordExpired: bool - Current password state
-- BadPasswordCount: int - Failed authentication attempts
-- MemberOf: List<string> - Group DNs
-- HealthStatus: AccountHealthStatus - Computed health flags
-- ThumbnailPhoto: byte[]? - Profile photo
+- sam_account_name: String - Primary login identifier
+- user_principal_name: String - UPN (user@domain.com)
+- display_name: String - Full display name
+- first_name / last_name: String - Given name and surname
+- email: String - Primary email address
+- department: String - Organizational department
+- title: String - Job title
+- distinguished_name: String - Full DN in AD
+- organizational_unit: String - Parent OU path
+- is_enabled: bool - Account enabled/disabled state
+- is_locked_out: bool - Lockout state
+- last_logon: Option<DateTime> - Last authentication timestamp
+- last_logon_workstation: Option<String> - Last machine name
+- password_last_set: Option<DateTime> - Last password change
+- account_expires: Option<DateTime> - Account expiration date
+- password_never_expires: bool - Password policy flag
+- password_expired: bool - Current password state
+- bad_password_count: i32 - Failed authentication attempts
+- member_of: Vec<String> - Group DNs
+- health_status: AccountHealthStatus - Computed health flags
+- thumbnail_photo: Option<Vec<u8>> - Profile photo
 
 **Relationships:**
 - Member of multiple DirectoryGroup objects
@@ -199,16 +208,16 @@ graph TB
 **Purpose**: Represents an AD computer account.
 
 **Key Attributes:**
-- Name: string - Computer name
-- DnsHostName: string - FQDN
-- DistinguishedName: string - Full DN
-- OrganizationalUnit: string - Parent OU
-- OperatingSystem: string - OS name
-- OperatingSystemVersion: string - OS version
-- IsEnabled: bool - Account state
-- LastLogon: DateTime? - Last authentication
-- MemberOf: List<string> - Group DNs
-- IPv4Address: string? - Resolved IP
+- name: String - Computer name
+- dns_host_name: String - FQDN
+- distinguished_name: String - Full DN
+- organizational_unit: String - Parent OU
+- operating_system: String - OS name
+- operating_system_version: String - OS version
+- is_enabled: bool - Account state
+- last_logon: Option<DateTime> - Last authentication
+- member_of: Vec<String> - Group DNs
+- ipv4_address: Option<String> - Resolved IP
 
 **Relationships:**
 - Member of multiple DirectoryGroup objects
@@ -219,14 +228,14 @@ graph TB
 **Purpose**: Represents an AD security or distribution group.
 
 **Key Attributes:**
-- Name: string - Group name
-- DistinguishedName: string - Full DN
-- Description: string - Group description
-- Scope: GroupScope (DomainLocal, Global, Universal)
-- Category: GroupCategory (Security, Distribution)
-- Members: List<string> - Member DNs
-- MemberOf: List<string> - Parent group DNs
-- MemberCount: int - Total member count
+- name: String - Group name
+- distinguished_name: String - Full DN
+- description: String - Group description
+- scope: GroupScope (DomainLocal, Global, Universal)
+- category: GroupCategory (Security, Distribution)
+- members: Vec<String> - Member DNs
+- member_of: Vec<String> - Parent group DNs
+- member_count: i32 - Total member count
 
 **Relationships:**
 - Contains multiple DirectoryUser, DirectoryComputer, or nested DirectoryGroup members
@@ -237,32 +246,32 @@ graph TB
 **Purpose**: Read-only Exchange mailbox diagnostic data (on-prem or online).
 
 **Key Attributes:**
-- MailboxName: string - Display name
-- PrimarySmtpAddress: string - Primary email
-- Aliases: List<string> - All proxy addresses
-- ForwardingAddress: string? - Mail forwarding target
-- MailboxType: string - Mailbox type (User, Shared, Room)
-- QuotaUsed: long? - Current mailbox size
-- QuotaLimit: long? - Mailbox quota
-- Delegates: List<string> - Delegation entries
-- Source: MailboxSource (OnPrem, Online) - Data origin
+- mailbox_name: String - Display name
+- primary_smtp_address: String - Primary email
+- aliases: Vec<String> - All proxy addresses
+- forwarding_address: Option<String> - Mail forwarding target
+- mailbox_type: String - Mailbox type (User, Shared, Room)
+- quota_used: Option<i64> - Current mailbox size
+- quota_limit: Option<i64> - Mailbox quota
+- delegates: Vec<String> - Delegation entries
+- source: MailboxSource (OnPrem, Online) - Data origin
 
 ### Preset
 
 **Purpose**: Declarative template for onboarding/offboarding operations.
 
 **Key Attributes:**
-- Id: Guid - Unique identifier
-- Name: string - Preset display name
-- Description: string - What this preset does
-- Type: PresetType (Onboarding, Offboarding)
-- TargetRole: string - Role/team this applies to
-- TargetOU: string - Default OU for new accounts
-- Groups: List<string> - AD group DNs to add/remove
-- AdditionalAttributes: Dictionary<string, string> - Extra AD attributes to set
-- CreatedBy: string - Creator
-- CreatedAt: DateTime - Creation timestamp
-- ModifiedAt: DateTime - Last modification
+- id: Uuid - Unique identifier
+- name: String - Preset display name
+- description: String - What this preset does
+- preset_type: PresetType (Onboarding, Offboarding)
+- target_role: String - Role/team this applies to
+- target_ou: String - Default OU for new accounts
+- groups: Vec<String> - AD group DNs to add/remove
+- additional_attributes: HashMap<String, String> - Extra AD attributes to set
+- created_by: String - Creator
+- created_at: DateTime - Creation timestamp
+- modified_at: DateTime - Last modification
 
 **Relationships:**
 - References multiple DirectoryGroup objects
@@ -273,250 +282,228 @@ graph TB
 **Purpose**: Internal DSPanel action log entry stored in SQLite.
 
 **Key Attributes:**
-- Id: long - Auto-increment ID
-- Timestamp: DateTime - When the action occurred
-- UserName: string - DSPanel operator (Windows account)
-- ActionType: string - Action category (PasswordReset, GroupAdd, etc.)
-- TargetObject: string - DN of the affected AD object
-- Details: string - JSON serialized action details
-- Result: ActionResult (Success, Failure, DryRun)
-- ErrorMessage: string? - Error details if failed
+- id: i64 - Auto-increment ID
+- timestamp: DateTime - When the action occurred
+- user_name: String - DSPanel operator (OS account)
+- action_type: String - Action category (PasswordReset, GroupAdd, etc.)
+- target_object: String - DN of the affected AD object
+- details: String - JSON serialized action details
+- result: ActionResult (Success, Failure, DryRun)
+- error_message: Option<String> - Error details if failed
 
 ### ObjectSnapshot
 
 **Purpose**: Point-in-time capture of an AD object's attributes for backup/restore.
 
 **Key Attributes:**
-- Id: long - Auto-increment ID
-- Timestamp: DateTime - Snapshot time
-- ObjectDN: string - Distinguished name
-- ObjectType: string - User, Computer, Group
-- OperationType: string - What triggered the snapshot
-- Attributes: string - JSON serialized attribute dictionary
-- CreatedBy: string - Who triggered the operation
+- id: i64 - Auto-increment ID
+- timestamp: DateTime - Snapshot time
+- object_dn: String - Distinguished name
+- object_type: String - User, Computer, Group
+- operation_type: String - What triggered the snapshot
+- attributes: String - JSON serialized attribute dictionary
+- created_by: String - Who triggered the operation
 
 ### AutomationRule
 
 **Purpose**: Trigger-based automation rule definition.
 
 **Key Attributes:**
-- Id: Guid - Unique identifier
-- Name: string - Rule name
-- IsEnabled: bool - Active state
-- TriggerType: TriggerType - What triggers the rule
-- TriggerCondition: string - JSON condition definition
-- Actions: List<AutomationAction> - What to execute
-- CreatedBy: string - Creator
-- LastTriggered: DateTime? - Last execution
+- id: Uuid - Unique identifier
+- name: String - Rule name
+- is_enabled: bool - Active state
+- trigger_type: TriggerType - What triggers the rule
+- trigger_condition: String - JSON condition definition
+- actions: Vec<AutomationAction> - What to execute
+- created_by: String - Creator
+- last_triggered: Option<DateTime> - Last execution
+
+### TypeScript Interfaces (Frontend)
+
+All TypeScript interfaces mirror the Rust structs and are used for type-safe IPC communication. Field names use camelCase per TypeScript conventions. Tauri's `invoke()` automatically handles the serde JSON serialization/deserialization across the IPC boundary.
 
 ---
 
 ## Components
 
-### PermissionService
+### permission module
 
-**Responsibility**: Detect current user's AD group memberships at startup and map to a PermissionLevel. Provide HasPermission() for UI binding.
+**Responsibility**: Detect current user's AD group memberships at startup and map to a PermissionLevel. Provide permission checking for both Rust commands and React UI binding.
 
-**Key Interfaces:**
-- IPermissionService.CurrentLevel: PermissionLevel
-- IPermissionService.HasPermission(PermissionLevel required): bool
-- IPermissionService.DetectPermissionLevelAsync(): Task
+**Key Functions (Rust):**
+- `get_current_level() -> PermissionLevel`
+- `has_permission(required: PermissionLevel) -> bool`
+- `detect_permission_level() -> Result<PermissionLevel>`
 
-**Dependencies**: IDirectoryProvider (to query current user's groups)
+**Frontend**: `usePermission()` hook + `PermissionContext` provider
 
-**Technology Stack**: Pure C# service, no external dependencies
+**Dependencies**: DirectoryProvider trait (to query current user's groups)
 
 ### DirectoryProviders
 
-**Responsibility**: Abstract all directory operations behind IDirectoryProvider. Two implementations: LdapDirectoryProvider (on-prem) and GraphDirectoryProvider (Entra ID).
+**Responsibility**: Abstract all directory operations behind the `DirectoryProvider` trait. Two implementations: `LdapDirectoryProvider` (on-prem) and `GraphDirectoryProvider` (Entra ID).
 
-**Key Interfaces:**
-- IDirectoryProvider.SearchUsersAsync(string query): Task<List<DirectoryUser>>
-- IDirectoryProvider.SearchComputersAsync(string query): Task<List<DirectoryComputer>>
-- IDirectoryProvider.GetGroupsAsync(): Task<List<DirectoryGroup>>
-- IDirectoryProvider.GetGroupMembersAsync(string groupDN): Task<List<string>>
-- IDirectoryProvider.ModifyGroupMembershipAsync(string groupDN, string memberDN, MembershipAction action): Task
-- IDirectoryProvider.ResetPasswordAsync(string userDN, string newPassword, bool mustChange): Task
-- IDirectoryProvider.UnlockAccountAsync(string userDN): Task
-- IDirectoryProvider.SetAccountEnabledAsync(string userDN, bool enabled): Task
-- IDirectoryProvider.MoveObjectAsync(string objectDN, string targetOU): Task
-- IDirectoryProvider.GetObjectAttributesAsync(string objectDN): Task<Dictionary<string, object>>
-- IDirectoryProvider.SetObjectAttributesAsync(string objectDN, Dictionary<string, object> attributes): Task
-- IDirectoryProvider.GetDeletedObjectsAsync(): Task<List<DeletedObject>>
-- IDirectoryProvider.RestoreDeletedObjectAsync(string objectDN, string targetOU): Task
-- ProviderType: DirectoryProviderType (OnPrem, Cloud, Hybrid)
+**Key Trait Methods (Rust):**
+- `search_users(query: &str) -> Result<Vec<DirectoryUser>>`
+- `search_computers(query: &str) -> Result<Vec<DirectoryComputer>>`
+- `get_groups() -> Result<Vec<DirectoryGroup>>`
+- `get_group_members(group_dn: &str) -> Result<Vec<String>>`
+- `modify_group_membership(group_dn: &str, member_dn: &str, action: MembershipAction) -> Result<()>`
+- `reset_password(user_dn: &str, new_password: &str, must_change: bool) -> Result<()>`
+- `unlock_account(user_dn: &str) -> Result<()>`
+- `set_account_enabled(user_dn: &str, enabled: bool) -> Result<()>`
+- `move_object(object_dn: &str, target_ou: &str) -> Result<()>`
+- `get_object_attributes(object_dn: &str) -> Result<HashMap<String, serde_json::Value>>`
+- `set_object_attributes(object_dn: &str, attributes: HashMap<String, serde_json::Value>) -> Result<()>`
+- `get_deleted_objects() -> Result<Vec<DeletedObject>>`
+- `restore_deleted_object(object_dn: &str, target_ou: &str) -> Result<()>`
+- `provider_type() -> DirectoryProviderType`
 
-**Dependencies**: System.DirectoryServices.Protocols (LDAP), Microsoft.Graph (Graph)
+**Dependencies**: ldap3 crate (LDAP), reqwest (Graph API)
 
-### ExchangeService
+### exchange module
 
 **Responsibility**: Query Exchange mailbox information in read-only mode. Delegates to LDAP msExch* attributes (on-prem) or Graph API (online).
 
-**Key Interfaces:**
-- IExchangeService.GetMailboxInfoAsync(string userDN): Task<ExchangeMailboxInfo?>
-- IExchangeService.IsExchangeAvailable: bool
+**Key Functions (Rust):**
+- `get_mailbox_info(user_dn: &str) -> Result<Option<ExchangeMailboxInfo>>`
+- `is_exchange_available() -> bool`
 
-**Dependencies**: IDirectoryProvider (for LDAP attributes), Microsoft.Graph (for Exchange Online)
+**Dependencies**: DirectoryProvider trait (for LDAP attributes), reqwest (for Exchange Online)
 
-### PresetService
+### preset module
 
 **Responsibility**: Load, validate, save, and execute presets from the configured network share.
 
-**Key Interfaces:**
-- IPresetService.GetPresetsAsync(): Task<List<Preset>>
-- IPresetService.SavePresetAsync(Preset preset): Task
-- IPresetService.DeletePresetAsync(Guid presetId): Task
-- IPresetService.PreviewPresetAsync(Preset preset, DirectoryUser targetUser): Task<PresetDiff>
-- IPresetService.ApplyPresetAsync(Preset preset, DirectoryUser targetUser): Task<PresetResult>
+**Key Functions (Rust):**
+- `get_presets() -> Result<Vec<Preset>>`
+- `save_preset(preset: &Preset) -> Result<()>`
+- `delete_preset(preset_id: Uuid) -> Result<()>`
+- `preview_preset(preset: &Preset, target_user: &DirectoryUser) -> Result<PresetDiff>`
+- `apply_preset(preset: &Preset, target_user: &DirectoryUser) -> Result<PresetResult>`
 
-**Dependencies**: IDirectoryProvider, file system access to network share
+**Dependencies**: DirectoryProvider trait, file system access to network share
 
-### AuditService
+### audit module
 
 **Responsibility**: Log all DSPanel actions to local SQLite database. Provide query/search/export capabilities.
 
-**Key Interfaces:**
-- IAuditService.LogAsync(AuditLogEntry entry): Task
-- IAuditService.SearchAsync(AuditSearchCriteria criteria): Task<List<AuditLogEntry>>
-- IAuditService.ExportAsync(AuditSearchCriteria criteria, ExportFormat format): Task<byte[]>
+**Key Functions (Rust):**
+- `log(entry: &AuditLogEntry) -> Result<()>`
+- `search(criteria: &AuditSearchCriteria) -> Result<Vec<AuditLogEntry>>`
+- `export(criteria: &AuditSearchCriteria, format: ExportFormat) -> Result<Vec<u8>>`
 
-**Dependencies**: Microsoft.Data.Sqlite, Dapper
+**Dependencies**: rusqlite
 
-### SnapshotService
+### snapshot module
 
 **Responsibility**: Capture AD object state before modifications and restore from snapshots.
 
-**Key Interfaces:**
-- ISnapshotService.CaptureAsync(string objectDN, string operationType): Task<ObjectSnapshot>
-- ISnapshotService.GetSnapshotsAsync(string objectDN): Task<List<ObjectSnapshot>>
-- ISnapshotService.RestoreAsync(long snapshotId): Task
-- ISnapshotService.CleanupAsync(int retentionDays): Task
+**Key Functions (Rust):**
+- `capture(object_dn: &str, operation_type: &str) -> Result<ObjectSnapshot>`
+- `get_snapshots(object_dn: &str) -> Result<Vec<ObjectSnapshot>>`
+- `restore(snapshot_id: i64) -> Result<()>`
+- `cleanup(retention_days: i32) -> Result<()>`
 
-**Dependencies**: IDirectoryProvider, Microsoft.Data.Sqlite
+**Dependencies**: DirectoryProvider trait, rusqlite
 
-### HealthCheckService
+### health module
 
 **Responsibility**: Compute account healthcheck badges and domain-wide health status.
 
-**Key Interfaces:**
-- IHealthCheckService.ComputeUserHealth(DirectoryUser user): AccountHealthStatus
-- IHealthCheckService.GetDCHealthAsync(): Task<List<DCHealthStatus>>
-- IHealthCheckService.GetReplicationStatusAsync(): Task<List<ReplicationStatus>>
-- IHealthCheckService.CheckDnsHealthAsync(): Task<DnsHealthReport>
-- IHealthCheckService.CheckKerberosClockAsync(): Task<ClockSkewReport>
+**Key Functions (Rust):**
+- `compute_user_health(user: &DirectoryUser) -> AccountHealthStatus`
+- `get_dc_health() -> Result<Vec<DCHealthStatus>>`
+- `get_replication_status() -> Result<Vec<ReplicationStatus>>`
+- `check_dns_health() -> Result<DnsHealthReport>`
+- `check_kerberos_clock() -> Result<ClockSkewReport>`
 
-**Dependencies**: IDirectoryProvider, DNS resolver, WMI provider
+**Dependencies**: DirectoryProvider trait, DNS resolver
 
-### SecurityAnalysisService
+### security module
 
 **Responsibility**: Compute domain risk score, detect AD attacks from event logs, and analyze privilege escalation paths.
 
-**Key Interfaces:**
-- ISecurityAnalysisService.ComputeRiskScoreAsync(): Task<RiskScoreReport>
-- ISecurityAnalysisService.GetPrivilegedAccountsAsync(): Task<List<PrivilegedAccountInfo>>
-- ISecurityAnalysisService.DetectAttacksAsync(): Task<List<SecurityAlert>>
-- ISecurityAnalysisService.GetEscalationPathsAsync(): Task<EscalationGraph>
+**Key Functions (Rust):**
+- `compute_risk_score() -> Result<RiskScoreReport>`
+- `get_privileged_accounts() -> Result<Vec<PrivilegedAccountInfo>>`
+- `detect_attacks() -> Result<Vec<SecurityAlert>>`
+- `get_escalation_paths() -> Result<EscalationGraph>`
 
-**Dependencies**: IDirectoryProvider, EventLogProvider
+**Dependencies**: DirectoryProvider trait
 
-### NtfsPermissionService
-
-**Responsibility**: Resolve NTFS ACLs on UNC paths and cross-reference with AD group memberships.
-
-**Key Interfaces:**
-- INtfsPermissionService.GetPermissionsAsync(string uncPath): Task<List<AclEntry>>
-- INtfsPermissionService.AnalyzeUserAccessAsync(string uncPath, string userDN): Task<AccessAnalysis>
-- INtfsPermissionService.CompareUserAccessAsync(string uncPath, string userDN1, string userDN2): Task<AccessComparison>
-
-**Dependencies**: System.Security.AccessControl, IDirectoryProvider
-
-### WmiMonitoringService
-
-**Responsibility**: Query remote workstation status via WMI/CIM.
-
-**Key Interfaces:**
-- IWmiMonitoringService.GetSystemInfoAsync(string computerName): Task<SystemInfo>
-- IWmiMonitoringService.GetRunningServicesAsync(string computerName): Task<List<ServiceInfo>>
-- IWmiMonitoringService.GetActiveSessionsAsync(string computerName): Task<List<SessionInfo>>
-
-**Dependencies**: System.Management
-
-### ReportService
+### report module
 
 **Responsibility**: Generate scheduled and on-demand reports.
 
-**Key Interfaces:**
-- IReportService.GenerateReportAsync(ReportType type, ReportParameters parameters): Task<ReportResult>
-- IReportService.ScheduleReportAsync(ScheduledReport schedule): Task
-- IReportService.GetScheduledReportsAsync(): Task<List<ScheduledReport>>
+**Key Functions (Rust):**
+- `generate_report(report_type: ReportType, parameters: &ReportParameters) -> Result<ReportResult>`
+- `schedule_report(schedule: &ScheduledReport) -> Result<()>`
+- `get_scheduled_reports() -> Result<Vec<ScheduledReport>>`
 
-**Dependencies**: IDirectoryProvider, ExportService
+**Dependencies**: DirectoryProvider trait, export module
 
-### ExportService
+### export module
 
 **Responsibility**: Export data to CSV and PDF formats.
 
-**Key Interfaces:**
-- IExportService.ExportToCsvAsync<T>(IEnumerable<T> data, string filePath): Task
-- IExportService.ExportToPdfAsync(ReportResult report, string filePath): Task
+**Key Functions (Rust):**
+- `export_to_csv<T: Serialize>(data: &[T], file_path: &Path) -> Result<()>`
+- `export_to_pdf(report: &ReportResult, file_path: &Path) -> Result<()>`
 
-**Dependencies**: CsvHelper, QuestPDF
+**Dependencies**: csv crate, printpdf/genpdf crate
 
-### NotificationService
+### notification module
 
 **Responsibility**: Send webhook notifications to Teams, Slack, or email.
 
-**Key Interfaces:**
-- INotificationService.SendAsync(NotificationEvent event): Task
-- INotificationService.TestChannelAsync(NotificationChannel channel): Task<bool>
+**Key Functions (Rust):**
+- `send(event: &NotificationEvent) -> Result<()>`
+- `test_channel(channel: &NotificationChannel) -> Result<bool>`
 
-**Dependencies**: HttpClient
+**Dependencies**: reqwest
 
-### NavigationService
+### Frontend Navigation
 
-**Responsibility**: Manage view navigation in the WPF shell (sidebar, tabs, dialogs).
+**Responsibility**: Manage page navigation in the React app shell (sidebar, tabs, dialogs).
 
-**Key Interfaces:**
-- INavigationService.NavigateTo<TViewModel>(object? parameter): void
-- INavigationService.OpenTab<TViewModel>(object? parameter): void
-- INavigationService.ShowDialog<TViewModel>(object? parameter): Task<bool?>
+**Implementation**: React Router + custom navigation context
 
-**Dependencies**: WPF Dispatcher, DI container
+**Key Hooks:**
+- `useNavigation().navigateTo(path: string, params?: object)`
+- `useNavigation().openTab(path: string, params?: object)`
+- `useDialog().showDialog(component: ReactNode)`
 
 ### Component Diagram
 
 ```mermaid
 graph LR
-    subgraph ViewModels
-        UserLookupVM --> PermissionSvc
-        UserLookupVM --> DirProvider
-        UserLookupVM --> ExchangeSvc
-        UserLookupVM --> HealthCheckSvc
-        ComparisonVM --> DirProvider
-        ComparisonVM --> NtfsSvc
-        GroupMgmtVM --> DirProvider
-        PresetVM --> PresetSvc2[PresetSvc]
-        SecurityVM --> SecuritySvc2[SecuritySvc]
-        InfraVM --> HealthCheckSvc
-        ReportVM --> ReportSvc2[ReportSvc]
-        AuditVM --> AuditSvc2[AuditSvc]
+    subgraph ReactComponents["React Pages/Components"]
+        UserLookupPage --> usePermission
+        UserLookupPage --> invoke_dir["invoke('search_users')"]
+        UserLookupPage --> invoke_health["invoke('compute_health')"]
+        ComparisonPage --> invoke_dir2["invoke('search_users')"]
+        GroupMgmtPage --> invoke_dir3["invoke('get_groups')"]
+        PresetPage --> invoke_preset["invoke('get_presets')"]
+        SecurityPage --> invoke_sec["invoke('compute_risk')"]
+        InfraPage --> invoke_health2["invoke('get_dc_health')"]
+        ReportPage --> invoke_report["invoke('generate_report')"]
+        AuditPage --> invoke_audit["invoke('search_audit')"]
     end
 
-    subgraph Services
-        PermissionSvc[PermissionService]
-        ExchangeSvc[ExchangeService]
-        HealthCheckSvc[HealthCheckService]
-        NtfsSvc[NtfsPermissionService]
-        PresetSvc2
-        SecuritySvc2
-        ReportSvc2
-        AuditSvc2
+    subgraph RustBackend["Rust Command Handlers"]
+        PermMod["permission module"]
+        DirProvider["DirectoryProvider trait"]
+        HealthMod["health module"]
+        PresetMod["preset module"]
+        SecMod["security module"]
+        ReportMod["report module"]
+        AuditMod["audit module"]
     end
 
     subgraph Providers
-        DirProvider[IDirectoryProvider]
-        LdapProv[LdapProvider]
-        GraphProv[GraphProvider]
+        LdapProv["LdapProvider"]
+        GraphProv["GraphProvider"]
         DirProvider -.-> LdapProv
         DirProvider -.-> GraphProv
     end
@@ -529,17 +516,17 @@ graph LR
 ### Active Directory (LDAP)
 
 - **Purpose**: Primary data source for all AD on-prem operations
-- **Authentication**: Kerberos (current Windows user credentials, no stored passwords)
+- **Authentication**: Kerberos (current OS user credentials, no stored passwords)
 - **Rate Limits**: None (on-prem infrastructure)
 
 **Key Operations:**
-- `SearchRequest` with LDAP filters for user/computer/group lookups
-- `ModifyRequest` for attribute changes, group membership modifications
-- `AddRequest` for object creation (onboarding)
-- `DeleteRequest` for object deletion
-- `ModifyDNRequest` for moving objects between OUs
+- Search with LDAP filters for user/computer/group lookups
+- Modify for attribute changes, group membership modifications
+- Add for object creation (onboarding)
+- Delete for object deletion
+- ModDN for moving objects between OUs
 
-**Integration Notes**: Use paged results (PageResultRequestControl) for queries returning 1000+ results. Always use LDAP over SSL (port 636) when available. Connection pooling via LdapConnection reuse.
+**Integration Notes**: Use paged results control for queries returning 1000+ results. Always use LDAP over TLS (port 636) when available. Connection pooling via ldap3's built-in connection management.
 
 ### Microsoft Graph API
 
@@ -557,7 +544,7 @@ graph LR
 - `GET /groups` - Group listing
 - `GET /users/{id}/mailFolders` - Mailbox quota info
 
-**Integration Notes**: Requires Azure AD App Registration with Directory.Read.All and Mail.Read delegated permissions minimum. Use batch requests ($batch) for multiple queries. Handle 429 (throttled) responses with retry-after header.
+**Integration Notes**: Requires Azure AD App Registration with Directory.Read.All and Mail.Read delegated permissions minimum. Use batch requests ($batch) for multiple queries. Handle 429 (throttled) responses with retry-after header. HTTP calls made via reqwest with appropriate headers and token management.
 
 ### HaveIBeenPwned API
 
@@ -591,29 +578,35 @@ graph LR
 ```mermaid
 sequenceDiagram
     actor User
-    participant VM as UserLookupViewModel
-    participant Perm as PermissionService
-    participant Dir as IDirectoryProvider
-    participant Health as HealthCheckService
-    participant Exch as ExchangeService
-    participant Audit as AuditService
+    participant UI as UserLookupPage (React)
+    participant IPC as Tauri invoke()
+    participant Cmd as Rust Command Handler
+    participant Perm as permission module
+    participant Dir as DirectoryProvider
+    participant Health as health module
+    participant Exch as exchange module
 
-    User->>VM: Enter search query
-    VM->>Dir: SearchUsersAsync(query)
-    Dir-->>VM: List<DirectoryUser>
-    VM->>VM: Display results list
+    User->>UI: Enter search query
+    UI->>IPC: invoke('search_users', { query })
+    IPC->>Cmd: search_users command
+    Cmd->>Dir: search_users(query)
+    Dir-->>Cmd: Vec<DirectoryUser>
+    Cmd-->>UI: JSON response
+    UI->>UI: Display results list
 
-    User->>VM: Select user from results
-    VM->>Dir: GetUserDetailsAsync(userDN)
-    Dir-->>VM: DirectoryUser (full attributes)
-    VM->>Health: ComputeUserHealth(user)
-    Health-->>VM: AccountHealthStatus flags
-    VM->>Exch: GetMailboxInfoAsync(userDN)
-    Exch-->>VM: ExchangeMailboxInfo (or null)
-    VM->>Perm: HasPermission(HelpDesk)
-    Perm-->>VM: true/false
-    VM->>VM: Show/hide action buttons based on permission
-    VM->>VM: Display user detail view with healthcheck badge
+    User->>UI: Select user from results
+    UI->>IPC: invoke('get_user_details', { user_dn })
+    IPC->>Cmd: get_user_details command
+    Cmd->>Dir: get_user_details(user_dn)
+    Dir-->>Cmd: DirectoryUser (full attributes)
+    Cmd->>Health: compute_user_health(user)
+    Health-->>Cmd: AccountHealthStatus flags
+    Cmd->>Exch: get_mailbox_info(user_dn)
+    Exch-->>Cmd: Option<ExchangeMailboxInfo>
+    Cmd-->>UI: JSON response (user + health + mailbox)
+    UI->>UI: Check permission context
+    UI->>UI: Show/hide action buttons based on permission
+    UI->>UI: Display user detail view with healthcheck badge
 ```
 
 ### Password Reset Workflow
@@ -621,39 +614,45 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     actor User
-    participant VM as UserLookupViewModel
-    participant Perm as PermissionService
-    participant MFA as MfaService
-    participant PwdGen as PasswordGenerator
+    participant UI as UserLookupPage (React)
+    participant IPC as Tauri invoke()
+    participant Cmd as Rust Command Handler
+    participant Perm as permission module
+    participant PwdGen as password module
     participant HIBP as HaveIBeenPwned
-    participant Dir as IDirectoryProvider
-    participant Snap as SnapshotService
-    participant Audit as AuditService
+    participant Dir as DirectoryProvider
+    participant Snap as snapshot module
+    participant Audit as audit module
 
-    User->>VM: Click "Reset Password"
-    VM->>Perm: HasPermission(HelpDesk)
-    Perm-->>VM: true
-    VM->>VM: Show password reset dialog
+    User->>UI: Click "Reset Password"
+    UI->>UI: Check permission context (HelpDesk+)
+    UI->>UI: Show password reset dialog
 
     alt Auto-generate password
-        VM->>PwdGen: Generate(criteria)
-        PwdGen-->>VM: generated password
-        VM->>HIBP: CheckCompromised(password)
-        HIBP-->>VM: safe / compromised
+        UI->>IPC: invoke('generate_password', { criteria })
+        IPC->>Cmd: generate_password command
+        Cmd->>PwdGen: generate(criteria)
+        PwdGen-->>Cmd: generated password
+        Cmd->>HIBP: check_compromised(password)
+        HIBP-->>Cmd: safe / compromised
+        Cmd-->>UI: { password, is_compromised }
         alt Compromised
-            VM->>VM: Show warning, regenerate
+            UI->>UI: Show warning, regenerate
         end
     end
 
-    User->>VM: Confirm reset
-    VM->>MFA: VerifyAsync() [if MFA enabled]
-    MFA-->>VM: verified
-    VM->>Snap: CaptureAsync(userDN, "PasswordReset")
-    Snap-->>VM: snapshot saved
-    VM->>Dir: ResetPasswordAsync(userDN, newPassword, mustChange)
-    Dir-->>VM: success
-    VM->>Audit: LogAsync(PasswordReset, userDN, success)
-    VM->>VM: Show confirmation with copyable password
+    User->>UI: Confirm reset
+    UI->>IPC: invoke('reset_password', { user_dn, password, must_change })
+    IPC->>Cmd: reset_password command
+    Cmd->>Perm: has_permission(HelpDesk)
+    Perm-->>Cmd: true
+    Cmd->>Snap: capture(user_dn, "PasswordReset")
+    Snap-->>Cmd: snapshot saved
+    Cmd->>Dir: reset_password(user_dn, password, must_change)
+    Dir-->>Cmd: Ok(())
+    Cmd->>Audit: log(PasswordReset, user_dn, success)
+    Cmd-->>UI: success
+    UI->>UI: Show confirmation with copyable password
 ```
 
 ### Onboarding Wizard Workflow
@@ -661,30 +660,40 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     actor User
-    participant Wizard as OnboardingWizardVM
-    participant Preset as PresetService
-    participant Dir as IDirectoryProvider
-    participant Snap as SnapshotService
-    participant Audit as AuditService
+    participant UI as OnboardingWizard (React)
+    participant IPC as Tauri invoke()
+    participant Cmd as Rust Command Handler
+    participant Preset as preset module
+    participant Dir as DirectoryProvider
+    participant Audit as audit module
 
-    User->>Wizard: Launch onboarding wizard
-    Wizard->>Preset: GetPresetsAsync()
-    Preset-->>Wizard: List<Preset>
+    User->>UI: Launch onboarding wizard
+    UI->>IPC: invoke('get_presets')
+    IPC->>Cmd: get_presets command
+    Cmd->>Preset: get_presets()
+    Preset-->>Cmd: Vec<Preset>
+    Cmd-->>UI: JSON response
 
-    User->>Wizard: Fill user details (name, login, etc.)
-    User->>Wizard: Select preset
-    Wizard->>Preset: PreviewPresetAsync(preset, targetUser)
-    Preset-->>Wizard: PresetDiff (groups to add, OU, attributes)
-    Wizard->>Wizard: Display dry-run preview
+    User->>UI: Fill user details (name, login, etc.)
+    User->>UI: Select preset
+    UI->>IPC: invoke('preview_preset', { preset, target_user })
+    IPC->>Cmd: preview_preset command
+    Cmd->>Preset: preview_preset(preset, target_user)
+    Preset-->>Cmd: PresetDiff (groups to add, OU, attributes)
+    Cmd-->>UI: JSON response
+    UI->>UI: Display dry-run preview
 
-    User->>Wizard: Confirm execution
-    Wizard->>Dir: CreateUserAsync(userDetails)
-    Dir-->>Wizard: user created
-    Wizard->>Preset: ApplyPresetAsync(preset, newUser)
-    Preset-->>Wizard: groups added, attributes set
-    Wizard->>Audit: LogAsync(Onboarding, userDN, details)
-    Wizard->>Wizard: Display formatted output (login, temp password, groups)
-    Wizard->>Wizard: Copy to clipboard button
+    User->>UI: Confirm execution
+    UI->>IPC: invoke('apply_onboarding', { user_details, preset })
+    IPC->>Cmd: apply_onboarding command
+    Cmd->>Dir: create_user(user_details)
+    Dir-->>Cmd: user created
+    Cmd->>Preset: apply_preset(preset, new_user)
+    Preset-->>Cmd: groups added, attributes set
+    Cmd->>Audit: log(Onboarding, user_dn, details)
+    Cmd-->>UI: { login, temp_password, groups }
+    UI->>UI: Display formatted output
+    UI->>UI: Copy to clipboard button
 ```
 
 ### Bulk Group Operation Workflow
@@ -692,39 +701,46 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     actor User
-    participant VM as GroupMgmtViewModel
-    participant Dir as IDirectoryProvider
-    participant Snap as SnapshotService
-    participant Audit as AuditService
+    participant UI as GroupManagementPage (React)
+    participant IPC as Tauri invoke()
+    participant Cmd as Rust Command Handler
+    participant Dir as DirectoryProvider
+    participant Snap as snapshot module
+    participant Audit as audit module
 
-    User->>VM: Select source group(s) and target group(s)
-    User->>VM: Select operation type (D/A/T)
-    User->>VM: Select members to affect
+    User->>UI: Select source group(s) and target group(s)
+    User->>UI: Select operation type (D/A/T)
+    User->>UI: Select members to affect
 
-    VM->>VM: Compute dry-run preview
-    VM->>VM: Display diff (members to add/remove per group)
+    UI->>IPC: invoke('preview_bulk_group_op', { params })
+    IPC->>Cmd: preview command
+    Cmd-->>UI: diff preview (members to add/remove per group)
+    UI->>UI: Display diff preview
 
-    User->>VM: Confirm execution
+    User->>UI: Confirm execution
+    UI->>IPC: invoke('execute_bulk_group_op', { params })
+    IPC->>Cmd: execute command
     loop For each affected member
-        VM->>Snap: CaptureAsync(memberDN, "BulkGroupOp")
+        Cmd->>Snap: capture(member_dn, "BulkGroupOp")
         alt Add operation
-            VM->>Dir: ModifyGroupMembershipAsync(targetGroup, member, Add)
+            Cmd->>Dir: modify_group_membership(target_group, member, Add)
         else Delete operation
-            VM->>Dir: ModifyGroupMembershipAsync(sourceGroup, member, Remove)
+            Cmd->>Dir: modify_group_membership(source_group, member, Remove)
         else Transfer operation
-            VM->>Dir: ModifyGroupMembershipAsync(targetGroup, member, Add)
-            VM->>Dir: ModifyGroupMembershipAsync(sourceGroup, member, Remove)
+            Cmd->>Dir: modify_group_membership(target_group, member, Add)
+            Cmd->>Dir: modify_group_membership(source_group, member, Remove)
         end
-        VM->>Audit: LogAsync(GroupMembershipChange, details)
+        Cmd->>Audit: log(GroupMembershipChange, details)
     end
-    VM->>VM: Show completion summary with rollback option
+    Cmd-->>UI: completion summary
+    UI->>UI: Show completion summary with rollback option
 ```
 
 ---
 
 ## Database Schema
 
-DSPanel uses SQLite for local-only storage (audit log, snapshots, settings). No server database.
+DSPanel uses SQLite (via rusqlite) for local-only storage (audit log, snapshots, settings). No server database.
 
 ```sql
 -- Audit Log
@@ -760,7 +776,7 @@ CREATE INDEX idx_snapshot_timestamp ON object_snapshots(timestamp);
 
 -- Scheduled Reports
 CREATE TABLE scheduled_reports (
-    id TEXT PRIMARY KEY,  -- GUID
+    id TEXT PRIMARY KEY,  -- UUID
     name TEXT NOT NULL,
     report_type TEXT NOT NULL,
     parameters TEXT NOT NULL,  -- JSON
@@ -775,7 +791,7 @@ CREATE TABLE scheduled_reports (
 
 -- Automation Rules
 CREATE TABLE automation_rules (
-    id TEXT PRIMARY KEY,  -- GUID
+    id TEXT PRIMARY KEY,  -- UUID
     name TEXT NOT NULL,
     is_enabled INTEGER NOT NULL DEFAULT 1,
     trigger_type TEXT NOT NULL,
@@ -787,7 +803,7 @@ CREATE TABLE automation_rules (
 
 -- Notification Channels
 CREATE TABLE notification_channels (
-    id TEXT PRIMARY KEY,  -- GUID
+    id TEXT PRIMARY KEY,  -- UUID
     name TEXT NOT NULL,
     channel_type TEXT NOT NULL,  -- Webhook, SMTP
     configuration TEXT NOT NULL,  -- JSON (URL, credentials)
@@ -811,8 +827,8 @@ CREATE TABLE risk_score_history (
 DSPanel/
   .github/
     workflows/
-      build.yml                      # CI: build + test on push/PR
-      release.yml                    # CD: build MSIX + portable on tag
+      ci.yml                           # CI: cargo test + pnpm test + clippy + eslint on push/PR
+      release.yml                      # CD: cargo tauri build on tag -> .msi/.dmg/.AppImage
     ISSUE_TEMPLATE/
       bug_report.md
       feature_request.md
@@ -820,200 +836,176 @@ DSPanel/
     brainstorming-session-results.md
     brief.md
     prd.md
-    architecture.md                  # This document
-    architecture/                    # Sharded architecture docs
-      01-tech-stack.md
-      02-data-models.md
-      03-components.md
-      04-source-tree.md
-      05-coding-standards.md
-    stories/                         # User stories for development
-  src/
-    DSPanel/
-      App.xaml
-      App.xaml.cs
-      MainWindow.xaml
-      MainWindow.xaml.cs
-      DSPanel.csproj
-      Converters/                    # WPF value converters
-        BoolToVisibilityConverter.cs
-        PermissionLevelConverter.cs
-        HealthStatusToColorConverter.cs
-      Helpers/                       # Utility classes
-        LdapHelpers.cs
-        DnParser.cs
-      Models/                        # Domain models (POCOs)
-        DirectoryUser.cs
-        DirectoryComputer.cs
-        DirectoryGroup.cs
-        ExchangeMailboxInfo.cs
-        AccountHealthStatus.cs
-        Preset.cs
-        AuditLogEntry.cs
-        ObjectSnapshot.cs
-        AutomationRule.cs
-        RiskScoreReport.cs
-        SecurityAlert.cs
-      Services/                      # Business logic services
-        Directory/
-          IDirectoryProvider.cs
-          LdapDirectoryProvider.cs
-          GraphDirectoryProvider.cs
-          DirectoryProviderFactory.cs
-        Exchange/
-          IExchangeService.cs
-          ExchangeService.cs
-        Permissions/
-          IPermissionService.cs
-          PermissionService.cs
-          PermissionLevel.cs
-        Presets/
-          IPresetService.cs
-          PresetService.cs
-          PresetValidator.cs
-        Audit/
-          IAuditService.cs
-          AuditService.cs
-        Snapshots/
-          ISnapshotService.cs
-          SnapshotService.cs
-        Health/
-          IHealthCheckService.cs
-          HealthCheckService.cs
-        Security/
-          ISecurityAnalysisService.cs
-          SecurityAnalysisService.cs
-          RiskScoreCalculator.cs
-          AttackDetector.cs
-        Ntfs/
-          INtfsPermissionService.cs
-          NtfsPermissionService.cs
-        Monitoring/
-          IWmiMonitoringService.cs
-          WmiMonitoringService.cs
-        Reports/
-          IReportService.cs
-          ReportService.cs
-        Export/
-          IExportService.cs
-          CsvExportService.cs
-          PdfExportService.cs
-        Notifications/
-          INotificationService.cs
-          NotificationService.cs
-          WebhookSender.cs
-        Scripts/
-          IScriptExecutionService.cs
-          ScriptExecutionService.cs
-        Navigation/
-          INavigationService.cs
-          NavigationService.cs
-        Update/
-          IUpdateService.cs
-          UpdateService.cs
-        Mfa/
-          IMfaService.cs
-          TotpMfaService.cs
-        Password/
-          IPasswordService.cs
-          PasswordGenerator.cs
-          HibpClient.cs
-      ViewModels/                    # MVVM ViewModels
-        MainViewModel.cs
-        UserLookupViewModel.cs
-        ComputerLookupViewModel.cs
-        ComparisonViewModel.cs
-        GroupManagementViewModel.cs
-        PresetManagementViewModel.cs
-        OnboardingWizardViewModel.cs
-        OffboardingViewModel.cs
-        InfrastructureHealthViewModel.cs
-        SecurityDashboardViewModel.cs
-        ReportsViewModel.cs
-        AuditLogViewModel.cs
-        SettingsViewModel.cs
-        Dialogs/
-          PasswordResetDialogViewModel.cs
-          MfaDialogViewModel.cs
-          DryRunPreviewDialogViewModel.cs
-          PresetEditorDialogViewModel.cs
-      Views/                         # WPF Views (XAML)
-        MainWindow.xaml(.cs)
-        Controls/
-          SearchBar.xaml(.cs)
-          HealthBadge.xaml(.cs)
-          PermissionGate.xaml(.cs)
-          GroupTreeView.xaml(.cs)
-          DiffViewer.xaml(.cs)
-        Pages/
-          UserLookupView.xaml(.cs)
-          ComputerLookupView.xaml(.cs)
-          ComparisonView.xaml(.cs)
-          GroupManagementView.xaml(.cs)
-          PresetManagementView.xaml(.cs)
-          OnboardingWizardView.xaml(.cs)
-          OffboardingView.xaml(.cs)
-          InfrastructureHealthView.xaml(.cs)
-          SecurityDashboardView.xaml(.cs)
-          ReportsView.xaml(.cs)
-          AuditLogView.xaml(.cs)
-          SettingsView.xaml(.cs)
-        Dialogs/
-          PasswordResetDialog.xaml(.cs)
-          MfaDialog.xaml(.cs)
-          DryRunPreviewDialog.xaml(.cs)
-          PresetEditorDialog.xaml(.cs)
-      Resources/
-        Styles/
-          Colors.xaml
-          DarkTheme.xaml
-          LightTheme.xaml
-          Controls.xaml
-        Icons/
-          dspanel.ico
-      Data/                          # SQLite database access
-        DatabaseInitializer.cs
-        AuditRepository.cs
-        SnapshotRepository.cs
-        SettingsRepository.cs
-    DSPanel.Tests/
-      DSPanel.Tests.csproj
-      Services/
-        Directory/
-          LdapDirectoryProviderTests.cs
-          GraphDirectoryProviderTests.cs
-        Permissions/
-          PermissionServiceTests.cs
-        Presets/
-          PresetServiceTests.cs
-          PresetValidatorTests.cs
-        Health/
-          HealthCheckServiceTests.cs
-        Security/
-          RiskScoreCalculatorTests.cs
-          AttackDetectorTests.cs
-        Ntfs/
-          NtfsPermissionServiceTests.cs
-        Password/
-          PasswordGeneratorTests.cs
-          HibpClientTests.cs
-        Export/
-          CsvExportServiceTests.cs
-      ViewModels/
-        UserLookupViewModelTests.cs
-        ComparisonViewModelTests.cs
-        GroupManagementViewModelTests.cs
-      Helpers/
-        DnParserTests.cs
-      TestHelpers/
-        MockDirectoryProvider.cs
-        TestDataBuilder.cs
+    architecture.md                    # This document
+    architecture/                      # Sharded architecture docs
+    stories/                           # User stories for development
+  src/                                 # React/TypeScript frontend
+    main.tsx                           # React entry point
+    App.tsx                            # Root component with router
+    App.css                            # Global styles
+    vite-env.d.ts                      # Vite type declarations
+    assets/                            # Static assets (images, icons)
+    components/                        # Reusable React components
+      common/
+        SearchBar.tsx
+        HealthBadge.tsx
+        PermissionGate.tsx
+        DiffViewer.tsx
+        LoadingSpinner.tsx
+        Pagination.tsx
+        StatusBadge.tsx
+        Avatar.tsx
+        CopyButton.tsx
+        EmptyState.tsx
+      layout/
+        AppShell.tsx                   # Main layout (sidebar + content)
+        Sidebar.tsx
+        TopBar.tsx
+      dialogs/
+        ConfirmationDialog.tsx
+        PasswordResetDialog.tsx
+        PresetEditorDialog.tsx
+        DryRunPreviewDialog.tsx
+    pages/                             # Page-level components (routes)
+      UserLookupPage.tsx
+      ComputerLookupPage.tsx
+      ComparisonPage.tsx
+      GroupManagementPage.tsx
+      PresetManagementPage.tsx
+      OnboardingWizardPage.tsx
+      OffboardingPage.tsx
+      InfrastructureHealthPage.tsx
+      SecurityDashboardPage.tsx
+      ReportsPage.tsx
+      AuditLogPage.tsx
+      SettingsPage.tsx
+    hooks/                             # Custom React hooks
+      usePermission.ts
+      useDirectory.ts
+      useDebounce.ts
+      useNavigation.ts
+      useTheme.ts
+    contexts/                          # React context providers
+      PermissionContext.tsx
+      ThemeContext.tsx
+      NotificationContext.tsx
+    types/                             # TypeScript type definitions
+      directory.ts                     # DirectoryUser, DirectoryComputer, etc.
+      audit.ts                         # AuditLogEntry, etc.
+      preset.ts                        # Preset, PresetDiff, etc.
+      health.ts                        # AccountHealthStatus, etc.
+      permissions.ts                   # PermissionLevel enum
+    lib/                               # Utility functions
+      tauri-commands.ts                # Typed wrappers around invoke()
+      formatters.ts                    # Date, DN, and display formatters
+      validators.ts                    # Client-side validation helpers
+    styles/                            # CSS / Tailwind configuration
+      tailwind.css                     # Tailwind directives
+      themes/
+        light.css
+        dark.css
+  src-tauri/                           # Rust backend (Tauri)
+    Cargo.toml                         # Rust dependencies
+    tauri.conf.json                    # Tauri configuration (permissions, CSP, window)
+    capabilities/                      # Tauri v2 capability files
+      default.json
+    src/
+      main.rs                          # Tauri app entry point
+      lib.rs                           # Module declarations
+      commands/                        # Tauri command handlers (IPC entry points)
+        mod.rs
+        user_commands.rs
+        computer_commands.rs
+        group_commands.rs
+        preset_commands.rs
+        audit_commands.rs
+        health_commands.rs
+        security_commands.rs
+        settings_commands.rs
+        password_commands.rs
+      services/                        # Business logic modules
+        mod.rs
+        directory/
+          mod.rs
+          traits.rs                    # DirectoryProvider trait definition
+          ldap_provider.rs             # ldap3-based implementation
+          graph_provider.rs            # reqwest-based Graph API implementation
+        exchange/
+          mod.rs
+        permission/
+          mod.rs
+          level.rs                     # PermissionLevel enum
+        preset/
+          mod.rs
+          validator.rs
+        audit/
+          mod.rs
+        snapshot/
+          mod.rs
+        health/
+          mod.rs
+        security/
+          mod.rs
+          risk_calculator.rs
+          attack_detector.rs
+        report/
+          mod.rs
+        export/
+          mod.rs
+          csv_export.rs
+          pdf_export.rs
+        notification/
+          mod.rs
+          webhook.rs
+        password/
+          mod.rs
+          generator.rs
+          hibp_client.rs
+        update/
+          mod.rs
+      models/                          # Rust data structs (serde)
+        mod.rs
+        directory_user.rs
+        directory_computer.rs
+        directory_group.rs
+        exchange_mailbox.rs
+        health_status.rs
+        preset.rs
+        audit_entry.rs
+        snapshot.rs
+        automation_rule.rs
+        risk_report.rs
+        security_alert.rs
+      db/                              # SQLite database access (rusqlite)
+        mod.rs
+        migrations.rs
+        audit_repo.rs
+        snapshot_repo.rs
+        settings_repo.rs
+      error.rs                         # Error types (thiserror)
+      state.rs                         # Tauri managed state definitions
+    tests/                             # Rust integration tests
+      directory_tests.rs
+      permission_tests.rs
+      preset_tests.rs
+      health_tests.rs
+      audit_tests.rs
+  public/                              # Static files served by Vite
+    favicon.svg
+  index.html                           # Vite HTML entry point
+  package.json                         # JS dependencies
+  pnpm-lock.yaml                       # Lockfile
+  tsconfig.json                        # TypeScript config
+  tsconfig.node.json                   # TypeScript config for Vite/Node
+  vite.config.ts                       # Vite configuration
+  tailwind.config.ts                   # Tailwind CSS configuration
+  .eslintrc.cjs                        # ESLint configuration
+  .prettierrc                          # Prettier configuration
   .gitignore
   .editorconfig
   CHANGELOG.md
   LICENSE
   README.md
-  DSPanel.sln
 ```
 
 ---
@@ -1030,22 +1022,23 @@ DSPanel/
 - **Strategy**: GitHub Releases with manual trigger on version tags
 - **CI/CD Platform**: GitHub Actions
 - **Pipeline Configuration**: `.github/workflows/`
-- **Artifacts**: MSIX package (signed) + portable exe (zip)
+- **Build Command**: `cargo tauri build`
+- **Artifacts**: Windows .msi installer, macOS .dmg, Linux .AppImage + .deb
 
 ### Environments
 
-- **Development**: Local developer machine with AD test domain
-- **CI**: GitHub Actions runner (Windows) - build + unit tests only
-- **Release**: GitHub Releases - tagged builds produce downloadable artifacts
+- **Development**: Local developer machine with AD test domain, `cargo tauri dev` for hot-reload
+- **CI**: GitHub Actions runner (Linux/Windows/macOS matrix) - build + unit tests only
+- **Release**: GitHub Releases - tagged builds produce downloadable platform artifacts
 
 ### Environment Promotion Flow
 
 ```
-feature branch --> PR --> main (CI: build + test)
+feature branch --> PR --> main (CI: cargo test + pnpm test + clippy + eslint)
                                   |
                           tag vX.Y.Z --> Release workflow
                                   |
-                          GitHub Release (MSIX + portable zip)
+                          GitHub Release (.msi + .dmg + .AppImage + .deb)
 ```
 
 ### Rollback Strategy
@@ -1060,18 +1053,19 @@ feature branch --> PR --> main (CI: build + test)
 
 ### General Approach
 
-- **Error Model**: Exception-based with custom exception hierarchy
-- **Exception Hierarchy**: DSPanelException (base) -> DirectoryException, PermissionDeniedException, PresetValidationException, ExportException, NetworkException
-- **Error Propagation**: Services throw typed exceptions. ViewModels catch and display user-friendly messages. Unhandled exceptions caught by global handler.
+- **Error Model**: Rust `Result<T, E>` with typed error enums via thiserror, propagated with `?` operator
+- **Error Hierarchy**: `DsPanelError` (enum) with variants: DirectoryError, PermissionDeniedError, PresetValidationError, ExportError, NetworkError, DatabaseError
+- **Error Propagation**: Rust services return `Result<T, DsPanelError>`. Tauri commands convert errors to serializable responses. React components display user-friendly messages via notification context.
+- **Frontend Errors**: Tauri invoke() rejects with error string on Rust errors. React error boundaries catch rendering failures.
 
 ### Logging Standards
 
-- **Library**: Serilog 4.x
-- **Format**: Structured JSON to file, plain text to console (debug only)
-- **Levels**: Verbose (trace), Debug (development), Information (operations), Warning (recoverable issues), Error (failures), Fatal (app crash)
+- **Library**: tracing crate with tracing-subscriber
+- **Format**: Structured JSON to file (tracing-appender), plain text to console (debug only)
+- **Levels**: TRACE, DEBUG, INFO, WARN, ERROR
 - **Required Context**:
-    - Operation context: current action type (Lookup, PasswordReset, GroupModify, etc.)
-    - User context: current Windows username (never log passwords or tokens)
+    - Operation context: current action type (Lookup, PasswordReset, GroupModify, etc.) via tracing spans
+    - User context: current OS username (never log passwords or tokens)
     - Target context: AD object DN being operated on
 
 ### Error Handling Patterns
@@ -1080,18 +1074,18 @@ feature branch --> PR --> main (CI: build + test)
 
 - **Retry Policy**: Exponential backoff (1s, 2s, 4s) with max 3 retries for transient failures (network timeout, 429, 503)
 - **Circuit Breaker**: After 5 consecutive failures to a provider, disable that provider and show status bar warning
-- **Timeout Configuration**: LDAP queries 30s, Graph API 15s, HIBP 5s, WMI 10s
-- **Error Translation**: All external errors wrapped in typed DSPanelExceptions with user-friendly messages
+- **Timeout Configuration**: LDAP queries 30s, Graph API 15s, HIBP 5s
+- **Error Translation**: All external errors mapped to DsPanelError variants with user-friendly messages
 
 #### Business Logic Errors
 
-- **Custom Exceptions**: PermissionDeniedException, ObjectNotFoundException, PresetValidationException, SnapshotNotFoundException
-- **User-Facing Errors**: Displayed in a notification bar (non-modal) with severity icon (info/warning/error)
-- **Error Codes**: Not used - exception types are sufficient for a desktop app
+- **Error Variants**: PermissionDeniedError, ObjectNotFoundError, PresetValidationError, SnapshotNotFoundError
+- **User-Facing Errors**: Displayed in a notification toast (non-modal) with severity icon (info/warning/error)
+- **Error Codes**: Not used - error enum variants are sufficient for a desktop app
 
 #### Data Consistency
 
-- **Transaction Strategy**: SQLite transactions for audit log batch writes
+- **Transaction Strategy**: SQLite transactions (rusqlite) for audit log batch writes
 - **Compensation Logic**: Object snapshots enable rollback of AD modifications
 - **Idempotency**: Group membership operations check current state before applying
 
@@ -1101,38 +1095,62 @@ feature branch --> PR --> main (CI: build + test)
 
 ### Core Standards
 
-- **Language**: C# 13, .NET 10.0
-- **Style & Linting**: .editorconfig with .NET default rules, `dotnet format` for enforcement
-- **Test Organization**: Mirror source tree (src/DSPanel/Services/Foo.cs -> src/DSPanel.Tests/Services/FooTests.cs)
+- **Backend**: Rust (stable), enforced by `cargo fmt` and `cargo clippy`
+- **Frontend**: TypeScript (strict mode), enforced by ESLint and Prettier
+- **Test Organization (Rust)**: Unit tests in same file (`#[cfg(test)] mod tests`), integration tests in `src-tauri/tests/`
+- **Test Organization (Frontend)**: Colocated test files (`Component.test.tsx` next to `Component.tsx`) or `__tests__/` directories
 
 ### Naming Conventions
 
+#### Rust
+
 | Element | Convention | Example |
 |---------|-----------|---------|
-| Interfaces | I-prefix | `IDirectoryProvider` |
-| Async methods | Async suffix | `SearchUsersAsync` |
-| Private fields | _camelCase | `_permissionService` |
-| Constants | PascalCase | `MaxRetryCount` |
-| XAML resources | PascalCase keys | `PrimaryButtonStyle` |
+| Modules | snake_case | `directory_provider` |
+| Structs/Enums | PascalCase | `DirectoryUser`, `PermissionLevel` |
+| Functions | snake_case | `search_users`, `compute_risk_score` |
+| Constants | SCREAMING_SNAKE_CASE | `MAX_RETRY_COUNT` |
+| Trait names | PascalCase | `DirectoryProvider` |
+| Fields | snake_case | `sam_account_name` |
+
+#### TypeScript / React
+
+| Element | Convention | Example |
+|---------|-----------|---------|
+| Components | PascalCase | `UserLookupPage`, `SearchBar` |
+| Hooks | camelCase with use prefix | `usePermission`, `useDebounce` |
+| Interfaces/Types | PascalCase | `DirectoryUser`, `AuditLogEntry` |
+| Functions/variables | camelCase | `searchUsers`, `isLoading` |
+| Constants | SCREAMING_SNAKE_CASE or camelCase | `MAX_PAGE_SIZE` |
+| CSS classes | kebab-case (Tailwind utilities) | `text-sm`, `bg-primary` |
 
 ### Critical Rules
 
-- **No blocking calls on UI thread**: All AD/network operations must use async/await. Never use .Result or .Wait() on the UI thread.
-- **Always use IDirectoryProvider**: Never instantiate LdapConnection or GraphServiceClient directly in ViewModels or Services. Always go through the provider abstraction.
-- **Permission check before action**: Every write operation must call HasPermission() before executing. Never rely solely on UI visibility for security.
-- **Snapshot before modify**: Every write operation on AD objects must call SnapshotService.CaptureAsync() before the modification.
-- **Audit every write**: Every successful or failed write operation must be logged via AuditService.LogAsync().
+- **Rust - no unwrap() in production code**: Always propagate errors with `?` or handle explicitly. `unwrap()` / `expect()` only in tests.
+- **Rust - no unsafe**: Unless strictly necessary and documented with a safety comment.
+- **Always use DirectoryProvider trait**: Never use ldap3 or reqwest directly in command handlers. Always go through the provider abstraction.
+- **Permission check before action**: Every write command must call `has_permission()` before executing. Never rely solely on UI visibility for security.
+- **Snapshot before modify**: Every write operation on AD objects must call `snapshot::capture()` before the modification.
+- **Audit every write**: Every successful or failed write operation must be logged via `audit::log()`.
 - **No secrets in code or logs**: Never log passwords, tokens, or credentials. Never hardcode connection strings or API keys.
-- **Dispose LDAP connections**: LdapConnection must be properly disposed. Use `using` statements or connection pooling.
-- **Null-check AD attributes**: AD attributes may be null or missing. Always handle null when reading from SearchResultEntry.
+- **Handle Option/Result for AD attributes**: AD attributes may be null or missing. Always handle None when parsing LDAP search results.
+- **Frontend - no any types**: TypeScript strict mode, no `any` escape hatches unless justified with a comment.
+- **Frontend - always handle loading/error states**: Every component that invokes a Tauri command must handle loading, success, and error states.
 
-### C# Specifics
+### Rust Specifics
 
-- **Nullable reference types**: Enabled project-wide. No suppression operators (!.) unless justified with comment.
-- **Primary constructors**: Use for DI injection in services and ViewModels.
-- **Collection expressions**: Prefer `[]` over `new List<T>()` for initialization.
-- **File-scoped namespaces**: Use `namespace DSPanel.Services;` (not block-scoped).
-- **Records**: Use for immutable data transfer objects (DTOs, report results).
+- **Edition**: 2021
+- **Clippy**: Run with `--deny warnings` in CI
+- **Error types**: Use `thiserror` for library-style errors, `anyhow` only in main/command entry points if needed
+- **Serde**: Derive `Serialize`/`Deserialize` on all IPC-crossing types, use `#[serde(rename_all = "camelCase")]` for frontend compatibility
+- **Async runtime**: tokio (bundled with Tauri)
+
+### TypeScript Specifics
+
+- **Strict mode**: Enabled in tsconfig.json (`strict: true`)
+- **No default exports**: Use named exports for better refactoring support
+- **React**: Functional components only, no class components
+- **State**: Prefer hooks (`useState`, `useReducer`) and context over external state management libraries
 
 ---
 
@@ -1141,50 +1159,66 @@ feature branch --> PR --> main (CI: build + test)
 ### Testing Philosophy
 
 - **Approach**: Test-after for initial development, test-driven for bug fixes
-- **Coverage Goals**: 90%+ on core services, best-effort on ViewModels
+- **Coverage Goals**: 90%+ on Rust services, best-effort on React components
 - **Test Pyramid**: Heavy unit tests, selective integration tests, manual UI tests
 
 ### Test Types and Organization
 
-#### Unit Tests
+#### Rust Unit Tests
 
-- **Framework**: xUnit 2.9.x
-- **File Convention**: `{ClassName}Tests.cs` in mirrored directory
-- **Location**: `src/DSPanel.Tests/`
-- **Mocking Library**: Moq 4.20.x
-- **Coverage Requirement**: 90%+ on Services/, best-effort on ViewModels/
+- **Framework**: cargo test (built-in)
+- **File Convention**: `#[cfg(test)] mod tests {}` at bottom of each source file
+- **Location**: Inline in `src-tauri/src/`
+- **Mocking**: Mock implementations of traits (no external mocking framework needed)
+- **Coverage Requirement**: 90%+ on services/, best-effort on commands/
 
-**AI Agent Requirements:**
-- Generate tests for all public methods
+**Requirements:**
+- Test all public functions
 - Cover edge cases and error conditions
-- Follow AAA pattern (Arrange, Act, Assert)
-- Mock all external dependencies (IDirectoryProvider, file system, network)
-- Use FluentAssertions for readable assertions
+- Follow arrange/act/assert pattern
+- Use mock trait implementations for external dependencies
+- Test error paths (Result::Err) as well as happy paths
+
+#### Frontend Unit Tests
+
+- **Framework**: vitest
+- **Component Testing**: React Testing Library
+- **File Convention**: `ComponentName.test.tsx` colocated with component
+- **Location**: Alongside source files in `src/`
+- **Coverage Requirement**: Best-effort on pages, good coverage on hooks and utility functions
+
+**Requirements:**
+- Test custom hooks with `renderHook()`
+- Test components with user-centric queries (`getByRole`, `getByText`)
+- Mock Tauri `invoke()` calls in tests
+- Test loading, success, and error states
 
 #### Integration Tests
 
 - **Scope**: Optional - for developers with access to an AD test domain
-- **Location**: `src/DSPanel.Tests/Integration/`
+- **Rust Location**: `src-tauri/tests/`
 - **Test Infrastructure**:
     - **LDAP**: Real AD test domain (not mocked) - run only locally, excluded from CI
     - **SQLite**: In-memory SQLite for audit/snapshot repository tests
 
 #### End-to-End Tests
 
-- **Framework**: Manual testing
+- **Framework**: Manual testing (Tauri WebDriver support available for future automation)
 - **Scope**: Full user workflows (lookup, reset, onboarding, bulk ops)
 - **Environment**: Developer machine connected to AD test domain
 
 ### Test Data Management
 
-- **Strategy**: Builder pattern for test data
-- **Fixtures**: TestDataBuilder class creates DirectoryUser, DirectoryGroup, Preset instances
-- **Factories**: MockDirectoryProvider returns configurable test data
-- **Cleanup**: In-memory SQLite databases auto-dispose after each test
+- **Strategy**: Builder pattern for test data (Rust) + fixture factories (TypeScript)
+- **Rust Fixtures**: Builder functions create DirectoryUser, DirectoryGroup, Preset instances
+- **TS Fixtures**: Factory functions return typed mock data
+- **Cleanup**: In-memory SQLite databases dropped after each test
 
 ### Continuous Testing
 
-- **CI Integration**: GitHub Actions runs `dotnet test` on every push/PR (unit tests only)
+- **CI Integration**: GitHub Actions runs `cargo test` and `pnpm test` on every push/PR
+- **Rust Linting**: `cargo clippy -- -D warnings` in CI
+- **Frontend Linting**: `pnpm lint` (ESLint) in CI
 - **Performance Tests**: Manual benchmarking for LDAP query performance on large domains
 - **Security Tests**: Manual review of permission gating and input validation
 
@@ -1194,30 +1228,30 @@ feature branch --> PR --> main (CI: build + test)
 
 ### Input Validation
 
-- **Validation Library**: Built-in .NET data annotations + custom validators
-- **Validation Location**: Service layer (before any AD operation)
+- **Backend Validation**: Custom validation functions in Rust service layer (before any AD operation)
+- **Frontend Validation**: TypeScript validation helpers for client-side UX (not security boundary)
 - **Required Rules:**
-    - All user search inputs sanitized for LDAP injection (escape special chars: `*`, `(`, `)`, `\`, NUL)
+    - All user search inputs sanitized for LDAP injection (escape special chars: `*`, `(`, `)`, `\`, NUL) in Rust
     - UNC paths validated for format and accessible characters
-    - Preset JSON validated against schema before loading
+    - Preset JSON validated with serde deserialization + custom validation before loading
     - Script paths validated against allowed script directory
 
 ### Authentication & Authorization
 
 - **Auth Method**: Windows Integrated Authentication (Kerberos) - no stored credentials
-- **Session Management**: Application-lifetime session, permission level cached at startup
+- **Session Management**: Application-lifetime session, permission level cached at startup in Tauri managed state
 - **Required Patterns:**
-    - IPermissionService.HasPermission() checked at service layer before every write operation
-    - UI elements bound to permission level for visibility (defense in depth, not sole control)
+    - Permission checked in Rust command handlers before every write operation
+    - React PermissionGate component controls UI visibility (defense in depth, not sole control)
     - MFA challenge (TOTP) configurable for sensitive operations
 
 ### Secrets Management
 
-- **Development**: No secrets needed (Kerberos auth uses current Windows credentials)
-- **Graph API**: Azure AD App Registration credentials stored in Windows Credential Manager (not plaintext)
+- **Development**: No secrets needed (Kerberos auth uses current OS credentials)
+- **Graph API**: Azure AD App Registration credentials stored in OS keychain (not plaintext)
 - **Code Requirements:**
     - NEVER hardcode secrets, tokens, or passwords
-    - Access Graph credentials via Windows Credential Manager API
+    - Access Graph credentials via OS keychain API
     - No secrets in logs, error messages, or snapshots
 
 ### Data Protection
@@ -1227,15 +1261,24 @@ feature branch --> PR --> main (CI: build + test)
 - **PII Handling**: AD user data displayed in-memory only, never cached to disk except in audit logs (action metadata only, not full user records)
 - **Logging Restrictions**: Never log passwords (old or new), authentication tokens, thumbnail photo data, or full LDAP query results
 
+### Tauri Security Configuration
+
+- **Content Security Policy (CSP)**: Strict CSP in `tauri.conf.json` - no inline scripts, no remote script loading
+- **Capability Permissions**: Minimal Tauri permissions - only enable required APIs (fs, http, shell as needed)
+- **IPC Security**: All Tauri commands validate inputs on the Rust side before processing
+- **No Remote Content**: Frontend is bundled locally, no remote URLs loaded in the webview
+
 ### Dependency Security
 
-- **Scanning Tool**: `dotnet list package --vulnerable` in CI pipeline
+- **Rust Scanning**: `cargo audit` in CI pipeline for known vulnerabilities in crate dependencies
+- **Frontend Scanning**: `pnpm audit` in CI pipeline for npm package vulnerabilities
 - **Update Policy**: Monthly dependency review, immediate update for critical CVEs
-- **Approval Process**: New NuGet packages require justification in PR description
+- **Approval Process**: New crate or npm packages require justification in PR description
 
 ### Security Testing
 
-- **SAST Tool**: .NET Analyzers (built-in) + security-focused rules
+- **Rust SAST**: cargo clippy with security-related lints
+- **Frontend SAST**: ESLint with security plugins
 - **DAST Tool**: N/A (desktop application, not web)
 - **Penetration Testing**: Manual review of LDAP injection vectors and permission bypass scenarios
 
@@ -1243,14 +1286,13 @@ feature branch --> PR --> main (CI: build + test)
 
 ## Next Steps
 
-### Architect Prompt (Frontend/UI)
-
-DSPanel is a desktop WPF application - there is no separate frontend. The UI architecture is embedded within this document (MVVM pattern, Views, ViewModels, navigation service). Proceed directly to story implementation.
-
 ### Development Start
 
+DSPanel uses a Tauri v2 hybrid architecture - the Rust backend handles system operations while the React frontend provides the UI. Both layers are developed in parallel.
+
 Review the PRD (docs/prd.md) Epic 1 stories and begin implementation following this architecture document. Key files to create first:
-1. Project skeleton with DI and hosting (Story 1.1)
-2. IDirectoryProvider interface and LDAP implementation (Story 1.2)
-3. PermissionService (Story 1.3)
-4. UserLookupViewModel and View (Story 1.4)
+
+1. Tauri project skeleton with Rust state management and React shell (Story 1.1)
+2. DirectoryProvider trait and ldap3-based implementation (Story 1.2)
+3. Permission module with React PermissionContext (Story 1.3)
+4. UserLookupPage React component with Tauri command integration (Story 1.4)

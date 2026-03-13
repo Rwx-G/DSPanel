@@ -4,7 +4,7 @@
 
 - **FR1**: The application shall detect the AD group memberships of the current Windows user at startup and map them to a permission level (ReadOnly, HelpDesk, AccountOperator, DomainAdmin).
 - **FR2**: The UI shall dynamically show, gray out, or hide actions and modules based on the detected permission level.
-- **FR3**: The application shall auto-detect the directory context at startup (AD on-prem, Entra ID, or hybrid) via the IDirectoryProvider adapter pattern.
+- **FR3**: The application shall auto-detect the directory context at startup (AD on-prem, Entra ID, or hybrid) via the DirectoryProvider trait (adapter pattern).
 - **FR4**: Users shall be able to search for AD user accounts by SAMAccountName, UPN, display name, or partial match and view complete account information (name, department, title, OU, DN, groups, status).
 - **FR5**: Users shall be able to search for AD computer accounts by name and view complete information (OS, version, last logon, OU, groups).
 - **FR6**: Each account lookup shall display a visual healthcheck badge showing account status flags (disabled, locked out, expired, password expired, inactive 30/90 days, never logged on, password never changed).
@@ -71,12 +71,12 @@
 - **NFR4**: The application shall handle large domains (100k+ objects) efficiently using LDAP pagination and result caching.
 - **NFR5**: No sensitive data (passwords, tokens) shall be stored locally on disk.
 - **NFR6**: All AD communication shall use secure protocols (LDAPS / Kerberos).
-- **NFR7**: The application shall follow MVVM pattern (CommunityToolkit.Mvvm) for clean separation of concerns.
-- **NFR8**: The codebase shall target .NET 10+ (LTS) with WPF for Windows desktop.
-- **NFR9**: The application shall be distributable as both MSIX package and portable exe (zip).
+- **NFR7**: The application shall follow a clean separation of concerns: Rust backend (Tauri commands) for business logic, React components for UI rendering.
+- **NFR8**: The backend shall be written in Rust (Tauri v2) and the frontend in React + TypeScript (Vite) for Windows desktop.
+- **NFR9**: The application shall be distributable as both NSIS installer and portable exe (zip) via Tauri bundler.
 - **NFR10**: The application shall support auto-update notification (check for new GitHub releases at startup).
 - **NFR11**: All user-facing strings shall be externalizable for future localization (English default, French planned).
-- **NFR12**: The application shall log operations and errors using structured logging (Serilog) with configurable log levels.
+- **NFR12**: The application shall log operations and errors using structured logging (tracing crate in Rust) with configurable log levels.
 - **NFR13**: Unit test coverage shall target 90%+ on core services (directory providers, permission service, preset engine).
 - **NFR14**: The application shall gracefully degrade when features are unavailable (e.g., no Exchange attributes found - hide Exchange panel, no Entra ID - disable cloud features).
 

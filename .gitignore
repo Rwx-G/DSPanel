@@ -1,62 +1,11 @@
-# .NET
-bin/
-obj/
-*.user
-*.suo
+# Rust
+target/
+Cargo.lock
 
-# Local notes (not tracked)
-quality-scoring.md
-*.userosscache
-*.sln.docstates
-
-# NuGet
-*.nupkg
-**/[Pp]ackages/*
-!**/[Pp]ackages/build/
-*.nuget.props
-*.nuget.targets
-project.lock.json
-
-# Build results
-[Dd]ebug/
-[Rr]elease/
-x64/
-x86/
-[Ww][Ii][Nn]32/
-[Aa][Rr][Mm]/
-[Aa][Rr][Mm]64/
-bld/
-[Bb]in/
-[Oo]bj/
-[Ll]og/
-[Ll]ogs/
-
-# Visual Studio
-.vs/
-*.sln.iml
-launchSettings.json
-
-# Rider
-.idea/
-*.sln.iml
-
-# VS Code
-.vscode/
-
-# MSIX packaging
-AppPackages/
-BundleArtifacts/
-*.appx
-*.appxbundle
-*.msix
-*.msixbundle
-*.msixupload
-
-# Test results
-TestResults/
-coverage/
-*.coverage
-*.coveragexml
+# Node
+node_modules/
+dist/
+package-lock.json
 
 # OS files
 Thumbs.db
@@ -64,22 +13,27 @@ ehthumbs.db
 Desktop.ini
 .DS_Store
 
+# IDE
+.vs/
+.idea/
+.vscode/
+*.sln.iml
+
 # Secrets - never commit
 *.pfx
 *.snk
-appsettings.*.json
-!appsettings.json
+*.env
+*.env.*
 
 # SQLite databases (local audit log, snapshots)
 *.db
 *.db-shm
 *.db-wal
 
-# Serilog log files
+# Logs
 logs/
-
-# Stryker mutation testing
-StrykerOutput/
+*.err
 
 # Claude Code
 .claude/memory/
+coverage/
