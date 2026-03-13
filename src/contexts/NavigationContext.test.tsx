@@ -22,12 +22,10 @@ describe("useNavigation", () => {
     }).toThrow("useNavigation must be used within NavigationProvider");
   });
 
-  it("should start with home tab", () => {
+  it("should start with no open tabs", () => {
     const { result } = renderHook(() => useNavigation(), { wrapper });
-    expect(result.current.openTabs).toHaveLength(1);
-    expect(result.current.openTabs[0].moduleId).toBe("home");
-    expect(result.current.openTabs[0].isPinned).toBe(true);
-    expect(result.current.activeTabId).toBe("tab-home");
+    expect(result.current.openTabs).toHaveLength(0);
+    expect(result.current.activeTabId).toBeNull();
   });
 
   it("should start with home breadcrumb", () => {
@@ -50,11 +48,11 @@ describe("useNavigation", () => {
       result.current.openTab("Users", "users", "user");
     });
 
-    expect(result.current.openTabs).toHaveLength(2);
-    expect(result.current.openTabs[1].title).toBe("Users");
-    expect(result.current.openTabs[1].moduleId).toBe("users");
-    expect(result.current.openTabs[1].isPinned).toBe(false);
-    expect(result.current.activeTabId).toBe(result.current.openTabs[1].id);
+    expect(result.current.openTabs).toHaveLength(1);
+    expect(result.current.openTabs[0].title).toBe("Users");
+    expect(result.current.openTabs[0].moduleId).toBe("users");
+    expect(result.current.openTabs[0].isPinned).toBe(false);
+    expect(result.current.activeTabId).toBe(result.current.openTabs[0].id);
   });
 
   it("should not duplicate tab for same moduleId", () => {
@@ -67,7 +65,7 @@ describe("useNavigation", () => {
       result.current.openTab("Users", "users");
     });
 
-    expect(result.current.openTabs).toHaveLength(2); // home + users
+    expect(result.current.openTabs).toHaveLength(1);
   });
 
   it("should activate existing tab when opening same moduleId", () => {
@@ -90,28 +88,21 @@ describe("useNavigation", () => {
 
   // --- closeTab ---
 
-  it("should close a non-pinned tab", () => {
+  it("should close a tab and go home when last tab closed", () => {
     const { result } = renderHook(() => useNavigation(), { wrapper });
 
     act(() => {
       result.current.openTab("Users", "users");
     });
+    const tabId = result.current.openTabs[0].id;
     act(() => {
-      result.current.closeTab(result.current.openTabs[1].id);
+      result.current.closeTab(tabId);
     });
 
-    expect(result.current.openTabs).toHaveLength(1);
-    expect(result.current.openTabs[0].moduleId).toBe("home");
-  });
-
-  it("should not close a pinned tab", () => {
-    const { result } = renderHook(() => useNavigation(), { wrapper });
-
-    act(() => {
-      result.current.closeTab("tab-home");
-    });
-
-    expect(result.current.openTabs).toHaveLength(1);
+    expect(result.current.openTabs).toHaveLength(0);
+    expect(result.current.activeTabId).toBeNull();
+    expect(result.current.breadcrumbs).toHaveLength(1);
+    expect(result.current.breadcrumbs[0].label).toBe("Home");
   });
 
   it("should select adjacent tab when closing active tab", () => {
@@ -124,7 +115,7 @@ describe("useNavigation", () => {
       result.current.openTab("Computers", "computers");
     });
 
-    const usersTabId = result.current.openTabs[1].id;
+    const usersTabId = result.current.openTabs[0].id;
     act(() => {
       result.current.activateTab(usersTabId);
     });
@@ -132,13 +123,14 @@ describe("useNavigation", () => {
       result.current.closeTab(usersTabId);
     });
 
-    // Should activate the tab at the same index or last
+    // Should activate the remaining tab
     expect(result.current.activeTabId).not.toBe(usersTabId);
+    expect(result.current.openTabs).toHaveLength(1);
   });
 
   // --- closeAllTabs ---
 
-  it("should close all non-pinned tabs", () => {
+  it("should close all tabs and go home", () => {
     const { result } = renderHook(() => useNavigation(), { wrapper });
 
     act(() => {
@@ -151,9 +143,10 @@ describe("useNavigation", () => {
       result.current.closeAllTabs();
     });
 
-    expect(result.current.openTabs).toHaveLength(1);
-    expect(result.current.openTabs[0].isPinned).toBe(true);
-    expect(result.current.activeTabId).toBe("tab-home");
+    expect(result.current.openTabs).toHaveLength(0);
+    expect(result.current.activeTabId).toBeNull();
+    expect(result.current.breadcrumbs).toHaveLength(1);
+    expect(result.current.breadcrumbs[0].label).toBe("Home");
   });
 
   // --- activateTab ---
@@ -168,10 +161,10 @@ describe("useNavigation", () => {
       result.current.openTab("Computers", "computers");
     });
     act(() => {
-      result.current.activateTab(result.current.openTabs[1].id);
+      result.current.activateTab(result.current.openTabs[0].id);
     });
 
-    expect(result.current.activeTabId).toBe(result.current.openTabs[1].id);
+    expect(result.current.activeTabId).toBe(result.current.openTabs[0].id);
   });
 
   it("should update breadcrumbs on tab activation", () => {
@@ -185,11 +178,30 @@ describe("useNavigation", () => {
     expect(result.current.breadcrumbs[1].label).toBe("Users");
 
     act(() => {
-      result.current.activateTab("tab-home");
+      result.current.goHome();
     });
 
     expect(result.current.breadcrumbs).toHaveLength(1);
     expect(result.current.breadcrumbs[0].label).toBe("Home");
+    expect(result.current.activeTabId).toBeNull();
+  });
+
+  // --- goHome ---
+
+  it("should go home by setting activeTabId to null", () => {
+    const { result } = renderHook(() => useNavigation(), { wrapper });
+
+    act(() => {
+      result.current.openTab("Users", "users");
+    });
+    act(() => {
+      result.current.goHome();
+    });
+
+    expect(result.current.activeTabId).toBeNull();
+    expect(result.current.breadcrumbs).toHaveLength(1);
+    // Tabs remain open
+    expect(result.current.openTabs).toHaveLength(1);
   });
 
   // --- moveTab ---
@@ -205,11 +217,11 @@ describe("useNavigation", () => {
     });
 
     act(() => {
-      result.current.moveTab(1, 2);
+      result.current.moveTab(0, 1);
     });
 
-    expect(result.current.openTabs[1].moduleId).toBe("computers");
-    expect(result.current.openTabs[2].moduleId).toBe("users");
+    expect(result.current.openTabs[0].moduleId).toBe("computers");
+    expect(result.current.openTabs[1].moduleId).toBe("users");
   });
 
   it("should handle invalid move indices gracefully", () => {
@@ -219,7 +231,7 @@ describe("useNavigation", () => {
       result.current.moveTab(-1, 5);
     });
 
-    expect(result.current.openTabs).toHaveLength(1); // No crash
+    expect(result.current.openTabs).toHaveLength(0); // No crash
   });
 
   // --- sidebar ---
@@ -259,8 +271,22 @@ describe("useNavigation", () => {
       result.current.navigateTo("users", "User Lookup");
     });
 
-    expect(result.current.openTabs).toHaveLength(2);
-    expect(result.current.openTabs[1].title).toBe("User Lookup");
-    expect(result.current.activeTabId).toBe(result.current.openTabs[1].id);
+    expect(result.current.openTabs).toHaveLength(1);
+    expect(result.current.openTabs[0].title).toBe("User Lookup");
+    expect(result.current.activeTabId).toBe(result.current.openTabs[0].id);
+  });
+
+  it("should navigate to home via navigateTo", () => {
+    const { result } = renderHook(() => useNavigation(), { wrapper });
+
+    act(() => {
+      result.current.openTab("Users", "users");
+    });
+    act(() => {
+      result.current.navigateTo("home", "Home");
+    });
+
+    expect(result.current.activeTabId).toBeNull();
+    expect(result.current.breadcrumbs).toHaveLength(1);
   });
 });

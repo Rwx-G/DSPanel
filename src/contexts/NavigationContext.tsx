@@ -17,6 +17,7 @@ interface NavigationState {
   closeTab: (tabId: string) => void;
   closeAllTabs: () => void;
   activateTab: (tabId: string) => void;
+  goHome: () => void;
   moveTab: (fromIndex: number, toIndex: number) => void;
   toggleSidebar: () => void;
   setSidebarExpanded: (expanded: boolean) => void;
@@ -44,21 +45,13 @@ export function resetTabIdCounter() {
   tabIdCounter = 0;
 }
 
-const HOME_TAB: TabItem = {
-  id: "tab-home",
-  title: "Home",
-  moduleId: "home",
-  icon: "home",
-  isPinned: true,
-};
-
 interface NavigationProviderProps {
   children: ReactNode;
 }
 
 export function NavigationProvider({ children }: NavigationProviderProps) {
-  const [openTabs, setOpenTabs] = useState<TabItem[]>([HOME_TAB]);
-  const [activeTabId, setActiveTabId] = useState<string>("tab-home");
+  const [openTabs, setOpenTabs] = useState<TabItem[]>([]);
+  const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [breadcrumbs, setBreadcrumbs] = useState<BreadcrumbSegment[]>([
     { label: "Home", navigationTarget: "home" },
   ]);
@@ -97,11 +90,20 @@ export function NavigationProvider({ children }: NavigationProviderProps) {
     [openTabs],
   );
 
+  const goHome = useCallback(() => {
+    setActiveTabId(null);
+    setBreadcrumbs([{ label: "Home", navigationTarget: "home" }]);
+  }, []);
+
   const navigateTo = useCallback(
     (moduleId: string, title: string) => {
-      openTab(title, moduleId);
+      if (moduleId === "home") {
+        goHome();
+      } else {
+        openTab(title, moduleId);
+      }
     },
-    [openTab],
+    [openTab, goHome],
   );
 
   const closeTab = useCallback(
@@ -112,23 +114,22 @@ export function NavigationProvider({ children }: NavigationProviderProps) {
 
         const filtered = prev.filter((t) => t.id !== tabId);
 
-        // If we're closing the active tab, select adjacent
+        // If we're closing the active tab, select adjacent or go home
         if (tabId === activeTabId) {
-          const closedIndex = prev.findIndex((t) => t.id === tabId);
-          const newActiveIndex = Math.min(closedIndex, filtered.length - 1);
-          const newActive = filtered[newActiveIndex];
-          if (newActive) {
+          if (filtered.length === 0) {
+            setActiveTabId(null);
+            setBreadcrumbs([{ label: "Home", navigationTarget: "home" }]);
+          } else {
+            const closedIndex = prev.findIndex((t) => t.id === tabId);
+            const newActiveIndex = Math.min(closedIndex, filtered.length - 1);
+            const newActive = filtered[newActiveIndex];
             setActiveTabId(newActive.id);
             setBreadcrumbs([
               { label: "Home", navigationTarget: "home" },
-              ...(newActive.moduleId !== "home"
-                ? [
-                    {
-                      label: newActive.title,
-                      navigationTarget: newActive.moduleId,
-                    },
-                  ]
-                : []),
+              {
+                label: newActive.title,
+                navigationTarget: newActive.moduleId,
+              },
             ]);
           }
         }
@@ -140,8 +141,8 @@ export function NavigationProvider({ children }: NavigationProviderProps) {
   );
 
   const closeAllTabs = useCallback(() => {
-    setOpenTabs((prev) => prev.filter((t) => t.isPinned));
-    setActiveTabId("tab-home");
+    setOpenTabs([]);
+    setActiveTabId(null);
     setBreadcrumbs([{ label: "Home", navigationTarget: "home" }]);
   }, []);
 
@@ -152,9 +153,7 @@ export function NavigationProvider({ children }: NavigationProviderProps) {
         setActiveTabId(tabId);
         setBreadcrumbs([
           { label: "Home", navigationTarget: "home" },
-          ...(tab.moduleId !== "home"
-            ? [{ label: tab.title, navigationTarget: tab.moduleId }]
-            : []),
+          { label: tab.title, navigationTarget: tab.moduleId },
         ]);
       }
     },
@@ -194,6 +193,7 @@ export function NavigationProvider({ children }: NavigationProviderProps) {
         closeTab,
         closeAllTabs,
         activateTab,
+        goHome,
         moveTab,
         toggleSidebar,
         setSidebarExpanded,

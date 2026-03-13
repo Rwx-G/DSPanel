@@ -43,7 +43,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({ expanded, onToggle }: SidebarProps) {
-  const { openTab, activeTabId, openTabs } = useNavigation();
+  const { openTab, activeTabId, openTabs, goHome } = useNavigation();
   const { currentTheme: mode, toggleTheme } = useTheme();
   const activeModuleId = openTabs.find((t) => t.id === activeTabId)?.moduleId;
 
@@ -58,7 +58,7 @@ export function Sidebar({ expanded, onToggle }: SidebarProps) {
 
   return (
     <aside
-      className="flex flex-col border-r border-[var(--color-border-default)] bg-[var(--color-sidebar-bg)] transition-[width] duration-300 ease-in-out"
+      className="flex shrink-0 flex-col overflow-hidden border-r border-[var(--color-border-default)] bg-[var(--color-sidebar-bg)] transition-[width] duration-300 ease-in-out"
       style={{
         width: expanded
           ? "var(--sidebar-width-expanded)"
@@ -67,11 +67,17 @@ export function Sidebar({ expanded, onToggle }: SidebarProps) {
       data-testid="sidebar"
     >
       {/* Header / Toggle */}
-      <div className="flex h-12 items-center border-b border-[var(--color-border-default)] px-2">
+      <div
+        className={`flex h-12 items-center border-b border-[var(--color-border-default)] px-2 ${!expanded ? "justify-center" : ""}`}
+      >
         {expanded && (
-          <span className="flex-1 truncate px-2 text-body font-semibold text-[var(--color-text-primary)]">
+          <button
+            className="flex-1 truncate px-2 text-left text-body font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)] transition-colors duration-150"
+            onClick={goHome}
+            title="Go to Home"
+          >
             DSPanel
-          </span>
+          </button>
         )}
         <button
           className="btn-ghost flex h-8 w-8 shrink-0 items-center justify-center rounded-md p-0"
@@ -84,15 +90,16 @@ export function Sidebar({ expanded, onToggle }: SidebarProps) {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-2">
-        {Object.entries(groups).map(([groupName, modules]) => (
+      <nav className="flex-1 overflow-y-auto overflow-x-hidden py-2">
+        {Object.entries(groups).map(([groupName, modules], groupIndex) => (
           <div key={groupName} className="mb-1">
             {expanded && (
               <div className="px-4 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-sidebar-group-label)]">
                 {groupName}
               </div>
             )}
-            {!expanded && (
+            {/* Separator in collapsed mode - skip for first group (header border-b is enough) */}
+            {!expanded && groupIndex > 0 && (
               <div className="mx-2 my-1 border-b border-[var(--color-border-default)]" />
             )}
             {modules.map((mod) => {
