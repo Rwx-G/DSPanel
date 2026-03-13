@@ -12,7 +12,7 @@ const defaultStatusBarProps = {
   domainController: "DC01",
   permissionLevel: "ReadOnly",
   isConnected: true,
-  appVersion: "0.1.0",
+  appVersion: "0.2.0",
 };
 
 function renderAppShell(children: ReactNode = <div>Content</div>) {
@@ -63,7 +63,7 @@ describe("AppShell", () => {
     expect(screen.getByTestId("status-connection")).toHaveTextContent(
       "Connected",
     );
-    expect(screen.getByTestId("status-version")).toHaveTextContent("v0.1.0");
+    expect(screen.getByTestId("status-version")).toHaveTextContent("v0.2.0");
   });
 
   // Keyboard shortcuts
@@ -81,14 +81,10 @@ describe("AppShell", () => {
   });
 
   it("should close active tab on Ctrl+W", () => {
-    function TestContent() {
-      return <div>Content</div>;
-    }
-
-    const { container } = render(
+    render(
       <NavigationProvider>
         <AppShell statusBarProps={defaultStatusBarProps}>
-          <TestContent />
+          <div>Content</div>
         </AppShell>
       </NavigationProvider>,
     );
@@ -102,11 +98,11 @@ describe("AppShell", () => {
     expect(screen.queryByTestId("tab-users")).not.toBeInTheDocument();
   });
 
-  it("should not close pinned tab on Ctrl+W", () => {
+  it("should do nothing on Ctrl+W when no tabs are open", () => {
     renderAppShell();
-    // Home tab is active and pinned
+    // No tabs open, Ctrl+W should not crash
     fireEvent.keyDown(window, { key: "w", ctrlKey: true });
-    expect(screen.getByTestId("tab-home")).toBeInTheDocument();
+    expect(screen.getByTestId("tab-bar")).toBeInTheDocument();
   });
 
   it("should switch tabs on Ctrl+1-9", () => {
@@ -118,19 +114,20 @@ describe("AppShell", () => {
       </NavigationProvider>,
     );
 
-    // Open a tab
+    // Open two tabs
     fireEvent.click(screen.getByTestId("sidebar-item-users"));
+    fireEvent.click(screen.getByTestId("sidebar-item-computers"));
 
-    // Ctrl+1 should go to first tab (home)
+    // Ctrl+1 should go to first tab (users)
     fireEvent.keyDown(window, { key: "1", ctrlKey: true });
-    expect(screen.getByTestId("tab-home")).toHaveAttribute(
+    expect(screen.getByTestId("tab-users")).toHaveAttribute(
       "aria-selected",
       "true",
     );
 
-    // Ctrl+2 should go to second tab (users)
+    // Ctrl+2 should go to second tab (computers)
     fireEvent.keyDown(window, { key: "2", ctrlKey: true });
-    expect(screen.getByTestId("tab-users")).toHaveAttribute(
+    expect(screen.getByTestId("tab-computers")).toHaveAttribute(
       "aria-selected",
       "true",
     );
@@ -139,7 +136,6 @@ describe("AppShell", () => {
   // Auto-collapse on narrow window
 
   it("should auto-collapse sidebar on narrow window", () => {
-    // Set narrow window
     Object.defineProperty(window, "innerWidth", {
       writable: true,
       configurable: true,
@@ -148,7 +144,6 @@ describe("AppShell", () => {
 
     renderAppShell();
 
-    // Trigger resize
     fireEvent(window, new Event("resize"));
 
     expect(screen.getByTestId("sidebar")).toHaveStyle({

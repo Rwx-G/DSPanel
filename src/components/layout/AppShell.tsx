@@ -1,9 +1,11 @@
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useRef } from "react";
 import { useNavigation } from "@/contexts/NavigationContext";
 import { Sidebar } from "./Sidebar";
 import { TabBar } from "./TabBar";
 import { Breadcrumbs } from "./Breadcrumbs";
 import { StatusBar, type StatusBarProps } from "./StatusBar";
+
+const NARROW_BREAKPOINT = 900;
 
 interface AppShellProps {
   statusBarProps: StatusBarProps;
@@ -21,16 +23,26 @@ export function AppShell({ statusBarProps, children }: AppShellProps) {
     closeTab,
   } = useNavigation();
 
-  // Auto-collapse sidebar on narrow windows
+  // Track the user's explicit preference (not auto-collapse state)
+  const userPrefersExpanded = useRef(true);
+
+  const handleToggleSidebar = useCallback(() => {
+    userPrefersExpanded.current = !sidebarExpanded;
+    toggleSidebar();
+  }, [sidebarExpanded, toggleSidebar]);
+
+  // Auto-collapse on narrow windows, restore preference on wide
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth < 900) {
+      if (window.innerWidth < NARROW_BREAKPOINT) {
         setSidebarExpanded(false);
+      } else {
+        setSidebarExpanded(userPrefersExpanded.current);
       }
     };
 
     window.addEventListener("resize", handleResize);
-    handleResize(); // Check on mount
+    handleResize();
 
     return () => window.removeEventListener("resize", handleResize);
   }, [setSidebarExpanded]);
@@ -41,7 +53,7 @@ export function AppShell({ statusBarProps, children }: AppShellProps) {
       // Ctrl+B: toggle sidebar
       if (e.ctrlKey && e.key === "b") {
         e.preventDefault();
-        toggleSidebar();
+        handleToggleSidebar();
         return;
       }
 
@@ -74,7 +86,7 @@ export function AppShell({ statusBarProps, children }: AppShellProps) {
         }
       }
     },
-    [toggleSidebar, activeTabId, closeTab, openTabs, activateTab],
+    [handleToggleSidebar, activeTabId, closeTab, openTabs, activateTab],
   );
 
   useEffect(() => {
@@ -88,7 +100,7 @@ export function AppShell({ statusBarProps, children }: AppShellProps) {
       data-testid="app-shell"
     >
       <div className="flex flex-1 overflow-hidden">
-        <Sidebar expanded={sidebarExpanded} onToggle={toggleSidebar} />
+        <Sidebar expanded={sidebarExpanded} onToggle={handleToggleSidebar} />
         <main className="flex flex-1 flex-col overflow-hidden">
           <Breadcrumbs />
           <TabBar />
