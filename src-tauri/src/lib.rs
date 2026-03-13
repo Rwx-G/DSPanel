@@ -62,11 +62,15 @@ pub fn run() {
             commands::get_permission_level,
             commands::get_user_groups,
             commands::has_permission,
+            commands::check_connection,
+            commands::get_domain_info,
             commands::search_users,
             commands::get_user,
             commands::search_computers,
             commands::ping_host,
             commands::resolve_dns,
+            commands::get_current_username,
+            commands::get_computer_name,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

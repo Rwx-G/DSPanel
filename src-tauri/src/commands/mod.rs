@@ -102,6 +102,50 @@ pub async fn ping_host(hostname: String) -> Result<String, AppError> {
     }
 }
 
+/// Checks whether the directory provider has an active connection to AD.
+///
+/// Returns a boolean: `true` if connected, `false` otherwise.
+/// This performs a lightweight rootDSE query via `test_connection()`.
+#[tauri::command]
+pub async fn check_connection(state: State<'_, AppState>) -> Result<bool, AppError> {
+    let provider = state.directory_provider.clone();
+    provider
+        .test_connection()
+        .await
+        .map_err(|e| AppError::Network(e.to_string()))
+}
+
+/// Returns domain information from the directory provider.
+///
+/// Returns a JSON object with `domain_name` (e.g. "CORP.LOCAL") and
+/// `is_connected` fields. Both may be null/false if not domain-joined.
+#[tauri::command]
+pub fn get_domain_info(state: State<'_, AppState>) -> DomainInfo {
+    let provider = &state.directory_provider;
+    DomainInfo {
+        domain_name: provider.domain_name().map(|s| s.to_string()),
+        is_connected: provider.is_connected(),
+    }
+}
+
+#[derive(serde::Serialize)]
+pub struct DomainInfo {
+    pub domain_name: Option<String>,
+    pub is_connected: bool,
+}
+
+/// Returns the current Windows username from the environment.
+#[tauri::command]
+pub fn get_current_username() -> String {
+    std::env::var("USERNAME").unwrap_or_else(|_| "Unknown".to_string())
+}
+
+/// Returns the computer name from the environment.
+#[tauri::command]
+pub fn get_computer_name() -> String {
+    std::env::var("COMPUTERNAME").unwrap_or_else(|_| "Unknown".to_string())
+}
+
 /// Resolves a hostname to IP addresses.
 #[tauri::command]
 pub async fn resolve_dns(hostname: String) -> Result<Vec<String>, AppError> {
