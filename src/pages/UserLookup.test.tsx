@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { UserLookup } from "./UserLookup";
 import type { DirectoryEntry } from "@/types/directory";
+import type { AccountHealthStatus } from "@/types/health";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
@@ -9,6 +10,18 @@ vi.mock("@tauri-apps/api/core", () => ({
 
 import { invoke } from "@tauri-apps/api/core";
 const mockInvoke = vi.mocked(invoke);
+
+const HEALTHY_STATUS: AccountHealthStatus = {
+  level: "Healthy",
+  activeFlags: [],
+};
+
+const CRITICAL_STATUS: AccountHealthStatus = {
+  level: "Critical",
+  activeFlags: [
+    { name: "Disabled", severity: "Critical", description: "Account is disabled" },
+  ],
+};
 
 function makeEntry(
   sam: string,
@@ -42,6 +55,24 @@ function makeEntry(
   };
 }
 
+function mockInvokeWith(
+  entries: DirectoryEntry[],
+  healthOverrides: Record<string, AccountHealthStatus> = {},
+) {
+  mockInvoke.mockImplementation(((cmd: string, args?: Record<string, unknown>) => {
+    if (cmd === "search_users") return Promise.resolve(entries);
+    if (cmd === "evaluate_health_cmd") {
+      const input = args?.input as { enabled: boolean } | undefined;
+      if (input && !input.enabled) return Promise.resolve(CRITICAL_STATUS);
+      for (const [, status] of Object.entries(healthOverrides)) {
+        return Promise.resolve(status);
+      }
+      return Promise.resolve(HEALTHY_STATUS);
+    }
+    return Promise.resolve(null);
+  }) as typeof invoke);
+}
+
 describe("UserLookup", () => {
   beforeEach(() => {
     mockInvoke.mockReset();
@@ -55,7 +86,7 @@ describe("UserLookup", () => {
   });
 
   it("shows loading state during search", async () => {
-    mockInvoke.mockImplementation(() => new Promise(() => {}));
+    mockInvoke.mockImplementation((() => new Promise(() => {})) as typeof invoke);
     render(<UserLookup />);
 
     const input = screen.getByTestId("search-input");
@@ -71,7 +102,7 @@ describe("UserLookup", () => {
       makeEntry("jdoe", "John Doe"),
       makeEntry("asmith", "Alice Smith"),
     ];
-    mockInvoke.mockResolvedValue(entries);
+    mockInvokeWith(entries);
 
     render(<UserLookup />);
     const input = screen.getByTestId("search-input");
@@ -87,7 +118,7 @@ describe("UserLookup", () => {
 
   it("auto-selects user when only one result", async () => {
     const entries = [makeEntry("jdoe", "John Doe")];
-    mockInvoke.mockResolvedValue(entries);
+    mockInvokeWith(entries);
 
     render(<UserLookup />);
     const input = screen.getByTestId("search-input");
@@ -99,7 +130,7 @@ describe("UserLookup", () => {
   });
 
   it("shows empty state when no results", async () => {
-    mockInvoke.mockResolvedValue([]);
+    mockInvokeWith([]);
 
     render(<UserLookup />);
     const input = screen.getByTestId("search-input");
@@ -111,7 +142,10 @@ describe("UserLookup", () => {
   });
 
   it("shows error state on search failure", async () => {
-    mockInvoke.mockRejectedValue(new Error("LDAP connection failed"));
+    mockInvoke.mockImplementation(((cmd: string) => {
+      if (cmd === "search_users") return Promise.reject(new Error("LDAP connection failed"));
+      return Promise.resolve(HEALTHY_STATUS);
+    }) as typeof invoke);
 
     render(<UserLookup />);
     const input = screen.getByTestId("search-input");
@@ -125,7 +159,13 @@ describe("UserLookup", () => {
   });
 
   it("shows retry button on error and retries search", async () => {
-    mockInvoke.mockRejectedValueOnce(new Error("fail"));
+    let callCount = 0;
+    mockInvoke.mockImplementation(((cmd: string) => {
+      if (cmd === "evaluate_health_cmd") return Promise.resolve(HEALTHY_STATUS);
+      callCount++;
+      if (callCount === 1) return Promise.reject(new Error("fail"));
+      return Promise.resolve([makeEntry("jdoe", "John Doe")]);
+    }) as typeof invoke);
 
     render(<UserLookup />);
     const input = screen.getByTestId("search-input");
@@ -135,8 +175,6 @@ describe("UserLookup", () => {
       expect(screen.getByText("Retry")).toBeInTheDocument();
     });
 
-    const entries = [makeEntry("jdoe", "John Doe")];
-    mockInvoke.mockResolvedValue(entries);
     fireEvent.click(screen.getByText("Retry"));
 
     await waitFor(() => {
@@ -149,7 +187,7 @@ describe("UserLookup", () => {
       makeEntry("jdoe", "John Doe"),
       makeEntry("asmith", "Alice Smith"),
     ];
-    mockInvoke.mockResolvedValue(entries);
+    mockInvokeWith(entries);
 
     render(<UserLookup />);
     const input = screen.getByTestId("search-input");
@@ -171,7 +209,7 @@ describe("UserLookup", () => {
 
   it("displays user detail with property groups", async () => {
     const entries = [makeEntry("jdoe", "John Doe")];
-    mockInvoke.mockResolvedValue(entries);
+    mockInvokeWith(entries);
 
     render(<UserLookup />);
     const input = screen.getByTestId("search-input");
@@ -190,7 +228,7 @@ describe("UserLookup", () => {
 
   it("displays group memberships section", async () => {
     const entries = [makeEntry("jdoe", "John Doe")];
-    mockInvoke.mockResolvedValue(entries);
+    mockInvokeWith(entries);
 
     render(<UserLookup />);
     const input = screen.getByTestId("search-input");
@@ -212,7 +250,7 @@ describe("UserLookup", () => {
         userAccountControl: ["514"],
       }),
     ];
-    mockInvoke.mockResolvedValue(entries);
+    mockInvokeWith(entries);
 
     render(<UserLookup />);
     const input = screen.getByTestId("search-input");
@@ -222,11 +260,13 @@ describe("UserLookup", () => {
       expect(screen.getByTestId("user-results-list")).toBeInTheDocument();
     });
 
-    const activeResult = screen.getByTestId("user-result-jdoe");
-    const activeBadge = activeResult.querySelector(
-      '[data-testid="health-badge"]',
-    );
-    expect(activeBadge).toHaveAttribute("data-level", "Healthy");
+    await waitFor(() => {
+      const activeResult = screen.getByTestId("user-result-jdoe");
+      const activeBadge = activeResult.querySelector(
+        '[data-testid="health-badge"]',
+      );
+      expect(activeBadge).toHaveAttribute("data-level", "Healthy");
+    });
 
     const disabledResult = screen.getByTestId("user-result-disabled");
     const disabledBadge = disabledResult.querySelector(
@@ -247,7 +287,7 @@ describe("UserLookup", () => {
   });
 
   it("calls invoke with correct command and arguments", async () => {
-    mockInvoke.mockResolvedValue([]);
+    mockInvokeWith([]);
 
     render(<UserLookup />);
     const input = screen.getByTestId("search-input");

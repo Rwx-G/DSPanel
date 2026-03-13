@@ -46,10 +46,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - React ErrorBoundary with fallback UI and retry, global unhandled rejection handler
 - Backend error mapping: parseBackendError, mapErrorToNotification, useErrorHandler hook
 - Rust panic hook logging panics via tracing before default handler
-- 526 frontend tests + 151 Rust tests = 677 total tests
+- Rust health check service: evaluate_health() with 9 account flags, exposed via evaluate_health_cmd Tauri command
+- Rust tests for ping_host and resolve_dns commands
+- 585 frontend tests + 172 Rust tests = 757 total tests
 
 ### Changed
 
+- ping_host command migrated from std::process::Command to tokio::process::Command for non-blocking async execution
+- Health check evaluation moved from TypeScript pure function to Rust backend service with Tauri command
 - Redesigned UI with professional design tokens: Inter + JetBrains Mono fonts, slate-based color palette, improved shadows and radii
 - Sidebar: icon-only collapsed mode with hover tooltips, active indicator bar, DSPanel branding, theme toggle (Sun/Moon)
 - StatusBar: animated ping connection indicator, ring-inset permission badge with color-mix, vertical separators

@@ -69,6 +69,7 @@ pub fn run() {
             commands::search_computers,
             commands::ping_host,
             commands::resolve_dns,
+            commands::evaluate_health_cmd,
             commands::get_current_username,
             commands::get_computer_name,
         ])

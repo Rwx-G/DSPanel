@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { SearchBar } from "@/components/common/SearchBar";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
@@ -17,6 +17,7 @@ import {
   type DirectoryUser,
   mapEntryToUser,
 } from "@/types/directory";
+import type { AccountHealthStatus } from "@/types/health";
 import { evaluateHealth } from "@/services/healthcheck";
 import { parseCnFromDn } from "@/utils/dn";
 import { Search, UserX, AlertCircle, User } from "lucide-react";
@@ -31,6 +32,29 @@ export function UserLookup() {
   const [searchResults, setSearchResults] = useState<DirectoryUser[]>([]);
   const [selectedUser, setSelectedUser] = useState<DirectoryUser | null>(null);
   const [groupFilterText, setGroupFilterText] = useState("");
+  const [healthMap, setHealthMap] = useState<
+    Map<string, AccountHealthStatus>
+  >(new Map());
+
+  useEffect(() => {
+    if (searchResults.length === 0) return;
+    let cancelled = false;
+    const computeHealth = async () => {
+      const entries = await Promise.all(
+        searchResults.map(async (user) => {
+          const status = await evaluateHealth(user);
+          return [user.samAccountName, status] as const;
+        }),
+      );
+      if (!cancelled) {
+        setHealthMap(new Map(entries));
+      }
+    };
+    computeHealth();
+    return () => {
+      cancelled = true;
+    };
+  }, [searchResults]);
 
   const handleSearch = useCallback(async (query: string) => {
     const trimmed = query.trim();
@@ -40,6 +64,7 @@ export function UserLookup() {
     setLookupState("loading");
     setErrorMessage("");
     setSelectedUser(null);
+    setHealthMap(new Map());
 
     try {
       const entries = await invoke<DirectoryEntry[]>("search_users", {
@@ -166,7 +191,11 @@ export function UserLookup() {
                       {user.department ? ` - ${user.department}` : ""}
                     </p>
                   </div>
-                  <HealthBadge healthStatus={evaluateHealth(user)} />
+                  {healthMap.get(user.samAccountName) && (
+                    <HealthBadge
+                      healthStatus={healthMap.get(user.samAccountName)!}
+                    />
+                  )}
                 </button>
               ))}
             </div>
@@ -178,6 +207,7 @@ export function UserLookup() {
               {selectedUser ? (
                 <UserDetail
                   user={selectedUser}
+                  healthStatus={healthMap.get(selectedUser.samAccountName)}
                   groupColumns={groupColumns}
                   groupRows={groupRows}
                   groupFilterText={groupFilterText}
@@ -200,6 +230,7 @@ export function UserLookup() {
 
 interface UserDetailProps {
   user: DirectoryUser;
+  healthStatus?: AccountHealthStatus;
   groupColumns: Column<{ name: string; dn: string }>[];
   groupRows: { name: string; dn: string }[];
   groupFilterText: string;
@@ -208,6 +239,7 @@ interface UserDetailProps {
 
 function UserDetail({
   user,
+  healthStatus,
   groupColumns,
   groupRows,
   groupFilterText,
@@ -278,7 +310,7 @@ function UserDetail({
           {user.displayName || user.samAccountName}
         </h2>
         <div className="flex items-center gap-2">
-          <HealthBadge healthStatus={evaluateHealth(user)} />
+          {healthStatus && <HealthBadge healthStatus={healthStatus} />}
           <StatusBadge
             text={user.enabled ? "Enabled" : "Disabled"}
             variant={user.enabled ? "success" : "error"}

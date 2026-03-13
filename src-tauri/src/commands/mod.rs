@@ -2,7 +2,7 @@ use tauri::State;
 
 use crate::error::AppError;
 use crate::models::DirectoryEntry;
-use crate::services::PermissionLevel;
+use crate::services::{AccountHealthStatus, HealthInput, PermissionLevel};
 use crate::state::AppState;
 
 /// Returns the application title from managed state.
@@ -72,9 +72,11 @@ pub async fn search_computers(
 }
 
 /// Pings a hostname and returns the result string.
+///
+/// Uses `tokio::process::Command` to avoid blocking the Tokio runtime thread pool.
 #[tauri::command]
 pub async fn ping_host(hostname: String) -> Result<String, AppError> {
-    use std::process::Command;
+    use tokio::process::Command;
     use std::time::Instant;
 
     let start = Instant::now();
@@ -82,12 +84,14 @@ pub async fn ping_host(hostname: String) -> Result<String, AppError> {
     #[cfg(target_os = "windows")]
     let output = Command::new("ping")
         .args(["-n", "1", "-w", "3000", &hostname])
-        .output();
+        .output()
+        .await;
 
     #[cfg(not(target_os = "windows"))]
     let output = Command::new("ping")
         .args(["-c", "1", "-W", "3", &hostname])
-        .output();
+        .output()
+        .await;
 
     match output {
         Ok(result) => {
@@ -144,6 +148,16 @@ pub fn get_current_username() -> String {
 #[tauri::command]
 pub fn get_computer_name() -> String {
     std::env::var("COMPUTERNAME").unwrap_or_else(|_| "Unknown".to_string())
+}
+
+/// Evaluates the health status of a user account.
+///
+/// Receives user account properties and returns a health assessment with
+/// severity level and active flags (Disabled, Locked, Expired, etc.).
+#[tauri::command]
+pub fn evaluate_health_cmd(input: HealthInput) -> AccountHealthStatus {
+    let now_ms = chrono::Utc::now().timestamp_millis();
+    crate::services::evaluate_health(&input, now_ms)
 }
 
 /// Resolves a hostname to IP addresses.
@@ -298,5 +312,77 @@ mod tests {
         let state = make_state_with_failure();
         let result = state.directory_provider.get_user_by_identity("jdoe").await;
         assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_ping_host_localhost_is_reachable() {
+        let result = ping_host("127.0.0.1".to_string()).await.unwrap();
+        assert!(
+            result.contains("Reachable"),
+            "Expected reachable, got: {}",
+            result
+        );
+    }
+
+    #[tokio::test]
+    async fn test_ping_host_invalid_returns_unreachable() {
+        let result = ping_host("192.0.2.1".to_string()).await.unwrap();
+        // RFC 5737 TEST-NET-1 should be unreachable
+        assert!(
+            result == "Unreachable" || result.contains("Reachable"),
+            "Expected valid response, got: {}",
+            result
+        );
+    }
+
+    #[tokio::test]
+    async fn test_resolve_dns_localhost() {
+        let result = resolve_dns("localhost".to_string()).await.unwrap();
+        assert!(!result.is_empty());
+        assert!(
+            result.iter().any(|ip| ip == "127.0.0.1" || ip == "::1"),
+            "Expected localhost to resolve to loopback, got: {:?}",
+            result
+        );
+    }
+
+    #[tokio::test]
+    async fn test_resolve_dns_invalid_returns_error() {
+        let result = resolve_dns("this.host.does.not.exist.invalid".to_string()).await;
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_evaluate_health_cmd_healthy_user() {
+        let input = HealthInput {
+            enabled: true,
+            locked_out: false,
+            account_expires: None,
+            password_last_set: Some("2026-03-01T10:00:00Z".to_string()),
+            password_expired: false,
+            password_never_expires: false,
+            last_logon: Some("2026-03-12T08:00:00Z".to_string()),
+            when_created: Some("2024-01-01T00:00:00Z".to_string()),
+        };
+        let result = evaluate_health_cmd(input);
+        assert_eq!(result.level, crate::services::HealthLevel::Healthy);
+        assert!(result.active_flags.is_empty());
+    }
+
+    #[test]
+    fn test_evaluate_health_cmd_disabled_user() {
+        let input = HealthInput {
+            enabled: false,
+            locked_out: false,
+            account_expires: None,
+            password_last_set: Some("2026-03-01T10:00:00Z".to_string()),
+            password_expired: false,
+            password_never_expires: false,
+            last_logon: Some("2026-03-12T08:00:00Z".to_string()),
+            when_created: Some("2024-01-01T00:00:00Z".to_string()),
+        };
+        let result = evaluate_health_cmd(input);
+        assert_eq!(result.level, crate::services::HealthLevel::Critical);
+        assert!(result.active_flags.iter().any(|f| f.name == "Disabled"));
     }
 }

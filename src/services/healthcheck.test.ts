@@ -1,6 +1,14 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { evaluateHealth } from "./healthcheck";
 import type { DirectoryUser } from "@/types/directory";
+import type { AccountHealthStatus } from "@/types/health";
+
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke: vi.fn(),
+}));
+
+import { invoke } from "@tauri-apps/api/core";
+const mockInvoke = vi.mocked(invoke);
 
 function makeHealthyUser(
   overrides: Partial<DirectoryUser> = {},
@@ -31,206 +39,119 @@ function makeHealthyUser(
   };
 }
 
-const NOW = new Date("2026-03-13T12:00:00Z");
+const HEALTHY_RESULT: AccountHealthStatus = {
+  level: "Healthy",
+  activeFlags: [],
+};
+
+const CRITICAL_RESULT: AccountHealthStatus = {
+  level: "Critical",
+  activeFlags: [
+    { name: "Disabled", severity: "Critical", description: "Account is disabled" },
+  ],
+};
+
+beforeEach(() => {
+  mockInvoke.mockReset();
+});
 
 describe("evaluateHealth", () => {
-  it("returns Healthy for a normal active user", () => {
-    const result = evaluateHealth(makeHealthyUser(), NOW);
+  it("calls evaluate_health_cmd Tauri command", async () => {
+    mockInvoke.mockResolvedValue(HEALTHY_RESULT);
+    const user = makeHealthyUser();
+    await evaluateHealth(user);
+    expect(mockInvoke).toHaveBeenCalledWith("evaluate_health_cmd", {
+      input: {
+        enabled: true,
+        lockedOut: false,
+        accountExpires: null,
+        passwordLastSet: "2026-03-01T10:00:00Z",
+        passwordExpired: false,
+        passwordNeverExpires: false,
+        lastLogon: "2026-03-12T08:00:00Z",
+        whenCreated: "2024-01-01T10:00:00Z",
+      },
+    });
+  });
+
+  it("returns the health status from Rust backend", async () => {
+    mockInvoke.mockResolvedValue(HEALTHY_RESULT);
+    const result = await evaluateHealth(makeHealthyUser());
     expect(result.level).toBe("Healthy");
     expect(result.activeFlags).toHaveLength(0);
   });
 
-  it("detects Disabled flag as Critical", () => {
-    const result = evaluateHealth(makeHealthyUser({ enabled: false }), NOW);
+  it("returns critical status for disabled user", async () => {
+    mockInvoke.mockResolvedValue(CRITICAL_RESULT);
+    const result = await evaluateHealth(makeHealthyUser({ enabled: false }));
     expect(result.level).toBe("Critical");
-    const flag = result.activeFlags.find((f) => f.name === "Disabled");
-    expect(flag).toBeDefined();
-    expect(flag!.severity).toBe("Critical");
+    expect(result.activeFlags[0].name).toBe("Disabled");
   });
 
-  it("detects Locked flag as Critical", () => {
-    const result = evaluateHealth(makeHealthyUser({ lockedOut: true }), NOW);
-    expect(result.level).toBe("Critical");
-    const flag = result.activeFlags.find((f) => f.name === "Locked");
-    expect(flag).toBeDefined();
-    expect(flag!.severity).toBe("Critical");
+  it("passes null accountExpires when not set", async () => {
+    mockInvoke.mockResolvedValue(HEALTHY_RESULT);
+    await evaluateHealth(makeHealthyUser({ accountExpires: null }));
+    const call = mockInvoke.mock.calls[0];
+    expect((call[1] as { input: { accountExpires: string | null } }).input.accountExpires).toBeNull();
   });
 
-  it("detects Expired account as Critical", () => {
-    const result = evaluateHealth(
-      makeHealthyUser({ accountExpires: "2026-01-01T00:00:00Z" }),
-      NOW,
-    );
-    expect(result.level).toBe("Critical");
-    expect(result.activeFlags.find((f) => f.name === "Expired")).toBeDefined();
+  it("passes null lastLogon when not set", async () => {
+    mockInvoke.mockResolvedValue(HEALTHY_RESULT);
+    await evaluateHealth(makeHealthyUser({ lastLogon: null }));
+    const call = mockInvoke.mock.calls[0];
+    expect((call[1] as { input: { lastLogon: string | null } }).input.lastLogon).toBeNull();
   });
 
-  it("does not flag account that expires in the future", () => {
-    const result = evaluateHealth(
-      makeHealthyUser({ accountExpires: "2027-01-01T00:00:00Z" }),
-      NOW,
-    );
-    expect(
-      result.activeFlags.find((f) => f.name === "Expired"),
-    ).toBeUndefined();
+  it("passes null passwordLastSet when not set", async () => {
+    mockInvoke.mockResolvedValue(HEALTHY_RESULT);
+    await evaluateHealth(makeHealthyUser({ passwordLastSet: null }));
+    const call = mockInvoke.mock.calls[0];
+    expect((call[1] as { input: { passwordLastSet: string | null } }).input.passwordLastSet).toBeNull();
   });
 
-  it("detects PasswordExpired as Critical", () => {
-    const result = evaluateHealth(
-      makeHealthyUser({ passwordExpired: true }),
-      NOW,
-    );
-    expect(result.level).toBe("Critical");
-    expect(
-      result.activeFlags.find((f) => f.name === "PasswordExpired"),
-    ).toBeDefined();
+  it("passes empty string whenCreated as null", async () => {
+    mockInvoke.mockResolvedValue(HEALTHY_RESULT);
+    await evaluateHealth(makeHealthyUser({ whenCreated: "" }));
+    const call = mockInvoke.mock.calls[0];
+    expect((call[1] as { input: { whenCreated: string | null } }).input.whenCreated).toBeNull();
   });
 
-  it("detects PasswordNeverExpires as Warning", () => {
-    const result = evaluateHealth(
-      makeHealthyUser({ passwordNeverExpires: true }),
-      NOW,
-    );
-    expect(result.level).toBe("Warning");
-    expect(
-      result.activeFlags.find((f) => f.name === "PasswordNeverExpires"),
-    ).toBeDefined();
+  it("propagates invoke errors", async () => {
+    mockInvoke.mockRejectedValue(new Error("IPC failed"));
+    await expect(evaluateHealth(makeHealthyUser())).rejects.toThrow("IPC failed");
   });
 
-  it("detects Inactive30Days as Warning", () => {
-    const result = evaluateHealth(
-      makeHealthyUser({ lastLogon: "2026-02-01T00:00:00Z" }),
-      NOW,
-    );
-    expect(result.level).toBe("Warning");
-    expect(
-      result.activeFlags.find((f) => f.name === "Inactive30Days"),
-    ).toBeDefined();
-  });
-
-  it("detects Inactive90Days as Critical (supersedes 30 days)", () => {
-    const result = evaluateHealth(
-      makeHealthyUser({ lastLogon: "2025-12-01T00:00:00Z" }),
-      NOW,
-    );
-    expect(result.level).toBe("Critical");
-    expect(
-      result.activeFlags.find((f) => f.name === "Inactive90Days"),
-    ).toBeDefined();
-    expect(
-      result.activeFlags.find((f) => f.name === "Inactive30Days"),
-    ).toBeUndefined();
-  });
-
-  it("detects NeverLoggedOn as Info when created > 1 day ago", () => {
-    const result = evaluateHealth(
-      makeHealthyUser({
-        lastLogon: null,
-        whenCreated: "2024-01-01T00:00:00Z",
-      }),
-      NOW,
-    );
-    expect(result.level).toBe("Info");
-    expect(
-      result.activeFlags.find((f) => f.name === "NeverLoggedOn"),
-    ).toBeDefined();
-  });
-
-  it("does not flag NeverLoggedOn when created today", () => {
-    const result = evaluateHealth(
-      makeHealthyUser({
-        lastLogon: null,
-        whenCreated: "2026-03-13T10:00:00Z",
-      }),
-      NOW,
-    );
-    expect(
-      result.activeFlags.find((f) => f.name === "NeverLoggedOn"),
-    ).toBeUndefined();
-  });
-
-  it("detects PasswordNeverChanged when pwdLastSet matches whenCreated", () => {
-    const result = evaluateHealth(
-      makeHealthyUser({
-        passwordLastSet: "2024-01-01T10:00:00Z",
-        whenCreated: "2024-01-01T10:00:30Z",
-      }),
-      NOW,
-    );
-    expect(
-      result.activeFlags.find((f) => f.name === "PasswordNeverChanged"),
-    ).toBeDefined();
-  });
-
-  it("does not flag PasswordNeverChanged when passwords differ by > 1 minute", () => {
-    const result = evaluateHealth(
-      makeHealthyUser({
-        passwordLastSet: "2026-03-01T10:00:00Z",
-        whenCreated: "2024-01-01T10:00:00Z",
-      }),
-      NOW,
-    );
-    expect(
-      result.activeFlags.find((f) => f.name === "PasswordNeverChanged"),
-    ).toBeUndefined();
-  });
-
-  it("combines multiple flags and takes worst severity", () => {
-    const result = evaluateHealth(
+  it("sends boolean fields correctly", async () => {
+    mockInvoke.mockResolvedValue(HEALTHY_RESULT);
+    await evaluateHealth(
       makeHealthyUser({
         enabled: false,
-        passwordNeverExpires: true,
         lockedOut: true,
-      }),
-      NOW,
-    );
-    expect(result.level).toBe("Critical");
-    expect(result.activeFlags.length).toBeGreaterThanOrEqual(3);
-  });
-
-  it("Warning + Warning stays Warning", () => {
-    const result = evaluateHealth(
-      makeHealthyUser({
+        passwordExpired: true,
         passwordNeverExpires: true,
-        lastLogon: "2026-02-01T00:00:00Z",
       }),
-      NOW,
     );
-    expect(result.level).toBe("Warning");
+    const call = mockInvoke.mock.calls[0];
+    const input = (call[1] as { input: Record<string, unknown> }).input;
+    expect(input.enabled).toBe(false);
+    expect(input.lockedOut).toBe(true);
+    expect(input.passwordExpired).toBe(true);
+    expect(input.passwordNeverExpires).toBe(true);
+  });
+
+  it("returns multi-flag results from backend", async () => {
+    const multiResult: AccountHealthStatus = {
+      level: "Critical",
+      activeFlags: [
+        { name: "Disabled", severity: "Critical", description: "Account is disabled" },
+        { name: "PasswordNeverExpires", severity: "Warning", description: "Password is set to never expire" },
+      ],
+    };
+    mockInvoke.mockResolvedValue(multiResult);
+    const result = await evaluateHealth(
+      makeHealthyUser({ enabled: false, passwordNeverExpires: true }),
+    );
     expect(result.activeFlags).toHaveLength(2);
-  });
-
-  it("handles null passwordLastSet gracefully", () => {
-    const result = evaluateHealth(
-      makeHealthyUser({ passwordLastSet: null }),
-      NOW,
-    );
-    expect(
-      result.activeFlags.find((f) => f.name === "PasswordNeverChanged"),
-    ).toBeUndefined();
-  });
-
-  it("handles boundary: exactly 30 days inactive", () => {
-    const thirtyDaysAgo = new Date(NOW);
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const result = evaluateHealth(
-      makeHealthyUser({ lastLogon: thirtyDaysAgo.toISOString() }),
-      NOW,
-    );
-    expect(
-      result.activeFlags.find((f) => f.name === "Inactive30Days"),
-    ).toBeDefined();
-  });
-
-  it("handles boundary: exactly 90 days inactive", () => {
-    const ninetyDaysAgo = new Date(NOW);
-    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
-    const result = evaluateHealth(
-      makeHealthyUser({ lastLogon: ninetyDaysAgo.toISOString() }),
-      NOW,
-    );
-    expect(
-      result.activeFlags.find((f) => f.name === "Inactive90Days"),
-    ).toBeDefined();
+    expect(result.level).toBe("Critical");
   });
 });

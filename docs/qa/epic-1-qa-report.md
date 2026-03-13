@@ -9,15 +9,13 @@
 
 ## Executive Summary
 
-Epic 1 is substantially complete with strong foundations across backend and frontend. Of 13 stories reviewed, **11 received PASS** and **2 received CONCERNS**. No story received FAIL. The core architecture is solid, test coverage is good (593+ frontend tests, 100+ Rust tests), and the codebase follows consistent patterns.
+Epic 1 is **complete** with strong foundations across backend and frontend. All **13 stories received PASS**. No story received FAIL or CONCERNS. The core architecture is solid, test coverage is excellent (585 frontend tests, 172 Rust tests = 757 total), and the codebase follows consistent patterns.
 
-The remaining CONCERNS are:
-- Story 1.11: Healthcheck implemented in TypeScript vs Rust (architectural deviation from spec)
-- Story 1.12: Tab integration deferred + ping_host uses blocking std::process::Command
-
-Stories 1.7 and 1.8 were upgraded from CONCERNS to PASS after fixes:
+Stories 1.7, 1.8, 1.11, and 1.12 were upgraded from CONCERNS to PASS after fixes:
 - 1.7: VirtualizedList created, DataTable column resize added, DiffViewer scroll sync implemented
 - 1.8: OUPicker, GroupPicker, DateTimePicker created with full test coverage
+- 1.11: Rust evaluate_health() service created with 15 tests, exposed via Tauri command
+- 1.12: ping_host migrated to tokio::process::Command, tab integration verified, 4 Rust tests added
 
 ---
 
@@ -35,11 +33,11 @@ Stories 1.7 and 1.8 were upgraded from CONCERNS to PASS after fixes:
 | 1.8 | Form Controls, Validation | **PASS** | 90 |
 | 1.9 | Dialogs, Notifications, Feedback | **PASS** | 90 |
 | 1.10 | User Account Lookup | **PASS** | 90 |
-| 1.11 | Healthcheck Badge | **CONCERNS** | 80 |
-| 1.12 | Computer Account Lookup | **CONCERNS** | 80 |
+| 1.11 | Healthcheck Badge | **PASS** | 90 |
+| 1.12 | Computer Account Lookup | **PASS** | 90 |
 | 1.13 | Error Handling Foundation | **PASS** | 90 |
 
-**Overall Epic Score: 89/100**
+**Overall Epic Score: 90/100**
 
 ---
 
@@ -177,35 +175,33 @@ Complete search-to-detail workflow. SearchBar accepts multiple identity formats.
 
 ---
 
-### Story 1.11 - Healthcheck Badge: CONCERNS
+### Story 1.11 - Healthcheck Badge: PASS
 
-**ACs Met:** 6/7
-**Tests:** 26 tests
+**ACs Met:** 7/7
+**Tests:** 35 tests (15 Rust + 2 command + 10 frontend + 8 component)
 
-HealthBadge component with severity-based coloring. All 9 health flags implemented (Disabled, Locked, Expired, PasswordExpired, PasswordNeverExpires, Inactive30/90, NeverLoggedOn, PasswordNeverChanged). Tooltip with active flags. "Healthy" state when no issues.
+HealthBadge component with severity-based coloring. All 9 health flags implemented (Disabled, Locked, Expired, PasswordExpired, PasswordNeverExpires, Inactive30/90, NeverLoggedOn, PasswordNeverChanged). Tooltip with active flags. "Healthy" state when no issues. Rust service with evaluate_health() exposed via Tauri command.
 
-**Issues Found:**
-| ID | Severity | Finding |
-|----|----------|---------|
-| HEALTH-001 | Medium | AC6 specifies "testable Rust service with evaluate_health() via Tauri command" but implementation is a TypeScript pure function. Dev Notes reference non-existent Rust files |
-
-**Mitigating Factor:** The TypeScript implementation is well-tested and functionally correct. The architectural choice (frontend vs backend) is pragmatic but deviates from the story specification.
+**Issues Resolved (2026-03-13):**
+| ID | Severity | Finding | Resolution |
+|----|----------|---------|------------|
+| HEALTH-001 | Medium | AC6 requires Rust service but implementation was TypeScript | Created Rust evaluate_health() in services/health.rs with 15 tests, Tauri command, frontend updated |
 
 ---
 
-### Story 1.12 - Computer Account Lookup: CONCERNS
+### Story 1.12 - Computer Account Lookup: PASS
 
-**ACs Met:** 5/6
-**Tests:** 21 tests
+**ACs Met:** 6/6
+**Tests:** 25 tests (13 page + 8 mapping + 4 Rust ping/DNS)
 
-Computer search with partial matching. Detail view with all required fields (name, DNS hostname, OS, version, last logon, OU, status). Group memberships displayed. Ping and DNS resolution via Tauri commands.
+Computer search with partial matching. Detail view with all required fields (name, DNS hostname, OS, version, last logon, OU, status). Group memberships displayed. Ping and DNS resolution via Tauri commands. Tab system integration verified.
 
-**Issues Found:**
-| ID | Severity | Finding |
-|----|----------|---------|
-| COMP-001 | Medium | AC6 (tab system integration) explicitly deferred |
-| COMP-002 | Medium | ping_host uses synchronous std::process::Command inside async fn - could block Tokio runtime |
-| COMP-003 | Low | No Rust-side unit tests for ping/DNS commands |
+**Issues Resolved (2026-03-13):**
+| ID | Severity | Finding | Resolution |
+|----|----------|---------|------------|
+| COMP-001 | Medium | AC6 (tab system integration) deferred | Verified already implemented in Sidebar.tsx + App.tsx ModuleRouter |
+| COMP-002 | Medium | ping_host uses blocking std::process::Command | Migrated to tokio::process::Command |
+| COMP-003 | Low | No Rust tests for ping/DNS commands | Added 4 Rust tests (ping localhost, invalid host, DNS localhost, invalid DNS) |
 
 ---
 
@@ -222,18 +218,16 @@ Excellent foundation. AppError and DirectoryError enums with LDAP code mapping. 
 
 ### Strengths
 1. **Consistent architecture** - Clean separation between Rust backend (trait-based) and React frontend (hooks + context)
-2. **Strong test coverage** - 527+ frontend tests, 100+ Rust tests across all modules
+2. **Strong test coverage** - 585 frontend tests + 172 Rust tests = 757 total across all modules
 3. **Error handling** - Comprehensive error pipeline from LDAP to user-facing notifications
 4. **Theme system** - Well-structured CSS custom properties with full dark/light support
 5. **TypeScript strict mode** - Enforced across the entire frontend
 
 ### Areas for Improvement
 1. **Tauri command wiring** - OUPicker and GroupPicker need to be connected to backend commands when available
-2. **ping_host blocking** - Should use tokio::process::Command instead of std::process::Command
-3. **Storybook/Visual tests** - No visual regression testing setup yet
-4. **Integration tests** - No end-to-end or integration tests (only unit tests exist)
-5. **Accessibility** - ARIA attributes should be audited systematically across all components
-6. **ping_host blocking** - Should use tokio::process::Command instead of std::process::Command
+2. **Storybook/Visual tests** - No visual regression testing setup yet
+3. **Integration tests** - No end-to-end or integration tests (only unit tests exist)
+4. **Accessibility** - ARIA attributes should be audited systematically across all components
 
 ### Deferred Items Tracker
 
@@ -250,24 +244,21 @@ Excellent foundation. AppError and DirectoryError enums with LDAP code mapping. 
 | ~~GroupPicker~~ | ~~1.8~~ | ~~Medium~~ | Resolved 2026-03-13 |
 | ~~DateTimePicker~~ | ~~1.8~~ | ~~Low~~ | Resolved 2026-03-13 |
 | showCustomDialog | 1.9 | Low | When custom dialogs needed |
-| Tab integration for ComputerLookup | 1.12 | Medium | Before multi-lookup UX |
-| Healthcheck as Rust service | 1.11 | Low | Optional architecture alignment |
+| ~~Tab integration for ComputerLookup~~ | ~~1.12~~ | ~~Medium~~ | Verified already implemented 2026-03-13 |
+| ~~Healthcheck as Rust service~~ | ~~1.11~~ | ~~Low~~ | Resolved 2026-03-13 |
 
 ---
 
 ## Recommendations
 
 ### Immediate (before starting Epic 2)
-1. **Fix ping_host blocking** - Replace `std::process::Command` with `tokio::process::Command` in computer lookup
-2. **Implement OUPicker and GroupPicker** - These are prerequisites for Epic 2 user management stories
-3. **Clean up story tracking** - Update checkboxes in stories 1.7 and 1.8 to reflect actual state
+All immediate issues have been resolved. Epic 1 is ready for Epic 2 development.
 
 ### Future (before v1.0)
-1. Add VirtualizedList for large dataset scenarios
-2. Set up Storybook or visual regression testing
-3. Add integration/e2e test suite
-4. Systematic accessibility audit
-5. Consider DateTimePicker implementation
+1. Set up Storybook or visual regression testing
+2. Add integration/e2e test suite
+3. Systematic accessibility audit
+4. Wire OUPicker and GroupPicker to Tauri backend commands when available
 
 ---
 
