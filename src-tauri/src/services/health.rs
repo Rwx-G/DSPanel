@@ -165,11 +165,10 @@ fn parse_date_to_ms(date_str: &str) -> Result<i64, ()> {
     if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(date_str) {
         return Ok(dt.timestamp_millis());
     }
-    // Try ISO 8601 without timezone (assume UTC)
+    // Try ISO 8601 without timezone (assume UTC).
+    // The `%.f` specifier matches both with and without fractional seconds,
+    // so a single parse call handles "T12:00:00" and "T12:00:00.123".
     if let Ok(dt) = chrono::NaiveDateTime::parse_from_str(date_str, "%Y-%m-%dT%H:%M:%S%.f") {
-        return Ok(dt.and_utc().timestamp_millis());
-    }
-    if let Ok(dt) = chrono::NaiveDateTime::parse_from_str(date_str, "%Y-%m-%dT%H:%M:%S") {
         return Ok(dt.and_utc().timestamp_millis());
     }
     // Try date-only
@@ -395,5 +394,77 @@ mod tests {
         let result = evaluate_health(&make_healthy_input(), now_ms());
         let json = serde_json::to_string(&result).unwrap();
         assert!(json.contains("activeFlags"));
+    }
+
+    #[test]
+    fn parse_date_naive_datetime_without_timezone() {
+        // Covers parse_date_to_ms branch: NaiveDateTime with fractional seconds
+        let input = HealthInput {
+            last_logon: Some("2026-02-06T08:00:00.123".to_string()),
+            ..make_healthy_input()
+        };
+        let result = evaluate_health(&input, now_ms());
+        assert!(result
+            .active_flags
+            .iter()
+            .any(|f| f.name == "Inactive30Days"));
+    }
+
+    #[test]
+    fn parse_date_naive_datetime_no_fractional() {
+        // Verifies %.f format also handles timestamps without fractional seconds
+        let input = HealthInput {
+            last_logon: Some("2026-02-06T08:00:00".to_string()),
+            ..make_healthy_input()
+        };
+        let result = evaluate_health(&input, now_ms());
+        assert!(result
+            .active_flags
+            .iter()
+            .any(|f| f.name == "Inactive30Days"));
+    }
+
+    #[test]
+    fn parse_date_date_only_format() {
+        // Covers parse_date_to_ms branch: date-only "YYYY-MM-DD"
+        let input = HealthInput {
+            account_expires: Some("2026-03-01".to_string()),
+            ..make_healthy_input()
+        };
+        let result = evaluate_health(&input, now_ms());
+        assert!(result
+            .active_flags
+            .iter()
+            .any(|f| f.name == "Expired"));
+    }
+
+    #[test]
+    fn parse_date_invalid_string_is_ignored() {
+        // Covers parse_date_to_ms error path: unparseable date string
+        let input = HealthInput {
+            account_expires: Some("not-a-date".to_string()),
+            ..make_healthy_input()
+        };
+        let result = evaluate_health(&input, now_ms());
+        // Invalid date should be silently ignored - no Expired flag
+        assert!(!result
+            .active_flags
+            .iter()
+            .any(|f| f.name == "Expired"));
+    }
+
+    #[test]
+    fn password_never_changed_with_date_only_format() {
+        // Covers parse_date_to_ms date-only branch for password comparison
+        let input = HealthInput {
+            password_last_set: Some("2026-01-01".to_string()),
+            when_created: Some("2026-01-01".to_string()),
+            ..make_healthy_input()
+        };
+        let result = evaluate_health(&input, now_ms());
+        assert!(result
+            .active_flags
+            .iter()
+            .any(|f| f.name == "PasswordNeverChanged"));
     }
 }

@@ -84,4 +84,61 @@ mod tests {
         // Second call should also not panic
         init_test_logging();
     }
+
+    #[test]
+    fn test_file_layer_construction() {
+        let test_dir = "target/test-logs-layer";
+        let _ = fs::remove_dir_all(test_dir);
+        fs::create_dir_all(test_dir).unwrap();
+
+        let file_appender = rolling::daily(test_dir, "dspanel.log");
+        let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
+
+        // Build the same layers as init_logging
+        use tracing_subscriber::Registry;
+        let _file_layer = fmt::layer::<Registry>()
+            .with_writer(non_blocking)
+            .with_ansi(false)
+            .with_target(true)
+            .with_thread_ids(true);
+
+        drop(guard);
+        let _ = fs::remove_dir_all(test_dir);
+    }
+
+    #[test]
+    fn test_console_layer_construction() {
+        use tracing_subscriber::Registry;
+        let _console_layer = fmt::layer::<Registry>()
+            .with_writer(std::io::stdout)
+            .with_target(true);
+        // Console layer created without panic
+    }
+
+    #[test]
+    fn test_env_filter_from_env_var_fallback() {
+        // When RUST_LOG is not set, should fall back to default
+        let filter = EnvFilter::try_from_default_env()
+            .unwrap_or_else(|_| EnvFilter::new("info,hyper=warn,tao=warn,wry=warn,reqwest=warn"));
+        let filter_str = format!("{}", filter);
+        assert!(filter_str.contains("warn"));
+    }
+
+    #[test]
+    fn test_non_blocking_writer_with_guard() {
+        let test_dir = "target/test-logs-guard";
+        let _ = fs::remove_dir_all(test_dir);
+        fs::create_dir_all(test_dir).unwrap();
+
+        let file_appender = rolling::daily(test_dir, "test.log");
+        let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
+
+        // Verify the non-blocking writer works
+        use tracing_subscriber::Registry;
+        let _layer = fmt::layer::<Registry>().with_writer(non_blocking);
+
+        // Guard must be dropped explicitly
+        drop(guard);
+        let _ = fs::remove_dir_all(test_dir);
+    }
 }

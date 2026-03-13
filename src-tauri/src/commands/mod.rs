@@ -5,28 +5,110 @@ use crate::models::DirectoryEntry;
 use crate::services::{AccountHealthStatus, HealthInput, PermissionLevel};
 use crate::state::AppState;
 
+// ---------------------------------------------------------------------------
+// Inner functions - testable without Tauri runtime
+// ---------------------------------------------------------------------------
+
+/// Returns the application title from state.
+pub(crate) fn get_app_title_inner(state: &AppState) -> String {
+    state.title.lock().unwrap().clone()
+}
+
+/// Returns the current user's permission level.
+pub(crate) fn get_permission_level_inner(state: &AppState) -> PermissionLevel {
+    state.permission_service.current_level()
+}
+
+/// Returns the current user's detected AD group names.
+pub(crate) fn get_user_groups_inner(state: &AppState) -> Vec<String> {
+    state.permission_service.user_groups()
+}
+
+/// Checks if the current user has the required permission level.
+pub(crate) fn has_permission_inner(state: &AppState, required: PermissionLevel) -> bool {
+    state.permission_service.has_permission(required)
+}
+
+/// Searches for user accounts matching the query string.
+pub(crate) async fn search_users_inner(
+    state: &AppState,
+    query: &str,
+) -> Result<Vec<DirectoryEntry>, AppError> {
+    let provider = state.directory_provider.clone();
+    provider
+        .search_users(query, 50)
+        .await
+        .map_err(|e| AppError::Directory(e.to_string()))
+}
+
+/// Returns a single user by sAMAccountName with full attributes.
+pub(crate) async fn get_user_inner(
+    state: &AppState,
+    sam_account_name: &str,
+) -> Result<Option<DirectoryEntry>, AppError> {
+    let provider = state.directory_provider.clone();
+    provider
+        .get_user_by_identity(sam_account_name)
+        .await
+        .map_err(|e| AppError::Directory(e.to_string()))
+}
+
+/// Searches for computer accounts matching the query string.
+pub(crate) async fn search_computers_inner(
+    state: &AppState,
+    query: &str,
+) -> Result<Vec<DirectoryEntry>, AppError> {
+    let provider = state.directory_provider.clone();
+    provider
+        .search_computers(query, 50)
+        .await
+        .map_err(|e| AppError::Directory(e.to_string()))
+}
+
+/// Checks whether the directory provider has an active connection.
+pub(crate) async fn check_connection_inner(state: &AppState) -> Result<bool, AppError> {
+    let provider = state.directory_provider.clone();
+    provider
+        .test_connection()
+        .await
+        .map_err(|e| AppError::Network(e.to_string()))
+}
+
+/// Returns domain information from the directory provider.
+pub(crate) fn get_domain_info_inner(state: &AppState) -> DomainInfo {
+    let provider = &state.directory_provider;
+    DomainInfo {
+        domain_name: provider.domain_name().map(|s| s.to_string()),
+        is_connected: provider.is_connected(),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Tauri commands - thin wrappers
+// ---------------------------------------------------------------------------
+
 /// Returns the application title from managed state.
 #[tauri::command]
 pub fn get_app_title(state: State<'_, AppState>) -> String {
-    state.title.lock().unwrap().clone()
+    get_app_title_inner(&state)
 }
 
 /// Returns the current user's permission level.
 #[tauri::command]
 pub fn get_permission_level(state: State<'_, AppState>) -> PermissionLevel {
-    state.permission_service.current_level()
+    get_permission_level_inner(&state)
 }
 
 /// Returns the current user's detected AD group names.
 #[tauri::command]
 pub fn get_user_groups(state: State<'_, AppState>) -> Vec<String> {
-    state.permission_service.user_groups()
+    get_user_groups_inner(&state)
 }
 
 /// Checks if the current user has the required permission level.
 #[tauri::command]
 pub fn has_permission(state: State<'_, AppState>, required: PermissionLevel) -> bool {
-    state.permission_service.has_permission(required)
+    has_permission_inner(&state, required)
 }
 
 /// Searches for user accounts matching the query string.
@@ -38,11 +120,7 @@ pub async fn search_users(
     query: String,
     state: State<'_, AppState>,
 ) -> Result<Vec<DirectoryEntry>, AppError> {
-    let provider = state.directory_provider.clone();
-    provider
-        .search_users(&query, 50)
-        .await
-        .map_err(|e| AppError::Directory(e.to_string()))
+    search_users_inner(&state, &query).await
 }
 
 /// Returns a single user by sAMAccountName with full attributes.
@@ -51,11 +129,7 @@ pub async fn get_user(
     sam_account_name: String,
     state: State<'_, AppState>,
 ) -> Result<Option<DirectoryEntry>, AppError> {
-    let provider = state.directory_provider.clone();
-    provider
-        .get_user_by_identity(&sam_account_name)
-        .await
-        .map_err(|e| AppError::Directory(e.to_string()))
+    get_user_inner(&state, &sam_account_name).await
 }
 
 /// Searches for computer accounts matching the query string.
@@ -64,11 +138,7 @@ pub async fn search_computers(
     query: String,
     state: State<'_, AppState>,
 ) -> Result<Vec<DirectoryEntry>, AppError> {
-    let provider = state.directory_provider.clone();
-    provider
-        .search_computers(&query, 50)
-        .await
-        .map_err(|e| AppError::Directory(e.to_string()))
+    search_computers_inner(&state, &query).await
 }
 
 /// Pings a hostname and returns the result string.
@@ -112,11 +182,7 @@ pub async fn ping_host(hostname: String) -> Result<String, AppError> {
 /// This performs a lightweight rootDSE query via `test_connection()`.
 #[tauri::command]
 pub async fn check_connection(state: State<'_, AppState>) -> Result<bool, AppError> {
-    let provider = state.directory_provider.clone();
-    provider
-        .test_connection()
-        .await
-        .map_err(|e| AppError::Network(e.to_string()))
+    check_connection_inner(&state).await
 }
 
 /// Returns domain information from the directory provider.
@@ -125,11 +191,7 @@ pub async fn check_connection(state: State<'_, AppState>) -> Result<bool, AppErr
 /// `is_connected` fields. Both may be null/false if not domain-joined.
 #[tauri::command]
 pub fn get_domain_info(state: State<'_, AppState>) -> DomainInfo {
-    let provider = &state.directory_provider;
-    DomainInfo {
-        domain_name: provider.domain_name().map(|s| s.to_string()),
-        is_connected: provider.is_connected(),
-    }
+    get_domain_info_inner(&state)
 }
 
 #[derive(serde::Serialize)]
@@ -194,39 +256,6 @@ mod tests {
         AppState::new(provider, PermissionConfig::default())
     }
 
-    #[test]
-    fn test_get_app_title_returns_default() {
-        let state = make_state();
-        let title = state.title.lock().unwrap().clone();
-        assert_eq!(title, "DSPanel");
-    }
-
-    #[test]
-    fn test_get_permission_level_returns_readonly_by_default() {
-        let state = make_state();
-        assert_eq!(
-            state.permission_service.current_level(),
-            PermissionLevel::ReadOnly
-        );
-    }
-
-    #[test]
-    fn test_has_permission_check() {
-        let state = make_state();
-        assert!(state
-            .permission_service
-            .has_permission(PermissionLevel::ReadOnly));
-        assert!(!state
-            .permission_service
-            .has_permission(PermissionLevel::HelpDesk));
-    }
-
-    #[test]
-    fn test_get_user_groups_empty_by_default() {
-        let state = make_state();
-        assert!(state.permission_service.user_groups().is_empty());
-    }
-
     use crate::models::DirectoryEntry;
     use std::collections::HashMap;
 
@@ -252,6 +281,145 @@ mod tests {
         AppState::new(provider, PermissionConfig::default())
     }
 
+    // -----------------------------------------------------------------------
+    // Inner function tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_get_app_title_inner() {
+        let state = make_state();
+        assert_eq!(get_app_title_inner(&state), "DSPanel");
+    }
+
+    #[test]
+    fn test_get_permission_level_inner() {
+        let state = make_state();
+        assert_eq!(get_permission_level_inner(&state), PermissionLevel::ReadOnly);
+    }
+
+    #[test]
+    fn test_get_user_groups_inner() {
+        let state = make_state();
+        assert!(get_user_groups_inner(&state).is_empty());
+    }
+
+    #[test]
+    fn test_has_permission_inner() {
+        let state = make_state();
+        assert!(has_permission_inner(&state, PermissionLevel::ReadOnly));
+        assert!(!has_permission_inner(&state, PermissionLevel::HelpDesk));
+    }
+
+    #[tokio::test]
+    async fn test_search_users_inner_returns_results() {
+        let users = vec![
+            make_user_entry("jdoe", "John Doe"),
+            make_user_entry("asmith", "Alice Smith"),
+        ];
+        let state = make_state_with_users(users);
+        let results = search_users_inner(&state, "doe").await.unwrap();
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].sam_account_name, Some("jdoe".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_search_users_inner_failure() {
+        let state = make_state_with_failure();
+        let result = search_users_inner(&state, "test").await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_get_user_inner_found() {
+        let users = vec![make_user_entry("jdoe", "John Doe")];
+        let state = make_state_with_users(users);
+        let result = get_user_inner(&state, "jdoe").await.unwrap();
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().display_name, Some("John Doe".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_get_user_inner_not_found() {
+        let users = vec![make_user_entry("jdoe", "John Doe")];
+        let state = make_state_with_users(users);
+        let result = get_user_inner(&state, "unknown").await.unwrap();
+        assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_get_user_inner_failure() {
+        let state = make_state_with_failure();
+        let result = get_user_inner(&state, "jdoe").await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_search_computers_inner_results() {
+        let computers = vec![DirectoryEntry {
+            distinguished_name: "CN=WS01,OU=Computers,DC=example,DC=com".to_string(),
+            sam_account_name: Some("WS01$".to_string()),
+            display_name: Some("WS01".to_string()),
+            object_class: Some("computer".to_string()),
+            attributes: HashMap::new(),
+        }];
+        let provider = Arc::new(MockDirectoryProvider::new().with_computers(computers));
+        let state = AppState::new(provider, PermissionConfig::default());
+        let results = search_computers_inner(&state, "WS").await.unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].sam_account_name, Some("WS01$".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_search_computers_inner_empty() {
+        let state = make_state();
+        let results = search_computers_inner(&state, "none").await.unwrap();
+        assert!(results.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_check_connection_inner() {
+        let state = make_state();
+        let result = check_connection_inner(&state).await.unwrap();
+        assert!(result);
+    }
+
+    #[test]
+    fn test_get_domain_info_inner() {
+        let state = make_state();
+        let info = get_domain_info_inner(&state);
+        assert_eq!(info.domain_name, Some("EXAMPLE.COM".to_string()));
+        assert!(info.is_connected);
+    }
+
+    // -----------------------------------------------------------------------
+    // Legacy tests (updated to use _inner where applicable)
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_get_app_title_returns_default() {
+        let state = make_state();
+        assert_eq!(get_app_title_inner(&state), "DSPanel");
+    }
+
+    #[test]
+    fn test_get_permission_level_returns_readonly_by_default() {
+        let state = make_state();
+        assert_eq!(get_permission_level_inner(&state), PermissionLevel::ReadOnly);
+    }
+
+    #[test]
+    fn test_has_permission_check() {
+        let state = make_state();
+        assert!(has_permission_inner(&state, PermissionLevel::ReadOnly));
+        assert!(!has_permission_inner(&state, PermissionLevel::HelpDesk));
+    }
+
+    #[test]
+    fn test_get_user_groups_empty_by_default() {
+        let state = make_state();
+        assert!(get_user_groups_inner(&state).is_empty());
+    }
+
     #[tokio::test]
     async fn test_search_users_returns_results() {
         let users = vec![
@@ -259,11 +427,7 @@ mod tests {
             make_user_entry("asmith", "Alice Smith"),
         ];
         let state = make_state_with_users(users);
-        let results = state
-            .directory_provider
-            .search_users("doe", 50)
-            .await
-            .unwrap();
+        let results = search_users_inner(&state, "doe").await.unwrap();
         assert_eq!(results.len(), 2);
         assert_eq!(results[0].sam_account_name, Some("jdoe".to_string()));
     }
@@ -271,18 +435,14 @@ mod tests {
     #[tokio::test]
     async fn test_search_users_returns_empty_for_no_match() {
         let state = make_state_with_users(vec![]);
-        let results = state
-            .directory_provider
-            .search_users("nobody", 50)
-            .await
-            .unwrap();
+        let results = search_users_inner(&state, "nobody").await.unwrap();
         assert!(results.is_empty());
     }
 
     #[tokio::test]
     async fn test_search_users_failure_returns_error() {
         let state = make_state_with_failure();
-        let result = state.directory_provider.search_users("test", 50).await;
+        let result = search_users_inner(&state, "test").await;
         assert!(result.is_err());
     }
 
@@ -290,11 +450,7 @@ mod tests {
     async fn test_get_user_by_identity_found() {
         let users = vec![make_user_entry("jdoe", "John Doe")];
         let state = make_state_with_users(users);
-        let result = state
-            .directory_provider
-            .get_user_by_identity("jdoe")
-            .await
-            .unwrap();
+        let result = get_user_inner(&state, "jdoe").await.unwrap();
         assert!(result.is_some());
         assert_eq!(result.unwrap().display_name, Some("John Doe".to_string()));
     }
@@ -303,18 +459,14 @@ mod tests {
     async fn test_get_user_by_identity_not_found() {
         let users = vec![make_user_entry("jdoe", "John Doe")];
         let state = make_state_with_users(users);
-        let result = state
-            .directory_provider
-            .get_user_by_identity("unknown")
-            .await
-            .unwrap();
+        let result = get_user_inner(&state, "unknown").await.unwrap();
         assert!(result.is_none());
     }
 
     #[tokio::test]
     async fn test_get_user_failure_returns_error() {
         let state = make_state_with_failure();
-        let result = state.directory_provider.get_user_by_identity("jdoe").await;
+        let result = get_user_inner(&state, "jdoe").await;
         assert!(result.is_err());
     }
 
@@ -388,5 +540,70 @@ mod tests {
         let result = evaluate_health_cmd(input);
         assert_eq!(result.level, crate::services::HealthLevel::Critical);
         assert!(result.active_flags.iter().any(|f| f.name == "Disabled"));
+    }
+
+    #[test]
+    fn test_get_current_username_returns_value() {
+        let result = get_current_username();
+        // In test environment, USERNAME should be set
+        assert!(!result.is_empty());
+    }
+
+    #[test]
+    fn test_get_computer_name_returns_value() {
+        let result = get_computer_name();
+        assert!(!result.is_empty());
+    }
+
+    #[test]
+    fn test_get_domain_info_with_mock() {
+        let state = make_state();
+        let info = get_domain_info_inner(&state);
+        assert_eq!(info.domain_name, Some("EXAMPLE.COM".to_string()));
+        assert!(info.is_connected);
+    }
+
+    #[test]
+    fn test_get_domain_info_disconnected() {
+        let provider = Arc::new(MockDirectoryProvider::disconnected());
+        let state = AppState::new(provider, PermissionConfig::default());
+        let info = get_domain_info_inner(&state);
+        assert!(info.domain_name.is_none());
+        assert!(!info.is_connected);
+    }
+
+    #[test]
+    fn test_domain_info_serialization() {
+        let info = DomainInfo {
+            domain_name: Some("CORP.LOCAL".to_string()),
+            is_connected: true,
+        };
+        let json = serde_json::to_string(&info).unwrap();
+        assert!(json.contains("domain_name"));
+        assert!(json.contains("is_connected"));
+        assert!(json.contains("CORP.LOCAL"));
+    }
+
+    #[tokio::test]
+    async fn test_search_computers_returns_results() {
+        let computers = vec![DirectoryEntry {
+            distinguished_name: "CN=WS01,OU=Computers,DC=example,DC=com".to_string(),
+            sam_account_name: Some("WS01$".to_string()),
+            display_name: Some("WS01".to_string()),
+            object_class: Some("computer".to_string()),
+            attributes: HashMap::new(),
+        }];
+        let provider = Arc::new(MockDirectoryProvider::new().with_computers(computers));
+        let state = AppState::new(provider, PermissionConfig::default());
+        let results = search_computers_inner(&state, "WS").await.unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].sam_account_name, Some("WS01$".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_search_computers_empty() {
+        let state = make_state();
+        let results = search_computers_inner(&state, "none").await.unwrap();
+        assert!(results.is_empty());
     }
 }

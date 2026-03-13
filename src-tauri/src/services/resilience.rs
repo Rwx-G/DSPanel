@@ -526,6 +526,35 @@ mod tests {
         assert!(cb.check_allowed().is_ok());
     }
 
+    #[tokio::test]
+    async fn test_retry_warn_log_on_transient_then_success() {
+        let config = RetryConfig {
+            max_retries: 2,
+            initial_delay: Duration::from_millis(10),
+            multiplier: 2.0,
+        };
+        let attempt = AtomicU32::new(0);
+
+        let result = retry_with_backoff(
+            &config,
+            || {
+                let n = attempt.fetch_add(1, Ordering::SeqCst);
+                async move {
+                    if n == 0 {
+                        Err(DirectoryError::Timeout)
+                    } else {
+                        Ok("recovered")
+                    }
+                }
+            },
+            |_| async {},
+        )
+        .await;
+
+        assert_eq!(result.unwrap(), "recovered");
+        assert_eq!(attempt.load(Ordering::SeqCst), 2);
+    }
+
     // -- TimeoutConfig tests --
 
     #[test]

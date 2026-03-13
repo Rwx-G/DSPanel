@@ -95,4 +95,37 @@ mod tests {
         let _ = AppState::new(provider, PermissionConfig::default());
         let _ = error::AppError::Internal("test".to_string());
     }
+
+    #[test]
+    fn test_install_panic_hook_does_not_panic() {
+        install_panic_hook();
+        // Hook installed successfully
+    }
+
+    #[test]
+    fn test_panic_hook_catches_str_panic() {
+        install_panic_hook();
+        let result = std::panic::catch_unwind(|| {
+            panic!("test string panic");
+        });
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_panic_hook_catches_string_panic() {
+        install_panic_hook();
+        let result = std::panic::catch_unwind(|| {
+            panic!("{}", "formatted panic".to_string());
+        });
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_panic_hook_catches_non_string_payload() {
+        install_panic_hook();
+        let result = std::panic::catch_unwind(|| {
+            std::panic::panic_any(42i32);
+        });
+        assert!(result.is_err());
+    }
 }

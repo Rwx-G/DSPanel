@@ -506,6 +506,42 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_resilient_search_groups() {
+        let groups = vec![DirectoryEntry {
+            distinguished_name: "CN=Admins,DC=test".to_string(),
+            sam_account_name: Some("Admins".to_string()),
+            display_name: Some("Admins".to_string()),
+            object_class: Some("group".to_string()),
+            attributes: HashMap::new(),
+        }];
+        let inner = Arc::new(MockDirectoryProvider::new().with_groups(groups));
+        let provider = ResilientDirectoryProvider::new(
+            inner,
+            RetryConfig::default(),
+            CircuitBreaker::new(CircuitBreakerConfig::default()),
+            noop_delay,
+        );
+
+        let results = provider.search_groups("Admin", 50).await.unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].sam_account_name, Some("Admins".to_string()));
+    }
+
+    #[test]
+    fn test_resilient_provider_base_dn_passthrough() {
+        let inner = Arc::new(MockDirectoryProvider::new());
+        let provider = ResilientDirectoryProvider::new(
+            inner,
+            RetryConfig::default(),
+            CircuitBreaker::new(CircuitBreakerConfig::default()),
+            noop_delay,
+        );
+
+        // MockDirectoryProvider returns Some for base_dn
+        assert_eq!(provider.base_dn(), Some("DC=example,DC=com"));
+    }
+
+    #[tokio::test]
     async fn test_resilient_get_current_user_groups() {
         let groups = vec!["CN=G1,DC=test".to_string()];
         let inner = Arc::new(MockDirectoryProvider::new().with_user_groups(groups));
