@@ -1,9 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import {
-  type PermissionLevel,
-  hasPermissionLevel,
-} from "@/types/permissions";
+import { type PermissionLevel, hasPermissionLevel } from "@/types/permissions";
 
 export function usePermissions() {
   const [level, setLevel] = useState<PermissionLevel>("ReadOnly");

@@ -75,10 +75,8 @@ describe("usePermissions", () => {
 
   it("should provide hasPermission for DomainAdmin level", async () => {
     mockedInvoke.mockImplementation((cmd: string) => {
-      if (cmd === "get_permission_level")
-        return Promise.resolve("DomainAdmin");
-      if (cmd === "get_user_groups")
-        return Promise.resolve(["Domain Admins"]);
+      if (cmd === "get_permission_level") return Promise.resolve("DomainAdmin");
+      if (cmd === "get_user_groups") return Promise.resolve(["Domain Admins"]);
       return Promise.resolve(null);
     });
 
