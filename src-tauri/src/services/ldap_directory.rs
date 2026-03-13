@@ -93,7 +93,9 @@ impl LdapDirectoryProvider {
     pub fn new() -> Self {
         let domain = std::env::var("USERDNSDOMAIN").ok();
         if domain.is_none() {
-            tracing::warn!("USERDNSDOMAIN not set - not domain-joined, directory provider will be offline");
+            tracing::warn!(
+                "USERDNSDOMAIN not set - not domain-joined, directory provider will be offline"
+            );
         } else {
             tracing::info!("Domain detected: {}", domain.as_ref().unwrap());
         }
@@ -113,12 +115,10 @@ impl LdapDirectoryProvider {
             .context("No domain available - machine is not domain-joined")?;
 
         let settings = LdapConnSettings::new();
-        let (conn, mut ldap) = LdapConnAsync::with_settings(
-            settings,
-            &format!("ldap://{}:389", domain),
-        )
-        .await
-        .context("Failed to connect to LDAP server")?;
+        let (conn, mut ldap) =
+            LdapConnAsync::with_settings(settings, &format!("ldap://{}:389", domain))
+                .await
+                .context("Failed to connect to LDAP server")?;
 
         tokio::spawn(conn.drive());
 
@@ -128,7 +128,12 @@ impl LdapDirectoryProvider {
 
         // Discover base DN via rootDSE
         let (rs, _) = ldap
-            .search("", Scope::Base, "(objectClass=*)", vec!["defaultNamingContext"])
+            .search(
+                "",
+                Scope::Base,
+                "(objectClass=*)",
+                vec!["defaultNamingContext"],
+            )
             .await
             .context("Failed to query rootDSE")?
             .success()
@@ -164,12 +169,7 @@ impl LdapDirectoryProvider {
 
         let mut ldap = self.connect().await?;
 
-        let base = self
-            .base_dn
-            .lock()
-            .unwrap()
-            .clone()
-            .unwrap_or_default();
+        let base = self.base_dn.lock().unwrap().clone().unwrap_or_default();
 
         let (rs, _) = ldap
             .search(&base, Scope::Subtree, filter, attrs.to_vec())
@@ -199,14 +199,8 @@ fn search_entry_to_directory_entry(se: SearchEntry) -> DirectoryEntry {
         .attrs
         .get("sAMAccountName")
         .and_then(|v| v.first().cloned());
-    let display = se
-        .attrs
-        .get("displayName")
-        .and_then(|v| v.first().cloned());
-    let object_class = se
-        .attrs
-        .get("objectClass")
-        .and_then(|v| v.last().cloned());
+    let display = se.attrs.get("displayName").and_then(|v| v.first().cloned());
+    let object_class = se.attrs.get("objectClass").and_then(|v| v.last().cloned());
 
     let mut attributes: HashMap<String, Vec<String>> = HashMap::new();
     for (key, values) in se.attrs {
@@ -256,11 +250,7 @@ impl DirectoryProvider for LdapDirectoryProvider {
         }
     }
 
-    async fn search_users(
-        &self,
-        filter: &str,
-        max_results: usize,
-    ) -> Result<Vec<DirectoryEntry>> {
+    async fn search_users(&self, filter: &str, max_results: usize) -> Result<Vec<DirectoryEntry>> {
         let escaped = ldap_escape(filter);
         let ldap_filter = format!(
             "(&(objectClass=user)(objectCategory=person)\
@@ -283,11 +273,7 @@ impl DirectoryProvider for LdapDirectoryProvider {
         self.search(&ldap_filter, COMPUTER_ATTRS, max_results).await
     }
 
-    async fn search_groups(
-        &self,
-        filter: &str,
-        max_results: usize,
-    ) -> Result<Vec<DirectoryEntry>> {
+    async fn search_groups(&self, filter: &str, max_results: usize) -> Result<Vec<DirectoryEntry>> {
         let escaped = ldap_escape(filter);
         let ldap_filter = format!(
             "(&(objectClass=group)(|(sAMAccountName=*{}*)(displayName=*{}*)))",
@@ -296,10 +282,7 @@ impl DirectoryProvider for LdapDirectoryProvider {
         self.search(&ldap_filter, GROUP_ATTRS, max_results).await
     }
 
-    async fn get_user_by_identity(
-        &self,
-        sam_account_name: &str,
-    ) -> Result<Option<DirectoryEntry>> {
+    async fn get_user_by_identity(&self, sam_account_name: &str) -> Result<Option<DirectoryEntry>> {
         let escaped = ldap_escape(sam_account_name);
         let ldap_filter = format!(
             "(&(objectClass=user)(objectCategory=person)(sAMAccountName={}))",
@@ -320,8 +303,8 @@ impl DirectoryProvider for LdapDirectoryProvider {
     }
 
     async fn get_current_user_groups(&self) -> Result<Vec<String>> {
-        let username = std::env::var("USERNAME")
-            .context("USERNAME environment variable not set")?;
+        let username =
+            std::env::var("USERNAME").context("USERNAME environment variable not set")?;
         let user = self.get_user_by_identity(&username).await?;
         match user {
             Some(entry) => Ok(entry.get_attribute_values("memberOf").to_vec()),
@@ -375,22 +358,13 @@ mod tests {
     #[test]
     fn test_search_entry_to_directory_entry_maps_fields() {
         let mut attrs = HashMap::new();
-        attrs.insert(
-            "sAMAccountName".to_string(),
-            vec!["jdoe".to_string()],
-        );
-        attrs.insert(
-            "displayName".to_string(),
-            vec!["John Doe".to_string()],
-        );
+        attrs.insert("sAMAccountName".to_string(), vec!["jdoe".to_string()]);
+        attrs.insert("displayName".to_string(), vec!["John Doe".to_string()]);
         attrs.insert(
             "objectClass".to_string(),
             vec!["top".to_string(), "person".to_string(), "user".to_string()],
         );
-        attrs.insert(
-            "mail".to_string(),
-            vec!["jdoe@example.com".to_string()],
-        );
+        attrs.insert("mail".to_string(), vec!["jdoe@example.com".to_string()]);
 
         let se = SearchEntry {
             dn: "CN=John Doe,OU=Users,DC=example,DC=com".to_string(),
@@ -407,10 +381,7 @@ mod tests {
         assert_eq!(entry.display_name, Some("John Doe".to_string()));
         // objectClass takes the last value (most specific)
         assert_eq!(entry.object_class, Some("user".to_string()));
-        assert_eq!(
-            entry.get_attribute("mail"),
-            Some("jdoe@example.com")
-        );
+        assert_eq!(entry.get_attribute("mail"), Some("jdoe@example.com"));
     }
 
     #[test]

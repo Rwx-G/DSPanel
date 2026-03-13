@@ -44,10 +44,7 @@ impl Default for PermissionConfig {
             "DSPanel-AccountOps".to_string(),
             PermissionLevel::AccountOperator,
         );
-        mappings.insert(
-            "Domain Admins".to_string(),
-            PermissionLevel::DomainAdmin,
-        );
+        mappings.insert("Domain Admins".to_string(), PermissionLevel::DomainAdmin);
         Self {
             group_mappings: mappings,
         }
@@ -94,18 +91,12 @@ impl PermissionService {
     /// The service queries the `DirectoryProvider` for the current user's groups,
     /// maps them to permission levels, and selects the highest level.
     /// Defaults to `ReadOnly` when no matching groups are found.
-    pub async fn detect_permissions(
-        &self,
-        provider: &dyn DirectoryProvider,
-    ) -> Result<()> {
+    pub async fn detect_permissions(&self, provider: &dyn DirectoryProvider) -> Result<()> {
         let group_dns = provider.get_current_user_groups().await?;
 
         // Extract the CN from each group DN for matching.
         // Group DNs are like "CN=Domain Admins,CN=Users,DC=example,DC=com"
-        let group_names: Vec<String> = group_dns
-            .iter()
-            .filter_map(|dn| extract_cn(dn))
-            .collect();
+        let group_names: Vec<String> = group_dns.iter().filter_map(|dn| extract_cn(dn)).collect();
 
         let mut detected_level = PermissionLevel::ReadOnly;
 
@@ -284,8 +275,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_detect_helpdesk_from_group() {
-        let provider = MockDirectoryProvider::new()
-            .with_user_groups(make_group_dns(&["DSPanel-HelpDesk"]));
+        let provider =
+            MockDirectoryProvider::new().with_user_groups(make_group_dns(&["DSPanel-HelpDesk"]));
         let service = default_service();
         service.detect_permissions(&provider).await.unwrap();
         assert_eq!(service.current_level(), PermissionLevel::HelpDesk);
@@ -293,20 +284,17 @@ mod tests {
 
     #[tokio::test]
     async fn test_detect_account_operator_from_group() {
-        let provider = MockDirectoryProvider::new()
-            .with_user_groups(make_group_dns(&["DSPanel-AccountOps"]));
+        let provider =
+            MockDirectoryProvider::new().with_user_groups(make_group_dns(&["DSPanel-AccountOps"]));
         let service = default_service();
         service.detect_permissions(&provider).await.unwrap();
-        assert_eq!(
-            service.current_level(),
-            PermissionLevel::AccountOperator
-        );
+        assert_eq!(service.current_level(), PermissionLevel::AccountOperator);
     }
 
     #[tokio::test]
     async fn test_detect_domain_admin_from_group() {
-        let provider = MockDirectoryProvider::new()
-            .with_user_groups(make_group_dns(&["Domain Admins"]));
+        let provider =
+            MockDirectoryProvider::new().with_user_groups(make_group_dns(&["Domain Admins"]));
         let service = default_service();
         service.detect_permissions(&provider).await.unwrap();
         assert_eq!(service.current_level(), PermissionLevel::DomainAdmin);
@@ -326,8 +314,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_inheritance_domain_admin_has_helpdesk_permission() {
-        let provider = MockDirectoryProvider::new()
-            .with_user_groups(make_group_dns(&["Domain Admins"]));
+        let provider =
+            MockDirectoryProvider::new().with_user_groups(make_group_dns(&["Domain Admins"]));
         let service = default_service();
         service.detect_permissions(&provider).await.unwrap();
         assert!(service.has_permission(PermissionLevel::HelpDesk));
@@ -337,8 +325,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_inheritance_account_operator_has_helpdesk_permission() {
-        let provider = MockDirectoryProvider::new()
-            .with_user_groups(make_group_dns(&["DSPanel-AccountOps"]));
+        let provider =
+            MockDirectoryProvider::new().with_user_groups(make_group_dns(&["DSPanel-AccountOps"]));
         let service = default_service();
         service.detect_permissions(&provider).await.unwrap();
         assert!(service.has_permission(PermissionLevel::ReadOnly));
@@ -349,8 +337,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_has_permission_returns_false_when_level_insufficient() {
-        let provider = MockDirectoryProvider::new()
-            .with_user_groups(make_group_dns(&["DSPanel-HelpDesk"]));
+        let provider =
+            MockDirectoryProvider::new().with_user_groups(make_group_dns(&["DSPanel-HelpDesk"]));
         let service = default_service();
         service.detect_permissions(&provider).await.unwrap();
         assert!(!service.has_permission(PermissionLevel::AccountOperator));
@@ -360,10 +348,7 @@ mod tests {
     #[tokio::test]
     async fn test_custom_group_name_configuration() {
         let mut mappings = HashMap::new();
-        mappings.insert(
-            "CustomAdmin".to_string(),
-            PermissionLevel::DomainAdmin,
-        );
+        mappings.insert("CustomAdmin".to_string(), PermissionLevel::DomainAdmin);
         let service = custom_service(mappings);
         let provider =
             MockDirectoryProvider::new().with_user_groups(make_group_dns(&["CustomAdmin"]));
@@ -431,10 +416,7 @@ mod tests {
 
     #[test]
     fn test_extract_cn_returns_none_for_non_cn() {
-        assert_eq!(
-            extract_cn("OU=Users,DC=example,DC=com"),
-            None
-        );
+        assert_eq!(extract_cn("OU=Users,DC=example,DC=com"), None);
     }
 
     #[test]

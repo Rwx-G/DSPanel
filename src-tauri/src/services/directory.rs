@@ -22,11 +22,7 @@ pub trait DirectoryProvider: Send + Sync {
     async fn test_connection(&self) -> Result<bool>;
 
     /// Searches for user accounts matching the filter.
-    async fn search_users(
-        &self,
-        filter: &str,
-        max_results: usize,
-    ) -> Result<Vec<DirectoryEntry>>;
+    async fn search_users(&self, filter: &str, max_results: usize) -> Result<Vec<DirectoryEntry>>;
 
     /// Searches for computer accounts matching the filter.
     async fn search_computers(
@@ -36,17 +32,10 @@ pub trait DirectoryProvider: Send + Sync {
     ) -> Result<Vec<DirectoryEntry>>;
 
     /// Searches for groups matching the filter.
-    async fn search_groups(
-        &self,
-        filter: &str,
-        max_results: usize,
-    ) -> Result<Vec<DirectoryEntry>>;
+    async fn search_groups(&self, filter: &str, max_results: usize) -> Result<Vec<DirectoryEntry>>;
 
     /// Returns a single user by sAMAccountName, or None if not found.
-    async fn get_user_by_identity(
-        &self,
-        sam_account_name: &str,
-    ) -> Result<Option<DirectoryEntry>>;
+    async fn get_user_by_identity(&self, sam_account_name: &str) -> Result<Option<DirectoryEntry>>;
 
     /// Returns the members of a group identified by its DN.
     async fn get_group_members(
@@ -202,9 +191,10 @@ pub mod tests {
         ) -> Result<Option<DirectoryEntry>> {
             self.check_failure()?;
             let users = self.users.lock().unwrap();
-            Ok(users.iter().find(|u| {
-                u.sam_account_name.as_deref() == Some(sam_account_name)
-            }).cloned())
+            Ok(users
+                .iter()
+                .find(|u| u.sam_account_name.as_deref() == Some(sam_account_name))
+                .cloned())
         }
 
         async fn get_group_members(

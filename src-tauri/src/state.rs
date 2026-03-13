@@ -18,10 +18,7 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub fn new(
-        provider: Arc<dyn DirectoryProvider>,
-        permission_config: PermissionConfig,
-    ) -> Self {
+    pub fn new(provider: Arc<dyn DirectoryProvider>, permission_config: PermissionConfig) -> Self {
         Self {
             title: Mutex::new("DSPanel".to_string()),
             initialized: Mutex::new(false),

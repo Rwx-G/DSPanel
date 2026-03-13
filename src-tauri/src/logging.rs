@@ -11,9 +11,8 @@ use tracing_subscriber::EnvFilter;
 /// - Default level: `info`
 /// - Noisy crates (`hyper`, `tao`, `wry`) are set to `warn`
 pub fn init_logging(log_dir: &str) {
-    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-        EnvFilter::new("info,hyper=warn,tao=warn,wry=warn,reqwest=warn")
-    });
+    let env_filter = EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| EnvFilter::new("info,hyper=warn,tao=warn,wry=warn,reqwest=warn"));
 
     let file_appender = rolling::daily(log_dir, "dspanel.log");
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
@@ -28,9 +27,7 @@ pub fn init_logging(log_dir: &str) {
         .with_target(true)
         .with_thread_ids(true);
 
-    let console_layer = fmt::layer()
-        .with_writer(std::io::stdout)
-        .with_target(true);
+    let console_layer = fmt::layer().with_writer(std::io::stdout).with_target(true);
 
     tracing_subscriber::registry()
         .with(env_filter)
