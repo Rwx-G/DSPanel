@@ -1,61 +1,55 @@
+schema: 1
 story: "1.8"
-title: "Form Controls, Validation and Input Patterns"
+story_title: "Form Controls, Validation and Input Patterns"
+gate: PASS
+status_reason: "All 12 ACs met. OUPicker, GroupPicker, DateTimePicker created with full test coverage. Data-driven design ready for Tauri command integration."
 reviewer: "Quinn (Test Architect)"
-date: "2026-03-13"
-gate: CONCERNS
+updated: "2026-03-13T18:40:00Z"
 
-summary: >
-  Core form infrastructure is solid: FormField, TextInput, PasswordInput,
-  ComboBox, ValidationSummary, useFormValidation, useChangeTracker, and
-  custom validators are all implemented and tested. Three AD-dependent
-  components are entirely missing: OUPicker, GroupPicker, and
-  DateTimePicker. Story status says "Done" but task checkboxes are all
-  unchecked, indicating a tracking discrepancy. The missing components
-  likely depend on Tauri backend commands not yet available.
+waiver: { active: false }
 
-tests:
-  total: 40+
-  passing: all
-  failing: 0
-  coverage_notes: >
-    Test files for FormField, TextInput, PasswordInput, ComboBox,
-    ValidationSummary, useFormValidation, useChangeTracker, and
-    validators. All pass.
+top_issues: []
 
-acceptance_criteria:
-  ac1_form_field: PASS
-  ac2_text_input: PASS
-  ac3_password_input: PASS
-  ac4_combobox: PASS
-  ac5_ou_picker: FAIL
-  ac5_notes: "Component file does not exist"
-  ac6_group_picker: FAIL
-  ac6_notes: "Component file does not exist"
-  ac7_datetime_picker: FAIL
-  ac7_notes: "Component file does not exist"
-  ac8_validation: PASS
-  ac9_validation_summary: PASS
-  ac10_dirty_tracking: PASS
-  ac11_theme: PASS
-  ac12_keyboard_aria: PASS
+quality_score: 90
+expires: "2026-03-27T00:00:00Z"
 
-issues:
-  - severity: high
-    description: "OUPicker component is completely missing (AC #5)"
-  - severity: high
-    description: "GroupPicker component is completely missing (AC #6)"
-  - severity: high
-    description: "DateTimePicker component is completely missing (AC #7)"
-  - severity: low
-    description: "Story status says Done but all task checkboxes are unchecked"
-  - severity: low
-    description: "ComboBox does not highlight matching text in dropdown"
-  - severity: low
-    description: "aria-describedby not linking errors to inputs"
+evidence:
+  tests_reviewed: 93
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    ac_gaps: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Password input defaults to masked. Validators use safe regex. No sensitive data persisted."
+  performance:
+    status: PASS
+    notes: "GroupPicker debounces search. DateTimePicker calendar grid is lightweight."
+  reliability:
+    status: PASS
+    notes: "All components handle disabled, error, and empty states"
+  maintainability:
+    status: PASS
+    notes: "Consistent patterns, forwardRef usage, custom hooks for validation and dirty tracking"
 
 recommendations:
-  - "Implement OUPicker, GroupPicker, DateTimePicker - or split to a separate story"
-  - "Add aria-describedby linking FormField errors to input elements"
-  - "Add search text highlighting in ComboBox dropdown options"
-  - "Update story task checkboxes to reflect actual state"
-  - "Consider memoizing ComboBox filteredOptions with useMemo"
+  immediate: []
+  future:
+    - action: "Wire OUPicker to Tauri get_ou_tree command when available"
+      refs: ["src/components/form/OUPicker.tsx"]
+    - action: "Wire GroupPicker to Tauri search_groups command when available"
+      refs: ["src/components/form/GroupPicker.tsx"]
+    - action: "Add aria-describedby linking errors to inputs"
+      refs: ["src/components/form/FormField.tsx"]
+    - action: "Highlight matching search text in ComboBox dropdown"
+      refs: ["src/components/form/ComboBox.tsx"]
+
+history:
+  - at: "2026-03-13T17:57:00Z"
+    gate: CONCERNS
+    note: "Initial review - OUPicker, GroupPicker, DateTimePicker missing"
+  - at: "2026-03-13T18:40:00Z"
+    gate: PASS
+    note: "All 3 components created with tests. Story checkboxes updated."

@@ -9,14 +9,15 @@
 
 ## Executive Summary
 
-Epic 1 is substantially complete with strong foundations across backend and frontend. Of 13 stories reviewed, **10 received PASS** and **3 received CONCERNS**. No story received FAIL. The core architecture is solid, test coverage is good (546+ frontend tests, 100+ Rust tests), and the codebase follows consistent patterns.
+Epic 1 is substantially complete with strong foundations across backend and frontend. Of 13 stories reviewed, **11 received PASS** and **2 received CONCERNS**. No story received FAIL. The core architecture is solid, test coverage is good (593+ frontend tests, 100+ Rust tests), and the codebase follows consistent patterns.
 
-The CONCERNS are primarily around:
-- Missing components that depend on future backend commands (OUPicker, GroupPicker, DateTimePicker)
-- Minor architectural decisions (healthcheck in TypeScript vs Rust)
-- Deferred features explicitly tracked in stories
+The remaining CONCERNS are:
+- Story 1.11: Healthcheck implemented in TypeScript vs Rust (architectural deviation from spec)
+- Story 1.12: Tab integration deferred + ping_host uses blocking std::process::Command
 
-Story 1.7 was upgraded from CONCERNS to PASS after fixes: VirtualizedList created, DataTable column resize added, DiffViewer scroll sync implemented.
+Stories 1.7 and 1.8 were upgraded from CONCERNS to PASS after fixes:
+- 1.7: VirtualizedList created, DataTable column resize added, DiffViewer scroll sync implemented
+- 1.8: OUPicker, GroupPicker, DateTimePicker created with full test coverage
 
 ---
 
@@ -31,14 +32,14 @@ Story 1.7 was upgraded from CONCERNS to PASS after fixes: VirtualizedList create
 | 1.5 | App Shell, Navigation and Tab System | **PASS** | 90 |
 | 1.6 | Common Reusable Controls | **PASS** | 90 |
 | 1.7 | Data Display Components | **PASS** | 90 |
-| 1.8 | Form Controls, Validation | **CONCERNS** | 70 |
+| 1.8 | Form Controls, Validation | **PASS** | 90 |
 | 1.9 | Dialogs, Notifications, Feedback | **PASS** | 90 |
 | 1.10 | User Account Lookup | **PASS** | 90 |
 | 1.11 | Healthcheck Badge | **CONCERNS** | 80 |
 | 1.12 | Computer Account Lookup | **CONCERNS** | 80 |
 | 1.13 | Error Handling Foundation | **PASS** | 90 |
 
-**Overall Epic Score: 87/100**
+**Overall Epic Score: 89/100**
 
 ---
 
@@ -135,23 +136,20 @@ All seven data display components implemented: DataTable (sortable, selection, a
 
 ---
 
-### Story 1.8 - Form Controls, Validation: CONCERNS
+### Story 1.8 - Form Controls, Validation: PASS
 
-**ACs Met:** 8/12
-**Tests:** Present for implemented components
+**ACs Met:** 12/12
+**Tests:** 93 tests across 8 component test files
 
-Implemented: FormField, TextInput (with validation states), PasswordInput (show/hide toggle), ComboBox (searchable), useFormValidation hook, ValidationSummary, useChangeTracker (dirty tracking).
+All form components implemented: FormField, TextInput, PasswordInput, ComboBox, OUPicker (TreeView-based), GroupPicker (debounced search + TagChip), DateTimePicker (calendar + time), ValidationSummary, useFormValidation, useChangeTracker.
 
-**Issues Found:**
-| ID | Severity | Finding |
-|----|----------|---------|
-| FORM-001 | Medium | OUPicker component missing - no file exists |
-| FORM-002 | Medium | GroupPicker component missing - no file exists |
-| FORM-003 | Medium | DateTimePicker component missing - no file exists |
-
-**Mitigating Factor:** These 3 components depend on backend Tauri commands (OU tree, group search) that are not yet available. They will be needed by Epic 2+. Core form infrastructure is solid.
-
-**Story Tracking Note:** Same checkbox discrepancy as 1.7.
+**Issues Resolved (2026-03-13):**
+| ID | Severity | Finding | Resolution |
+|----|----------|---------|------------|
+| FORM-001 | Medium | OUPicker missing | Created with TreeView integration, lazy-load, loading/error states + 10 tests |
+| FORM-002 | Medium | GroupPicker missing | Created with debounced search, multi-select, TagChip display + 12 tests |
+| FORM-003 | Medium | DateTimePicker missing | Created with calendar popup, month nav, time picker + 25 tests |
+| TRACK-002 | Low | Task checkboxes unchecked | All checkboxes updated |
 
 ---
 
@@ -230,8 +228,8 @@ Excellent foundation. AppError and DirectoryError enums with LDAP code mapping. 
 5. **TypeScript strict mode** - Enforced across the entire frontend
 
 ### Areas for Improvement
-1. **Missing components** - OUPicker, GroupPicker, DateTimePicker need implementation
-2. **Story tracking hygiene** - Story 1.8 has unchecked task boxes despite "Done" status
+1. **Tauri command wiring** - OUPicker and GroupPicker need to be connected to backend commands when available
+2. **ping_host blocking** - Should use tokio::process::Command instead of std::process::Command
 3. **Storybook/Visual tests** - No visual regression testing setup yet
 4. **Integration tests** - No end-to-end or integration tests (only unit tests exist)
 5. **Accessibility** - ARIA attributes should be audited systematically across all components
@@ -248,9 +246,9 @@ Excellent foundation. AppError and DirectoryError enums with LDAP code mapping. 
 | ~~VirtualizedList~~ | ~~1.7~~ | ~~Medium~~ | Resolved 2026-03-13 |
 | ~~DataTable column resize~~ | ~~1.7~~ | ~~Low~~ | Resolved 2026-03-13 |
 | ~~DiffViewer scroll sync~~ | ~~1.7~~ | ~~Low~~ | Resolved 2026-03-13 |
-| OUPicker | 1.8 | Medium | Epic 2 (user management) |
-| GroupPicker | 1.8 | Medium | Epic 2 (user management) |
-| DateTimePicker | 1.8 | Low | When date input needed |
+| ~~OUPicker~~ | ~~1.8~~ | ~~Medium~~ | Resolved 2026-03-13 |
+| ~~GroupPicker~~ | ~~1.8~~ | ~~Medium~~ | Resolved 2026-03-13 |
+| ~~DateTimePicker~~ | ~~1.8~~ | ~~Low~~ | Resolved 2026-03-13 |
 | showCustomDialog | 1.9 | Low | When custom dialogs needed |
 | Tab integration for ComputerLookup | 1.12 | Medium | Before multi-lookup UX |
 | Healthcheck as Rust service | 1.11 | Low | Optional architecture alignment |
