@@ -19,7 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Data display components: DataTable (sortable, frozen columns), FilterBar, Pagination, PropertyGrid, TreeView, DiffViewer (Story 1.7)
 - CSV export utility with field escaping (csvExport.ts)
 - Diff color tokens for light and dark themes
-- 264 frontend tests (213 new for navigation, layout, common, and data components)
+- Form controls: FormField, TextInput, PasswordInput (show/hide), ComboBox (searchable), ValidationSummary (Story 1.8)
+- useFormValidation hook with field-level and form-level validation
+- useChangeTracker hook with dirty detection and beforeunload guard
+- Validators: isValidSamAccountName, isValidDistinguishedName, isRequired, isMinLength, isMaxLength
+- 349 frontend tests (298 new for navigation, layout, common, data, and form components)
 
 ### Changed
 
