@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { Calendar, ChevronLeft, ChevronRight, Clock, X } from "lucide-react";
+import { CalendarGrid } from "@/components/form/CalendarGrid";
 
 interface DateTimePickerProps {
   value: Date | null;
@@ -25,16 +26,6 @@ const MONTH_NAMES = [
   "December",
 ];
 
-const DAY_NAMES = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
-
-function getDaysInMonth(year: number, month: number): number {
-  return new Date(year, month + 1, 0).getDate();
-}
-
-function getFirstDayOfWeek(year: number, month: number): number {
-  return new Date(year, month, 1).getDay();
-}
-
 function formatDate(date: Date, includeTime: boolean): string {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -43,14 +34,6 @@ function formatDate(date: Date, includeTime: boolean): string {
   const hours = String(date.getHours()).padStart(2, "0");
   const minutes = String(date.getMinutes()).padStart(2, "0");
   return `${year}-${month}-${day} ${hours}:${minutes}`;
-}
-
-function isSameDay(a: Date, b: Date): boolean {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
 }
 
 export function DateTimePicker({
@@ -71,9 +54,6 @@ export function DateTimePicker({
   const containerRef = useRef<HTMLDivElement>(null);
 
   const today = useMemo(() => new Date(), []);
-
-  const daysInMonth = getDaysInMonth(viewYear, viewMonth);
-  const firstDay = getFirstDayOfWeek(viewYear, viewMonth);
 
   const handlePrevMonth = useCallback(() => {
     setViewMonth((prev) => {
@@ -228,52 +208,13 @@ export function DateTimePicker({
             </button>
           </div>
 
-          {/* Day headers */}
-          <div className="grid grid-cols-7 gap-0 mb-1">
-            {DAY_NAMES.map((day) => (
-              <div
-                key={day}
-                className="w-8 h-8 flex items-center justify-center text-caption text-[var(--color-text-secondary)] font-medium"
-              >
-                {day}
-              </div>
-            ))}
-          </div>
-
-          {/* Calendar days */}
-          <div
-            className="grid grid-cols-7 gap-0"
-            data-testid="date-time-calendar"
-          >
-            {/* Empty cells for offset */}
-            {Array.from({ length: firstDay }, (_, i) => (
-              <div key={`empty-${i}`} className="w-8 h-8" />
-            ))}
-            {/* Day cells */}
-            {Array.from({ length: daysInMonth }, (_, i) => {
-              const day = i + 1;
-              const date = new Date(viewYear, viewMonth, day);
-              const isSelected = value ? isSameDay(date, value) : false;
-              const isToday = isSameDay(date, today);
-
-              return (
-                <button
-                  key={day}
-                  onClick={() => handleSelectDay(day)}
-                  className={`w-8 h-8 flex items-center justify-center rounded-md text-caption transition-colors ${
-                    isSelected
-                      ? "bg-[var(--color-primary)] text-white font-medium"
-                      : isToday
-                        ? "border border-[var(--color-primary)] text-[var(--color-primary)]"
-                        : "text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]"
-                  }`}
-                  data-testid={`date-day-${day}`}
-                >
-                  {day}
-                </button>
-              );
-            })}
-          </div>
+          <CalendarGrid
+            viewYear={viewYear}
+            viewMonth={viewMonth}
+            value={value}
+            today={today}
+            onSelectDay={handleSelectDay}
+          />
 
           {/* Time picker */}
           {includeTime && value && (

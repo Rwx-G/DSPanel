@@ -29,6 +29,7 @@ export function GroupPicker({
   const [searchText, setSearchText] = useState("");
   const [results, setResults] = useState<GroupOption[]>([]);
   const [loading, setLoading] = useState(false);
+  const [searchError, setSearchError] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [highlightIndex, setHighlightIndex] = useState(-1);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -40,7 +41,7 @@ export function GroupPicker({
   const onSearchRef = useRef(onSearch);
   onSearchRef.current = onSearch;
 
-  // Debounced search
+  // Debounced search with cancellation for stale requests
   useEffect(() => {
     if (!searchText.trim()) {
       setResults([]);
@@ -48,20 +49,35 @@ export function GroupPicker({
       return;
     }
 
+    let cancelled = false;
     setLoading(true);
+    setSearchError(false);
     const timer = setTimeout(async () => {
       try {
         const searchResults = await onSearchRef.current(searchText);
-        setResults(
-          searchResults.filter((g) => !selectedDNs.current.has(g.distinguishedName)),
-        );
-        setIsOpen(true);
+        if (!cancelled) {
+          setResults(
+            searchResults.filter((g) => !selectedDNs.current.has(g.distinguishedName)),
+          );
+          setIsOpen(true);
+        }
+      } catch {
+        if (!cancelled) {
+          setResults([]);
+          setSearchError(true);
+          setIsOpen(true);
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     }, debounceMs);
 
-    return () => clearTimeout(timer);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [searchText, debounceMs]);
 
   const handleAddGroup = useCallback(
@@ -223,7 +239,16 @@ export function GroupPicker({
         </div>
       )}
 
-      {isOpen && !loading && results.length === 0 && searchText.trim() && (
+      {isOpen && !loading && searchError && (
+        <div
+          className="absolute z-20 mt-1 w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] shadow-md px-3 py-2 text-caption text-[var(--color-error)]"
+          data-testid="group-picker-error"
+        >
+          Search failed. Please try again.
+        </div>
+      )}
+
+      {isOpen && !loading && !searchError && results.length === 0 && searchText.trim() && (
         <div
           className="absolute z-20 mt-1 w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] shadow-md px-3 py-2 text-caption text-[var(--color-text-secondary)]"
           data-testid="group-picker-no-results"

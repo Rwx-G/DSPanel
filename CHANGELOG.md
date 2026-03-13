@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Epic 1 - Foundation and Core Lookup. Full rewrite from C#/WPF to Rust/Tauri v2 + React/TypeScript.
 Cross-platform (Windows, macOS, Linux), lightweight native binary (~8.5 MB).
 
+Code quality pass across Rust backend and React frontend: accessibility (WCAG focus traps,
+ARIA live regions, skip-to-main link), error resilience (per-user health checks, stale request
+cancellation, explicit error logging), performance (React.memo, concurrency-limited batch ops),
+and maintainability (shared hooks and components to eliminate duplication).
+
 ### Added
 
 - Project skeleton: Tauri v2 + React/TS, tracing logging, panic hook (1.1)

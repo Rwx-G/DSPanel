@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { DialogShell } from "@/components/dialogs/DialogShell";
 
 interface ProgressDialogProps {
   statusMessage: string;
@@ -28,19 +29,16 @@ export function ProgressDialog({
   }, [cancellable, onCancel]);
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--color-surface-overlay)]"
-      data-testid="progress-overlay"
+    <DialogShell
+      maxWidth="sm"
+      ariaLabel={statusMessage}
+      overlayTestId="progress-overlay"
+      dialogTestId="progress-dialog"
     >
-      <div
-        className="mx-4 w-full max-w-sm rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-4 shadow-lg"
-        role="dialog"
-        aria-modal="true"
-        aria-label={statusMessage}
-        data-testid="progress-dialog"
-      >
+      <div className="p-4">
         <p
           className="mb-3 text-body text-[var(--color-text-primary)]"
+          aria-live="polite"
           data-testid="progress-message"
         >
           {statusMessage}
@@ -85,6 +83,6 @@ export function ProgressDialog({
           </div>
         )}
       </div>
-    </div>
+    </DialogShell>
   );
 }

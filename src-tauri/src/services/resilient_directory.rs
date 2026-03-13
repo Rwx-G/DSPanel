@@ -9,6 +9,36 @@ use crate::models::DirectoryEntry;
 use crate::services::directory::DirectoryProvider;
 use crate::services::resilience::{retry_with_backoff, CircuitBreaker, RetryConfig};
 
+/// Executes a directory operation with retry and circuit breaker protection.
+///
+/// Two forms:
+/// - `resilient_call!(self, |inner| expr)` - no captured args
+/// - `resilient_call!(self, arg, |inner, a| expr)` - one captured String arg
+macro_rules! resilient_call {
+    ($self:ident, |$inner:ident| $body:expr) => {{
+        let $inner = $self.inner.clone();
+        $self
+            .execute_with_resilience(|| {
+                let $inner = $inner.clone();
+                async move { $body }
+            })
+            .await
+            .map_err(|e| anyhow::anyhow!(e))
+    }};
+    ($self:ident, $arg:ident, |$inner:ident, $a:ident| $body:expr) => {{
+        let inner_ref = $self.inner.clone();
+        let arg_val = $arg;
+        $self
+            .execute_with_resilience(|| {
+                let $inner = inner_ref.clone();
+                let $a = arg_val.clone();
+                async move { $body }
+            })
+            .await
+            .map_err(|e| anyhow::anyhow!(e))
+    }};
+}
+
 /// A decorator around `DirectoryProvider` that adds retry and circuit breaker
 /// resilience to all directory operations.
 ///
@@ -125,25 +155,14 @@ where
     }
 
     async fn test_connection(&self) -> Result<bool> {
-        let inner = self.inner.clone();
-        self.execute_with_resilience(|| {
-            let inner = inner.clone();
-            async move { inner.test_connection().await }
-        })
-        .await
-        .map_err(|e| anyhow::anyhow!(e))
+        resilient_call!(self, |inner| inner.test_connection().await)
     }
 
     async fn search_users(&self, filter: &str, max_results: usize) -> Result<Vec<DirectoryEntry>> {
-        let inner = self.inner.clone();
         let filter = filter.to_string();
-        self.execute_with_resilience(|| {
-            let inner = inner.clone();
-            let f = filter.clone();
-            async move { inner.search_users(&f, max_results).await }
-        })
-        .await
-        .map_err(|e| anyhow::anyhow!(e))
+        resilient_call!(self, filter, |inner, f| inner
+            .search_users(&f, max_results)
+            .await)
     }
 
     async fn search_computers(
@@ -151,39 +170,24 @@ where
         filter: &str,
         max_results: usize,
     ) -> Result<Vec<DirectoryEntry>> {
-        let inner = self.inner.clone();
         let filter = filter.to_string();
-        self.execute_with_resilience(|| {
-            let inner = inner.clone();
-            let f = filter.clone();
-            async move { inner.search_computers(&f, max_results).await }
-        })
-        .await
-        .map_err(|e| anyhow::anyhow!(e))
+        resilient_call!(self, filter, |inner, f| inner
+            .search_computers(&f, max_results)
+            .await)
     }
 
     async fn search_groups(&self, filter: &str, max_results: usize) -> Result<Vec<DirectoryEntry>> {
-        let inner = self.inner.clone();
         let filter = filter.to_string();
-        self.execute_with_resilience(|| {
-            let inner = inner.clone();
-            let f = filter.clone();
-            async move { inner.search_groups(&f, max_results).await }
-        })
-        .await
-        .map_err(|e| anyhow::anyhow!(e))
+        resilient_call!(self, filter, |inner, f| inner
+            .search_groups(&f, max_results)
+            .await)
     }
 
     async fn get_user_by_identity(&self, sam_account_name: &str) -> Result<Option<DirectoryEntry>> {
-        let inner = self.inner.clone();
         let sam = sam_account_name.to_string();
-        self.execute_with_resilience(|| {
-            let inner = inner.clone();
-            let s = sam.clone();
-            async move { inner.get_user_by_identity(&s).await }
-        })
-        .await
-        .map_err(|e| anyhow::anyhow!(e))
+        resilient_call!(self, sam, |inner, s| inner
+            .get_user_by_identity(&s)
+            .await)
     }
 
     async fn get_group_members(
@@ -191,25 +195,14 @@ where
         group_dn: &str,
         max_results: usize,
     ) -> Result<Vec<DirectoryEntry>> {
-        let inner = self.inner.clone();
         let dn = group_dn.to_string();
-        self.execute_with_resilience(|| {
-            let inner = inner.clone();
-            let d = dn.clone();
-            async move { inner.get_group_members(&d, max_results).await }
-        })
-        .await
-        .map_err(|e| anyhow::anyhow!(e))
+        resilient_call!(self, dn, |inner, d| inner
+            .get_group_members(&d, max_results)
+            .await)
     }
 
     async fn get_current_user_groups(&self) -> Result<Vec<String>> {
-        let inner = self.inner.clone();
-        self.execute_with_resilience(|| {
-            let inner = inner.clone();
-            async move { inner.get_current_user_groups().await }
-        })
-        .await
-        .map_err(|e| anyhow::anyhow!(e))
+        resilient_call!(self, |inner| inner.get_current_user_groups().await)
     }
 }
 

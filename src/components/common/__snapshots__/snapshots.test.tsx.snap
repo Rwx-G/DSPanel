@@ -209,6 +209,7 @@ exports[`Common controls - visual snapshots > SearchBar renders correctly 1`] = 
     />
   </svg>
   <input
+    aria-label="Search users..."
     class="flex-1 bg-transparent text-body text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-secondary)]"
     data-testid="search-input"
     placeholder="Search users..."

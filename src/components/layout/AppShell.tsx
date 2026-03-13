@@ -115,9 +115,16 @@ export function AppShell({ statusBarProps, children }: AppShellProps) {
       className="flex h-screen flex-col bg-[var(--color-surface-bg)]"
       data-testid="app-shell"
     >
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:z-[100] focus:rounded-md focus:bg-[var(--color-primary)] focus:px-4 focus:py-2 focus:text-white"
+        data-testid="skip-to-main"
+      >
+        Skip to main content
+      </a>
       <div className="flex flex-1 overflow-hidden">
         <Sidebar expanded={sidebarExpanded} onToggle={handleToggleSidebar} />
-        <main aria-label="Main content" className="flex flex-1 flex-col overflow-hidden">
+        <main id="main-content" aria-label="Main content" className="flex flex-1 flex-col overflow-hidden">
           <Breadcrumbs />
           <TabBar />
           <div className="flex-1 overflow-auto">{children}</div>

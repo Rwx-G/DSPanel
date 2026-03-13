@@ -1,5 +1,4 @@
 pub mod commands;
-pub mod db;
 pub mod error;
 pub mod logging;
 pub mod models;

@@ -59,37 +59,37 @@ export function App() {
           isConnected: info.is_connected,
         }));
       })
-      .catch(() => {});
+      .catch((e) => console.warn("Failed to get domain info:", e));
 
     invoke<boolean>("check_connection")
       .then((connected) => {
         setStatus((s) => ({ ...s, isConnected: connected }));
       })
-      .catch(() => {});
+      .catch((e) => console.warn("Failed to check connection:", e));
 
     invoke<string>("get_permission_level")
       .then((level) => {
         setStatus((s) => ({ ...s, permissionLevel: level }));
       })
-      .catch(() => {});
+      .catch((e) => console.warn("Failed to get permission level:", e));
 
     invoke<string>("get_current_username")
       .then((name) => {
         setStatus((s) => ({ ...s, username: name }));
       })
-      .catch(() => {});
+      .catch((e) => console.warn("Failed to get username:", e));
 
     invoke<string>("get_computer_name")
       .then((name) => {
         setStatus((s) => ({ ...s, computerName: name }));
       })
-      .catch(() => {});
+      .catch((e) => console.warn("Failed to get computer name:", e));
 
     invoke<string[]>("get_user_groups")
       .then((groups) => {
         setStatus((s) => ({ ...s, userGroups: groups }));
       })
-      .catch(() => {});
+      .catch((e) => console.warn("Failed to get user groups:", e));
   }, []);
 
   return (

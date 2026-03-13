@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useId } from "react";
 import { CheckCircle, AlertTriangle, AlertCircle, Info } from "lucide-react";
 import type { AccountHealthStatus, HealthLevel } from "@/types/health";
 
@@ -22,6 +22,7 @@ interface HealthBadgeProps {
 
 export function HealthBadge({ healthStatus }: HealthBadgeProps) {
   const [showTooltip, setShowTooltip] = useState(false);
+  const tooltipId = useId();
   const Icon = LEVEL_ICON[healthStatus.level];
   const flagCount = healthStatus.activeFlags.length;
 
@@ -35,6 +36,7 @@ export function HealthBadge({ healthStatus }: HealthBadgeProps) {
       tabIndex={0}
       role="status"
       aria-label={`Health: ${healthStatus.level}${flagCount > 0 ? `, ${flagCount} issue${flagCount > 1 ? "s" : ""}` : ""}`}
+      aria-describedby={showTooltip ? tooltipId : undefined}
       data-testid="health-badge"
       data-level={healthStatus.level}
     >
@@ -49,6 +51,8 @@ export function HealthBadge({ healthStatus }: HealthBadgeProps) {
 
       {showTooltip && (
         <div
+          id={tooltipId}
+          role="tooltip"
           className="absolute left-1/2 top-full z-50 mt-1 w-64 -translate-x-1/2 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-2 shadow-lg"
           data-testid="health-tooltip"
         >

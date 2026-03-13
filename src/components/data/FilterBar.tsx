@@ -75,6 +75,7 @@ export function FilterBar({
         value={textValue}
         onChange={(e) => setTextValue(e.target.value)}
         placeholder={placeholder}
+        aria-label={placeholder}
         className="flex-1 min-w-[120px] bg-transparent text-body text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-secondary)]"
         data-testid="filter-text-input"
       />

@@ -22,6 +22,7 @@ pub fn init_logging(log_dir: &str) {
     // and close the non-blocking writer, silently losing subsequent log
     // entries. Since Tauri has no pre-exit hook to drop it gracefully,
     // leaking is the standard approach for process-lifetime logging.
+    #[allow(clippy::mem_forget)]
     std::mem::forget(_guard);
 
     let file_layer = fmt::layer()

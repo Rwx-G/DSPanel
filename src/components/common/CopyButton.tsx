@@ -17,10 +17,14 @@ export function CopyButton({ text, feedbackMs = 2000 }: CopyButtonProps) {
   }, []);
 
   const handleCopy = useCallback(async () => {
-    await navigator.clipboard.writeText(text);
-    setCopied(true);
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => setCopied(false), feedbackMs);
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => setCopied(false), feedbackMs);
+    } catch {
+      console.warn("Clipboard write failed - permission denied or API unavailable");
+    }
   }, [text, feedbackMs]);
 
   return (

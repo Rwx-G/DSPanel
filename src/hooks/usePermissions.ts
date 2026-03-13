@@ -16,7 +16,8 @@ export function usePermissions() {
         setLevel(permLevel);
         setGroups(userGroups);
       })
-      .catch(() => {
+      .catch((e) => {
+        console.warn("Failed to load permissions, defaulting to ReadOnly:", e);
         setLevel("ReadOnly");
         setGroups([]);
       })
