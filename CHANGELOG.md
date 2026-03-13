@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Application shell with collapsible sidebar, tab bar, breadcrumbs, and status bar (Story 1.5)
+- NavigationContext with tab management: open, close, closeAll, activate, move, deduplication by moduleId
+- Keyboard shortcuts: Ctrl+B (toggle sidebar), Ctrl+W (close tab), Ctrl+Tab/Shift+Tab (cycle tabs), Ctrl+1-9 (jump to tab)
+- Auto-collapse sidebar at narrow window widths (<900px)
+- StatusBar with connection indicator, domain info, permission badge, and app version
+- 110 frontend tests (59 new for navigation and layout components)
+
 ### Changed
 
 - All documentation (~45 files) migrated from C#/WPF/.NET references to Rust/Tauri v2 + React/TypeScript
