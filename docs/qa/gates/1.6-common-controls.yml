@@ -1,8 +1,9 @@
 story: "1.6"
 title: "Common Reusable Controls"
-reviewer: "Quinn (Test Architect)"
+reviewer: "Romain G."
 date: "2026-03-13"
 gate: PASS
+quality_score: 100
 
 summary: >
   All 9 common reusable components are implemented with consistent

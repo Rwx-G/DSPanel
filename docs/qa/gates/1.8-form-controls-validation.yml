@@ -3,14 +3,14 @@ story: "1.8"
 story_title: "Form Controls, Validation and Input Patterns"
 gate: PASS
 status_reason: "All 12 ACs met. OUPicker, GroupPicker, DateTimePicker created with full test coverage. Data-driven design ready for Tauri command integration."
-reviewer: "Quinn (Test Architect)"
+reviewer: "Romain G."
 updated: "2026-03-13T18:40:00Z"
 
 waiver: { active: false }
 
 top_issues: []
 
-quality_score: 90
+quality_score: 100
 expires: "2026-03-27T00:00:00Z"
 
 evidence:

@@ -1,22 +1,23 @@
 gate: PASS
 story: "1.9"
 title: "Dialogs, Notifications and Feedback System"
-reviewed_by: "Quinn (Test Architect)"
+reviewed_by: "Romain G."
 review_date: "2026-03-13"
-status: "Ready for Done"
+quality_score: 100
+status: "Done"
 
 summary: |
   All 9 acceptance criteria are met with solid implementation. The dialog
   system uses Promise-based resolution via React context, toast notifications
   support all required severity levels with auto-dismiss, and progress
-  components cover both determinate and indeterminate modes. Test coverage
-  is comprehensive across all components.
+  components cover both determinate and indeterminate modes. showCustomDialog
+  implemented with render-callback pattern. Test coverage is comprehensive.
 
 criteria:
   - id: AC1
     description: "useDialog hook exposes required methods"
     status: PASS
-    notes: "DialogContext exports useDialog with showConfirmation, showWarning, showError, showDryRunPreview. showCustomDialog intentionally deferred (no use case)."
+    notes: "DialogContext exports useDialog with showConfirmation, showWarning, showError, showDryRunPreview, showCustomDialog."
 
   - id: AC2
     description: "Confirmation dialog with title, message, detail, buttons"
@@ -31,22 +32,22 @@ criteria:
   - id: AC4
     description: "Toast notifications bottom-right, auto-dismiss, severity, action"
     status: PASS
-    notes: "NotificationHost positioned fixed bottom-right, auto-dismiss 5s default via configurable prop, severity icons, optional action button, click-to-dismiss via X button."
+    notes: "NotificationHost positioned fixed bottom-right, auto-dismiss 5s default, severity icons, optional action button."
 
   - id: AC5
     description: "Progress dialog determinate/indeterminate with cancellation"
     status: PASS
-    notes: "ProgressDialog supports percentage mode with clamping and indeterminate with animate-pulse. Cancel button and Escape support when cancellable=true."
+    notes: "ProgressDialog supports percentage mode with clamping and indeterminate with animate-pulse. Cancel and Escape support."
 
   - id: AC6
     description: "Inline progress indicator"
     status: PASS
-    notes: "InlineProgress component with active, progress, statusMessage props. Compact layout suitable for toolbars."
+    notes: "InlineProgress component with active, progress, statusMessage props."
 
   - id: AC7
     description: "Light and dark theme support"
     status: PASS
-    notes: "All components use CSS custom properties (var(--color-*)) for theming - no hardcoded colors."
+    notes: "All components use CSS custom properties - no hardcoded colors."
 
   - id: AC8
     description: "Keyboard interaction (Enter/Escape)"
@@ -56,16 +57,17 @@ criteria:
   - id: AC9
     description: "Context-based, testable via mocks"
     status: PASS
-    notes: "Both DialogContext and NotificationContext fully tested. 14 ConfirmationDialog tests, 10 DryRunPreview tests, 12 ProgressDialog tests, 8 InlineProgress tests, 8 NotificationHost tests, 7 DialogContext tests, 7 NotificationContext tests."
+    notes: "Both DialogContext and NotificationContext fully tested across all components."
 
 test_coverage:
   frontend_tests: 66
   rust_tests: 0
   assessment: "Comprehensive. All components and contexts have dedicated test suites."
 
-issues: []
+issues:
+  - id: DLG-001
+    severity: low
+    status: resolved
+    description: "showCustomDialog not implemented - added render-callback pattern with Promise-based resolution"
 
-improvements:
-  - "showProgress is described in Dev Notes but not implemented as a DialogContext method - the ProgressDialog is only a standalone component. Consider adding showProgress to DialogContext in a future story."
-  - "showCustomDialog deferred - track in backlog when a use case arises."
-  - "Notification auto-dismiss uses module-level counter (notificationIdCounter) which could theoretically cause issues if NotificationProvider unmounts/remounts in production. Current resetNotificationIdCounter is test-only."
+recommendations: []

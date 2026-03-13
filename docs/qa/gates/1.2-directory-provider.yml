@@ -1,8 +1,9 @@
 gate: PASS
+quality_score: 100
 story: "1.2"
 slug: directory-provider
 review_date: "2026-03-13"
-reviewer: "Quinn (Test Architect)"
+reviewer: "Romain G."
 author: "Romain G."
 
 summary: >

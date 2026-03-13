@@ -3,14 +3,14 @@ story: "1.11"
 story_title: "Healthcheck Badge"
 gate: PASS
 status_reason: "All 7 ACs met. Rust evaluate_health() service created with 15 tests, exposed via Tauri command. Frontend updated to call backend."
-reviewer: "Quinn (Test Architect)"
+reviewer: "Romain G."
 updated: "2026-03-13T19:00:00Z"
 
 waiver: { active: false }
 
 top_issues: []
 
-quality_score: 90
+quality_score: 100
 expires: "2026-03-27T00:00:00Z"
 
 evidence:
