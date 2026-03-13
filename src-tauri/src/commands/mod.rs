@@ -58,6 +58,68 @@ pub async fn get_user(
         .map_err(|e| AppError::Directory(e.to_string()))
 }
 
+/// Searches for computer accounts matching the query string.
+#[tauri::command]
+pub async fn search_computers(
+    query: String,
+    state: State<'_, AppState>,
+) -> Result<Vec<DirectoryEntry>, AppError> {
+    let provider = state.directory_provider.clone();
+    provider
+        .search_computers(&query, 50)
+        .await
+        .map_err(|e| AppError::Directory(e.to_string()))
+}
+
+/// Pings a hostname and returns the result string.
+#[tauri::command]
+pub async fn ping_host(hostname: String) -> Result<String, AppError> {
+    use std::process::Command;
+    use std::time::Instant;
+
+    let start = Instant::now();
+
+    #[cfg(target_os = "windows")]
+    let output = Command::new("ping")
+        .args(["-n", "1", "-w", "3000", &hostname])
+        .output();
+
+    #[cfg(not(target_os = "windows"))]
+    let output = Command::new("ping")
+        .args(["-c", "1", "-W", "3", &hostname])
+        .output();
+
+    match output {
+        Ok(result) => {
+            let elapsed = start.elapsed().as_millis();
+            if result.status.success() {
+                Ok(format!("Reachable ({}ms)", elapsed))
+            } else {
+                Ok("Unreachable".to_string())
+            }
+        }
+        Err(_) => Ok("Unreachable".to_string()),
+    }
+}
+
+/// Resolves a hostname to IP addresses.
+#[tauri::command]
+pub async fn resolve_dns(hostname: String) -> Result<Vec<String>, AppError> {
+    use tokio::net::lookup_host;
+
+    match lookup_host(format!("{}:0", hostname)).await {
+        Ok(addrs) => {
+            let ips: Vec<String> = addrs.map(|a| a.ip().to_string()).collect();
+            if ips.is_empty() {
+                Err(AppError::Network("No addresses found".to_string()))
+            } else {
+                Ok(ips)
+            }
+        }
+        Err(e) => Err(AppError::Network(format!("DNS resolution failed: {}", e))),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -62,6 +62,36 @@ export function mapEntryToUser(entry: DirectoryEntry): DirectoryUser {
   };
 }
 
+export interface DirectoryComputer {
+  distinguishedName: string;
+  name: string;
+  dnsHostName: string;
+  operatingSystem: string;
+  osVersion: string;
+  lastLogon: string | null;
+  organizationalUnit: string;
+  enabled: boolean;
+  memberOf: string[];
+}
+
+export function mapEntryToComputer(entry: DirectoryEntry): DirectoryComputer {
+  const attr = (name: string): string => entry.attributes[name]?.[0] ?? "";
+  const attrList = (name: string): string[] => entry.attributes[name] ?? [];
+  const uac = parseInt(attr("userAccountControl") || "0", 10);
+
+  return {
+    distinguishedName: entry.distinguishedName,
+    name: entry.displayName ?? entry.samAccountName?.replace(/\$$/, "") ?? "",
+    dnsHostName: attr("dNSHostName"),
+    operatingSystem: attr("operatingSystem"),
+    osVersion: attr("operatingSystemVersion"),
+    lastLogon: attr("lastLogon") || null,
+    organizationalUnit: parseOuFromDn(entry.distinguishedName),
+    enabled: (uac & 0x0002) === 0,
+    memberOf: attrList("memberOf"),
+  };
+}
+
 function parseOuFromDn(dn: string): string {
   const parts = dn.split(",");
   const ous = parts

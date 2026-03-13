@@ -34,6 +34,9 @@ pub fn run() {
             commands::has_permission,
             commands::search_users,
             commands::get_user,
+            commands::search_computers,
+            commands::ping_host,
+            commands::resolve_dns,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
