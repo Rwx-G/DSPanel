@@ -127,9 +127,15 @@ impl LdapDirectoryProvider {
 
         tokio::spawn(conn.drive());
 
+        #[cfg(feature = "gssapi")]
         ldap.sasl_gssapi_bind(domain)
             .await
             .context("GSSAPI (Kerberos) authentication failed")?;
+
+        #[cfg(not(feature = "gssapi"))]
+        ldap.simple_bind("", "")
+            .await
+            .context("Anonymous LDAP bind failed (build without gssapi feature)")?;
 
         // Discover base DN via rootDSE
         let (rs, _) = ldap

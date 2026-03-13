@@ -32,6 +32,7 @@ Desktop.ini
 
 # Logs
 logs/
+*.err
 
 # Claude Code
 .claude/memory/
