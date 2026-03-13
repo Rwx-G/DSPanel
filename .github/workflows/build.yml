@@ -8,69 +8,97 @@ on:
 
 jobs:
   build:
-    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    runs-on: ${{ matrix.os }}
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
         with:
-          dotnet-version: 10.0.x
+          components: rustfmt, clippy
 
-      - name: Restore tools
-        run: dotnet tool restore
-
-      - name: Restore dependencies
-        run: dotnet restore
-
-      - name: Check formatting
-        run: dotnet format --verify-no-changes --severity error
-
-      - name: Build
-        run: dotnet build --no-restore --configuration Release
-
-      - name: Test with coverage
-        run: >
-          dotnet test --no-build --configuration Release
-          --verbosity normal
-          --collect:"XPlat Code Coverage"
-          --settings coverlet.runsettings
-          --results-directory TestResults
-
-      - name: Upload coverage report
-        if: always()
-        uses: actions/upload-artifact@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          name: coverage-report
-          path: TestResults/**/coverage.cobertura.xml
-          retention-days: 14
+          node-version: 20
 
-      - name: Check for vulnerable packages
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: latest
+          run_install: false
+
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_OUTPUT
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: ${{ runner.os }}-pnpm-
+
+      - name: Cache cargo registry and build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src-tauri/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('src-tauri/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
         run: |
-          $output = dotnet list package --vulnerable --include-transitive 2>&1
-          $output | Write-Host
-          if ($output -match "has the following vulnerable packages") {
-            Write-Warning "Vulnerable packages detected"
-            exit 1
-          }
-        shell: pwsh
-        continue-on-error: true
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libssl-dev libayatana-appindicator3-dev librsvg2-dev
 
-      - name: Publish self-contained exe
+      - name: Install frontend dependencies
+        run: pnpm install
+
+      - name: Check Rust formatting
+        working-directory: src-tauri
+        run: cargo fmt --check
+
+      - name: Run Clippy
+        working-directory: src-tauri
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Run Rust tests
+        working-directory: src-tauri
+        run: cargo test
+
+      - name: Run frontend lint
+        run: pnpm lint
+
+      - name: Run frontend tests
+        run: pnpm test
+
+      - name: Build Tauri app
         if: github.ref == 'refs/heads/main'
-        run: >
-          dotnet publish src/DSPanel/DSPanel.csproj
-          --configuration Release
-          --output publish/win-x64
-          --self-contained true
-          --runtime win-x64
-          -p:PublishSingleFile=true
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: --verbose
 
       - name: Upload build artifact
         if: github.ref == 'refs/heads/main'
         uses: actions/upload-artifact@v4
         with:
-          name: DSPanel-win-x64
-          path: publish/win-x64/
+          name: DSPanel-${{ matrix.os }}
+          path: |
+            src-tauri/target/release/bundle/**/*.msi
+            src-tauri/target/release/bundle/**/*.dmg
+            src-tauri/target/release/bundle/**/*.AppImage
+            src-tauri/target/release/bundle/**/*.deb
           retention-days: 30

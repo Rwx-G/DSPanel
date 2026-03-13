@@ -21,9 +21,9 @@ Closes #
 
 ## Checklist
 
-- [ ] Code follows the project coding standards (`.editorconfig`, `dotnet format`)
+- [ ] Code follows the project coding standards (`cargo fmt`, `cargo clippy`, `eslint`, `prettier`)
 - [ ] Tests added/updated for changes
-- [ ] All existing tests pass (`dotnet test`)
+- [ ] All existing tests pass (`cargo test` and `pnpm test`)
 - [ ] Documentation updated if needed
 - [ ] CHANGELOG.md updated under `[Unreleased]`
 - [ ] No secrets or sensitive data in committed files

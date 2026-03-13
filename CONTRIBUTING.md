@@ -29,36 +29,66 @@ Thank you for your interest in contributing to DSPanel! This document provides g
 
 ### Prerequisites
 
-- .NET 10.0 SDK
-- Windows 10/11 with WPF support
-- An Active Directory test environment (for integration testing)
+- Rust (stable toolchain) - install via [rustup](https://rustup.rs/)
+- Node.js 20+
+- pnpm (`npm install -g pnpm`)
+- Platform-specific Tauri dependencies:
+  - **Linux**: `sudo apt install libwebkit2gtk-4.1-dev build-essential curl wget file libssl-dev libayatana-appindicator3-dev librsvg2-dev`
+  - **macOS**: Xcode Command Line Tools (`xcode-select --install`)
+  - **Windows**: Microsoft Visual Studio C++ Build Tools, WebView2
 
 ### Build and Test
 
 ```bash
-dotnet restore
-dotnet build
-dotnet test
+# Install frontend dependencies
+pnpm install
+
+# Run in development mode (hot-reload)
+cargo tauri dev
+
+# Run Rust tests
+cargo test
+
+# Run frontend tests
+pnpm test
+
+# Check Rust formatting
+cargo fmt --check
+
+# Run Rust linter
+cargo clippy
+
+# Run frontend linter
+pnpm lint
+
+# Build release binary
+cargo tauri build
 ```
 
 ## Coding Standards
 
-### Conventions
+### Rust Conventions
 
-- **Language**: C# 12 with nullable reference types enabled
-- **Style**: Follow `.editorconfig` rules, run `dotnet format` before committing
-- **Namespaces**: File-scoped (`namespace DSPanel.Services;`)
-- **Private fields**: `_camelCase` prefix
-- **Async methods**: `Async` suffix
-- **Interfaces**: `I` prefix
+- **Edition**: Rust 2021
+- **Formatting**: Run `cargo fmt` before committing
+- **Linting**: `cargo clippy` must pass with no warnings
+- **Error handling**: Use `thiserror` for library errors, `anyhow` for application errors
+- **Naming**: snake_case for functions/variables, PascalCase for types, SCREAMING_SNAKE_CASE for constants
+
+### TypeScript/React Conventions
+
+- **Style**: Follow ESLint + Prettier rules (configured in the project)
+- **Components**: Functional components with hooks
+- **State management**: React state + Tauri IPC commands
+- **Naming**: camelCase for variables/functions, PascalCase for components and types
 
 ### Architecture Rules
 
-- All AD operations go through `IDirectoryProvider` - never instantiate LDAP/Graph clients directly
-- Every write operation must check permissions via `IPermissionService.HasPermission()`
-- Every write operation must create a snapshot via `ISnapshotService.CaptureAsync()`
-- Every write operation must be logged via `IAuditService.LogAsync()`
-- No blocking calls on the UI thread - use `async/await` for all I/O
+- All AD operations go through the Rust backend via Tauri commands - never call LDAP directly from the frontend
+- Every write operation must check permissions before execution
+- Every write operation must create a snapshot for rollback
+- Every write operation must be logged for audit
+- Keep the frontend responsive - use async Tauri commands for all I/O
 
 ### Commit Messages
 
@@ -77,8 +107,8 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 
 ### Tests
 
-- Mirror the source tree: `src/DSPanel/Services/Foo.cs` -> `src/DSPanel.Tests/Services/FooTests.cs`
-- Use xUnit + Moq + FluentAssertions
+- **Rust**: Place unit tests in `#[cfg(test)] mod tests` blocks within each module; integration tests go in `src-tauri/tests/`
+- **Frontend**: Place tests alongside components as `*.test.tsx` files; use Vitest + React Testing Library
 - Follow AAA pattern (Arrange, Act, Assert)
 - Target 90%+ coverage on core services
 

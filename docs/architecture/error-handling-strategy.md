@@ -2,18 +2,19 @@
 
 ### General Approach
 
-- **Error Model**: Exception-based with custom exception hierarchy
-- **Exception Hierarchy**: DSPanelException (base) -> DirectoryException, PermissionDeniedException, PresetValidationException, ExportException, NetworkException
-- **Error Propagation**: Services throw typed exceptions. ViewModels catch and display user-friendly messages. Unhandled exceptions caught by global handler.
+- **Error Model**: Rust `Result<T, E>` with typed error enums via thiserror, propagated with the `?` operator
+- **Error Hierarchy**: `DsPanelError` (enum) with variants: DirectoryError, PermissionDeniedError, PresetValidationError, ExportError, NetworkError, DatabaseError
+- **Error Propagation**: Rust services return `Result<T, DsPanelError>`. Tauri commands convert errors to serializable responses. React components display user-friendly messages via notification context.
+- **Frontend Errors**: Tauri `invoke()` rejects with error string on Rust errors. React error boundaries catch rendering failures.
 
 ### Logging Standards
 
-- **Library**: Serilog 4.x
-- **Format**: Structured JSON to file, plain text to console (debug only)
-- **Levels**: Verbose (trace), Debug (development), Information (operations), Warning (recoverable issues), Error (failures), Fatal (app crash)
+- **Library**: tracing crate with tracing-subscriber
+- **Format**: Structured JSON to file (tracing-appender with daily rotation), plain text to console (debug only)
+- **Levels**: TRACE, DEBUG, INFO, WARN, ERROR
 - **Required Context**:
-    - Operation context: current action type (Lookup, PasswordReset, GroupModify, etc.)
-    - User context: current Windows username (never log passwords or tokens)
+    - Operation context: current action type (Lookup, PasswordReset, GroupModify, etc.) via tracing spans
+    - User context: current OS username (never log passwords or tokens)
     - Target context: AD object DN being operated on
 
 ### Error Handling Patterns
@@ -22,20 +23,19 @@
 
 - **Retry Policy**: Exponential backoff (1s, 2s, 4s) with max 3 retries for transient failures (network timeout, 429, 503)
 - **Circuit Breaker**: After 5 consecutive failures to a provider, disable that provider and show status bar warning
-- **Timeout Configuration**: LDAP queries 30s, Graph API 15s, HIBP 5s, WMI 10s
-- **Error Translation**: All external errors wrapped in typed DSPanelExceptions with user-friendly messages
+- **Timeout Configuration**: LDAP queries 30s, Graph API 15s, HIBP 5s
+- **Error Translation**: All external errors mapped to DsPanelError variants with user-friendly messages
 
 #### Business Logic Errors
 
-- **Custom Exceptions**: PermissionDeniedException, ObjectNotFoundException, PresetValidationException, SnapshotNotFoundException
-- **User-Facing Errors**: Displayed in a notification bar (non-modal) with severity icon (info/warning/error)
-- **Error Codes**: Not used - exception types are sufficient for a desktop app
+- **Error Variants**: PermissionDeniedError, ObjectNotFoundError, PresetValidationError, SnapshotNotFoundError
+- **User-Facing Errors**: Displayed in a notification toast (non-modal) with severity icon (info/warning/error) via React NotificationContext
+- **Error Codes**: Not used - error enum variants are sufficient for a desktop app
 
 #### Data Consistency
 
-- **Transaction Strategy**: SQLite transactions for audit log batch writes
+- **Transaction Strategy**: SQLite transactions (rusqlite) for audit log batch writes
 - **Compensation Logic**: Object snapshots enable rollback of AD modifications
 - **Idempotency**: Group membership operations check current state before applying
 
 ---
-

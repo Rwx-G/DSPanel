@@ -14,7 +14,7 @@ Author: Romain G.
 
 ### Level 1 - Reference Tokens (raw palette)
 
-Defined in LightTheme.xaml / DarkTheme.xaml as `Color` resources.
+Defined in light-theme.css / dark-theme.css as CSS custom properties.
 
 ### Level 2 - Semantic Tokens (functional role)
 
@@ -132,7 +132,7 @@ Map semantic tokens to specific components (sidebar.background, tab.active.borde
 
 - **Keyboard**: All controls reachable via Tab, logical tab order
 - **Focus indicators**: 2px outline, 3:1 contrast minimum
-- **AutomationProperties.Name**: On every interactive WPF control
+- **aria-label**: On every interactive element (buttons, inputs, links)
 - **Shortcuts documented**: F1 or ? shows shortcut list
   - Ctrl+K: Search
   - Ctrl+B: Toggle sidebar
@@ -143,14 +143,14 @@ Map semantic tokens to specific components (sidebar.background, tab.active.borde
 - **High contrast**: Test with Windows High Contrast mode
 - **Minimum text size**: 12px secondary, 14px primary
 
-## WPF-Specific Rules
+## React/Tauri-Specific Rules
 
-- **Never block UI thread**: All AD queries via async/await
-- **VirtualizingStackPanel**: On all lists that may exceed ~50 items
-- **Freeze()**: Call on static Freezable objects (brushes, geometries)
-- **Animate only Opacity and RenderTransform**: Never Width/Height/Margin (triggers layout pass)
-- **DPI**: Test on multi-monitor setups with different DPI
-- **Resource loading**: Theme dictionaries in App.xaml, single parse point
+- **Never block the main thread**: All AD queries via async Tauri commands (invoke), use React Suspense or loading states
+- **Virtualized lists**: Use react-window or react-virtuoso for lists that may exceed ~50 items
+- **CSS animations**: Animate only transform and opacity (composite-only properties) - never width/height/margin (triggers layout reflow)
+- **DPI**: Test on multi-monitor setups with different DPI/scaling via Tauri window configuration
+- **Theme loading**: CSS custom properties in a single root stylesheet, switched via data-theme attribute on document root
+- **Tauri IPC**: Keep command payloads small and serializable (serde); avoid sending large blobs through IPC
 
 ## Implementation Priority
 
@@ -170,6 +170,6 @@ Map semantic tokens to specific components (sidebar.background, tab.active.borde
 
 ### High impact, high effort
 11. Command palette (Ctrl+K)
-12. VirtualizingStackPanel on all lists
+12. Virtualized lists (react-window/react-virtuoso)
 13. High contrast mode mapping
 14. Drag-and-drop tab reordering

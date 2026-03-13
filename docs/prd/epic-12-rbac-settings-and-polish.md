@@ -53,10 +53,10 @@ I want DSPanel to be available in French,
 so that I can use the tool in my preferred language.
 
 #### Acceptance Criteria
-1. All user-facing strings externalized to .resx resource files
+1. All user-facing strings externalized to JSON translation files (i18next)
 2. English (en) as default language
 3. French (fr) translation provided
-4. Language selection in settings (requires restart)
+4. Language selection in settings (hot-switchable at runtime)
 5. Date, number, and currency formatting follows selected locale
 6. Developer documentation explains how to add new languages
 

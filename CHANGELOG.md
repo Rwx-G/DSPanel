@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- All documentation (~45 files) migrated from C#/WPF/.NET references to Rust/Tauri v2 + React/TypeScript
+- Architecture docs rewritten: tech stack, source tree, components, coding standards, error handling, test strategy, deployment
+- All 12 Epic 1 stories rewritten with Rust/TypeScript acceptance criteria, tasks, and code examples
+- All 49 Epic 2-12 stories updated with new stack references
+- PRD updated: requirements, technical assumptions, repo structure, service architecture, testing stack
+- CI workflows rewritten for cargo/pnpm/tauri (build.yml + release.yml)
+- CONTRIBUTING.md rewritten for Rust + Node.js development workflow
+- PR template updated for cargo/pnpm commands
+- Story 2.0 (Error Handling Foundation) moved to Story 1.13 under Epic 1
+
+## [0.2.0] - 2026-03-13
+
+### Changed
+
+- Full migration from C#/WPF (.NET 10) to Rust/Tauri v2 + React/TypeScript
+- Cross-platform support: Windows, macOS, Linux (previously Windows-only)
+- Lightweight native binary (~8.5 MB) instead of .NET runtime dependency
+
+### Removed
+
+- All C#/WPF source code (tagged as `v0.1.0-csharp` for reference)
+
 ## [0.1.0] - 2026-03-11
 
 ### Added

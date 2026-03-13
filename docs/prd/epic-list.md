@@ -1,6 +1,6 @@
 # Epic List
 
-- **Epic 1: Foundation and Core Lookup** (12 stories) - Establish project infrastructure (solution, DI, navigation shell, IDirectoryProvider, permission detection), build comprehensive Base UI foundations (theme system, shell/navigation/tabs, reusable controls, data display, forms/validation, dialogs/notifications), and deliver the first usable features: user/computer account lookup with healthcheck badge.
+- **Epic 1: Foundation and Core Lookup** (12 stories) - Establish project infrastructure (Tauri/Rust backend, React frontend, navigation shell, DirectoryProvider trait, permission detection), build comprehensive Base UI foundations (theme system, shell/navigation/tabs, reusable components, data display, forms/validation, dialogs/notifications), and deliver the first usable features: user/computer account lookup with healthcheck badge.
 
 - **Epic 2: Support Actions and Account Management** (5 stories) - Deliver the core helpdesk actions (password reset, unlock, enable/disable) with permission enforcement, MFA gate, and secure password generation.
 
