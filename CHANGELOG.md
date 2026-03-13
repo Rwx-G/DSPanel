@@ -23,7 +23,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - useFormValidation hook with field-level and form-level validation
 - useChangeTracker hook with dirty detection and beforeunload guard
 - Validators: isValidSamAccountName, isValidDistinguishedName, isRequired, isMinLength, isMaxLength
-- 349 frontend tests (298 new for navigation, layout, common, data, and form components)
+- Dialog system: ConfirmationDialog (severity icons, expandable detail, keyboard Enter/Escape), DryRunPreviewDialog (scrollable change list), ProgressDialog (determinate/indeterminate with cancel) (Story 1.9)
+- DialogContext with Promise-based useDialog hook: showConfirmation, showWarning, showError, showDryRunPreview
+- Toast notification system: NotificationContext with auto-dismiss, severity levels, action buttons, NotificationHost (Story 1.9)
+- InlineProgress compact progress bar for embedding in toolbars
+- 416 frontend tests (365 new for navigation, layout, common, data, form, dialog, and notification components)
 
 ### Changed
 
