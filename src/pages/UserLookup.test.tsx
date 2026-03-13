@@ -28,6 +28,8 @@ function makeEntry(
       title: ["Engineer"],
       userAccountControl: ["512"],
       lockoutTime: ["0"],
+      lastLogon: ["2026-03-12T08:00:00Z"],
+      pwdLastSet: ["2026-02-01T10:00:00Z"],
       memberOf: [
         "CN=Domain Users,CN=Users,DC=example,DC=com",
         "CN=Developers,OU=Groups,DC=example,DC=com",
@@ -203,7 +205,7 @@ describe("UserLookup", () => {
     expect(screen.getByText("Developers")).toBeInTheDocument();
   });
 
-  it("shows status badges for enabled/disabled users in results list", async () => {
+  it("shows health badges for enabled/disabled users in results list", async () => {
     const entries = [
       makeEntry("jdoe", "John Doe"),
       makeEntry("disabled", "Disabled User", {
@@ -220,11 +222,17 @@ describe("UserLookup", () => {
       expect(screen.getByTestId("user-results-list")).toBeInTheDocument();
     });
 
-    const activeButtons = screen.getByTestId("user-result-jdoe");
-    expect(activeButtons).toHaveTextContent("Active");
+    const activeResult = screen.getByTestId("user-result-jdoe");
+    const activeBadge = activeResult.querySelector(
+      '[data-testid="health-badge"]',
+    );
+    expect(activeBadge).toHaveAttribute("data-level", "Healthy");
 
-    const disabledButtons = screen.getByTestId("user-result-disabled");
-    expect(disabledButtons).toHaveTextContent("Disabled");
+    const disabledResult = screen.getByTestId("user-result-disabled");
+    const disabledBadge = disabledResult.querySelector(
+      '[data-testid="health-badge"]',
+    );
+    expect(disabledBadge).toHaveAttribute("data-level", "Critical");
   });
 
   it("does not search with empty query", async () => {
