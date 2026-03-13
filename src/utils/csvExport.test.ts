@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { escapeCsvField, formatCsv } from "./csvExport";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { escapeCsvField, formatCsv, downloadCsv } from "./csvExport";
 
 describe("escapeCsvField", () => {
   it("should return plain text unchanged", () => {
@@ -52,5 +52,69 @@ describe("formatCsv", () => {
   it("should handle single row", () => {
     const result = formatCsv(["X"], [["1"]]);
     expect(result).toBe("X\n1");
+  });
+});
+
+describe("downloadCsv", () => {
+  const mockLink = {
+    href: "",
+    download: "",
+    click: vi.fn(),
+  };
+
+  let createObjectURLSpy: ReturnType<typeof vi.spyOn>;
+  let revokeObjectURLSpy: ReturnType<typeof vi.spyOn>;
+  let createElementSpy: ReturnType<typeof vi.spyOn>;
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function setupMocks() {
+    createObjectURLSpy = vi
+      .spyOn(URL, "createObjectURL")
+      .mockReturnValue("blob:test");
+    revokeObjectURLSpy = vi
+      .spyOn(URL, "revokeObjectURL")
+      .mockImplementation(() => {});
+    createElementSpy = vi
+      .spyOn(document, "createElement")
+      .mockReturnValue(mockLink as unknown as HTMLAnchorElement);
+    mockLink.href = "";
+    mockLink.download = "";
+    mockLink.click.mockClear();
+  }
+
+  it("should create a Blob with CSV content", () => {
+    setupMocks();
+    downloadCsv("test.csv", "Name,Age\nAlice,30");
+
+    expect(createObjectURLSpy).toHaveBeenCalledTimes(1);
+    const blob = createObjectURLSpy.mock.calls[0][0] as Blob;
+    expect(blob).toBeInstanceOf(Blob);
+    expect(blob.type).toBe("text/csv;charset=utf-8;");
+  });
+
+  it("should set correct filename on link", () => {
+    setupMocks();
+    downloadCsv("export-data.csv", "a,b");
+
+    expect(createElementSpy).toHaveBeenCalledWith("a");
+    expect(mockLink.download).toBe("export-data.csv");
+    expect(mockLink.href).toBe("blob:test");
+  });
+
+  it("should click the link to trigger download", () => {
+    setupMocks();
+    downloadCsv("test.csv", "x");
+
+    expect(mockLink.click).toHaveBeenCalledTimes(1);
+  });
+
+  it("should revoke the object URL after download", () => {
+    setupMocks();
+    downloadCsv("test.csv", "x");
+
+    expect(revokeObjectURLSpy).toHaveBeenCalledWith("blob:test");
   });
 });

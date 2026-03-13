@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { GroupPicker, type GroupOption } from "./GroupPicker";
@@ -258,7 +258,171 @@ describe("GroupPicker", () => {
     expect(picker).toHaveClass("pointer-events-none");
     expect(picker).toHaveClass("opacity-50");
   });
-});
 
-// Need afterEach at module level for cleanup
-const { afterEach } = await import("vitest");
+  it("should navigate results with ArrowDown key", async () => {
+    render(
+      <GroupPicker
+        selectedGroups={[]}
+        onSelectionChange={onSelectionChange}
+        onSearch={onSearch}
+        debounceMs={100}
+      />,
+    );
+
+    fireEvent.change(screen.getByTestId("group-picker-search"), {
+      target: { value: "test" },
+    });
+
+    await vi.advanceTimersByTimeAsync(150);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("group-picker-dropdown")).toBeInTheDocument();
+    });
+
+    const input = screen.getByTestId("group-picker-search");
+
+    // Press ArrowDown to highlight first item (index 0)
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+
+    const firstOption = screen.getByTestId("group-option-Admins");
+    expect(firstOption.className).toContain("bg-[var(--color-primary-subtle)]");
+
+    // Press ArrowDown again to highlight second item (index 1)
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+
+    const secondOption = screen.getByTestId("group-option-Users");
+    expect(secondOption.className).toContain(
+      "bg-[var(--color-primary-subtle)]",
+    );
+    // First option should no longer be highlighted
+    expect(firstOption.className).not.toContain(
+      "bg-[var(--color-primary-subtle)]",
+    );
+  });
+
+  it("should navigate results with ArrowUp key", async () => {
+    render(
+      <GroupPicker
+        selectedGroups={[]}
+        onSelectionChange={onSelectionChange}
+        onSearch={onSearch}
+        debounceMs={100}
+      />,
+    );
+
+    fireEvent.change(screen.getByTestId("group-picker-search"), {
+      target: { value: "test" },
+    });
+
+    await vi.advanceTimersByTimeAsync(150);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("group-picker-dropdown")).toBeInTheDocument();
+    });
+
+    const input = screen.getByTestId("group-picker-search");
+
+    // Navigate down twice (to index 1)
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+
+    const secondOption = screen.getByTestId("group-option-Users");
+    expect(secondOption.className).toContain(
+      "bg-[var(--color-primary-subtle)]",
+    );
+
+    // Navigate up (back to index 0)
+    fireEvent.keyDown(input, { key: "ArrowUp" });
+
+    const firstOption = screen.getByTestId("group-option-Admins");
+    expect(firstOption.className).toContain("bg-[var(--color-primary-subtle)]");
+    expect(secondOption.className).not.toContain(
+      "bg-[var(--color-primary-subtle)]",
+    );
+  });
+
+  it("should select highlighted result with Enter key", async () => {
+    render(
+      <GroupPicker
+        selectedGroups={[]}
+        onSelectionChange={onSelectionChange}
+        onSearch={onSearch}
+        debounceMs={100}
+      />,
+    );
+
+    fireEvent.change(screen.getByTestId("group-picker-search"), {
+      target: { value: "test" },
+    });
+
+    await vi.advanceTimersByTimeAsync(150);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("group-picker-dropdown")).toBeInTheDocument();
+    });
+
+    const input = screen.getByTestId("group-picker-search");
+
+    // Navigate to first item and press Enter
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    expect(onSelectionChange).toHaveBeenCalledWith([mockGroups[0]]);
+  });
+
+  it("should close dropdown on Escape key", async () => {
+    render(
+      <GroupPicker
+        selectedGroups={[]}
+        onSelectionChange={onSelectionChange}
+        onSearch={onSearch}
+        debounceMs={100}
+      />,
+    );
+
+    fireEvent.change(screen.getByTestId("group-picker-search"), {
+      target: { value: "test" },
+    });
+
+    await vi.advanceTimersByTimeAsync(150);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("group-picker-dropdown")).toBeInTheDocument();
+    });
+
+    const input = screen.getByTestId("group-picker-search");
+    fireEvent.keyDown(input, { key: "Escape" });
+
+    expect(
+      screen.queryByTestId("group-picker-dropdown"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("should close dropdown on click outside", async () => {
+    render(
+      <GroupPicker
+        selectedGroups={[]}
+        onSelectionChange={onSelectionChange}
+        onSearch={onSearch}
+        debounceMs={100}
+      />,
+    );
+
+    fireEvent.change(screen.getByTestId("group-picker-search"), {
+      target: { value: "test" },
+    });
+
+    await vi.advanceTimersByTimeAsync(150);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("group-picker-dropdown")).toBeInTheDocument();
+    });
+
+    // Simulate click outside the component
+    fireEvent.mouseDown(document.body);
+
+    expect(
+      screen.queryByTestId("group-picker-dropdown"),
+    ).not.toBeInTheDocument();
+  });
+});

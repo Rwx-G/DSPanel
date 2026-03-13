@@ -108,4 +108,90 @@ describe("ComboBox", () => {
     fireEvent.keyDown(screen.getByTestId("combobox"), { key: "Escape" });
     expect(screen.queryByTestId("combobox-dropdown")).not.toBeInTheDocument();
   });
+
+  it("should open dropdown on ArrowDown when closed", () => {
+    render(<ComboBox options={options} value="" onChange={vi.fn()} />);
+    expect(screen.queryByTestId("combobox-dropdown")).not.toBeInTheDocument();
+    fireEvent.keyDown(screen.getByTestId("combobox"), { key: "ArrowDown" });
+    expect(screen.getByTestId("combobox-dropdown")).toBeInTheDocument();
+  });
+
+  it("should open dropdown on Enter when closed", () => {
+    render(<ComboBox options={options} value="" onChange={vi.fn()} />);
+    expect(screen.queryByTestId("combobox-dropdown")).not.toBeInTheDocument();
+    fireEvent.keyDown(screen.getByTestId("combobox"), { key: "Enter" });
+    expect(screen.getByTestId("combobox-dropdown")).toBeInTheDocument();
+  });
+
+  it("should navigate options with ArrowDown", () => {
+    render(<ComboBox options={options} value="" onChange={vi.fn()} />);
+    fireEvent.click(screen.getByTestId("combobox-trigger"));
+    const container = screen.getByTestId("combobox");
+    fireEvent.keyDown(container, { key: "ArrowDown" });
+    expect(screen.getByTestId("combobox-option-us").className).toContain(
+      "bg-[var(--color-primary-subtle)]",
+    );
+    fireEvent.keyDown(container, { key: "ArrowDown" });
+    expect(screen.getByTestId("combobox-option-uk").className).toContain(
+      "bg-[var(--color-primary-subtle)]",
+    );
+    expect(screen.getByTestId("combobox-option-us").className).not.toContain(
+      "bg-[var(--color-primary-subtle)]",
+    );
+  });
+
+  it("should navigate options with ArrowUp", () => {
+    render(<ComboBox options={options} value="" onChange={vi.fn()} />);
+    fireEvent.click(screen.getByTestId("combobox-trigger"));
+    const container = screen.getByTestId("combobox");
+    fireEvent.keyDown(container, { key: "ArrowDown" });
+    fireEvent.keyDown(container, { key: "ArrowDown" });
+    expect(screen.getByTestId("combobox-option-uk").className).toContain(
+      "bg-[var(--color-primary-subtle)]",
+    );
+    fireEvent.keyDown(container, { key: "ArrowUp" });
+    expect(screen.getByTestId("combobox-option-us").className).toContain(
+      "bg-[var(--color-primary-subtle)]",
+    );
+  });
+
+  it("should select highlighted option with Enter", () => {
+    const onChange = vi.fn();
+    render(<ComboBox options={options} value="" onChange={onChange} />);
+    fireEvent.click(screen.getByTestId("combobox-trigger"));
+    const container = screen.getByTestId("combobox");
+    fireEvent.keyDown(container, { key: "ArrowDown" });
+    fireEvent.keyDown(container, { key: "Enter" });
+    expect(onChange).toHaveBeenCalledWith("us");
+    expect(screen.queryByTestId("combobox-dropdown")).not.toBeInTheDocument();
+  });
+
+  it("should close dropdown on click outside", () => {
+    render(<ComboBox options={options} value="" onChange={vi.fn()} />);
+    fireEvent.click(screen.getByTestId("combobox-trigger"));
+    expect(screen.getByTestId("combobox-dropdown")).toBeInTheDocument();
+    fireEvent.mouseDown(document.body);
+    expect(screen.queryByTestId("combobox-dropdown")).not.toBeInTheDocument();
+  });
+
+  it("should show error border when error prop is true", () => {
+    render(<ComboBox options={options} value="" onChange={vi.fn()} error />);
+    expect(screen.getByTestId("combobox-trigger").className).toContain(
+      "border-[var(--color-error)]",
+    );
+  });
+
+  it("should display custom placeholder", () => {
+    render(
+      <ComboBox
+        options={options}
+        value=""
+        onChange={vi.fn()}
+        placeholder="Pick one"
+      />,
+    );
+    expect(screen.getByTestId("combobox-trigger")).toHaveTextContent(
+      "Pick one",
+    );
+  });
 });
