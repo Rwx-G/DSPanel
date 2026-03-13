@@ -62,9 +62,9 @@ export function HealthBadge({ healthStatus }: HealthBadgeProps) {
                 const FlagIcon = LEVEL_ICON[flag.severity];
                 return (
                   <li
-                    key={i}
+                    key={flag.name}
                     className="flex items-start gap-1.5"
-                    data-testid={`health-flag-${i}`}
+                    data-testid={`health-flag-${flag.name}`}
                   >
                     <FlagIcon
                       size={12}

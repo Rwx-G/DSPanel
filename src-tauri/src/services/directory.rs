@@ -16,7 +16,7 @@ pub trait DirectoryProvider: Send + Sync {
     fn domain_name(&self) -> Option<&str>;
 
     /// The base DN for searches (e.g. "DC=corp,DC=local"), if known.
-    fn base_dn(&self) -> Option<&str>;
+    fn base_dn(&self) -> Option<String>;
 
     /// Tests the connection by performing a lightweight rootDSE query.
     async fn test_connection(&self) -> Result<bool>;
@@ -146,8 +146,8 @@ pub mod tests {
             self.domain.as_deref()
         }
 
-        fn base_dn(&self) -> Option<&str> {
-            self.base.as_deref()
+        fn base_dn(&self) -> Option<String> {
+            self.base.clone()
         }
 
         async fn test_connection(&self) -> Result<bool> {
@@ -264,7 +264,7 @@ pub mod tests {
     async fn test_mock_provider_domain_info() {
         let provider = MockDirectoryProvider::new();
         assert_eq!(provider.domain_name(), Some("EXAMPLE.COM"));
-        assert_eq!(provider.base_dn(), Some("DC=example,DC=com"));
+        assert_eq!(provider.base_dn(), Some("DC=example,DC=com".to_string()));
     }
 
     #[tokio::test]

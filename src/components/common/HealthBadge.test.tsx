@@ -79,9 +79,9 @@ describe("HealthBadge", () => {
     expect(screen.queryByTestId("health-tooltip")).not.toBeInTheDocument();
     fireEvent.mouseEnter(screen.getByTestId("health-badge"));
     expect(screen.getByTestId("health-tooltip")).toBeInTheDocument();
-    expect(screen.getByTestId("health-flag-0")).toHaveTextContent(
-      "Inactive30Days",
-    );
+    expect(
+      screen.getByTestId("health-flag-Inactive30Days"),
+    ).toHaveTextContent("Inactive30Days");
   });
 
   it("hides tooltip on mouse leave", () => {

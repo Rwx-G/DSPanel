@@ -74,7 +74,10 @@ pub fn run() {
             commands::get_computer_name,
         ])
         .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .unwrap_or_else(|e| {
+            tracing::error!("Fatal: failed to start Tauri application: {}", e);
+            std::process::exit(1);
+        });
 }
 
 #[cfg(test)]

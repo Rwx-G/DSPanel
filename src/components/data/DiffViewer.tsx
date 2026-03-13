@@ -87,7 +87,7 @@ function InlineDiff({ lines }: { lines: DiffLine[] }) {
     >
       {lines.map((line, i) => (
         <div
-          key={i}
+          key={`${line.type}-${line.oldLineNumber ?? ""}-${line.newLineNumber ?? ""}-${i}`}
           className={`flex ${LINE_STYLES[line.type]}`}
           data-testid={`diff-line-${i}`}
           data-type={line.type}
@@ -136,7 +136,7 @@ function SideBySideDiff({ lines }: { lines: DiffLine[] }) {
       >
         {oldLines.map((line, i) => (
           <div
-            key={i}
+            key={`old-${line.oldLineNumber ?? i}`}
             className={`flex ${line.type === "removed" ? LINE_STYLES.removed : ""}`}
           >
             <span className="w-10 shrink-0 text-right pr-2 text-[var(--color-text-secondary)] select-none opacity-60">
@@ -154,7 +154,7 @@ function SideBySideDiff({ lines }: { lines: DiffLine[] }) {
       >
         {newLines.map((line, i) => (
           <div
-            key={i}
+            key={`new-${line.newLineNumber ?? i}`}
             className={`flex ${line.type === "added" ? LINE_STYLES.added : ""}`}
           >
             <span className="w-10 shrink-0 text-right pr-2 text-[var(--color-text-secondary)] select-none opacity-60">

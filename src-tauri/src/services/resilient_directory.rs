@@ -120,7 +120,7 @@ where
         self.inner.domain_name()
     }
 
-    fn base_dn(&self) -> Option<&str> {
+    fn base_dn(&self) -> Option<String> {
         self.inner.base_dn()
     }
 
@@ -538,7 +538,7 @@ mod tests {
         );
 
         // MockDirectoryProvider returns Some for base_dn
-        assert_eq!(provider.base_dn(), Some("DC=example,DC=com"));
+        assert_eq!(provider.base_dn(), Some("DC=example,DC=com".to_string()));
     }
 
     #[tokio::test]

@@ -17,8 +17,11 @@ pub fn init_logging(log_dir: &str) {
     let file_appender = rolling::daily(log_dir, "dspanel.log");
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
 
-    // Leak the guard so it lives for the entire process lifetime.
-    // This is intentional - the guard must outlive all tracing calls.
+    // Intentional leak: the WorkerGuard must outlive all tracing calls,
+    // meaning it must live for the entire process. Dropping it would flush
+    // and close the non-blocking writer, silently losing subsequent log
+    // entries. Since Tauri has no pre-exit hook to drop it gracefully,
+    // leaking is the standard approach for process-lifetime logging.
     std::mem::forget(_guard);
 
     let file_layer = fmt::layer()

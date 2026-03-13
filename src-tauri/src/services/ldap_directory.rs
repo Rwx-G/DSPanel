@@ -226,11 +226,8 @@ impl DirectoryProvider for LdapDirectoryProvider {
         self.domain.as_deref()
     }
 
-    fn base_dn(&self) -> Option<&str> {
-        // Cannot return a reference to Mutex-protected data directly.
-        // For the trait contract, return None if not yet discovered.
-        // Callers should use test_connection() first.
-        None
+    fn base_dn(&self) -> Option<String> {
+        self.base_dn.lock().unwrap().clone()
     }
 
     async fn test_connection(&self) -> Result<bool> {

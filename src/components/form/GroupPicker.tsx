@@ -34,7 +34,11 @@ export function GroupPicker({
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const selectedDNs = new Set(selectedGroups.map((g) => g.distinguishedName));
+  const selectedDNs = useRef(new Set<string>());
+  selectedDNs.current = new Set(selectedGroups.map((g) => g.distinguishedName));
+
+  const onSearchRef = useRef(onSearch);
+  onSearchRef.current = onSearch;
 
   // Debounced search
   useEffect(() => {
@@ -47,9 +51,9 @@ export function GroupPicker({
     setLoading(true);
     const timer = setTimeout(async () => {
       try {
-        const searchResults = await onSearch(searchText);
+        const searchResults = await onSearchRef.current(searchText);
         setResults(
-          searchResults.filter((g) => !selectedDNs.has(g.distinguishedName)),
+          searchResults.filter((g) => !selectedDNs.current.has(g.distinguishedName)),
         );
         setIsOpen(true);
       } finally {
@@ -58,7 +62,6 @@ export function GroupPicker({
     }, debounceMs);
 
     return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchText, debounceMs]);
 
   const handleAddGroup = useCallback(
