@@ -14,7 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Keyboard shortcuts: Ctrl+B (toggle sidebar), Ctrl+W (close tab), Ctrl+Tab/Shift+Tab (cycle tabs), Ctrl+1-9 (jump to tab)
 - Auto-collapse sidebar at narrow window widths (<900px)
 - StatusBar with connection indicator, domain info, permission badge, and app version
-- 110 frontend tests (59 new for navigation and layout components)
+- Common reusable controls: SearchBar (debounced), PermissionGate, StatusBadge, Avatar, TagChip, LoadingSpinner, EmptyState, InfoCard, CopyButton (Story 1.6)
+- useDebounce hook and avatar utility functions (getInitials, getAvatarColor)
+- 191 frontend tests (140 new for navigation, layout, and common components)
 
 ### Changed
 
