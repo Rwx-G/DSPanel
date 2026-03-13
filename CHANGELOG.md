@@ -38,7 +38,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Tauri commands: search_computers, ping_host (system ping), resolve_dns (tokio lookup_host)
 - DirectoryComputer type with mapEntryToComputer mapping
 - ComputerLookup detail: Identity, Status, Location, Network sections with ping button and DNS auto-resolution
-- 502 frontend tests + 103 Rust tests = 605 total tests
+- DirectoryError enum with LDAP error code classification (transient vs permanent) and user-friendly messages (Story 1.13)
+- Exponential backoff retry policy with injectable delay function for deterministic testing
+- Circuit breaker (Closed/Open/HalfOpen) with configurable threshold and recovery timeout
+- ResilientDirectoryProvider decorator wrapping DirectoryProvider with retry + circuit breaker
+- TimeoutConfig centralizing timeouts: LDAP 30s, Graph API 15s, HIBP 5s, WMI 10s
+- React ErrorBoundary with fallback UI and retry, global unhandled rejection handler
+- Backend error mapping: parseBackendError, mapErrorToNotification, useErrorHandler hook
+- Rust panic hook logging panics via tracing before default handler
+- 526 frontend tests + 151 Rust tests = 677 total tests
 
 ### Changed
 
