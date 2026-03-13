@@ -8,10 +8,6 @@ import {
 } from "@/contexts/NavigationContext";
 import { TabBar } from "./TabBar";
 
-function wrapper({ children }: { children: ReactNode }) {
-  return <NavigationProvider>{children}</NavigationProvider>;
-}
-
 function renderWithNavigation(ui: ReactNode) {
   return render(<NavigationProvider>{ui}</NavigationProvider>);
 }
@@ -31,23 +27,13 @@ describe("TabBar", () => {
     expect(screen.getByRole("tablist")).toBeInTheDocument();
   });
 
-  it("should render the home tab", () => {
+  it("should render empty tab bar by default", () => {
     renderWithNavigation(<TabBar />);
-    expect(screen.getByTestId("tab-home")).toBeInTheDocument();
+    expect(screen.getByTestId("tab-bar")).toBeInTheDocument();
+    expect(screen.queryByRole("tab")).not.toBeInTheDocument();
   });
 
-  it("should mark home tab as active by default", () => {
-    renderWithNavigation(<TabBar />);
-    const homeTab = screen.getByTestId("tab-home");
-    expect(homeTab).toHaveAttribute("aria-selected", "true");
-  });
-
-  it("should not show close button on pinned tabs", () => {
-    renderWithNavigation(<TabBar />);
-    expect(screen.queryByTestId("tab-close-home")).not.toBeInTheDocument();
-  });
-
-  it("should render multiple tabs when opened", () => {
+  it("should render a tab when opened", () => {
     function TestSetup() {
       const { openTab } = useNavigation();
       return (
@@ -64,11 +50,10 @@ describe("TabBar", () => {
     renderWithNavigation(<TestSetup />);
     fireEvent.click(screen.getByTestId("open-users"));
 
-    expect(screen.getByTestId("tab-home")).toBeInTheDocument();
     expect(screen.getByTestId("tab-users")).toBeInTheDocument();
   });
 
-  it("should show close button on non-pinned tabs", () => {
+  it("should show close button on tabs", () => {
     function TestSetup() {
       const { openTab } = useNavigation();
       return (
@@ -88,7 +73,7 @@ describe("TabBar", () => {
     expect(screen.getByTestId("tab-close-users")).toBeInTheDocument();
   });
 
-  it("should switch active tab on click", () => {
+  it("should mark opened tab as active", () => {
     function TestSetup() {
       const { openTab } = useNavigation();
       return (
@@ -104,13 +89,48 @@ describe("TabBar", () => {
 
     renderWithNavigation(<TestSetup />);
     fireEvent.click(screen.getByTestId("open-users"));
-    fireEvent.click(screen.getByTestId("tab-home"));
 
-    expect(screen.getByTestId("tab-home")).toHaveAttribute(
+    expect(screen.getByTestId("tab-users")).toHaveAttribute(
       "aria-selected",
       "true",
     );
+  });
+
+  it("should switch active tab on click", () => {
+    function TestSetup() {
+      const { openTab } = useNavigation();
+      return (
+        <>
+          <button
+            data-testid="open-users"
+            onClick={() => openTab("Users", "users")}
+          />
+          <button
+            data-testid="open-computers"
+            onClick={() => openTab("Computers", "computers")}
+          />
+          <TabBar />
+        </>
+      );
+    }
+
+    renderWithNavigation(<TestSetup />);
+    fireEvent.click(screen.getByTestId("open-users"));
+    fireEvent.click(screen.getByTestId("open-computers"));
+
+    // Computers is active
+    expect(screen.getByTestId("tab-computers")).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+
+    // Click users tab
+    fireEvent.click(screen.getByTestId("tab-users"));
     expect(screen.getByTestId("tab-users")).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.getByTestId("tab-computers")).toHaveAttribute(
       "aria-selected",
       "false",
     );
@@ -157,7 +177,7 @@ describe("TabBar", () => {
     expect(screen.getByTestId("tab-users")).toHaveTextContent("User Lookup");
   });
 
-  it("should close tab on middle-click for non-pinned tabs", () => {
+  it("should close tab on middle-click", () => {
     function TestSetup() {
       const { openTab } = useNavigation();
       return (
@@ -182,18 +202,5 @@ describe("TabBar", () => {
     });
 
     expect(screen.queryByTestId("tab-users")).not.toBeInTheDocument();
-  });
-
-  it("should not close pinned tab on middle-click", () => {
-    renderWithNavigation(<TabBar />);
-
-    const homeTab = screen.getByTestId("tab-home");
-    act(() => {
-      homeTab.dispatchEvent(
-        new MouseEvent("auxclick", { bubbles: true, button: 1 }),
-      );
-    });
-
-    expect(screen.getByTestId("tab-home")).toBeInTheDocument();
   });
 });
