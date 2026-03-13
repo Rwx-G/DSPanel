@@ -32,6 +32,8 @@ pub fn run() {
             commands::get_permission_level,
             commands::get_user_groups,
             commands::has_permission,
+            commands::search_users,
+            commands::get_user,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
