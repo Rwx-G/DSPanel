@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - StatusBar with connection indicator, domain info, permission badge, and app version
 - Common reusable controls: SearchBar (debounced), PermissionGate, StatusBadge, Avatar, TagChip, LoadingSpinner, EmptyState, InfoCard, CopyButton (Story 1.6)
 - useDebounce hook and avatar utility functions (getInitials, getAvatarColor)
-- Data display components: DataTable (sortable, frozen columns), FilterBar, Pagination, PropertyGrid, TreeView, DiffViewer (Story 1.7)
+- Data display components: DataTable (sortable, frozen columns, column resize), FilterBar, Pagination, PropertyGrid, TreeView, DiffViewer (synchronized scroll), VirtualizedList (Story 1.7)
 - CSV export utility with field escaping (csvExport.ts)
 - Diff color tokens for light and dark themes
 - Form controls: FormField, TextInput, PasswordInput (show/hide), ComboBox (searchable), ValidationSummary (Story 1.8)

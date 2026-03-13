@@ -156,4 +156,61 @@ describe("DataTable", () => {
     );
     expect(screen.getAllByTestId("custom-render")).toHaveLength(3);
   });
+
+  it("should render resize handles on columns", () => {
+    render(
+      <DataTable columns={columns} data={testData} rowKey={(r) => r.id} />,
+    );
+    expect(screen.getByTestId("resize-handle-name")).toBeInTheDocument();
+    expect(screen.getByTestId("resize-handle-email")).toBeInTheDocument();
+  });
+
+  it("should not render resize handle when resizable is false", () => {
+    const nonResizableColumns: Column<TestRow>[] = [
+      { key: "name", header: "Name", resizable: false },
+      { key: "email", header: "Email" },
+    ];
+    render(
+      <DataTable
+        columns={nonResizableColumns}
+        data={testData}
+        rowKey={(r) => r.id}
+      />,
+    );
+    expect(screen.queryByTestId("resize-handle-name")).not.toBeInTheDocument();
+    expect(screen.getByTestId("resize-handle-email")).toBeInTheDocument();
+  });
+
+  it("should have col-resize cursor on resize handle", () => {
+    render(
+      <DataTable columns={columns} data={testData} rowKey={(r) => r.id} />,
+    );
+    const handle = screen.getByTestId("resize-handle-name");
+    expect(handle).toHaveClass("cursor-col-resize");
+  });
+
+  it("should have separator role on resize handle", () => {
+    render(
+      <DataTable columns={columns} data={testData} rowKey={(r) => r.id} />,
+    );
+    const handle = screen.getByTestId("resize-handle-name");
+    expect(handle).toHaveAttribute("role", "separator");
+    expect(handle).toHaveAttribute("aria-orientation", "vertical");
+  });
+
+  it("should not trigger sort when clicking resize handle", () => {
+    const onSort = vi.fn();
+    render(
+      <DataTable
+        columns={columns}
+        data={testData}
+        onSort={onSort}
+        rowKey={(r) => r.id}
+      />,
+    );
+    fireEvent.mouseDown(screen.getByTestId("resize-handle-name"), {
+      clientX: 100,
+    });
+    expect(onSort).not.toHaveBeenCalled();
+  });
 });

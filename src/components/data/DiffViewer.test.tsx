@@ -74,4 +74,40 @@ describe("DiffViewer", () => {
     render(<DiffViewer lines={testLines} defaultMode="side-by-side" />);
     expect(screen.getByTestId("diff-side-by-side")).toBeInTheDocument();
   });
+
+  it("should render left and right panels in side-by-side mode", () => {
+    render(<DiffViewer lines={testLines} defaultMode="side-by-side" />);
+    expect(screen.getByTestId("diff-panel-left")).toBeInTheDocument();
+    expect(screen.getByTestId("diff-panel-right")).toBeInTheDocument();
+  });
+
+  it("should synchronize scroll between panels", () => {
+    render(<DiffViewer lines={testLines} defaultMode="side-by-side" />);
+    const leftPanel = screen.getByTestId("diff-panel-left");
+    const rightPanel = screen.getByTestId("diff-panel-right");
+
+    // Simulate left panel scroll
+    Object.defineProperty(leftPanel, "scrollTop", {
+      value: 100,
+      writable: true,
+    });
+    fireEvent.scroll(leftPanel);
+
+    // Right panel should sync
+    expect(rightPanel.scrollTop).toBe(100);
+  });
+
+  it("should synchronize scroll from right to left panel", () => {
+    render(<DiffViewer lines={testLines} defaultMode="side-by-side" />);
+    const leftPanel = screen.getByTestId("diff-panel-left");
+    const rightPanel = screen.getByTestId("diff-panel-right");
+
+    Object.defineProperty(rightPanel, "scrollTop", {
+      value: 50,
+      writable: true,
+    });
+    fireEvent.scroll(rightPanel);
+
+    expect(leftPanel.scrollTop).toBe(50);
+  });
 });

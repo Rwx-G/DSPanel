@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 
 export interface DiffLine {
   type: "unchanged" | "added" | "removed";
@@ -109,10 +109,29 @@ function InlineDiff({ lines }: { lines: DiffLine[] }) {
 function SideBySideDiff({ lines }: { lines: DiffLine[] }) {
   const oldLines = lines.filter((l) => l.type !== "added");
   const newLines = lines.filter((l) => l.type !== "removed");
+  const leftRef = useRef<HTMLDivElement>(null);
+  const rightRef = useRef<HTMLDivElement>(null);
+  const syncingRef = useRef(false);
+
+  const handleScroll = useCallback((source: "left" | "right") => {
+    if (syncingRef.current) return;
+    syncingRef.current = true;
+    const from = source === "left" ? leftRef.current : rightRef.current;
+    const to = source === "left" ? rightRef.current : leftRef.current;
+    if (from && to) {
+      to.scrollTop = from.scrollTop;
+    }
+    syncingRef.current = false;
+  }, []);
 
   return (
     <div className="flex" data-testid="diff-side-by-side">
-      <div className="flex-1 overflow-auto font-mono text-caption border-r border-[var(--color-border-default)]">
+      <div
+        ref={leftRef}
+        className="flex-1 overflow-auto font-mono text-caption border-r border-[var(--color-border-default)]"
+        onScroll={() => handleScroll("left")}
+        data-testid="diff-panel-left"
+      >
         {oldLines.map((line, i) => (
           <div
             key={i}
@@ -125,7 +144,12 @@ function SideBySideDiff({ lines }: { lines: DiffLine[] }) {
           </div>
         ))}
       </div>
-      <div className="flex-1 overflow-auto font-mono text-caption">
+      <div
+        ref={rightRef}
+        className="flex-1 overflow-auto font-mono text-caption"
+        onScroll={() => handleScroll("right")}
+        data-testid="diff-panel-right"
+      >
         {newLines.map((line, i) => (
           <div
             key={i}
