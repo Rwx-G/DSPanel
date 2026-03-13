@@ -5,6 +5,7 @@ import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { EmptyState } from "@/components/common/EmptyState";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { CopyButton } from "@/components/common/CopyButton";
+import { HealthBadge } from "@/components/common/HealthBadge";
 import {
   PropertyGrid,
   type PropertyGroup,
@@ -16,6 +17,7 @@ import {
   type DirectoryUser,
   mapEntryToUser,
 } from "@/types/directory";
+import { evaluateHealth } from "@/services/healthcheck";
 import { parseCnFromDn } from "@/utils/dn";
 import { Search, UserX, AlertCircle, User } from "lucide-react";
 
@@ -164,10 +166,7 @@ export function UserLookup() {
                       {user.department ? ` - ${user.department}` : ""}
                     </p>
                   </div>
-                  <StatusBadge
-                    text={user.enabled ? "Active" : "Disabled"}
-                    variant={user.enabled ? "success" : "error"}
-                  />
+                  <HealthBadge healthStatus={evaluateHealth(user)} />
                 </button>
               ))}
             </div>
@@ -279,6 +278,7 @@ function UserDetail({
           {user.displayName || user.samAccountName}
         </h2>
         <div className="flex items-center gap-2">
+          <HealthBadge healthStatus={evaluateHealth(user)} />
           <StatusBadge
             text={user.enabled ? "Enabled" : "Disabled"}
             variant={user.enabled ? "success" : "error"}
