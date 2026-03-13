@@ -105,7 +105,7 @@ export function TabBar() {
   return (
     <div
       ref={containerRef}
-      className={`flex items-center border-b border-[var(--color-border-default)] bg-[var(--color-surface-card)] transition-[height,opacity] duration-200 ease-in-out ${
+      className={`flex items-center border-b border-[var(--color-border-default)] bg-[var(--color-surface-bg)] transition-[height,opacity] duration-200 ease-in-out ${
         hasTabs ? "h-9 opacity-100" : "h-0 opacity-0 border-b-0"
       }`}
       role="tablist"
@@ -123,7 +123,7 @@ export function TabBar() {
       )}
       <div
         ref={tabsRef}
-        className="flex flex-1 items-center overflow-x-auto scrollbar-none"
+        className="flex h-full flex-1 items-stretch overflow-x-auto scrollbar-none"
       >
       {openTabs.map((tab, index) => (
         <TabItem
@@ -230,12 +230,12 @@ const TabItem = memo(function TabItem({
 }: TabItemProps) {
   return (
     <div
-      className={`group relative flex h-full items-center gap-1.5 border-r border-[var(--color-border-subtle)] px-3 select-none transition-colors duration-150 ${
+      className={`group relative flex h-full items-center gap-1.5 px-3 select-none transition-colors duration-150 ${
         isDragging ? "z-10 cursor-grabbing shadow-md" : "cursor-grab"
       } ${
         isActive
-          ? "bg-[var(--color-surface-bg)] text-[var(--color-text-primary)]"
-          : "text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)]"
+          ? "bg-[var(--color-surface-card)] text-[var(--color-text-primary)] font-medium"
+          : "text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-card)]/50 hover:text-[var(--color-text-primary)]"
       }`}
       style={{
         transform: isDragging ? `translateX(${dragDeltaX}px)` : undefined,
@@ -255,7 +255,7 @@ const TabItem = memo(function TabItem({
       data-testid={`tab-${tab.moduleId}`}
     >
       {isActive && (
-        <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-[var(--color-primary)]" />
+        <span className="absolute bottom-0 left-2 right-2 h-[2px] rounded-full bg-[var(--color-primary)]" />
       )}
       <span className="text-caption truncate max-w-[120px]">
         {tab.title}

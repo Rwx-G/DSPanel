@@ -146,8 +146,8 @@ pub async fn search_computers(
 /// Uses `tokio::process::Command` to avoid blocking the Tokio runtime thread pool.
 #[tauri::command]
 pub async fn ping_host(hostname: String) -> Result<String, AppError> {
-    use tokio::process::Command;
     use std::time::Instant;
+    use tokio::process::Command;
 
     let start = Instant::now();
 
@@ -234,7 +234,11 @@ pub async fn resolve_dns(hostname: String) -> Result<Vec<String>, AppError> {
     use tokio::net::lookup_host;
     use tokio::time::{timeout, Duration};
 
-    let result = timeout(Duration::from_secs(5), lookup_host(format!("{}:0", hostname))).await;
+    let result = timeout(
+        Duration::from_secs(5),
+        lookup_host(format!("{}:0", hostname)),
+    )
+    .await;
 
     match result {
         Ok(Ok(addrs)) => {
@@ -300,7 +304,10 @@ mod tests {
     #[test]
     fn test_get_permission_level_inner() {
         let state = make_state();
-        assert_eq!(get_permission_level_inner(&state), PermissionLevel::ReadOnly);
+        assert_eq!(
+            get_permission_level_inner(&state),
+            PermissionLevel::ReadOnly
+        );
     }
 
     #[test]
@@ -410,7 +417,10 @@ mod tests {
     #[test]
     fn test_get_permission_level_returns_readonly_by_default() {
         let state = make_state();
-        assert_eq!(get_permission_level_inner(&state), PermissionLevel::ReadOnly);
+        assert_eq!(
+            get_permission_level_inner(&state),
+            PermissionLevel::ReadOnly
+        );
     }
 
     #[test]

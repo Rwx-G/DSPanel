@@ -12,7 +12,7 @@ import { UserLookup } from "@/pages/UserLookup";
 import { ComputerLookup } from "@/pages/ComputerLookup";
 import { HomePage } from "@/pages/HomePage";
 
-const APP_VERSION = "0.2.0";
+const APP_VERSION = __APP_VERSION__;
 
 /** Installs a global handler for unhandled promise rejections. */
 function installGlobalErrorHandlers() {

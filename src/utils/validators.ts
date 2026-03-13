@@ -1,6 +1,6 @@
 export function isValidSamAccountName(value: string): boolean {
   if (!value || value.length === 0 || value.length > 20) return false;
-  return /^[a-zA-Z0-9._\-]+$/.test(value);
+  return /^[a-zA-Z0-9._-]+$/.test(value);
 }
 
 export function isValidDistinguishedName(value: string): boolean {

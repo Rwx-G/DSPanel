@@ -85,7 +85,7 @@ describe("App", () => {
 
     render(<App />);
 
-    expect(screen.getByTestId("status-version")).toHaveTextContent("v0.2.0");
+    expect(screen.getByTestId("status-version")).toHaveTextContent(`v${__APP_VERSION__}`);
   });
 
   it("should display username on dashboard", async () => {

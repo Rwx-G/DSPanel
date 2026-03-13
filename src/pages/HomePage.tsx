@@ -4,7 +4,6 @@ import {
   Wifi,
   WifiOff,
   User,
-  Monitor,
   Globe,
   KeyRound,
   Users,

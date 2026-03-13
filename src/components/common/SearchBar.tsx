@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useEffect, useCallback } from "react";
 import { Search, X } from "lucide-react";
 
 interface SearchBarProps {

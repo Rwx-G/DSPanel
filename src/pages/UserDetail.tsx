@@ -25,7 +25,7 @@ export function UserDetail({
   healthStatus,
   groupColumns,
   groupRows,
-  groupFilterText,
+  groupFilterText: _groupFilterText,
   onGroupFilterText,
 }: UserDetailProps) {
   const [groupFilters, setGroupFilters] = useState<FilterChip[]>([]);

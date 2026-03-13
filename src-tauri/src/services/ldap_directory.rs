@@ -85,6 +85,12 @@ pub struct LdapDirectoryProvider {
     connected: Mutex<bool>,
 }
 
+impl Default for LdapDirectoryProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl LdapDirectoryProvider {
     /// Creates a new `LdapDirectoryProvider`.
     ///
@@ -92,12 +98,11 @@ impl LdapDirectoryProvider {
     /// If the variable is not set, the provider operates in disconnected mode.
     pub fn new() -> Self {
         let domain = std::env::var("USERDNSDOMAIN").ok();
-        if domain.is_none() {
-            tracing::warn!(
+        match &domain {
+            None => tracing::warn!(
                 "USERDNSDOMAIN not set - not domain-joined, directory provider will be offline"
-            );
-        } else {
-            tracing::info!("Domain detected: {}", domain.as_ref().unwrap());
+            ),
+            Some(d) => tracing::info!("Domain detected: {}", d),
         }
 
         Self {

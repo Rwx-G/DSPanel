@@ -62,7 +62,7 @@ export function HealthBadge({ healthStatus }: HealthBadgeProps) {
             </p>
           ) : (
             <ul className="space-y-1">
-              {healthStatus.activeFlags.map((flag, i) => {
+              {healthStatus.activeFlags.map((flag) => {
                 const FlagIcon = LEVEL_ICON[flag.severity];
                 return (
                   <li

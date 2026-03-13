@@ -185,9 +185,7 @@ where
 
     async fn get_user_by_identity(&self, sam_account_name: &str) -> Result<Option<DirectoryEntry>> {
         let sam = sam_account_name.to_string();
-        resilient_call!(self, sam, |inner, s| inner
-            .get_user_by_identity(&s)
-            .await)
+        resilient_call!(self, sam, |inner, s| inner.get_user_by_identity(&s).await)
     }
 
     async fn get_group_members(
@@ -225,9 +223,7 @@ mod tests {
         }
     }
 
-    fn noop_delay(_: Duration) -> impl Future<Output = ()> {
-        async {}
-    }
+    async fn noop_delay(_: Duration) {}
 
     #[tokio::test]
     async fn test_resilient_search_users_success() {

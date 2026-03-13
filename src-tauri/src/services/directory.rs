@@ -69,6 +69,12 @@ pub mod tests {
         should_fail: Mutex<bool>,
     }
 
+    impl Default for MockDirectoryProvider {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
+
     impl MockDirectoryProvider {
         pub fn new() -> Self {
             Self {

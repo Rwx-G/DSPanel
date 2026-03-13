@@ -127,8 +127,7 @@ pub fn evaluate_health(input: &HealthInput, now_ms: i64) -> AccountHealthStatus 
         }
     }
 
-    if let (Some(ref pwd_set), Some(ref created)) =
-        (&input.password_last_set, &input.when_created)
+    if let (Some(ref pwd_set), Some(ref created)) = (&input.password_last_set, &input.when_created)
     {
         if let (Ok(pwd_ms), Ok(created_ms)) = (parse_date_to_ms(pwd_set), parse_date_to_ms(created))
         {
@@ -173,11 +172,7 @@ fn parse_date_to_ms(date_str: &str) -> Result<i64, ()> {
     }
     // Try date-only
     if let Ok(d) = chrono::NaiveDate::parse_from_str(date_str, "%Y-%m-%d") {
-        return Ok(d
-            .and_hms_opt(0, 0, 0)
-            .unwrap()
-            .and_utc()
-            .timestamp_millis());
+        return Ok(d.and_hms_opt(0, 0, 0).unwrap().and_utc().timestamp_millis());
     }
     Err(())
 }
@@ -245,10 +240,7 @@ mod tests {
         };
         let result = evaluate_health(&input, now_ms());
         assert_eq!(result.level, HealthLevel::Critical);
-        assert!(result
-            .active_flags
-            .iter()
-            .any(|f| f.name == "Expired"));
+        assert!(result.active_flags.iter().any(|f| f.name == "Expired"));
     }
 
     #[test]
@@ -432,10 +424,7 @@ mod tests {
             ..make_healthy_input()
         };
         let result = evaluate_health(&input, now_ms());
-        assert!(result
-            .active_flags
-            .iter()
-            .any(|f| f.name == "Expired"));
+        assert!(result.active_flags.iter().any(|f| f.name == "Expired"));
     }
 
     #[test]
@@ -447,10 +436,7 @@ mod tests {
         };
         let result = evaluate_health(&input, now_ms());
         // Invalid date should be silently ignored - no Expired flag
-        assert!(!result
-            .active_flags
-            .iter()
-            .any(|f| f.name == "Expired"));
+        assert!(!result.active_flags.iter().any(|f| f.name == "Expired"));
     }
 
     #[test]

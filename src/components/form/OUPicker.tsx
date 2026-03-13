@@ -38,7 +38,7 @@ export function OUPicker({
   error = false,
   disabled = false,
 }: OUPickerProps) {
-  const [expandedIds] = useState<Set<string>>(new Set());
+  const [_expandedIds] = useState<Set<string>>(new Set());
 
   const treeNodes = useMemo(() => ouNodesToTreeNodes(nodes), [nodes]);
   const selectedIds = useMemo(
