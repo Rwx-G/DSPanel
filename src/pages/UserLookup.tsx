@@ -252,6 +252,8 @@ function UserDetail({
       category: "Identity",
       items: [
         { label: "Display Name", value: user.displayName },
+        { label: "SAM Account Name", value: user.samAccountName },
+        { label: "User Principal Name", value: user.userPrincipalName },
         { label: "First Name", value: user.givenName },
         { label: "Last Name", value: user.surname },
         { label: "Email", value: user.email },

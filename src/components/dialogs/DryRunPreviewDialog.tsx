@@ -54,10 +54,12 @@ export function DryRunPreviewDialog({
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
+        aria-labelledby="dryrun-dialog-title"
         data-testid="dryrun-dialog"
       >
         <div className="border-b border-[var(--color-border-subtle)] px-4 py-3">
           <h2
+            id="dryrun-dialog-title"
             className="text-body font-semibold text-[var(--color-text-primary)]"
             data-testid="dryrun-title"
           >

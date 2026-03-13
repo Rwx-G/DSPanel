@@ -36,6 +36,7 @@ export function ProgressDialog({
         className="mx-4 w-full max-w-sm rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-4 shadow-lg"
         role="dialog"
         aria-modal="true"
+        aria-label={statusMessage}
         data-testid="progress-dialog"
       >
         <p
@@ -50,6 +51,10 @@ export function ProgressDialog({
             className={`h-full rounded-full bg-[var(--color-primary)] transition-all ${
               isIndeterminate ? "animate-pulse w-full" : ""
             }`}
+            role="progressbar"
+            aria-valuenow={isIndeterminate ? undefined : Math.round(Math.min(100, Math.max(0, percentage)))}
+            aria-valuemin={0}
+            aria-valuemax={100}
             style={
               isIndeterminate
                 ? undefined

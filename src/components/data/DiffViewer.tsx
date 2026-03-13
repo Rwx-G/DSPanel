@@ -51,6 +51,7 @@ export function DiffViewer({ lines, defaultMode = "inline" }: DiffViewerProps) {
               : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
           }`}
           onClick={() => setMode("inline")}
+          aria-pressed={mode === "inline"}
           data-testid="diff-mode-inline"
         >
           Inline
@@ -62,6 +63,7 @@ export function DiffViewer({ lines, defaultMode = "inline" }: DiffViewerProps) {
               : "text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
           }`}
           onClick={() => setMode("side-by-side")}
+          aria-pressed={mode === "side-by-side"}
           data-testid="diff-mode-side-by-side"
         >
           Side by Side

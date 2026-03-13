@@ -26,7 +26,8 @@ export function InfoCard({
       <button
         className="flex w-full items-center gap-2 px-3 py-2 text-left text-body font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors"
         onClick={() => collapsible && setExpanded(!expanded)}
-        aria-expanded={expanded}
+        aria-expanded={collapsible ? expanded : undefined}
+        aria-label={collapsible ? `${expanded ? "Collapse" : "Expand"} ${header}` : undefined}
         data-testid="info-card-header"
       >
         {collapsible &&

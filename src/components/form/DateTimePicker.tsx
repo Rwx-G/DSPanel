@@ -207,6 +207,7 @@ export function DateTimePicker({
             <button
               onClick={handlePrevMonth}
               className="rounded-sm p-1 hover:bg-[var(--color-surface-hover)] transition-colors"
+              aria-label="Previous month"
               data-testid="date-time-prev-month"
             >
               <ChevronLeft size={16} />
@@ -220,6 +221,7 @@ export function DateTimePicker({
             <button
               onClick={handleNextMonth}
               className="rounded-sm p-1 hover:bg-[var(--color-surface-hover)] transition-colors"
+              aria-label="Next month"
               data-testid="date-time-next-month"
             >
               <ChevronRight size={16} />
@@ -284,6 +286,7 @@ export function DateTimePicker({
                 <button
                   onClick={() => handleTimeChange("hours", -1)}
                   className="rounded-sm px-1 py-0.5 text-caption hover:bg-[var(--color-surface-hover)] transition-colors"
+                  aria-label="Decrease hours"
                   data-testid="time-hours-down"
                 >
                   -
@@ -297,6 +300,7 @@ export function DateTimePicker({
                 <button
                   onClick={() => handleTimeChange("hours", 1)}
                   className="rounded-sm px-1 py-0.5 text-caption hover:bg-[var(--color-surface-hover)] transition-colors"
+                  aria-label="Increase hours"
                   data-testid="time-hours-up"
                 >
                   +
@@ -309,6 +313,7 @@ export function DateTimePicker({
                 <button
                   onClick={() => handleTimeChange("minutes", -1)}
                   className="rounded-sm px-1 py-0.5 text-caption hover:bg-[var(--color-surface-hover)] transition-colors"
+                  aria-label="Decrease minutes"
                   data-testid="time-minutes-down"
                 >
                   -
@@ -322,6 +327,7 @@ export function DateTimePicker({
                 <button
                   onClick={() => handleTimeChange("minutes", 1)}
                   className="rounded-sm px-1 py-0.5 text-caption hover:bg-[var(--color-surface-hover)] transition-colors"
+                  aria-label="Increase minutes"
                   data-testid="time-minutes-up"
                 >
                   +

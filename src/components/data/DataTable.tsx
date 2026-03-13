@@ -153,6 +153,9 @@ export function DataTable<T>({
                   } ${col.frozen ? "sticky left-0 z-10 bg-[var(--color-surface-card)]" : ""}`}
                   style={widthStyle}
                   onClick={() => handleSort(col)}
+                  tabIndex={col.sortable ? 0 : undefined}
+                  onKeyDown={col.sortable ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleSort(col); } } : undefined}
+                  aria-sort={sortState?.key === col.key ? (sortState.direction === "asc" ? "ascending" : "descending") : undefined}
                   data-testid={`column-header-${col.key}`}
                 >
                   <span className="flex items-center gap-1">
@@ -181,6 +184,7 @@ export function DataTable<T>({
                       data-testid={`resize-handle-${col.key}`}
                       role="separator"
                       aria-orientation="vertical"
+                      aria-label={`Resize ${col.header} column`}
                     />
                   )}
                 </th>

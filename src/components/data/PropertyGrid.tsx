@@ -55,6 +55,7 @@ export function PropertyGrid({ groups }: PropertyGridProps) {
               className="flex w-full items-center gap-1 px-2 py-1.5 text-left text-caption font-medium text-[var(--color-text-secondary)] uppercase tracking-wider hover:text-[var(--color-text-primary)] transition-colors"
               onClick={() => toggleGroup(group.category)}
               aria-expanded={!isCollapsed}
+              aria-label={`${isCollapsed ? "Expand" : "Collapse"} ${group.category}`}
               data-testid={`property-group-toggle-${group.category}`}
             >
               {isCollapsed ? (

@@ -83,6 +83,7 @@ export function FilterBar({
         <button
           onClick={clearAll}
           className="text-caption text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
+          aria-label="Clear all filters"
           data-testid="filter-clear-all"
         >
           Clear all

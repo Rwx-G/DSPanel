@@ -160,6 +160,7 @@ export function ComboBox({
               }}
               placeholder="Search..."
               className="w-full bg-transparent px-2 py-1 text-body text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-secondary)]"
+              aria-label="Search options"
               data-testid="combobox-search"
             />
           </div>

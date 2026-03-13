@@ -34,6 +34,7 @@ export function SearchBar({
       <Search
         size={16}
         className="shrink-0 text-[var(--color-text-secondary)]"
+        aria-hidden="true"
       />
       <input
         type="text"

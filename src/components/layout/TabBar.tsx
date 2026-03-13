@@ -306,9 +306,12 @@ export function TabBar() {
         <div
           className="fixed z-50 min-w-[160px] rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] py-1 shadow-lg"
           style={{ left: contextMenu.x, top: contextMenu.y }}
+          role="menu"
+          aria-label="Tab options"
           data-testid="tab-context-menu"
         >
           <button
+            role="menuitem"
             className="flex w-full items-center px-3 py-1.5 text-caption text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]"
             onClick={() => {
               closeTab(contextMenu.tabId);
@@ -319,6 +322,7 @@ export function TabBar() {
             Close
           </button>
           <button
+            role="menuitem"
             className="flex w-full items-center px-3 py-1.5 text-caption text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]"
             onClick={() => {
               closeOtherTabs(contextMenu.tabId);
@@ -328,8 +332,9 @@ export function TabBar() {
           >
             Close Others
           </button>
-          <div className="mx-2 my-1 border-t border-[var(--color-border-subtle)]" />
+          <div className="mx-2 my-1 border-t border-[var(--color-border-subtle)]" role="separator" />
           <button
+            role="menuitem"
             className="flex w-full items-center px-3 py-1.5 text-caption text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]"
             onClick={() => {
               closeAllTabs();

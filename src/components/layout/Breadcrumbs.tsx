@@ -5,7 +5,8 @@ export function Breadcrumbs() {
   const { breadcrumbs, navigateTo } = useNavigation();
 
   return (
-    <div
+    <nav
+      aria-label="Breadcrumb"
       className="flex h-8 items-center gap-1 border-b border-[var(--color-border-subtle)] px-4 text-caption text-[var(--color-text-secondary)] bg-[var(--color-surface-bg)]"
       data-testid="breadcrumbs"
     >
@@ -33,6 +34,6 @@ export function Breadcrumbs() {
           </button>
         </span>
       ))}
-    </div>
+    </nav>
   );
 }

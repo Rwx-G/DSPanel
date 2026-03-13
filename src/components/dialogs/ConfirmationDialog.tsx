@@ -71,11 +71,13 @@ export function ConfirmationDialog({
         tabIndex={-1}
         role="dialog"
         aria-modal="true"
+        aria-labelledby="confirmation-dialog-title"
         data-testid="confirmation-dialog"
       >
         <div className="flex items-center gap-2 border-b border-[var(--color-border-subtle)] px-4 py-3">
-          <IconComp size={20} className={SEVERITY_COLOR[severity]} />
+          <IconComp size={20} className={SEVERITY_COLOR[severity]} aria-hidden="true" />
           <h2
+            id="confirmation-dialog-title"
             className="text-body font-semibold text-[var(--color-text-primary)]"
             data-testid="dialog-title"
           >

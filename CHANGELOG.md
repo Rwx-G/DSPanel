@@ -36,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Healthcheck badge with 9 account flags: Disabled, Locked, Expired, PasswordExpired, PasswordNeverExpires, Inactive30/90Days, NeverLoggedOn, PasswordNeverChanged (Story 1.11)
 - evaluateHealth() pure function with injectable clock for deterministic testing
 - HealthBadge component with severity colors, icons, hover tooltip, and keyboard accessibility (focus/blur)
+- User detail view now displays SAM Account Name and User Principal Name fields
 - Computer account lookup page with search, results list, detail panel, group memberships DataTable (Story 1.12)
 - Tauri commands: search_computers, ping_host (system ping), resolve_dns (tokio lookup_host)
 - DirectoryComputer type with mapEntryToComputer mapping
@@ -50,7 +51,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rust panic hook logging panics via tracing before default handler
 - Rust health check service: evaluate_health() with 9 account flags, exposed via evaluate_health_cmd Tauri command
 - Rust tests for ping_host and resolve_dns commands
-- 585 frontend tests + 172 Rust tests = 757 total tests
+- Snapshot visual tests for all 9 common controls (Story 1.6 AC11)
+- Comprehensive ARIA accessibility attributes across all components (26 issues resolved)
+- 595 frontend tests + 172 Rust tests = 767 total tests
 
 ### Changed
 
