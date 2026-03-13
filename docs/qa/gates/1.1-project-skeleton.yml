@@ -1,0 +1,81 @@
+gate: PASS
+story: "1.1"
+slug: project-skeleton
+review_date: "2026-03-13"
+reviewer: "Quinn (Test Architect)"
+author: "Romain G."
+
+summary: >
+  Story 1.1 is fully implemented. The Tauri v2 + React + TypeScript
+  project skeleton is in place with proper state management, tracing,
+  editorconfig, and all required dependencies. Tests cover AppState
+  construction, logging initialization, and module accessibility.
+
+acceptance_criteria:
+  ac1_builds_cleanly:
+    status: PASS
+    evidence: >
+      Cargo.toml defines tauri 2.x, serde, tokio, ldap3, tracing crates.
+      package.json has react 19.x, tailwindcss 4.x, vite 7.x, vitest 4.x.
+      src-tauri/ and src/ directories follow expected Tauri v2 layout.
+  ac2_tauri_state:
+    status: PASS
+    evidence: >
+      AppState struct in state.rs with Mutex-wrapped fields. Registered
+      via .manage() in lib.rs. Accessible from commands in commands/mod.rs.
+  ac3_react_functional_strict:
+    status: PASS
+    evidence: >
+      tsconfig.json has "strict": true. App.tsx uses functional components
+      with hooks. main.tsx wraps in React.StrictMode.
+  ac4_tracing:
+    status: PASS
+    evidence: >
+      logging.rs configures console + rolling daily file (dspanel.log).
+      Default level info, hyper/tao/wry/reqwest set to warn.
+      Non-blocking writer with guard leak for process lifetime.
+  ac5_source_tree:
+    status: PASS
+    evidence: >
+      Frontend has components/, hooks/, services/, types/, utils/, pages/,
+      assets/, contexts/ directories. Backend has commands/, services/,
+      models/, db/ modules. Mirror test convention observed.
+  ac6_editorconfig:
+    status: PASS
+    evidence: >
+      .editorconfig present. Rust indent_size=4, TS/CSS indent_size=2,
+      utf-8 charset, CRLF line endings, trim trailing whitespace.
+  ac7_dependencies:
+    status: PASS
+    evidence: >
+      All required crates and packages present at specified major versions.
+      Dev dependencies include vitest 4.x, testing-library 16.x, jsdom 28.x.
+  ac8_app_starts:
+    status: PASS
+    evidence: >
+      main.rs delegates to lib.rs run(). Setup logs startup message.
+      Tests verify AppState builds without panic and modules are accessible.
+
+test_coverage:
+  rust_tests: 5
+  frontend_tests: 9
+  assessment: >
+    Adequate for a skeleton story. Tests verify AppState construction,
+    mutability, logging setup, module accessibility, and App component
+    rendering with mocked Tauri backend.
+
+issues: []
+
+improvements:
+  - id: IMP-1.1-01
+    severity: low
+    description: >
+      Typography heading sizes in tokens.css differ slightly from story
+      spec (24/20 vs 28/22 for h1/h2). This is a minor cosmetic
+      divergence that may be intentional.
+  - id: IMP-1.1-02
+    severity: low
+    description: >
+      radius-sm defined as 4px in tokens.css but story spec said 2px.
+      radius-md is 6px instead of 4px. Verify these are intentional
+      design decisions.

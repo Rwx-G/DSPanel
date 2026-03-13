@@ -1,0 +1,72 @@
+gate: CONCERNS
+story: "1.11"
+title: "Healthcheck Badge"
+reviewed_by: "Quinn (Test Architect)"
+review_date: "2026-03-13"
+status: "Changes Required"
+
+summary: |
+  Core functionality is well-implemented. The evaluateHealth pure function
+  correctly detects all 9 flags with proper severity classification. The
+  HealthBadge component renders correctly with tooltip. However, AC6 states
+  the health check logic should be "a testable Rust service with
+  evaluate_health(user) method, exposed via Tauri command", but the actual
+  implementation is a pure TypeScript function called inline. The story
+  task list acknowledges this deviation ("Note: Implemented as pure
+  TypeScript instead of Rust"), but the AC text was not updated. This is
+  a non-critical concern since the TypeScript implementation is well-tested
+  and functionally equivalent.
+
+criteria:
+  - id: AC1
+    description: "HealthBadge in search results and detail view"
+    status: PASS
+    notes: "HealthBadge rendered in both UserLookup results list (line 169) and UserDetail header (line 281)."
+
+  - id: AC2
+    description: "Badge aggregates all 9 flags"
+    status: PASS
+    notes: "evaluateHealth checks: Disabled, Locked, Expired, PasswordExpired, PasswordNeverExpires, Inactive30Days, Inactive90Days, NeverLoggedOn, PasswordNeverChanged."
+
+  - id: AC3
+    description: "Badge color reflects worst severity"
+    status: PASS
+    notes: "LEVEL_STYLES maps Healthy=green, Info=blue, Warning=orange, Critical=red. Level is computed as worst severity across all flags."
+
+  - id: AC4
+    description: "Tooltip lists all active flags"
+    status: PASS
+    notes: "Custom hover tooltip via onMouseEnter/onMouseLeave, lists flag name, severity icon, and description for each active flag."
+
+  - id: AC5
+    description: "Badge displays Healthy when no issues"
+    status: PASS
+    notes: "Shows 'Healthy' text with CheckCircle icon when flagCount === 0."
+
+  - id: AC6
+    description: "Health check logic is a testable Rust service exposed via Tauri command"
+    status: CONCERN
+    notes: "Implemented as TypeScript pure function (src/services/healthcheck.ts) instead of Rust service. Story task list acknowledges this ('Note: Implemented as pure TypeScript'). The AC text should be updated to match the actual implementation. The function is well-tested (18 tests) and functionally correct."
+
+  - id: AC7
+    description: "Comprehensive unit tests for every flag and combination"
+    status: PASS
+    notes: "18 evaluateHealth tests + 8 HealthBadge tests. Covers all flags individually, boundary conditions (exactly 30/90 days), combinations, severity escalation, null handling."
+
+test_coverage:
+  healthcheck_tests: 18
+  health_badge_tests: 8
+  user_lookup_health_tests: 2
+  rust_tests: 0
+  assessment: "Excellent test coverage for the TypeScript implementation. No Rust tests since the Rust service was not implemented."
+
+issues:
+  - severity: low
+    description: "AC6 specifies Rust service + Tauri command but implementation is TypeScript. Story acknowledges this but AC text should be updated."
+  - severity: low
+    description: "Dev Notes section still references Rust types (src-tauri/src/models/health.rs) and Rust integration pattern that were not implemented. Dev Notes should be updated to reflect actual architecture."
+
+improvements:
+  - "Update AC6 text to reflect the actual TypeScript implementation, or create a follow-up task to implement the Rust service if needed for Epic 2 write operations."
+  - "Update Dev Notes to remove references to non-existent Rust files (src-tauri/src/models/health.rs, src-tauri/src/services/health.rs, src-tauri/src/commands/health.rs)."
+  - "Consider adding keyboard accessibility to the tooltip (currently mouse-only hover)."

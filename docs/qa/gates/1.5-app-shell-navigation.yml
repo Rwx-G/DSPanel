@@ -1,0 +1,41 @@
+story: "1.5"
+title: "Application Shell, Navigation and Tab System"
+reviewer: "Quinn (Test Architect)"
+date: "2026-03-13"
+gate: PASS
+
+summary: >
+  All critical acceptance criteria are met. The app shell provides a
+  three-zone layout with sidebar, tabbed content, breadcrumbs, and status
+  bar. Navigation context is fully functional with tab deduplication,
+  drag-to-reorder, and keyboard shortcuts. Responsive sidebar
+  auto-collapses at the 900px breakpoint. Two minor tab features (Close
+  All context menu, overflow scroll buttons) and window state persistence
+  are explicitly deferred.
+
+tests:
+  total: 65
+  passing: 65
+  failing: 0
+  coverage_notes: >
+    NavigationContext (16), AppShell (12), TabBar (9), Sidebar (13),
+    Breadcrumbs (4), StatusBar (11). All pass.
+
+acceptance_criteria:
+  ac1_layout: PASS
+  ac2_sidebar: PASS
+  ac3_tabs: PARTIAL
+  ac3_notes: "Close All context menu and overflow scroll buttons deferred"
+  ac4_breadcrumbs: PASS
+  ac5_status_bar: PASS
+  ac6_nav_service: PASS
+  ac7_keyboard: PASS
+  ac8_window_state: DEFERRED
+  ac9_responsive: PASS
+
+issues: []
+
+recommendations:
+  - "Implement tab overflow scroll buttons when tab count grows"
+  - "Implement Close All via right-click context menu"
+  - "Memoize openTab callback to reduce downstream re-renders"

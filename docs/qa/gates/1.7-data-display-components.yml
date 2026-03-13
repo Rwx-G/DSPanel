@@ -1,0 +1,57 @@
+story: "1.7"
+title: "Data Display Components"
+reviewer: "Quinn (Test Architect)"
+date: "2026-03-13"
+gate: CONCERNS
+
+summary: >
+  Six of seven planned components are implemented and tested (DataTable,
+  FilterBar, Pagination, PropertyGrid, TreeView, DiffViewer).
+  VirtualizedList is entirely missing. DataTable lacks column resize
+  handles. DiffViewer side-by-side mode lacks synchronized scrolling.
+  Story status says "Done" but task checkboxes are all unchecked,
+  indicating a status/tracking discrepancy. CSV export utility is
+  implemented and tested.
+
+tests:
+  total: 40+
+  passing: all
+  failing: 0
+  coverage_notes: >
+    Test files for DataTable, FilterBar, Pagination, PropertyGrid,
+    TreeView, DiffViewer, and csvExport. All pass.
+
+acceptance_criteria:
+  ac1_data_table: PARTIAL
+  ac1_notes: "Column resize handles not implemented"
+  ac2_filter_bar: PASS
+  ac3_pagination: PASS
+  ac4_virtualized_list: FAIL
+  ac4_notes: "Component file does not exist"
+  ac5_property_grid: PASS
+  ac6_tree_view: PASS
+  ac7_diff_viewer: PARTIAL
+  ac7_notes: "Side-by-side synchronized scrolling not implemented"
+  ac8_theme: PASS
+  ac9_states: PASS
+  ac10_csv_export: PARTIAL
+  ac10_notes: "Utility exists but no context menu integration in DataTable"
+
+issues:
+  - severity: high
+    description: "VirtualizedList component is completely missing (AC #4)"
+  - severity: medium
+    description: "DataTable lacks column resize drag handles (AC #1)"
+  - severity: medium
+    description: "DiffViewer side-by-side mode does not synchronize scroll (AC #7)"
+  - severity: low
+    description: "Story status says Done but all task checkboxes are unchecked"
+  - severity: low
+    description: "CSV export context menu not wired to DataTable (AC #10)"
+
+recommendations:
+  - "Implement VirtualizedList with @tanstack/react-virtual"
+  - "Add column resize handles to DataTable"
+  - "Add synchronized scrolling to DiffViewer side-by-side mode"
+  - "Integrate CSV export into DataTable via context menu"
+  - "Update story task checkboxes to reflect actual state"

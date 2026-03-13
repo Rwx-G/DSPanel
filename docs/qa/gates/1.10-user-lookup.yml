@@ -1,0 +1,73 @@
+gate: PASS
+story: "1.10"
+title: "User Account Lookup"
+reviewed_by: "Quinn (Test Architect)"
+review_date: "2026-03-13"
+status: "Ready for Done"
+
+summary: |
+  All 9 acceptance criteria are met. The UserLookup page implements a
+  complete search-results-detail workflow with proper state machine
+  (initial/loading/results/empty/error). Backend Tauri commands are
+  registered and functional. Test coverage is solid across frontend
+  component tests, type mapping tests, and DN utility tests.
+
+criteria:
+  - id: AC1
+    description: "Search bar with multiple field matching, Enter/button trigger"
+    status: PASS
+    notes: "SearchBar at top, onSearch triggers invoke('search_users', {query}). Trims whitespace, skips empty queries."
+
+  - id: AC2
+    description: "Results list with name, department, account status"
+    status: PASS
+    notes: "Left panel w-64 shows user icon, displayName, samAccountName, department, and HealthBadge (which supersedes simple status badge)."
+
+  - id: AC3
+    description: "Detail view with identity fields"
+    status: PASS
+    notes: "PropertyGrid with Identity section: DisplayName, GivenName, Surname, Email, Department, Title. Location section: OU path, DN."
+
+  - id: AC4
+    description: "Account status indicators"
+    status: PASS
+    notes: "StatusBadge for Enabled/Disabled, Locked badge. Account Status section in PropertyGrid."
+
+  - id: AC5
+    description: "Authentication info display"
+    status: PASS
+    notes: "Authentication section: BadPasswordCount, LastLogon, LastLogonWorkstation. Dates section: PasswordLastSet, PasswordExpired, PasswordNeverExpires, WhenCreated, WhenChanged."
+
+  - id: AC6
+    description: "Group memberships in sortable/filterable DataTable"
+    status: PASS
+    notes: "DataTable with Group Name (parsed from DN) and DN columns, both sortable. FilterBar with text filter for group names."
+
+  - id: AC7
+    description: "Async LDAP queries with loading spinner"
+    status: PASS
+    notes: "LoadingSpinner displayed during 'loading' state with 'Searching...' message."
+
+  - id: AC8
+    description: "Empty state when no results"
+    status: PASS
+    notes: "EmptyState with UserX icon and 'No users found' message including the query string."
+
+  - id: AC9
+    description: "Error state with retry"
+    status: PASS
+    notes: "EmptyState with AlertCircle icon, error message, and Retry button that re-executes the last query."
+
+test_coverage:
+  frontend_tests: 13
+  type_mapping_tests: 13
+  dn_utility_tests: 13
+  rust_command_tests: 6
+  assessment: "Good coverage. The UserLookup page has 13 tests covering all states. Type mapping has 13 tests. DN utilities have 13 tests."
+
+issues: []
+
+improvements:
+  - "Search cancellation is deferred (AbortController not supported by Tauri invoke). If a user types fast, multiple searches may overlap. Consider adding a request ID or ignoring stale responses."
+  - "The userPrincipalName field is defined in the story's DirectoryUser table but not displayed in the detail view PropertyGrid. Consider adding it to the Identity section."
+  - "Auto-select on single result works but does not highlight the item in the results list visually (though technically it does via the bg-selected class check)."

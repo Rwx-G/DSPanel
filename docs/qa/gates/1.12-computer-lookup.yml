@@ -1,0 +1,63 @@
+gate: CONCERNS
+story: "1.12"
+title: "Computer Account Lookup"
+reviewed_by: "Quinn (Test Architect)"
+review_date: "2026-03-13"
+status: "Changes Required"
+
+summary: |
+  Core computer lookup functionality is well-implemented and mirrors
+  the UserLookup pattern. Ping and DNS resolution Tauri commands are
+  functional. Test coverage is good for the frontend. AC6 (tab system
+  integration) is explicitly deferred. Two non-critical concerns exist
+  around Rust-side ping/DNS test coverage and the deferred tab integration.
+
+criteria:
+  - id: AC1
+    description: "Search bar with exact and partial matching"
+    status: PASS
+    notes: "SearchBar with invoke('search_computers', {query}). Same pattern as UserLookup."
+
+  - id: AC2
+    description: "Detail view with computer properties"
+    status: PASS
+    notes: "PropertyGrid with Identity (name, DNS, OS, OS version), Status (enabled, lastLogon), Location (OU, DN), Network (IP addresses, ping result)."
+
+  - id: AC3
+    description: "Group memberships in sortable/filterable DataTable"
+    status: PASS
+    notes: "Same DataTable/FilterBar pattern as UserLookup. Group Name parsed from DN, sortable columns."
+
+  - id: AC4
+    description: "Ping button with reachable/unreachable status"
+    status: PASS
+    notes: "Ping button calls invoke('ping_host', {hostname}). Shows 'Pinging...' during operation, 'Reachable (Xms)' or 'Unreachable' result. Button disabled when pinging or no DNS hostname."
+
+  - id: AC5
+    description: "DNS resolution displays resolved IP addresses"
+    status: PASS
+    notes: "Auto-resolves via useEffect when selectedComputer changes. Calls invoke('resolve_dns', {hostname}). Shows IP addresses joined with comma or 'Resolving...' or 'DNS resolution failed'."
+
+  - id: AC6
+    description: "Tab system integration for consistent navigation"
+    status: CONCERN
+    notes: "Explicitly deferred in task list. ComputerLookup is registered in NavigationContext modules and routed via ModuleRouter in App.tsx, but the tab system page routing (opening multiple tabs to different computers) is not yet implemented."
+
+test_coverage:
+  frontend_page_tests: 13
+  type_mapping_tests: 8
+  rust_command_tests: 6
+  rust_ping_dns_tests: 0
+  assessment: "Good frontend coverage. However, the Rust ping_host and resolve_dns commands lack dedicated unit tests - they are only tested indirectly through the Tauri command integration. The ping command uses system ping which is hard to unit test, but DNS resolution could have trait-based mocking."
+
+issues:
+  - severity: low
+    description: "AC6 (tab system integration) is deferred. The story should be kept at Done only if this is tracked as a follow-up."
+  - severity: low
+    description: "No Rust-side unit tests for ping_host and resolve_dns commands. ping_host uses synchronous std::process::Command which could block the async runtime."
+
+improvements:
+  - "ping_host uses std::process::Command::output() synchronously inside an async function. Consider using tokio::process::Command for non-blocking execution."
+  - "Add Rust unit tests for DNS resolution (at minimum, test the error path and empty results handling)."
+  - "Track AC6 tab system integration as a separate follow-up task."
+  - "Consider adding a timeout visual indicator for DNS resolution (currently shows 'Resolving...' indefinitely if the DNS lookup hangs)."
