@@ -31,7 +31,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Tauri commands: search_users and get_user delegating to DirectoryProvider
 - DirectoryUser type with mapEntryToUser mapping from DirectoryEntry attributes
 - DN parsing utilities: parseOuBreadcrumb, parseCnFromDn, formatOuPath
-- 455 frontend tests + 103 Rust tests = 558 total tests
+- Healthcheck badge with 9 account flags: Disabled, Locked, Expired, PasswordExpired, PasswordNeverExpires, Inactive30/90Days, NeverLoggedOn, PasswordNeverChanged (Story 1.11)
+- evaluateHealth() pure function with injectable clock for deterministic testing
+- HealthBadge component with severity colors, icons, and hover tooltip showing all active flags
+- 481 frontend tests + 103 Rust tests = 584 total tests
 
 ### Changed
 
