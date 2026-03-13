@@ -51,6 +51,12 @@
   --color-perm-accountops: #ff9800;
   --color-perm-domainadmin: #f44336;
 
+  /* Diff */
+  --color-diff-added-bg: rgba(76, 175, 80, 0.12);
+  --color-diff-added-text: #2e7d32;
+  --color-diff-removed-bg: rgba(244, 67, 54, 0.12);
+  --color-diff-removed-text: #c62828;
+
   /* Scrollbar */
   --color-scrollbar-track: transparent;
   --color-scrollbar-thumb: #c0c0c0;
