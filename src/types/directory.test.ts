@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { mapEntryToUser, type DirectoryEntry } from "./directory";
+import {
+  mapEntryToUser,
+  mapEntryToComputer,
+  type DirectoryEntry,
+} from "./directory";
 
 function makeEntry(overrides: Partial<DirectoryEntry> = {}): DirectoryEntry {
   return {
@@ -134,5 +138,85 @@ describe("mapEntryToUser", () => {
       }),
     );
     expect(user.passwordNeverExpires).toBe(true);
+  });
+});
+
+function makeComputerEntry(
+  overrides: Partial<DirectoryEntry> = {},
+): DirectoryEntry {
+  return {
+    distinguishedName: "CN=WS001,OU=Workstations,OU=Computers,DC=corp,DC=local",
+    samAccountName: "WS001$",
+    displayName: "WS001",
+    objectClass: "computer",
+    attributes: {
+      dNSHostName: ["ws001.corp.local"],
+      operatingSystem: ["Windows 11 Enterprise"],
+      operatingSystemVersion: ["10.0 (22631)"],
+      userAccountControl: ["4096"],
+      lastLogon: ["2026-03-12T08:00:00Z"],
+      memberOf: [
+        "CN=Domain Computers,CN=Users,DC=corp,DC=local",
+        "CN=Workstations,OU=Groups,DC=corp,DC=local",
+      ],
+    },
+    ...overrides,
+  };
+}
+
+describe("mapEntryToComputer", () => {
+  it("maps basic identity fields", () => {
+    const computer = mapEntryToComputer(makeComputerEntry());
+    expect(computer.name).toBe("WS001");
+    expect(computer.dnsHostName).toBe("ws001.corp.local");
+    expect(computer.operatingSystem).toBe("Windows 11 Enterprise");
+    expect(computer.osVersion).toBe("10.0 (22631)");
+  });
+
+  it("parses OU from distinguished name", () => {
+    const computer = mapEntryToComputer(makeComputerEntry());
+    expect(computer.organizationalUnit).toBe("Computers > Workstations");
+  });
+
+  it("maps enabled status from userAccountControl", () => {
+    const computer = mapEntryToComputer(makeComputerEntry());
+    expect(computer.enabled).toBe(true);
+  });
+
+  it("detects disabled computer", () => {
+    const computer = mapEntryToComputer(
+      makeComputerEntry({
+        attributes: {
+          ...makeComputerEntry().attributes,
+          userAccountControl: ["4098"],
+        },
+      }),
+    );
+    expect(computer.enabled).toBe(false);
+  });
+
+  it("maps memberOf as string array", () => {
+    const computer = mapEntryToComputer(makeComputerEntry());
+    expect(computer.memberOf).toHaveLength(2);
+  });
+
+  it("maps lastLogon", () => {
+    const computer = mapEntryToComputer(makeComputerEntry());
+    expect(computer.lastLogon).toBe("2026-03-12T08:00:00Z");
+  });
+
+  it("handles missing optional attributes", () => {
+    const computer = mapEntryToComputer(makeComputerEntry({ attributes: {} }));
+    expect(computer.dnsHostName).toBe("");
+    expect(computer.operatingSystem).toBe("");
+    expect(computer.lastLogon).toBeNull();
+    expect(computer.memberOf).toEqual([]);
+  });
+
+  it("strips $ suffix from samAccountName for name", () => {
+    const computer = mapEntryToComputer(
+      makeComputerEntry({ displayName: null }),
+    );
+    expect(computer.name).toBe("WS001");
   });
 });
