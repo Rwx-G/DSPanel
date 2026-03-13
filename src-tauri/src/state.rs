@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use crate::services::DirectoryProvider;
+use crate::services::{DirectoryProvider, PermissionConfig, PermissionService};
 
 /// Global application state managed by Tauri.
 ///
@@ -13,14 +13,20 @@ pub struct AppState {
     pub initialized: Mutex<bool>,
     /// Directory provider for AD operations (trait object behind Arc for sharing).
     pub directory_provider: Arc<dyn DirectoryProvider>,
+    /// Permission service for checking user authorization levels.
+    pub permission_service: PermissionService,
 }
 
 impl AppState {
-    pub fn new(provider: Arc<dyn DirectoryProvider>) -> Self {
+    pub fn new(
+        provider: Arc<dyn DirectoryProvider>,
+        permission_config: PermissionConfig,
+    ) -> Self {
         Self {
             title: Mutex::new("DSPanel".to_string()),
             initialized: Mutex::new(false),
             directory_provider: provider,
+            permission_service: PermissionService::new(permission_config),
         }
     }
 }
@@ -29,10 +35,11 @@ impl AppState {
 mod tests {
     use super::*;
     use crate::services::directory::tests::MockDirectoryProvider;
+    use crate::services::PermissionLevel;
 
     fn make_state() -> AppState {
         let provider = Arc::new(MockDirectoryProvider::new());
-        AppState::new(provider)
+        AppState::new(provider, PermissionConfig::default())
     }
 
     #[test]
@@ -65,7 +72,27 @@ mod tests {
     #[test]
     fn test_app_state_with_disconnected_provider() {
         let provider = Arc::new(MockDirectoryProvider::disconnected());
-        let state = AppState::new(provider);
+        let state = AppState::new(provider, PermissionConfig::default());
         assert!(!state.directory_provider.is_connected());
+    }
+
+    #[test]
+    fn test_app_state_has_permission_service() {
+        let state = make_state();
+        assert_eq!(
+            state.permission_service.current_level(),
+            PermissionLevel::ReadOnly
+        );
+    }
+
+    #[test]
+    fn test_app_state_permission_service_has_permission() {
+        let state = make_state();
+        assert!(state
+            .permission_service
+            .has_permission(PermissionLevel::ReadOnly));
+        assert!(!state
+            .permission_service
+            .has_permission(PermissionLevel::HelpDesk));
     }
 }
