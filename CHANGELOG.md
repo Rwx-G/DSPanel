@@ -27,7 +27,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - DialogContext with Promise-based useDialog hook: showConfirmation, showWarning, showError, showDryRunPreview
 - Toast notification system: NotificationContext with auto-dismiss, severity levels, action buttons, NotificationHost (Story 1.9)
 - InlineProgress compact progress bar for embedding in toolbars
-- 416 frontend tests (365 new for navigation, layout, common, data, form, dialog, and notification components)
+- User account lookup page with search, results list, detail panel (PropertyGrid), and group memberships DataTable (Story 1.10)
+- Tauri commands: search_users and get_user delegating to DirectoryProvider
+- DirectoryUser type with mapEntryToUser mapping from DirectoryEntry attributes
+- DN parsing utilities: parseOuBreadcrumb, parseCnFromDn, formatOuPath
+- 455 frontend tests + 103 Rust tests = 558 total tests
 
 ### Changed
 
