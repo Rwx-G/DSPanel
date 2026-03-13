@@ -24,10 +24,26 @@ export function AppShell({ statusBarProps, children }: AppShellProps) {
   } = useNavigation();
 
   // Track the user's explicit preference (not auto-collapse state)
-  const userPrefersExpanded = useRef(true);
+  // Initialize from localStorage if available
+  const userPrefersExpanded = useRef(
+    (() => {
+      try {
+        const stored = localStorage.getItem("dspanel-sidebar-expanded");
+        return stored !== null ? stored === "true" : true;
+      } catch {
+        return true;
+      }
+    })(),
+  );
 
   const handleToggleSidebar = useCallback(() => {
-    userPrefersExpanded.current = !sidebarExpanded;
+    const newValue = !sidebarExpanded;
+    userPrefersExpanded.current = newValue;
+    try {
+      localStorage.setItem("dspanel-sidebar-expanded", String(newValue));
+    } catch {
+      // localStorage unavailable
+    }
     toggleSidebar();
   }, [sidebarExpanded, toggleSidebar]);
 

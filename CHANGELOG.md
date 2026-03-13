@@ -12,7 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Application shell with collapsible sidebar, tab bar, breadcrumbs, and status bar (Story 1.5)
 - NavigationContext with tab management: open, close, closeAll, activate, move, deduplication by moduleId
 - Keyboard shortcuts: Ctrl+B (toggle sidebar), Ctrl+W (close tab), Ctrl+Tab/Shift+Tab (cycle tabs), Ctrl+1-9 (jump to tab)
-- Auto-collapse sidebar at narrow window widths (<900px)
+- Auto-collapse sidebar at narrow window widths (<900px) with localStorage persistence of user preference
+- TabBar overflow scroll buttons (left/right chevrons) when tabs exceed available width
+- Tab context menu with Close, Close Others, Close All options (right-click)
 - StatusBar with connection indicator, domain info, permission badge, and app version
 - Common reusable controls: SearchBar (debounced), PermissionGate, StatusBadge, Avatar, TagChip, LoadingSpinner, EmptyState, InfoCard, CopyButton (Story 1.6)
 - useDebounce hook and avatar utility functions (getInitials, getAvatarColor)
@@ -24,7 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - useChangeTracker hook with dirty detection and beforeunload guard
 - Validators: isValidSamAccountName, isValidDistinguishedName, isRequired, isMinLength, isMaxLength
 - Dialog system: ConfirmationDialog (severity icons, expandable detail, keyboard Enter/Escape), DryRunPreviewDialog (scrollable change list), ProgressDialog (determinate/indeterminate with cancel) (Story 1.9)
-- DialogContext with Promise-based useDialog hook: showConfirmation, showWarning, showError, showDryRunPreview
+- DialogContext with Promise-based useDialog hook: showConfirmation, showWarning, showError, showDryRunPreview, showCustomDialog
 - Toast notification system: NotificationContext with auto-dismiss, severity levels, action buttons, NotificationHost (Story 1.9)
 - InlineProgress compact progress bar for embedding in toolbars
 - User account lookup page with search, results list, detail panel (PropertyGrid), and group memberships DataTable (Story 1.10)
@@ -33,11 +35,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - DN parsing utilities: parseOuBreadcrumb, parseCnFromDn, formatOuPath
 - Healthcheck badge with 9 account flags: Disabled, Locked, Expired, PasswordExpired, PasswordNeverExpires, Inactive30/90Days, NeverLoggedOn, PasswordNeverChanged (Story 1.11)
 - evaluateHealth() pure function with injectable clock for deterministic testing
-- HealthBadge component with severity colors, icons, and hover tooltip showing all active flags
+- HealthBadge component with severity colors, icons, hover tooltip, and keyboard accessibility (focus/blur)
 - Computer account lookup page with search, results list, detail panel, group memberships DataTable (Story 1.12)
 - Tauri commands: search_computers, ping_host (system ping), resolve_dns (tokio lookup_host)
 - DirectoryComputer type with mapEntryToComputer mapping
-- ComputerLookup detail: Identity, Status, Location, Network sections with ping button and DNS auto-resolution
+- ComputerLookup detail: Identity, Status, Location, Network sections with ping button, DNS auto-resolution with cache and timeout indicator
 - DirectoryError enum with LDAP error code classification (transient vs permanent) and user-friendly messages (Story 1.13)
 - Exponential backoff retry policy with injectable delay function for deterministic testing
 - Circuit breaker (Closed/Open/HalfOpen) with configurable threshold and recovery timeout
@@ -53,6 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - ping_host command migrated from std::process::Command to tokio::process::Command for non-blocking async execution
+- resolve_dns command now has a 5-second timeout to prevent indefinite hanging
 - Health check evaluation moved from TypeScript pure function to Rust backend service with Tauri command
 - Redesigned UI with professional design tokens: Inter + JetBrains Mono fonts, slate-based color palette, improved shadows and radii
 - Sidebar: icon-only collapsed mode with hover tooltips, active indicator bar, DSPanel branding, theme toggle (Sun/Moon)

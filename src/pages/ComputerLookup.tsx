@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { SearchBar } from "@/components/common/SearchBar";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
@@ -183,16 +183,34 @@ function ComputerDetail({ computer }: { computer: DirectoryComputer }) {
   const [pingResult, setPingResult] = useState<string | null>(null);
   const [isPinging, setIsPinging] = useState(false);
   const [resolvedAddresses, setResolvedAddresses] = useState<string[]>([]);
+  const [isResolvingDns, setIsResolvingDns] = useState(false);
+  const dnsCacheRef = useRef<Map<string, string[]>>(new Map());
 
   useEffect(() => {
-    if (computer.dnsHostName) {
-      invoke<string[]>("resolve_dns", { hostname: computer.dnsHostName })
-        .then(setResolvedAddresses)
-        .catch(() => setResolvedAddresses(["DNS resolution failed"]));
-    } else {
+    if (!computer.dnsHostName) {
       setResolvedAddresses([]);
+      setPingResult(null);
+      return;
     }
+
+    const cached = dnsCacheRef.current.get(computer.dnsHostName);
+    if (cached) {
+      setResolvedAddresses(cached);
+      setPingResult(null);
+      return;
+    }
+
+    setIsResolvingDns(true);
+    setResolvedAddresses([]);
     setPingResult(null);
+
+    invoke<string[]>("resolve_dns", { hostname: computer.dnsHostName })
+      .then((addrs) => {
+        dnsCacheRef.current.set(computer.dnsHostName!, addrs);
+        setResolvedAddresses(addrs);
+      })
+      .catch(() => setResolvedAddresses(["DNS resolution failed"]))
+      .finally(() => setIsResolvingDns(false));
   }, [computer.dnsHostName]);
 
   const handlePing = async () => {
@@ -259,10 +277,11 @@ function ComputerDetail({ computer }: { computer: DirectoryComputer }) {
       items: [
         {
           label: "IP Address(es)",
-          value:
-            resolvedAddresses.length > 0
+          value: isResolvingDns
+            ? "Resolving..."
+            : resolvedAddresses.length > 0
               ? resolvedAddresses.join(", ")
-              : "Resolving...",
+              : "N/A",
         },
         { label: "Ping", value: pingResult ?? "Not tested" },
       ],

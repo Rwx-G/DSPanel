@@ -30,6 +30,11 @@ export function HealthBadge({ healthStatus }: HealthBadgeProps) {
       className="relative inline-flex"
       onMouseEnter={() => setShowTooltip(true)}
       onMouseLeave={() => setShowTooltip(false)}
+      onFocus={() => setShowTooltip(true)}
+      onBlur={() => setShowTooltip(false)}
+      tabIndex={0}
+      role="status"
+      aria-label={`Health: ${healthStatus.level}${flagCount > 0 ? `, ${flagCount} issue${flagCount > 1 ? "s" : ""}` : ""}`}
       data-testid="health-badge"
       data-level={healthStatus.level}
     >

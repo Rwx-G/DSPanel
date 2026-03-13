@@ -160,13 +160,16 @@ pub fn evaluate_health_cmd(input: HealthInput) -> AccountHealthStatus {
     crate::services::evaluate_health(&input, now_ms)
 }
 
-/// Resolves a hostname to IP addresses.
+/// Resolves a hostname to IP addresses with a 5-second timeout.
 #[tauri::command]
 pub async fn resolve_dns(hostname: String) -> Result<Vec<String>, AppError> {
     use tokio::net::lookup_host;
+    use tokio::time::{timeout, Duration};
 
-    match lookup_host(format!("{}:0", hostname)).await {
-        Ok(addrs) => {
+    let result = timeout(Duration::from_secs(5), lookup_host(format!("{}:0", hostname))).await;
+
+    match result {
+        Ok(Ok(addrs)) => {
             let ips: Vec<String> = addrs.map(|a| a.ip().to_string()).collect();
             if ips.is_empty() {
                 Err(AppError::Network("No addresses found".to_string()))
@@ -174,7 +177,8 @@ pub async fn resolve_dns(hostname: String) -> Result<Vec<String>, AppError> {
                 Ok(ips)
             }
         }
-        Err(e) => Err(AppError::Network(format!("DNS resolution failed: {}", e))),
+        Ok(Err(e)) => Err(AppError::Network(format!("DNS resolution failed: {}", e))),
+        Err(_) => Err(AppError::Network("DNS resolution timed out".to_string())),
     }
 }
 

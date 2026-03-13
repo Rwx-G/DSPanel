@@ -90,15 +90,17 @@ Complete CSS architecture with tokens, light/dark themes (35+ variables each). R
 
 ### Story 1.5 - App Shell, Navigation and Tab System: PASS
 
-**ACs Met:** 10/12 (2 explicitly deferred)
+**ACs Met:** 12/12
 **Tests:** 65 frontend tests
 
 Three-zone layout with collapsible sidebar, tabbed content area, and status bar. NavigationContext manages full tab lifecycle. Keyboard shortcuts implemented (Ctrl+B, Ctrl+W, Ctrl+Tab, etc.). Breadcrumbs functional.
 
-**Deferred (tracked in story):**
-- Window state persistence (Task 8)
-- Tab "Close All" context menu
-- Tab overflow scroll dropdown
+**Issues Resolved (2026-03-13):**
+| ID | Severity | Finding | Resolution |
+|----|----------|---------|------------|
+| NAV-001 | Low | Sidebar state not persisted | Added localStorage persistence of user sidebar preference |
+| NAV-002 | Low | Tab context menu missing | Added right-click context menu with Close, Close Others, Close All |
+| NAV-003 | Low | Tab overflow not handled | Added scroll buttons (chevrons) when tabs exceed container width |
 
 ---
 
@@ -153,13 +155,15 @@ All form components implemented: FormField, TextInput, PasswordInput, ComboBox, 
 
 ### Story 1.9 - Dialogs, Notifications and Feedback: PASS
 
-**ACs Met:** 8/9 (showCustomDialog deferred)
+**ACs Met:** 9/9
 **Tests:** 66+ frontend tests
 
 DialogContext with useDialog hook. ConfirmationDialog, DryRunPreviewDialog, ProgressDialog all implemented. Toast notification system with auto-dismiss, severity levels, and NotificationHost. InlineProgress for embedded feedback. All keyboard-accessible.
 
-**Deferred (tracked in story):**
-- showCustomDialog method
+**Issues Resolved (2026-03-13):**
+| ID | Severity | Finding | Resolution |
+|----|----------|---------|------------|
+| DLG-001 | Low | showCustomDialog not implemented | Added render-callback pattern with Promise-based resolution |
 
 ---
 
@@ -186,6 +190,7 @@ HealthBadge component with severity-based coloring. All 9 health flags implement
 | ID | Severity | Finding | Resolution |
 |----|----------|---------|------------|
 | HEALTH-001 | Medium | AC6 requires Rust service but implementation was TypeScript | Created Rust evaluate_health() in services/health.rs with 15 tests, Tauri command, frontend updated |
+| HEALTH-002 | Low | HealthBadge tooltip not keyboard-accessible | Added tabIndex, role="status", aria-label, focus/blur handlers |
 
 ---
 
@@ -202,6 +207,8 @@ Computer search with partial matching. Detail view with all required fields (nam
 | COMP-001 | Medium | AC6 (tab system integration) deferred | Verified already implemented in Sidebar.tsx + App.tsx ModuleRouter |
 | COMP-002 | Medium | ping_host uses blocking std::process::Command | Migrated to tokio::process::Command |
 | COMP-003 | Low | No Rust tests for ping/DNS commands | Added 4 Rust tests (ping localhost, invalid host, DNS localhost, invalid DNS) |
+| COMP-004 | Low | DNS resolution can hang indefinitely | Added 5-second tokio::time::timeout to resolve_dns |
+| COMP-005 | Low | No DNS result caching | Added useRef-based DNS cache in ComputerDetail to avoid repeated lookups |
 
 ---
 
@@ -233,9 +240,9 @@ Excellent foundation. AppError and DirectoryError enums with LDAP code mapping. 
 
 | Item | Story | Priority | Needed By |
 |------|-------|----------|-----------|
-| Window state persistence | 1.5 | Low | Nice-to-have |
-| Tab Close All context menu | 1.5 | Low | Nice-to-have |
-| Tab overflow dropdown | 1.5 | Low | When many tabs needed |
+| ~~Window state persistence~~ | ~~1.5~~ | ~~Low~~ | Resolved 2026-03-13 |
+| ~~Tab Close All context menu~~ | ~~1.5~~ | ~~Low~~ | Resolved 2026-03-13 |
+| ~~Tab overflow dropdown~~ | ~~1.5~~ | ~~Low~~ | Resolved 2026-03-13 |
 | Visual tests / Storybook | 1.6 | Low | Before v1.0 |
 | ~~VirtualizedList~~ | ~~1.7~~ | ~~Medium~~ | Resolved 2026-03-13 |
 | ~~DataTable column resize~~ | ~~1.7~~ | ~~Low~~ | Resolved 2026-03-13 |
@@ -243,7 +250,7 @@ Excellent foundation. AppError and DirectoryError enums with LDAP code mapping. 
 | ~~OUPicker~~ | ~~1.8~~ | ~~Medium~~ | Resolved 2026-03-13 |
 | ~~GroupPicker~~ | ~~1.8~~ | ~~Medium~~ | Resolved 2026-03-13 |
 | ~~DateTimePicker~~ | ~~1.8~~ | ~~Low~~ | Resolved 2026-03-13 |
-| showCustomDialog | 1.9 | Low | When custom dialogs needed |
+| ~~showCustomDialog~~ | ~~1.9~~ | ~~Low~~ | Resolved 2026-03-13 |
 | ~~Tab integration for ComputerLookup~~ | ~~1.12~~ | ~~Medium~~ | Verified already implemented 2026-03-13 |
 | ~~Healthcheck as Rust service~~ | ~~1.11~~ | ~~Low~~ | Resolved 2026-03-13 |
 

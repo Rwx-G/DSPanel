@@ -20,6 +20,9 @@ interface DialogContextValue {
   showWarning: (title: string, message: string) => Promise<void>;
   showError: (title: string, message: string, detail?: string) => Promise<void>;
   showDryRunPreview: (changes: DryRunChange[]) => Promise<boolean>;
+  showCustomDialog: <T>(
+    render: (resolve: (value: T | null) => void) => ReactNode,
+  ) => Promise<T | null>;
 }
 
 const DialogContext = createContext<DialogContextValue | null>(null);
@@ -129,9 +132,28 @@ export function DialogProvider({ children }: DialogProviderProps) {
     });
   }, []);
 
+  const showCustomDialog = useCallback(
+    <T,>(render: (resolve: (value: T | null) => void) => ReactNode) => {
+      return new Promise<T | null>((resolve) => {
+        const handleResolve = (value: T | null) => {
+          setDialog(null);
+          resolve(value);
+        };
+        setDialog(render(handleResolve));
+      });
+    },
+    [],
+  );
+
   return (
     <DialogContext.Provider
-      value={{ showConfirmation, showWarning, showError, showDryRunPreview }}
+      value={{
+        showConfirmation,
+        showWarning,
+        showError,
+        showDryRunPreview,
+        showCustomDialog,
+      }}
     >
       {children}
       {dialog}

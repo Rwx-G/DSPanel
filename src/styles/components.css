@@ -290,6 +290,14 @@
   background: var(--color-scrollbar-thumb-hover);
 }
 
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
 /* --- List --- */
 
 .list-item {
