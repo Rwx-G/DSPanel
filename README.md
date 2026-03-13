@@ -8,7 +8,7 @@
   <img src="https://img.shields.io/badge/Rust-2021-orange.svg" alt="Rust">
   <img src="https://img.shields.io/badge/Tauri-v2-blue.svg" alt="Tauri">
   <img src="https://img.shields.io/badge/Platform-Windows%20|%20macOS%20|%20Linux-0078D6.svg" alt="Platform">
-  <img src="https://img.shields.io/badge/Status-v0.2.0-brightgreen.svg" alt="Status">
+  <img src="https://img.shields.io/badge/Status-v0.1.0-brightgreen.svg" alt="Status">
 </p>
 
 ---
@@ -73,7 +73,7 @@ Download the latest release from [GitHub Releases](https://github.com/Rwx-G/DSPa
 ### Prerequisites
 
 - [Rust](https://rustup.rs/) (latest stable)
-- [Node.js](https://nodejs.org/) (v20+)
+- [Node.js](https://nodejs.org/) (v20+) with [pnpm](https://pnpm.io/)
 - OS-specific dependencies (see [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/))
 
 ### Build
@@ -81,14 +81,14 @@ Download the latest release from [GitHub Releases](https://github.com/Rwx-G/DSPa
 ```bash
 git clone https://github.com/Rwx-G/DSPanel.git
 cd DSPanel
-npm install
-npm run tauri build
+pnpm install
+pnpm tauri build
 ```
 
 ### Dev mode
 
 ```bash
-npm run tauri dev
+pnpm tauri dev
 ```
 
 ## Project Structure

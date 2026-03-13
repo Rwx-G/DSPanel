@@ -7,89 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-03-13
+
+Epic 1 - Foundation and Core Lookup. Full rewrite from C#/WPF to Rust/Tauri v2 + React/TypeScript.
+Cross-platform (Windows, macOS, Linux), lightweight native binary (~8.5 MB).
+
 ### Added
 
-- Application shell with collapsible sidebar, tab bar, breadcrumbs, and status bar (Story 1.5)
-- NavigationContext with tab management: open, close, closeAll, activate, move, deduplication by moduleId
-- Keyboard shortcuts: Ctrl+B (toggle sidebar), Ctrl+W (close tab), Ctrl+Tab/Shift+Tab (cycle tabs), Ctrl+1-9 (jump to tab)
-- Auto-collapse sidebar at narrow window widths (<900px) with localStorage persistence of user preference
-- TabBar overflow scroll buttons (left/right chevrons) when tabs exceed available width
-- Tab context menu with Close, Close Others, Close All options (right-click)
-- StatusBar with connection indicator, domain info, permission badge, and app version
-- Common reusable controls: SearchBar (debounced), PermissionGate, StatusBadge, Avatar, TagChip, LoadingSpinner, EmptyState, InfoCard, CopyButton (Story 1.6)
-- useDebounce hook and avatar utility functions (getInitials, getAvatarColor)
-- Data display components: DataTable (sortable, frozen columns, column resize), FilterBar, Pagination, PropertyGrid, TreeView, DiffViewer (synchronized scroll), VirtualizedList (Story 1.7)
-- CSV export utility with field escaping (csvExport.ts)
-- Diff color tokens for light and dark themes
-- Form controls: FormField, TextInput, PasswordInput (show/hide), ComboBox (searchable), OUPicker (TreeView), GroupPicker (search + multi-select), DateTimePicker (calendar + time), ValidationSummary (Story 1.8)
-- useFormValidation hook with field-level and form-level validation
-- useChangeTracker hook with dirty detection and beforeunload guard
-- Validators: isValidSamAccountName, isValidDistinguishedName, isRequired, isMinLength, isMaxLength
-- Dialog system: ConfirmationDialog (severity icons, expandable detail, keyboard Enter/Escape), DryRunPreviewDialog (scrollable change list), ProgressDialog (determinate/indeterminate with cancel) (Story 1.9)
-- DialogContext with Promise-based useDialog hook: showConfirmation, showWarning, showError, showDryRunPreview, showCustomDialog
-- Toast notification system: NotificationContext with auto-dismiss, severity levels, action buttons, NotificationHost (Story 1.9)
-- InlineProgress compact progress bar for embedding in toolbars
-- User account lookup page with search, results list, detail panel (PropertyGrid), and group memberships DataTable (Story 1.10)
-- Tauri commands: search_users and get_user delegating to DirectoryProvider
-- DirectoryUser type with mapEntryToUser mapping from DirectoryEntry attributes
-- DN parsing utilities: parseOuBreadcrumb, parseCnFromDn, formatOuPath
-- Healthcheck badge with 9 account flags: Disabled, Locked, Expired, PasswordExpired, PasswordNeverExpires, Inactive30/90Days, NeverLoggedOn, PasswordNeverChanged (Story 1.11)
-- evaluateHealth() pure function with injectable clock for deterministic testing
-- HealthBadge component with severity colors, icons, hover tooltip, and keyboard accessibility (focus/blur)
-- User detail view now displays SAM Account Name and User Principal Name fields
-- Computer account lookup page with search, results list, detail panel, group memberships DataTable (Story 1.12)
-- Tauri commands: search_computers, ping_host (system ping), resolve_dns (tokio lookup_host)
-- DirectoryComputer type with mapEntryToComputer mapping
-- ComputerLookup detail: Identity, Status, Location, Network sections with ping button, DNS auto-resolution with cache and timeout indicator
-- DirectoryError enum with LDAP error code classification (transient vs permanent) and user-friendly messages (Story 1.13)
-- Exponential backoff retry policy with injectable delay function for deterministic testing
-- Circuit breaker (Closed/Open/HalfOpen) with configurable threshold and recovery timeout
-- ResilientDirectoryProvider decorator wrapping DirectoryProvider with retry + circuit breaker
-- TimeoutConfig centralizing timeouts: LDAP 30s, Graph API 15s, HIBP 5s, WMI 10s
-- React ErrorBoundary with fallback UI and retry, global unhandled rejection handler
-- Backend error mapping: parseBackendError, mapErrorToNotification, useErrorHandler hook
-- Rust panic hook logging panics via tracing before default handler
-- Rust health check service: evaluate_health() with 9 account flags, exposed via evaluate_health_cmd Tauri command
-- Rust tests for ping_host and resolve_dns commands
-- Snapshot visual tests for all 9 common controls (Story 1.6 AC11)
-- Comprehensive ARIA accessibility attributes across all components (26 issues resolved)
-- 595 frontend tests + 172 Rust tests = 767 total tests
-
-### Changed
-
-- ping_host command migrated from std::process::Command to tokio::process::Command for non-blocking async execution
-- resolve_dns command now has a 5-second timeout to prevent indefinite hanging
-- Health check evaluation moved from TypeScript pure function to Rust backend service with Tauri command
-- Redesigned UI with professional design tokens: Inter + JetBrains Mono fonts, slate-based color palette, improved shadows and radii
-- Sidebar: icon-only collapsed mode with hover tooltips, active indicator bar, DSPanel branding, theme toggle (Sun/Moon)
-- StatusBar: animated ping connection indicator, ring-inset permission badge with color-mix, vertical separators
-- TabBar: bottom-bar active indicator instead of border
-- Breadcrumbs: hover backgrounds, refined height
-- Home screen: Shield icon, QuickAction cards grid, professional welcome layout
-- Dark theme: no pure black backgrounds (slate-900 base), improved contrast ratios
-- All documentation (~45 files) migrated from C#/WPF/.NET references to Rust/Tauri v2 + React/TypeScript
-- Architecture docs rewritten: tech stack, source tree, components, coding standards, error handling, test strategy, deployment
-- All 12 Epic 1 stories rewritten with Rust/TypeScript acceptance criteria, tasks, and code examples
-- All 49 Epic 2-12 stories updated with new stack references
-- PRD updated: requirements, technical assumptions, repo structure, service architecture, testing stack
-- CI workflows rewritten for cargo/pnpm/tauri (build.yml + release.yml)
-- CONTRIBUTING.md rewritten for Rust + Node.js development workflow
-- PR template updated for cargo/pnpm commands
-- Story 2.0 (Error Handling Foundation) moved to Story 1.13 under Epic 1
-
-## [0.2.0] - 2026-03-13
-
-### Changed
-
-- Full migration from C#/WPF (.NET 10) to Rust/Tauri v2 + React/TypeScript
-- Cross-platform support: Windows, macOS, Linux (previously Windows-only)
-- Lightweight native binary (~8.5 MB) instead of .NET runtime dependency
+- Project skeleton: Tauri v2 + React/TS, tracing logging, panic hook (1.1)
+- DirectoryProvider trait with LDAP implementation, Kerberos auth (1.2)
+- Permission detection from AD groups: ReadOnly/HelpDesk/AccountOperator/DomainAdmin (1.3)
+- Theme system with design tokens, dark/light modes, CSS architecture (1.4)
+- Application shell: sidebar, tab bar (drag, context menu, scroll), breadcrumbs, status bar, keyboard shortcuts (1.5)
+- Common controls: SearchBar, PermissionGate, StatusBadge, Avatar, TagChip, LoadingSpinner, EmptyState, InfoCard, CopyButton (1.6)
+- Data display: DataTable, FilterBar, Pagination, PropertyGrid, TreeView, DiffViewer, VirtualizedList, CSV export (1.7)
+- Form controls: FormField, TextInput, PasswordInput, ComboBox, OUPicker, GroupPicker, DateTimePicker, ValidationSummary, useFormValidation, useChangeTracker (1.8)
+- Dialogs and notifications: ConfirmationDialog, DryRunPreviewDialog, ProgressDialog, DialogContext, NotificationContext, InlineProgress (1.9)
+- User account lookup: search, detail panel, group memberships, DN parsing (1.10)
+- Healthcheck badge: 9 account flags with severity levels, Rust backend evaluate_health (1.11)
+- Computer account lookup: search, detail, ping, DNS resolution (1.12)
+- Error handling: DirectoryError, retry with backoff, circuit breaker, ResilientDirectoryProvider, ErrorBoundary, useErrorHandler (1.13)
+- ARIA accessibility across all components
+- All documentation migrated to Rust/Tauri v2 stack (~45 files)
+- CI workflows for cargo/pnpm/tauri
+- 840 tests (632 frontend + 208 Rust), 78% Rust line coverage
 
 ### Removed
 
 - All C#/WPF source code (tagged as `v0.1.0-csharp` for reference)
 
-## [0.1.0] - 2026-03-11
+## [0.1.0-csharp] - 2026-03-11 (archived, see tag `v0.1.0-csharp`)
 
 ### Added
 

@@ -34,3 +34,4 @@ logs/
 
 # Claude Code
 .claude/memory/
+coverage/
