@@ -71,7 +71,7 @@ export function ProgressDialog({
         {cancellable && onCancel && (
           <div className="mt-3 flex justify-end">
             <button
-              className="btn-secondary"
+              className="btn btn-outline btn-sm"
               onClick={onCancel}
               data-testid="progress-cancel"
             >

@@ -22,6 +22,7 @@
   --color-surface-overlay: rgba(15, 23, 42, 0.5);
   --color-surface-hover: rgba(15, 23, 42, 0.04);
   --color-surface-selected: rgba(59, 130, 246, 0.08);
+  --color-surface-ancestor: rgba(15, 23, 42, 0.06);
 
   /* Sidebar */
   --color-sidebar-bg: #f1f5f9;

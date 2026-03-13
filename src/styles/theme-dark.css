@@ -22,6 +22,7 @@
   --color-surface-overlay: rgba(0, 0, 0, 0.6);
   --color-surface-hover: rgba(255, 255, 255, 0.06);
   --color-surface-selected: rgba(96, 165, 250, 0.12);
+  --color-surface-ancestor: rgba(255, 255, 255, 0.08);
 
   /* Sidebar */
   --color-sidebar-bg: #0f172a;
@@ -37,9 +38,9 @@
   --color-text-link: #60a5fa;
 
   /* Borders */
-  --color-border-default: #1e293b;
+  --color-border-default: #334155;
   --color-border-strong: #475569;
-  --color-border-subtle: #1e293b;
+  --color-border-subtle: #263348;
   --color-border-focus: #60a5fa;
 
   /* Semantic */
