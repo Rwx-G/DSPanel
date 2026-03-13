@@ -11,9 +11,39 @@ use std::sync::Arc;
 use services::{LdapDirectoryProvider, PermissionConfig};
 use state::AppState;
 
+/// Installs a custom panic hook that logs panics via tracing before
+/// delegating to the default handler. This ensures panics in async tasks
+/// or background threads are always captured in the log file.
+pub fn install_panic_hook() {
+    let default_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |panic_info| {
+        let location = panic_info
+            .location()
+            .map(|l| format!("{}:{}:{}", l.file(), l.line(), l.column()))
+            .unwrap_or_else(|| "unknown location".to_string());
+
+        let message = if let Some(s) = panic_info.payload().downcast_ref::<&str>() {
+            s.to_string()
+        } else if let Some(s) = panic_info.payload().downcast_ref::<String>() {
+            s.clone()
+        } else {
+            "unknown panic payload".to_string()
+        };
+
+        tracing::error!(
+            location = %location,
+            message = %message,
+            "PANIC: unhandled panic caught by global hook"
+        );
+
+        default_hook(panic_info);
+    }));
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     logging::init_logging("logs");
+    install_panic_hook();
 
     tracing::info!("DSPanel starting up");
 
