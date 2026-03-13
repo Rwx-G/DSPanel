@@ -1,1 +1,3 @@
-// Data models (serde-serializable structs crossing the IPC boundary)
+pub mod directory_entry;
+
+pub use directory_entry::DirectoryEntry;

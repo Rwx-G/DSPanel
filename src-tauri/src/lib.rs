@@ -6,6 +6,9 @@ pub mod models;
 pub mod services;
 pub mod state;
 
+use std::sync::Arc;
+
+use services::LdapDirectoryProvider;
 use state::AppState;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -14,7 +17,8 @@ pub fn run() {
 
     tracing::info!("DSPanel starting up");
 
-    let app_state = AppState::new();
+    let provider = Arc::new(LdapDirectoryProvider::new());
+    let app_state = AppState::new(provider);
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
@@ -31,17 +35,19 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::services::directory::tests::MockDirectoryProvider;
 
     #[test]
     fn test_app_state_builds_without_panic() {
-        let state = AppState::new();
+        let provider = Arc::new(MockDirectoryProvider::new());
+        let state = AppState::new(provider);
         assert_eq!(*state.title.lock().unwrap(), "DSPanel");
     }
 
     #[test]
     fn test_modules_are_accessible() {
-        // Verify all module declarations compile and are accessible
-        let _ = AppState::new();
+        let provider = Arc::new(MockDirectoryProvider::new());
+        let _ = AppState::new(provider);
         let _ = error::AppError::Internal("test".to_string());
     }
 }

@@ -11,11 +11,13 @@ pub fn get_app_title(state: State<'_, AppState>) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::services::directory::tests::MockDirectoryProvider;
+    use std::sync::Arc;
 
     #[test]
     fn test_get_app_title_returns_default() {
-        // Directly test the logic without Tauri runtime
-        let state = AppState::new();
+        let provider = Arc::new(MockDirectoryProvider::new());
+        let state = AppState::new(provider);
         let title = state.title.lock().unwrap().clone();
         assert_eq!(title, "DSPanel");
     }
