@@ -5,9 +5,12 @@ import {
   ChevronLeft,
   ChevronRight,
   Home,
+  Sun,
+  Moon,
   type LucideIcon,
 } from "lucide-react";
 import { useNavigation } from "@/contexts/NavigationContext";
+import { useTheme } from "@/hooks/useTheme";
 import { type SidebarModule } from "@/types/navigation";
 
 const ICON_MAP: Record<string, LucideIcon> = {
@@ -41,6 +44,7 @@ interface SidebarProps {
 
 export function Sidebar({ expanded, onToggle }: SidebarProps) {
   const { openTab, activeTabId, openTabs } = useNavigation();
+  const { currentTheme: mode, toggleTheme } = useTheme();
   const activeModuleId = openTabs.find((t) => t.id === activeTabId)?.moduleId;
 
   const groups = MODULES.reduce(
@@ -54,26 +58,42 @@ export function Sidebar({ expanded, onToggle }: SidebarProps) {
 
   return (
     <aside
-      className="flex flex-col border-r border-[var(--color-border-default)] bg-[var(--color-surface-card)] transition-[width] duration-[var(--transition-normal)]"
-      style={{ width: expanded ? 220 : 48 }}
+      className="flex flex-col border-r border-[var(--color-border-default)] bg-[var(--color-sidebar-bg)] transition-[width] duration-300 ease-in-out"
+      style={{
+        width: expanded
+          ? "var(--sidebar-width-expanded)"
+          : "var(--sidebar-width-collapsed)",
+      }}
       data-testid="sidebar"
     >
-      <button
-        className="btn-ghost flex items-center justify-center p-2"
-        onClick={onToggle}
-        aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
-        data-testid="sidebar-toggle"
-      >
-        {expanded ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
-      </button>
+      {/* Header / Toggle */}
+      <div className="flex h-12 items-center border-b border-[var(--color-border-default)] px-2">
+        {expanded && (
+          <span className="flex-1 truncate px-2 text-body font-semibold text-[var(--color-text-primary)]">
+            DSPanel
+          </span>
+        )}
+        <button
+          className="btn-ghost flex h-8 w-8 shrink-0 items-center justify-center rounded-md p-0"
+          onClick={onToggle}
+          aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
+          data-testid="sidebar-toggle"
+        >
+          {expanded ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
+        </button>
+      </div>
 
-      <nav className="flex-1 overflow-y-auto">
+      {/* Navigation */}
+      <nav className="flex-1 overflow-y-auto py-2">
         {Object.entries(groups).map(([groupName, modules]) => (
-          <div key={groupName} className="mb-2">
+          <div key={groupName} className="mb-1">
             {expanded && (
-              <div className="text-caption px-3 py-1 text-[var(--color-text-secondary)] uppercase tracking-wider">
+              <div className="px-4 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-sidebar-group-label)]">
                 {groupName}
               </div>
+            )}
+            {!expanded && (
+              <div className="mx-2 my-1 border-b border-[var(--color-border-default)]" />
             )}
             {modules.map((mod) => {
               const IconComp = ICON_MAP[mod.icon] ?? User;
@@ -82,18 +102,25 @@ export function Sidebar({ expanded, onToggle }: SidebarProps) {
               return (
                 <button
                   key={mod.id}
-                  className={`flex w-full items-center gap-2 px-3 py-2 text-left transition-colors duration-[var(--transition-fast)] ${
+                  className={`group relative mx-2 mb-0.5 flex w-[calc(100%-16px)] items-center gap-3 rounded-md px-3 py-2 text-left text-body transition-colors duration-150 ${
                     isActive
-                      ? "bg-[var(--color-primary-subtle)] text-[var(--color-primary)]"
-                      : "text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]"
-                  }`}
+                      ? "bg-[var(--color-sidebar-item-active)] font-medium text-[var(--color-primary)]"
+                      : "text-[var(--color-text-secondary)] hover:bg-[var(--color-sidebar-item-hover)] hover:text-[var(--color-text-primary)]"
+                  } ${!expanded ? "justify-center px-0" : ""}`}
                   onClick={() => openTab(mod.label, mod.id, mod.icon)}
-                  title={mod.label}
+                  title={expanded ? undefined : mod.label}
                   data-testid={`sidebar-item-${mod.id}`}
                 >
-                  <IconComp size={18} />
-                  {expanded && (
-                    <span className="text-body truncate">{mod.label}</span>
+                  {isActive && (
+                    <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-[var(--color-primary)]" />
+                  )}
+                  <IconComp size={18} className="shrink-0" />
+                  {expanded && <span className="truncate">{mod.label}</span>}
+                  {/* Tooltip for collapsed mode */}
+                  {!expanded && (
+                    <span className="pointer-events-none absolute left-full z-50 ml-2 whitespace-nowrap rounded-md bg-[var(--color-surface-elevated)] px-2.5 py-1.5 text-caption font-medium text-[var(--color-text-primary)] opacity-0 shadow-md transition-opacity duration-150 group-hover:opacity-100">
+                      {mod.label}
+                    </span>
                   )}
                 </button>
               );
@@ -101,6 +128,34 @@ export function Sidebar({ expanded, onToggle }: SidebarProps) {
           </div>
         ))}
       </nav>
+
+      {/* Footer - Theme toggle */}
+      <div className="border-t border-[var(--color-border-default)] p-2">
+        <button
+          className={`group relative flex w-full items-center gap-3 rounded-md px-3 py-2 text-body text-[var(--color-text-secondary)] transition-colors duration-150 hover:bg-[var(--color-sidebar-item-hover)] hover:text-[var(--color-text-primary)] ${!expanded ? "justify-center px-0" : ""}`}
+          onClick={toggleTheme}
+          title={
+            expanded ? undefined : mode === "dark" ? "Light mode" : "Dark mode"
+          }
+          data-testid="theme-toggle"
+        >
+          {mode === "dark" ? (
+            <Sun size={18} className="shrink-0" />
+          ) : (
+            <Moon size={18} className="shrink-0" />
+          )}
+          {expanded && (
+            <span className="truncate">
+              {mode === "dark" ? "Light mode" : "Dark mode"}
+            </span>
+          )}
+          {!expanded && (
+            <span className="pointer-events-none absolute left-full z-50 ml-2 whitespace-nowrap rounded-md bg-[var(--color-surface-elevated)] px-2.5 py-1.5 text-caption font-medium text-[var(--color-text-primary)] opacity-0 shadow-md transition-opacity duration-150 group-hover:opacity-100">
+              {mode === "dark" ? "Light mode" : "Dark mode"}
+            </span>
+          )}
+        </button>
+      </div>
     </aside>
   );
 }

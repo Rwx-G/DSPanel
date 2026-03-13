@@ -50,6 +50,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Redesigned UI with professional design tokens: Inter + JetBrains Mono fonts, slate-based color palette, improved shadows and radii
+- Sidebar: icon-only collapsed mode with hover tooltips, active indicator bar, DSPanel branding, theme toggle (Sun/Moon)
+- StatusBar: animated ping connection indicator, ring-inset permission badge with color-mix, vertical separators
+- TabBar: bottom-bar active indicator instead of border
+- Breadcrumbs: hover backgrounds, refined height
+- Home screen: Shield icon, QuickAction cards grid, professional welcome layout
+- Dark theme: no pure black backgrounds (slate-900 base), improved contrast ratios
 - All documentation (~45 files) migrated from C#/WPF/.NET references to Rust/Tauri v2 + React/TypeScript
 - Architecture docs rewritten: tech stack, source tree, components, coding standards, error handling, test strategy, deployment
 - All 12 Epic 1 stories rewritten with Rust/TypeScript acceptance criteria, tasks, and code examples

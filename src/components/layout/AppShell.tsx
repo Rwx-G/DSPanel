@@ -92,7 +92,7 @@ export function AppShell({ statusBarProps, children }: AppShellProps) {
         <main className="flex flex-1 flex-col overflow-hidden">
           <Breadcrumbs />
           <TabBar />
-          <div className="flex-1 overflow-auto p-4">{children}</div>
+          <div className="flex-1 overflow-auto">{children}</div>
         </main>
       </div>
       <StatusBar {...statusBarProps} />

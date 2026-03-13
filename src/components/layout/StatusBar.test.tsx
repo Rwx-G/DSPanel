@@ -64,13 +64,17 @@ describe("StatusBar", () => {
 
   it("should apply success color class to indicator when connected", () => {
     render(<StatusBar {...defaultProps} />);
-    const svg = screen.getByTestId("status-bar").querySelector("svg");
-    expect(svg?.getAttribute("class")).toContain("color-success");
+    const dot = screen
+      .getByTestId("status-bar")
+      .querySelector("span.relative.inline-flex.rounded-full");
+    expect(dot?.className).toContain("color-success");
   });
 
   it("should apply error color class to indicator when disconnected", () => {
     render(<StatusBar {...defaultProps} isConnected={false} />);
-    const svg = screen.getByTestId("status-bar").querySelector("svg");
-    expect(svg?.getAttribute("class")).toContain("color-error");
+    const dot = screen
+      .getByTestId("status-bar")
+      .querySelector("span.relative.inline-flex.rounded-full");
+    expect(dot?.className).toContain("color-error");
   });
 });

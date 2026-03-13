@@ -66,14 +66,18 @@ describe("Sidebar", () => {
     expect(screen.getByText("Computer Lookup")).toBeInTheDocument();
   });
 
-  it("should hide module labels when collapsed", () => {
+  it("should hide module labels when collapsed but show tooltips", () => {
     render(
       <NavigationProvider>
         <Sidebar expanded={false} onToggle={vi.fn()} />
       </NavigationProvider>,
     );
-    expect(screen.queryByText("User Lookup")).not.toBeInTheDocument();
-    expect(screen.queryByText("Computer Lookup")).not.toBeInTheDocument();
+    // Labels are hidden but tooltip spans still contain the text
+    const userLabels = screen.getAllByText("User Lookup");
+    // Only tooltip span should remain (no inline label)
+    userLabels.forEach((el) => {
+      expect(el.className).toContain("pointer-events-none");
+    });
   });
 
   it("should show group headers when expanded", () => {
@@ -116,22 +120,26 @@ describe("Sidebar", () => {
     expect(item.className).toContain("color-primary");
   });
 
-  it("should set width to 220px when expanded", () => {
+  it("should set width via CSS variable when expanded", () => {
     render(
       <NavigationProvider>
         <Sidebar expanded={true} onToggle={vi.fn()} />
       </NavigationProvider>,
     );
-    expect(screen.getByTestId("sidebar")).toHaveStyle({ width: "220px" });
+    expect(screen.getByTestId("sidebar")).toHaveStyle({
+      width: "var(--sidebar-width-expanded)",
+    });
   });
 
-  it("should set width to 48px when collapsed", () => {
+  it("should set width via CSS variable when collapsed", () => {
     render(
       <NavigationProvider>
         <Sidebar expanded={false} onToggle={vi.fn()} />
       </NavigationProvider>,
     );
-    expect(screen.getByTestId("sidebar")).toHaveStyle({ width: "48px" });
+    expect(screen.getByTestId("sidebar")).toHaveStyle({
+      width: "var(--sidebar-width-collapsed)",
+    });
   });
 
   it("should have accessible label for expand", () => {
@@ -152,10 +160,10 @@ describe("Sidebar", () => {
     expect(screen.getByLabelText("Collapse sidebar")).toBeInTheDocument();
   });
 
-  it("should have title attribute on module items", () => {
+  it("should have title attribute on module items when collapsed", () => {
     render(
       <NavigationProvider>
-        <Sidebar expanded={true} onToggle={vi.fn()} />
+        <Sidebar expanded={false} onToggle={vi.fn()} />
       </NavigationProvider>,
     );
     expect(screen.getByTestId("sidebar-item-users")).toHaveAttribute(

@@ -71,13 +71,13 @@ describe("AppShell", () => {
   it("should toggle sidebar on Ctrl+B", () => {
     renderAppShell();
     const sidebar = screen.getByTestId("sidebar");
-    expect(sidebar).toHaveStyle({ width: "220px" });
+    expect(sidebar).toHaveStyle({ width: "var(--sidebar-width-expanded)" });
 
     fireEvent.keyDown(window, { key: "b", ctrlKey: true });
-    expect(sidebar).toHaveStyle({ width: "48px" });
+    expect(sidebar).toHaveStyle({ width: "var(--sidebar-width-collapsed)" });
 
     fireEvent.keyDown(window, { key: "b", ctrlKey: true });
-    expect(sidebar).toHaveStyle({ width: "220px" });
+    expect(sidebar).toHaveStyle({ width: "var(--sidebar-width-expanded)" });
   });
 
   it("should close active tab on Ctrl+W", () => {
@@ -151,7 +151,9 @@ describe("AppShell", () => {
     // Trigger resize
     fireEvent(window, new Event("resize"));
 
-    expect(screen.getByTestId("sidebar")).toHaveStyle({ width: "48px" });
+    expect(screen.getByTestId("sidebar")).toHaveStyle({
+      width: "var(--sidebar-width-collapsed)",
+    });
   });
 
   it("should keep sidebar expanded on wide window", () => {
@@ -165,6 +167,8 @@ describe("AppShell", () => {
 
     fireEvent(window, new Event("resize"));
 
-    expect(screen.getByTestId("sidebar")).toHaveStyle({ width: "220px" });
+    expect(screen.getByTestId("sidebar")).toHaveStyle({
+      width: "var(--sidebar-width-expanded)",
+    });
   });
 });

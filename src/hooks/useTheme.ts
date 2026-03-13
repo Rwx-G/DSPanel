@@ -5,19 +5,28 @@ export type ThemeMode = "light" | "dark";
 const STORAGE_KEY = "dspanel-theme";
 
 function getSystemTheme(): ThemeMode {
-  if (
-    typeof window !== "undefined" &&
-    window.matchMedia("(prefers-color-scheme: dark)").matches
-  ) {
-    return "dark";
+  try {
+    if (
+      typeof window !== "undefined" &&
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-color-scheme: dark)").matches
+    ) {
+      return "dark";
+    }
+  } catch {
+    // matchMedia may not be available in test environments
   }
   return "light";
 }
 
 function getSavedTheme(): ThemeMode | null {
   if (typeof window === "undefined") return null;
-  const saved = localStorage.getItem(STORAGE_KEY);
-  if (saved === "light" || saved === "dark") return saved;
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved === "light" || saved === "dark") return saved;
+  } catch {
+    // localStorage may not be available in test environments
+  }
   return null;
 }
 

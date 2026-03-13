@@ -83,7 +83,7 @@ describe("App", () => {
 
     render(<App />);
 
-    expect(screen.getByTestId("status-version")).toHaveTextContent("v0.1.0");
+    expect(screen.getByTestId("status-version")).toHaveTextContent("v0.2.0");
   });
 
   it("should call get_app_title on mount", () => {
