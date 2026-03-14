@@ -23,6 +23,9 @@ export function PasswordFlagsEditor({
   const [passwordNeverExpires, setPasswordNeverExpires] = useState(
     user.passwordNeverExpires,
   );
+  // User Cannot Change Password is read-only (DACL modification not yet implemented)
+  const userCannotChangePassword = false;
+
   const [saving, setSaving] = useState(false);
 
   const isDirty = useMemo(
@@ -96,6 +99,22 @@ export function PasswordFlagsEditor({
         />
         <span className="text-body text-[var(--color-text-primary)]">
           Password Never Expires
+        </span>
+      </label>
+
+      <label className="flex items-center gap-2">
+        <input
+          type="checkbox"
+          checked={userCannotChangePassword}
+          disabled
+          className="rounded border-[var(--color-border-default)] opacity-50"
+          data-testid="user-cannot-change-password-checkbox"
+        />
+        <span className="text-body text-[var(--color-text-secondary)]">
+          User Cannot Change Password
+        </span>
+        <span className="text-caption text-[var(--color-text-secondary)] italic">
+          (requires DACL - not yet supported)
         </span>
       </label>
 
