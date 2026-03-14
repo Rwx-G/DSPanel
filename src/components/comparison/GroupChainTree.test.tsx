@@ -135,6 +135,37 @@ describe("GroupChainTree", () => {
     });
   });
 
+  it("detects circular reference and shows warning", async () => {
+    // IT Team contains a sub-group that contains IT Team again
+    const topMembers = [makeGroup("Sub-Group")];
+    const subMembers = [makeGroup("IT Team")]; // circular!
+
+    mockInvoke
+      .mockResolvedValueOnce(topMembers)
+      .mockResolvedValueOnce(subMembers);
+
+    render(
+      <GroupChainTree
+        groupDn="CN=IT Team,OU=Groups,DC=contoso,DC=com"
+        groupName="IT Team"
+      />,
+    );
+
+    // Expand IT Team
+    fireEvent.click(screen.getByTestId("group-chain-toggle-IT Team"));
+    await waitFor(() => {
+      expect(screen.getByTestId("group-chain-toggle-Sub-Group")).toBeInTheDocument();
+    });
+
+    // Expand Sub-Group
+    fireEvent.click(screen.getByTestId("group-chain-toggle-Sub-Group"));
+    await waitFor(() => {
+      // IT Team appears again but with circular reference warning
+      expect(screen.getByTestId("circular-ref-IT Team")).toBeInTheDocument();
+      expect(screen.getByText("(circular reference)")).toBeInTheDocument();
+    });
+  });
+
   it("collapses on second click", async () => {
     mockInvoke.mockResolvedValueOnce([makeUser("jdoe", "John Doe")]);
 
