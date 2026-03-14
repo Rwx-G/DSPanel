@@ -163,26 +163,27 @@ export function NtfsAnalyzer() {
       </h1>
 
       {/* Controls */}
-      <div className="flex items-end gap-3">
-        <div className="flex-1">
-          <label className="mb-1 block text-caption font-medium text-[var(--color-text-secondary)]">
-            UNC Path
-          </label>
-          <input
-            type="text"
-            className="w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-bg)] px-3 py-1.5 text-body text-[var(--color-text-primary)] placeholder-[var(--color-text-secondary)] focus:border-[var(--color-primary)] focus:outline-none"
-            placeholder="\\\\server\\share\\folder"
-            value={uncPath}
-            onChange={(e) => setUncPath(e.target.value)}
-            data-testid="analyzer-path-input"
-          />
-        </div>
-        <div className="w-32">
-          <label className="mb-1 block text-caption font-medium text-[var(--color-text-secondary)]">
-            Depth
-          </label>
-          <select
-            className="w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-bg)] px-3 py-1.5 text-body text-[var(--color-text-primary)]"
+      <div>
+        <div className="flex items-end gap-3">
+          <div className="flex-1">
+            <label className="mb-1 block text-caption font-medium text-[var(--color-text-secondary)]">
+              UNC Path
+            </label>
+            <input
+              type="text"
+              className="w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-bg)] px-3 py-1.5 text-body text-[var(--color-text-primary)] placeholder-[var(--color-text-secondary)] focus:border-[var(--color-primary)] focus:outline-none"
+              placeholder="\\\\server\\share\\folder"
+              value={uncPath}
+              onChange={(e) => setUncPath(e.target.value)}
+              data-testid="analyzer-path-input"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-caption font-medium text-[var(--color-text-secondary)]">
+              Depth
+            </label>
+            <select
+              className="w-40 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-bg)] px-3 py-1.5 text-body text-[var(--color-text-primary)]"
             value={depth}
             onChange={(e) => setDepth(Number(e.target.value))}
             data-testid="depth-selector"
@@ -193,16 +194,18 @@ export function NtfsAnalyzer() {
             <option value={3}>3 levels</option>
             <option value={5}>5 levels</option>
           </select>
+          </div>
+          <button
+            className="btn btn-primary btn-sm flex items-center gap-1.5"
+            style={{ padding: "6px 12px" }}
+            onClick={analyze}
+            disabled={!uncPath.trim() || isAnalyzing}
+            data-testid="analyze-button"
+          >
+            {isAnalyzing ? <LoadingSpinner size="sm" /> : <FolderSearch size={14} />}
+            Analyze
+          </button>
         </div>
-        <button
-          className="btn btn-primary flex items-center gap-1.5 px-4 py-1.5"
-          onClick={analyze}
-          disabled={!uncPath.trim() || isAnalyzing}
-          data-testid="analyze-button"
-        >
-          {isAnalyzing ? <LoadingSpinner size="sm" /> : <FolderSearch size={14} />}
-          Analyze
-        </button>
       </div>
 
       {/* Error */}

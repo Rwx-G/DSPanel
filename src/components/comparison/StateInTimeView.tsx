@@ -70,7 +70,7 @@ export function StateInTimeView({ objectDn, objectType }: StateInTimeViewProps) 
       {/* Load button */}
       {!metadata && (
         <button
-          className="btn btn-primary flex items-center gap-1.5 px-4 py-1.5"
+          className="btn btn-primary btn-sm flex items-center gap-1.5"
           onClick={loadMetadata}
           disabled={isLoading}
           data-testid="load-metadata-button"
@@ -195,7 +195,7 @@ export function StateInTimeView({ objectDn, objectType }: StateInTimeViewProps) 
                   ))}
                 </select>
                 <button
-                  className="btn btn-primary px-4 py-1.5"
+                  className="btn btn-primary btn-sm"
                   onClick={computeDiff}
                   disabled={!selectedFrom || !selectedTo}
                   data-testid="compute-diff-button"

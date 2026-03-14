@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
   type GroupComparisonResult,
@@ -125,6 +125,47 @@ export function useComparison() {
     setFilter("");
   }, []);
 
+  // Track which prefill request we've already processed
+  const lastPrefillRef = useRef<string | null>(null);
+
+  const prefill = useCallback(
+    async (samA: string, samB: string) => {
+      const key = `${samA}::${samB}`;
+      if (lastPrefillRef.current === key) return;
+      lastPrefillRef.current = key;
+
+      setError(null);
+      setComparisonResult(null);
+
+      try {
+        const [entryA, entryB] = await Promise.all([
+          invoke<DirectoryEntry | null>("get_user", { samAccountName: samA }),
+          invoke<DirectoryEntry | null>("get_user", { samAccountName: samB }),
+        ]);
+        setUserA(entryA);
+        setUserB(entryB);
+
+        if (entryA?.samAccountName && entryB?.samAccountName) {
+          setIsComparing(true);
+          try {
+            const result = await invoke<GroupComparisonResult>("compare_users", {
+              samA: entryA.samAccountName,
+              samB: entryB.samAccountName,
+            });
+            setComparisonResult(result);
+          } catch (e) {
+            setError(`Comparison failed: ${e}`);
+          } finally {
+            setIsComparing(false);
+          }
+        }
+      } catch (e) {
+        setError(`Failed to load users: ${e}`);
+      }
+    },
+    [],
+  );
+
   return {
     userA,
     userB,
@@ -142,5 +183,6 @@ export function useComparison() {
     setSortField,
     setSortDirection,
     reset,
+    prefill,
   };
 }

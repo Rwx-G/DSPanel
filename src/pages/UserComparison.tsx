@@ -1,8 +1,9 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Search, GitCompareArrows, RotateCcw, Users, UserPlus } from "lucide-react";
 import { useComparison } from "@/hooks/useComparison";
 import { useDebounce } from "@/hooks/useDebounce";
+import { useNavigation } from "@/contexts/NavigationContext";
 import { type DirectoryEntry } from "@/types/directory";
 import { type GroupCategory, type GroupDisplayItem } from "@/types/comparison";
 import { parseCnFromDn } from "@/utils/dn";
@@ -182,9 +183,19 @@ export function UserComparison() {
     setSortField,
     setSortDirection,
     reset,
+    prefill,
   } = useComparison();
 
   const { notify } = useNotifications();
+  const { openTabs, activeTabId } = useNavigation();
+
+  // React to prefill data passed via tab navigation
+  useEffect(() => {
+    const tab = openTabs.find((t) => t.id === activeTabId && t.moduleId === "user-comparison");
+    if (tab?.data?.compareSamA && tab?.data?.compareSamB) {
+      prefill(tab.data.compareSamA as string, tab.data.compareSamB as string);
+    }
+  }, [activeTabId, openTabs, prefill]);
 
   const [contextMenuPos, setContextMenuPos] = useState<{ x: number; y: number } | null>(null);
   const [contextMenuItems, setContextMenuItems] = useState<ContextMenuItem[]>([]);
@@ -211,7 +222,7 @@ export function UserComparison() {
                 userDn: userA.distinguishedName,
                 groupDn: group.dn,
               });
-              notify(`Added to ${group.name}`, "success");
+              notify(`${userA.displayName ?? userA.samAccountName} added to ${group.name}`, "success");
               compare();
             } catch (err) {
               notify(`Failed to add to group: ${err}`, "error");
@@ -230,7 +241,7 @@ export function UserComparison() {
                 userDn: userB.distinguishedName,
                 groupDn: group.dn,
               });
-              notify(`Added to ${group.name}`, "success");
+              notify(`${userB.displayName ?? userB.samAccountName} added to ${group.name}`, "success");
               compare();
             } catch (err) {
               notify(`Failed to add to group: ${err}`, "error");
@@ -283,7 +294,7 @@ export function UserComparison() {
       {/* Compare button */}
       <div className="flex justify-center">
         <button
-          className="btn btn-primary flex items-center gap-2 px-6 py-2"
+          className="btn btn-primary btn-sm flex items-center gap-1.5"
           onClick={compare}
           disabled={!canCompare}
           data-testid="compare-button"

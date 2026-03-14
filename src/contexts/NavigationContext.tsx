@@ -13,7 +13,7 @@ interface NavigationState {
   breadcrumbs: BreadcrumbSegment[];
   sidebarExpanded: boolean;
   navigateTo: (moduleId: string, title: string) => void;
-  openTab: (title: string, moduleId: string, icon?: string) => TabItem;
+  openTab: (title: string, moduleId: string, icon?: string, data?: Record<string, unknown>) => TabItem;
   closeTab: (tabId: string) => void;
   closeAllTabs: () => void;
   activateTab: (tabId: string) => void;
@@ -58,16 +58,22 @@ export function NavigationProvider({ children }: NavigationProviderProps) {
   const [sidebarExpanded, setSidebarExpanded] = useState(true);
 
   const openTab = useCallback(
-    (title: string, moduleId: string, icon?: string): TabItem => {
+    (title: string, moduleId: string, icon?: string, data?: Record<string, unknown>): TabItem => {
       // Check if tab with same moduleId already exists
       const existing = openTabs.find((t) => t.moduleId === moduleId);
       if (existing) {
+        // Update data if provided
+        if (data) {
+          setOpenTabs((prev) =>
+            prev.map((t) => (t.id === existing.id ? { ...t, data } : t)),
+          );
+        }
         setActiveTabId(existing.id);
         setBreadcrumbs([
           { label: "Home", navigationTarget: "home" },
           { label: title, navigationTarget: moduleId },
         ]);
-        return existing;
+        return { ...existing, data: data ?? existing.data };
       }
 
       const newTab: TabItem = {
@@ -76,6 +82,7 @@ export function NavigationProvider({ children }: NavigationProviderProps) {
         moduleId,
         icon,
         isPinned: false,
+        data,
       };
 
       setOpenTabs((prev) => [...prev, newTab]);

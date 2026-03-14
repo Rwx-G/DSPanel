@@ -316,6 +316,17 @@
   background-color: var(--color-primary-subtle);
 }
 
+/* --- Notification progress bar --- */
+
+@keyframes notification-shrink {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
+}
+
 /* --- Focus visible ring for all interactive elements --- */
 
 :focus-visible {

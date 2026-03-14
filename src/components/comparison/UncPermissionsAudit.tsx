@@ -107,7 +107,7 @@ export function UncPermissionsAudit({ userA, userB }: UncPermissionsAuditProps) 
           />
         </div>
         <button
-          className="btn btn-primary flex items-center gap-1.5 px-4 py-1.5"
+          className="btn btn-primary btn-sm flex items-center gap-1.5"
           onClick={audit}
           disabled={!uncPath.trim() || isAuditing}
           data-testid="audit-button"
