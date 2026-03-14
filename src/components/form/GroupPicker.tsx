@@ -57,7 +57,9 @@ export function GroupPicker({
         const searchResults = await onSearchRef.current(searchText);
         if (!cancelled) {
           setResults(
-            searchResults.filter((g) => !selectedDNs.current.has(g.distinguishedName)),
+            searchResults.filter(
+              (g) => !selectedDNs.current.has(g.distinguishedName),
+            ),
           );
           setIsOpen(true);
         }
@@ -248,14 +250,18 @@ export function GroupPicker({
         </div>
       )}
 
-      {isOpen && !loading && !searchError && results.length === 0 && searchText.trim() && (
-        <div
-          className="absolute z-20 mt-1 w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] shadow-md px-3 py-2 text-caption text-[var(--color-text-secondary)]"
-          data-testid="group-picker-no-results"
-        >
-          No groups found
-        </div>
-      )}
+      {isOpen &&
+        !loading &&
+        !searchError &&
+        results.length === 0 &&
+        searchText.trim() && (
+          <div
+            className="absolute z-20 mt-1 w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] shadow-md px-3 py-2 text-caption text-[var(--color-text-secondary)]"
+            data-testid="group-picker-no-results"
+          >
+            No groups found
+          </div>
+        )}
     </div>
   );
 }

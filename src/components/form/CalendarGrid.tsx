@@ -49,10 +49,7 @@ export const CalendarGrid = memo(function CalendarGrid({
         ))}
       </div>
 
-      <div
-        className="grid grid-cols-7 gap-0"
-        data-testid="date-time-calendar"
-      >
+      <div className="grid grid-cols-7 gap-0" data-testid="date-time-calendar">
         {Array.from({ length: firstDay }, (_, i) => (
           <div key={`empty-${i}`} className="w-8 h-8" />
         ))}

@@ -57,7 +57,8 @@ function makeBrowseResult(entries: DirectoryEntry[], hasMore = false) {
 
 function mockBrowseWith(entries: DirectoryEntry[]) {
   mockInvoke.mockImplementation(((cmd: string) => {
-    if (cmd === "browse_computers") return Promise.resolve(makeBrowseResult(entries));
+    if (cmd === "browse_computers")
+      return Promise.resolve(makeBrowseResult(entries));
     if (cmd === "search_computers") return Promise.resolve(entries);
     if (cmd === "resolve_dns") return Promise.resolve(["10.0.0.1"]);
     return Promise.resolve(null);
@@ -86,14 +87,17 @@ describe("ComputerLookup", () => {
   });
 
   it("shows loading state during initial load", () => {
-    mockInvoke.mockImplementation((() => new Promise(() => {})) as typeof invoke);
+    mockInvoke.mockImplementation(
+      (() => new Promise(() => {})) as typeof invoke,
+    );
     render(<ComputerLookup />);
     expect(screen.getByTestId("computer-lookup-loading")).toBeInTheDocument();
   });
 
   it("shows error state on browse failure", async () => {
     mockInvoke.mockImplementation(((cmd: string) => {
-      if (cmd === "browse_computers") return Promise.reject(new Error("LDAP error"));
+      if (cmd === "browse_computers")
+        return Promise.reject(new Error("LDAP error"));
       return Promise.resolve(null);
     }) as typeof invoke);
 

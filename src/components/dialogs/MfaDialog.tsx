@@ -57,10 +57,7 @@ export function MfaDialog({ onVerified, onCancel }: MfaDialogProps) {
       maxWidth="sm"
     >
       <div className="flex items-center gap-2 border-b border-[var(--color-border-subtle)] px-4 py-3">
-        <ShieldCheck
-          size={20}
-          className="text-[var(--color-primary)]"
-        />
+        <ShieldCheck size={20} className="text-[var(--color-primary)]" />
         <h2 className="text-body font-semibold text-[var(--color-text-primary)]">
           MFA Verification Required
         </h2>
@@ -76,9 +73,7 @@ export function MfaDialog({ onVerified, onCancel }: MfaDialogProps) {
           inputMode="numeric"
           maxLength={8}
           value={code}
-          onChange={(e) =>
-            setCode(e.target.value.replace(/[^0-9]/g, ""))
-          }
+          onChange={(e) => setCode(e.target.value.replace(/[^0-9]/g, ""))}
           onKeyDown={handleKeyDown}
           placeholder="000000"
           className="w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-2 text-center text-lg font-mono tracking-widest text-[var(--color-text-primary)] outline-none focus:border-[var(--color-border-focus)] focus:ring-1 focus:ring-[var(--color-border-focus)]"

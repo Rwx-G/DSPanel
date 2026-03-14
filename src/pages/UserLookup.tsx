@@ -34,9 +34,9 @@ export function UserLookup() {
   } = useUserBrowse();
 
   const [groupFilterText, setGroupFilterText] = useState("");
-  const [healthMap, setHealthMap] = useState<
-    Map<string, AccountHealthStatus>
-  >(new Map());
+  const [healthMap, setHealthMap] = useState<Map<string, AccountHealthStatus>>(
+    new Map(),
+  );
 
   useEffect(() => {
     if (users.length === 0) return;
@@ -146,9 +146,7 @@ export function UserLookup() {
           </p>
         </div>
         {healthMap.get(user.samAccountName) && (
-          <HealthBadge
-            healthStatus={healthMap.get(user.samAccountName)!}
-          />
+          <HealthBadge healthStatus={healthMap.get(user.samAccountName)!} />
         )}
       </button>
     ),
@@ -167,9 +165,15 @@ export function UserLookup() {
         />
       </div>
 
-      <div className="sr-only" aria-live="polite" data-testid="user-lookup-status">
+      <div
+        className="sr-only"
+        aria-live="polite"
+        data-testid="user-lookup-status"
+      >
         {loading && "Loading users..."}
-        {!loading && users.length > 0 && `${users.length} user${users.length > 1 ? "s" : ""} found`}
+        {!loading &&
+          users.length > 0 &&
+          `${users.length} user${users.length > 1 ? "s" : ""} found`}
         {!loading && users.length === 0 && !error && "No users found"}
         {error && `Error: ${error}`}
       </div>
@@ -203,7 +207,11 @@ export function UserLookup() {
             <EmptyState
               icon={<UserX size={48} />}
               title="No users found"
-              description={filterText ? `No users match "${filterText}".` : "No users available."}
+              description={
+                filterText
+                  ? `No users match "${filterText}".`
+                  : "No users available."
+              }
             />
           </div>
         )}

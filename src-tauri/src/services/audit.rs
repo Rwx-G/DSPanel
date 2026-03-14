@@ -251,4 +251,77 @@ mod tests {
         let _ = fs::remove_file(&path);
         let _ = fs::remove_dir(&dir);
     }
+
+    #[test]
+    fn test_log_success_details_preserved() {
+        let svc = AuditService::new_in_memory();
+        svc.log_success(
+            "AccountEnabled",
+            "CN=Jane,DC=corp,DC=com",
+            "Account enabled by operator",
+        );
+        let entries = svc.get_entries();
+        assert_eq!(entries[0].details, "Account enabled by operator");
+        assert_eq!(entries[0].target_dn, "CN=Jane,DC=corp,DC=com");
+        assert!(entries[0].success);
+    }
+
+    #[test]
+    fn test_log_failure_details_preserved() {
+        let svc = AuditService::new_in_memory();
+        svc.log_failure(
+            "AccountDisableFailed",
+            "CN=Bob,DC=corp,DC=com",
+            "LDAP error: insufficient access",
+        );
+        let entries = svc.get_entries();
+        assert_eq!(entries[0].details, "LDAP error: insufficient access");
+        assert!(!entries[0].success);
+    }
+
+    #[test]
+    fn test_multiple_persist_and_reload() {
+        let dir = std::env::temp_dir().join("dspanel_test_audit_multi");
+        let _ = fs::create_dir_all(&dir);
+        let path = dir.join("audit-multi.json");
+
+        {
+            let svc = AuditService {
+                entries: Mutex::new(Vec::new()),
+                operator: "admin".to_string(),
+                persist_path: Some(path.clone()),
+            };
+            svc.log_success("Action1", "dn1", "first");
+            svc.log_failure("Action2", "dn2", "second failed");
+            svc.log_success("Action3", "dn3", "third");
+            assert_eq!(svc.count(), 3);
+        }
+
+        let loaded = AuditService::load_from_file(&path).unwrap();
+        assert_eq!(loaded.len(), 3);
+        assert_eq!(loaded[0].action, "Action1");
+        assert!(loaded[0].success);
+        assert_eq!(loaded[1].action, "Action2");
+        assert!(!loaded[1].success);
+        assert_eq!(loaded[2].action, "Action3");
+
+        let _ = fs::remove_file(&path);
+        let _ = fs::remove_dir(&dir);
+    }
+
+    #[test]
+    fn test_load_from_nonexistent_file() {
+        let path = PathBuf::from("/tmp/dspanel_nonexistent_audit.json");
+        let loaded = AuditService::load_from_file(&path);
+        assert!(loaded.is_none());
+    }
+
+    #[test]
+    fn test_entry_deserialization() {
+        let json = r#"{"timestamp":"2026-03-14","operator":"admin","action":"Test","targetDn":"CN=X","details":"d","success":true}"#;
+        let entry: AuditEntry = serde_json::from_str(json).unwrap();
+        assert_eq!(entry.action, "Test");
+        assert_eq!(entry.target_dn, "CN=X");
+        assert!(entry.success);
+    }
 }

@@ -533,4 +533,116 @@ mod tests {
         // PasswordFlagsChange not required by default
         assert!(svc.check_mfa_for_action("PasswordFlagsChange").is_ok());
     }
+
+    #[test]
+    fn test_mfa_rate_limiting_blocks_after_max_attempts() {
+        let svc = MfaService::new_in_memory();
+        svc.setup("testuser").unwrap();
+
+        // Fail 5 times
+        for _ in 0..5 {
+            assert!(!svc.verify("000000").unwrap());
+        }
+
+        // 6th attempt should be blocked with an error
+        let result = svc.verify("000000");
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Too many failed MFA attempts"));
+    }
+
+    #[test]
+    fn test_mfa_reset_failed_attempts() {
+        let svc = MfaService::new_in_memory();
+        svc.setup("testuser").unwrap();
+
+        // Fail 3 times
+        for _ in 0..3 {
+            assert!(!svc.verify("000000").unwrap());
+        }
+
+        svc.reset_failed_attempts();
+
+        // Should be able to verify again (not locked out)
+        assert!(!svc.verify("000000").unwrap());
+    }
+
+    #[test]
+    fn test_mfa_successful_verify_resets_failed_count() {
+        let svc = MfaService::new_in_memory();
+        let result = svc.setup("testuser").unwrap();
+
+        // Fail 3 times
+        for _ in 0..3 {
+            assert!(!svc.verify("000000").unwrap());
+        }
+
+        // Succeed with backup code - should reset counter
+        let backup = result.backup_codes[0].clone();
+        assert!(svc.verify(&backup).unwrap());
+
+        // Should be able to fail again without being locked
+        for _ in 0..4 {
+            assert!(!svc.verify("000000").unwrap());
+        }
+    }
+
+    #[test]
+    fn test_mfa_revoke_clears_failed_attempts() {
+        let svc = MfaService::new_in_memory();
+        svc.setup("testuser").unwrap();
+
+        for _ in 0..3 {
+            assert!(!svc.verify("000000").unwrap());
+        }
+
+        svc.revoke();
+
+        // After revoke, not configured
+        assert!(!svc.is_configured());
+        assert!(svc.verify("123456").is_err()); // err because not configured
+    }
+
+    #[test]
+    fn test_mfa_requires_bulk_operations_when_configured() {
+        let svc = MfaService::new_in_memory();
+        let mut config = MfaConfig::default();
+        config.require_for_bulk_operations = true;
+        svc.set_config(config);
+        svc.setup("testuser").unwrap();
+        assert!(svc.requires_mfa("BulkOperation"));
+    }
+
+    #[test]
+    fn test_mfa_default_service() {
+        // Test Default trait implementation
+        let svc = MfaService::new_in_memory();
+        assert!(!svc.is_configured());
+        assert_eq!(svc.config().require_for_password_reset, true);
+    }
+
+    #[test]
+    fn test_mfa_backup_codes_are_8_digits() {
+        let svc = MfaService::new_in_memory();
+        let result = svc.setup("testuser").unwrap();
+        for code in &result.backup_codes {
+            assert_eq!(code.len(), 8);
+            assert!(code.chars().all(|c| c.is_ascii_digit()));
+        }
+    }
+
+    #[test]
+    fn test_mfa_setup_replaces_previous_config() {
+        let svc = MfaService::new_in_memory();
+        let result1 = svc.setup("user1").unwrap();
+        let result2 = svc.setup("user2").unwrap();
+        // New setup should produce different secrets
+        assert_ne!(result1.secret_base32, result2.secret_base32);
+        // Old backup codes should no longer work
+        assert!(!svc.verify(&result1.backup_codes[0]).unwrap());
+        // New backup codes should work
+        assert!(svc.verify(&result2.backup_codes[0]).unwrap());
+    }
 }

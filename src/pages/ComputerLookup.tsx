@@ -4,10 +4,7 @@ import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { EmptyState } from "@/components/common/EmptyState";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { VirtualizedList } from "@/components/data/VirtualizedList";
-import {
-  type DirectoryComputer,
-  mapEntryToComputer,
-} from "@/types/directory";
+import { type DirectoryComputer, mapEntryToComputer } from "@/types/directory";
 import { useBrowse } from "@/hooks/useBrowse";
 import { ComputerDetail } from "@/pages/ComputerDetail";
 import { MonitorX, AlertCircle, Monitor } from "lucide-react";
@@ -89,9 +86,15 @@ export function ComputerLookup() {
         />
       </div>
 
-      <div className="sr-only" aria-live="polite" data-testid="computer-lookup-status">
+      <div
+        className="sr-only"
+        aria-live="polite"
+        data-testid="computer-lookup-status"
+      >
         {loading && "Loading computers..."}
-        {!loading && computers.length > 0 && `${computers.length} computer${computers.length > 1 ? "s" : ""} found`}
+        {!loading &&
+          computers.length > 0 &&
+          `${computers.length} computer${computers.length > 1 ? "s" : ""} found`}
         {!loading && computers.length === 0 && !error && "No computers found"}
         {error && `Error: ${error}`}
       </div>
@@ -125,7 +128,11 @@ export function ComputerLookup() {
             <EmptyState
               icon={<MonitorX size={48} />}
               title="No computers found"
-              description={filterText ? `No computers match "${filterText}".` : "No computers available."}
+              description={
+                filterText
+                  ? `No computers match "${filterText}".`
+                  : "No computers available."
+              }
             />
           </div>
         )}

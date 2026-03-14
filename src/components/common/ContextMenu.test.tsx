@@ -34,9 +34,7 @@ describe("ContextMenu", () => {
 
   it("calls item onClick and onClose when clicked", () => {
     const onClose = vi.fn();
-    const items: ContextMenuItem[] = [
-      { label: "Action", onClick: vi.fn() },
-    ];
+    const items: ContextMenuItem[] = [{ label: "Action", onClick: vi.fn() }];
 
     render(
       <ContextMenu items={items} position={{ x: 0, y: 0 }} onClose={onClose} />,

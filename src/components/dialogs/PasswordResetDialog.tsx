@@ -71,10 +71,8 @@ export function PasswordResetDialog({
   const validation = validatePassword(manualPassword);
   const manualValid = isPasswordValid(validation);
 
-  const activePassword =
-    mode === "manual" ? manualPassword : generatedPassword;
-  const canReset =
-    mode === "manual" ? manualValid : generatedPassword !== null;
+  const activePassword = mode === "manual" ? manualPassword : generatedPassword;
+  const canReset = mode === "manual" ? manualValid : generatedPassword !== null;
 
   const handleGenerate = useCallback(async () => {
     setGenerating(true);
@@ -100,9 +98,7 @@ export function PasswordResetDialog({
         setHibpResult({ isBreached: false, breachCount: 0, checked: false });
       }
     } catch (e) {
-      setError(
-        typeof e === "string" ? e : "Failed to generate password",
-      );
+      setError(typeof e === "string" ? e : "Failed to generate password");
     } finally {
       setGenerating(false);
     }
@@ -302,7 +298,8 @@ export function PasswordResetDialog({
                       </span>
                     ) : hibpResult.isBreached ? (
                       <span className="text-caption text-[var(--color-error)]">
-                        Found in {hibpResult.breachCount.toLocaleString()} breaches - consider regenerating
+                        Found in {hibpResult.breachCount.toLocaleString()}{" "}
+                        breaches - consider regenerating
                       </span>
                     ) : (
                       <span className="text-caption text-[var(--color-success)]">
@@ -360,13 +357,7 @@ export function PasswordResetDialog({
   );
 }
 
-function ValidationItem({
-  label,
-  valid,
-}: {
-  label: string;
-  valid: boolean;
-}) {
+function ValidationItem({ label, valid }: { label: string; valid: boolean }) {
   return (
     <li
       className={

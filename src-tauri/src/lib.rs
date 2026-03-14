@@ -7,9 +7,9 @@ pub mod state;
 
 use std::sync::Arc;
 
-use services::PermissionConfig;
 #[cfg(not(feature = "demo"))]
 use services::LdapDirectoryProvider;
+use services::PermissionConfig;
 use state::AppState;
 
 /// Installs a custom panic hook that logs panics via tracing before
@@ -54,8 +54,7 @@ pub fn run() {
         Arc::new(services::demo_provider::DemoDirectoryProvider::new())
     };
     #[cfg(not(feature = "demo"))]
-    let provider: Arc<dyn services::DirectoryProvider> =
-        Arc::new(LdapDirectoryProvider::new());
+    let provider: Arc<dyn services::DirectoryProvider> = Arc::new(LdapDirectoryProvider::new());
 
     let app_state = AppState::new(provider, PermissionConfig::default());
 

@@ -251,7 +251,9 @@ where
 
     async fn get_cannot_change_password(&self, user_dn: &str) -> Result<bool> {
         let dn = user_dn.to_string();
-        resilient_call!(self, dn, |inner, d| inner.get_cannot_change_password(&d).await)
+        resilient_call!(self, dn, |inner, d| inner
+            .get_cannot_change_password(&d)
+            .await)
     }
 
     async fn set_password_flags(

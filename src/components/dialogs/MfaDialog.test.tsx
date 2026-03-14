@@ -105,4 +105,89 @@ describe("MfaDialog", () => {
     expect(input).toHaveValue("12345678");
     expect(screen.getByTestId("mfa-verify")).not.toBeDisabled();
   });
+
+  it("shows error when verification throws string", async () => {
+    mockInvoke.mockRejectedValueOnce("Rate limited" as never);
+
+    render(<MfaDialog onVerified={onVerified} onCancel={onCancel} />);
+    const input = screen.getByTestId("mfa-code-input");
+    fireEvent.change(input, { target: { value: "123456" } });
+    fireEvent.click(screen.getByTestId("mfa-verify"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("mfa-error")).toHaveTextContent("Rate limited");
+    });
+  });
+
+  it("shows generic error when verification throws non-string", async () => {
+    mockInvoke.mockRejectedValueOnce(new Error("fail") as never);
+
+    render(<MfaDialog onVerified={onVerified} onCancel={onCancel} />);
+    const input = screen.getByTestId("mfa-code-input");
+    fireEvent.change(input, { target: { value: "123456" } });
+    fireEvent.click(screen.getByTestId("mfa-verify"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("mfa-error")).toHaveTextContent(
+        "Verification failed",
+      );
+    });
+  });
+
+  it("handles Enter key to verify", async () => {
+    mockInvoke.mockResolvedValueOnce(true as never);
+
+    render(<MfaDialog onVerified={onVerified} onCancel={onCancel} />);
+    const input = screen.getByTestId("mfa-code-input");
+    fireEvent.change(input, { target: { value: "123456" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith("mfa_verify", { code: "123456" });
+      expect(onVerified).toHaveBeenCalled();
+    });
+  });
+
+  it("handles Escape key to cancel", () => {
+    render(<MfaDialog onVerified={onVerified} onCancel={onCancel} />);
+    const input = screen.getByTestId("mfa-code-input");
+    fireEvent.keyDown(input, { key: "Escape" });
+    expect(onCancel).toHaveBeenCalled();
+  });
+
+  it("does not verify when code is too short on Enter", async () => {
+    render(<MfaDialog onVerified={onVerified} onCancel={onCancel} />);
+    const input = screen.getByTestId("mfa-code-input");
+    fireEvent.change(input, { target: { value: "123" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    // Should not have called invoke since code is < 6 digits
+    expect(mockInvoke).not.toHaveBeenCalled();
+  });
+
+  it("disables verify button while loading", async () => {
+    let resolveInvoke: (value: boolean) => void;
+    mockInvoke.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveInvoke = resolve as (value: boolean) => void;
+      }) as never,
+    );
+
+    render(<MfaDialog onVerified={onVerified} onCancel={onCancel} />);
+    const input = screen.getByTestId("mfa-code-input");
+    fireEvent.change(input, { target: { value: "123456" } });
+    fireEvent.click(screen.getByTestId("mfa-verify"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("mfa-verify")).toHaveTextContent(
+        "Verifying...",
+      );
+    });
+
+    resolveInvoke!(true);
+
+    await waitFor(() => {
+      expect(onVerified).toHaveBeenCalled();
+    });
+  });
 });

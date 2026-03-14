@@ -4,7 +4,10 @@ import { CopyButton } from "@/components/common/CopyButton";
 import { HealthBadge } from "@/components/common/HealthBadge";
 import { UserActions } from "@/components/common/UserActions";
 import { PasswordFlagsEditor } from "@/components/common/PasswordFlagsEditor";
-import { ContextMenu, type ContextMenuItem } from "@/components/common/ContextMenu";
+import {
+  ContextMenu,
+  type ContextMenuItem,
+} from "@/components/common/ContextMenu";
 import {
   PropertyGrid,
   type PropertyGroup,
@@ -60,9 +63,18 @@ export function UserDetail({
 }: UserDetailProps) {
   const [groupFilters, setGroupFilters] = useState<FilterChip[]>([]);
   const [showPasswordReset, setShowPasswordReset] = useState(false);
-  const [contextMenuPos, setContextMenuPos] = useState<{ x: number; y: number } | null>(null);
-  const [contextMenuRow, setContextMenuRow] = useState<{ name: string; dn: string } | null>(null);
-  const [groupMembersDialog, setGroupMembersDialog] = useState<{ dn: string; name: string } | null>(null);
+  const [contextMenuPos, setContextMenuPos] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
+  const [contextMenuRow, setContextMenuRow] = useState<{
+    name: string;
+    dn: string;
+  } | null>(null);
+  const [groupMembersDialog, setGroupMembersDialog] = useState<{
+    dn: string;
+    name: string;
+  } | null>(null);
 
   const handleRefresh = onRefresh ?? (() => {});
 
@@ -110,16 +122,32 @@ export function UserDetail({
     {
       category: "Account Status",
       items: [
-        { label: "Status", value: user.enabled ? "Enabled" : "Disabled", severity: s("Status") },
-        { label: "Locked Out", value: user.lockedOut ? "Yes" : "No", severity: s("Locked Out") },
-        { label: "Account Expires", value: user.accountExpires ?? "Never", severity: s("Account Expires") },
+        {
+          label: "Status",
+          value: user.enabled ? "Enabled" : "Disabled",
+          severity: s("Status"),
+        },
+        {
+          label: "Locked Out",
+          value: user.lockedOut ? "Yes" : "No",
+          severity: s("Locked Out"),
+        },
+        {
+          label: "Account Expires",
+          value: user.accountExpires ?? "Never",
+          severity: s("Account Expires"),
+        },
       ],
     },
     {
       category: "Authentication",
       items: [
         { label: "Bad Password Count", value: String(user.badPasswordCount) },
-        { label: "Last Logon", value: user.lastLogon ?? "Never", severity: s("Last Logon") },
+        {
+          label: "Last Logon",
+          value: user.lastLogon ?? "Never",
+          severity: s("Last Logon"),
+        },
         {
           label: "Last Logon Workstation",
           value: user.lastLogonWorkstation || "N/A",
@@ -129,7 +157,11 @@ export function UserDetail({
     {
       category: "Dates",
       items: [
-        { label: "Password Last Set", value: user.passwordLastSet ?? "Never", severity: s("Password Last Set") },
+        {
+          label: "Password Last Set",
+          value: user.passwordLastSet ?? "Never",
+          severity: s("Password Last Set"),
+        },
         {
           label: "Password Expired",
           value: user.passwordExpired ? "Yes" : "No",

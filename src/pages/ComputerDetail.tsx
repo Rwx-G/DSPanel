@@ -2,7 +2,10 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { CopyButton } from "@/components/common/CopyButton";
-import { ContextMenu, type ContextMenuItem } from "@/components/common/ContextMenu";
+import {
+  ContextMenu,
+  type ContextMenuItem,
+} from "@/components/common/ContextMenu";
 import {
   PropertyGrid,
   type PropertyGroup,
@@ -17,9 +20,18 @@ import { Users } from "lucide-react";
 export function ComputerDetail({ computer }: { computer: DirectoryComputer }) {
   const [groupFilterText, setGroupFilterText] = useState("");
   const [groupFilters, setGroupFilters] = useState<FilterChip[]>([]);
-  const [contextMenuPos, setContextMenuPos] = useState<{ x: number; y: number } | null>(null);
-  const [contextMenuRow, setContextMenuRow] = useState<{ name: string; dn: string } | null>(null);
-  const [groupMembersDialog, setGroupMembersDialog] = useState<{ dn: string; name: string } | null>(null);
+  const [contextMenuPos, setContextMenuPos] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
+  const [contextMenuRow, setContextMenuRow] = useState<{
+    name: string;
+    dn: string;
+  } | null>(null);
+  const [groupMembersDialog, setGroupMembersDialog] = useState<{
+    dn: string;
+    name: string;
+  } | null>(null);
   const [pingResult, setPingResult] = useState<string | null>(null);
   const [isPinging, setIsPinging] = useState(false);
   const [resolvedAddresses, setResolvedAddresses] = useState<string[]>([]);
@@ -127,7 +139,9 @@ export function ComputerDetail({ computer }: { computer: DirectoryComputer }) {
           label: "Ping",
           value: pingResult ?? "Not tested",
           severity: pingResult
-            ? pingResult.startsWith("Reachable") ? "Success" as const : "Error" as const
+            ? pingResult.startsWith("Reachable")
+              ? ("Success" as const)
+              : ("Error" as const)
             : undefined,
         },
       ],

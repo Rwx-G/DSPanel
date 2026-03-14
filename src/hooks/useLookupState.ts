@@ -55,9 +55,7 @@ export function useLookupState<T>({
           setSelectedItem(mapped[0]);
         }
       } catch (err) {
-        setErrorMessage(
-          err instanceof Error ? err.message : "Search failed",
-        );
+        setErrorMessage(err instanceof Error ? err.message : "Search failed");
         setLookupState("error");
       }
     },

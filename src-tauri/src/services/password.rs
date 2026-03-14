@@ -372,4 +372,106 @@ mod tests {
         assert!(!password.is_empty());
         assert!(!result.checked);
     }
+
+    #[tokio::test]
+    async fn test_generate_safe_password_returns_unchecked_without_client() {
+        let options = PasswordOptions {
+            length: 16,
+            ..Default::default()
+        };
+        let (password, result) = generate_safe_password(&options, None, 0).await.unwrap();
+        assert_eq!(password.len(), 16);
+        assert!(!result.checked);
+        assert!(!result.is_breached);
+    }
+
+    #[test]
+    fn test_generate_password_digits_only() {
+        let options = PasswordOptions {
+            length: 10,
+            include_uppercase: false,
+            include_lowercase: false,
+            include_digits: true,
+            include_special: false,
+            exclude_ambiguous: false,
+        };
+        let password = generate_password(&options).unwrap();
+        assert!(password.chars().all(|c| c.is_ascii_digit()));
+    }
+
+    #[test]
+    fn test_generate_password_special_only() {
+        let options = PasswordOptions {
+            length: 10,
+            include_uppercase: false,
+            include_lowercase: false,
+            include_digits: false,
+            include_special: true,
+            exclude_ambiguous: false,
+        };
+        let password = generate_password(&options).unwrap();
+        assert!(password.chars().all(|c| !c.is_ascii_alphanumeric()));
+    }
+
+    #[test]
+    fn test_generate_password_excludes_ambiguous_from_uppercase() {
+        let options = PasswordOptions {
+            length: 100,
+            include_uppercase: true,
+            include_lowercase: false,
+            include_digits: false,
+            include_special: false,
+            exclude_ambiguous: true,
+        };
+        let password = generate_password(&options).unwrap();
+        assert!(!password.contains('O'));
+        assert!(!password.contains('I'));
+    }
+
+    #[test]
+    fn test_generate_password_excludes_ambiguous_from_digits() {
+        let options = PasswordOptions {
+            length: 100,
+            include_uppercase: false,
+            include_lowercase: false,
+            include_digits: true,
+            include_special: false,
+            exclude_ambiguous: true,
+        };
+        let password = generate_password(&options).unwrap();
+        assert!(!password.contains('0'));
+        assert!(!password.contains('1'));
+    }
+
+    #[test]
+    fn test_hibp_result_not_breached() {
+        let result = HibpResult {
+            is_breached: false,
+            breach_count: 0,
+            checked: true,
+        };
+        assert!(!result.is_breached);
+        assert_eq!(result.breach_count, 0);
+    }
+
+    #[test]
+    fn test_password_options_deserialization() {
+        let json = r#"{"length":12,"includeUppercase":true,"includeLowercase":false,"includeDigits":true,"includeSpecial":false,"excludeAmbiguous":true}"#;
+        let opts: PasswordOptions = serde_json::from_str(json).unwrap();
+        assert_eq!(opts.length, 12);
+        assert!(opts.include_uppercase);
+        assert!(!opts.include_lowercase);
+        assert!(opts.include_digits);
+        assert!(!opts.include_special);
+        assert!(opts.exclude_ambiguous);
+    }
+
+    #[test]
+    fn test_hibp_result_deserialization() {
+        let json = r#"{"isBreached":true,"breachCount":100,"checked":true}"#;
+        let result: HibpResult = serde_json::from_str(json).unwrap();
+        assert!(result.is_breached);
+        assert_eq!(result.breach_count, 100);
+        assert!(result.checked);
+    }
 }

@@ -46,7 +46,11 @@ const HEALTHY_STATUS: AccountHealthStatus = {
 const CRITICAL_STATUS: AccountHealthStatus = {
   level: "Critical",
   activeFlags: [
-    { name: "Disabled", severity: "Critical", description: "Account is disabled" },
+    {
+      name: "Disabled",
+      severity: "Critical",
+      description: "Account is disabled",
+    },
   ],
 };
 
@@ -94,8 +98,12 @@ function mockBrowseWith(
   entries: DirectoryEntry[],
   healthOverrides: Record<string, AccountHealthStatus> = {},
 ) {
-  mockInvoke.mockImplementation(((cmd: string, args?: Record<string, unknown>) => {
-    if (cmd === "browse_users") return Promise.resolve(makeBrowseResult(entries));
+  mockInvoke.mockImplementation(((
+    cmd: string,
+    args?: Record<string, unknown>,
+  ) => {
+    if (cmd === "browse_users")
+      return Promise.resolve(makeBrowseResult(entries));
     if (cmd === "search_users") return Promise.resolve(entries);
     if (cmd === "evaluate_health_cmd") {
       const input = args?.input as { enabled: boolean } | undefined;
@@ -115,7 +123,10 @@ describe("UserLookup", () => {
   });
 
   it("renders with search bar and loads users on mount", async () => {
-    const entries = [makeEntry("jdoe", "John Doe"), makeEntry("asmith", "Alice Smith")];
+    const entries = [
+      makeEntry("jdoe", "John Doe"),
+      makeEntry("asmith", "Alice Smith"),
+    ];
     mockBrowseWith(entries);
 
     render(<UserLookup />, { wrapper: TestProviders });
@@ -131,7 +142,9 @@ describe("UserLookup", () => {
   });
 
   it("shows loading state during initial load", () => {
-    mockInvoke.mockImplementation((() => new Promise(() => {})) as typeof invoke);
+    mockInvoke.mockImplementation(
+      (() => new Promise(() => {})) as typeof invoke,
+    );
     render(<UserLookup />, { wrapper: TestProviders });
     expect(screen.getByTestId("user-lookup-loading")).toBeInTheDocument();
   });
@@ -155,7 +168,8 @@ describe("UserLookup", () => {
 
   it("shows error state on browse failure", async () => {
     mockInvoke.mockImplementation(((cmd: string) => {
-      if (cmd === "browse_users") return Promise.reject(new Error("LDAP connection failed"));
+      if (cmd === "browse_users")
+        return Promise.reject(new Error("LDAP connection failed"));
       return Promise.resolve(HEALTHY_STATUS);
     }) as typeof invoke);
 
@@ -175,7 +189,9 @@ describe("UserLookup", () => {
       if (cmd === "browse_users") {
         callCount++;
         if (callCount === 1) return Promise.reject(new Error("fail"));
-        return Promise.resolve(makeBrowseResult([makeEntry("jdoe", "John Doe")]));
+        return Promise.resolve(
+          makeBrowseResult([makeEntry("jdoe", "John Doe")]),
+        );
       }
       return Promise.resolve(null);
     }) as typeof invoke);

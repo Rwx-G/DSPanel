@@ -14,7 +14,8 @@ describe("PasswordGenerator", () => {
     vi.clearAllMocks();
     // Default: generate_password returns a password
     mockInvoke.mockImplementation(((cmd: string) => {
-      if (cmd === "generate_password") return Promise.resolve("DefaultPass123!");
+      if (cmd === "generate_password")
+        return Promise.resolve("DefaultPass123!");
       return Promise.resolve(undefined);
     }) as typeof invoke);
   });
@@ -139,7 +140,11 @@ describe("PasswordGenerator", () => {
     mockInvoke.mockImplementation(((cmd: string) => {
       if (cmd === "generate_password") return Promise.resolve("SafePass!");
       if (cmd === "check_password_hibp")
-        return Promise.resolve({ isBreached: false, breachCount: 0, checked: true });
+        return Promise.resolve({
+          isBreached: false,
+          breachCount: 0,
+          checked: true,
+        });
       return Promise.resolve(undefined);
     }) as typeof invoke);
 
@@ -160,7 +165,11 @@ describe("PasswordGenerator", () => {
     mockInvoke.mockImplementation(((cmd: string) => {
       if (cmd === "generate_password") return Promise.resolve("password");
       if (cmd === "check_password_hibp")
-        return Promise.resolve({ isBreached: true, breachCount: 3861493, checked: true });
+        return Promise.resolve({
+          isBreached: true,
+          breachCount: 3861493,
+          checked: true,
+        });
       return Promise.resolve(undefined);
     }) as typeof invoke);
 
@@ -209,7 +218,9 @@ describe("PasswordGenerator", () => {
       expect(screen.getByTestId("error-message")).toBeInTheDocument();
     });
 
-    expect(screen.getByTestId("error-message")).toHaveTextContent("No categories selected");
+    expect(screen.getByTestId("error-message")).toHaveTextContent(
+      "No categories selected",
+    );
   });
 
   it("displays best practices section", () => {

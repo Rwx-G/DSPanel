@@ -124,7 +124,11 @@ export function AppShell({ statusBarProps, children }: AppShellProps) {
       </a>
       <div className="flex flex-1 overflow-hidden">
         <Sidebar expanded={sidebarExpanded} onToggle={handleToggleSidebar} />
-        <main id="main-content" aria-label="Main content" className="flex flex-1 flex-col overflow-hidden">
+        <main
+          id="main-content"
+          aria-label="Main content"
+          className="flex flex-1 flex-col overflow-hidden"
+        >
           <Breadcrumbs />
           <TabBar />
           <div className="flex-1 overflow-auto">{children}</div>

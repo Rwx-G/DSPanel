@@ -94,10 +94,7 @@ export function UserActions({
 
   return (
     <PermissionGate requiredLevel="HelpDesk">
-      <div
-        className="flex items-center gap-2"
-        data-testid="user-actions"
-      >
+      <div className="flex items-center gap-2" data-testid="user-actions">
         <button
           className="btn btn-sm btn-primary flex items-center gap-1"
           onClick={onResetPassword}

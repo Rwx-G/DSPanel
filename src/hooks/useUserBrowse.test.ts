@@ -53,7 +53,10 @@ describe("useUserBrowse", () => {
   });
 
   it("loads first page on mount", async () => {
-    const entries = [makeEntry("jdoe", "John Doe"), makeEntry("asmith", "Alice Smith")];
+    const entries = [
+      makeEntry("jdoe", "John Doe"),
+      makeEntry("asmith", "Alice Smith"),
+    ];
     mockInvoke.mockResolvedValueOnce(makeBrowseResult(entries));
 
     const { result } = renderHook(() => useUserBrowse());

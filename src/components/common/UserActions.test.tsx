@@ -4,6 +4,7 @@ import { type ReactNode } from "react";
 import { UserActions } from "./UserActions";
 import { DialogProvider } from "@/contexts/DialogContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
+import { NotificationHost } from "@/components/common/NotificationHost";
 import type { DirectoryUser } from "@/types/directory";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -28,7 +29,10 @@ const mockInvoke = vi.mocked(invoke);
 function TestProviders({ children }: { children: ReactNode }) {
   return (
     <NotificationProvider>
-      <DialogProvider>{children}</DialogProvider>
+      <DialogProvider>
+        {children}
+        <NotificationHost />
+      </DialogProvider>
     </NotificationProvider>
   );
 }
@@ -236,9 +240,142 @@ describe("UserActions", () => {
     fireEvent.click(screen.getByTestId("dialog-cancel"));
 
     await waitFor(() => {
-      expect(screen.queryByTestId("confirmation-dialog")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("confirmation-dialog"),
+      ).not.toBeInTheDocument();
     });
 
     expect(mockInvoke).not.toHaveBeenCalled();
+  });
+
+  it("calls enable_account when enable is confirmed", async () => {
+    mockInvoke.mockResolvedValueOnce(undefined as never);
+
+    render(
+      <UserActions
+        user={makeUser({ enabled: false })}
+        onRefresh={onRefresh}
+        onResetPassword={onResetPassword}
+      />,
+      { wrapper: TestProviders },
+    );
+
+    fireEvent.click(screen.getByTestId("enable-btn"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("confirmation-dialog")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId("dialog-confirm"));
+
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith("enable_account", {
+        userDn: "CN=John Doe,OU=Users,DC=example,DC=com",
+      });
+    });
+  });
+
+  it("calls disable_account when disable is confirmed", async () => {
+    mockInvoke.mockResolvedValueOnce(undefined as never);
+
+    render(
+      <UserActions
+        user={makeUser({ enabled: true })}
+        onRefresh={onRefresh}
+        onResetPassword={onResetPassword}
+      />,
+      { wrapper: TestProviders },
+    );
+
+    fireEvent.click(screen.getByTestId("disable-btn"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("confirmation-dialog")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId("dialog-confirm"));
+
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith("disable_account", {
+        userDn: "CN=John Doe,OU=Users,DC=example,DC=com",
+      });
+    });
+  });
+
+  it("shows error notification on action failure with string error", async () => {
+    mockInvoke.mockRejectedValueOnce("Insufficient permissions" as never);
+
+    render(
+      <UserActions
+        user={makeUser({ lockedOut: true })}
+        onRefresh={onRefresh}
+        onResetPassword={onResetPassword}
+      />,
+      { wrapper: TestProviders },
+    );
+
+    fireEvent.click(screen.getByTestId("unlock-btn"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("confirmation-dialog")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId("dialog-confirm"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Insufficient permissions")).toBeInTheDocument();
+    });
+  });
+
+  it("shows generic error on action failure with non-string error", async () => {
+    mockInvoke.mockRejectedValueOnce(new Error("network") as never);
+
+    render(
+      <UserActions
+        user={makeUser({ lockedOut: true })}
+        onRefresh={onRefresh}
+        onResetPassword={onResetPassword}
+      />,
+      { wrapper: TestProviders },
+    );
+
+    fireEvent.click(screen.getByTestId("unlock-btn"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("confirmation-dialog")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId("dialog-confirm"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Unlock failed")).toBeInTheDocument();
+    });
+  });
+
+  it("shows parsed JSON error message when error is JSON", async () => {
+    mockInvoke.mockRejectedValueOnce(
+      JSON.stringify({ userMessage: "Access denied by policy" }) as never,
+    );
+
+    render(
+      <UserActions
+        user={makeUser({ lockedOut: true })}
+        onRefresh={onRefresh}
+        onResetPassword={onResetPassword}
+      />,
+      { wrapper: TestProviders },
+    );
+
+    fireEvent.click(screen.getByTestId("unlock-btn"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("confirmation-dialog")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId("dialog-confirm"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Access denied by policy")).toBeInTheDocument();
+    });
   });
 });

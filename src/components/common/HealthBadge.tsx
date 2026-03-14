@@ -25,7 +25,10 @@ export function HealthBadge({ healthStatus }: HealthBadgeProps) {
   const [showTooltip, setShowTooltip] = useState(false);
   const tooltipId = useId();
   const badgeRef = useRef<HTMLDivElement>(null);
-  const [tooltipPos, setTooltipPos] = useState<{ top: number; left: number } | null>(null);
+  const [tooltipPos, setTooltipPos] = useState<{
+    top: number;
+    left: number;
+  } | null>(null);
   const Icon = LEVEL_ICON[healthStatus.level];
   const flagCount = healthStatus.activeFlags.length;
 

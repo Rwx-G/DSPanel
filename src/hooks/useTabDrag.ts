@@ -15,14 +15,23 @@ interface UseTabDragOptions {
   activateTab: (tabId: string) => void;
 }
 
-export function useTabDrag({ tabCount, moveTab, activateTab }: UseTabDragOptions) {
+export function useTabDrag({
+  tabCount,
+  moveTab,
+  activateTab,
+}: UseTabDragOptions) {
   const dragRef = useRef<DragState | null>(null);
   const [dragTabId, setDragTabId] = useState<string | null>(null);
   const [dragDeltaX, setDragDeltaX] = useState(0);
   const didDragRef = useRef(false);
 
   const handlePointerDown = useCallback(
-    (e: React.PointerEvent, tabId: string, tabIndex: number, containerEl: HTMLElement | null) => {
+    (
+      e: React.PointerEvent,
+      tabId: string,
+      tabIndex: number,
+      containerEl: HTMLElement | null,
+    ) => {
       if (e.button !== 0) return;
       if ((e.target as HTMLElement).closest("button")) return;
       if (!containerEl) return;

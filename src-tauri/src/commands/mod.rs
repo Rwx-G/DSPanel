@@ -117,11 +117,8 @@ pub(crate) async fn browse_users_inner(
 
     let total_count = entries.len();
     let start = page * page_size;
-    let page_entries: Vec<DirectoryEntry> = entries
-        .into_iter()
-        .skip(start)
-        .take(page_size)
-        .collect();
+    let page_entries: Vec<DirectoryEntry> =
+        entries.into_iter().skip(start).take(page_size).collect();
     let has_more = start + page_entries.len() < total_count;
 
     Ok(BrowseResult {
@@ -172,11 +169,8 @@ pub(crate) async fn browse_computers_inner(
 
     let total_count = entries.len();
     let start = page * page_size;
-    let page_entries: Vec<DirectoryEntry> = entries
-        .into_iter()
-        .skip(start)
-        .take(page_size)
-        .collect();
+    let page_entries: Vec<DirectoryEntry> =
+        entries.into_iter().skip(start).take(page_size).collect();
     let has_more = start + page_entries.len() < total_count;
 
     Ok(BrowseResult {

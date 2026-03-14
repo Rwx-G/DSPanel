@@ -433,4 +433,125 @@ mod tests {
         // Only the original fake ACE remains
         assert_eq!(count2, 1);
     }
+
+    // --- is_cannot_change_password tests ---
+
+    #[test]
+    fn test_is_cannot_change_password_false_on_empty_dacl() {
+        let sd = make_minimal_sd();
+        assert!(!is_cannot_change_password(&sd).unwrap());
+    }
+
+    #[test]
+    fn test_is_cannot_change_password_true_after_deny() {
+        let sd = make_minimal_sd();
+        let modified = set_cannot_change_password(&sd, true).unwrap();
+        assert!(is_cannot_change_password(&modified).unwrap());
+    }
+
+    #[test]
+    fn test_is_cannot_change_password_false_after_remove() {
+        let sd = make_minimal_sd();
+        let with_deny = set_cannot_change_password(&sd, true).unwrap();
+        let without_deny = set_cannot_change_password(&with_deny, false).unwrap();
+        assert!(!is_cannot_change_password(&without_deny).unwrap());
+    }
+
+    #[test]
+    fn test_is_cannot_change_password_false_with_only_everyone() {
+        // Build SD with only the Everyone deny ACE (not SELF)
+        let mut sd = make_minimal_sd();
+        let everyone_ace = build_deny_change_password_ace(SID_EVERYONE);
+        let dacl_start = 20;
+        let new_acl_size = 8u16 + everyone_ace.len() as u16;
+        sd[dacl_start + 2] = new_acl_size as u8;
+        sd[dacl_start + 3] = (new_acl_size >> 8) as u8;
+        sd[dacl_start + 4] = 1;
+        sd.extend_from_slice(&everyone_ace);
+
+        // Only one deny ACE - both are required for "cannot change password"
+        assert!(!is_cannot_change_password(&sd).unwrap());
+    }
+
+    #[test]
+    fn test_is_cannot_change_password_rejects_too_short() {
+        let sd = vec![0u8; 10];
+        assert!(is_cannot_change_password(&sd).is_err());
+    }
+
+    #[test]
+    fn test_is_cannot_change_password_no_dacl_returns_false() {
+        let mut sd = vec![0u8; 20];
+        sd[0] = 0x01;
+        // DACL offset = 0 (no DACL)
+        assert!(!is_cannot_change_password(&sd).unwrap());
+    }
+
+    #[test]
+    fn test_is_cannot_change_password_invalid_dacl_offset() {
+        let mut sd = vec![0u8; 20];
+        sd[0] = 0x01;
+        // DACL offset points beyond SD
+        sd[16] = 0xFF;
+        assert!(is_cannot_change_password(&sd).is_err());
+    }
+
+    #[test]
+    fn test_build_deny_ace_self_format() {
+        let ace = build_deny_change_password_ace(SID_SELF);
+        assert_eq!(ace[0], ACCESS_DENIED_OBJECT_ACE_TYPE);
+        let size = u16::from_le_bytes([ace[2], ace[3]]);
+        assert_eq!(size as usize, ace.len());
+        // Verify GUID at offset 12
+        assert_eq!(&ace[12..28], &CHANGE_PASSWORD_GUID);
+    }
+
+    #[test]
+    fn test_is_deny_ace_too_short_returns_false() {
+        let short_ace = vec![0u8; 10];
+        assert!(!is_deny_change_password_ace(&short_ace, SID_EVERYONE));
+    }
+
+    #[test]
+    fn test_is_deny_ace_wrong_type_returns_false() {
+        let mut ace = build_deny_change_password_ace(SID_EVERYONE);
+        ace[0] = 0x00; // Change type to ACCESS_ALLOWED
+        assert!(!is_deny_change_password_ace(&ace, SID_EVERYONE));
+    }
+
+    #[test]
+    fn test_is_deny_ace_wrong_mask_returns_false() {
+        let mut ace = build_deny_change_password_ace(SID_EVERYONE);
+        ace[4] = 0x00; // Corrupt mask
+        ace[5] = 0x00;
+        ace[6] = 0x00;
+        ace[7] = 0x00;
+        assert!(!is_deny_change_password_ace(&ace, SID_EVERYONE));
+    }
+
+    #[test]
+    fn test_is_deny_ace_wrong_guid_returns_false() {
+        let mut ace = build_deny_change_password_ace(SID_EVERYONE);
+        ace[12] = 0xFF; // Corrupt GUID
+        assert!(!is_deny_change_password_ace(&ace, SID_EVERYONE));
+    }
+
+    #[test]
+    fn test_set_deny_updates_offsets_after_dacl() {
+        // Build SD with owner offset after DACL
+        let mut sd = make_minimal_sd();
+        // Set owner offset to point after the DACL (at end of SD)
+        let owner_off = sd.len() as u32;
+        sd[4..8].copy_from_slice(&owner_off.to_le_bytes());
+        // Add a dummy owner SID placeholder
+        sd.extend_from_slice(&[
+            0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00,
+        ]);
+
+        let result = set_cannot_change_password(&sd, true).unwrap();
+
+        // Owner offset should have shifted by the size of 2 added ACEs
+        let new_owner_off = u32::from_le_bytes([result[4], result[5], result[6], result[7]]);
+        assert!(new_owner_off > owner_off);
+    }
 }

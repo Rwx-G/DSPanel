@@ -23,7 +23,8 @@ export function PasswordFlagsEditor({
   const [passwordNeverExpires, setPasswordNeverExpires] = useState(
     user.passwordNeverExpires,
   );
-  const [userCannotChangePassword, setUserCannotChangePassword] = useState(false);
+  const [userCannotChangePassword, setUserCannotChangePassword] =
+    useState(false);
   const [adCannotChangePassword, setAdCannotChangePassword] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -57,7 +58,12 @@ export function PasswordFlagsEditor({
     () =>
       passwordNeverExpires !== user.passwordNeverExpires ||
       userCannotChangePassword !== adCannotChangePassword,
-    [passwordNeverExpires, user.passwordNeverExpires, userCannotChangePassword, adCannotChangePassword],
+    [
+      passwordNeverExpires,
+      user.passwordNeverExpires,
+      userCannotChangePassword,
+      adCannotChangePassword,
+    ],
   );
 
   const canEdit = hasPermission("AccountOperator");
@@ -117,10 +123,7 @@ export function PasswordFlagsEditor({
   ]);
 
   return (
-    <div
-      className="space-y-2"
-      data-testid="password-flags-editor"
-    >
+    <div className="space-y-2" data-testid="password-flags-editor">
       <h4 className="text-caption font-semibold text-[var(--color-text-primary)]">
         Password Flags
       </h4>

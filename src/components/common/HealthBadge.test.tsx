@@ -79,9 +79,9 @@ describe("HealthBadge", () => {
     expect(screen.queryByTestId("health-tooltip")).not.toBeInTheDocument();
     fireEvent.mouseEnter(screen.getByTestId("health-badge"));
     expect(screen.getByTestId("health-tooltip")).toBeInTheDocument();
-    expect(
-      screen.getByTestId("health-flag-Inactive30Days"),
-    ).toHaveTextContent("Inactive30Days");
+    expect(screen.getByTestId("health-flag-Inactive30Days")).toHaveTextContent(
+      "Inactive30Days",
+    );
   });
 
   it("hides tooltip on mouse leave", () => {
@@ -152,6 +152,73 @@ describe("HealthBadge", () => {
     expect(screen.getByTestId("health-badge")).toHaveAttribute(
       "data-level",
       "Info",
+    );
+  });
+
+  it("shows tooltip on focus and hides on blur", () => {
+    render(
+      <HealthBadge
+        healthStatus={makeStatus({
+          level: "Warning",
+          activeFlags: [
+            {
+              name: "TestFlag",
+              severity: "Warning",
+              description: "Test description",
+            },
+          ],
+        })}
+      />,
+    );
+
+    const badge = screen.getByTestId("health-badge");
+    fireEvent.focus(badge);
+    expect(screen.getByTestId("health-tooltip")).toBeInTheDocument();
+
+    fireEvent.blur(badge);
+    expect(screen.queryByTestId("health-tooltip")).not.toBeInTheDocument();
+  });
+
+  it("has correct aria-label for healthy status", () => {
+    render(<HealthBadge healthStatus={makeStatus()} />);
+    expect(screen.getByTestId("health-badge")).toHaveAttribute(
+      "aria-label",
+      "Health: Healthy",
+    );
+  });
+
+  it("has correct aria-label for status with issues", () => {
+    render(
+      <HealthBadge
+        healthStatus={makeStatus({
+          level: "Warning",
+          activeFlags: [
+            { name: "Flag1", severity: "Warning", description: "d1" },
+            { name: "Flag2", severity: "Warning", description: "d2" },
+          ],
+        })}
+      />,
+    );
+    expect(screen.getByTestId("health-badge")).toHaveAttribute(
+      "aria-label",
+      "Health: Warning, 2 issues",
+    );
+  });
+
+  it("has correct aria-label for single issue", () => {
+    render(
+      <HealthBadge
+        healthStatus={makeStatus({
+          level: "Critical",
+          activeFlags: [
+            { name: "Flag1", severity: "Critical", description: "d" },
+          ],
+        })}
+      />,
+    );
+    expect(screen.getByTestId("health-badge")).toHaveAttribute(
+      "aria-label",
+      "Health: Critical, 1 issue",
     );
   });
 });

@@ -99,9 +99,17 @@ export function Sidebar({ expanded, onToggle }: SidebarProps) {
       </div>
 
       {/* Navigation */}
-      <nav aria-label="Main navigation" className="flex-1 overflow-y-auto overflow-x-hidden py-2">
+      <nav
+        aria-label="Main navigation"
+        className="flex-1 overflow-y-auto overflow-x-hidden py-2"
+      >
         {Object.entries(groups).map(([groupName, modules], groupIndex) => (
-          <div key={groupName} className="mb-1" role="group" aria-label={groupName}>
+          <div
+            key={groupName}
+            className="mb-1"
+            role="group"
+            aria-label={groupName}
+          >
             {expanded && (
               <div className="px-4 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-sidebar-group-label)]">
                 {groupName}

@@ -98,19 +98,19 @@ export function App() {
     <ErrorBoundary>
       <NotificationProvider>
         <DialogProvider>
-        <NavigationProvider>
-          <AppShell
-            statusBarProps={{
-              domainName: status.domainName,
-              domainController: null,
-              permissionLevel: status.permissionLevel,
-              isConnected: status.isConnected,
-              appVersion: APP_VERSION,
-            }}
-          >
-            <ModuleRouter status={status} />
-          </AppShell>
-        </NavigationProvider>
+          <NavigationProvider>
+            <AppShell
+              statusBarProps={{
+                domainName: status.domainName,
+                domainController: null,
+                permissionLevel: status.permissionLevel,
+                isConnected: status.isConnected,
+                appVersion: APP_VERSION,
+              }}
+            >
+              <ModuleRouter status={status} />
+            </AppShell>
+          </NavigationProvider>
         </DialogProvider>
         <NotificationHost />
       </NotificationProvider>

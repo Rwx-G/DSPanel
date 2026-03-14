@@ -156,8 +156,23 @@ export function DataTable<T>({
                   style={widthStyle}
                   onClick={() => handleSort(col)}
                   tabIndex={col.sortable ? 0 : undefined}
-                  onKeyDown={col.sortable ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleSort(col); } } : undefined}
-                  aria-sort={sortState?.key === col.key ? (sortState.direction === "asc" ? "ascending" : "descending") : undefined}
+                  onKeyDown={
+                    col.sortable
+                      ? (e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            handleSort(col);
+                          }
+                        }
+                      : undefined
+                  }
+                  aria-sort={
+                    sortState?.key === col.key
+                      ? sortState.direction === "asc"
+                        ? "ascending"
+                        : "descending"
+                      : undefined
+                  }
                   data-testid={`column-header-${col.key}`}
                 >
                   <span className="flex items-center gap-1">
@@ -202,7 +217,14 @@ export function DataTable<T>({
                 onRowClick ? "cursor-pointer" : ""
               }`}
               onClick={() => onRowClick?.(row)}
-              onContextMenu={onRowContextMenu ? (e) => { e.preventDefault(); onRowContextMenu(row, e); } : undefined}
+              onContextMenu={
+                onRowContextMenu
+                  ? (e) => {
+                      e.preventDefault();
+                      onRowContextMenu(row, e);
+                    }
+                  : undefined
+              }
               data-testid="data-table-row"
             >
               {columns.map((col) => (

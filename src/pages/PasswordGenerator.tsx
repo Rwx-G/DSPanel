@@ -144,7 +144,10 @@ export function PasswordGenerator() {
           </div>
 
           {/* HIBP result - fixed height slot to prevent layout shift */}
-          <div className="min-h-[28px] flex items-center" data-testid="hibp-result-slot">
+          <div
+            className="min-h-[28px] flex items-center"
+            data-testid="hibp-result-slot"
+          >
             {hibpResult ? (
               <HibpStatusBadge result={hibpResult} />
             ) : (
@@ -179,7 +182,9 @@ export function PasswordGenerator() {
                 >
                   {length}
                 </span>
-                <span className={`text-caption px-1.5 py-0.5 rounded-full ${strengthLabel.class}`}>
+                <span
+                  className={`text-caption px-1.5 py-0.5 rounded-full ${strengthLabel.class}`}
+                >
                   {strengthLabel.text}
                 </span>
               </div>
@@ -248,13 +253,31 @@ export function PasswordGenerator() {
             </p>
           </div>
           <ul className="text-caption text-[var(--color-text-secondary)] space-y-1 ml-6 list-disc">
-            <li>Use at least <strong>20 characters</strong> for administrative accounts (16 minimum for standard users)</li>
-            <li>Include <strong>3+ character categories</strong> (uppercase, lowercase, digits, special)</li>
+            <li>
+              Use at least <strong>20 characters</strong> for administrative
+              accounts (16 minimum for standard users)
+            </li>
+            <li>
+              Include <strong>3+ character categories</strong> (uppercase,
+              lowercase, digits, special)
+            </li>
             <li>Never reuse passwords across different accounts or services</li>
-            <li>Use the <strong>breach check</strong> to verify the password has not appeared in known data breaches (HIBP k-anonymity - your password never leaves your machine)</li>
-            <li>Enable <strong>"Must change at next logon"</strong> when resetting passwords for other users</li>
-            <li>Avoid dictionary words, personal info, or common patterns (abc123, qwerty)</li>
-            <li>Consider using a password manager for storing generated passwords</li>
+            <li>
+              Use the <strong>breach check</strong> to verify the password has
+              not appeared in known data breaches (HIBP k-anonymity - your
+              password never leaves your machine)
+            </li>
+            <li>
+              Enable <strong>"Must change at next logon"</strong> when resetting
+              passwords for other users
+            </li>
+            <li>
+              Avoid dictionary words, personal info, or common patterns (abc123,
+              qwerty)
+            </li>
+            <li>
+              Consider using a password manager for storing generated passwords
+            </li>
           </ul>
         </div>
       </div>
@@ -263,10 +286,17 @@ export function PasswordGenerator() {
 }
 
 function getStrengthLabel(length: number): { text: string; class: string } {
-  if (length >= 24) return { text: "Excellent", class: "bg-green-100 text-[var(--color-success)]" };
-  if (length >= 20) return { text: "Strong", class: "bg-blue-100 text-[var(--color-info)]" };
-  if (length >= 16) return { text: "Good", class: "bg-green-100 text-[var(--color-success)]" };
-  if (length >= 12) return { text: "Fair", class: "bg-yellow-100 text-[var(--color-warning)]" };
+  if (length >= 24)
+    return {
+      text: "Excellent",
+      class: "bg-green-100 text-[var(--color-success)]",
+    };
+  if (length >= 20)
+    return { text: "Strong", class: "bg-blue-100 text-[var(--color-info)]" };
+  if (length >= 16)
+    return { text: "Good", class: "bg-green-100 text-[var(--color-success)]" };
+  if (length >= 12)
+    return { text: "Fair", class: "bg-yellow-100 text-[var(--color-warning)]" };
   return { text: "Weak", class: "bg-red-100 text-[var(--color-error)]" };
 }
 
@@ -320,10 +350,9 @@ function HibpInfoTooltip() {
             Have I Been Pwned (HIBP)
           </p>
           <p className="text-caption text-[var(--color-text-secondary)] mb-2">
-            Breach data is provided by{" "}
-            <strong>haveibeenpwned.com</strong>, a free service created
-            by Troy Hunt that aggregates data from publicly disclosed
-            security breaches.
+            Breach data is provided by <strong>haveibeenpwned.com</strong>, a
+            free service created by Troy Hunt that aggregates data from publicly
+            disclosed security breaches.
           </p>
           <p className="text-caption text-[var(--color-text-secondary)] mb-2">
             The database contains over <strong>14 billion</strong> compromised
@@ -334,8 +363,8 @@ function HibpInfoTooltip() {
               Privacy: k-anonymity protocol
             </p>
             <p className="text-caption text-[var(--color-text-secondary)]">
-              Only the first 5 characters of the password's SHA-1 hash
-              are sent to the API. Your full password never leaves your machine.
+              Only the first 5 characters of the password's SHA-1 hash are sent
+              to the API. Your full password never leaves your machine.
             </p>
           </div>
         </div>

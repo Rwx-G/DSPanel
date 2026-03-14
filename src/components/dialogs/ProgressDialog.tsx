@@ -50,7 +50,11 @@ export function ProgressDialog({
               isIndeterminate ? "animate-pulse w-full" : ""
             }`}
             role="progressbar"
-            aria-valuenow={isIndeterminate ? undefined : Math.round(Math.min(100, Math.max(0, percentage)))}
+            aria-valuenow={
+              isIndeterminate
+                ? undefined
+                : Math.round(Math.min(100, Math.max(0, percentage)))
+            }
             aria-valuemin={0}
             aria-valuemax={100}
             style={

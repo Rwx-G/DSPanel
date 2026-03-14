@@ -87,12 +87,21 @@ export function PropertyGrid({ groups }: PropertyGridProps) {
             {!isCollapsed && (
               <div>
                 {group.items.map((item, idx) => {
-                  const SeverityIcon = item.severity === "Critical" || item.severity === "Error" ? AlertCircle : item.severity === "Warning" ? AlertTriangle : item.severity === "Success" ? CheckCircle : null;
+                  const SeverityIcon =
+                    item.severity === "Critical" || item.severity === "Error"
+                      ? AlertCircle
+                      : item.severity === "Warning"
+                        ? AlertTriangle
+                        : item.severity === "Success"
+                          ? CheckCircle
+                          : null;
                   return (
                     <div
                       key={item.label}
                       className={`group flex items-center gap-2 px-3 py-1 transition-colors ${
-                        idx > 0 ? "border-t border-[var(--color-border-subtle)]" : ""
+                        idx > 0
+                          ? "border-t border-[var(--color-border-subtle)]"
+                          : ""
                       } ${item.severity ? SEVERITY_ROW_STYLE[item.severity] : "hover:bg-[var(--color-surface-hover)]"}`}
                       data-testid={`property-item-${item.label}`}
                       data-severity={item.severity ?? undefined}
@@ -100,10 +109,19 @@ export function PropertyGrid({ groups }: PropertyGridProps) {
                       <span className="min-w-[140px] shrink-0 text-caption text-[var(--color-text-secondary)]">
                         {item.label}
                       </span>
-                      <span className={`flex-1 text-body break-all ${
-                        item.severity ? SEVERITY_VALUE_STYLE[item.severity] : "text-[var(--color-text-primary)]"
-                      }`}>
-                        {SeverityIcon && <SeverityIcon size={12} className="inline mr-1 -mt-0.5" />}
+                      <span
+                        className={`flex-1 text-body break-all ${
+                          item.severity
+                            ? SEVERITY_VALUE_STYLE[item.severity]
+                            : "text-[var(--color-text-primary)]"
+                        }`}
+                      >
+                        {SeverityIcon && (
+                          <SeverityIcon
+                            size={12}
+                            className="inline mr-1 -mt-0.5"
+                          />
+                        )}
                         {item.value}
                       </span>
                       <span className="opacity-0 group-hover:opacity-100 transition-opacity">

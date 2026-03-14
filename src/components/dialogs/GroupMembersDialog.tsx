@@ -102,7 +102,10 @@ export function GroupMembersDialog({
 
         {!loading && !error && members.length === 0 && (
           <div data-testid="group-members-empty">
-            <EmptyState title="No members" description="This group has no members." />
+            <EmptyState
+              title="No members"
+              description="This group has no members."
+            />
           </div>
         )}
 
@@ -130,7 +133,8 @@ export function GroupMembersDialog({
                     data-testid="group-member-row"
                   >
                     <td className="px-3 py-2 text-[var(--color-text-primary)]">
-                      {member.displayName ?? parseCnFromDn(member.distinguishedName)}
+                      {member.displayName ??
+                        parseCnFromDn(member.distinguishedName)}
                     </td>
                     <td className="px-3 py-2 text-[var(--color-text-secondary)]">
                       {member.samAccountName ?? "-"}

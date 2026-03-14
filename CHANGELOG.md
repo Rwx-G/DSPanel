@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-03-14
+
+Epic 2 - Support Actions and Account Management. Password reset, secure password generator,
+account unlock/enable/disable, password flag management, and MFA gate for sensitive operations.
+
 ### Added
 
 - User browse mode: UserLookup page loads users on mount without requiring a search query
@@ -21,15 +26,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Secure password generator with configurable criteria and HIBP k-anonymity breach checking (2.2)
 - Standalone Password Generator page accessible to all permission levels (2.2)
 - Account unlock, enable, and disable actions with confirmation dialogs (2.3)
-- Password flag management (Password Never Expires) with dry-run preview (2.4)
+- Password flag management (Password Never Expires, User Cannot Change Password) with dry-run preview (2.4)
+- DACL-based "User Cannot Change Password" flag via binary security descriptor manipulation (2.4)
 - MFA gate service with RFC 6238 TOTP, backup codes, and per-action configuration (2.5)
 - MFA verification dialog for sensitive operations (2.5)
-- Audit service logging all sensitive operations (success and failure)
+- MFA setup wizard with QR code display, verification step, and backup codes (2.5)
+- MFA enforcement at command level with 5-minute session window (2.5)
+- Rate limiting on MFA verification (5 failed attempts before lockout) (2.5)
+- Audit service logging all sensitive operations with file-based persistence (2.5)
 - UserActions component integrating password reset, unlock, enable/disable buttons
 - PasswordFlagsEditor component with dirty tracking and AccountOperator gating
-- New Tauri commands: reset_password, unlock_account, enable_account, disable_account, set_password_flags, generate_password, check_password_hibp, get_audit_entries, mfa_setup, mfa_verify, mfa_is_configured, mfa_revoke, mfa_get_config, mfa_set_config, mfa_requires
+- useMfaGate hook for reusable MFA verification across components
+- New Tauri commands: reset_password, unlock_account, enable_account, disable_account, set_password_flags, generate_password, check_password_hibp, get_audit_entries, get_cannot_change_password, mfa_setup, mfa_verify, mfa_is_configured, mfa_revoke, mfa_get_config, mfa_set_config, mfa_requires
 - DirectoryProvider trait extended with write operations (reset_password, unlock_account, enable_account, disable_account, set_password_flags)
 - ResilientDirectoryProvider wraps all new write operations with retry and circuit breaker
+- 135 new tests (34 Rust + 54 frontend + 47 coverage hardening) covering Epic 2 features
 
 ### Changed
 
@@ -37,10 +48,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Action buttons (UserActions, PasswordFlagsEditor) use btn-sm for compact sizing
 - UserDetail sections separated with visible borders for better visual hierarchy
 - PropertyGrid categories separated with subtle borders
-
-### Added (continued)
-
-- 101 new tests (47 Rust + 55 frontend) covering Epic 2 features
 
 ## [0.1.0] - 2026-03-13
 

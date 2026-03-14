@@ -57,10 +57,7 @@ export function HomePage({ status }: HomePageProps) {
   }, [refreshMfaStatus]);
 
   return (
-    <div
-      className="h-full overflow-y-auto p-6"
-      data-testid="main-content"
-    >
+    <div className="h-full overflow-y-auto p-6" data-testid="main-content">
       <div className="mx-auto max-w-3xl">
         {/* Header */}
         <div className="mb-6 flex items-center gap-4">
@@ -81,12 +78,12 @@ export function HomePage({ status }: HomePageProps) {
         <div className="grid grid-cols-2 gap-4">
           {/* Connection Status */}
           <DashboardCard
-            icon={status.isConnected ? <Wifi size={18} /> : <WifiOff size={18} />}
+            icon={
+              status.isConnected ? <Wifi size={18} /> : <WifiOff size={18} />
+            }
             title="Active Directory"
             iconColor={
-              status.isConnected
-                ? "var(--color-success)"
-                : "var(--color-error)"
+              status.isConnected ? "var(--color-success)" : "var(--color-error)"
             }
           >
             <StatusRow
@@ -98,10 +95,7 @@ export function HomePage({ status }: HomePageProps) {
                   : "var(--color-error)"
               }
             />
-            <StatusRow
-              label="Domain"
-              value={status.domainName ?? "N/A"}
-            />
+            <StatusRow label="Domain" value={status.domainName ?? "N/A"} />
           </DashboardCard>
 
           {/* Current Session */}
@@ -111,10 +105,7 @@ export function HomePage({ status }: HomePageProps) {
             iconColor="var(--color-primary)"
           >
             <StatusRow label="User" value={status.username || "..."} />
-            <StatusRow
-              label="Computer"
-              value={status.computerName || "..."}
-            />
+            <StatusRow label="Computer" value={status.computerName || "..."} />
           </DashboardCard>
 
           {/* Permissions */}
@@ -155,12 +146,20 @@ export function HomePage({ status }: HomePageProps) {
           <DashboardCard
             icon={<ShieldCheck size={18} />}
             title="MFA Security"
-            iconColor={mfaConfigured ? "var(--color-success)" : "var(--color-text-secondary)"}
+            iconColor={
+              mfaConfigured
+                ? "var(--color-success)"
+                : "var(--color-text-secondary)"
+            }
           >
             <StatusRow
               label="Status"
               value={mfaConfigured ? "Configured" : "Not configured"}
-              valueColor={mfaConfigured ? "var(--color-success)" : "var(--color-text-secondary)"}
+              valueColor={
+                mfaConfigured
+                  ? "var(--color-success)"
+                  : "var(--color-text-secondary)"
+              }
             />
             <div className="flex gap-2 pt-1">
               {!mfaConfigured ? (
@@ -210,8 +209,8 @@ export function HomePage({ status }: HomePageProps) {
         {!status.isConnected && (
           <div className="mt-4 rounded-lg border border-[var(--color-warning-bg)] bg-[var(--color-warning-bg)] p-3">
             <p className="text-caption text-[var(--color-warning)]">
-              Not connected to Active Directory. Directory lookups will not
-              be available. Check that this machine is domain-joined and has
+              Not connected to Active Directory. Directory lookups will not be
+              available. Check that this machine is domain-joined and has
               network access to a domain controller.
             </p>
           </div>

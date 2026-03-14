@@ -115,7 +115,9 @@ export function AdvancedAttributes({ rawAttributes }: AdvancedAttributesProps) {
               : "text-[var(--color-text-disabled)] opacity-0 group-hover:opacity-100"
           }`}
           onClick={() => toggleFavorite(key)}
-          aria-label={isFav ? `Remove ${key} from favorites` : `Add ${key} to favorites`}
+          aria-label={
+            isFav ? `Remove ${key} from favorites` : `Add ${key} to favorites`
+          }
           data-testid={`favorite-toggle-${key}`}
         >
           <Star size={12} fill={isFav ? "currentColor" : "none"} />
@@ -124,7 +126,9 @@ export function AdvancedAttributes({ rawAttributes }: AdvancedAttributesProps) {
           {key}
         </span>
         <span className="flex-1 text-body text-[var(--color-text-primary)] break-all font-mono">
-          {displayValue || <span className="text-[var(--color-text-disabled)]">(empty)</span>}
+          {displayValue || (
+            <span className="text-[var(--color-text-disabled)]">(empty)</span>
+          )}
         </span>
         <span className="opacity-0 group-hover:opacity-100 transition-opacity">
           <CopyButton text={displayValue} />
@@ -154,56 +158,63 @@ export function AdvancedAttributes({ rawAttributes }: AdvancedAttributesProps) {
 
       {!collapsed && totalCount > 0 && (
         <>
-        <div className="mb-2 flex items-center gap-2 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2 py-1">
-          <Search size={14} className="shrink-0 text-[var(--color-text-secondary)]" />
-          <input
-            type="text"
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            placeholder="Filter attributes..."
-            className="flex-1 bg-transparent text-body text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-secondary)]"
-            data-testid="advanced-attributes-search"
-          />
-          {searchText && (
-            <button
-              onClick={() => setSearchText("")}
-              className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
-              aria-label="Clear filter"
-            >
-              <X size={14} />
-            </button>
-          )}
-        </div>
+          <div className="mb-2 flex items-center gap-2 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2 py-1">
+            <Search
+              size={14}
+              className="shrink-0 text-[var(--color-text-secondary)]"
+            />
+            <input
+              type="text"
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              placeholder="Filter attributes..."
+              className="flex-1 bg-transparent text-body text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-secondary)]"
+              data-testid="advanced-attributes-search"
+            />
+            {searchText && (
+              <button
+                onClick={() => setSearchText("")}
+                className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+                aria-label="Clear filter"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
 
-        {filteredCount === 0 && (
-          <p className="py-3 text-center text-caption text-[var(--color-text-secondary)]">
-            No attributes match "{searchText}"
-          </p>
-        )}
-
-        {filteredCount > 0 && (
-        <div className="rounded-lg border border-[var(--color-border-default)] overflow-hidden">
-          {favoriteAttrs.length > 0 && (
-            <>
-              <div className="px-3 py-1.5 text-[10px] font-medium uppercase tracking-wider text-[var(--color-warning)] bg-[var(--color-surface-card)]">
-                Favorites
-              </div>
-              {favoriteAttrs.map(([key, values]) => renderRow(key, values, true))}
-            </>
+          {filteredCount === 0 && (
+            <p className="py-3 text-center text-caption text-[var(--color-text-secondary)]">
+              No attributes match "{searchText}"
+            </p>
           )}
-          {otherAttrs.length > 0 && (
-            <>
+
+          {filteredCount > 0 && (
+            <div className="rounded-lg border border-[var(--color-border-default)] overflow-hidden">
               {favoriteAttrs.length > 0 && (
-                <div className="border-t border-[var(--color-border-default)]" />
+                <>
+                  <div className="px-3 py-1.5 text-[10px] font-medium uppercase tracking-wider text-[var(--color-warning)] bg-[var(--color-surface-card)]">
+                    Favorites
+                  </div>
+                  {favoriteAttrs.map(([key, values]) =>
+                    renderRow(key, values, true),
+                  )}
+                </>
               )}
-              <div className="px-3 py-1.5 text-[10px] font-medium uppercase tracking-wider text-[var(--color-text-secondary)] bg-[var(--color-surface-card)]">
-                All Attributes
-              </div>
-              {otherAttrs.map(([key, values]) => renderRow(key, values, false))}
-            </>
+              {otherAttrs.length > 0 && (
+                <>
+                  {favoriteAttrs.length > 0 && (
+                    <div className="border-t border-[var(--color-border-default)]" />
+                  )}
+                  <div className="px-3 py-1.5 text-[10px] font-medium uppercase tracking-wider text-[var(--color-text-secondary)] bg-[var(--color-surface-card)]">
+                    All Attributes
+                  </div>
+                  {otherAttrs.map(([key, values]) =>
+                    renderRow(key, values, false),
+                  )}
+                </>
+              )}
+            </div>
           )}
-        </div>
-        )}
         </>
       )}
     </div>
