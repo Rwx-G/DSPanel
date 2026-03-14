@@ -110,8 +110,8 @@ pub fn compute_attribute_diff(
     metadata
         .iter()
         .filter(|m| {
-            m.last_originating_change_time >= from_time.to_string()
-                && m.last_originating_change_time <= to_time.to_string()
+            m.last_originating_change_time.as_str() >= from_time
+                && m.last_originating_change_time.as_str() <= to_time
         })
         .map(|m| AttributeChangeDiff {
             attribute_name: m.attribute_name.clone(),
@@ -178,7 +178,10 @@ mod tests {
     #[test]
     fn test_parse_attribute_values() {
         let result = parse_replication_metadata(SAMPLE_XML);
-        let display_name = result.iter().find(|m| m.attribute_name == "displayName").unwrap();
+        let display_name = result
+            .iter()
+            .find(|m| m.attribute_name == "displayName")
+            .unwrap();
         assert_eq!(display_name.version, 3);
         assert_eq!(
             display_name.last_originating_change_time,
@@ -237,20 +240,14 @@ mod tests {
     #[test]
     fn test_extract_xml_value_with_whitespace() {
         let xml = "<tag>  trimmed  </tag>";
-        assert_eq!(
-            extract_xml_value(xml, "tag"),
-            Some("trimmed".to_string())
-        );
+        assert_eq!(extract_xml_value(xml, "tag"), Some("trimmed".to_string()));
     }
 
     #[test]
     fn test_compute_attribute_diff() {
         let metadata = parse_replication_metadata(SAMPLE_XML);
-        let diff = compute_attribute_diff(
-            &metadata,
-            "2026-02-01T00:00:00Z",
-            "2026-02-28T23:59:59Z",
-        );
+        let diff =
+            compute_attribute_diff(&metadata, "2026-02-01T00:00:00Z", "2026-02-28T23:59:59Z");
         assert_eq!(diff.len(), 1);
         assert_eq!(diff[0].attribute_name, "displayName");
         assert_eq!(diff[0].version_before, 2);
@@ -260,22 +257,16 @@ mod tests {
     #[test]
     fn test_compute_attribute_diff_full_range() {
         let metadata = parse_replication_metadata(SAMPLE_XML);
-        let diff = compute_attribute_diff(
-            &metadata,
-            "2025-01-01T00:00:00Z",
-            "2027-01-01T00:00:00Z",
-        );
+        let diff =
+            compute_attribute_diff(&metadata, "2025-01-01T00:00:00Z", "2027-01-01T00:00:00Z");
         assert_eq!(diff.len(), 3);
     }
 
     #[test]
     fn test_compute_attribute_diff_empty_range() {
         let metadata = parse_replication_metadata(SAMPLE_XML);
-        let diff = compute_attribute_diff(
-            &metadata,
-            "2020-01-01T00:00:00Z",
-            "2020-12-31T23:59:59Z",
-        );
+        let diff =
+            compute_attribute_diff(&metadata, "2020-01-01T00:00:00Z", "2020-12-31T23:59:59Z");
         assert!(diff.is_empty());
     }
 

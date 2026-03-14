@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Side-by-side user comparison with group membership delta (shared/only-A/only-B) and color-coded display (3.1)
+- Group diff algorithm with case-insensitive DN comparison and sorted output (3.1)
+- User comparison page with dual search, filter, and sort controls (3.1)
+- UNC path permissions audit with NTFS ACL reading via Windows API (3.2)
+- ACE cross-reference with user group SIDs showing access indicators (allowed/denied/no-match) (3.2)
+- CSV export for UNC permissions audit results (3.2)
+- Standalone NTFS Permissions Analyzer page with recursive depth scanning (3.3)
+- Allow/deny conflict detection across parent/child paths (3.3)
+- Inherited vs explicit ACE filtering toggle (3.3)
+- State-in-time replication metadata viewer parsing msDS-ReplAttributeMetaData XML (3.4)
+- Attribute timeline sorted by last change time with version and originating DC (3.4)
+- Attribute diff between two timestamps showing version changes (3.4)
+- Replication History section in user detail view (3.4)
+- New sidebar entries: User Comparison (Directory group), NTFS Analyzer (Tools group)
+- New Tauri commands: compare_users, audit_ntfs_permissions, cross_reference_ntfs, analyze_ntfs, get_replication_metadata, compute_attribute_diff
+
 ## [0.2.0] - 2026-03-14
 
 Epic 2 - Support Actions and Account Management. Password reset, secure password generator,

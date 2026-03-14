@@ -114,10 +114,7 @@ pub fn format_permissions(access_mask: u32) -> Vec<String> {
 ///
 /// Checks if the trustee SID matches any SID in the user's group list
 /// or the user's own SID.
-pub fn check_user_access(
-    ace: &AceEntry,
-    user_sids: &[String],
-) -> AccessIndicator {
+pub fn check_user_access(ace: &AceEntry, user_sids: &[String]) -> AccessIndicator {
     let trustee_lower = ace.trustee_sid.to_lowercase();
     let is_member = user_sids
         .iter()
@@ -152,15 +149,14 @@ pub fn cross_reference_aces(
 ///
 /// On non-Windows platforms, returns an error.
 #[cfg(windows)]
+#[allow(clippy::transmute_ptr_to_ref, clippy::missing_transmute_annotations)]
 pub fn read_acl(path: &str) -> Result<Vec<AceEntry>, String> {
     use std::ptr;
     use windows::core::PCWSTR;
     use windows::Win32::Foundation::LocalFree;
-    use windows::Win32::Security::Authorization::{
-        GetNamedSecurityInfoW, SE_FILE_OBJECT,
-    };
+    use windows::Win32::Security::Authorization::{GetNamedSecurityInfoW, SE_FILE_OBJECT};
     use windows::Win32::Security::{
-        ACE_HEADER, ACCESS_ALLOWED_ACE, ACCESS_DENIED_ACE, ACL as WinAcl,
+        ACCESS_ALLOWED_ACE, ACCESS_DENIED_ACE, ACE_HEADER, ACL as WinAcl,
         DACL_SECURITY_INFORMATION, PSECURITY_DESCRIPTOR,
     };
 
@@ -252,14 +248,13 @@ pub fn read_acl(path: &str) -> Result<Vec<AceEntry>, String> {
 }
 
 #[cfg(windows)]
+#[allow(clippy::transmute_ptr_to_ref, clippy::missing_transmute_annotations)]
 fn sid_to_string(sid: *const std::ffi::c_void) -> String {
     use windows::Win32::Security::Authorization::ConvertSidToStringSidW;
     use windows::Win32::Security::PSID;
 
     let mut string_sid = windows::core::PWSTR::null();
-    let result = unsafe {
-        ConvertSidToStringSidW(PSID(sid as *mut _), &mut string_sid)
-    };
+    let result = unsafe { ConvertSidToStringSidW(PSID(sid as *mut _), &mut string_sid) };
 
     if result.is_ok() {
         let s = unsafe { string_sid.to_string() }.unwrap_or_default();
@@ -428,10 +423,7 @@ mod tests {
         ];
 
         let user_a_sids = vec!["S-1-5-21-100".to_string()]; // In GroupA only
-        let user_b_sids = vec![
-            "S-1-5-21-100".to_string(),
-            "S-1-5-21-200".to_string(),
-        ]; // In both
+        let user_b_sids = vec!["S-1-5-21-100".to_string(), "S-1-5-21-200".to_string()]; // In both
 
         let results = cross_reference_aces(&aces, &user_a_sids, &user_b_sids);
         assert_eq!(results.len(), 2);

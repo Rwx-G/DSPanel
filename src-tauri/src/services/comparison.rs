@@ -29,14 +29,14 @@ pub fn compute_group_diff(groups_a: &[String], groups_b: &[String]) -> GroupComp
         .filter(|g| shared_lower.contains(&g.to_lowercase()))
         .cloned()
         .collect();
-    shared_groups.sort_by(|a, b| a.to_lowercase().cmp(&b.to_lowercase()));
+    shared_groups.sort_by_key(|a| a.to_lowercase());
 
     let mut only_a_groups: Vec<String> = groups_a
         .iter()
         .filter(|g| !set_b.contains(&g.to_lowercase()))
         .cloned()
         .collect();
-    only_a_groups.sort_by(|a, b| a.to_lowercase().cmp(&b.to_lowercase()));
+    only_a_groups.sort_by_key(|a| a.to_lowercase());
 
     // Preserve original casing from groups_b for only-B
     let mut only_b_groups: Vec<String> = groups_b
@@ -44,7 +44,7 @@ pub fn compute_group_diff(groups_a: &[String], groups_b: &[String]) -> GroupComp
         .filter(|g| !set_a.contains(&g.to_lowercase()))
         .cloned()
         .collect();
-    only_b_groups.sort_by(|a, b| a.to_lowercase().cmp(&b.to_lowercase()));
+    only_b_groups.sort_by_key(|a| a.to_lowercase());
 
     GroupComparisonResult {
         total_a: groups_a.len(),
@@ -75,8 +75,12 @@ mod tests {
         let result = compute_group_diff(&groups_a, &groups_b);
 
         assert_eq!(result.shared_groups.len(), 2);
-        assert!(result.shared_groups.contains(&"CN=Group2,DC=example,DC=com".to_string()));
-        assert!(result.shared_groups.contains(&"CN=Group3,DC=example,DC=com".to_string()));
+        assert!(result
+            .shared_groups
+            .contains(&"CN=Group2,DC=example,DC=com".to_string()));
+        assert!(result
+            .shared_groups
+            .contains(&"CN=Group3,DC=example,DC=com".to_string()));
         assert_eq!(result.only_a_groups, vec!["CN=Group1,DC=example,DC=com"]);
         assert_eq!(result.only_b_groups, vec!["CN=Group4,DC=example,DC=com"]);
         assert_eq!(result.total_a, 3);
@@ -145,10 +149,7 @@ mod tests {
 
         assert_eq!(result.shared_groups.len(), 1);
         // Preserves original casing from groups_a
-        assert_eq!(
-            result.shared_groups[0],
-            "CN=Group1,DC=EXAMPLE,DC=COM"
-        );
+        assert_eq!(result.shared_groups[0], "CN=Group1,DC=EXAMPLE,DC=COM");
         assert!(result.only_a_groups.is_empty());
         assert!(result.only_b_groups.is_empty());
     }

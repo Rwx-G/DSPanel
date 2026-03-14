@@ -638,7 +638,7 @@ impl DirectoryProvider for LdapDirectoryProvider {
     }
 
     async fn get_replication_metadata(&self, object_dn: &str) -> Result<Option<String>> {
-        let base_dn = self.base_dn().context("Not connected - no base DN")?;
+        let _base_dn = self.base_dn().context("Not connected - no base DN")?;
         let mut ldap = self.connect().await?;
 
         let (entries, _) = ldap

@@ -1,5 +1,5 @@
-use serde::Serialize;
 use crate::services::ntfs::{AceAccessType, AceEntry};
+use serde::Serialize;
 
 /// Result of a recursive NTFS analysis.
 #[derive(Debug, Clone, Serialize)]
@@ -100,7 +100,12 @@ pub fn enumerate_directories(base_path: &str, max_depth: usize) -> Vec<Result<St
         return results;
     }
 
-    fn recurse(path: &str, depth: usize, max_depth: usize, results: &mut Vec<Result<String, String>>) {
+    fn recurse(
+        path: &str,
+        depth: usize,
+        max_depth: usize,
+        results: &mut Vec<Result<String, String>>,
+    ) {
         if depth >= max_depth {
             return;
         }
@@ -147,26 +152,24 @@ pub fn analyze(base_path: &str, max_depth: usize) -> NtfsAnalysisResult {
 
     for dir_result in &dir_results {
         match dir_result {
-            Ok(path) => {
-                match crate::services::ntfs::read_acl(path) {
-                    Ok(aces) => {
-                        total_aces += aces.len();
-                        paths.push(PathAclResult {
-                            path: path.clone(),
-                            aces,
-                            error: None,
-                        });
-                    }
-                    Err(e) => {
-                        total_errors += 1;
-                        paths.push(PathAclResult {
-                            path: path.clone(),
-                            aces: vec![],
-                            error: Some(e),
-                        });
-                    }
+            Ok(path) => match crate::services::ntfs::read_acl(path) {
+                Ok(aces) => {
+                    total_aces += aces.len();
+                    paths.push(PathAclResult {
+                        path: path.clone(),
+                        aces,
+                        error: None,
+                    });
                 }
-            }
+                Err(e) => {
+                    total_errors += 1;
+                    paths.push(PathAclResult {
+                        path: path.clone(),
+                        aces: vec![],
+                        error: Some(e),
+                    });
+                }
+            },
             Err(e) => {
                 total_errors += 1;
                 paths.push(PathAclResult {
@@ -194,7 +197,13 @@ pub fn analyze(base_path: &str, max_depth: usize) -> NtfsAnalysisResult {
 mod tests {
     use super::*;
 
-    fn make_ace(sid: &str, name: &str, access: AceAccessType, perms: Vec<&str>, inherited: bool) -> AceEntry {
+    fn make_ace(
+        sid: &str,
+        name: &str,
+        access: AceAccessType,
+        perms: Vec<&str>,
+        inherited: bool,
+    ) -> AceEntry {
         AceEntry {
             trustee_sid: sid.to_string(),
             trustee_display_name: name.to_string(),
@@ -209,16 +218,24 @@ mod tests {
         let paths = vec![
             PathAclResult {
                 path: "\\\\server\\share".to_string(),
-                aces: vec![
-                    make_ace("S-1-5-21-100", "Admins", AceAccessType::Allow, vec!["Read", "Write"], false),
-                ],
+                aces: vec![make_ace(
+                    "S-1-5-21-100",
+                    "Admins",
+                    AceAccessType::Allow,
+                    vec!["Read", "Write"],
+                    false,
+                )],
                 error: None,
             },
             PathAclResult {
                 path: "\\\\server\\share\\subfolder".to_string(),
-                aces: vec![
-                    make_ace("S-1-5-21-100", "Admins", AceAccessType::Deny, vec!["Write"], false),
-                ],
+                aces: vec![make_ace(
+                    "S-1-5-21-100",
+                    "Admins",
+                    AceAccessType::Deny,
+                    vec!["Write"],
+                    false,
+                )],
                 error: None,
             },
         ];
@@ -235,16 +252,24 @@ mod tests {
         let paths = vec![
             PathAclResult {
                 path: "\\\\server\\share".to_string(),
-                aces: vec![
-                    make_ace("S-1-5-21-100", "Admins", AceAccessType::Allow, vec!["Read"], false),
-                ],
+                aces: vec![make_ace(
+                    "S-1-5-21-100",
+                    "Admins",
+                    AceAccessType::Allow,
+                    vec!["Read"],
+                    false,
+                )],
                 error: None,
             },
             PathAclResult {
                 path: "\\\\server\\share\\sub".to_string(),
-                aces: vec![
-                    make_ace("S-1-5-21-200", "Users", AceAccessType::Deny, vec!["Read"], false),
-                ],
+                aces: vec![make_ace(
+                    "S-1-5-21-200",
+                    "Users",
+                    AceAccessType::Deny,
+                    vec!["Read"],
+                    false,
+                )],
                 error: None,
             },
         ];
@@ -258,8 +283,20 @@ mod tests {
         let paths = vec![PathAclResult {
             path: "\\\\server\\share".to_string(),
             aces: vec![
-                make_ace("S-1-5-21-100", "Admins", AceAccessType::Allow, vec!["Read"], false),
-                make_ace("S-1-5-21-100", "Admins", AceAccessType::Deny, vec!["Read"], false),
+                make_ace(
+                    "S-1-5-21-100",
+                    "Admins",
+                    AceAccessType::Allow,
+                    vec!["Read"],
+                    false,
+                ),
+                make_ace(
+                    "S-1-5-21-100",
+                    "Admins",
+                    AceAccessType::Deny,
+                    vec!["Read"],
+                    false,
+                ),
             ],
             error: None,
         }];
@@ -274,16 +311,24 @@ mod tests {
         let paths = vec![
             PathAclResult {
                 path: "\\\\server\\share".to_string(),
-                aces: vec![
-                    make_ace("S-1-5-21-100", "Admins", AceAccessType::Allow, vec!["Read"], false),
-                ],
+                aces: vec![make_ace(
+                    "S-1-5-21-100",
+                    "Admins",
+                    AceAccessType::Allow,
+                    vec!["Read"],
+                    false,
+                )],
                 error: None,
             },
             PathAclResult {
                 path: "\\\\server\\share\\sub".to_string(),
-                aces: vec![
-                    make_ace("S-1-5-21-100", "Admins", AceAccessType::Deny, vec!["Write"], false),
-                ],
+                aces: vec![make_ace(
+                    "S-1-5-21-100",
+                    "Admins",
+                    AceAccessType::Deny,
+                    vec!["Write"],
+                    false,
+                )],
                 error: None,
             },
         ];
@@ -297,16 +342,24 @@ mod tests {
         let paths = vec![
             PathAclResult {
                 path: "\\\\server\\share".to_string(),
-                aces: vec![
-                    make_ace("S-1-5-21-ABC", "Group", AceAccessType::Allow, vec!["Read"], false),
-                ],
+                aces: vec![make_ace(
+                    "S-1-5-21-ABC",
+                    "Group",
+                    AceAccessType::Allow,
+                    vec!["Read"],
+                    false,
+                )],
                 error: None,
             },
             PathAclResult {
                 path: "\\\\server\\share\\sub".to_string(),
-                aces: vec![
-                    make_ace("s-1-5-21-abc", "Group", AceAccessType::Deny, vec!["Read"], false),
-                ],
+                aces: vec![make_ace(
+                    "s-1-5-21-abc",
+                    "Group",
+                    AceAccessType::Deny,
+                    vec!["Read"],
+                    false,
+                )],
                 error: None,
             },
         ];

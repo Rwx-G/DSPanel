@@ -6,13 +6,13 @@ use crate::error::AppError;
 use crate::models::DirectoryEntry;
 use crate::services::audit::AuditEntry;
 use crate::services::comparison::GroupComparisonResult;
+use crate::services::mfa::{MfaConfig, MfaSetupResult};
 use crate::services::ntfs::{AceCrossReference, AceEntry, NtfsAuditResult};
 use crate::services::ntfs_analyzer::NtfsAnalysisResult;
+use crate::services::password::{HibpResult, PasswordOptions};
 use crate::services::replication::{
     AttributeChangeDiff, AttributeMetadata, ReplicationMetadataResult,
 };
-use crate::services::mfa::{MfaConfig, MfaSetupResult};
-use crate::services::password::{HibpResult, PasswordOptions};
 use crate::services::{AccountHealthStatus, HealthInput, PermissionLevel};
 use crate::state::AppState;
 
@@ -441,12 +441,8 @@ pub(crate) async fn compare_users_inner(
         .map_err(|e| AppError::Directory(e.to_string()))?
         .ok_or_else(|| AppError::Directory(format!("User not found: {}", sam_b)))?;
 
-    let groups_a: Vec<String> = user_a
-        .get_attribute_values("memberOf")
-        .to_vec();
-    let groups_b: Vec<String> = user_b
-        .get_attribute_values("memberOf")
-        .to_vec();
+    let groups_a: Vec<String> = user_a.get_attribute_values("memberOf").to_vec();
+    let groups_b: Vec<String> = user_b.get_attribute_values("memberOf").to_vec();
 
     Ok(crate::services::comparison::compute_group_diff(
         &groups_a, &groups_b,
@@ -455,11 +451,9 @@ pub(crate) async fn compare_users_inner(
 
 /// Reads NTFS ACL from a UNC path.
 pub(crate) fn audit_ntfs_permissions_inner(path: &str) -> Result<NtfsAuditResult, AppError> {
-    crate::services::ntfs::validate_unc_path(path)
-        .map_err(|e| AppError::Configuration(e))?;
+    crate::services::ntfs::validate_unc_path(path).map_err(AppError::Configuration)?;
 
-    let aces = crate::services::ntfs::read_acl(path)
-        .map_err(|e| AppError::Directory(e))?;
+    let aces = crate::services::ntfs::read_acl(path).map_err(AppError::Directory)?;
 
     Ok(NtfsAuditResult {
         path: path.to_string(),
@@ -517,12 +511,8 @@ pub(crate) fn compute_attribute_diff_inner(
 }
 
 /// Performs a recursive NTFS permissions analysis on a UNC path.
-pub(crate) fn analyze_ntfs_inner(
-    path: &str,
-    depth: usize,
-) -> Result<NtfsAnalysisResult, AppError> {
-    crate::services::ntfs::validate_unc_path(path)
-        .map_err(|e| AppError::Configuration(e))?;
+pub(crate) fn analyze_ntfs_inner(path: &str, depth: usize) -> Result<NtfsAnalysisResult, AppError> {
+    crate::services::ntfs::validate_unc_path(path).map_err(AppError::Configuration)?;
 
     Ok(crate::services::ntfs_analyzer::analyze(path, depth))
 }
@@ -1693,16 +1683,11 @@ mod tests {
             make_user_with_groups(
                 "asmith",
                 "Alice Smith",
-                vec![
-                    "CN=Group2,DC=example,DC=com",
-                    "CN=Group4,DC=example,DC=com",
-                ],
+                vec!["CN=Group2,DC=example,DC=com", "CN=Group4,DC=example,DC=com"],
             ),
         ];
         let state = make_state_with_users(users);
-        let result = compare_users_inner(&state, "jdoe", "asmith")
-            .await
-            .unwrap();
+        let result = compare_users_inner(&state, "jdoe", "asmith").await.unwrap();
         assert_eq!(result.shared_groups.len(), 1);
         assert_eq!(result.only_a_groups.len(), 2);
         assert_eq!(result.only_b_groups.len(), 1);
@@ -1807,9 +1792,7 @@ mod tests {
             make_user_entry("asmith", "Alice Smith"),
         ];
         let state = make_state_with_users(users);
-        let result = compare_users_inner(&state, "jdoe", "asmith")
-            .await
-            .unwrap();
+        let result = compare_users_inner(&state, "jdoe", "asmith").await.unwrap();
         assert!(result.shared_groups.is_empty());
         assert!(result.only_a_groups.is_empty());
         assert!(result.only_b_groups.is_empty());
@@ -1832,10 +1815,8 @@ mod tests {
     <usnLocalChange>67890</usnLocalChange>
 </DS_REPL_ATTR_META_DATA>"#;
 
-        let provider = Arc::new(
-            MockDirectoryProvider::new()
-                .with_replication_metadata(xml.to_string()),
-        );
+        let provider =
+            Arc::new(MockDirectoryProvider::new().with_replication_metadata(xml.to_string()));
         let state = AppState::new_for_test(provider, PermissionConfig::default());
         let result = get_replication_metadata_inner(&state, "CN=Test,DC=example,DC=com")
             .await
@@ -1883,11 +1864,8 @@ mod tests {
                 originating_usn: 0,
             },
         ];
-        let diff = compute_attribute_diff_inner(
-            &metadata,
-            "2026-02-01T00:00:00Z",
-            "2026-02-28T23:59:59Z",
-        );
+        let diff =
+            compute_attribute_diff_inner(&metadata, "2026-02-01T00:00:00Z", "2026-02-28T23:59:59Z");
         assert_eq!(diff.len(), 1);
         assert_eq!(diff[0].attribute_name, "displayName");
     }
