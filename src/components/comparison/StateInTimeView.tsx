@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { History, ArrowRight, AlertTriangle, Clock, Server, Hash } from "lucide-react";
 import {
@@ -20,6 +20,15 @@ export function StateInTimeView({ objectDn, objectType }: StateInTimeViewProps) 
   const [selectedFrom, setSelectedFrom] = useState<string>("");
   const [selectedTo, setSelectedTo] = useState<string>("");
   const [diff, setDiff] = useState<AttributeChangeDiff[] | null>(null);
+
+  // Reset when user changes
+  useEffect(() => {
+    setMetadata(null);
+    setError(null);
+    setDiff(null);
+    setSelectedFrom("");
+    setSelectedTo("");
+  }, [objectDn]);
 
   const loadMetadata = useCallback(async () => {
     setIsLoading(true);

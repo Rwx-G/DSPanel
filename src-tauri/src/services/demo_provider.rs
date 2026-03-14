@@ -349,6 +349,53 @@ fn sample_browse_users() -> Vec<DirectoryEntry> {
     users
 }
 
+fn dn_seed(dn: &str) -> u64 {
+    dn.bytes().fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64))
+}
+
+fn sample_replication_metadata_for(object_dn: &str) -> String {
+    let seed = dn_seed(object_dn);
+    // Vary dates and versions per user using the seed
+    let day_offset = (seed % 28) as u32 + 1;
+    let hour = (seed % 20) as u32 + 4;
+    let v_base = (seed % 5) as u64;
+    let dc = if seed % 2 == 0 { "DC01" } else { "DC02" };
+    let dc_alt = if seed % 2 == 0 { "DC02" } else { "DC01" };
+    let usn_base = 10000 + (seed % 50000);
+
+    let attrs: Vec<(&str, u64, String, &str, u64)> = vec![
+        ("sAMAccountName",      1,              format!("2024-06-{}T{:02}:12:00Z", (day_offset % 28) + 1, hour), dc, usn_base),
+        ("userPrincipalName",   1,              format!("2024-06-{}T{:02}:12:00Z", (day_offset % 28) + 1, hour), dc, usn_base + 1),
+        ("mail",                v_base + 1,     format!("2025-{:02}-{}T{:02}:00:00Z", (seed % 10) + 1, (day_offset % 27) + 1, (hour + 3) % 24), dc_alt, usn_base + 5000),
+        ("displayName",         v_base + 2,     format!("2025-{:02}-{}T{:02}:30:00Z", (seed % 8) + 3, (day_offset % 26) + 1, (hour + 5) % 24), dc_alt, usn_base + 15000),
+        ("department",          v_base + 1,     format!("2025-{:02}-{}T{:02}:20:00Z", (seed % 6) + 5, (day_offset % 25) + 1, (hour + 2) % 24), dc, usn_base + 12000),
+        ("title",               v_base + 3,     format!("2026-01-{}T{:02}:45:00Z", (day_offset % 28) + 1, (hour + 1) % 24), dc, usn_base + 30000),
+        ("userAccountControl",  v_base + 2,     format!("2026-01-{}T{:02}:30:00Z", ((day_offset + 5) % 28) + 1, (hour + 4) % 24), dc, usn_base + 28000),
+        ("pwdLastSet",          v_base + 4,     format!("2026-02-{}T{:02}:00:00Z", (day_offset % 27) + 1, (hour + 6) % 24), dc, usn_base + 40000),
+        ("memberOf",            v_base + 5,     format!("2026-02-{}T{:02}:45:00Z", ((day_offset + 10) % 27) + 1, (hour + 3) % 24), dc, usn_base + 42000),
+        ("lastLogonTimestamp",  v_base + 8,     format!("2026-03-{}T{:02}:15:00Z", (day_offset % 13) + 1, (hour + 7) % 24), dc_alt, usn_base + 50000),
+        ("whenChanged",        v_base + 10,     format!("2026-03-{}T{:02}:15:00Z", (day_offset % 13) + 1, (hour + 7) % 24), dc_alt, usn_base + 50001),
+    ];
+
+    attrs
+        .iter()
+        .map(|(name, ver, time, originating_dc, usn)| {
+            format!(
+                r#"<DS_REPL_ATTR_META_DATA>
+    <pszAttributeName>{}</pszAttributeName>
+    <dwVersion>{}</dwVersion>
+    <ftimeLastOriginatingChange>{}</ftimeLastOriginatingChange>
+    <pszLastOriginatingDsaDN>CN={},OU=Domain Controllers,DC=contoso,DC=com</pszLastOriginatingDsaDN>
+    <usnOriginatingChange>{}</usnOriginatingChange>
+    <usnLocalChange>{}</usnLocalChange>
+</DS_REPL_ATTR_META_DATA>"#,
+                name, ver, time, originating_dc, usn, usn + 300
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 fn sample_computers() -> Vec<DirectoryEntry> {
     vec![
         make_computer(
@@ -426,6 +473,24 @@ fn make_user(
         vec![
             "CN=Domain Users,CN=Users,DC=contoso,DC=com".to_string(),
             format!("CN={} Team,OU=Groups,DC=contoso,DC=com", dept),
+        ],
+    );
+
+    // Token groups: SIDs of all groups the user is a member of (used for ACL cross-reference)
+    let dept_group_sid = match dept {
+        "IT" => "S-1-5-21-1234567890-9876543210-1111111111-1102",
+        "Finance" => "S-1-5-21-1234567890-9876543210-1111111111-1105",
+        "Engineering" => "S-1-5-21-1234567890-9876543210-1111111111-1106",
+        "Sales" => "S-1-5-21-1234567890-9876543210-1111111111-1108",
+        "Marketing" => "S-1-5-21-1234567890-9876543210-1111111111-1109",
+        "HR" => "S-1-5-21-1234567890-9876543210-1111111111-1110",
+        _ => "S-1-5-21-1234567890-9876543210-1111111111-1199",
+    };
+    attrs.insert(
+        "tokenGroups".to_string(),
+        vec![
+            "S-1-5-21-1234567890-9876543210-1111111111-513".to_string(), // Domain Users
+            dept_group_sid.to_string(),
         ],
     );
 
@@ -560,7 +625,7 @@ impl DirectoryProvider for DemoDirectoryProvider {
 
     async fn search_users(&self, filter: &str, max_results: usize) -> Result<Vec<DirectoryEntry>> {
         let lower = filter.to_lowercase();
-        Ok(sample_users()
+        Ok(sample_browse_users()
             .into_iter()
             .filter(|u| {
                 let sam = u.sam_account_name.as_deref().unwrap_or("").to_lowercase();
@@ -609,7 +674,7 @@ impl DirectoryProvider for DemoDirectoryProvider {
     }
 
     async fn get_user_by_identity(&self, sam_account_name: &str) -> Result<Option<DirectoryEntry>> {
-        Ok(sample_users()
+        Ok(sample_browse_users()
             .into_iter()
             .find(|u| u.sam_account_name.as_deref() == Some(sam_account_name)))
     }
@@ -689,7 +754,7 @@ impl DirectoryProvider for DemoDirectoryProvider {
         Ok(())
     }
 
-    async fn get_replication_metadata(&self, _object_dn: &str) -> Result<Option<String>> {
-        Ok(None)
+    async fn get_replication_metadata(&self, object_dn: &str) -> Result<Option<String>> {
+        Ok(Some(sample_replication_metadata_for(object_dn)))
     }
 }

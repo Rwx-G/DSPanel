@@ -14,6 +14,7 @@ interface NavigationState {
   sidebarExpanded: boolean;
   navigateTo: (moduleId: string, title: string) => void;
   openTab: (title: string, moduleId: string, icon?: string, data?: Record<string, unknown>) => TabItem;
+  clearTabData: (tabId: string) => void;
   closeTab: (tabId: string) => void;
   closeAllTabs: () => void;
   activateTab: (tabId: string) => void;
@@ -96,6 +97,12 @@ export function NavigationProvider({ children }: NavigationProviderProps) {
     },
     [openTabs],
   );
+
+  const clearTabData = useCallback((tabId: string) => {
+    setOpenTabs((prev) =>
+      prev.map((t) => (t.id === tabId ? { ...t, data: undefined } : t)),
+    );
+  }, []);
 
   const goHome = useCallback(() => {
     setActiveTabId(null);
@@ -197,6 +204,7 @@ export function NavigationProvider({ children }: NavigationProviderProps) {
         sidebarExpanded,
         navigateTo,
         openTab,
+        clearTabData,
         closeTab,
         closeAllTabs,
         activateTab,

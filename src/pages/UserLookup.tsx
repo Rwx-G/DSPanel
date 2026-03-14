@@ -129,7 +129,32 @@ export function UserLookup() {
   const handleUserContextMenu = useCallback(
     (e: React.MouseEvent, user: DirectoryUser) => {
       e.preventDefault();
-      if (!selectedUser || selectedUser.samAccountName === user.samAccountName) return;
+
+      if (!selectedUser) {
+        setContextMenuItems([
+          {
+            label: "Select a user first to compare",
+            icon: <GitCompareArrows size={14} />,
+            onClick: () => {},
+            disabled: true,
+          },
+        ]);
+        setContextMenuPos({ x: e.clientX, y: e.clientY });
+        return;
+      }
+
+      if (selectedUser.samAccountName === user.samAccountName) {
+        setContextMenuItems([
+          {
+            label: "Cannot compare a user with itself",
+            icon: <GitCompareArrows size={14} />,
+            onClick: () => {},
+            disabled: true,
+          },
+        ]);
+        setContextMenuPos({ x: e.clientX, y: e.clientY });
+        return;
+      }
 
       const selectedName = selectedUser.displayName || selectedUser.samAccountName;
       const targetName = user.displayName || user.samAccountName;

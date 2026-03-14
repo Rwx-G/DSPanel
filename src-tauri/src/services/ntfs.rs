@@ -272,6 +272,79 @@ pub fn read_acl(_path: &str) -> Result<Vec<AceEntry>, String> {
     Err("NTFS ACL reading is only supported on Windows".to_string())
 }
 
+/// Returns demo ACL data for testing without a real UNC path.
+///
+/// Group names match those assigned to demo users (e.g. "IT Team",
+/// "Engineering Team") so that "View group members" returns results.
+#[cfg(feature = "demo")]
+pub fn read_acl_demo(path: &str) -> Vec<AceEntry> {
+    let seed = path
+        .bytes()
+        .fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
+
+    let mut aces = vec![
+        AceEntry {
+            trustee_sid: "S-1-5-32-544".to_string(),
+            trustee_display_name: "BUILTIN\\Administrators".to_string(),
+            access_type: AceAccessType::Allow,
+            permissions: vec!["FullControl".to_string()],
+            is_inherited: false,
+        },
+        AceEntry {
+            trustee_sid: "S-1-5-18".to_string(),
+            trustee_display_name: "NT AUTHORITY\\SYSTEM".to_string(),
+            access_type: AceAccessType::Allow,
+            permissions: vec!["FullControl".to_string()],
+            is_inherited: false,
+        },
+        AceEntry {
+            trustee_sid: "S-1-5-21-1234567890-9876543210-1111111111-513".to_string(),
+            trustee_display_name: "CONTOSO\\Domain Users".to_string(),
+            access_type: AceAccessType::Allow,
+            permissions: vec!["ReadAndExecute".to_string()],
+            is_inherited: true,
+        },
+        AceEntry {
+            trustee_sid: "S-1-5-21-1234567890-9876543210-1111111111-1102".to_string(),
+            trustee_display_name: "CONTOSO\\IT Team".to_string(),
+            access_type: AceAccessType::Allow,
+            permissions: vec!["Modify".to_string()],
+            is_inherited: true,
+        },
+        AceEntry {
+            trustee_sid: "S-1-5-21-1234567890-9876543210-1111111111-1105".to_string(),
+            trustee_display_name: "CONTOSO\\Finance Team".to_string(),
+            access_type: AceAccessType::Allow,
+            permissions: vec!["Read".to_string(), "Write".to_string()],
+            is_inherited: false,
+        },
+    ];
+
+    // Add a deny ACE for some paths
+    if seed % 3 == 0 {
+        aces.push(AceEntry {
+            trustee_sid: "S-1-5-21-1234567890-9876543210-1111111111-1108".to_string(),
+            trustee_display_name: "CONTOSO\\Sales Team".to_string(),
+            access_type: AceAccessType::Deny,
+            permissions: vec!["Write".to_string(), "Delete".to_string()],
+            is_inherited: false,
+        });
+    }
+
+    // Vary some ACEs based on path depth
+    if path.matches('\\').count() > 4 {
+        aces.push(AceEntry {
+            trustee_sid: "S-1-5-21-1234567890-9876543210-1111111111-1106".to_string(),
+            trustee_display_name: "CONTOSO\\Engineering Team".to_string(),
+            access_type: AceAccessType::Allow,
+            permissions: vec!["Modify".to_string()],
+            is_inherited: false,
+        });
+    }
+
+    aces
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

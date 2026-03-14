@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useRef } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
   type GroupComparisonResult,
@@ -125,23 +125,19 @@ export function useComparison() {
     setFilter("");
   }, []);
 
-  // Track which prefill request we've already processed
-  const lastPrefillRef = useRef<string | null>(null);
-
   const prefill = useCallback(
     async (samA: string, samB: string) => {
-      const key = `${samA}::${samB}`;
-      if (lastPrefillRef.current === key) return;
-      lastPrefillRef.current = key;
-
       setError(null);
       setComparisonResult(null);
 
+      // Load both users via search (more reliable than get_user for all users)
       try {
-        const [entryA, entryB] = await Promise.all([
-          invoke<DirectoryEntry | null>("get_user", { samAccountName: samA }),
-          invoke<DirectoryEntry | null>("get_user", { samAccountName: samB }),
+        const [resultsA, resultsB] = await Promise.all([
+          invoke<DirectoryEntry[]>("search_users", { query: samA }),
+          invoke<DirectoryEntry[]>("search_users", { query: samB }),
         ]);
+        const entryA = resultsA.find((e) => e.samAccountName === samA) ?? resultsA[0] ?? null;
+        const entryB = resultsB.find((e) => e.samAccountName === samB) ?? resultsB[0] ?? null;
         setUserA(entryA);
         setUserB(entryB);
 
@@ -158,6 +154,10 @@ export function useComparison() {
           } finally {
             setIsComparing(false);
           }
+        } else {
+          setError(
+            `User not found: ${!entryA ? samA : ""}${!entryA && !entryB ? ", " : ""}${!entryB ? samB : ""}`,
+          );
         }
       } catch (e) {
         setError(`Failed to load users: ${e}`);

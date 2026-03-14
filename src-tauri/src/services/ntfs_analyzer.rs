@@ -143,7 +143,49 @@ pub fn enumerate_directories(base_path: &str, _max_depth: usize) -> Vec<Result<S
     vec![Ok(base_path.to_string())]
 }
 
+/// Performs a full NTFS analysis with demo data.
+#[cfg(feature = "demo")]
+pub fn analyze(base_path: &str, max_depth: usize) -> NtfsAnalysisResult {
+    // Generate fake subdirectories
+    let mut dir_paths = vec![base_path.to_string()];
+    if max_depth >= 1 {
+        dir_paths.push(format!("{}\\Documents", base_path));
+        dir_paths.push(format!("{}\\Projects", base_path));
+        dir_paths.push(format!("{}\\Shared", base_path));
+    }
+    if max_depth >= 2 {
+        dir_paths.push(format!("{}\\Projects\\Alpha", base_path));
+        dir_paths.push(format!("{}\\Projects\\Beta", base_path));
+        dir_paths.push(format!("{}\\Shared\\Reports", base_path));
+    }
+
+    let mut paths = Vec::new();
+    let mut total_aces = 0;
+
+    for path in &dir_paths {
+        let aces = crate::services::ntfs::read_acl_demo(path);
+        total_aces += aces.len();
+        paths.push(PathAclResult {
+            path: path.clone(),
+            aces,
+            error: None,
+        });
+    }
+
+    let conflicts = detect_conflicts(&paths);
+    let total_paths_scanned = dir_paths.len();
+
+    NtfsAnalysisResult {
+        paths,
+        conflicts,
+        total_aces,
+        total_paths_scanned,
+        total_errors: 0,
+    }
+}
+
 /// Performs a full NTFS analysis: scan paths, read ACLs, detect conflicts.
+#[cfg(not(feature = "demo"))]
 pub fn analyze(base_path: &str, max_depth: usize) -> NtfsAnalysisResult {
     let dir_results = enumerate_directories(base_path, max_depth);
     let mut paths = Vec::new();

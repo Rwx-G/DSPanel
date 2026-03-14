@@ -7,12 +7,22 @@ import {
   ShieldX,
   ChevronDown,
   ChevronRight,
+  Users,
 } from "lucide-react";
 import { type NtfsAnalysisResult, type PathAclResult } from "@/types/ntfs-analyzer";
+import { type AceEntry } from "@/types/ntfs";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
+import { ContextMenu, type ContextMenuItem } from "@/components/common/ContextMenu";
+import { GroupMembersDialog } from "@/components/dialogs/GroupMembersDialog";
 import { formatCsv, downloadCsv } from "@/utils/csvExport";
 
-function PathAclSection({ result }: { result: PathAclResult }) {
+function PathAclSection({
+  result,
+  onTrusteeContextMenu,
+}: {
+  result: PathAclResult;
+  onTrusteeContextMenu: (e: React.MouseEvent, ace: AceEntry) => void;
+}) {
   const [expanded, setExpanded] = useState(true);
 
   return (
@@ -44,7 +54,13 @@ function PathAclSection({ result }: { result: PathAclResult }) {
             </div>
           )}
           {result.aces.length > 0 && (
-            <table className="w-full text-body">
+            <table className="w-full table-fixed text-body">
+              <colgroup>
+                <col className="w-[40%]" />
+                <col className="w-[12%]" />
+                <col className="w-[33%]" />
+                <col className="w-[15%]" />
+              </colgroup>
               <thead>
                 <tr className="border-t border-[var(--color-border-default)] bg-[var(--color-surface-bg)]">
                   <th className="px-3 py-1.5 text-left text-caption font-medium text-[var(--color-text-secondary)]">
@@ -70,14 +86,17 @@ function PathAclSection({ result }: { result: PathAclResult }) {
                       className={`border-t border-[var(--color-border-subtle)] ${isDeny ? "bg-[var(--color-error-bg)]" : ""}`}
                       data-testid={`ace-row-${result.path}-${idx}`}
                     >
-                      <td className="px-3 py-1.5 text-[var(--color-text-primary)]">
+                      <td
+                        className="cursor-context-menu truncate px-3 py-1.5 text-[var(--color-text-primary)]"
+                        onContextMenu={(e) => onTrusteeContextMenu(e, ace)}
+                      >
                         {ace.trusteeDisplayName}
                       </td>
                       <td className={`px-3 py-1.5 font-medium ${isDeny ? "text-[var(--color-error)]" : "text-[var(--color-success)]"}`}>
                         {isDeny && <ShieldX size={12} className="mr-1 inline" />}
                         {ace.accessType}
                       </td>
-                      <td className="px-3 py-1.5 text-[var(--color-text-primary)]">
+                      <td className="truncate px-3 py-1.5 text-[var(--color-text-primary)]">
                         {ace.permissions.join(", ")}
                       </td>
                       <td className="px-3 py-1.5 text-center text-caption text-[var(--color-text-secondary)]">
@@ -105,8 +124,35 @@ export function NtfsAnalyzer() {
   const [depth, setDepth] = useState(0);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<NtfsAnalysisResult | null>(null);
+  const [contextMenuPos, setContextMenuPos] = useState<{ x: number; y: number } | null>(null);
+  const [contextMenuItems, setContextMenuItems] = useState<ContextMenuItem[]>([]);
+  const [groupMembersDialog, setGroupMembersDialog] = useState<{ dn: string; name: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showExplicitOnly, setShowExplicitOnly] = useState(false);
+
+  const handleTrusteeContextMenu = useCallback(
+    (e: React.MouseEvent, ace: AceEntry) => {
+      e.preventDefault();
+      // Extract group name from display name (e.g. "CONTOSO\IT Team" -> "IT Team")
+      const name = ace.trusteeDisplayName.includes("\\")
+        ? ace.trusteeDisplayName.split("\\").pop()!
+        : ace.trusteeDisplayName;
+      // Build group DN matching the demo data convention
+      const groupDn = name === "Domain Users"
+        ? `CN=${name},CN=Users,DC=contoso,DC=com`
+        : `CN=${name},OU=Groups,DC=contoso,DC=com`;
+
+      setContextMenuItems([
+        {
+          label: `View members of ${name}`,
+          icon: <Users size={14} />,
+          onClick: () => setGroupMembersDialog({ dn: groupDn, name }),
+        },
+      ]);
+      setContextMenuPos({ x: e.clientX, y: e.clientY });
+    },
+    [],
+  );
 
   const analyze = useCallback(async () => {
     if (!uncPath.trim()) return;
@@ -127,7 +173,7 @@ export function NtfsAnalyzer() {
     }
   }, [uncPath, depth]);
 
-  const exportCsv = useCallback(() => {
+  const exportCsv = useCallback(async () => {
     if (!result) return;
     const headers = ["Path", "Trustee", "Trustee SID", "Type", "Permissions", "Inherited", "Source"];
     const rows: string[][] = [];
@@ -145,7 +191,7 @@ export function NtfsAnalyzer() {
       }
     }
     const csv = formatCsv(headers, rows);
-    downloadCsv(`ntfs-analysis-${Date.now()}.csv`, csv);
+    await downloadCsv(`ntfs-analysis-${Date.now()}.csv`, csv);
   }, [result]);
 
   const filteredPaths = result?.paths.map((pr) => {
@@ -172,9 +218,14 @@ export function NtfsAnalyzer() {
             <input
               type="text"
               className="w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-bg)] px-3 py-1.5 text-body text-[var(--color-text-primary)] placeholder-[var(--color-text-secondary)] focus:border-[var(--color-primary)] focus:outline-none"
-              placeholder="\\\\server\\share\\folder"
+              placeholder="\\server\share\folder"
               value={uncPath}
               onChange={(e) => setUncPath(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && uncPath.trim() && !isAnalyzing) {
+                  analyze();
+                }
+              }}
               data-testid="analyzer-path-input"
             />
           </div>
@@ -290,10 +341,24 @@ export function NtfsAnalyzer() {
           {/* Path results */}
           <div className="flex-1 space-y-2 overflow-y-auto">
             {filteredPaths?.map((pr, idx) => (
-              <PathAclSection key={`${pr.path}-${idx}`} result={pr} />
+              <PathAclSection key={`${pr.path}-${idx}`} result={pr} onTrusteeContextMenu={handleTrusteeContextMenu} />
             ))}
           </div>
         </div>
+      )}
+
+      <ContextMenu
+        items={contextMenuItems}
+        position={contextMenuPos}
+        onClose={() => setContextMenuPos(null)}
+      />
+
+      {groupMembersDialog && (
+        <GroupMembersDialog
+          groupDn={groupMembersDialog.dn}
+          groupName={groupMembersDialog.name}
+          onClose={() => setGroupMembersDialog(null)}
+        />
       )}
     </div>
   );

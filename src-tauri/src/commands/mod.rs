@@ -421,6 +421,34 @@ pub(crate) fn get_audit_entries_inner(state: &AppState) -> Vec<AuditEntry> {
     state.audit_service.get_entries()
 }
 
+/// Resolves a user by sAMAccountName, trying get_user_by_identity first,
+/// then falling back to search_users if not found.
+async fn resolve_user(
+    provider: &dyn crate::services::DirectoryProvider,
+    sam: &str,
+) -> Result<DirectoryEntry, AppError> {
+    // Try exact lookup first
+    if let Some(user) = provider
+        .get_user_by_identity(sam)
+        .await
+        .map_err(|e| AppError::Directory(e.to_string()))?
+    {
+        return Ok(user);
+    }
+
+    // Fallback to search (handles cases where sAMAccountName filter doesn't match)
+    let results = provider
+        .search_users(sam, 5)
+        .await
+        .map_err(|e| AppError::Directory(e.to_string()))?;
+
+    results
+        .into_iter()
+        .find(|u| u.sam_account_name.as_deref() == Some(sam))
+        .or_else(|| None)
+        .ok_or_else(|| AppError::Directory(format!("User not found: {}", sam)))
+}
+
 /// Compares the group memberships of two users identified by sAMAccountName.
 pub(crate) async fn compare_users_inner(
     state: &AppState,
@@ -429,17 +457,8 @@ pub(crate) async fn compare_users_inner(
 ) -> Result<GroupComparisonResult, AppError> {
     let provider = state.directory_provider.clone();
 
-    let user_a = provider
-        .get_user_by_identity(sam_a)
-        .await
-        .map_err(|e| AppError::Directory(e.to_string()))?
-        .ok_or_else(|| AppError::Directory(format!("User not found: {}", sam_a)))?;
-
-    let user_b = provider
-        .get_user_by_identity(sam_b)
-        .await
-        .map_err(|e| AppError::Directory(e.to_string()))?
-        .ok_or_else(|| AppError::Directory(format!("User not found: {}", sam_b)))?;
+    let user_a = resolve_user(&*provider, sam_a).await?;
+    let user_b = resolve_user(&*provider, sam_b).await?;
 
     let groups_a: Vec<String> = user_a.get_attribute_values("memberOf").to_vec();
     let groups_b: Vec<String> = user_b.get_attribute_values("memberOf").to_vec();
@@ -453,6 +472,10 @@ pub(crate) async fn compare_users_inner(
 pub(crate) fn audit_ntfs_permissions_inner(path: &str) -> Result<NtfsAuditResult, AppError> {
     crate::services::ntfs::validate_unc_path(path).map_err(AppError::Configuration)?;
 
+    #[cfg(feature = "demo")]
+    let aces = crate::services::ntfs::read_acl_demo(path);
+
+    #[cfg(not(feature = "demo"))]
     let aces = crate::services::ntfs::read_acl(path).map_err(AppError::Directory)?;
 
     Ok(NtfsAuditResult {
@@ -947,6 +970,35 @@ pub fn mfa_set_config(config: MfaConfig, state: State<'_, AppState>) {
 #[tauri::command]
 pub fn mfa_requires(action: String, state: State<'_, AppState>) -> bool {
     state.mfa_service.requires_mfa(&action)
+}
+
+/// Opens a native save file dialog and writes content to the selected path.
+///
+/// Returns the path the file was saved to, or None if the user cancelled.
+#[tauri::command]
+pub async fn save_file_dialog(
+    content: String,
+    default_name: String,
+    filter_name: String,
+    filter_extensions: Vec<String>,
+) -> Result<Option<String>, AppError> {
+    let ext_refs: Vec<&str> = filter_extensions.iter().map(|s| s.as_str()).collect();
+    let dialog = rfd::AsyncFileDialog::new()
+        .set_file_name(&default_name)
+        .add_filter(&filter_name, &ext_refs);
+
+    let handle = dialog.save_file().await;
+
+    match handle {
+        Some(file) => {
+            let path = file.path().to_string_lossy().to_string();
+            tokio::fs::write(file.path(), content.as_bytes())
+                .await
+                .map_err(|e| AppError::Internal(format!("Failed to write file: {}", e)))?;
+            Ok(Some(path))
+        }
+        None => Ok(None),
+    }
 }
 
 /// Resolves a hostname to IP addresses with a 5-second timeout.
