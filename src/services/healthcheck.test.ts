@@ -17,6 +17,7 @@ function makeHealthyUser(
     distinguishedName: "CN=John Doe,OU=Users,DC=example,DC=com",
     samAccountName: "jdoe",
     displayName: "John Doe",
+    userPrincipalName: "jdoe@example.com",
     givenName: "John",
     surname: "Doe",
     email: "jdoe@example.com",

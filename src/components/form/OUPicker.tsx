@@ -47,10 +47,11 @@ export function OUPicker({
   );
 
   const handleExpand = useCallback(
-    async (id: string) => {
-      if (onExpand) {
-        return onExpand(id);
-      }
+    (id: string): Promise<TreeNode[]> | void => {
+      if (!onExpand) return;
+      const result = onExpand(id);
+      if (!result) return;
+      return result.then((nodes) => ouNodesToTreeNodes(nodes));
     },
     [onExpand],
   );

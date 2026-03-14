@@ -21,8 +21,8 @@ const mockGroups: GroupOption[] = [
 ];
 
 describe("GroupPicker", () => {
-  let onSearch: ReturnType<typeof vi.fn>;
-  let onSelectionChange: ReturnType<typeof vi.fn>;
+  let onSearch: ReturnType<typeof vi.fn<(query: string) => Promise<GroupOption[]>>>;
+  let onSelectionChange: ReturnType<typeof vi.fn<(groups: GroupOption[]) => void>>;
 
   beforeEach(() => {
     onSearch = vi.fn().mockResolvedValue(mockGroups);

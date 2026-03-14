@@ -10,6 +10,7 @@ export interface DirectoryUser {
   distinguishedName: string;
   samAccountName: string;
   displayName: string;
+  userPrincipalName: string;
   givenName: string;
   surname: string;
   email: string;
@@ -41,6 +42,7 @@ export function mapEntryToUser(entry: DirectoryEntry): DirectoryUser {
     distinguishedName: entry.distinguishedName,
     samAccountName: entry.samAccountName ?? "",
     displayName: entry.displayName ?? attr("displayName"),
+    userPrincipalName: attr("userPrincipalName"),
     givenName: attr("givenName"),
     surname: attr("sn"),
     email: attr("mail"),

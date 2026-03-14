@@ -1,6 +1,7 @@
 import { renderHook, act } from "@testing-library/react";
 import { vi, describe, it, expect, beforeEach } from "vitest";
 import { useLookupState } from "./useLookupState";
+import { type DirectoryEntry } from "@/types/directory";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
@@ -10,8 +11,18 @@ import { invoke } from "@tauri-apps/api/core";
 
 const mockInvoke = vi.mocked(invoke);
 
-const mapEntry = (entry: { sam_account_name?: string }) => ({
-  name: entry.sam_account_name ?? "unknown",
+function makeMockEntry(sam: string): DirectoryEntry {
+  return {
+    distinguishedName: `CN=${sam},DC=example,DC=com`,
+    samAccountName: sam,
+    displayName: null,
+    objectClass: "user",
+    attributes: {},
+  };
+}
+
+const mapEntry = (entry: DirectoryEntry) => ({
+  name: entry.samAccountName ?? "unknown",
 });
 
 describe("useLookupState", () => {
@@ -45,8 +56,8 @@ describe("useLookupState", () => {
 
   it("transitions to results on successful search", async () => {
     mockInvoke.mockResolvedValue([
-      { sam_account_name: "jdoe" },
-      { sam_account_name: "jsmith" },
+      makeMockEntry("jdoe"),
+      makeMockEntry("jsmith"),
     ]);
 
     const { result } = renderHook(() =>
@@ -63,7 +74,7 @@ describe("useLookupState", () => {
   });
 
   it("auto-selects when single result", async () => {
-    mockInvoke.mockResolvedValue([{ sam_account_name: "jdoe" }]);
+    mockInvoke.mockResolvedValue([makeMockEntry("jdoe")]);
 
     const { result } = renderHook(() =>
       useLookupState({ command: "search_users", mapEntry }),
@@ -122,7 +133,7 @@ describe("useLookupState", () => {
   });
 
   it("retries the last query", async () => {
-    mockInvoke.mockResolvedValue([{ sam_account_name: "jdoe" }]);
+    mockInvoke.mockResolvedValue([makeMockEntry("jdoe")]);
 
     const { result } = renderHook(() =>
       useLookupState({ command: "search_users", mapEntry }),
@@ -133,7 +144,7 @@ describe("useLookupState", () => {
     });
 
     mockInvoke.mockClear();
-    mockInvoke.mockResolvedValue([{ sam_account_name: "jdoe" }]);
+    mockInvoke.mockResolvedValue([makeMockEntry("jdoe")]);
 
     await act(async () => {
       result.current.handleRetry();
@@ -168,8 +179,8 @@ describe("useLookupState", () => {
 
   it("allows manual item selection", async () => {
     mockInvoke.mockResolvedValue([
-      { sam_account_name: "a" },
-      { sam_account_name: "b" },
+      makeMockEntry("a"),
+      makeMockEntry("b"),
     ]);
 
     const { result } = renderHook(() =>

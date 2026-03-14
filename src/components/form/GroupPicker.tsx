@@ -190,7 +190,7 @@ export function GroupPicker({
           data-testid="group-picker-search"
         />
         {loading && (
-          <LoadingSpinner size="small" data-testid="group-picker-loading" />
+          <LoadingSpinner size={16} data-testid="group-picker-loading" />
         )}
         {searchText && !loading && (
           <button
