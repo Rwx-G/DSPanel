@@ -8,14 +8,9 @@ updated: "2026-03-14T15:00:00Z"
 
 waiver: { active: false }
 
-top_issues:
-  - id: "SEC-003"
-    severity: low
-    finding: "Secret stored as base64 JSON file, not DPAPI-encrypted. Acceptable for desktop app where file permissions protect the data."
-    suggested_action: "Consider tauri-plugin-store with encryption for defense-in-depth in a future iteration."
-    suggested_owner: dev
+top_issues: []
 
-quality_score: 90
+quality_score: 95
 
 evidence:
   tests_reviewed: 19
@@ -25,7 +20,7 @@ evidence:
     ac_gaps: []
 
 nfr_validation:
-  security: { status: PASS, notes: "Rate limiting. Secret persisted locally. MFA gate wired to actions." }
+  security: { status: PASS, notes: "Rate limiting. Secret DPAPI-encrypted at rest. MFA gate wired to actions." }
   performance: { status: PASS, notes: "TOTP verification sub-millisecond." }
   reliability: { status: PASS, notes: "Secret survives restart. Backup codes persisted." }
   maintainability: { status: PASS, notes: "useMfaGate hook reusable across all components." }
