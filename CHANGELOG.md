@@ -7,23 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-03-15
+
+Epic 3 - Comparison & Permissions Audit. Side-by-side user comparison, NTFS permissions
+analysis with ACL cross-referencing, and AD replication metadata timeline.
+
 ### Added
 
 - Side-by-side user comparison with group membership delta (shared/only-A/only-B) and color-coded display (3.1)
 - Group diff algorithm with case-insensitive DN comparison and sorted output (3.1)
-- User comparison page with dual search, filter, and sort controls (3.1)
+- User comparison page with dual search, filter, sort, OU/lastLogon/status in user cards (3.1)
+- Right-click context menu on groups: "View group members" and "Add user to group" (3.1)
+- Cross-tab compare: right-click in User Lookup to compare two users directly (3.1)
 - UNC path permissions audit with NTFS ACL reading via Windows API (3.2)
 - ACE cross-reference with user group SIDs showing access indicators (allowed/denied/no-match) (3.2)
-- CSV export for UNC permissions audit results (3.2)
+- Access Summary with per-user breakdown and differences explanation (3.2)
+- Color-coded ACE rows with legend (green=both, red=A only, blue=B only) (3.2)
+- CSV export via native save file dialog (rfd crate) (3.2)
 - Standalone NTFS Permissions Analyzer page with recursive depth scanning (3.3)
 - Allow/deny conflict detection across parent/child paths (3.3)
 - Inherited vs explicit ACE filtering toggle (3.3)
+- Group chain tree with recursive expansion and circular reference detection (3.3)
+- Right-click "View group members" on ACE trustees (3.3)
 - State-in-time replication metadata viewer parsing msDS-ReplAttributeMetaData XML (3.4)
 - Attribute timeline sorted by last change time with version and originating DC (3.4)
 - Attribute diff between two timestamps showing version changes (3.4)
-- Replication History section in user detail view (3.4)
+- Replication History section in user and computer detail views (3.4)
+- Tab state persistence across switches (components stay mounted)
+- Toast notifications with severity-colored progress bar
+- Technical backlog document (docs/backlog.md)
 - New sidebar entries: User Comparison (Directory group), NTFS Analyzer (Tools group)
-- New Tauri commands: compare_users, audit_ntfs_permissions, cross_reference_ntfs, analyze_ntfs, get_replication_metadata, compute_attribute_diff
+- New Tauri commands: compare_users, add_user_to_group, audit_ntfs_permissions, cross_reference_ntfs, analyze_ntfs, get_replication_metadata, compute_attribute_diff, save_file_dialog
+
+### Changed
+
+- Context menu onClick deferred to microtask for async-safe handling
+- Demo provider: search_users and get_user_by_identity use full 26-user dataset
+- useBrowse: removed auto-select on single search result for better UX
+
+### Fixed
+
+- Notification notify() argument order (message, severity) was inverted causing NotificationHost crash
+- Async context menu actions no longer trigger ErrorBoundary via unhandled rejections
 
 ## [0.2.0] - 2026-03-14
 

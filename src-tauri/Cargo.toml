@@ -1,6 +1,6 @@
 [package]
 name = "dspanel"
-version = "0.2.0"
+version = "0.3.0"
 description = "DSPanel - Active Directory management tool"
 authors = ["Romain G."]
 license = "Apache-2.0"
