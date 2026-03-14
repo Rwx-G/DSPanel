@@ -1,0 +1,46 @@
+schema: 1
+story: "3.4"
+story_title: "State-in-Time Comparison"
+gate: CONCERNS
+status_reason: "Solid replication metadata parsing and timeline UI. AC #4 shows version numbers but not actual attribute values. AC #6 only integrated in UserDetail, not ComputerDetail or group views."
+reviewer: "Quinn (Test Architect)"
+updated: "2026-03-14T23:30:00Z"
+
+waiver: { active: false }
+
+top_issues:
+  - id: "AC-004"
+    severity: low
+    finding: "Diff view shows version before/after but not actual attribute values - AC #4 asks for before/after value display"
+    suggested_action: "Can be deferred - metadata only contains timestamps and versions, not historical values. Current implementation is correct per AD limitations."
+    suggested_owner: dev
+  - id: "AC-006"
+    severity: medium
+    finding: "History tab only integrated in UserDetail, not in ComputerDetail or group objects"
+    suggested_action: "Add StateInTimeView to ComputerDetail and group detail views"
+    suggested_owner: dev
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 25
+  risks_identified: 2
+  trace:
+    ac_covered: [1, 2, 3, 5, 7]
+    ac_gaps: [4, 6]
+
+nfr_validation:
+  security: { status: PASS, notes: "Read-only replication data, no write operations" }
+  performance: { status: PASS, notes: "Single LDAP query, lightweight XML parsing" }
+  reliability: { status: PASS, notes: "Graceful handling of missing/malformed metadata, state reset on user change" }
+  maintainability: { status: PASS, notes: "Reusable StateInTimeView component with objectType prop ready for computer/group" }
+
+recommendations:
+  immediate:
+    - action: "Wire StateInTimeView into ComputerDetail page"
+      refs: ["src/pages/ComputerDetail.tsx"]
+  future:
+    - action: "Add actual attribute value display alongside version numbers when feasible"
+      refs: ["src/components/comparison/StateInTimeView.tsx"]
+    - action: "Support msDS-ReplValueMetaData for linked attributes (member/memberOf)"
+      refs: ["src-tauri/src/services/replication.rs"]

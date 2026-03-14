@@ -1,0 +1,44 @@
+schema: 1
+story: "3.3"
+story_title: "NTFS Permissions Analyzer"
+gate: CONCERNS
+status_reason: "Strong recursive analysis with conflict detection and polished UI. AC #3 (group chain resolution with expandable tree) not implemented. AC #7 partially met - CSV export works but PDF export is missing."
+reviewer: "Quinn (Test Architect)"
+updated: "2026-03-14T23:25:00Z"
+
+waiver: { active: false }
+
+top_issues:
+  - id: "AC-003"
+    severity: medium
+    finding: "Group chain resolution (AC #3) - trustees show names but not member hierarchy as expandable tree"
+    suggested_action: "Implement expandable tree view for group members using TreeView component"
+    suggested_owner: dev
+  - id: "AC-007"
+    severity: low
+    finding: "PDF export not implemented - only CSV export available"
+    suggested_action: "Can be deferred to a future sprint - CSV covers primary use case"
+    suggested_owner: dev
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 18
+  risks_identified: 2
+  trace:
+    ac_covered: [1, 2, 4, 5, 6]
+    ac_gaps: [3, 7]
+
+nfr_validation:
+  security: { status: PASS, notes: "UNC path validation, no secrets exposed" }
+  performance: { status: CONCERNS, notes: "Recursive scanning capped at depth 5, but large trees could be slow" }
+  reliability: { status: PASS, notes: "Per-directory error handling, graceful degradation" }
+  maintainability: { status: PASS, notes: "Clean service/component/type separation" }
+
+recommendations:
+  immediate:
+    - action: "Implement group chain expandable tree for AC #3"
+      refs: ["src/pages/NtfsAnalyzer.tsx", "src/components/data/TreeView.tsx"]
+  future:
+    - action: "Add PDF export using printpdf or genpdf crate"
+      refs: ["src-tauri/src/services/ntfs_analyzer.rs"]
