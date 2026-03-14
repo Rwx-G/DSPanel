@@ -349,6 +349,35 @@ fn sample_browse_users() -> Vec<DirectoryEntry> {
     users
 }
 
+fn sample_group_entries() -> Vec<DirectoryEntry> {
+    vec![
+        make_group("IT-Admins", "IT Team", "IT"),
+        make_group("IT-Support", "IT Team", "IT"),
+        make_group("Dev-Frontend", "Engineering Team", "Engineering"),
+        make_group("Dev-Backend", "Engineering Team", "Engineering"),
+        make_group("Finance-Analysts", "Finance Team", "Finance"),
+        make_group("Sales-EMEA", "Sales Team", "Sales"),
+    ]
+}
+
+fn make_group(name: &str, parent_group: &str, _dept: &str) -> DirectoryEntry {
+    let mut attrs = HashMap::new();
+    attrs.insert(
+        "memberOf".to_string(),
+        vec![format!(
+            "CN={},OU=Groups,DC=contoso,DC=com",
+            parent_group
+        )],
+    );
+    DirectoryEntry {
+        distinguished_name: format!("CN={},OU=Groups,DC=contoso,DC=com", name),
+        sam_account_name: Some(name.to_string()),
+        display_name: Some(name.to_string()),
+        object_class: Some("group".to_string()),
+        attributes: attrs,
+    }
+}
+
 fn dn_seed(dn: &str) -> u64 {
     dn.bytes().fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64))
 }
@@ -684,10 +713,11 @@ impl DirectoryProvider for DemoDirectoryProvider {
         group_dn: &str,
         max_results: usize,
     ) -> Result<Vec<DirectoryEntry>> {
-        // Search both users and computers for members of this group
+        // Search users, computers, and sub-groups for members of this group
         let mut members: Vec<DirectoryEntry> = sample_browse_users()
             .into_iter()
             .chain(sample_computers().into_iter())
+            .chain(sample_group_entries().into_iter())
             .filter(|entry| {
                 entry
                     .get_attribute_values("memberOf")

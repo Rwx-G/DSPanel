@@ -14,6 +14,7 @@ import { type AceEntry } from "@/types/ntfs";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { ContextMenu, type ContextMenuItem } from "@/components/common/ContextMenu";
 import { GroupMembersDialog } from "@/components/dialogs/GroupMembersDialog";
+import { GroupChainTree } from "@/components/comparison/GroupChainTree";
 import { formatCsv, downloadCsv } from "@/utils/csvExport";
 
 function PathAclSection({
@@ -24,6 +25,19 @@ function PathAclSection({
   onTrusteeContextMenu: (e: React.MouseEvent, ace: AceEntry) => void;
 }) {
   const [expanded, setExpanded] = useState(true);
+  const [expandedTrustees, setExpandedTrustees] = useState<Set<number>>(new Set());
+
+  const toggleTrustee = (idx: number) => {
+    setExpandedTrustees((prev) => {
+      const next = new Set(prev);
+      if (next.has(idx)) {
+        next.delete(idx);
+      } else {
+        next.add(idx);
+      }
+      return next;
+    });
+  };
 
   return (
     <div
@@ -87,10 +101,29 @@ function PathAclSection({
                       data-testid={`ace-row-${result.path}-${idx}`}
                     >
                       <td
-                        className="cursor-context-menu truncate px-3 py-1.5 text-[var(--color-text-primary)]"
+                        className="px-3 py-1.5 text-[var(--color-text-primary)]"
                         onContextMenu={(e) => onTrusteeContextMenu(e, ace)}
                       >
-                        {ace.trusteeDisplayName}
+                        <button
+                          className="flex items-center gap-1.5 cursor-pointer hover:text-[var(--color-primary)] transition-colors"
+                          onClick={() => toggleTrustee(idx)}
+                          data-testid={`trustee-expand-${idx}`}
+                        >
+                          {expandedTrustees.has(idx) ? (
+                            <ChevronDown size={12} className="shrink-0 text-[var(--color-text-secondary)]" />
+                          ) : (
+                            <ChevronRight size={12} className="shrink-0 text-[var(--color-text-secondary)]" />
+                          )}
+                          <span className="truncate">{ace.trusteeDisplayName}</span>
+                        </button>
+                        {expandedTrustees.has(idx) && (
+                          <div className="mt-1">
+                            <GroupChainTree
+                              groupDn={`CN=${ace.trusteeDisplayName.includes("\\") ? ace.trusteeDisplayName.split("\\").pop()! : ace.trusteeDisplayName},OU=Groups,DC=contoso,DC=com`}
+                              groupName={ace.trusteeDisplayName.includes("\\") ? ace.trusteeDisplayName.split("\\").pop()! : ace.trusteeDisplayName}
+                            />
+                          </div>
+                        )}
                       </td>
                       <td className={`px-3 py-1.5 font-medium ${isDeny ? "text-[var(--color-error)]" : "text-[var(--color-success)]"}`}>
                         {isDeny && <ShieldX size={12} className="mr-1 inline" />}

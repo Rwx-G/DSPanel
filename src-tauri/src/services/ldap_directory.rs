@@ -441,7 +441,10 @@ impl DirectoryProvider for LdapDirectoryProvider {
     ) -> Result<Vec<DirectoryEntry>> {
         let validated = validate_search_input(group_dn)?;
         let escaped = ldap_escape(validated);
-        let ldap_filter = format!("(&(objectClass=user)(memberOf={}))", escaped);
+        let ldap_filter = format!(
+            "(&(|(objectClass=user)(objectClass=group))(memberOf={}))",
+            escaped
+        );
         self.search(&ldap_filter, USER_ATTRS, max_results).await
     }
 
