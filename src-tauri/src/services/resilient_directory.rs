@@ -276,6 +276,18 @@ where
         .await
         .map_err(|e| anyhow::anyhow!(e))
     }
+
+    async fn get_replication_metadata(&self, object_dn: &str) -> Result<Option<String>> {
+        let dn = object_dn.to_string();
+        let inner_ref = self.inner.clone();
+        self.execute_with_resilience(|| {
+            let inner = inner_ref.clone();
+            let d = dn.clone();
+            async move { inner.get_replication_metadata(&d).await }
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!(e))
+    }
 }
 
 #[cfg(test)]

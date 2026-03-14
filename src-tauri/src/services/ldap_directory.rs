@@ -636,6 +636,36 @@ impl DirectoryProvider for LdapDirectoryProvider {
             }
         }
     }
+
+    async fn get_replication_metadata(&self, object_dn: &str) -> Result<Option<String>> {
+        let base_dn = self.base_dn().context("Not connected - no base DN")?;
+        let mut ldap = self.connect().await?;
+
+        let (entries, _) = ldap
+            .search(
+                object_dn,
+                ldap3::Scope::Base,
+                "(objectClass=*)",
+                vec!["msDS-ReplAttributeMetaData"],
+            )
+            .await
+            .context("Failed to query replication metadata")?
+            .success()
+            .context("Replication metadata LDAP query returned error")?;
+
+        let _ = ldap.unbind().await;
+
+        if let Some(entry) = entries.into_iter().next() {
+            let se = ldap3::SearchEntry::construct(entry);
+            if let Some(values) = se.attrs.get("msDS-ReplAttributeMetaData") {
+                if let Some(raw) = values.first() {
+                    return Ok(Some(raw.clone()));
+                }
+            }
+        }
+
+        Ok(None)
+    }
 }
 
 #[cfg(test)]

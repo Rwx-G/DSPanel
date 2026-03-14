@@ -8,6 +8,9 @@ use crate::services::audit::AuditEntry;
 use crate::services::comparison::GroupComparisonResult;
 use crate::services::ntfs::{AceCrossReference, AceEntry, NtfsAuditResult};
 use crate::services::ntfs_analyzer::NtfsAnalysisResult;
+use crate::services::replication::{
+    AttributeChangeDiff, AttributeMetadata, ReplicationMetadataResult,
+};
 use crate::services::mfa::{MfaConfig, MfaSetupResult};
 use crate::services::password::{HibpResult, PasswordOptions};
 use crate::services::{AccountHealthStatus, HealthInput, PermissionLevel};
@@ -474,6 +477,45 @@ pub(crate) fn cross_reference_ntfs_inner(
     crate::services::ntfs::cross_reference_aces(aces, user_a_sids, user_b_sids)
 }
 
+/// Retrieves and parses replication metadata for an AD object.
+pub(crate) async fn get_replication_metadata_inner(
+    state: &AppState,
+    object_dn: &str,
+) -> Result<ReplicationMetadataResult, AppError> {
+    let provider = state.directory_provider.clone();
+    let raw = provider
+        .get_replication_metadata(object_dn)
+        .await
+        .map_err(|e| AppError::Directory(e.to_string()))?;
+
+    match raw {
+        Some(xml) => {
+            let attributes = crate::services::replication::parse_replication_metadata(&xml);
+            Ok(ReplicationMetadataResult {
+                object_dn: object_dn.to_string(),
+                attributes,
+                is_available: true,
+                message: None,
+            })
+        }
+        None => Ok(ReplicationMetadataResult {
+            object_dn: object_dn.to_string(),
+            attributes: vec![],
+            is_available: false,
+            message: Some("Replication metadata not available for this object".to_string()),
+        }),
+    }
+}
+
+/// Computes attribute diff between two timestamps.
+pub(crate) fn compute_attribute_diff_inner(
+    metadata: &[AttributeMetadata],
+    from_time: &str,
+    to_time: &str,
+) -> Vec<AttributeChangeDiff> {
+    crate::services::replication::compute_attribute_diff(metadata, from_time, to_time)
+}
+
 /// Performs a recursive NTFS permissions analysis on a UNC path.
 pub(crate) fn analyze_ntfs_inner(
     path: &str,
@@ -727,6 +769,25 @@ pub async fn set_password_flags(
 #[tauri::command]
 pub fn get_audit_entries(state: State<'_, AppState>) -> Vec<AuditEntry> {
     get_audit_entries_inner(&state)
+}
+
+/// Retrieves replication metadata for an AD object.
+#[tauri::command]
+pub async fn get_replication_metadata(
+    object_dn: String,
+    state: State<'_, AppState>,
+) -> Result<ReplicationMetadataResult, AppError> {
+    get_replication_metadata_inner(&state, &object_dn).await
+}
+
+/// Computes attribute diff between two timestamps.
+#[tauri::command]
+pub fn compute_attribute_diff(
+    metadata: Vec<AttributeMetadata>,
+    from_time: String,
+    to_time: String,
+) -> Vec<AttributeChangeDiff> {
+    compute_attribute_diff_inner(&metadata, &from_time, &to_time)
 }
 
 /// Performs a recursive NTFS permissions analysis.
@@ -1754,5 +1815,80 @@ mod tests {
         assert!(result.only_b_groups.is_empty());
         assert_eq!(result.total_a, 0);
         assert_eq!(result.total_b, 0);
+    }
+
+    // -----------------------------------------------------------------------
+    // Epic 3 command tests - get_replication_metadata_inner
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_get_replication_metadata_available() {
+        let xml = r#"<DS_REPL_ATTR_META_DATA>
+    <pszAttributeName>displayName</pszAttributeName>
+    <dwVersion>3</dwVersion>
+    <ftimeLastOriginatingChange>2026-02-15T14:30:00Z</ftimeLastOriginatingChange>
+    <pszLastOriginatingDsaDN>CN=DC1</pszLastOriginatingDsaDN>
+    <usnOriginatingChange>12345</usnOriginatingChange>
+    <usnLocalChange>67890</usnLocalChange>
+</DS_REPL_ATTR_META_DATA>"#;
+
+        let provider = Arc::new(
+            MockDirectoryProvider::new()
+                .with_replication_metadata(xml.to_string()),
+        );
+        let state = AppState::new_for_test(provider, PermissionConfig::default());
+        let result = get_replication_metadata_inner(&state, "CN=Test,DC=example,DC=com")
+            .await
+            .unwrap();
+        assert!(result.is_available);
+        assert_eq!(result.attributes.len(), 1);
+        assert_eq!(result.attributes[0].attribute_name, "displayName");
+    }
+
+    #[tokio::test]
+    async fn test_get_replication_metadata_not_available() {
+        let state = make_state();
+        let result = get_replication_metadata_inner(&state, "CN=Test,DC=example,DC=com")
+            .await
+            .unwrap();
+        assert!(!result.is_available);
+        assert!(result.attributes.is_empty());
+        assert!(result.message.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_get_replication_metadata_failure() {
+        let state = make_state_with_failure();
+        let result = get_replication_metadata_inner(&state, "CN=Test,DC=example,DC=com").await;
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_compute_attribute_diff_inner() {
+        let metadata = vec![
+            crate::services::replication::AttributeMetadata {
+                attribute_name: "displayName".to_string(),
+                version: 3,
+                last_originating_change_time: "2026-02-15T14:30:00Z".to_string(),
+                last_originating_dsa_dn: String::new(),
+                local_usn: 0,
+                originating_usn: 0,
+            },
+            crate::services::replication::AttributeMetadata {
+                attribute_name: "title".to_string(),
+                version: 5,
+                last_originating_change_time: "2026-03-01T08:00:00Z".to_string(),
+                last_originating_dsa_dn: String::new(),
+                local_usn: 0,
+                originating_usn: 0,
+            },
+        ];
+        let diff = compute_attribute_diff_inner(
+            &metadata,
+            "2026-02-01T00:00:00Z",
+            "2026-02-28T23:59:59Z",
+        );
+        assert_eq!(diff.len(), 1);
+        assert_eq!(diff[0].attribute_name, "displayName");
     }
 }

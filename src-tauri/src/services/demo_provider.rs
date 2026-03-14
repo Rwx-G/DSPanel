@@ -683,4 +683,8 @@ impl DirectoryProvider for DemoDirectoryProvider {
         tracing::info!(target_dn = %user_dn, pne, uccp, "DEMO: password flags simulated");
         Ok(())
     }
+
+    async fn get_replication_metadata(&self, _object_dn: &str) -> Result<Option<String>> {
+        Ok(None)
+    }
 }

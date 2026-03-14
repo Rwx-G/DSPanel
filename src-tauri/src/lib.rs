@@ -110,6 +110,8 @@ pub fn run() {
             commands::mfa_set_config,
             commands::mfa_requires,
             commands::compare_users,
+            commands::get_replication_metadata,
+            commands::compute_attribute_diff,
             commands::analyze_ntfs,
             commands::audit_ntfs_permissions,
             commands::cross_reference_ntfs,

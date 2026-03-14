@@ -11,6 +11,7 @@ pub mod mfa;
 pub mod ntfs;
 pub mod ntfs_analyzer;
 pub mod password;
+pub mod replication;
 pub mod permissions;
 pub mod resilience;
 pub mod resilient_directory;
