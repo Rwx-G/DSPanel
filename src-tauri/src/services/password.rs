@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use rand::rngs::OsRng;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use sha1::{Digest, Sha1};
@@ -49,7 +50,7 @@ pub struct HibpResult {
 pub fn generate_password(options: &PasswordOptions) -> Result<String> {
     let mut pool: Vec<u8> = Vec::new();
     let mut required: Vec<u8> = Vec::new();
-    let mut rng = rand::thread_rng();
+    let mut rng = OsRng;
 
     let is_ambiguous = |c: u8| -> bool { AMBIGUOUS.contains(&c) };
     let filter = |chars: &[u8], exclude: bool| -> Vec<u8> {
