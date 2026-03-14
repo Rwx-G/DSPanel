@@ -1,4 +1,4 @@
-import { useRef, type ReactNode } from "react";
+import { useRef, useEffect, type ReactNode } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { EmptyState } from "@/components/common/EmptyState";
@@ -9,9 +9,11 @@ interface VirtualizedListProps<T> {
   estimateSize: number;
   itemKey: (item: T, index: number) => string | number;
   loading?: boolean;
+  loadingMore?: boolean;
   emptyMessage?: string;
   className?: string;
   overscan?: number;
+  onEndReached?: () => void;
 }
 
 export function VirtualizedList<T>({
@@ -20,9 +22,11 @@ export function VirtualizedList<T>({
   estimateSize,
   itemKey,
   loading = false,
+  loadingMore = false,
   emptyMessage = "No items",
   className,
   overscan = 5,
+  onEndReached,
 }: VirtualizedListProps<T>) {
   const parentRef = useRef<HTMLDivElement>(null);
 
@@ -33,6 +37,17 @@ export function VirtualizedList<T>({
     overscan,
     getItemKey: (index) => itemKey(items[index], index),
   });
+
+  // Trigger onEndReached when last virtual item is visible
+  const virtualItems = virtualizer.getVirtualItems();
+  const lastItem = virtualItems[virtualItems.length - 1];
+
+  useEffect(() => {
+    if (!lastItem || !onEndReached) return;
+    if (lastItem.index >= items.length - 1) {
+      onEndReached();
+    }
+  }, [lastItem?.index, items.length, onEndReached]);
 
   if (loading) {
     return (
@@ -66,7 +81,7 @@ export function VirtualizedList<T>({
           position: "relative",
         }}
       >
-        {virtualizer.getVirtualItems().map((virtualItem) => (
+        {virtualItems.map((virtualItem) => (
           <div
             key={virtualItem.key}
             data-testid="virtualized-list-item"
@@ -83,6 +98,14 @@ export function VirtualizedList<T>({
           </div>
         ))}
       </div>
+      {loadingMore && (
+        <div
+          className="flex justify-center py-2"
+          data-testid="virtualized-list-loading-more"
+        >
+          <LoadingSpinner message="Loading more..." />
+        </div>
+      )}
     </div>
   );
 }
