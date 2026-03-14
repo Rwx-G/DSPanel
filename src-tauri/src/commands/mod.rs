@@ -2,6 +2,9 @@ use tauri::State;
 
 use crate::error::AppError;
 use crate::models::DirectoryEntry;
+use crate::services::audit::AuditEntry;
+use crate::services::mfa::{MfaConfig, MfaSetupResult};
+use crate::services::password::{HibpResult, PasswordOptions};
 use crate::services::{AccountHealthStatus, HealthInput, PermissionLevel};
 use crate::state::AppState;
 
@@ -81,6 +84,177 @@ pub(crate) fn get_domain_info_inner(state: &AppState) -> DomainInfo {
         domain_name: provider.domain_name().map(|s| s.to_string()),
         is_connected: provider.is_connected(),
     }
+}
+
+/// Resets a user's password via the directory provider.
+pub(crate) async fn reset_password_inner(
+    state: &AppState,
+    user_dn: &str,
+    new_password: &str,
+    must_change_at_next_logon: bool,
+) -> Result<(), AppError> {
+    if !state
+        .permission_service
+        .has_permission(PermissionLevel::HelpDesk)
+    {
+        return Err(AppError::PermissionDenied(
+            "Password reset requires HelpDesk permission or higher".to_string(),
+        ));
+    }
+
+    let provider = state.directory_provider.clone();
+    match provider
+        .reset_password(user_dn, new_password, must_change_at_next_logon)
+        .await
+    {
+        Ok(()) => {
+            state.audit_service.log_success(
+                "PasswordReset",
+                user_dn,
+                &format!(
+                    "Password reset (must_change_at_next_logon={})",
+                    must_change_at_next_logon
+                ),
+            );
+            Ok(())
+        }
+        Err(e) => {
+            state
+                .audit_service
+                .log_failure("PasswordResetFailed", user_dn, &e.to_string());
+            Err(AppError::Directory(e.to_string()))
+        }
+    }
+}
+
+/// Unlocks a user account via the directory provider.
+pub(crate) async fn unlock_account_inner(state: &AppState, user_dn: &str) -> Result<(), AppError> {
+    if !state
+        .permission_service
+        .has_permission(PermissionLevel::HelpDesk)
+    {
+        return Err(AppError::PermissionDenied(
+            "Account unlock requires HelpDesk permission or higher".to_string(),
+        ));
+    }
+
+    let provider = state.directory_provider.clone();
+    match provider.unlock_account(user_dn).await {
+        Ok(()) => {
+            state
+                .audit_service
+                .log_success("AccountUnlocked", user_dn, "Account unlocked");
+            Ok(())
+        }
+        Err(e) => {
+            state
+                .audit_service
+                .log_failure("AccountUnlockFailed", user_dn, &e.to_string());
+            Err(AppError::Directory(e.to_string()))
+        }
+    }
+}
+
+/// Enables a user account via the directory provider.
+pub(crate) async fn enable_account_inner(state: &AppState, user_dn: &str) -> Result<(), AppError> {
+    if !state
+        .permission_service
+        .has_permission(PermissionLevel::HelpDesk)
+    {
+        return Err(AppError::PermissionDenied(
+            "Account enable requires HelpDesk permission or higher".to_string(),
+        ));
+    }
+
+    let provider = state.directory_provider.clone();
+    match provider.enable_account(user_dn).await {
+        Ok(()) => {
+            state
+                .audit_service
+                .log_success("AccountEnabled", user_dn, "Account enabled");
+            Ok(())
+        }
+        Err(e) => {
+            state
+                .audit_service
+                .log_failure("AccountEnableFailed", user_dn, &e.to_string());
+            Err(AppError::Directory(e.to_string()))
+        }
+    }
+}
+
+/// Disables a user account via the directory provider.
+pub(crate) async fn disable_account_inner(state: &AppState, user_dn: &str) -> Result<(), AppError> {
+    if !state
+        .permission_service
+        .has_permission(PermissionLevel::HelpDesk)
+    {
+        return Err(AppError::PermissionDenied(
+            "Account disable requires HelpDesk permission or higher".to_string(),
+        ));
+    }
+
+    let provider = state.directory_provider.clone();
+    match provider.disable_account(user_dn).await {
+        Ok(()) => {
+            state
+                .audit_service
+                .log_success("AccountDisabled", user_dn, "Account disabled");
+            Ok(())
+        }
+        Err(e) => {
+            state
+                .audit_service
+                .log_failure("AccountDisableFailed", user_dn, &e.to_string());
+            Err(AppError::Directory(e.to_string()))
+        }
+    }
+}
+
+/// Sets password flags on a user account via the directory provider.
+pub(crate) async fn set_password_flags_inner(
+    state: &AppState,
+    user_dn: &str,
+    password_never_expires: bool,
+    user_cannot_change_password: bool,
+) -> Result<(), AppError> {
+    if !state
+        .permission_service
+        .has_permission(PermissionLevel::AccountOperator)
+    {
+        return Err(AppError::PermissionDenied(
+            "Password flag management requires AccountOperator permission or higher".to_string(),
+        ));
+    }
+
+    let provider = state.directory_provider.clone();
+    match provider
+        .set_password_flags(user_dn, password_never_expires, user_cannot_change_password)
+        .await
+    {
+        Ok(()) => {
+            state.audit_service.log_success(
+                "PasswordFlagsChanged",
+                user_dn,
+                &format!(
+                    "password_never_expires={}, user_cannot_change_password={}",
+                    password_never_expires, user_cannot_change_password
+                ),
+            );
+            Ok(())
+        }
+        Err(e) => {
+            state
+                .audit_service
+                .log_failure("PasswordFlagsChangeFailed", user_dn, &e.to_string());
+            Err(AppError::Directory(e.to_string()))
+        }
+    }
+}
+
+/// Returns audit log entries.
+pub(crate) fn get_audit_entries_inner(state: &AppState) -> Vec<AuditEntry> {
+    state.audit_service.get_entries()
 }
 
 // ---------------------------------------------------------------------------
@@ -226,6 +400,147 @@ pub fn get_computer_name() -> String {
 pub fn evaluate_health_cmd(input: HealthInput) -> AccountHealthStatus {
     let now_ms = chrono::Utc::now().timestamp_millis();
     crate::services::evaluate_health(&input, now_ms)
+}
+
+/// Resets a user's password.
+#[tauri::command]
+pub async fn reset_password(
+    user_dn: String,
+    new_password: String,
+    must_change_at_next_logon: bool,
+    state: State<'_, AppState>,
+) -> Result<(), AppError> {
+    reset_password_inner(&state, &user_dn, &new_password, must_change_at_next_logon).await
+}
+
+/// Unlocks a user account.
+#[tauri::command]
+pub async fn unlock_account(user_dn: String, state: State<'_, AppState>) -> Result<(), AppError> {
+    unlock_account_inner(&state, &user_dn).await
+}
+
+/// Enables a user account.
+#[tauri::command]
+pub async fn enable_account(user_dn: String, state: State<'_, AppState>) -> Result<(), AppError> {
+    enable_account_inner(&state, &user_dn).await
+}
+
+/// Disables a user account.
+#[tauri::command]
+pub async fn disable_account(user_dn: String, state: State<'_, AppState>) -> Result<(), AppError> {
+    disable_account_inner(&state, &user_dn).await
+}
+
+/// Sets password flags on a user account.
+#[tauri::command]
+pub async fn set_password_flags(
+    user_dn: String,
+    password_never_expires: bool,
+    user_cannot_change_password: bool,
+    state: State<'_, AppState>,
+) -> Result<(), AppError> {
+    set_password_flags_inner(
+        &state,
+        &user_dn,
+        password_never_expires,
+        user_cannot_change_password,
+    )
+    .await
+}
+
+/// Returns audit log entries.
+#[tauri::command]
+pub fn get_audit_entries(state: State<'_, AppState>) -> Vec<AuditEntry> {
+    get_audit_entries_inner(&state)
+}
+
+/// Generates a secure password with optional HIBP breach check.
+#[tauri::command]
+pub async fn generate_password(
+    length: Option<usize>,
+    include_uppercase: Option<bool>,
+    include_lowercase: Option<bool>,
+    include_digits: Option<bool>,
+    include_special: Option<bool>,
+    exclude_ambiguous: Option<bool>,
+    state: State<'_, AppState>,
+) -> Result<String, AppError> {
+    let options = PasswordOptions {
+        length: length.unwrap_or(16),
+        include_uppercase: include_uppercase.unwrap_or(true),
+        include_lowercase: include_lowercase.unwrap_or(true),
+        include_digits: include_digits.unwrap_or(true),
+        include_special: include_special.unwrap_or(true),
+        exclude_ambiguous: exclude_ambiguous.unwrap_or(false),
+    };
+    let (password, _hibp) =
+        crate::services::password::generate_safe_password(&options, Some(&state.http_client), 5)
+            .await
+            .map_err(|e| AppError::Internal(e.to_string()))?;
+    Ok(password)
+}
+
+/// Checks a password against the HIBP Pwned Passwords API.
+#[tauri::command]
+pub async fn check_password_hibp(
+    password: String,
+    state: State<'_, AppState>,
+) -> Result<HibpResult, AppError> {
+    crate::services::password::check_hibp(&password, &state.http_client)
+        .await
+        .map_err(|e| AppError::Network(e.to_string()))
+}
+
+/// Sets up MFA (TOTP) for the current operator.
+#[tauri::command]
+pub fn mfa_setup(state: State<'_, AppState>) -> Result<MfaSetupResult, AppError> {
+    let username = std::env::var("USERNAME").unwrap_or_else(|_| "Unknown".to_string());
+    state
+        .mfa_service
+        .setup(&username)
+        .map_err(|e| AppError::Internal(e.to_string()))
+}
+
+/// Verifies a TOTP code.
+#[tauri::command]
+pub fn mfa_verify(code: String, state: State<'_, AppState>) -> Result<bool, AppError> {
+    state
+        .mfa_service
+        .verify(&code)
+        .map_err(|e| AppError::Internal(e.to_string()))
+}
+
+/// Returns whether MFA is configured.
+#[tauri::command]
+pub fn mfa_is_configured(state: State<'_, AppState>) -> bool {
+    state.mfa_service.is_configured()
+}
+
+/// Revokes MFA setup.
+#[tauri::command]
+pub fn mfa_revoke(state: State<'_, AppState>) {
+    state.mfa_service.revoke();
+    state
+        .audit_service
+        .log_success("MfaRevoked", "", "MFA configuration revoked");
+}
+
+/// Returns the current MFA configuration.
+#[tauri::command]
+pub fn mfa_get_config(state: State<'_, AppState>) -> MfaConfig {
+    state.mfa_service.config()
+}
+
+/// Updates the MFA configuration.
+#[tauri::command]
+pub fn mfa_set_config(config: MfaConfig, state: State<'_, AppState>) {
+    state.mfa_service.set_config(config);
+}
+
+/// Checks if a given action requires MFA.
+#[tauri::command]
+pub fn mfa_requires(action: String, state: State<'_, AppState>) -> bool {
+    state.mfa_service.requires_mfa(&action)
 }
 
 /// Resolves a hostname to IP addresses with a 5-second timeout.
@@ -621,5 +936,252 @@ mod tests {
         let state = make_state();
         let results = search_computers_inner(&state, "none").await.unwrap();
         assert!(results.is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // Helper: create state with a specific permission level
+    // -----------------------------------------------------------------------
+
+    fn make_state_with_level(level: PermissionLevel) -> AppState {
+        let provider = Arc::new(MockDirectoryProvider::new());
+        let state = AppState::new(provider, PermissionConfig::default());
+        state.permission_service.set_level(level);
+        state
+    }
+
+    /// Creates a state with a given permission level and returns both the
+    /// state and a cloned Arc to the mock provider for call verification.
+    fn make_state_with_level_and_provider(
+        level: PermissionLevel,
+    ) -> (AppState, Arc<MockDirectoryProvider>) {
+        let provider = Arc::new(MockDirectoryProvider::new());
+        let provider_ref = Arc::clone(&provider);
+        let state = AppState::new(provider, PermissionConfig::default());
+        state.permission_service.set_level(level);
+        (state, provider_ref)
+    }
+
+    fn make_state_with_level_and_failure(level: PermissionLevel) -> AppState {
+        let provider = Arc::new(MockDirectoryProvider::new().with_failure());
+        let state = AppState::new(provider, PermissionConfig::default());
+        state.permission_service.set_level(level);
+        state
+    }
+
+    // -----------------------------------------------------------------------
+    // Epic 2 command tests - reset_password_inner
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_reset_password_requires_helpdesk_permission() {
+        let state = make_state(); // ReadOnly by default
+        let result =
+            reset_password_inner(&state, "CN=Test,DC=example,DC=com", "NewPass1!", false).await;
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        match err {
+            AppError::PermissionDenied(msg) => {
+                assert!(msg.contains("HelpDesk"));
+            }
+            other => panic!("Expected PermissionDenied, got: {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_reset_password_succeeds_with_helpdesk() {
+        let state = make_state_with_level(PermissionLevel::HelpDesk);
+        let result =
+            reset_password_inner(&state, "CN=Test,DC=example,DC=com", "NewPass1!", false).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_reset_password_calls_provider_with_correct_args() {
+        let (state, provider) = make_state_with_level_and_provider(PermissionLevel::HelpDesk);
+        reset_password_inner(&state, "CN=User1,DC=example,DC=com", "Secret123!", true)
+            .await
+            .unwrap();
+        let calls = provider.reset_password_calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].0, "CN=User1,DC=example,DC=com");
+        assert_eq!(calls[0].1, "Secret123!");
+        assert!(calls[0].2); // must_change_at_next_logon
+    }
+
+    #[tokio::test]
+    async fn test_reset_password_logs_audit_on_success() {
+        let state = make_state_with_level(PermissionLevel::HelpDesk);
+        reset_password_inner(&state, "CN=User1,DC=example,DC=com", "Pass!", true)
+            .await
+            .unwrap();
+        let entries = state.audit_service.get_entries();
+        assert_eq!(entries.len(), 1);
+        assert!(entries[0].success);
+        assert_eq!(entries[0].action, "PasswordReset");
+        assert_eq!(entries[0].target_dn, "CN=User1,DC=example,DC=com");
+        assert!(entries[0]
+            .details
+            .contains("must_change_at_next_logon=true"));
+    }
+
+    #[tokio::test]
+    async fn test_reset_password_logs_audit_on_failure() {
+        let state = make_state_with_level_and_failure(PermissionLevel::HelpDesk);
+        let result =
+            reset_password_inner(&state, "CN=User1,DC=example,DC=com", "Pass!", false).await;
+        assert!(result.is_err());
+        let entries = state.audit_service.get_entries();
+        assert_eq!(entries.len(), 1);
+        assert!(!entries[0].success);
+        assert_eq!(entries[0].action, "PasswordResetFailed");
+        assert_eq!(entries[0].target_dn, "CN=User1,DC=example,DC=com");
+    }
+
+    // -----------------------------------------------------------------------
+    // Epic 2 command tests - unlock_account_inner
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_unlock_account_requires_helpdesk() {
+        let state = make_state(); // ReadOnly
+        let result = unlock_account_inner(&state, "CN=Test,DC=example,DC=com").await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            AppError::PermissionDenied(msg) => assert!(msg.contains("HelpDesk")),
+            other => panic!("Expected PermissionDenied, got: {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_unlock_account_succeeds() {
+        let (state, provider) = make_state_with_level_and_provider(PermissionLevel::HelpDesk);
+        unlock_account_inner(&state, "CN=Locked,DC=example,DC=com")
+            .await
+            .unwrap();
+        let calls = provider.unlock_calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0], "CN=Locked,DC=example,DC=com");
+        let entries = state.audit_service.get_entries();
+        assert_eq!(entries.len(), 1);
+        assert!(entries[0].success);
+        assert_eq!(entries[0].action, "AccountUnlocked");
+    }
+
+    // -----------------------------------------------------------------------
+    // Epic 2 command tests - enable_account_inner
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_enable_account_requires_helpdesk() {
+        let state = make_state(); // ReadOnly
+        let result = enable_account_inner(&state, "CN=Test,DC=example,DC=com").await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            AppError::PermissionDenied(msg) => assert!(msg.contains("HelpDesk")),
+            other => panic!("Expected PermissionDenied, got: {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_enable_account_succeeds() {
+        let (state, provider) = make_state_with_level_and_provider(PermissionLevel::HelpDesk);
+        enable_account_inner(&state, "CN=Disabled,DC=example,DC=com")
+            .await
+            .unwrap();
+        let calls = provider.enable_calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0], "CN=Disabled,DC=example,DC=com");
+        let entries = state.audit_service.get_entries();
+        assert_eq!(entries.len(), 1);
+        assert!(entries[0].success);
+        assert_eq!(entries[0].action, "AccountEnabled");
+    }
+
+    // -----------------------------------------------------------------------
+    // Epic 2 command tests - disable_account_inner
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_disable_account_requires_helpdesk() {
+        let state = make_state(); // ReadOnly
+        let result = disable_account_inner(&state, "CN=Test,DC=example,DC=com").await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            AppError::PermissionDenied(msg) => assert!(msg.contains("HelpDesk")),
+            other => panic!("Expected PermissionDenied, got: {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_disable_account_succeeds() {
+        let (state, provider) = make_state_with_level_and_provider(PermissionLevel::HelpDesk);
+        disable_account_inner(&state, "CN=Active,DC=example,DC=com")
+            .await
+            .unwrap();
+        let calls = provider.disable_calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0], "CN=Active,DC=example,DC=com");
+        let entries = state.audit_service.get_entries();
+        assert_eq!(entries.len(), 1);
+        assert!(entries[0].success);
+        assert_eq!(entries[0].action, "AccountDisabled");
+    }
+
+    // -----------------------------------------------------------------------
+    // Epic 2 command tests - set_password_flags_inner
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_set_password_flags_requires_account_operator() {
+        // HelpDesk is insufficient for set_password_flags
+        let state = make_state_with_level(PermissionLevel::HelpDesk);
+        let result =
+            set_password_flags_inner(&state, "CN=Test,DC=example,DC=com", true, false).await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            AppError::PermissionDenied(msg) => assert!(msg.contains("AccountOperator")),
+            other => panic!("Expected PermissionDenied, got: {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_set_password_flags_succeeds() {
+        let (state, provider) =
+            make_state_with_level_and_provider(PermissionLevel::AccountOperator);
+        set_password_flags_inner(&state, "CN=User1,DC=example,DC=com", true, false)
+            .await
+            .unwrap();
+        let calls = provider.set_password_flags_calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].0, "CN=User1,DC=example,DC=com");
+        assert!(calls[0].1); // password_never_expires
+        assert!(!calls[0].2); // user_cannot_change_password
+        let entries = state.audit_service.get_entries();
+        assert_eq!(entries.len(), 1);
+        assert!(entries[0].success);
+        assert_eq!(entries[0].action, "PasswordFlagsChanged");
+        assert!(entries[0].details.contains("password_never_expires=true"));
+        assert!(entries[0]
+            .details
+            .contains("user_cannot_change_password=false"));
+    }
+
+    // -----------------------------------------------------------------------
+    // Epic 2 command tests - get_audit_entries_inner
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_get_audit_entries_returns_entries() {
+        let state = make_state();
+        // Initially empty
+        assert!(get_audit_entries_inner(&state).is_empty());
+        // Add some audit entries via the service directly
+        state.audit_service.log_success("Action1", "dn1", "detail1");
+        state.audit_service.log_failure("Action2", "dn2", "detail2");
+        let entries = get_audit_entries_inner(&state);
+        assert_eq!(entries.len(), 2);
+        // Most recent first
+        assert_eq!(entries[0].action, "Action2");
+        assert_eq!(entries[1].action, "Action1");
     }
 }

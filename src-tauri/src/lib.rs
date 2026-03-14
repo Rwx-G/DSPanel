@@ -71,6 +71,21 @@ pub fn run() {
             commands::evaluate_health_cmd,
             commands::get_current_username,
             commands::get_computer_name,
+            commands::reset_password,
+            commands::unlock_account,
+            commands::enable_account,
+            commands::disable_account,
+            commands::set_password_flags,
+            commands::get_audit_entries,
+            commands::generate_password,
+            commands::check_password_hibp,
+            commands::mfa_setup,
+            commands::mfa_verify,
+            commands::mfa_is_configured,
+            commands::mfa_revoke,
+            commands::mfa_get_config,
+            commands::mfa_set_config,
+            commands::mfa_requires,
         ])
         .run(tauri::generate_context!())
         .unwrap_or_else(|e| {
