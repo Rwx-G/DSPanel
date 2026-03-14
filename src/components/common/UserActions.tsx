@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { PermissionGate } from "@/components/common/PermissionGate";
 import { useDialog } from "@/contexts/DialogContext";
 import { useNotifications } from "@/contexts/NotificationContext";
+import { useMfaGate } from "@/hooks/useMfaGate";
 import { type DirectoryUser } from "@/types/directory";
 import { Unlock, Power, PowerOff, KeyRound } from "lucide-react";
 
@@ -19,6 +20,7 @@ export function UserActions({
 }: UserActionsProps) {
   const { showConfirmation } = useDialog();
   const { notify } = useNotifications();
+  const { checkMfa } = useMfaGate();
   const [loading, setLoading] = useState<string | null>(null);
 
   const handleAction = useCallback(
@@ -26,7 +28,13 @@ export function UserActions({
       action: string,
       command: string,
       confirmMessage: string,
+      mfaAction?: string,
     ) => {
+      if (mfaAction) {
+        const mfaAllowed = await checkMfa(mfaAction);
+        if (!mfaAllowed) return;
+      }
+
       const confirmed = await showConfirmation(
         `${action} Account`,
         confirmMessage,
@@ -50,7 +58,7 @@ export function UserActions({
         setLoading(null);
       }
     },
-    [user, showConfirmation, notify, onRefresh],
+    [user, showConfirmation, notify, onRefresh, checkMfa],
   );
 
   const handleUnlock = useCallback(
@@ -79,6 +87,7 @@ export function UserActions({
         "Disable",
         "disable_account",
         `Are you sure you want to disable the account for ${user.displayName} (${user.samAccountName})? The user will no longer be able to log in.`,
+        "AccountDisable",
       ),
     [handleAction, user],
   );
