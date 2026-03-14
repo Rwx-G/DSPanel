@@ -6,6 +6,7 @@ use crate::error::AppError;
 use crate::models::DirectoryEntry;
 use crate::services::audit::AuditEntry;
 use crate::services::comparison::GroupComparisonResult;
+use crate::services::ntfs::{AceCrossReference, AceEntry, NtfsAuditResult};
 use crate::services::mfa::{MfaConfig, MfaSetupResult};
 use crate::services::password::{HibpResult, PasswordOptions};
 use crate::services::{AccountHealthStatus, HealthInput, PermissionLevel};
@@ -448,6 +449,30 @@ pub(crate) async fn compare_users_inner(
     ))
 }
 
+/// Reads NTFS ACL from a UNC path.
+pub(crate) fn audit_ntfs_permissions_inner(path: &str) -> Result<NtfsAuditResult, AppError> {
+    crate::services::ntfs::validate_unc_path(path)
+        .map_err(|e| AppError::Configuration(e))?;
+
+    let aces = crate::services::ntfs::read_acl(path)
+        .map_err(|e| AppError::Directory(e))?;
+
+    Ok(NtfsAuditResult {
+        path: path.to_string(),
+        aces,
+        errors: vec![],
+    })
+}
+
+/// Cross-references NTFS ACEs with two users' group SIDs.
+pub(crate) fn cross_reference_ntfs_inner(
+    aces: &[AceEntry],
+    user_a_sids: &[String],
+    user_b_sids: &[String],
+) -> Vec<AceCrossReference> {
+    crate::services::ntfs::cross_reference_aces(aces, user_a_sids, user_b_sids)
+}
+
 // ---------------------------------------------------------------------------
 // Tauri commands - thin wrappers
 // ---------------------------------------------------------------------------
@@ -690,6 +715,22 @@ pub async fn set_password_flags(
 #[tauri::command]
 pub fn get_audit_entries(state: State<'_, AppState>) -> Vec<AuditEntry> {
     get_audit_entries_inner(&state)
+}
+
+/// Reads NTFS ACL from a UNC path and returns parsed ACE entries.
+#[tauri::command]
+pub fn audit_ntfs_permissions(path: String) -> Result<NtfsAuditResult, AppError> {
+    audit_ntfs_permissions_inner(&path)
+}
+
+/// Cross-references ACEs with two users' group SIDs.
+#[tauri::command]
+pub fn cross_reference_ntfs(
+    aces: Vec<AceEntry>,
+    user_a_sids: Vec<String>,
+    user_b_sids: Vec<String>,
+) -> Vec<AceCrossReference> {
+    cross_reference_ntfs_inner(&aces, &user_a_sids, &user_b_sids)
 }
 
 /// Compares group memberships of two users, returning shared/unique groups.
@@ -1615,6 +1656,69 @@ mod tests {
         let state = make_state_with_failure();
         let result = compare_users_inner(&state, "jdoe", "asmith").await;
         assert!(result.is_err());
+    }
+
+    // -----------------------------------------------------------------------
+    // Epic 3 command tests - NTFS permissions
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_audit_ntfs_permissions_invalid_path() {
+        let result = audit_ntfs_permissions_inner("C:\\local\\path");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_audit_ntfs_permissions_missing_share() {
+        let result = audit_ntfs_permissions_inner("\\\\server");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_cross_reference_ntfs_inner_with_matches() {
+        let aces = vec![
+            crate::services::ntfs::AceEntry {
+                trustee_sid: "S-1-5-21-100".to_string(),
+                trustee_display_name: "Admins".to_string(),
+                access_type: crate::services::ntfs::AceAccessType::Allow,
+                permissions: vec!["FullControl".to_string()],
+                is_inherited: false,
+            },
+            crate::services::ntfs::AceEntry {
+                trustee_sid: "S-1-5-21-200".to_string(),
+                trustee_display_name: "Users".to_string(),
+                access_type: crate::services::ntfs::AceAccessType::Deny,
+                permissions: vec!["Write".to_string()],
+                is_inherited: true,
+            },
+        ];
+        let user_a_sids = vec!["S-1-5-21-100".to_string()];
+        let user_b_sids = vec!["S-1-5-21-200".to_string()];
+
+        let results = cross_reference_ntfs_inner(&aces, &user_a_sids, &user_b_sids);
+        assert_eq!(results.len(), 2);
+        assert_eq!(
+            results[0].user_a_access,
+            crate::services::ntfs::AccessIndicator::Allowed
+        );
+        assert_eq!(
+            results[0].user_b_access,
+            crate::services::ntfs::AccessIndicator::NoMatch
+        );
+        assert_eq!(
+            results[1].user_a_access,
+            crate::services::ntfs::AccessIndicator::NoMatch
+        );
+        assert_eq!(
+            results[1].user_b_access,
+            crate::services::ntfs::AccessIndicator::Denied
+        );
+    }
+
+    #[test]
+    fn test_cross_reference_ntfs_inner_empty() {
+        let results = cross_reference_ntfs_inner(&[], &[], &[]);
+        assert!(results.is_empty());
     }
 
     #[tokio::test]

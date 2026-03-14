@@ -8,6 +8,7 @@ pub mod dpapi;
 pub mod health;
 pub mod ldap_directory;
 pub mod mfa;
+pub mod ntfs;
 pub mod password;
 pub mod permissions;
 pub mod resilience;

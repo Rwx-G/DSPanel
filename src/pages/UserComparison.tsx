@@ -7,6 +7,7 @@ import { type DirectoryEntry } from "@/types/directory";
 import { type GroupCategory } from "@/types/comparison";
 import { parseCnFromDn } from "@/utils/dn";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
+import { UncPermissionsAudit } from "@/components/comparison/UncPermissionsAudit";
 
 const CATEGORY_STYLES: Record<GroupCategory, { bg: string; text: string; label: string }> = {
   shared: {
@@ -240,6 +241,16 @@ export function UserComparison() {
           data-testid="comparison-error"
         >
           {error}
+        </div>
+      )}
+
+      {/* UNC Permissions Audit */}
+      {userA && userB && (
+        <div className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-4">
+          <h2 className="mb-3 text-body font-semibold text-[var(--color-text-primary)]">
+            UNC Path Permissions Audit
+          </h2>
+          <UncPermissionsAudit userA={userA} userB={userB} />
         </div>
       )}
 
