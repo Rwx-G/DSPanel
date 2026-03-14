@@ -1,0 +1,33 @@
+schema: 1
+story: "3.1"
+story_title: "Side-by-Side User Comparison"
+gate: PASS
+status_reason: "All critical ACs met. User cards now display OU, last logon, and account status. Array mutation fix applied. Only nested group resolution (tokenGroups) remains as future enhancement."
+reviewer: "Quinn (Test Architect)"
+updated: "2026-03-14T23:45:00Z"
+
+waiver: { active: false }
+
+top_issues: []
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 15
+  risks_identified: 2
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7]
+    ac_gaps: []
+
+nfr_validation:
+  security: { status: PASS, notes: "add_user_to_group gated by HelpDesk permission with audit logging" }
+  performance: { status: PASS, notes: "O(n) set operations, efficient for typical AD group counts" }
+  reliability: { status: PASS, notes: "Error handling on all invoke calls, resolve_user fallback" }
+  maintainability: { status: PASS, notes: "Clean separation - comparison.rs service, useComparison hook, UserComparison page" }
+
+recommendations:
+  future:
+    - action: "Consider tokenGroups-based nested group resolution"
+      refs: ["src-tauri/src/services/comparison.rs"]
+    - action: "Spread array before sort in filteredGroups useMemo to avoid mutation"
+      refs: ["src/hooks/useComparison.ts"]

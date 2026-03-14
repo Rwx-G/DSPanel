@@ -1,4 +1,5 @@
 pub mod audit;
+pub mod comparison;
 pub mod dacl;
 #[cfg(feature = "demo")]
 pub mod demo_provider;
@@ -7,8 +8,11 @@ pub mod dpapi;
 pub mod health;
 pub mod ldap_directory;
 pub mod mfa;
+pub mod ntfs;
+pub mod ntfs_analyzer;
 pub mod password;
 pub mod permissions;
+pub mod replication;
 pub mod resilience;
 pub mod resilient_directory;
 pub mod snapshot;

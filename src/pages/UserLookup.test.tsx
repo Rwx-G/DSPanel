@@ -4,13 +4,16 @@ import { type ReactNode } from "react";
 import { UserLookup } from "./UserLookup";
 import { DialogProvider } from "@/contexts/DialogContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
+import { NavigationProvider } from "@/contexts/NavigationContext";
 import type { DirectoryEntry } from "@/types/directory";
 import type { AccountHealthStatus } from "@/types/health";
 
 function TestProviders({ children }: { children: ReactNode }) {
   return (
     <NotificationProvider>
-      <DialogProvider>{children}</DialogProvider>
+      <DialogProvider>
+        <NavigationProvider>{children}</NavigationProvider>
+      </DialogProvider>
     </NotificationProvider>
   );
 }

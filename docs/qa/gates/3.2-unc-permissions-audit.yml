@@ -1,0 +1,31 @@
+schema: 1
+story: "3.2"
+story_title: "UNC Path Permissions Audit"
+gate: PASS
+status_reason: "All 7 ACs fully implemented. Solid NTFS ACL reading, cross-reference logic, Access Summary with explanations, color-coded display, and CSV export via native dialog."
+reviewer: "Quinn (Test Architect)"
+updated: "2026-03-14T23:20:00Z"
+
+waiver: { active: false }
+
+top_issues: []
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 27
+  risks_identified: 1
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7]
+    ac_gaps: []
+
+nfr_validation:
+  security: { status: PASS, notes: "UNC path validation, unsafe Win32 API properly scoped" }
+  performance: { status: PASS, notes: "Single Win32 API call per path" }
+  reliability: { status: PASS, notes: "Error handling for access denied, path not found, malformed UNC" }
+  maintainability: { status: PASS, notes: "Clean cfg(windows)/cfg(demo) separation, AccessSummary component" }
+
+recommendations:
+  future:
+    - action: "Resolve trustee SIDs to display names via AD lookup in production mode"
+      refs: ["src-tauri/src/services/ntfs.rs"]

@@ -22,6 +22,7 @@ import { type DirectoryUser } from "@/types/directory";
 import type { AccountHealthStatus, HealthLevel } from "@/types/health";
 import { parseCnFromDn } from "@/utils/dn";
 import { Users } from "lucide-react";
+import { StateInTimeView } from "@/components/comparison/StateInTimeView";
 
 /** Maps health flag names to the PropertyGrid label they correspond to. */
 const FLAG_TO_LABEL: Record<string, string> = {
@@ -264,6 +265,15 @@ export function UserDetail({
       <div className="border-t border-[var(--color-border-default)]" />
 
       <AdvancedAttributes rawAttributes={user.rawAttributes} />
+
+      <div className="border-t border-[var(--color-border-default)]" />
+
+      <div data-testid="user-history-section">
+        <h3 className="mb-2 text-body font-semibold text-[var(--color-text-primary)]">
+          Replication History
+        </h3>
+        <StateInTimeView objectDn={user.distinguishedName} objectType="user" />
+      </div>
 
       <ContextMenu
         items={contextMenuItems}

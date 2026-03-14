@@ -1,0 +1,33 @@
+schema: 1
+story: "3.4"
+story_title: "State-in-Time Comparison"
+gate: PASS
+status_reason: "All critical ACs met. Replication History integrated in UserDetail and ComputerDetail. AC #4 version-only display is correct per AD metadata limitations. Group objects deferred as they rarely have replication metadata."
+reviewer: "Quinn (Test Architect)"
+updated: "2026-03-14T23:30:00Z"
+
+waiver: { active: false }
+
+top_issues: []
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 25
+  risks_identified: 2
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7]
+    ac_gaps: []
+
+nfr_validation:
+  security: { status: PASS, notes: "Read-only replication data, no write operations" }
+  performance: { status: PASS, notes: "Single LDAP query, lightweight XML parsing" }
+  reliability: { status: PASS, notes: "Graceful handling of missing/malformed metadata, state reset on user change" }
+  maintainability: { status: PASS, notes: "Reusable StateInTimeView component with objectType prop ready for computer/group" }
+
+recommendations:
+  future:
+    - action: "Add actual attribute value display alongside version numbers when feasible"
+      refs: ["src/components/comparison/StateInTimeView.tsx"]
+    - action: "Support msDS-ReplValueMetaData for linked attributes (member/memberOf)"
+      refs: ["src-tauri/src/services/replication.rs"]

@@ -16,6 +16,7 @@ import { GroupMembersDialog } from "@/components/dialogs/GroupMembersDialog";
 import { type DirectoryComputer } from "@/types/directory";
 import { parseCnFromDn } from "@/utils/dn";
 import { Users } from "lucide-react";
+import { StateInTimeView } from "@/components/comparison/StateInTimeView";
 
 export function ComputerDetail({ computer }: { computer: DirectoryComputer }) {
   const [groupFilterText, setGroupFilterText] = useState("");
@@ -234,6 +235,15 @@ export function ComputerDetail({ computer }: { computer: DirectoryComputer }) {
           rowKey={(row) => row.dn}
           onRowContextMenu={handleGroupContextMenu}
         />
+      </div>
+
+      <div className="border-t border-[var(--color-border-default)]" />
+
+      <div data-testid="computer-history-section">
+        <h3 className="mb-2 text-body font-semibold text-[var(--color-text-primary)]">
+          Replication History
+        </h3>
+        <StateInTimeView objectDn={computer.distinguishedName} objectType="computer" />
       </div>
 
       <ContextMenu

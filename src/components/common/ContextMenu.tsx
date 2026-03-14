@@ -10,7 +10,7 @@ import { createPortal } from "react-dom";
 export interface ContextMenuItem {
   label: string;
   icon?: ReactNode;
-  onClick: () => void;
+  onClick: () => void | Promise<void>;
   disabled?: boolean;
 }
 
@@ -72,8 +72,21 @@ export function ContextMenu({ items, position, onClose }: ContextMenuProps) {
   const handleItemClick = useCallback(
     (item: ContextMenuItem) => {
       if (!item.disabled) {
-        item.onClick();
         onClose();
+        // Defer onClick to next tick so the menu is unmounted first,
+        // and catch any rejected promises to prevent unhandled rejections.
+        Promise.resolve().then(() => {
+          try {
+            const result = item.onClick();
+            if (result && typeof (result as Promise<void>).catch === "function") {
+              (result as Promise<void>).catch((err) => {
+                console.error("[ContextMenu] Action failed:", err);
+              });
+            }
+          } catch (err) {
+            console.error("[ContextMenu] Action failed:", err);
+          }
+        });
       }
     },
     [onClose],

@@ -13,6 +13,8 @@ import { UserLookup } from "@/pages/UserLookup";
 import { ComputerLookup } from "@/pages/ComputerLookup";
 import { HomePage } from "@/pages/HomePage";
 import { PasswordGenerator } from "@/pages/PasswordGenerator";
+import { UserComparison } from "@/pages/UserComparison";
+import { NtfsAnalyzer } from "@/pages/NtfsAnalyzer";
 
 const APP_VERSION = __APP_VERSION__;
 
@@ -118,19 +120,54 @@ export function App() {
   );
 }
 
+const MODULE_COMPONENTS: Record<string, React.ComponentType<Record<string, never>>> = {
+  users: UserLookup,
+  computers: ComputerLookup,
+  "user-comparison": UserComparison,
+  "ntfs-analyzer": NtfsAnalyzer,
+  "password-generator": PasswordGenerator,
+};
+
 function ModuleRouter({ status }: { status: AppStatus }) {
   const { openTabs, activeTabId } = useNavigation();
   const activeTab = openTabs.find((t) => t.id === activeTabId);
-  const moduleId = activeTab?.moduleId ?? "home";
+  const activeModuleId = activeTab?.moduleId ?? "home";
 
-  switch (moduleId) {
-    case "users":
-      return <UserLookup />;
-    case "computers":
-      return <ComputerLookup />;
-    case "password-generator":
-      return <PasswordGenerator />;
-    default:
-      return <HomePage status={status} />;
+  // Track which modules have been opened so they stay mounted
+  const [mountedModules, setMountedModules] = useState<Set<string>>(new Set());
+
+  if (activeModuleId !== "home" && !mountedModules.has(activeModuleId)) {
+    setMountedModules((prev) => new Set(prev).add(activeModuleId));
   }
+
+  // Unmount modules whose tabs have been closed
+  const openModuleIds = new Set(openTabs.map((t) => t.moduleId));
+  const activeMounted = Array.from(mountedModules).filter((m) =>
+    openModuleIds.has(m),
+  );
+  if (activeMounted.length !== mountedModules.size) {
+    setMountedModules(new Set(activeMounted));
+  }
+
+  return (
+    <>
+      {/* Home page - only render when active */}
+      {activeModuleId === "home" && <HomePage status={status} />}
+
+      {/* Keep all opened modules mounted, hide inactive ones */}
+      {activeMounted.map((moduleId) => {
+        const Component = MODULE_COMPONENTS[moduleId];
+        if (!Component) return null;
+        return (
+          <div
+            key={moduleId}
+            className="h-full"
+            style={{ display: activeModuleId === moduleId ? "block" : "none" }}
+          >
+            <Component />
+          </div>
+        );
+      })}
+    </>
+  );
 }

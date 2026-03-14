@@ -5,8 +5,14 @@ use std::time::{Duration, Instant};
 use crate::error::AppError;
 use crate::models::DirectoryEntry;
 use crate::services::audit::AuditEntry;
+use crate::services::comparison::GroupComparisonResult;
 use crate::services::mfa::{MfaConfig, MfaSetupResult};
+use crate::services::ntfs::{AceCrossReference, AceEntry, NtfsAuditResult};
+use crate::services::ntfs_analyzer::NtfsAnalysisResult;
 use crate::services::password::{HibpResult, PasswordOptions};
+use crate::services::replication::{
+    AttributeChangeDiff, AttributeMetadata, ReplicationMetadataResult,
+};
 use crate::services::{AccountHealthStatus, HealthInput, PermissionLevel};
 use crate::state::AppState;
 
@@ -415,6 +421,162 @@ pub(crate) fn get_audit_entries_inner(state: &AppState) -> Vec<AuditEntry> {
     state.audit_service.get_entries()
 }
 
+/// Resolves a user by sAMAccountName, trying get_user_by_identity first,
+/// then falling back to search_users if not found.
+async fn resolve_user(
+    provider: &dyn crate::services::DirectoryProvider,
+    sam: &str,
+) -> Result<DirectoryEntry, AppError> {
+    // Try exact lookup first
+    if let Some(user) = provider
+        .get_user_by_identity(sam)
+        .await
+        .map_err(|e| AppError::Directory(e.to_string()))?
+    {
+        return Ok(user);
+    }
+
+    // Fallback to search (handles cases where sAMAccountName filter doesn't match)
+    let results = provider
+        .search_users(sam, 5)
+        .await
+        .map_err(|e| AppError::Directory(e.to_string()))?;
+
+    results
+        .into_iter()
+        .find(|u| u.sam_account_name.as_deref() == Some(sam))
+        .ok_or_else(|| AppError::Directory(format!("User not found: {}", sam)))
+}
+
+/// Compares the group memberships of two users identified by sAMAccountName.
+pub(crate) async fn compare_users_inner(
+    state: &AppState,
+    sam_a: &str,
+    sam_b: &str,
+) -> Result<GroupComparisonResult, AppError> {
+    let provider = state.directory_provider.clone();
+
+    let user_a = resolve_user(&*provider, sam_a).await?;
+    let user_b = resolve_user(&*provider, sam_b).await?;
+
+    let groups_a: Vec<String> = user_a.get_attribute_values("memberOf").to_vec();
+    let groups_b: Vec<String> = user_b.get_attribute_values("memberOf").to_vec();
+
+    Ok(crate::services::comparison::compute_group_diff(
+        &groups_a, &groups_b,
+    ))
+}
+
+/// Reads NTFS ACL from a UNC path.
+pub(crate) fn audit_ntfs_permissions_inner(path: &str) -> Result<NtfsAuditResult, AppError> {
+    crate::services::ntfs::validate_unc_path(path).map_err(AppError::Configuration)?;
+
+    #[cfg(feature = "demo")]
+    let aces = crate::services::ntfs::read_acl_demo(path);
+
+    #[cfg(not(feature = "demo"))]
+    let aces = crate::services::ntfs::read_acl(path).map_err(AppError::Directory)?;
+
+    Ok(NtfsAuditResult {
+        path: path.to_string(),
+        aces,
+        errors: vec![],
+    })
+}
+
+/// Cross-references NTFS ACEs with two users' group SIDs.
+pub(crate) fn cross_reference_ntfs_inner(
+    aces: &[AceEntry],
+    user_a_sids: &[String],
+    user_b_sids: &[String],
+) -> Vec<AceCrossReference> {
+    crate::services::ntfs::cross_reference_aces(aces, user_a_sids, user_b_sids)
+}
+
+/// Adds a user to a group. Requires HelpDesk permission.
+pub(crate) async fn add_user_to_group_inner(
+    state: &AppState,
+    user_dn: &str,
+    group_dn: &str,
+) -> Result<(), AppError> {
+    if !state
+        .permission_service
+        .has_permission(PermissionLevel::HelpDesk)
+    {
+        return Err(AppError::PermissionDenied(
+            "Requires HelpDesk permission or higher".to_string(),
+        ));
+    }
+
+    state.snapshot_service.capture(user_dn, "AddToGroup");
+
+    let provider = state.directory_provider.clone();
+    match provider.add_user_to_group(user_dn, group_dn).await {
+        Ok(()) => {
+            state.audit_service.log_success(
+                "AddedToGroup",
+                user_dn,
+                &format!("Added to group {}", group_dn),
+            );
+            Ok(())
+        }
+        Err(e) => {
+            state.audit_service.log_failure(
+                "AddToGroupFailed",
+                user_dn,
+                &format!("Failed to add to group {}: {}", group_dn, e),
+            );
+            Err(AppError::Directory(e.to_string()))
+        }
+    }
+}
+
+/// Retrieves and parses replication metadata for an AD object.
+pub(crate) async fn get_replication_metadata_inner(
+    state: &AppState,
+    object_dn: &str,
+) -> Result<ReplicationMetadataResult, AppError> {
+    let provider = state.directory_provider.clone();
+    let raw = provider
+        .get_replication_metadata(object_dn)
+        .await
+        .map_err(|e| AppError::Directory(e.to_string()))?;
+
+    match raw {
+        Some(xml) => {
+            let attributes = crate::services::replication::parse_replication_metadata(&xml);
+            Ok(ReplicationMetadataResult {
+                object_dn: object_dn.to_string(),
+                attributes,
+                is_available: true,
+                message: None,
+            })
+        }
+        None => Ok(ReplicationMetadataResult {
+            object_dn: object_dn.to_string(),
+            attributes: vec![],
+            is_available: false,
+            message: Some("Replication metadata not available for this object".to_string()),
+        }),
+    }
+}
+
+/// Computes attribute diff between two timestamps.
+pub(crate) fn compute_attribute_diff_inner(
+    metadata: &[AttributeMetadata],
+    from_time: &str,
+    to_time: &str,
+) -> Vec<AttributeChangeDiff> {
+    crate::services::replication::compute_attribute_diff(metadata, from_time, to_time)
+}
+
+/// Performs a recursive NTFS permissions analysis on a UNC path.
+pub(crate) fn analyze_ntfs_inner(path: &str, depth: usize) -> Result<NtfsAnalysisResult, AppError> {
+    crate::services::ntfs::validate_unc_path(path).map_err(AppError::Configuration)?;
+
+    Ok(crate::services::ntfs_analyzer::analyze(path, depth))
+}
+
 // ---------------------------------------------------------------------------
 // Tauri commands - thin wrappers
 // ---------------------------------------------------------------------------
@@ -659,6 +821,67 @@ pub fn get_audit_entries(state: State<'_, AppState>) -> Vec<AuditEntry> {
     get_audit_entries_inner(&state)
 }
 
+/// Adds a user to a group.
+#[tauri::command]
+pub async fn add_user_to_group(
+    user_dn: String,
+    group_dn: String,
+    state: State<'_, AppState>,
+) -> Result<(), AppError> {
+    add_user_to_group_inner(&state, &user_dn, &group_dn).await
+}
+
+/// Retrieves replication metadata for an AD object.
+#[tauri::command]
+pub async fn get_replication_metadata(
+    object_dn: String,
+    state: State<'_, AppState>,
+) -> Result<ReplicationMetadataResult, AppError> {
+    get_replication_metadata_inner(&state, &object_dn).await
+}
+
+/// Computes attribute diff between two timestamps.
+#[tauri::command]
+pub fn compute_attribute_diff(
+    metadata: Vec<AttributeMetadata>,
+    from_time: String,
+    to_time: String,
+) -> Vec<AttributeChangeDiff> {
+    compute_attribute_diff_inner(&metadata, &from_time, &to_time)
+}
+
+/// Performs a recursive NTFS permissions analysis.
+#[tauri::command]
+pub fn analyze_ntfs(path: String, depth: usize) -> Result<NtfsAnalysisResult, AppError> {
+    analyze_ntfs_inner(&path, depth)
+}
+
+/// Reads NTFS ACL from a UNC path and returns parsed ACE entries.
+#[tauri::command]
+pub fn audit_ntfs_permissions(path: String) -> Result<NtfsAuditResult, AppError> {
+    audit_ntfs_permissions_inner(&path)
+}
+
+/// Cross-references ACEs with two users' group SIDs.
+#[tauri::command]
+pub fn cross_reference_ntfs(
+    aces: Vec<AceEntry>,
+    user_a_sids: Vec<String>,
+    user_b_sids: Vec<String>,
+) -> Vec<AceCrossReference> {
+    cross_reference_ntfs_inner(&aces, &user_a_sids, &user_b_sids)
+}
+
+/// Compares group memberships of two users, returning shared/unique groups.
+#[tauri::command]
+pub async fn compare_users(
+    sam_a: String,
+    sam_b: String,
+    state: State<'_, AppState>,
+) -> Result<GroupComparisonResult, AppError> {
+    compare_users_inner(&state, &sam_a, &sam_b).await
+}
+
 /// Generates a secure password with optional HIBP breach check.
 #[tauri::command]
 pub async fn generate_password(
@@ -746,6 +969,35 @@ pub fn mfa_set_config(config: MfaConfig, state: State<'_, AppState>) {
 #[tauri::command]
 pub fn mfa_requires(action: String, state: State<'_, AppState>) -> bool {
     state.mfa_service.requires_mfa(&action)
+}
+
+/// Opens a native save file dialog and writes content to the selected path.
+///
+/// Returns the path the file was saved to, or None if the user cancelled.
+#[tauri::command]
+pub async fn save_file_dialog(
+    content: String,
+    default_name: String,
+    filter_name: String,
+    filter_extensions: Vec<String>,
+) -> Result<Option<String>, AppError> {
+    let ext_refs: Vec<&str> = filter_extensions.iter().map(|s| s.as_str()).collect();
+    let dialog = rfd::AsyncFileDialog::new()
+        .set_file_name(&default_name)
+        .add_filter(&filter_name, &ext_refs);
+
+    let handle = dialog.save_file().await;
+
+    match handle {
+        Some(file) => {
+            let path = file.path().to_string_lossy().to_string();
+            tokio::fs::write(file.path(), content.as_bytes())
+                .await
+                .map_err(|e| AppError::Internal(format!("Failed to write file: {}", e)))?;
+            Ok(Some(path))
+        }
+        None => Ok(None),
+    }
 }
 
 /// Resolves a hostname to IP addresses with a 5-second timeout.
@@ -1493,5 +1745,227 @@ mod tests {
         let state = make_state_with_failure();
         let result = get_group_members_inner(&state, "CN=G,DC=test").await;
         assert!(result.is_err());
+    }
+
+    // -----------------------------------------------------------------------
+    // Epic 3 command tests - compare_users_inner
+    // -----------------------------------------------------------------------
+
+    fn make_user_with_groups(sam: &str, display: &str, groups: Vec<&str>) -> DirectoryEntry {
+        let mut attrs = HashMap::new();
+        attrs.insert("mail".to_string(), vec![format!("{}@example.com", sam)]);
+        attrs.insert(
+            "memberOf".to_string(),
+            groups.iter().map(|g| g.to_string()).collect(),
+        );
+        DirectoryEntry {
+            distinguished_name: format!("CN={},OU=Users,DC=example,DC=com", display),
+            sam_account_name: Some(sam.to_string()),
+            display_name: Some(display.to_string()),
+            object_class: Some("user".to_string()),
+            attributes: attrs,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_compare_users_returns_diff() {
+        let users = vec![
+            make_user_with_groups(
+                "jdoe",
+                "John Doe",
+                vec![
+                    "CN=Group1,DC=example,DC=com",
+                    "CN=Group2,DC=example,DC=com",
+                    "CN=Group3,DC=example,DC=com",
+                ],
+            ),
+            make_user_with_groups(
+                "asmith",
+                "Alice Smith",
+                vec!["CN=Group2,DC=example,DC=com", "CN=Group4,DC=example,DC=com"],
+            ),
+        ];
+        let state = make_state_with_users(users);
+        let result = compare_users_inner(&state, "jdoe", "asmith").await.unwrap();
+        assert_eq!(result.shared_groups.len(), 1);
+        assert_eq!(result.only_a_groups.len(), 2);
+        assert_eq!(result.only_b_groups.len(), 1);
+        assert_eq!(result.total_a, 3);
+        assert_eq!(result.total_b, 2);
+    }
+
+    #[tokio::test]
+    async fn test_compare_users_user_a_not_found() {
+        let users = vec![make_user_entry("jdoe", "John Doe")];
+        let state = make_state_with_users(users);
+        let result = compare_users_inner(&state, "unknown", "jdoe").await;
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("User not found: unknown"));
+    }
+
+    #[tokio::test]
+    async fn test_compare_users_user_b_not_found() {
+        let users = vec![make_user_entry("jdoe", "John Doe")];
+        let state = make_state_with_users(users);
+        let result = compare_users_inner(&state, "jdoe", "unknown").await;
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("User not found: unknown"));
+    }
+
+    #[tokio::test]
+    async fn test_compare_users_provider_failure() {
+        let state = make_state_with_failure();
+        let result = compare_users_inner(&state, "jdoe", "asmith").await;
+        assert!(result.is_err());
+    }
+
+    // -----------------------------------------------------------------------
+    // Epic 3 command tests - NTFS permissions
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_audit_ntfs_permissions_invalid_path() {
+        let result = audit_ntfs_permissions_inner("C:\\local\\path");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_audit_ntfs_permissions_missing_share() {
+        let result = audit_ntfs_permissions_inner("\\\\server");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_cross_reference_ntfs_inner_with_matches() {
+        let aces = vec![
+            crate::services::ntfs::AceEntry {
+                trustee_sid: "S-1-5-21-100".to_string(),
+                trustee_display_name: "Admins".to_string(),
+                access_type: crate::services::ntfs::AceAccessType::Allow,
+                permissions: vec!["FullControl".to_string()],
+                is_inherited: false,
+            },
+            crate::services::ntfs::AceEntry {
+                trustee_sid: "S-1-5-21-200".to_string(),
+                trustee_display_name: "Users".to_string(),
+                access_type: crate::services::ntfs::AceAccessType::Deny,
+                permissions: vec!["Write".to_string()],
+                is_inherited: true,
+            },
+        ];
+        let user_a_sids = vec!["S-1-5-21-100".to_string()];
+        let user_b_sids = vec!["S-1-5-21-200".to_string()];
+
+        let results = cross_reference_ntfs_inner(&aces, &user_a_sids, &user_b_sids);
+        assert_eq!(results.len(), 2);
+        assert_eq!(
+            results[0].user_a_access,
+            crate::services::ntfs::AccessIndicator::Allowed
+        );
+        assert_eq!(
+            results[0].user_b_access,
+            crate::services::ntfs::AccessIndicator::NoMatch
+        );
+        assert_eq!(
+            results[1].user_a_access,
+            crate::services::ntfs::AccessIndicator::NoMatch
+        );
+        assert_eq!(
+            results[1].user_b_access,
+            crate::services::ntfs::AccessIndicator::Denied
+        );
+    }
+
+    #[test]
+    fn test_cross_reference_ntfs_inner_empty() {
+        let results = cross_reference_ntfs_inner(&[], &[], &[]);
+        assert!(results.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_compare_users_no_groups() {
+        let users = vec![
+            make_user_entry("jdoe", "John Doe"),
+            make_user_entry("asmith", "Alice Smith"),
+        ];
+        let state = make_state_with_users(users);
+        let result = compare_users_inner(&state, "jdoe", "asmith").await.unwrap();
+        assert!(result.shared_groups.is_empty());
+        assert!(result.only_a_groups.is_empty());
+        assert!(result.only_b_groups.is_empty());
+        assert_eq!(result.total_a, 0);
+        assert_eq!(result.total_b, 0);
+    }
+
+    // -----------------------------------------------------------------------
+    // Epic 3 command tests - get_replication_metadata_inner
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_get_replication_metadata_available() {
+        let xml = r#"<DS_REPL_ATTR_META_DATA>
+    <pszAttributeName>displayName</pszAttributeName>
+    <dwVersion>3</dwVersion>
+    <ftimeLastOriginatingChange>2026-02-15T14:30:00Z</ftimeLastOriginatingChange>
+    <pszLastOriginatingDsaDN>CN=DC1</pszLastOriginatingDsaDN>
+    <usnOriginatingChange>12345</usnOriginatingChange>
+    <usnLocalChange>67890</usnLocalChange>
+</DS_REPL_ATTR_META_DATA>"#;
+
+        let provider =
+            Arc::new(MockDirectoryProvider::new().with_replication_metadata(xml.to_string()));
+        let state = AppState::new_for_test(provider, PermissionConfig::default());
+        let result = get_replication_metadata_inner(&state, "CN=Test,DC=example,DC=com")
+            .await
+            .unwrap();
+        assert!(result.is_available);
+        assert_eq!(result.attributes.len(), 1);
+        assert_eq!(result.attributes[0].attribute_name, "displayName");
+    }
+
+    #[tokio::test]
+    async fn test_get_replication_metadata_not_available() {
+        let state = make_state();
+        let result = get_replication_metadata_inner(&state, "CN=Test,DC=example,DC=com")
+            .await
+            .unwrap();
+        assert!(!result.is_available);
+        assert!(result.attributes.is_empty());
+        assert!(result.message.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_get_replication_metadata_failure() {
+        let state = make_state_with_failure();
+        let result = get_replication_metadata_inner(&state, "CN=Test,DC=example,DC=com").await;
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_compute_attribute_diff_inner() {
+        let metadata = vec![
+            crate::services::replication::AttributeMetadata {
+                attribute_name: "displayName".to_string(),
+                version: 3,
+                last_originating_change_time: "2026-02-15T14:30:00Z".to_string(),
+                last_originating_dsa_dn: String::new(),
+                local_usn: 0,
+                originating_usn: 0,
+            },
+            crate::services::replication::AttributeMetadata {
+                attribute_name: "title".to_string(),
+                version: 5,
+                last_originating_change_time: "2026-03-01T08:00:00Z".to_string(),
+                last_originating_dsa_dn: String::new(),
+                local_usn: 0,
+                originating_usn: 0,
+            },
+        ];
+        let diff =
+            compute_attribute_diff_inner(&metadata, "2026-02-01T00:00:00Z", "2026-02-28T23:59:59Z");
+        assert_eq!(diff.len(), 1);
+        assert_eq!(diff[0].attribute_name, "displayName");
     }
 }

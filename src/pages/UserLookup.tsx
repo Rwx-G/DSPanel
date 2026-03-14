@@ -15,8 +15,10 @@ import type { AccountHealthStatus } from "@/types/health";
 import { evaluateHealth } from "@/services/healthcheck";
 import { parseCnFromDn } from "@/utils/dn";
 import { useUserBrowse } from "@/hooks/useUserBrowse";
+import { useNavigation } from "@/contexts/NavigationContext";
+import { ContextMenu, type ContextMenuItem } from "@/components/common/ContextMenu";
 import { UserDetail } from "@/pages/UserDetail";
-import { UserX, AlertCircle, User } from "lucide-react";
+import { UserX, AlertCircle, User, GitCompareArrows } from "lucide-react";
 
 export function UserLookup() {
   const {
@@ -33,6 +35,9 @@ export function UserLookup() {
     refresh,
   } = useUserBrowse();
 
+  const { openTab } = useNavigation();
+  const [contextMenuPos, setContextMenuPos] = useState<{ x: number; y: number } | null>(null);
+  const [contextMenuItems, setContextMenuItems] = useState<ContextMenuItem[]>([]);
   const [groupFilterText, setGroupFilterText] = useState("");
   const [healthMap, setHealthMap] = useState<Map<string, AccountHealthStatus>>(
     new Map(),
@@ -121,6 +126,56 @@ export function UserLookup() {
     dn,
   }));
 
+  const handleUserContextMenu = useCallback(
+    (e: React.MouseEvent, user: DirectoryUser) => {
+      e.preventDefault();
+
+      if (!selectedUser) {
+        setContextMenuItems([
+          {
+            label: "Select a user first to compare",
+            icon: <GitCompareArrows size={14} />,
+            onClick: () => {},
+            disabled: true,
+          },
+        ]);
+        setContextMenuPos({ x: e.clientX, y: e.clientY });
+        return;
+      }
+
+      if (selectedUser.samAccountName === user.samAccountName) {
+        setContextMenuItems([
+          {
+            label: "Cannot compare a user with itself",
+            icon: <GitCompareArrows size={14} />,
+            onClick: () => {},
+            disabled: true,
+          },
+        ]);
+        setContextMenuPos({ x: e.clientX, y: e.clientY });
+        return;
+      }
+
+      const selectedName = selectedUser.displayName || selectedUser.samAccountName;
+      const targetName = user.displayName || user.samAccountName;
+
+      setContextMenuItems([
+        {
+          label: `Compare ${selectedName} with ${targetName}`,
+          icon: <GitCompareArrows size={14} />,
+          onClick: () => {
+            openTab("User Comparison", "user-comparison", "compare", {
+              compareSamA: selectedUser.samAccountName,
+              compareSamB: user.samAccountName,
+            });
+          },
+        },
+      ]);
+      setContextMenuPos({ x: e.clientX, y: e.clientY });
+    },
+    [selectedUser, openTab],
+  );
+
   const renderUserItem = useCallback(
     (user: DirectoryUser) => (
       <button
@@ -130,6 +185,7 @@ export function UserLookup() {
             : ""
         }`}
         onClick={() => setSelectedUser(user)}
+        onContextMenu={(e) => handleUserContextMenu(e, user)}
         data-testid={`user-result-${user.samAccountName}`}
       >
         <User
@@ -150,7 +206,7 @@ export function UserLookup() {
         )}
       </button>
     ),
-    [selectedUser, setSelectedUser, healthMap],
+    [selectedUser, setSelectedUser, healthMap, handleUserContextMenu],
   );
 
   return (
@@ -258,6 +314,12 @@ export function UserLookup() {
           </>
         )}
       </div>
+
+      <ContextMenu
+        items={contextMenuItems}
+        position={contextMenuPos}
+        onClose={() => setContextMenuPos(null)}
+      />
     </div>
   );
 }

@@ -441,7 +441,10 @@ impl DirectoryProvider for LdapDirectoryProvider {
     ) -> Result<Vec<DirectoryEntry>> {
         let validated = validate_search_input(group_dn)?;
         let escaped = ldap_escape(validated);
-        let ldap_filter = format!("(&(objectClass=user)(memberOf={}))", escaped);
+        let ldap_filter = format!(
+            "(&(|(objectClass=user)(objectClass=group))(memberOf={}))",
+            escaped
+        );
         self.search(&ldap_filter, USER_ATTRS, max_results).await
     }
 
@@ -635,6 +638,62 @@ impl DirectoryProvider for LdapDirectoryProvider {
                 Ok(Vec::new())
             }
         }
+    }
+
+    async fn add_user_to_group(&self, user_dn: &str, group_dn: &str) -> Result<()> {
+        use ldap3::Mod;
+        use std::collections::HashSet;
+
+        let mut ldap = self.connect().await?;
+        ldap.modify(
+            group_dn,
+            vec![Mod::Add(
+                "member".to_string(),
+                HashSet::from([user_dn.to_string()]),
+            )],
+        )
+        .await
+        .context("Failed to add user to group")?
+        .success()
+        .context("Add user to group LDAP operation returned error")?;
+
+        let _ = ldap.unbind().await;
+        tracing::info!(
+            user_dn = %user_dn,
+            group_dn = %group_dn,
+            "User added to group"
+        );
+        Ok(())
+    }
+
+    async fn get_replication_metadata(&self, object_dn: &str) -> Result<Option<String>> {
+        let _base_dn = self.base_dn().context("Not connected - no base DN")?;
+        let mut ldap = self.connect().await?;
+
+        let (entries, _) = ldap
+            .search(
+                object_dn,
+                ldap3::Scope::Base,
+                "(objectClass=*)",
+                vec!["msDS-ReplAttributeMetaData"],
+            )
+            .await
+            .context("Failed to query replication metadata")?
+            .success()
+            .context("Replication metadata LDAP query returned error")?;
+
+        let _ = ldap.unbind().await;
+
+        if let Some(entry) = entries.into_iter().next() {
+            let se = ldap3::SearchEntry::construct(entry);
+            if let Some(values) = se.attrs.get("msDS-ReplAttributeMetaData") {
+                if let Some(raw) = values.first() {
+                    return Ok(Some(raw.clone()));
+                }
+            }
+        }
+
+        Ok(None)
     }
 }
 

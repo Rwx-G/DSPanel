@@ -25,8 +25,15 @@ const SEVERITY_TEXT: Record<NotificationSeverity, string> = {
   error: "text-[var(--color-error)]",
 };
 
+const SEVERITY_BAR_COLOR: Record<NotificationSeverity, string> = {
+  info: "var(--color-info)",
+  success: "var(--color-success)",
+  warning: "var(--color-warning)",
+  error: "var(--color-error)",
+};
+
 export function NotificationHost() {
-  const { notifications, dismiss } = useNotifications();
+  const { notifications, dismiss, autoDismissMs } = useNotifications();
 
   if (notifications.length === 0) return null;
 
@@ -42,36 +49,48 @@ export function NotificationHost() {
         return (
           <div
             key={notification.id}
-            className={`flex items-start gap-2 rounded-md border border-[var(--color-border-default)] border-l-4 bg-[var(--color-surface-card)] px-3 py-2 shadow-md animate-in slide-in-from-right ${SEVERITY_BG[notification.severity]}`}
+            className={`relative overflow-hidden rounded-md border border-[var(--color-border-default)] border-l-4 bg-[var(--color-surface-card)] shadow-md animate-in slide-in-from-right ${SEVERITY_BG[notification.severity]}`}
             role="alert"
             data-testid={`notification-${notification.id}`}
           >
-            <Icon
-              size={16}
-              className={`mt-0.5 shrink-0 ${SEVERITY_TEXT[notification.severity]}`}
-            />
-            <div className="flex-1">
-              <p className="text-body text-[var(--color-text-primary)]">
-                {notification.message}
-              </p>
-              {notification.action && (
-                <button
-                  className="mt-1 text-caption font-medium text-[var(--color-primary)] hover:underline"
-                  onClick={notification.action.onClick}
-                  data-testid={`notification-action-${notification.id}`}
-                >
-                  {notification.action.label}
-                </button>
-              )}
+            <div className="flex items-start gap-2 px-3 py-2">
+              <Icon
+                size={16}
+                className={`mt-0.5 shrink-0 ${SEVERITY_TEXT[notification.severity]}`}
+              />
+              <div className="flex-1">
+                <p className="text-body text-[var(--color-text-primary)]">
+                  {notification.message}
+                </p>
+                {notification.action && (
+                  <button
+                    className="mt-1 text-caption font-medium text-[var(--color-primary)] hover:underline"
+                    onClick={notification.action.onClick}
+                    data-testid={`notification-action-${notification.id}`}
+                  >
+                    {notification.action.label}
+                  </button>
+                )}
+              </div>
+              <button
+                onClick={() => dismiss(notification.id)}
+                className="mt-0.5 shrink-0 rounded-sm p-0.5 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
+                aria-label="Dismiss notification"
+                data-testid={`notification-dismiss-${notification.id}`}
+              >
+                <X size={14} />
+              </button>
             </div>
-            <button
-              onClick={() => dismiss(notification.id)}
-              className="shrink-0 rounded-sm p-0.5 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
-              aria-label="Dismiss notification"
-              data-testid={`notification-dismiss-${notification.id}`}
-            >
-              <X size={14} />
-            </button>
+            {/* Progress bar */}
+            <div
+              className="absolute bottom-0 left-0 h-[2px]"
+              style={{
+                backgroundColor: SEVERITY_BAR_COLOR[notification.severity],
+                width: "100%",
+                animation: `notification-shrink ${autoDismissMs}ms linear forwards`,
+              }}
+              data-testid={`notification-progress-${notification.id}`}
+            />
           </div>
         );
       })}

@@ -8,6 +8,8 @@ import {
   Home,
   Sun,
   Moon,
+  GitCompareArrows,
+  FolderSearch,
   type LucideIcon,
 } from "lucide-react";
 import { useNavigation } from "@/contexts/NavigationContext";
@@ -20,6 +22,8 @@ const ICON_MAP: Record<string, LucideIcon> = {
   computer: Monitor,
   key: KeyRound,
   settings: Settings,
+  compare: GitCompareArrows,
+  "folder-search": FolderSearch,
 };
 
 const MODULES: SidebarModule[] = [
@@ -31,10 +35,24 @@ const MODULES: SidebarModule[] = [
     requiredLevel: "ReadOnly",
   },
   {
+    id: "user-comparison",
+    label: "User Comparison",
+    icon: "compare",
+    group: "Directory",
+    requiredLevel: "ReadOnly",
+  },
+  {
     id: "computers",
     label: "Computer Lookup",
     icon: "computer",
     group: "Directory",
+    requiredLevel: "ReadOnly",
+  },
+  {
+    id: "ntfs-analyzer",
+    label: "NTFS Analyzer",
+    icon: "folder-search",
+    group: "Tools",
     requiredLevel: "ReadOnly",
   },
   {

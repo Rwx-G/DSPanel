@@ -109,6 +109,14 @@ pub fn run() {
             commands::mfa_get_config,
             commands::mfa_set_config,
             commands::mfa_requires,
+            commands::compare_users,
+            commands::save_file_dialog,
+            commands::add_user_to_group,
+            commands::get_replication_metadata,
+            commands::compute_attribute_diff,
+            commands::analyze_ntfs,
+            commands::audit_ntfs_permissions,
+            commands::cross_reference_ntfs,
         ])
         .run(tauri::generate_context!())
         .unwrap_or_else(|e| {
