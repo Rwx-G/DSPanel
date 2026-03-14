@@ -12,9 +12,14 @@ const mockInvoke = vi.mocked(invoke);
 describe("PasswordGenerator", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default: generate_password returns a password
+    mockInvoke.mockImplementation(((cmd: string) => {
+      if (cmd === "generate_password") return Promise.resolve("DefaultPass123!");
+      return Promise.resolve(undefined);
+    }) as typeof invoke);
   });
 
-  it("renders page with controls", () => {
+  it("renders page with controls", async () => {
     render(<PasswordGenerator />);
     expect(screen.getByTestId("password-generator-page")).toBeInTheDocument();
     expect(screen.getByText("Password Generator")).toBeInTheDocument();
@@ -22,16 +27,64 @@ describe("PasswordGenerator", () => {
     expect(screen.getByTestId("generate-btn")).toBeInTheDocument();
   });
 
+  it("generates password automatically on mount", async () => {
+    render(<PasswordGenerator />);
+
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith(
+        "generate_password",
+        expect.objectContaining({ length: 16 }),
+      );
+    });
+
+    expect(screen.getByTestId("password-result")).toBeInTheDocument();
+    expect(screen.getByText("DefaultPass123!")).toBeInTheDocument();
+  });
+
+  it("password display is always visible (no layout shift)", () => {
+    render(<PasswordGenerator />);
+    expect(screen.getByTestId("password-result")).toBeInTheDocument();
+  });
+
   it("shows default length of 16", () => {
     render(<PasswordGenerator />);
     expect(screen.getByTestId("length-value")).toHaveTextContent("16");
   });
 
-  it("updates length when slider changes", () => {
+  it("regenerates when length changes", async () => {
     render(<PasswordGenerator />);
-    const slider = screen.getByTestId("length-slider");
-    fireEvent.change(slider, { target: { value: "24" } });
-    expect(screen.getByTestId("length-value")).toHaveTextContent("24");
+
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledTimes(1);
+    });
+
+    fireEvent.change(screen.getByTestId("length-slider"), {
+      target: { value: "24" },
+    });
+
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith(
+        "generate_password",
+        expect.objectContaining({ length: 24 }),
+      );
+    });
+  });
+
+  it("regenerates when checkbox changes", async () => {
+    render(<PasswordGenerator />);
+
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledTimes(1);
+    });
+
+    fireEvent.click(screen.getByTestId("opt-ambiguous"));
+
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith(
+        "generate_password",
+        expect.objectContaining({ excludeAmbiguous: true }),
+      );
+    });
   });
 
   it("has all category checkboxes checked by default", () => {
@@ -43,56 +96,39 @@ describe("PasswordGenerator", () => {
     expect(screen.getByTestId("opt-ambiguous")).not.toBeChecked();
   });
 
-  it("calls generate_password on button click", async () => {
-    mockInvoke.mockResolvedValueOnce("Abc123!@XyZ" as never);
+  it("regenerate button generates a new password", async () => {
+    let callCount = 0;
+    mockInvoke.mockImplementation(((cmd: string) => {
+      if (cmd === "generate_password") {
+        callCount++;
+        return Promise.resolve(callCount === 1 ? "First!" : "Second!");
+      }
+      return Promise.resolve(undefined);
+    }) as typeof invoke);
 
     render(<PasswordGenerator />);
+
+    await waitFor(() => {
+      expect(screen.getByText("First!")).toBeInTheDocument();
+    });
+
     fireEvent.click(screen.getByTestId("generate-btn"));
 
     await waitFor(() => {
-      expect(mockInvoke).toHaveBeenCalledWith(
-        "generate_password",
-        expect.objectContaining({
-          length: 16,
-          includeUppercase: true,
-          includeLowercase: true,
-          includeDigits: true,
-          includeSpecial: true,
-          excludeAmbiguous: false,
-        }),
-      );
+      expect(screen.getByText("Second!")).toBeInTheDocument();
     });
   });
 
-  it("displays generated password", async () => {
-    mockInvoke.mockResolvedValueOnce("SecurePass123!" as never);
-
+  it("shows copy button alongside password", async () => {
     render(<PasswordGenerator />);
-    fireEvent.click(screen.getByTestId("generate-btn"));
-
-    await waitFor(() => {
-      expect(screen.getByTestId("password-result")).toBeInTheDocument();
-    });
-
-    expect(screen.getByText("SecurePass123!")).toBeInTheDocument();
-  });
-
-  it("shows copy button after generation", async () => {
-    mockInvoke.mockResolvedValueOnce("Pass123!" as never);
-
-    render(<PasswordGenerator />);
-    fireEvent.click(screen.getByTestId("generate-btn"));
 
     await waitFor(() => {
       expect(screen.getByTestId("copy-button")).toBeInTheDocument();
     });
   });
 
-  it("shows check HIBP button after generation", async () => {
-    mockInvoke.mockResolvedValueOnce("Pass123!" as never);
-
+  it("shows check HIBP button", async () => {
     render(<PasswordGenerator />);
-    fireEvent.click(screen.getByTestId("generate-btn"));
 
     await waitFor(() => {
       expect(screen.getByTestId("check-hibp-btn")).toBeInTheDocument();
@@ -108,7 +144,6 @@ describe("PasswordGenerator", () => {
     }) as typeof invoke);
 
     render(<PasswordGenerator />);
-    fireEvent.click(screen.getByTestId("generate-btn"));
 
     await waitFor(() => {
       expect(screen.getByTestId("check-hibp-btn")).toBeInTheDocument();
@@ -130,7 +165,6 @@ describe("PasswordGenerator", () => {
     }) as typeof invoke);
 
     render(<PasswordGenerator />);
-    fireEvent.click(screen.getByTestId("generate-btn"));
 
     await waitFor(() => {
       expect(screen.getByTestId("check-hibp-btn")).toBeInTheDocument();
@@ -154,7 +188,6 @@ describe("PasswordGenerator", () => {
     }) as typeof invoke);
 
     render(<PasswordGenerator />);
-    fireEvent.click(screen.getByTestId("generate-btn"));
 
     await waitFor(() => {
       expect(screen.getByTestId("check-hibp-btn")).toBeInTheDocument();
@@ -168,10 +201,9 @@ describe("PasswordGenerator", () => {
   });
 
   it("shows error message on generation failure", async () => {
-    mockInvoke.mockRejectedValueOnce("No categories selected" as never);
+    mockInvoke.mockRejectedValue("No categories selected");
 
     render(<PasswordGenerator />);
-    fireEvent.click(screen.getByTestId("generate-btn"));
 
     await waitFor(() => {
       expect(screen.getByTestId("error-message")).toBeInTheDocument();
@@ -180,20 +212,15 @@ describe("PasswordGenerator", () => {
     expect(screen.getByTestId("error-message")).toHaveTextContent("No categories selected");
   });
 
-  it("passes exclude ambiguous option correctly", async () => {
-    mockInvoke.mockResolvedValueOnce("Pass123" as never);
-
+  it("displays best practices section", () => {
     render(<PasswordGenerator />);
-    fireEvent.click(screen.getByTestId("opt-ambiguous"));
-    fireEvent.click(screen.getByTestId("generate-btn"));
+    expect(screen.getByText("Password Best Practices")).toBeInTheDocument();
+    expect(screen.getByText(/16 characters/)).toBeInTheDocument();
+  });
 
-    await waitFor(() => {
-      expect(mockInvoke).toHaveBeenCalledWith(
-        "generate_password",
-        expect.objectContaining({
-          excludeAmbiguous: true,
-        }),
-      );
-    });
+  it("page is scrollable", () => {
+    render(<PasswordGenerator />);
+    const page = screen.getByTestId("password-generator-page");
+    expect(page.className).toContain("overflow-y-auto");
   });
 });

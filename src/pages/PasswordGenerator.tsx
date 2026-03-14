@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { CopyButton } from "@/components/common/CopyButton";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
@@ -25,14 +25,12 @@ export function PasswordGenerator() {
   const [includeSpecial, setIncludeSpecial] = useState(true);
   const [excludeAmbiguous, setExcludeAmbiguous] = useState(false);
 
-  const [password, setPassword] = useState<string | null>(null);
+  const [password, setPassword] = useState("");
   const [hibpResult, setHibpResult] = useState<HibpResult | null>(null);
-  const [loading, setLoading] = useState(false);
   const [checkingHibp, setCheckingHibp] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleGenerate = useCallback(async () => {
-    setLoading(true);
+  const generate = useCallback(async () => {
     setError(null);
     setHibpResult(null);
     try {
@@ -47,8 +45,6 @@ export function PasswordGenerator() {
       setPassword(result);
     } catch (e) {
       setError(typeof e === "string" ? e : "Failed to generate password");
-    } finally {
-      setLoading(false);
     }
   }, [
     length,
@@ -58,6 +54,11 @@ export function PasswordGenerator() {
     includeSpecial,
     excludeAmbiguous,
   ]);
+
+  // Generate on mount and whenever options change
+  useEffect(() => {
+    generate();
+  }, [generate]);
 
   const handleCheckHibp = useCallback(async () => {
     if (!password) return;
@@ -78,12 +79,13 @@ export function PasswordGenerator() {
 
   return (
     <div
-      className="flex h-full items-center justify-center p-6"
+      className="h-full overflow-y-auto"
       data-testid="password-generator-page"
     >
-      <div className="w-full max-w-xl space-y-5">
+      <div className="mx-auto w-full max-w-xl px-6 py-8 space-y-5">
+        {/* Header */}
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--color-primary-subtle)]">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--color-primary-subtle)]">
             <KeyRound size={20} className="text-[var(--color-primary)]" />
           </div>
           <div>
@@ -96,7 +98,62 @@ export function PasswordGenerator() {
           </div>
         </div>
 
-        {/* Generator card */}
+        {/* Password display - always visible */}
+        <div
+          className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-4 space-y-3"
+          data-testid="password-result"
+        >
+          <div className="flex items-center gap-2 rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-bg)] px-4 py-3 min-h-[52px]">
+            {password ? (
+              <code className="flex-1 text-lg font-mono text-[var(--color-text-primary)] select-all break-all tracking-wide">
+                {password}
+              </code>
+            ) : (
+              <span className="flex-1 text-body text-[var(--color-text-disabled)] italic">
+                Generating...
+              </span>
+            )}
+            {password && <CopyButton text={password} />}
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={generate}
+              data-testid="generate-btn"
+            >
+              <RefreshCw size={14} />
+              Regenerate
+            </button>
+            <button
+              className="btn btn-outline btn-sm"
+              onClick={handleCheckHibp}
+              disabled={checkingHibp || !password}
+              data-testid="check-hibp-btn"
+            >
+              {checkingHibp ? (
+                <LoadingSpinner size={14} />
+              ) : (
+                <>
+                  <ShieldCheck size={14} />
+                  Check Breach Database
+                </>
+              )}
+            </button>
+            {hibpResult && <HibpStatusBadge result={hibpResult} />}
+          </div>
+
+          {error && (
+            <p
+              className="text-caption text-[var(--color-error)]"
+              data-testid="error-message"
+            >
+              {error}
+            </p>
+          )}
+        </div>
+
+        {/* Options card */}
         <div className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-5 space-y-4">
           {/* Length slider */}
           <div className="space-y-2">
@@ -169,67 +226,7 @@ export function PasswordGenerator() {
               testId="opt-ambiguous"
             />
           </div>
-
-          {/* Generate button */}
-          <button
-            className="btn btn-primary w-full"
-            onClick={handleGenerate}
-            disabled={loading}
-            data-testid="generate-btn"
-          >
-            {loading ? (
-              <LoadingSpinner size={16} />
-            ) : (
-              <>
-                <RefreshCw size={16} />
-                Generate Password
-              </>
-            )}
-          </button>
         </div>
-
-        {error && (
-          <p
-            className="text-caption text-[var(--color-error)]"
-            data-testid="error-message"
-          >
-            {error}
-          </p>
-        )}
-
-        {/* Result card */}
-        {password && (
-          <div
-            className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-5 space-y-3"
-            data-testid="password-result"
-          >
-            <div className="flex items-center gap-2 rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-bg)] px-4 py-3">
-              <code className="flex-1 text-lg font-mono text-[var(--color-text-primary)] select-all break-all tracking-wide">
-                {password}
-              </code>
-              <CopyButton text={password} />
-            </div>
-
-            <div className="flex items-center gap-3">
-              <button
-                className="btn btn-outline btn-sm"
-                onClick={handleCheckHibp}
-                disabled={checkingHibp}
-                data-testid="check-hibp-btn"
-              >
-                {checkingHibp ? (
-                  <LoadingSpinner size={14} />
-                ) : (
-                  <>
-                    <ShieldCheck size={14} />
-                    Check Breach Database
-                  </>
-                )}
-              </button>
-              {hibpResult && <HibpStatusBadge result={hibpResult} />}
-            </div>
-          </div>
-        )}
 
         {/* Best practices card */}
         <div className="rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-surface-bg)] p-4 space-y-2">
