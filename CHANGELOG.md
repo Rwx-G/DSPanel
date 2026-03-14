@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Password reset with manual/auto-generate modes via PasswordResetDialog (2.1)
+- Secure password generator with configurable criteria and HIBP k-anonymity breach checking (2.2)
+- Standalone Password Generator page accessible to all permission levels (2.2)
+- Account unlock, enable, and disable actions with confirmation dialogs (2.3)
+- Password flag management (Password Never Expires) with dry-run preview (2.4)
+- MFA gate service with RFC 6238 TOTP, backup codes, and per-action configuration (2.5)
+- MFA verification dialog for sensitive operations (2.5)
+- Audit service logging all sensitive operations (success and failure)
+- UserActions component integrating password reset, unlock, enable/disable buttons
+- PasswordFlagsEditor component with dirty tracking and AccountOperator gating
+- New Tauri commands: reset_password, unlock_account, enable_account, disable_account, set_password_flags, generate_password, check_password_hibp, get_audit_entries, mfa_setup, mfa_verify, mfa_is_configured, mfa_revoke, mfa_get_config, mfa_set_config, mfa_requires
+- DirectoryProvider trait extended with write operations (reset_password, unlock_account, enable_account, disable_account, set_password_flags)
+- ResilientDirectoryProvider wraps all new write operations with retry and circuit breaker
+- 101 new tests (47 Rust + 55 frontend) covering Epic 2 features
+
 ## [0.1.0] - 2026-03-13
 
 Epic 1 - Foundation and Core Lookup. Full rewrite from C#/WPF to Rust/Tauri v2 + React/TypeScript.
