@@ -5,6 +5,7 @@ Cargo.lock
 # Node
 node_modules/
 dist/
+.vite/
 package-lock.json
 
 # OS files
