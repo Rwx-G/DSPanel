@@ -87,6 +87,9 @@ pub trait DirectoryProvider: Send + Sync {
         user_cannot_change_password: bool,
     ) -> Result<()>;
 
+    /// Adds a user to a group by modifying the group's `member` attribute.
+    async fn add_user_to_group(&self, user_dn: &str, group_dn: &str) -> Result<()>;
+
     /// Returns the raw `msDS-ReplAttributeMetaData` value for an object.
     ///
     /// This is an operational attribute that must be explicitly requested.
@@ -353,6 +356,11 @@ pub mod tests {
                 password_never_expires,
                 user_cannot_change_password,
             ));
+            Ok(())
+        }
+
+        async fn add_user_to_group(&self, _user_dn: &str, _group_dn: &str) -> Result<()> {
+            self.check_failure()?;
             Ok(())
         }
 

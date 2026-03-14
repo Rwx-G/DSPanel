@@ -637,6 +637,32 @@ impl DirectoryProvider for LdapDirectoryProvider {
         }
     }
 
+    async fn add_user_to_group(&self, user_dn: &str, group_dn: &str) -> Result<()> {
+        use ldap3::Mod;
+        use std::collections::HashSet;
+
+        let mut ldap = self.connect().await?;
+        ldap.modify(
+            group_dn,
+            vec![Mod::Add(
+                "member".to_string(),
+                HashSet::from([user_dn.to_string()]),
+            )],
+        )
+        .await
+        .context("Failed to add user to group")?
+        .success()
+        .context("Add user to group LDAP operation returned error")?;
+
+        let _ = ldap.unbind().await;
+        tracing::info!(
+            user_dn = %user_dn,
+            group_dn = %group_dn,
+            "User added to group"
+        );
+        Ok(())
+    }
+
     async fn get_replication_metadata(&self, object_dn: &str) -> Result<Option<String>> {
         let _base_dn = self.base_dn().context("Not connected - no base DN")?;
         let mut ldap = self.connect().await?;

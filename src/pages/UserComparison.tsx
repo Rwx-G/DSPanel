@@ -1,13 +1,15 @@
 import { useState, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Search, GitCompareArrows, RotateCcw } from "lucide-react";
+import { Search, GitCompareArrows, RotateCcw, Users, UserPlus } from "lucide-react";
 import { useComparison } from "@/hooks/useComparison";
 import { useDebounce } from "@/hooks/useDebounce";
 import { type DirectoryEntry } from "@/types/directory";
-import { type GroupCategory } from "@/types/comparison";
+import { type GroupCategory, type GroupDisplayItem } from "@/types/comparison";
 import { parseCnFromDn } from "@/utils/dn";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
-import { UncPermissionsAudit } from "@/components/comparison/UncPermissionsAudit";
+import { ContextMenu, type ContextMenuItem } from "@/components/common/ContextMenu";
+import { GroupMembersDialog } from "@/components/dialogs/GroupMembersDialog";
+import { useNotifications } from "@/contexts/NotificationContext";
 
 const CATEGORY_STYLES: Record<GroupCategory, { bg: string; text: string; label: string }> = {
   shared: {
@@ -118,7 +120,7 @@ function UserSearchField({
             {results.map((entry) => (
               <button
                 key={entry.distinguishedName}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-body hover:bg-[var(--color-surface-hover)] transition-colors"
+                className="flex w-full items-baseline gap-2 px-3 py-2 text-left text-body hover:bg-[var(--color-surface-hover)] transition-colors"
                 onMouseDown={(e) => {
                   e.preventDefault();
                   if (entry.samAccountName) {
@@ -182,6 +184,67 @@ export function UserComparison() {
     reset,
   } = useComparison();
 
+  const { notify } = useNotifications();
+
+  const [contextMenuPos, setContextMenuPos] = useState<{ x: number; y: number } | null>(null);
+  const [contextMenuItems, setContextMenuItems] = useState<ContextMenuItem[]>([]);
+  const [groupMembersDialog, setGroupMembersDialog] = useState<{ dn: string; name: string } | null>(null);
+
+  const handleGroupContextMenu = useCallback(
+    (e: React.MouseEvent, group: GroupDisplayItem) => {
+      e.preventDefault();
+      const items: ContextMenuItem[] = [
+        {
+          label: "View group members",
+          icon: <Users size={14} />,
+          onClick: () => setGroupMembersDialog({ dn: group.dn, name: group.name }),
+        },
+      ];
+
+      if (group.category === "onlyB" && userA) {
+        items.push({
+          label: `Add ${userA.displayName ?? userA.samAccountName} to this group`,
+          icon: <UserPlus size={14} />,
+          onClick: async () => {
+            try {
+              await invoke("add_user_to_group", {
+                userDn: userA.distinguishedName,
+                groupDn: group.dn,
+              });
+              notify("success", `Added to ${group.name}`);
+              compare();
+            } catch (err) {
+              notify("error", `Failed: ${err}`);
+            }
+          },
+        });
+      }
+
+      if (group.category === "onlyA" && userB) {
+        items.push({
+          label: `Add ${userB.displayName ?? userB.samAccountName} to this group`,
+          icon: <UserPlus size={14} />,
+          onClick: async () => {
+            try {
+              await invoke("add_user_to_group", {
+                userDn: userB.distinguishedName,
+                groupDn: group.dn,
+              });
+              notify("success", `Added to ${group.name}`);
+              compare();
+            } catch (err) {
+              notify("error", `Failed: ${err}`);
+            }
+          },
+        });
+      }
+
+      setContextMenuItems(items);
+      setContextMenuPos({ x: e.clientX, y: e.clientY });
+    },
+    [userA, userB, compare, notify],
+  );
+
   const canCompare = userA !== null && userB !== null && !isComparing;
 
   return (
@@ -241,16 +304,6 @@ export function UserComparison() {
           data-testid="comparison-error"
         >
           {error}
-        </div>
-      )}
-
-      {/* UNC Permissions Audit */}
-      {userA && userB && (
-        <div className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-4">
-          <h2 className="mb-3 text-body font-semibold text-[var(--color-text-primary)]">
-            UNC Path Permissions Audit
-          </h2>
-          <UncPermissionsAudit userA={userA} userB={userB} />
         </div>
       )}
 
@@ -334,9 +387,10 @@ export function UserComparison() {
                   return (
                     <div
                       key={`${group.dn}-${group.category}-${idx}`}
-                      className={`flex items-center gap-3 border-b border-[var(--color-border-subtle)] px-4 py-2 last:border-b-0 ${style.bg}`}
+                      className={`flex cursor-context-menu items-center gap-3 border-b border-[var(--color-border-subtle)] px-4 py-2 last:border-b-0 ${style.bg}`}
                       data-testid={`group-item-${idx}`}
                       data-category={group.category}
+                      onContextMenu={(e) => handleGroupContextMenu(e, group)}
                     >
                       <span
                         className={`inline-flex min-w-[60px] items-center justify-center rounded-full px-2 py-0.5 text-[11px] font-medium ${style.text} ${style.bg}`}
@@ -356,6 +410,20 @@ export function UserComparison() {
             )}
           </div>
         </div>
+      )}
+
+      <ContextMenu
+        items={contextMenuItems}
+        position={contextMenuPos}
+        onClose={() => setContextMenuPos(null)}
+      />
+
+      {groupMembersDialog && (
+        <GroupMembersDialog
+          groupDn={groupMembersDialog.dn}
+          groupName={groupMembersDialog.name}
+          onClose={() => setGroupMembersDialog(null)}
+        />
       )}
     </div>
   );

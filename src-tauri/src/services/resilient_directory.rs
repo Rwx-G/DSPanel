@@ -277,6 +277,20 @@ where
         .map_err(|e| anyhow::anyhow!(e))
     }
 
+    async fn add_user_to_group(&self, user_dn: &str, group_dn: &str) -> Result<()> {
+        let u = user_dn.to_string();
+        let g = group_dn.to_string();
+        let inner_ref = self.inner.clone();
+        self.execute_with_resilience(|| {
+            let inner = inner_ref.clone();
+            let u = u.clone();
+            let g = g.clone();
+            async move { inner.add_user_to_group(&u, &g).await }
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!(e))
+    }
+
     async fn get_replication_metadata(&self, object_dn: &str) -> Result<Option<String>> {
         let dn = object_dn.to_string();
         let inner_ref = self.inner.clone();

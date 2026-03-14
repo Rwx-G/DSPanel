@@ -684,6 +684,11 @@ impl DirectoryProvider for DemoDirectoryProvider {
         Ok(())
     }
 
+    async fn add_user_to_group(&self, user_dn: &str, group_dn: &str) -> Result<()> {
+        tracing::info!(user_dn = %user_dn, group_dn = %group_dn, "DEMO: add user to group simulated");
+        Ok(())
+    }
+
     async fn get_replication_metadata(&self, _object_dn: &str) -> Result<Option<String>> {
         Ok(None)
     }

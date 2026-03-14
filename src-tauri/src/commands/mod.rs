@@ -471,6 +471,44 @@ pub(crate) fn cross_reference_ntfs_inner(
     crate::services::ntfs::cross_reference_aces(aces, user_a_sids, user_b_sids)
 }
 
+/// Adds a user to a group. Requires HelpDesk permission.
+pub(crate) async fn add_user_to_group_inner(
+    state: &AppState,
+    user_dn: &str,
+    group_dn: &str,
+) -> Result<(), AppError> {
+    if !state
+        .permission_service
+        .has_permission(PermissionLevel::HelpDesk)
+    {
+        return Err(AppError::PermissionDenied(
+            "Requires HelpDesk permission or higher".to_string(),
+        ));
+    }
+
+    state.snapshot_service.capture(user_dn, "AddToGroup");
+
+    let provider = state.directory_provider.clone();
+    match provider.add_user_to_group(user_dn, group_dn).await {
+        Ok(()) => {
+            state.audit_service.log_success(
+                "AddedToGroup",
+                user_dn,
+                &format!("Added to group {}", group_dn),
+            );
+            Ok(())
+        }
+        Err(e) => {
+            state.audit_service.log_failure(
+                "AddToGroupFailed",
+                user_dn,
+                &format!("Failed to add to group {}: {}", group_dn, e),
+            );
+            Err(AppError::Directory(e.to_string()))
+        }
+    }
+}
+
 /// Retrieves and parses replication metadata for an AD object.
 pub(crate) async fn get_replication_metadata_inner(
     state: &AppState,
@@ -759,6 +797,16 @@ pub async fn set_password_flags(
 #[tauri::command]
 pub fn get_audit_entries(state: State<'_, AppState>) -> Vec<AuditEntry> {
     get_audit_entries_inner(&state)
+}
+
+/// Adds a user to a group.
+#[tauri::command]
+pub async fn add_user_to_group(
+    user_dn: String,
+    group_dn: String,
+    state: State<'_, AppState>,
+) -> Result<(), AppError> {
+    add_user_to_group_inner(&state, &user_dn, &group_dn).await
 }
 
 /// Retrieves replication metadata for an AD object.

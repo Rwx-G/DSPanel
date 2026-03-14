@@ -110,6 +110,7 @@ pub fn run() {
             commands::mfa_set_config,
             commands::mfa_requires,
             commands::compare_users,
+            commands::add_user_to_group,
             commands::get_replication_metadata,
             commands::compute_attribute_diff,
             commands::analyze_ntfs,
