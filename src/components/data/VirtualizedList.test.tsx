@@ -174,6 +174,38 @@ describe("VirtualizedList", () => {
     expect(container).toHaveStyle({ height: "4000px" });
   });
 
+  it("should call onEndReached when last item is visible", () => {
+    const items = makeItems(5);
+    const onEndReached = vi.fn();
+    render(
+      <VirtualizedList
+        items={items}
+        renderItem={(item) => <div>{item.label}</div>}
+        estimateSize={40}
+        itemKey={(item) => item.id}
+        onEndReached={onEndReached}
+      />,
+    );
+    // Mock shows all 5 items (< 20 limit), so last item is visible
+    expect(onEndReached).toHaveBeenCalled();
+  });
+
+  it("should show loading more indicator", () => {
+    const items = makeItems(3);
+    render(
+      <VirtualizedList
+        items={items}
+        renderItem={(item) => <div>{item.label}</div>}
+        estimateSize={40}
+        itemKey={(item) => item.id}
+        loadingMore={true}
+      />,
+    );
+    expect(
+      screen.getByTestId("virtualized-list-loading-more"),
+    ).toBeInTheDocument();
+  });
+
   it("should pass index to renderItem", () => {
     const items = makeItems(3);
     const renderItem = vi.fn((item: TestItem, index: number) => (

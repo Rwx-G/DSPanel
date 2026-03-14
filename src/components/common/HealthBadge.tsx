@@ -1,4 +1,5 @@
-import { useState, useId } from "react";
+import { useState, useId, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { CheckCircle, AlertTriangle, AlertCircle, Info } from "lucide-react";
 import type { AccountHealthStatus, HealthLevel } from "@/types/health";
 
@@ -23,11 +24,41 @@ interface HealthBadgeProps {
 export function HealthBadge({ healthStatus }: HealthBadgeProps) {
   const [showTooltip, setShowTooltip] = useState(false);
   const tooltipId = useId();
+  const badgeRef = useRef<HTMLDivElement>(null);
+  const [tooltipPos, setTooltipPos] = useState<{
+    top: number;
+    left: number;
+  } | null>(null);
   const Icon = LEVEL_ICON[healthStatus.level];
   const flagCount = healthStatus.activeFlags.length;
 
+  // Compute tooltip position relative to viewport when shown
+  useEffect(() => {
+    if (!showTooltip || !badgeRef.current) {
+      setTooltipPos(null);
+      return;
+    }
+    const rect = badgeRef.current.getBoundingClientRect();
+    const tooltipWidth = 256; // w-64 = 16rem = 256px
+    let left = rect.left + rect.width / 2 - tooltipWidth / 2;
+    let top = rect.bottom + 4;
+
+    // Keep within viewport
+    if (left < 4) left = 4;
+    if (left + tooltipWidth > window.innerWidth - 4) {
+      left = window.innerWidth - tooltipWidth - 4;
+    }
+    // If it would go below viewport, show above
+    if (top + 100 > window.innerHeight) {
+      top = rect.top - 4;
+    }
+
+    setTooltipPos({ top, left });
+  }, [showTooltip]);
+
   return (
     <div
+      ref={badgeRef}
       className="relative inline-flex"
       onMouseEnter={() => setShowTooltip(true)}
       onMouseLeave={() => setShowTooltip(false)}
@@ -49,46 +80,50 @@ export function HealthBadge({ healthStatus }: HealthBadgeProps) {
           : `${flagCount} issue${flagCount > 1 ? "s" : ""}`}
       </span>
 
-      {showTooltip && (
-        <div
-          id={tooltipId}
-          role="tooltip"
-          className="absolute left-1/2 top-full z-50 mt-1 w-64 -translate-x-1/2 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-2 shadow-lg"
-          data-testid="health-tooltip"
-        >
-          {flagCount === 0 ? (
-            <p className="text-caption text-[var(--color-text-secondary)]">
-              No issues detected
-            </p>
-          ) : (
-            <ul className="space-y-1">
-              {healthStatus.activeFlags.map((flag) => {
-                const FlagIcon = LEVEL_ICON[flag.severity];
-                return (
-                  <li
-                    key={flag.name}
-                    className="flex items-start gap-1.5"
-                    data-testid={`health-flag-${flag.name}`}
-                  >
-                    <FlagIcon
-                      size={12}
-                      className={`mt-0.5 shrink-0 ${LEVEL_STYLES[flag.severity].split(" ")[1]}`}
-                    />
-                    <div>
-                      <span className="text-caption font-medium text-[var(--color-text-primary)]">
-                        {flag.name}
-                      </span>
-                      <p className="text-[10px] text-[var(--color-text-secondary)]">
-                        {flag.description}
-                      </p>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
-      )}
+      {showTooltip &&
+        tooltipPos &&
+        createPortal(
+          <div
+            id={tooltipId}
+            role="tooltip"
+            className="fixed z-50 w-64 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-2 shadow-lg"
+            style={{ top: tooltipPos.top, left: tooltipPos.left }}
+            data-testid="health-tooltip"
+          >
+            {flagCount === 0 ? (
+              <p className="text-caption text-[var(--color-text-secondary)]">
+                No issues detected
+              </p>
+            ) : (
+              <ul className="space-y-1">
+                {healthStatus.activeFlags.map((flag) => {
+                  const FlagIcon = LEVEL_ICON[flag.severity];
+                  return (
+                    <li
+                      key={flag.name}
+                      className="flex items-start gap-1.5"
+                      data-testid={`health-flag-${flag.name}`}
+                    >
+                      <FlagIcon
+                        size={12}
+                        className={`mt-0.5 shrink-0 ${LEVEL_STYLES[flag.severity].split(" ")[1]}`}
+                      />
+                      <div>
+                        <span className="text-caption font-medium text-[var(--color-text-primary)]">
+                          {flag.name}
+                        </span>
+                        <p className="text-[10px] text-[var(--color-text-secondary)]">
+                          {flag.description}
+                        </p>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

@@ -85,7 +85,9 @@ describe("App", () => {
 
     render(<App />);
 
-    expect(screen.getByTestId("status-version")).toHaveTextContent(`v${__APP_VERSION__}`);
+    expect(screen.getByTestId("status-version")).toHaveTextContent(
+      `v${__APP_VERSION__}`,
+    );
   });
 
   it("should display username on dashboard", async () => {
@@ -107,7 +109,9 @@ describe("App", () => {
     render(<App />);
 
     await waitFor(() => {
-      expect(screen.getAllByText("CORP.LOCAL").length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText("CORP.LOCAL").length).toBeGreaterThanOrEqual(
+        1,
+      );
     });
   });
 

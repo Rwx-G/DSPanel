@@ -7,10 +7,12 @@ import {
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import { NotificationHost } from "@/components/common/NotificationHost";
 import { ErrorBoundary } from "@/components/common/ErrorBoundary";
+import { DialogProvider } from "@/contexts/DialogContext";
 import { AppShell } from "@/components/layout/AppShell";
 import { UserLookup } from "@/pages/UserLookup";
 import { ComputerLookup } from "@/pages/ComputerLookup";
 import { HomePage } from "@/pages/HomePage";
+import { PasswordGenerator } from "@/pages/PasswordGenerator";
 
 const APP_VERSION = __APP_VERSION__;
 
@@ -95,19 +97,21 @@ export function App() {
   return (
     <ErrorBoundary>
       <NotificationProvider>
-        <NavigationProvider>
-          <AppShell
-            statusBarProps={{
-              domainName: status.domainName,
-              domainController: null,
-              permissionLevel: status.permissionLevel,
-              isConnected: status.isConnected,
-              appVersion: APP_VERSION,
-            }}
-          >
-            <ModuleRouter status={status} />
-          </AppShell>
-        </NavigationProvider>
+        <DialogProvider>
+          <NavigationProvider>
+            <AppShell
+              statusBarProps={{
+                domainName: status.domainName,
+                domainController: null,
+                permissionLevel: status.permissionLevel,
+                isConnected: status.isConnected,
+                appVersion: APP_VERSION,
+              }}
+            >
+              <ModuleRouter status={status} />
+            </AppShell>
+          </NavigationProvider>
+        </DialogProvider>
         <NotificationHost />
       </NotificationProvider>
     </ErrorBoundary>
@@ -124,6 +128,8 @@ function ModuleRouter({ status }: { status: AppStatus }) {
       return <UserLookup />;
     case "computers":
       return <ComputerLookup />;
+    case "password-generator":
+      return <PasswordGenerator />;
     default:
       return <HomePage status={status} />;
   }

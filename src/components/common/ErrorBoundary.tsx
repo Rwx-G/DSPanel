@@ -58,7 +58,7 @@ export class ErrorBoundary extends Component<
             investigation.
           </p>
           <button
-            className="btn-primary"
+            className="btn btn-primary"
             onClick={this.handleRetry}
             data-testid="error-boundary-retry"
           >

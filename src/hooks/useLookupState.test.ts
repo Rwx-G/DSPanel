@@ -178,10 +178,7 @@ describe("useLookupState", () => {
   });
 
   it("allows manual item selection", async () => {
-    mockInvoke.mockResolvedValue([
-      makeMockEntry("a"),
-      makeMockEntry("b"),
-    ]);
+    mockInvoke.mockResolvedValue([makeMockEntry("a"), makeMockEntry("b")]);
 
     const { result } = renderHook(() =>
       useLookupState({ command: "search_users", mapEntry }),

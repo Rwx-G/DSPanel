@@ -7,7 +7,9 @@ pub mod state;
 
 use std::sync::Arc;
 
-use services::{LdapDirectoryProvider, PermissionConfig};
+#[cfg(not(feature = "demo"))]
+use services::LdapDirectoryProvider;
+use services::PermissionConfig;
 use state::AppState;
 
 /// Installs a custom panic hook that logs panics via tracing before
@@ -46,13 +48,30 @@ pub fn run() {
 
     tracing::info!("DSPanel starting up");
 
-    let provider = Arc::new(LdapDirectoryProvider::new());
+    #[cfg(feature = "demo")]
+    let provider: Arc<dyn services::DirectoryProvider> = {
+        tracing::warn!("DEMO MODE ACTIVE - using mock directory data");
+        Arc::new(services::demo_provider::DemoDirectoryProvider::new())
+    };
+    #[cfg(not(feature = "demo"))]
+    let provider: Arc<dyn services::DirectoryProvider> = Arc::new(LdapDirectoryProvider::new());
+
     let app_state = AppState::new(provider, PermissionConfig::default());
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .manage(app_state)
-        .setup(|_app| {
+        .setup(|app| {
+            // Detect permissions from AD groups on startup
+            use tauri::Manager;
+            let state = app.state::<AppState>();
+            let provider = state.directory_provider.clone();
+            let permission_svc = &state.permission_service;
+            tauri::async_runtime::block_on(async {
+                if let Err(e) = permission_svc.detect_permissions(&*provider).await {
+                    tracing::warn!("Permission detection failed: {}", e);
+                }
+            });
             tracing::info!("DSPanel setup complete");
             Ok(())
         })
@@ -65,12 +84,31 @@ pub fn run() {
             commands::get_domain_info,
             commands::search_users,
             commands::get_user,
+            commands::browse_users,
+            commands::browse_computers,
+            commands::get_group_members,
             commands::search_computers,
             commands::ping_host,
             commands::resolve_dns,
             commands::evaluate_health_cmd,
             commands::get_current_username,
             commands::get_computer_name,
+            commands::reset_password,
+            commands::unlock_account,
+            commands::enable_account,
+            commands::disable_account,
+            commands::get_cannot_change_password,
+            commands::set_password_flags,
+            commands::get_audit_entries,
+            commands::generate_password,
+            commands::check_password_hibp,
+            commands::mfa_setup,
+            commands::mfa_verify,
+            commands::mfa_is_configured,
+            commands::mfa_revoke,
+            commands::mfa_get_config,
+            commands::mfa_set_config,
+            commands::mfa_requires,
         ])
         .run(tauri::generate_context!())
         .unwrap_or_else(|e| {
@@ -87,14 +125,14 @@ mod tests {
     #[test]
     fn test_app_state_builds_without_panic() {
         let provider = Arc::new(MockDirectoryProvider::new());
-        let state = AppState::new(provider, PermissionConfig::default());
+        let state = AppState::new_for_test(provider, PermissionConfig::default());
         assert_eq!(*state.title.lock().unwrap(), "DSPanel");
     }
 
     #[test]
     fn test_modules_are_accessible() {
         let provider = Arc::new(MockDirectoryProvider::new());
-        let _ = AppState::new(provider, PermissionConfig::default());
+        let _ = AppState::new_for_test(provider, PermissionConfig::default());
         let _ = error::AppError::Internal("test".to_string());
     }
 

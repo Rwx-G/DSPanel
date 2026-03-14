@@ -183,6 +183,14 @@ where
             .await)
     }
 
+    async fn browse_users(&self, max_results: usize) -> Result<Vec<DirectoryEntry>> {
+        resilient_call!(self, |inner| inner.browse_users(max_results).await)
+    }
+
+    async fn browse_computers(&self, max_results: usize) -> Result<Vec<DirectoryEntry>> {
+        resilient_call!(self, |inner| inner.browse_computers(max_results).await)
+    }
+
     async fn get_user_by_identity(&self, sam_account_name: &str) -> Result<Option<DirectoryEntry>> {
         let sam = sam_account_name.to_string();
         resilient_call!(self, sam, |inner, s| inner.get_user_by_identity(&s).await)
@@ -201,6 +209,72 @@ where
 
     async fn get_current_user_groups(&self) -> Result<Vec<String>> {
         resilient_call!(self, |inner| inner.get_current_user_groups().await)
+    }
+
+    async fn reset_password(
+        &self,
+        user_dn: &str,
+        new_password: &str,
+        must_change_at_next_logon: bool,
+    ) -> Result<()> {
+        let dn = user_dn.to_string();
+        let pwd = new_password.to_string();
+        let inner_ref = self.inner.clone();
+        self.execute_with_resilience(|| {
+            let inner = inner_ref.clone();
+            let d = dn.clone();
+            let p = pwd.clone();
+            async move {
+                inner
+                    .reset_password(&d, &p, must_change_at_next_logon)
+                    .await
+            }
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!(e))
+    }
+
+    async fn unlock_account(&self, user_dn: &str) -> Result<()> {
+        let dn = user_dn.to_string();
+        resilient_call!(self, dn, |inner, d| inner.unlock_account(&d).await)
+    }
+
+    async fn enable_account(&self, user_dn: &str) -> Result<()> {
+        let dn = user_dn.to_string();
+        resilient_call!(self, dn, |inner, d| inner.enable_account(&d).await)
+    }
+
+    async fn disable_account(&self, user_dn: &str) -> Result<()> {
+        let dn = user_dn.to_string();
+        resilient_call!(self, dn, |inner, d| inner.disable_account(&d).await)
+    }
+
+    async fn get_cannot_change_password(&self, user_dn: &str) -> Result<bool> {
+        let dn = user_dn.to_string();
+        resilient_call!(self, dn, |inner, d| inner
+            .get_cannot_change_password(&d)
+            .await)
+    }
+
+    async fn set_password_flags(
+        &self,
+        user_dn: &str,
+        password_never_expires: bool,
+        user_cannot_change_password: bool,
+    ) -> Result<()> {
+        let dn = user_dn.to_string();
+        let inner_ref = self.inner.clone();
+        self.execute_with_resilience(|| {
+            let inner = inner_ref.clone();
+            let d = dn.clone();
+            async move {
+                inner
+                    .set_password_flags(&d, password_never_expires, user_cannot_change_password)
+                    .await
+            }
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!(e))
     }
 }
 
@@ -459,6 +533,20 @@ mod tests {
         );
 
         let results = provider.search_computers("WS", 50).await.unwrap();
+        assert_eq!(results.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_resilient_browse_users() {
+        let inner = Arc::new(MockDirectoryProvider::new().with_users(vec![make_entry("jdoe")]));
+        let provider = ResilientDirectoryProvider::new(
+            inner,
+            RetryConfig::default(),
+            CircuitBreaker::new(CircuitBreakerConfig::default()),
+            noop_delay,
+        );
+
+        let results = provider.browse_users(500).await.unwrap();
         assert_eq!(results.len(), 1);
     }
 

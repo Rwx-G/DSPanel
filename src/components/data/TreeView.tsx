@@ -78,7 +78,12 @@ function TreeNodeItem({
     (node.children && node.children.length > 0) || node.hasChildren;
 
   return (
-    <div data-testid={`tree-node-${node.id}`} role="treeitem" aria-expanded={hasChildren ? isExpanded : undefined} aria-selected={isSelected}>
+    <div
+      data-testid={`tree-node-${node.id}`}
+      role="treeitem"
+      aria-expanded={hasChildren ? isExpanded : undefined}
+      aria-selected={isSelected}
+    >
       <div
         className={`relative flex items-center gap-1 px-2 py-1 cursor-pointer transition-colors ${
           isSelected
@@ -112,7 +117,9 @@ function TreeNodeItem({
               onToggle(node.id, node);
             }}
             className="shrink-0 rounded-sm p-0.5 hover:bg-[var(--color-surface-hover)] transition-transform"
-            aria-label={isExpanded ? `Collapse ${node.label}` : `Expand ${node.label}`}
+            aria-label={
+              isExpanded ? `Collapse ${node.label}` : `Expand ${node.label}`
+            }
             data-testid={`tree-toggle-${node.id}`}
           >
             {isExpanded ? (

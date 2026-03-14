@@ -23,7 +23,9 @@ export function CopyButton({ text, feedbackMs = 2000 }: CopyButtonProps) {
       if (timerRef.current) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(() => setCopied(false), feedbackMs);
     } catch {
-      console.warn("Clipboard write failed - permission denied or API unavailable");
+      console.warn(
+        "Clipboard write failed - permission denied or API unavailable",
+      );
     }
   }, [text, feedbackMs]);
 

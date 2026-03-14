@@ -356,11 +356,7 @@ describe("DataTable", () => {
       { id: "1", name: null, email: "test@test.com" },
     ];
     render(
-      <DataTable
-        columns={nullColumns}
-        data={nullData}
-        rowKey={(r) => r.id}
-      />,
+      <DataTable columns={nullColumns} data={nullData} rowKey={(r) => r.id} />,
     );
     const rows = screen.getAllByTestId("data-table-row");
     expect(rows).toHaveLength(1);

@@ -1,6 +1,7 @@
 import {
   User,
   Monitor,
+  KeyRound,
   Settings,
   ChevronLeft,
   ChevronRight,
@@ -17,6 +18,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   home: Home,
   user: User,
   computer: Monitor,
+  key: KeyRound,
   settings: Settings,
 };
 
@@ -33,6 +35,13 @@ const MODULES: SidebarModule[] = [
     label: "Computer Lookup",
     icon: "computer",
     group: "Directory",
+    requiredLevel: "ReadOnly",
+  },
+  {
+    id: "password-generator",
+    label: "Password Generator",
+    icon: "key",
+    group: "Tools",
     requiredLevel: "ReadOnly",
   },
 ];
@@ -80,7 +89,7 @@ export function Sidebar({ expanded, onToggle }: SidebarProps) {
           </button>
         )}
         <button
-          className="btn-ghost flex h-8 w-8 shrink-0 items-center justify-center rounded-md p-0"
+          className="btn btn-ghost flex h-8 w-8 shrink-0 items-center justify-center rounded-md p-0"
           onClick={onToggle}
           aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
           data-testid="sidebar-toggle"
@@ -90,9 +99,17 @@ export function Sidebar({ expanded, onToggle }: SidebarProps) {
       </div>
 
       {/* Navigation */}
-      <nav aria-label="Main navigation" className="flex-1 overflow-y-auto overflow-x-hidden py-2">
+      <nav
+        aria-label="Main navigation"
+        className="flex-1 overflow-y-auto overflow-x-hidden py-2"
+      >
         {Object.entries(groups).map(([groupName, modules], groupIndex) => (
-          <div key={groupName} className="mb-1" role="group" aria-label={groupName}>
+          <div
+            key={groupName}
+            className="mb-1"
+            role="group"
+            aria-label={groupName}
+          >
             {expanded && (
               <div className="px-4 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-sidebar-group-label)]">
                 {groupName}

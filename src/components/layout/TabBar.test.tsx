@@ -438,9 +438,18 @@ describe("TabBar", () => {
     scrollContainer.scrollBy = scrollBySpy;
 
     // Mock scroll measurements to simulate overflow with scroll position > 0
-    Object.defineProperty(scrollContainer, "scrollLeft", { value: 50, configurable: true });
-    Object.defineProperty(scrollContainer, "clientWidth", { value: 200, configurable: true });
-    Object.defineProperty(scrollContainer, "scrollWidth", { value: 500, configurable: true });
+    Object.defineProperty(scrollContainer, "scrollLeft", {
+      value: 50,
+      configurable: true,
+    });
+    Object.defineProperty(scrollContainer, "clientWidth", {
+      value: 200,
+      configurable: true,
+    });
+    Object.defineProperty(scrollContainer, "scrollWidth", {
+      value: 500,
+      configurable: true,
+    });
 
     act(() => {
       scrollContainer.dispatchEvent(new Event("scroll"));
@@ -450,7 +459,10 @@ describe("TabBar", () => {
     expect(scrollLeftBtn).toBeInTheDocument();
 
     fireEvent.click(scrollLeftBtn);
-    expect(scrollBySpy).toHaveBeenCalledWith({ left: -150, behavior: "smooth" });
+    expect(scrollBySpy).toHaveBeenCalledWith({
+      left: -150,
+      behavior: "smooth",
+    });
   });
 
   it("should show and use scroll-right button when content overflows", () => {
@@ -479,9 +491,18 @@ describe("TabBar", () => {
     scrollContainer.scrollBy = scrollBySpy;
 
     // Mock: scrollLeft=0, clientWidth < scrollWidth means we can scroll right
-    Object.defineProperty(scrollContainer, "scrollLeft", { value: 0, configurable: true });
-    Object.defineProperty(scrollContainer, "clientWidth", { value: 200, configurable: true });
-    Object.defineProperty(scrollContainer, "scrollWidth", { value: 500, configurable: true });
+    Object.defineProperty(scrollContainer, "scrollLeft", {
+      value: 0,
+      configurable: true,
+    });
+    Object.defineProperty(scrollContainer, "clientWidth", {
+      value: 200,
+      configurable: true,
+    });
+    Object.defineProperty(scrollContainer, "scrollWidth", {
+      value: 500,
+      configurable: true,
+    });
 
     act(() => {
       scrollContainer.dispatchEvent(new Event("scroll"));

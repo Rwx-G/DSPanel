@@ -11,8 +11,14 @@ interface ContextMenuState {
 }
 
 export function TabBar() {
-  const { openTabs, activeTabId, activateTab, closeTab, closeAllTabs, moveTab } =
-    useNavigation();
+  const {
+    openTabs,
+    activeTabId,
+    activateTab,
+    closeTab,
+    closeAllTabs,
+    moveTab,
+  } = useNavigation();
 
   const hasTabs = openTabs.length > 0;
   const containerRef = useRef<HTMLDivElement>(null);
@@ -64,7 +70,10 @@ export function TabBar() {
   const scrollTabs = useCallback((direction: "left" | "right") => {
     const el = tabsRef.current;
     if (!el) return;
-    el.scrollBy({ left: direction === "left" ? -150 : 150, behavior: "smooth" });
+    el.scrollBy({
+      left: direction === "left" ? -150 : 150,
+      behavior: "smooth",
+    });
   }, []);
 
   const handlePointerDown = useCallback(
@@ -125,22 +134,22 @@ export function TabBar() {
         ref={tabsRef}
         className="flex h-full flex-1 items-stretch overflow-x-auto scrollbar-none"
       >
-      {openTabs.map((tab, index) => (
-        <TabItem
-          key={tab.id}
-          tab={tab}
-          index={index}
-          isActive={tab.id === activeTabId}
-          isDragging={tab.id === dragTabId}
-          dragDeltaX={tab.id === dragTabId ? dragDeltaX : 0}
-          onTabClick={handleTabClick}
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-          onContextMenu={handleContextMenu}
-          onClose={closeTab}
-        />
-      ))}
+        {openTabs.map((tab, index) => (
+          <TabItem
+            key={tab.id}
+            tab={tab}
+            index={index}
+            isActive={tab.id === activeTabId}
+            isDragging={tab.id === dragTabId}
+            dragDeltaX={tab.id === dragTabId ? dragDeltaX : 0}
+            onTabClick={handleTabClick}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onContextMenu={handleContextMenu}
+            onClose={closeTab}
+          />
+        ))}
       </div>
       {canScrollRight && (
         <button
@@ -183,7 +192,10 @@ export function TabBar() {
           >
             Close Others
           </button>
-          <div className="mx-2 my-1 border-t border-[var(--color-border-subtle)]" role="separator" />
+          <div
+            className="mx-2 my-1 border-t border-[var(--color-border-subtle)]"
+            role="separator"
+          />
           <button
             role="menuitem"
             className="flex w-full items-center px-3 py-1.5 text-caption text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]"
@@ -257,9 +269,7 @@ const TabItem = memo(function TabItem({
       {isActive && (
         <span className="absolute bottom-0 left-2 right-2 h-[2px] rounded-full bg-[var(--color-primary)]" />
       )}
-      <span className="text-caption truncate max-w-[120px]">
-        {tab.title}
-      </span>
+      <span className="text-caption truncate max-w-[120px]">{tab.title}</span>
 
       {!tab.isPinned && (
         <button

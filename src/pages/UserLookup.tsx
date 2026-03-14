@@ -1,50 +1,54 @@
 import { useState, useCallback, useEffect } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { SearchBar } from "@/components/common/SearchBar";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { EmptyState } from "@/components/common/EmptyState";
 import { HealthBadge } from "@/components/common/HealthBadge";
+import { VirtualizedList } from "@/components/data/VirtualizedList";
 import { type Column } from "@/components/data/DataTable";
-import { type DirectoryUser, mapEntryToUser } from "@/types/directory";
+import {
+  type DirectoryEntry,
+  type DirectoryUser,
+  mapEntryToUser,
+} from "@/types/directory";
 import type { AccountHealthStatus } from "@/types/health";
 import { evaluateHealth } from "@/services/healthcheck";
 import { parseCnFromDn } from "@/utils/dn";
-import { useLookupState } from "@/hooks/useLookupState";
+import { useUserBrowse } from "@/hooks/useUserBrowse";
 import { UserDetail } from "@/pages/UserDetail";
-import { Search, UserX, AlertCircle, User } from "lucide-react";
+import { UserX, AlertCircle, User } from "lucide-react";
 
 export function UserLookup() {
   const {
-    lookupState,
-    errorMessage,
-    searchResults,
-    lastQuery,
-    searchValue,
-    setSearchValue,
-    handleSearch,
-    handleRetry,
+    items: users,
+    loading,
+    loadingMore,
+    error,
+    hasMore,
+    filterText,
+    setFilterText,
+    loadMore,
     selectedItem: selectedUser,
     setSelectedItem: setSelectedUser,
-  } = useLookupState<DirectoryUser>({
-    command: "search_users",
-    mapEntry: mapEntryToUser,
-  });
+    refresh,
+  } = useUserBrowse();
 
   const [groupFilterText, setGroupFilterText] = useState("");
-  const [healthMap, setHealthMap] = useState<
-    Map<string, AccountHealthStatus>
-  >(new Map());
+  const [healthMap, setHealthMap] = useState<Map<string, AccountHealthStatus>>(
+    new Map(),
+  );
 
   useEffect(() => {
-    if (searchResults.length === 0) return;
+    if (users.length === 0) return;
     let cancelled = false;
 
     const computeHealth = async () => {
       const CONCURRENCY = 3;
       const map = new Map<string, AccountHealthStatus>();
 
-      for (let i = 0; i < searchResults.length; i += CONCURRENCY) {
+      for (let i = 0; i < users.length; i += CONCURRENCY) {
         if (cancelled) return;
-        const batch = searchResults.slice(i, i + CONCURRENCY);
+        const batch = users.slice(i, i + CONCURRENCY);
         const entries = await Promise.allSettled(
           batch.map(async (user) => {
             const status = await evaluateHealth(user);
@@ -67,15 +71,39 @@ export function UserLookup() {
     return () => {
       cancelled = true;
     };
-  }, [searchResults]);
+  }, [users]);
 
-  const handleSearchWithHealthReset = useCallback(
+  const handleFilterChange = useCallback(
     async (query: string) => {
-      setHealthMap(new Map());
-      await handleSearch(query);
+      // Only reset health map when the filter actually changes the user list
+      if (query.length >= 3) {
+        setHealthMap(new Map());
+      }
+      setFilterText(query);
     },
-    [handleSearch],
+    [setFilterText],
   );
+
+  const refreshSelectedUser = useCallback(async () => {
+    if (!selectedUser) return;
+    try {
+      const entry = await invoke<DirectoryEntry | null>("get_user", {
+        samAccountName: selectedUser.samAccountName,
+      });
+      if (entry) {
+        const updated = mapEntryToUser(entry);
+        setSelectedUser(updated);
+        const health = await evaluateHealth(updated);
+        setHealthMap((prev) => {
+          const next = new Map(prev);
+          next.set(updated.samAccountName, health);
+          return next;
+        });
+      }
+    } catch (e) {
+      console.warn("Failed to refresh user:", e);
+    }
+  }, [selectedUser, setSelectedUser]);
 
   const filteredGroups = selectedUser
     ? selectedUser.memberOf.filter((dn) =>
@@ -93,106 +121,116 @@ export function UserLookup() {
     dn,
   }));
 
+  const renderUserItem = useCallback(
+    (user: DirectoryUser) => (
+      <button
+        className={`flex w-full items-center gap-2 border-b border-[var(--color-border-subtle)] px-3 py-2 text-left transition-colors hover:bg-[var(--color-surface-hover)] ${
+          selectedUser?.samAccountName === user.samAccountName
+            ? "bg-[var(--color-surface-selected)]"
+            : ""
+        }`}
+        onClick={() => setSelectedUser(user)}
+        data-testid={`user-result-${user.samAccountName}`}
+      >
+        <User
+          size={16}
+          className="shrink-0 text-[var(--color-text-secondary)]"
+        />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-body font-medium text-[var(--color-text-primary)]">
+            {user.displayName || user.samAccountName}
+          </p>
+          <p className="truncate text-caption text-[var(--color-text-secondary)]">
+            {user.samAccountName}
+            {user.department ? ` - ${user.department}` : ""}
+          </p>
+        </div>
+        {healthMap.get(user.samAccountName) && (
+          <HealthBadge healthStatus={healthMap.get(user.samAccountName)!} />
+        )}
+      </button>
+    ),
+    [selectedUser, setSelectedUser, healthMap],
+  );
+
   return (
     <div className="flex h-full flex-col" data-testid="user-lookup">
       <div className="border-b border-[var(--color-border-subtle)] p-3">
         <SearchBar
-          value={searchValue}
-          onChange={setSearchValue}
-          onSearch={handleSearchWithHealthReset}
+          value={filterText}
+          onChange={handleFilterChange}
+          onSearch={handleFilterChange}
           placeholder="Search by name, username, or email..."
-          debounceMs={0}
+          debounceMs={300}
         />
       </div>
 
-      <div className="sr-only" aria-live="polite" data-testid="user-lookup-status">
-        {lookupState === "loading" && "Searching users..."}
-        {lookupState === "results" && `${searchResults.length} user${searchResults.length > 1 ? "s" : ""} found for "${lastQuery}"`}
-        {lookupState === "empty" && `No results for "${lastQuery}"`}
-        {lookupState === "error" && `Search failed: ${errorMessage}`}
+      <div
+        className="sr-only"
+        aria-live="polite"
+        data-testid="user-lookup-status"
+      >
+        {loading && "Loading users..."}
+        {!loading &&
+          users.length > 0 &&
+          `${users.length} user${users.length > 1 ? "s" : ""} found`}
+        {!loading && users.length === 0 && !error && "No users found"}
+        {error && `Error: ${error}`}
       </div>
 
       <div className="flex flex-1 overflow-hidden">
-        {lookupState === "initial" && (
-          <div className="flex flex-1 items-center justify-center">
-            <EmptyState
-              icon={<Search size={48} />}
-              title="Search for a user"
-              description="Enter a username, display name, or email to get started."
-            />
-          </div>
-        )}
-
-        {lookupState === "loading" && (
+        {loading && (
           <div
             className="flex flex-1 items-center justify-center"
             data-testid="user-lookup-loading"
           >
-            <LoadingSpinner message="Searching..." />
+            <LoadingSpinner message="Loading users..." />
           </div>
         )}
 
-        {lookupState === "empty" && (
-          <div className="flex flex-1 items-center justify-center">
-            <EmptyState
-              icon={<UserX size={48} />}
-              title="No users found"
-              description={`No users match "${lastQuery}".`}
-            />
-          </div>
-        )}
-
-        {lookupState === "error" && (
+        {!loading && error && (
           <div
             className="flex flex-1 items-center justify-center"
             data-testid="user-lookup-error"
           >
             <EmptyState
               icon={<AlertCircle size={48} />}
-              title="Search failed"
-              description={errorMessage}
-              action={{ label: "Retry", onClick: handleRetry }}
+              title="Failed to load users"
+              description={error}
+              action={{ label: "Retry", onClick: refresh }}
             />
           </div>
         )}
 
-        {lookupState === "results" && (
+        {!loading && !error && users.length === 0 && (
+          <div className="flex flex-1 items-center justify-center">
+            <EmptyState
+              icon={<UserX size={48} />}
+              title="No users found"
+              description={
+                filterText
+                  ? `No users match "${filterText}".`
+                  : "No users available."
+              }
+            />
+          </div>
+        )}
+
+        {!loading && !error && users.length > 0 && (
           <>
             <div
-              className="w-64 shrink-0 overflow-auto border-r border-[var(--color-border-subtle)]"
+              className="w-64 shrink-0 border-r border-[var(--color-border-subtle)]"
               data-testid="user-results-list"
             >
-              {searchResults.map((user) => (
-                <button
-                  key={user.samAccountName}
-                  className={`flex w-full items-center gap-2 border-b border-[var(--color-border-subtle)] px-3 py-2 text-left transition-colors hover:bg-[var(--color-surface-hover)] ${
-                    selectedUser?.samAccountName === user.samAccountName
-                      ? "bg-[var(--color-surface-selected)]"
-                      : ""
-                  }`}
-                  onClick={() => setSelectedUser(user)}
-                  data-testid={`user-result-${user.samAccountName}`}
-                >
-                  <User
-                    size={16}
-                    className="shrink-0 text-[var(--color-text-secondary)]"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-body font-medium text-[var(--color-text-primary)]">
-                      {user.displayName || user.samAccountName}
-                    </p>
-                    <p className="truncate text-caption text-[var(--color-text-secondary)]">
-                      {user.samAccountName}
-                      {user.department ? ` - ${user.department}` : ""}
-                    </p>
-                  </div>
-                  {healthMap.get(user.samAccountName) && (
-                    <HealthBadge
-                      healthStatus={healthMap.get(user.samAccountName)!}
-                    />
-                  )}
-                </button>
-              ))}
+              <VirtualizedList
+                items={users}
+                renderItem={renderUserItem}
+                estimateSize={52}
+                itemKey={(user) => user.samAccountName}
+                loadingMore={loadingMore}
+                onEndReached={hasMore ? loadMore : undefined}
+                className="h-full"
+              />
             </div>
 
             <div
@@ -207,6 +245,7 @@ export function UserLookup() {
                   groupRows={groupRows}
                   groupFilterText={groupFilterText}
                   onGroupFilterText={setGroupFilterText}
+                  onRefresh={refreshSelectedUser}
                 />
               ) : (
                 <div className="flex h-full items-center justify-center">

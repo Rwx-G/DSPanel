@@ -44,8 +44,48 @@ pub trait DirectoryProvider: Send + Sync {
         max_results: usize,
     ) -> Result<Vec<DirectoryEntry>>;
 
+    /// Fetches all user accounts (up to `max_results`) for browsing.
+    ///
+    /// Unlike `search_users`, this uses a broad filter without a search term.
+    /// The caller is responsible for paging and sorting the results.
+    async fn browse_users(&self, max_results: usize) -> Result<Vec<DirectoryEntry>>;
+
+    /// Fetches all computer accounts (up to `max_results`) for browsing.
+    async fn browse_computers(&self, max_results: usize) -> Result<Vec<DirectoryEntry>>;
+
     /// Returns the current user's group memberships (DNs).
     async fn get_current_user_groups(&self) -> Result<Vec<String>>;
+
+    /// Resets the password for a user account.
+    ///
+    /// Sets the `unicodePwd` attribute to the new password (quoted UTF-16LE).
+    /// If `must_change_at_next_logon` is true, sets `pwdLastSet = 0`.
+    async fn reset_password(
+        &self,
+        user_dn: &str,
+        new_password: &str,
+        must_change_at_next_logon: bool,
+    ) -> Result<()>;
+
+    /// Unlocks a user account by setting `lockoutTime = 0`.
+    async fn unlock_account(&self, user_dn: &str) -> Result<()>;
+
+    /// Enables a user account by clearing the ACCOUNTDISABLE flag in `userAccountControl`.
+    async fn enable_account(&self, user_dn: &str) -> Result<()>;
+
+    /// Disables a user account by setting the ACCOUNTDISABLE flag in `userAccountControl`.
+    async fn disable_account(&self, user_dn: &str) -> Result<()>;
+
+    /// Reads the "User Cannot Change Password" flag from the DACL.
+    async fn get_cannot_change_password(&self, user_dn: &str) -> Result<bool>;
+
+    /// Sets password-related flags on a user account.
+    async fn set_password_flags(
+        &self,
+        user_dn: &str,
+        password_never_expires: bool,
+        user_cannot_change_password: bool,
+    ) -> Result<()>;
 }
 
 #[cfg(test)]
@@ -67,6 +107,12 @@ pub mod tests {
         members: Mutex<Vec<DirectoryEntry>>,
         user_groups: Mutex<Vec<String>>,
         should_fail: Mutex<bool>,
+        pub reset_password_calls: Mutex<Vec<(String, String, bool)>>,
+        pub unlock_calls: Mutex<Vec<String>>,
+        pub enable_calls: Mutex<Vec<String>>,
+        pub disable_calls: Mutex<Vec<String>>,
+        pub set_password_flags_calls: Mutex<Vec<(String, bool, bool)>>,
+        cannot_change_password: Mutex<bool>,
     }
 
     impl Default for MockDirectoryProvider {
@@ -87,6 +133,12 @@ pub mod tests {
                 members: Mutex::new(Vec::new()),
                 user_groups: Mutex::new(Vec::new()),
                 should_fail: Mutex::new(false),
+                reset_password_calls: Mutex::new(Vec::new()),
+                unlock_calls: Mutex::new(Vec::new()),
+                enable_calls: Mutex::new(Vec::new()),
+                disable_calls: Mutex::new(Vec::new()),
+                set_password_flags_calls: Mutex::new(Vec::new()),
+                cannot_change_password: Mutex::new(false),
             }
         }
 
@@ -101,6 +153,12 @@ pub mod tests {
                 members: Mutex::new(Vec::new()),
                 user_groups: Mutex::new(Vec::new()),
                 should_fail: Mutex::new(false),
+                reset_password_calls: Mutex::new(Vec::new()),
+                unlock_calls: Mutex::new(Vec::new()),
+                enable_calls: Mutex::new(Vec::new()),
+                disable_calls: Mutex::new(Vec::new()),
+                set_password_flags_calls: Mutex::new(Vec::new()),
+                cannot_change_password: Mutex::new(false),
             }
         }
 
@@ -203,6 +261,18 @@ pub mod tests {
                 .cloned())
         }
 
+        async fn browse_users(&self, max_results: usize) -> Result<Vec<DirectoryEntry>> {
+            self.check_failure()?;
+            let users = self.users.lock().unwrap();
+            Ok(users.iter().take(max_results).cloned().collect())
+        }
+
+        async fn browse_computers(&self, max_results: usize) -> Result<Vec<DirectoryEntry>> {
+            self.check_failure()?;
+            let computers = self.computers.lock().unwrap();
+            Ok(computers.iter().take(max_results).cloned().collect())
+        }
+
         async fn get_group_members(
             &self,
             _group_dn: &str,
@@ -216,6 +286,60 @@ pub mod tests {
         async fn get_current_user_groups(&self) -> Result<Vec<String>> {
             self.check_failure()?;
             Ok(self.user_groups.lock().unwrap().clone())
+        }
+
+        async fn reset_password(
+            &self,
+            user_dn: &str,
+            new_password: &str,
+            must_change_at_next_logon: bool,
+        ) -> Result<()> {
+            self.check_failure()?;
+            self.reset_password_calls.lock().unwrap().push((
+                user_dn.to_string(),
+                new_password.to_string(),
+                must_change_at_next_logon,
+            ));
+            Ok(())
+        }
+
+        async fn unlock_account(&self, user_dn: &str) -> Result<()> {
+            self.check_failure()?;
+            self.unlock_calls.lock().unwrap().push(user_dn.to_string());
+            Ok(())
+        }
+
+        async fn enable_account(&self, user_dn: &str) -> Result<()> {
+            self.check_failure()?;
+            self.enable_calls.lock().unwrap().push(user_dn.to_string());
+            Ok(())
+        }
+
+        async fn disable_account(&self, user_dn: &str) -> Result<()> {
+            self.check_failure()?;
+            self.disable_calls.lock().unwrap().push(user_dn.to_string());
+            Ok(())
+        }
+
+        async fn get_cannot_change_password(&self, _user_dn: &str) -> Result<bool> {
+            self.check_failure()?;
+            Ok(*self.cannot_change_password.lock().unwrap())
+        }
+
+        async fn set_password_flags(
+            &self,
+            user_dn: &str,
+            password_never_expires: bool,
+            user_cannot_change_password: bool,
+        ) -> Result<()> {
+            self.check_failure()?;
+            *self.cannot_change_password.lock().unwrap() = user_cannot_change_password;
+            self.set_password_flags_calls.lock().unwrap().push((
+                user_dn.to_string(),
+                password_never_expires,
+                user_cannot_change_password,
+            ));
+            Ok(())
         }
     }
 
@@ -339,6 +463,29 @@ pub mod tests {
         let provider = MockDirectoryProvider::new().with_users(users);
         let result = provider.get_user_by_identity("unknown").await.unwrap();
         assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_browse_users_returns_all_users() {
+        let users = vec![
+            make_user_entry("jdoe", "John Doe"),
+            make_user_entry("asmith", "Alice Smith"),
+        ];
+        let provider = MockDirectoryProvider::new().with_users(users);
+        let results = provider.browse_users(500).await.unwrap();
+        assert_eq!(results.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_browse_users_respects_max_results() {
+        let users = vec![
+            make_user_entry("u1", "User 1"),
+            make_user_entry("u2", "User 2"),
+            make_user_entry("u3", "User 3"),
+        ];
+        let provider = MockDirectoryProvider::new().with_users(users);
+        let results = provider.browse_users(2).await.unwrap();
+        assert_eq!(results.len(), 2);
     }
 
     #[tokio::test]

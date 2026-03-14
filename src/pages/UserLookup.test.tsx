@@ -1,11 +1,38 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { type ReactNode } from "react";
 import { UserLookup } from "./UserLookup";
+import { DialogProvider } from "@/contexts/DialogContext";
+import { NotificationProvider } from "@/contexts/NotificationContext";
 import type { DirectoryEntry } from "@/types/directory";
 import type { AccountHealthStatus } from "@/types/health";
 
+function TestProviders({ children }: { children: ReactNode }) {
+  return (
+    <NotificationProvider>
+      <DialogProvider>{children}</DialogProvider>
+    </NotificationProvider>
+  );
+}
+
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
+}));
+
+// Mock react-virtual to avoid needing real scroll container measurements
+vi.mock("@tanstack/react-virtual", () => ({
+  useVirtualizer: vi.fn(({ count, estimateSize, getItemKey }) => {
+    const items = Array.from({ length: Math.min(count, 50) }, (_, i) => ({
+      key: getItemKey ? getItemKey(i) : i,
+      index: i,
+      start: i * estimateSize(i),
+      size: estimateSize(i),
+    }));
+    return {
+      getTotalSize: () => count * estimateSize(0),
+      getVirtualItems: () => items,
+    };
+  }),
 }));
 
 import { invoke } from "@tauri-apps/api/core";
@@ -19,7 +46,11 @@ const HEALTHY_STATUS: AccountHealthStatus = {
 const CRITICAL_STATUS: AccountHealthStatus = {
   level: "Critical",
   activeFlags: [
-    { name: "Disabled", severity: "Critical", description: "Account is disabled" },
+    {
+      name: "Disabled",
+      severity: "Critical",
+      description: "Account is disabled",
+    },
   ],
 };
 
@@ -55,11 +86,24 @@ function makeEntry(
   };
 }
 
-function mockInvokeWith(
+function makeBrowseResult(entries: DirectoryEntry[], hasMore = false) {
+  return {
+    entries,
+    totalCount: entries.length + (hasMore ? 50 : 0),
+    hasMore,
+  };
+}
+
+function mockBrowseWith(
   entries: DirectoryEntry[],
   healthOverrides: Record<string, AccountHealthStatus> = {},
 ) {
-  mockInvoke.mockImplementation(((cmd: string, args?: Record<string, unknown>) => {
+  mockInvoke.mockImplementation(((
+    cmd: string,
+    args?: Record<string, unknown>,
+  ) => {
+    if (cmd === "browse_users")
+      return Promise.resolve(makeBrowseResult(entries));
     if (cmd === "search_users") return Promise.resolve(entries);
     if (cmd === "evaluate_health_cmd") {
       const input = args?.input as { enabled: boolean } | undefined;
@@ -78,35 +122,16 @@ describe("UserLookup", () => {
     mockInvoke.mockReset();
   });
 
-  it("renders initial state with search bar and empty state", () => {
-    render(<UserLookup />);
-    expect(screen.getByTestId("user-lookup")).toBeInTheDocument();
-    expect(screen.getByTestId("search-bar")).toBeInTheDocument();
-    expect(screen.getByText("Search for a user")).toBeInTheDocument();
-  });
-
-  it("shows loading state during search", async () => {
-    mockInvoke.mockImplementation((() => new Promise(() => {})) as typeof invoke);
-    render(<UserLookup />);
-
-    const input = screen.getByTestId("search-input");
-    fireEvent.change(input, { target: { value: "jdoe" } });
-
-    await waitFor(() => {
-      expect(screen.getByTestId("user-lookup-loading")).toBeInTheDocument();
-    });
-  });
-
-  it("shows results after successful search", async () => {
+  it("renders with search bar and loads users on mount", async () => {
     const entries = [
       makeEntry("jdoe", "John Doe"),
       makeEntry("asmith", "Alice Smith"),
     ];
-    mockInvokeWith(entries);
+    mockBrowseWith(entries);
 
-    render(<UserLookup />);
-    const input = screen.getByTestId("search-input");
-    fireEvent.change(input, { target: { value: "doe" } });
+    render(<UserLookup />, { wrapper: TestProviders });
+    expect(screen.getByTestId("user-lookup")).toBeInTheDocument();
+    expect(screen.getByTestId("search-bar")).toBeInTheDocument();
 
     await waitFor(() => {
       expect(screen.getByTestId("user-results-list")).toBeInTheDocument();
@@ -116,60 +141,62 @@ describe("UserLookup", () => {
     expect(screen.getByTestId("user-result-asmith")).toBeInTheDocument();
   });
 
-  it("auto-selects user when only one result", async () => {
-    const entries = [makeEntry("jdoe", "John Doe")];
-    mockInvokeWith(entries);
-
-    render(<UserLookup />);
-    const input = screen.getByTestId("search-input");
-    fireEvent.change(input, { target: { value: "jdoe" } });
-
-    await waitFor(() => {
-      expect(screen.getByTestId("user-detail")).toBeInTheDocument();
-    });
+  it("shows loading state during initial load", () => {
+    mockInvoke.mockImplementation(
+      (() => new Promise(() => {})) as typeof invoke,
+    );
+    render(<UserLookup />, { wrapper: TestProviders });
+    expect(screen.getByTestId("user-lookup-loading")).toBeInTheDocument();
   });
 
-  it("shows empty state when no results", async () => {
-    mockInvokeWith([]);
+  it("shows results list with users from browse", async () => {
+    const entries = [
+      makeEntry("jdoe", "John Doe"),
+      makeEntry("asmith", "Alice Smith"),
+    ];
+    mockBrowseWith(entries);
 
-    render(<UserLookup />);
-    const input = screen.getByTestId("search-input");
-    fireEvent.change(input, { target: { value: "nobody" } });
+    render(<UserLookup />, { wrapper: TestProviders });
 
     await waitFor(() => {
-      expect(screen.getByText("No users found")).toBeInTheDocument();
+      expect(screen.getByTestId("user-results-list")).toBeInTheDocument();
     });
+
+    expect(screen.getByTestId("user-result-jdoe")).toBeInTheDocument();
+    expect(screen.getByTestId("user-result-asmith")).toBeInTheDocument();
   });
 
-  it("shows error state on search failure", async () => {
+  it("shows error state on browse failure", async () => {
     mockInvoke.mockImplementation(((cmd: string) => {
-      if (cmd === "search_users") return Promise.reject(new Error("LDAP connection failed"));
+      if (cmd === "browse_users")
+        return Promise.reject(new Error("LDAP connection failed"));
       return Promise.resolve(HEALTHY_STATUS);
     }) as typeof invoke);
 
-    render(<UserLookup />);
-    const input = screen.getByTestId("search-input");
-    fireEvent.change(input, { target: { value: "test" } });
+    render(<UserLookup />, { wrapper: TestProviders });
 
     await waitFor(() => {
       expect(screen.getByTestId("user-lookup-error")).toBeInTheDocument();
     });
 
-    expect(screen.getByText("Search failed")).toBeInTheDocument();
+    expect(screen.getByText("Failed to load users")).toBeInTheDocument();
   });
 
-  it("shows retry button on error and retries search", async () => {
+  it("shows retry button on error", async () => {
     let callCount = 0;
     mockInvoke.mockImplementation(((cmd: string) => {
       if (cmd === "evaluate_health_cmd") return Promise.resolve(HEALTHY_STATUS);
-      callCount++;
-      if (callCount === 1) return Promise.reject(new Error("fail"));
-      return Promise.resolve([makeEntry("jdoe", "John Doe")]);
+      if (cmd === "browse_users") {
+        callCount++;
+        if (callCount === 1) return Promise.reject(new Error("fail"));
+        return Promise.resolve(
+          makeBrowseResult([makeEntry("jdoe", "John Doe")]),
+        );
+      }
+      return Promise.resolve(null);
     }) as typeof invoke);
 
-    render(<UserLookup />);
-    const input = screen.getByTestId("search-input");
-    fireEvent.change(input, { target: { value: "test" } });
+    render(<UserLookup />, { wrapper: TestProviders });
 
     await waitFor(() => {
       expect(screen.getByText("Retry")).toBeInTheDocument();
@@ -187,11 +214,9 @@ describe("UserLookup", () => {
       makeEntry("jdoe", "John Doe"),
       makeEntry("asmith", "Alice Smith"),
     ];
-    mockInvokeWith(entries);
+    mockBrowseWith(entries);
 
-    render(<UserLookup />);
-    const input = screen.getByTestId("search-input");
-    fireEvent.change(input, { target: { value: "test" } });
+    render(<UserLookup />, { wrapper: TestProviders });
 
     await waitFor(() => {
       expect(screen.getByTestId("user-result-jdoe")).toBeInTheDocument();
@@ -209,11 +234,15 @@ describe("UserLookup", () => {
 
   it("displays user detail with property groups", async () => {
     const entries = [makeEntry("jdoe", "John Doe")];
-    mockInvokeWith(entries);
+    mockBrowseWith(entries);
 
-    render(<UserLookup />);
-    const input = screen.getByTestId("search-input");
-    fireEvent.change(input, { target: { value: "jdoe" } });
+    render(<UserLookup />, { wrapper: TestProviders });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("user-result-jdoe")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId("user-result-jdoe"));
 
     await waitFor(() => {
       expect(screen.getByTestId("user-detail")).toBeInTheDocument();
@@ -228,11 +257,15 @@ describe("UserLookup", () => {
 
   it("displays group memberships section", async () => {
     const entries = [makeEntry("jdoe", "John Doe")];
-    mockInvokeWith(entries);
+    mockBrowseWith(entries);
 
-    render(<UserLookup />);
-    const input = screen.getByTestId("search-input");
-    fireEvent.change(input, { target: { value: "jdoe" } });
+    render(<UserLookup />, { wrapper: TestProviders });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("user-result-jdoe")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId("user-result-jdoe"));
 
     await waitFor(() => {
       expect(screen.getByTestId("user-groups-section")).toBeInTheDocument();
@@ -243,18 +276,16 @@ describe("UserLookup", () => {
     expect(screen.getByText("Developers")).toBeInTheDocument();
   });
 
-  it("shows health badges for enabled/disabled users in results list", async () => {
+  it("shows health badges for users in results list", async () => {
     const entries = [
       makeEntry("jdoe", "John Doe"),
       makeEntry("disabled", "Disabled User", {
         userAccountControl: ["514"],
       }),
     ];
-    mockInvokeWith(entries);
+    mockBrowseWith(entries);
 
-    render(<UserLookup />);
-    const input = screen.getByTestId("search-input");
-    fireEvent.change(input, { target: { value: "test" } });
+    render(<UserLookup />, { wrapper: TestProviders });
 
     await waitFor(() => {
       expect(screen.getByTestId("user-results-list")).toBeInTheDocument();
@@ -275,27 +306,15 @@ describe("UserLookup", () => {
     expect(disabledBadge).toHaveAttribute("data-level", "Critical");
   });
 
-  it("does not search with empty query", async () => {
-    render(<UserLookup />);
-    const input = screen.getByTestId("search-input");
-    fireEvent.change(input, { target: { value: "" } });
+  it("calls browse_users on mount", async () => {
+    mockBrowseWith([]);
+
+    render(<UserLookup />, { wrapper: TestProviders });
 
     await waitFor(() => {
-      expect(screen.getByText("Search for a user")).toBeInTheDocument();
-    });
-    expect(mockInvoke).not.toHaveBeenCalled();
-  });
-
-  it("calls invoke with correct command and arguments", async () => {
-    mockInvokeWith([]);
-
-    render(<UserLookup />);
-    const input = screen.getByTestId("search-input");
-    fireEvent.change(input, { target: { value: "jdoe" } });
-
-    await waitFor(() => {
-      expect(mockInvoke).toHaveBeenCalledWith("search_users", {
-        query: "jdoe",
+      expect(mockInvoke).toHaveBeenCalledWith("browse_users", {
+        page: 0,
+        pageSize: 50,
       });
     });
   });

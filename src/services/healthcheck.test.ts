@@ -36,6 +36,7 @@ function makeHealthyUser(
     whenCreated: "2024-01-01T10:00:00Z",
     whenChanged: "2026-03-10T10:00:00Z",
     memberOf: [],
+    rawAttributes: {},
     ...overrides,
   };
 }
@@ -48,7 +49,11 @@ const HEALTHY_RESULT: AccountHealthStatus = {
 const CRITICAL_RESULT: AccountHealthStatus = {
   level: "Critical",
   activeFlags: [
-    { name: "Disabled", severity: "Critical", description: "Account is disabled" },
+    {
+      name: "Disabled",
+      severity: "Critical",
+      description: "Account is disabled",
+    },
   ],
 };
 
@@ -93,33 +98,45 @@ describe("evaluateHealth", () => {
     mockInvoke.mockResolvedValue(HEALTHY_RESULT);
     await evaluateHealth(makeHealthyUser({ accountExpires: null }));
     const call = mockInvoke.mock.calls[0];
-    expect((call[1] as { input: { accountExpires: string | null } }).input.accountExpires).toBeNull();
+    expect(
+      (call[1] as { input: { accountExpires: string | null } }).input
+        .accountExpires,
+    ).toBeNull();
   });
 
   it("passes null lastLogon when not set", async () => {
     mockInvoke.mockResolvedValue(HEALTHY_RESULT);
     await evaluateHealth(makeHealthyUser({ lastLogon: null }));
     const call = mockInvoke.mock.calls[0];
-    expect((call[1] as { input: { lastLogon: string | null } }).input.lastLogon).toBeNull();
+    expect(
+      (call[1] as { input: { lastLogon: string | null } }).input.lastLogon,
+    ).toBeNull();
   });
 
   it("passes null passwordLastSet when not set", async () => {
     mockInvoke.mockResolvedValue(HEALTHY_RESULT);
     await evaluateHealth(makeHealthyUser({ passwordLastSet: null }));
     const call = mockInvoke.mock.calls[0];
-    expect((call[1] as { input: { passwordLastSet: string | null } }).input.passwordLastSet).toBeNull();
+    expect(
+      (call[1] as { input: { passwordLastSet: string | null } }).input
+        .passwordLastSet,
+    ).toBeNull();
   });
 
   it("passes empty string whenCreated as null", async () => {
     mockInvoke.mockResolvedValue(HEALTHY_RESULT);
     await evaluateHealth(makeHealthyUser({ whenCreated: "" }));
     const call = mockInvoke.mock.calls[0];
-    expect((call[1] as { input: { whenCreated: string | null } }).input.whenCreated).toBeNull();
+    expect(
+      (call[1] as { input: { whenCreated: string | null } }).input.whenCreated,
+    ).toBeNull();
   });
 
   it("propagates invoke errors", async () => {
     mockInvoke.mockRejectedValue(new Error("IPC failed"));
-    await expect(evaluateHealth(makeHealthyUser())).rejects.toThrow("IPC failed");
+    await expect(evaluateHealth(makeHealthyUser())).rejects.toThrow(
+      "IPC failed",
+    );
   });
 
   it("sends boolean fields correctly", async () => {
@@ -144,8 +161,16 @@ describe("evaluateHealth", () => {
     const multiResult: AccountHealthStatus = {
       level: "Critical",
       activeFlags: [
-        { name: "Disabled", severity: "Critical", description: "Account is disabled" },
-        { name: "PasswordNeverExpires", severity: "Warning", description: "Password is set to never expire" },
+        {
+          name: "Disabled",
+          severity: "Critical",
+          description: "Account is disabled",
+        },
+        {
+          name: "PasswordNeverExpires",
+          severity: "Warning",
+          description: "Password is set to never expire",
+        },
       ],
     };
     mockInvoke.mockResolvedValue(multiResult);

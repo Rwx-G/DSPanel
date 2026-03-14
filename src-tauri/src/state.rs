@@ -1,6 +1,11 @@
 use std::sync::{Arc, Mutex};
+use std::time::Instant;
 
-use crate::services::{DirectoryProvider, PermissionConfig, PermissionService};
+use crate::models::DirectoryEntry;
+use crate::services::{
+    AuditService, DirectoryProvider, MfaService, PermissionConfig, PermissionService,
+    SnapshotService,
+};
 
 /// Global application state managed by Tauri.
 ///
@@ -15,15 +20,59 @@ pub struct AppState {
     pub directory_provider: Arc<dyn DirectoryProvider>,
     /// Permission service for checking user authorization levels.
     pub permission_service: PermissionService,
+    /// Audit service for logging sensitive operations.
+    pub audit_service: AuditService,
+    /// MFA service for TOTP verification.
+    pub mfa_service: MfaService,
+    /// HTTP client for external API calls (HIBP, etc.).
+    pub http_client: reqwest::Client,
+    /// Snapshot service for capturing object state before modifications.
+    pub snapshot_service: SnapshotService,
+    /// Cache for browse_users: (fetch_time, sorted_entries). TTL: 60 seconds.
+    pub browse_cache: Mutex<Option<(Instant, Vec<DirectoryEntry>)>>,
+    /// Cache for browse_computers: (fetch_time, sorted_entries). TTL: 60 seconds.
+    pub browse_computers_cache: Mutex<Option<(Instant, Vec<DirectoryEntry>)>>,
 }
 
 impl AppState {
     pub fn new(provider: Arc<dyn DirectoryProvider>, permission_config: PermissionConfig) -> Self {
+        let http_client = reqwest::Client::builder()
+            .user_agent(format!("DSPanel/{}", env!("CARGO_PKG_VERSION")))
+            .timeout(std::time::Duration::from_secs(5))
+            .build()
+            .unwrap_or_default();
+
         Self {
             title: Mutex::new("DSPanel".to_string()),
             initialized: Mutex::new(false),
             directory_provider: provider,
             permission_service: PermissionService::new(permission_config),
+            audit_service: AuditService::new(),
+            mfa_service: MfaService::new(),
+            http_client,
+            snapshot_service: SnapshotService::new(),
+            browse_cache: Mutex::new(None),
+            browse_computers_cache: Mutex::new(None),
+        }
+    }
+
+    /// Creates an AppState with in-memory services (no file I/O) for testing.
+    #[cfg(test)]
+    pub fn new_for_test(
+        provider: Arc<dyn DirectoryProvider>,
+        permission_config: PermissionConfig,
+    ) -> Self {
+        Self {
+            title: Mutex::new("DSPanel".to_string()),
+            initialized: Mutex::new(false),
+            directory_provider: provider,
+            permission_service: PermissionService::new(permission_config),
+            audit_service: AuditService::new_in_memory(),
+            mfa_service: MfaService::new_in_memory(),
+            http_client: reqwest::Client::new(),
+            snapshot_service: SnapshotService::new(),
+            browse_cache: Mutex::new(None),
+            browse_computers_cache: Mutex::new(None),
         }
     }
 }
@@ -36,7 +85,7 @@ mod tests {
 
     fn make_state() -> AppState {
         let provider = Arc::new(MockDirectoryProvider::new());
-        AppState::new(provider, PermissionConfig::default())
+        AppState::new_for_test(provider, PermissionConfig::default())
     }
 
     #[test]
@@ -69,7 +118,7 @@ mod tests {
     #[test]
     fn test_app_state_with_disconnected_provider() {
         let provider = Arc::new(MockDirectoryProvider::disconnected());
-        let state = AppState::new(provider, PermissionConfig::default());
+        let state = AppState::new_for_test(provider, PermissionConfig::default());
         assert!(!state.directory_provider.is_connected());
     }
 

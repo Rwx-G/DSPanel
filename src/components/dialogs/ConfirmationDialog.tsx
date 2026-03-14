@@ -60,7 +60,11 @@ export function ConfirmationDialog({
       dialogTestId="confirmation-dialog"
     >
       <div className="flex items-center gap-2 border-b border-[var(--color-border-subtle)] px-4 py-3">
-        <IconComp size={20} className={SEVERITY_COLOR[severity]} aria-hidden="true" />
+        <IconComp
+          size={20}
+          className={SEVERITY_COLOR[severity]}
+          aria-hidden="true"
+        />
         <h2
           id="confirmation-dialog-title"
           className="text-body font-semibold text-[var(--color-text-primary)]"
@@ -92,7 +96,7 @@ export function ConfirmationDialog({
       <div className="flex justify-end gap-2 border-t border-[var(--color-border-subtle)] px-4 py-3">
         {cancelLabel && (
           <button
-            className="btn-secondary"
+            className="btn btn-secondary"
             onClick={onCancel}
             data-testid="dialog-cancel"
           >
@@ -100,7 +104,7 @@ export function ConfirmationDialog({
           </button>
         )}
         <button
-          className="btn-primary"
+          className="btn btn-primary"
           onClick={onConfirm}
           data-testid="dialog-confirm"
         >

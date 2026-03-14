@@ -29,7 +29,13 @@ describe("Common controls - visual snapshots", () => {
   });
 
   it("StatusBadge renders all variants", () => {
-    const variants = ["success", "warning", "error", "info", "neutral"] as const;
+    const variants = [
+      "success",
+      "warning",
+      "error",
+      "info",
+      "neutral",
+    ] as const;
     const { container } = render(
       <div>
         {variants.map((v) => (
@@ -41,9 +47,7 @@ describe("Common controls - visual snapshots", () => {
   });
 
   it("Avatar renders with initials fallback", () => {
-    const { container } = render(
-      <Avatar displayName="John Doe" size={40} />,
-    );
+    const { container } = render(<Avatar displayName="John Doe" size={40} />);
     expect(container.firstChild).toMatchSnapshot();
   });
 
@@ -55,16 +59,12 @@ describe("Common controls - visual snapshots", () => {
   });
 
   it("TagChip renders without remove button", () => {
-    const { container } = render(
-      <TagChip text="ReadOnly" removable={false} />,
-    );
+    const { container } = render(<TagChip text="ReadOnly" removable={false} />);
     expect(container.firstChild).toMatchSnapshot();
   });
 
   it("LoadingSpinner renders with message", () => {
-    const { container } = render(
-      <LoadingSpinner message="Loading data..." />,
-    );
+    const { container } = render(<LoadingSpinner message="Loading data..." />);
     expect(container.firstChild).toMatchSnapshot();
   });
 
