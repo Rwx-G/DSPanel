@@ -7,7 +7,9 @@ pub mod state;
 
 use std::sync::Arc;
 
-use services::{LdapDirectoryProvider, PermissionConfig};
+use services::PermissionConfig;
+#[cfg(not(feature = "demo"))]
+use services::LdapDirectoryProvider;
 use state::AppState;
 
 /// Installs a custom panic hook that logs panics via tracing before
@@ -46,13 +48,31 @@ pub fn run() {
 
     tracing::info!("DSPanel starting up");
 
-    let provider = Arc::new(LdapDirectoryProvider::new());
+    #[cfg(feature = "demo")]
+    let provider: Arc<dyn services::DirectoryProvider> = {
+        tracing::warn!("DEMO MODE ACTIVE - using mock directory data");
+        Arc::new(services::demo_provider::DemoDirectoryProvider::new())
+    };
+    #[cfg(not(feature = "demo"))]
+    let provider: Arc<dyn services::DirectoryProvider> =
+        Arc::new(LdapDirectoryProvider::new());
+
     let app_state = AppState::new(provider, PermissionConfig::default());
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .manage(app_state)
-        .setup(|_app| {
+        .setup(|app| {
+            // Detect permissions from AD groups on startup
+            use tauri::Manager;
+            let state = app.state::<AppState>();
+            let provider = state.directory_provider.clone();
+            let permission_svc = &state.permission_service;
+            tauri::async_runtime::block_on(async {
+                if let Err(e) = permission_svc.detect_permissions(&*provider).await {
+                    tracing::warn!("Permission detection failed: {}", e);
+                }
+            });
             tracing::info!("DSPanel setup complete");
             Ok(())
         })

@@ -1,5 +1,7 @@
 pub mod audit;
 pub mod dacl;
+#[cfg(feature = "demo")]
+pub mod demo_provider;
 pub mod directory;
 pub mod dpapi;
 pub mod health;
