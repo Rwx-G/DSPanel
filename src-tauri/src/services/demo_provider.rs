@@ -202,6 +202,32 @@ fn make_user(
         format!("CN={} Team,OU=Groups,DC=contoso,DC=com", dept),
     ]);
 
+    // Advanced/extended attributes (typically hidden in basic AD explorers)
+    attrs.insert("cn".to_string(), vec![display.to_string()]);
+    attrs.insert("objectGUID".to_string(), vec![format!("a1b2c3d4-e5f6-7890-{:04x}-abcdef012345", sam.len() * 1000)]);
+    attrs.insert("objectSid".to_string(), vec![format!("S-1-5-21-1234567890-9876543210-1111111111-{}", 1100 + sam.len())]);
+    attrs.insert("adminCount".to_string(), vec!["0".to_string()]);
+    attrs.insert("logonCount".to_string(), vec![format!("{}", sam.len() * 47)]);
+    attrs.insert("telephoneNumber".to_string(), vec![format!("+1-555-01{:02}", sam.len())]);
+    attrs.insert("physicalDeliveryOfficeName".to_string(), vec!["Building A - Floor 3".to_string()]);
+    attrs.insert("streetAddress".to_string(), vec!["123 Corporate Blvd".to_string()]);
+    attrs.insert("l".to_string(), vec!["Seattle".to_string()]);
+    attrs.insert("st".to_string(), vec!["WA".to_string()]);
+    attrs.insert("postalCode".to_string(), vec!["98101".to_string()]);
+    attrs.insert("co".to_string(), vec!["United States".to_string()]);
+    attrs.insert("company".to_string(), vec!["Contoso Ltd.".to_string()]);
+    attrs.insert("manager".to_string(), vec![format!("CN=Manager of {},OU={},OU=Users,DC=contoso,DC=com", display, dept)]);
+    attrs.insert("directReports".to_string(), vec![]);
+    attrs.insert("homeDrive".to_string(), vec!["H:".to_string()]);
+    attrs.insert("homeDirectory".to_string(), vec![format!("\\\\fileserver\\homes\\{}", sam)]);
+    attrs.insert("scriptPath".to_string(), vec!["logon.bat".to_string()]);
+    attrs.insert("profilePath".to_string(), vec![format!("\\\\fileserver\\profiles\\{}", sam)]);
+    attrs.insert("extensionAttribute1".to_string(), vec![format!("EMP-{:05}", sam.len() * 1234)]);
+    attrs.insert("extensionAttribute2".to_string(), vec![dept.to_string()]);
+    attrs.insert("extensionAttribute5".to_string(), vec![format!("SAP-{}", sam.to_uppercase())]);
+    attrs.insert("msDS-UserPasswordExpiryTimeComputed".to_string(), vec!["133600000000000000".to_string()]);
+    attrs.insert("msDS-PrincipalName".to_string(), vec![format!("CONTOSO\\{}", sam)]);
+
     DirectoryEntry {
         distinguished_name: format!("CN={},OU={},OU=Users,DC=contoso,DC=com", display, dept),
         sam_account_name: Some(sam.to_string()),
@@ -219,6 +245,9 @@ fn make_computer(name: &str, dns: &str, os: &str, os_ver: &str) -> DirectoryEntr
     attrs.insert("userAccountControl".to_string(), vec!["4096".to_string()]);
     attrs.insert("lastLogon".to_string(), vec!["133512000000000000".to_string()]);
     attrs.insert("objectClass".to_string(), vec!["computer".to_string()]);
+    attrs.insert("memberOf".to_string(), vec![
+        "CN=Domain Computers,CN=Users,DC=contoso,DC=com".to_string(),
+    ]);
 
     DirectoryEntry {
         distinguished_name: format!("CN={},OU=Computers,DC=contoso,DC=com", name),
@@ -282,6 +311,10 @@ impl DirectoryProvider for DemoDirectoryProvider {
         Ok(sample_browse_users().into_iter().take(max_results).collect())
     }
 
+    async fn browse_computers(&self, max_results: usize) -> Result<Vec<DirectoryEntry>> {
+        Ok(sample_computers().into_iter().take(max_results).collect())
+    }
+
     async fn get_user_by_identity(&self, sam_account_name: &str) -> Result<Option<DirectoryEntry>> {
         Ok(sample_users()
             .into_iter()
@@ -289,23 +322,26 @@ impl DirectoryProvider for DemoDirectoryProvider {
     }
 
     async fn get_group_members(&self, group_dn: &str, max_results: usize) -> Result<Vec<DirectoryEntry>> {
-        // Return a subset of users as group members based on group DN
-        let all = sample_browse_users();
-        let members: Vec<DirectoryEntry> = all
+        // Search both users and computers for members of this group
+        let mut members: Vec<DirectoryEntry> = sample_browse_users()
             .into_iter()
-            .filter(|u| {
-                u.get_attribute_values("memberOf")
+            .chain(sample_computers().into_iter())
+            .filter(|entry| {
+                entry.get_attribute_values("memberOf")
                     .iter()
                     .any(|m| m == group_dn)
             })
             .take(max_results)
             .collect();
-        // If no exact match, return first few users as a demo fallback
-        if members.is_empty() {
-            Ok(sample_users().into_iter().take(max_results.min(3)).collect())
-        } else {
-            Ok(members)
-        }
+
+        // Sort by display name for consistent ordering
+        members.sort_by(|a, b| {
+            let da = a.display_name.as_deref().unwrap_or("");
+            let db = b.display_name.as_deref().unwrap_or("");
+            da.cmp(db)
+        });
+
+        Ok(members)
     }
 
     async fn get_current_user_groups(&self) -> Result<Vec<String>> {

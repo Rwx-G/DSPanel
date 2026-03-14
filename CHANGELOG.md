@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New Tauri commands: reset_password, unlock_account, enable_account, disable_account, set_password_flags, generate_password, check_password_hibp, get_audit_entries, mfa_setup, mfa_verify, mfa_is_configured, mfa_revoke, mfa_get_config, mfa_set_config, mfa_requires
 - DirectoryProvider trait extended with write operations (reset_password, unlock_account, enable_account, disable_account, set_password_flags)
 - ResilientDirectoryProvider wraps all new write operations with retry and circuit breaker
+
 ### Changed
 
 - UserLookup page: removed blank initial state, users visible on open

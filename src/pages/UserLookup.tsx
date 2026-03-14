@@ -20,7 +20,7 @@ import { UserX, AlertCircle, User } from "lucide-react";
 
 export function UserLookup() {
   const {
-    users,
+    items: users,
     loading,
     loadingMore,
     error,
@@ -28,8 +28,8 @@ export function UserLookup() {
     filterText,
     setFilterText,
     loadMore,
-    selectedUser,
-    setSelectedUser,
+    selectedItem: selectedUser,
+    setSelectedItem: setSelectedUser,
     refresh,
   } = useUserBrowse();
 
@@ -75,7 +75,10 @@ export function UserLookup() {
 
   const handleFilterChange = useCallback(
     async (query: string) => {
-      setHealthMap(new Map());
+      // Only reset health map when the filter actually changes the user list
+      if (query.length >= 3) {
+        setHealthMap(new Map());
+      }
       setFilterText(query);
     },
     [setFilterText],

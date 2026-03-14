@@ -36,6 +36,7 @@ function makeHealthyUser(
     whenCreated: "2024-01-01T10:00:00Z",
     whenChanged: "2026-03-10T10:00:00Z",
     memberOf: [],
+    rawAttributes: {},
     ...overrides,
   };
 }

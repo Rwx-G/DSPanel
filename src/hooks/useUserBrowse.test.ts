@@ -62,7 +62,7 @@ describe("useUserBrowse", () => {
       expect(result.current.loading).toBe(false);
     });
 
-    expect(result.current.users).toHaveLength(2);
+    expect(result.current.items).toHaveLength(2);
     expect(result.current.mode).toBe("browse");
     expect(mockInvoke).toHaveBeenCalledWith("browse_users", {
       page: 0,
@@ -86,7 +86,7 @@ describe("useUserBrowse", () => {
     });
 
     expect(result.current.error).toBe("LDAP failed");
-    expect(result.current.users).toHaveLength(0);
+    expect(result.current.items).toHaveLength(0);
   });
 
   it("loads more pages in browse mode", async () => {
@@ -102,7 +102,7 @@ describe("useUserBrowse", () => {
     });
 
     expect(result.current.hasMore).toBe(true);
-    expect(result.current.users).toHaveLength(2);
+    expect(result.current.items).toHaveLength(2);
 
     mockInvoke.mockResolvedValueOnce(makeBrowseResult(page1, false));
 
@@ -114,7 +114,7 @@ describe("useUserBrowse", () => {
       expect(result.current.loadingMore).toBe(false);
     });
 
-    expect(result.current.users).toHaveLength(3);
+    expect(result.current.items).toHaveLength(3);
     expect(result.current.hasMore).toBe(false);
   });
 
@@ -137,8 +137,8 @@ describe("useUserBrowse", () => {
     });
 
     expect(result.current.mode).toBe("browse");
-    expect(result.current.users).toHaveLength(1);
-    expect(result.current.users[0].samAccountName).toBe("jdoe");
+    expect(result.current.items).toHaveLength(1);
+    expect(result.current.items[0].samAccountName).toBe("jdoe");
   });
 
   it("switches to server search with 3+ char filter", async () => {
@@ -163,8 +163,8 @@ describe("useUserBrowse", () => {
     });
 
     expect(result.current.mode).toBe("search");
-    expect(result.current.users).toHaveLength(1);
-    expect(result.current.users[0].samAccountName).toBe("asmith");
+    expect(result.current.items).toHaveLength(1);
+    expect(result.current.items[0].samAccountName).toBe("asmith");
     expect(mockInvoke).toHaveBeenCalledWith("search_users", { query: "ali" });
   });
 
@@ -188,7 +188,7 @@ describe("useUserBrowse", () => {
     });
 
     expect(result.current.mode).toBe("browse");
-    expect(result.current.users).toHaveLength(1);
+    expect(result.current.items).toHaveLength(1);
   });
 
   it("auto-selects when search returns single result", async () => {
@@ -211,8 +211,8 @@ describe("useUserBrowse", () => {
       expect(result.current.loading).toBe(false);
     });
 
-    expect(result.current.selectedUser).not.toBeNull();
-    expect(result.current.selectedUser?.samAccountName).toBe("jdoe");
+    expect(result.current.selectedItem).not.toBeNull();
+    expect(result.current.selectedItem?.samAccountName).toBe("jdoe");
   });
 
   it("refresh resets state and reloads", async () => {

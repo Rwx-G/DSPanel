@@ -47,9 +47,9 @@
   --color-success: #4ade80;
   --color-success-bg: rgba(74, 222, 128, 0.12);
   --color-warning: #fbbf24;
-  --color-warning-bg: rgba(251, 191, 36, 0.12);
+  --color-warning-bg: rgba(251, 191, 36, 0.18);
   --color-error: #f87171;
-  --color-error-bg: rgba(248, 113, 113, 0.12);
+  --color-error-bg: rgba(248, 113, 113, 0.18);
   --color-info: #60a5fa;
   --color-info-bg: rgba(96, 165, 250, 0.12);
 

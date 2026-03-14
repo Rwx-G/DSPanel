@@ -50,6 +50,9 @@ pub trait DirectoryProvider: Send + Sync {
     /// The caller is responsible for paging and sorting the results.
     async fn browse_users(&self, max_results: usize) -> Result<Vec<DirectoryEntry>>;
 
+    /// Fetches all computer accounts (up to `max_results`) for browsing.
+    async fn browse_computers(&self, max_results: usize) -> Result<Vec<DirectoryEntry>>;
+
     /// Returns the current user's group memberships (DNs).
     async fn get_current_user_groups(&self) -> Result<Vec<String>>;
 
@@ -256,6 +259,12 @@ pub mod tests {
             self.check_failure()?;
             let users = self.users.lock().unwrap();
             Ok(users.iter().take(max_results).cloned().collect())
+        }
+
+        async fn browse_computers(&self, max_results: usize) -> Result<Vec<DirectoryEntry>> {
+            self.check_failure()?;
+            let computers = self.computers.lock().unwrap();
+            Ok(computers.iter().take(max_results).cloned().collect())
         }
 
         async fn get_group_members(

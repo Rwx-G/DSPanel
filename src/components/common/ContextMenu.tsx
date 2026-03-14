@@ -63,8 +63,6 @@ export function ContextMenu({ items, position, onClose }: ContextMenuProps) {
     };
   }, [position, onClose]);
 
-  if (!position) return null;
-
   const handleItemClick = useCallback(
     (item: ContextMenuItem) => {
       if (!item.disabled) {
@@ -74,6 +72,8 @@ export function ContextMenu({ items, position, onClose }: ContextMenuProps) {
     },
     [onClose],
   );
+
+  if (!position) return null;
 
   return createPortal(
     <div

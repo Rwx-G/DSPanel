@@ -57,6 +57,7 @@ function makeUser(overrides: Partial<DirectoryUser> = {}): DirectoryUser {
     whenCreated: "2024-01-01",
     whenChanged: "2026-03-01",
     memberOf: [],
+    rawAttributes: {},
     ...overrides,
   };
 }

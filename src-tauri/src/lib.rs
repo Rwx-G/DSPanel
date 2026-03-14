@@ -86,6 +86,7 @@ pub fn run() {
             commands::search_users,
             commands::get_user,
             commands::browse_users,
+            commands::browse_computers,
             commands::get_group_members,
             commands::search_computers,
             commands::ping_host,

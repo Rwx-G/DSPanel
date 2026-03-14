@@ -29,7 +29,11 @@ export interface DirectoryUser {
   whenCreated: string;
   whenChanged: string;
   memberOf: string[];
+  rawAttributes: Record<string, string[]>;
 }
+
+/** Default empty rawAttributes for test helpers that build DirectoryUser manually. */
+export const EMPTY_RAW_ATTRIBUTES: Record<string, string[]> = {};
 
 export function mapEntryToUser(entry: DirectoryEntry): DirectoryUser {
   const attr = (name: string): string => entry.attributes[name]?.[0] ?? "";
@@ -61,6 +65,7 @@ export function mapEntryToUser(entry: DirectoryEntry): DirectoryUser {
     whenCreated: attr("whenCreated"),
     whenChanged: attr("whenChanged"),
     memberOf: attrList("memberOf"),
+    rawAttributes: entry.attributes,
   };
 }
 

@@ -1,19 +1,25 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { CopyButton } from "@/components/common/CopyButton";
+import { ContextMenu, type ContextMenuItem } from "@/components/common/ContextMenu";
 import {
   PropertyGrid,
   type PropertyGroup,
 } from "@/components/data/PropertyGrid";
 import { DataTable, type Column } from "@/components/data/DataTable";
 import { FilterBar, type FilterChip } from "@/components/data/FilterBar";
+import { GroupMembersDialog } from "@/components/dialogs/GroupMembersDialog";
 import { type DirectoryComputer } from "@/types/directory";
 import { parseCnFromDn } from "@/utils/dn";
+import { Users } from "lucide-react";
 
 export function ComputerDetail({ computer }: { computer: DirectoryComputer }) {
   const [groupFilterText, setGroupFilterText] = useState("");
   const [groupFilters, setGroupFilters] = useState<FilterChip[]>([]);
+  const [contextMenuPos, setContextMenuPos] = useState<{ x: number; y: number } | null>(null);
+  const [contextMenuRow, setContextMenuRow] = useState<{ name: string; dn: string } | null>(null);
+  const [groupMembersDialog, setGroupMembersDialog] = useState<{ dn: string; name: string } | null>(null);
   const [pingResult, setPingResult] = useState<string | null>(null);
   const [isPinging, setIsPinging] = useState(false);
   const [resolvedAddresses, setResolvedAddresses] = useState<string[]>([]);
@@ -117,10 +123,44 @@ export function ComputerDetail({ computer }: { computer: DirectoryComputer }) {
               ? resolvedAddresses.join(", ")
               : "N/A",
         },
-        { label: "Ping", value: pingResult ?? "Not tested" },
+        {
+          label: "Ping",
+          value: pingResult ?? "Not tested",
+          severity: pingResult
+            ? pingResult.startsWith("Reachable") ? "Success" as const : "Error" as const
+            : undefined,
+        },
       ],
     },
   ];
+
+  const handleGroupContextMenu = useCallback(
+    (row: { name: string; dn: string }, event: React.MouseEvent) => {
+      setContextMenuRow(row);
+      setContextMenuPos({ x: event.clientX, y: event.clientY });
+    },
+    [],
+  );
+
+  const closeContextMenu = useCallback(() => {
+    setContextMenuPos(null);
+    setContextMenuRow(null);
+  }, []);
+
+  const contextMenuItems: ContextMenuItem[] = contextMenuRow
+    ? [
+        {
+          label: "View group members",
+          icon: <Users size={14} />,
+          onClick: () => {
+            setGroupMembersDialog({
+              dn: contextMenuRow.dn,
+              name: parseCnFromDn(contextMenuRow.dn),
+            });
+          },
+        },
+      ]
+    : [];
 
   return (
     <div className="space-y-4" data-testid="computer-detail">
@@ -141,11 +181,9 @@ export function ComputerDetail({ computer }: { computer: DirectoryComputer }) {
         {computer.dnsHostName && <CopyButton text={computer.dnsHostName} />}
       </div>
 
-      <PropertyGrid groups={propertyGroups} />
-
-      <div className="flex gap-2">
+      <div className="flex items-center gap-2">
         <button
-          className="btn btn-secondary"
+          className="btn btn-sm flex items-center gap-1 bg-[var(--color-info)] text-white hover:opacity-90"
           onClick={handlePing}
           disabled={isPinging || !computer.dnsHostName}
           data-testid="ping-button"
@@ -153,18 +191,18 @@ export function ComputerDetail({ computer }: { computer: DirectoryComputer }) {
           {isPinging ? "Pinging..." : "Ping"}
         </button>
         {pingResult && (
-          <span
-            className={`text-caption ${
-              pingResult.startsWith("Reachable")
-                ? "text-[var(--color-success)]"
-                : "text-[var(--color-error)]"
-            }`}
-            data-testid="ping-result"
-          >
-            {pingResult}
-          </span>
+          <StatusBadge
+            text={pingResult}
+            variant={pingResult.startsWith("Reachable") ? "success" : "error"}
+          />
         )}
       </div>
+
+      <div className="border-t border-[var(--color-border-default)]" />
+
+      <PropertyGrid groups={propertyGroups} />
+
+      <div className="border-t border-[var(--color-border-default)]" />
 
       <div data-testid="computer-groups-section">
         <h3 className="mb-2 text-body font-semibold text-[var(--color-text-primary)]">
@@ -180,8 +218,23 @@ export function ComputerDetail({ computer }: { computer: DirectoryComputer }) {
           columns={groupColumns}
           data={groupRows}
           rowKey={(row) => row.dn}
+          onRowContextMenu={handleGroupContextMenu}
         />
       </div>
+
+      <ContextMenu
+        items={contextMenuItems}
+        position={contextMenuPos}
+        onClose={closeContextMenu}
+      />
+
+      {groupMembersDialog && (
+        <GroupMembersDialog
+          groupDn={groupMembersDialog.dn}
+          groupName={groupMembersDialog.name}
+          onClose={() => setGroupMembersDialog(null)}
+        />
+      )}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useRef } from "react";
 import { Search, X } from "lucide-react";
 
 interface SearchBarProps {
@@ -16,15 +16,23 @@ export function SearchBar({
   placeholder = "Search...",
   debounceMs = 300,
 }: SearchBarProps) {
+  // Stabilize callbacks via refs so the debounce effect only fires
+  // when `value` changes, not when the parent re-renders with a new
+  // callback reference.
+  const onSearchRef = useRef(onSearch);
+  onSearchRef.current = onSearch;
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+
   useEffect(() => {
-    const timer = setTimeout(() => onSearch(value), debounceMs);
+    const timer = setTimeout(() => onSearchRef.current(value), debounceMs);
     return () => clearTimeout(timer);
-  }, [value, debounceMs, onSearch]);
+  }, [value, debounceMs]);
 
   const handleClear = useCallback(() => {
-    onChange("");
-    onSearch("");
-  }, [onChange, onSearch]);
+    onChangeRef.current("");
+    onSearchRef.current("");
+  }, []);
 
   return (
     <div

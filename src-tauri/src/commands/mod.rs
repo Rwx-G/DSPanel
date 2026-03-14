@@ -131,6 +131,61 @@ pub(crate) async fn browse_users_inner(
     })
 }
 
+/// Browse computers with server-side caching and pagination.
+pub(crate) async fn browse_computers_inner(
+    state: &AppState,
+    page: usize,
+    page_size: usize,
+) -> Result<BrowseResult, AppError> {
+    const CACHE_TTL: Duration = Duration::from_secs(60);
+    const MAX_BROWSE: usize = 500;
+
+    let cached = {
+        let cache = state.browse_computers_cache.lock().unwrap();
+        cache
+            .as_ref()
+            .filter(|(ts, _)| ts.elapsed() < CACHE_TTL)
+            .map(|(_, entries)| entries.clone())
+    };
+
+    let entries = match cached {
+        Some(entries) => entries,
+        None => {
+            let provider = state.directory_provider.clone();
+            let mut fresh = provider
+                .browse_computers(MAX_BROWSE)
+                .await
+                .map_err(|e| AppError::Directory(e.to_string()))?;
+
+            fresh.sort_by(|a, b| {
+                let da = a.display_name.as_deref().unwrap_or("").to_lowercase();
+                let db = b.display_name.as_deref().unwrap_or("").to_lowercase();
+                da.cmp(&db)
+            });
+
+            let mut cache = state.browse_computers_cache.lock().unwrap();
+            *cache = Some((Instant::now(), fresh.clone()));
+
+            fresh
+        }
+    };
+
+    let total_count = entries.len();
+    let start = page * page_size;
+    let page_entries: Vec<DirectoryEntry> = entries
+        .into_iter()
+        .skip(start)
+        .take(page_size)
+        .collect();
+    let has_more = start + page_entries.len() < total_count;
+
+    Ok(BrowseResult {
+        entries: page_entries,
+        total_count,
+        has_more,
+    })
+}
+
 /// Returns members of a group by its DN.
 pub(crate) async fn get_group_members_inner(
     state: &AppState,
@@ -473,6 +528,16 @@ pub async fn browse_users(
     state: State<'_, AppState>,
 ) -> Result<BrowseResult, AppError> {
     browse_users_inner(&state, page, page_size).await
+}
+
+/// Browses all computers with pagination (cached server-side for 60s).
+#[tauri::command]
+pub async fn browse_computers(
+    page: usize,
+    page_size: usize,
+    state: State<'_, AppState>,
+) -> Result<BrowseResult, AppError> {
+    browse_computers_inner(&state, page, page_size).await
 }
 
 /// Returns the members of a group identified by its DN.

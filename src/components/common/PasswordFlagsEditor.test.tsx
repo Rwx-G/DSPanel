@@ -59,6 +59,7 @@ function makeUser(overrides: Partial<DirectoryUser> = {}): DirectoryUser {
     whenCreated: "2024-01-01",
     whenChanged: "2026-03-01",
     memberOf: [],
+    rawAttributes: {},
     ...overrides,
   };
 }
@@ -91,28 +92,35 @@ describe("PasswordFlagsEditor", () => {
     expect(screen.getByTestId("password-never-expires-checkbox")).toBeChecked();
   });
 
-  it("shows save button when flag is changed", () => {
+  it("save button is always visible but disabled when unchanged", () => {
     render(
       <PasswordFlagsEditor user={makeUser()} onRefresh={onRefresh} />,
       { wrapper: TestProviders },
     );
-    expect(screen.queryByTestId("save-flags-btn")).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByTestId("password-never-expires-checkbox"));
-
-    expect(screen.getByTestId("save-flags-btn")).toBeInTheDocument();
+    const btn = screen.getByTestId("save-flags-btn");
+    expect(btn).toBeInTheDocument();
+    expect(btn).toBeDisabled();
   });
 
-  it("hides save button when flag is reset to original", () => {
+  it("save button becomes enabled when flag is changed", () => {
     render(
       <PasswordFlagsEditor user={makeUser()} onRefresh={onRefresh} />,
       { wrapper: TestProviders },
     );
     fireEvent.click(screen.getByTestId("password-never-expires-checkbox"));
-    expect(screen.getByTestId("save-flags-btn")).toBeInTheDocument();
+    expect(screen.getByTestId("save-flags-btn")).toBeEnabled();
+  });
+
+  it("save button becomes disabled again when flag is reset to original", () => {
+    render(
+      <PasswordFlagsEditor user={makeUser()} onRefresh={onRefresh} />,
+      { wrapper: TestProviders },
+    );
+    fireEvent.click(screen.getByTestId("password-never-expires-checkbox"));
+    expect(screen.getByTestId("save-flags-btn")).toBeEnabled();
 
     fireEvent.click(screen.getByTestId("password-never-expires-checkbox"));
-    expect(screen.queryByTestId("save-flags-btn")).not.toBeInTheDocument();
+    expect(screen.getByTestId("save-flags-btn")).toBeDisabled();
   });
 
   it("shows dry-run preview on save", async () => {

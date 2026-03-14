@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { PermissionGate } from "@/components/common/PermissionGate";
 import { useDialog } from "@/contexts/DialogContext";
@@ -23,13 +23,23 @@ export function PasswordFlagsEditor({
   const [passwordNeverExpires, setPasswordNeverExpires] = useState(
     user.passwordNeverExpires,
   );
-  const [userCannotChangePassword, setUserCannotChangePassword] = useState(false);
+  // userCannotChangePassword lives in the DACL, not a simple LDAP attribute.
+  // The initial value is unknown (defaults to false) until a dedicated query
+  // is implemented. Tracked as a known limitation.
+  const initialCannotChange = false;
+  const [userCannotChangePassword, setUserCannotChangePassword] = useState(initialCannotChange);
   const [saving, setSaving] = useState(false);
+
+  // Reset local state when a different user is selected
+  useEffect(() => {
+    setPasswordNeverExpires(user.passwordNeverExpires);
+    setUserCannotChangePassword(initialCannotChange);
+  }, [user.distinguishedName, user.passwordNeverExpires]);
 
   const isDirty = useMemo(
     () =>
       passwordNeverExpires !== user.passwordNeverExpires ||
-      userCannotChangePassword !== false,
+      userCannotChangePassword !== initialCannotChange,
     [passwordNeverExpires, user.passwordNeverExpires, userCannotChangePassword],
   );
 
@@ -46,11 +56,11 @@ export function PasswordFlagsEditor({
       });
     }
 
-    if (userCannotChangePassword !== false) {
+    if (userCannotChangePassword !== initialCannotChange) {
       changes.push({
         type: "modify",
         targetName: "User Cannot Change Password",
-        description: `No -> ${userCannotChangePassword ? "Yes" : "No"}`,
+        description: `${initialCannotChange ? "Yes" : "No"} -> ${userCannotChangePassword ? "Yes" : "No"}`,
       });
     }
 
@@ -125,16 +135,14 @@ export function PasswordFlagsEditor({
       </label>
 
       <PermissionGate requiredLevel="AccountOperator">
-        {isDirty && (
-          <button
-            className="btn btn-sm btn-primary text-caption"
-            onClick={handleSave}
-            disabled={saving}
-            data-testid="save-flags-btn"
-          >
-            {saving ? "Saving..." : "Save Changes"}
-          </button>
-        )}
+        <button
+          className="btn btn-sm btn-primary text-caption"
+          onClick={handleSave}
+          disabled={!isDirty || saving}
+          data-testid="save-flags-btn"
+        >
+          {saving ? "Saving..." : "Save Changes"}
+        </button>
       </PermissionGate>
     </div>
   );

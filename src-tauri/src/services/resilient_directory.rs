@@ -187,6 +187,10 @@ where
         resilient_call!(self, |inner| inner.browse_users(max_results).await)
     }
 
+    async fn browse_computers(&self, max_results: usize) -> Result<Vec<DirectoryEntry>> {
+        resilient_call!(self, |inner| inner.browse_computers(max_results).await)
+    }
+
     async fn get_user_by_identity(&self, sam_account_name: &str) -> Result<Option<DirectoryEntry>> {
         let sam = sam_account_name.to_string();
         resilient_call!(self, sam, |inner, s| inner.get_user_by_identity(&s).await)

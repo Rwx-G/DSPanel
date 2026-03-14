@@ -17,6 +17,13 @@ so that I can quickly find and manage groups.
 6. Search works across both views with instant filtering
 7. Large domains handled via lazy loading (expand OU on demand)
 
+> **NB - Cross-module navigation**: The UserLookup "View group members" dialog
+> (right-click on a group membership row) should include a link/button to open
+> the Group Management module with that group pre-selected. This provides a
+> seamless drill-down from user detail into full group management. The deep-link
+> mechanism (e.g. `navigation.openTab("groups", { selectedGroupDn })`) should be
+> implemented as part of this story.
+
 ### Story 4.2: Group Member Management
 
 As an AccountOperator,
