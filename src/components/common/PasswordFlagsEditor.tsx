@@ -127,7 +127,7 @@ export function PasswordFlagsEditor({
       <PermissionGate requiredLevel="AccountOperator">
         {isDirty && (
           <button
-            className="btn-primary text-caption"
+            className="btn btn-primary text-caption"
             onClick={handleSave}
             disabled={saving}
             data-testid="save-flags-btn"

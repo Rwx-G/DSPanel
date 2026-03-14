@@ -89,7 +89,7 @@ export function Sidebar({ expanded, onToggle }: SidebarProps) {
           </button>
         )}
         <button
-          className="btn-ghost flex h-8 w-8 shrink-0 items-center justify-center rounded-md p-0"
+          className="btn btn-ghost flex h-8 w-8 shrink-0 items-center justify-center rounded-md p-0"
           onClick={onToggle}
           aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
           data-testid="sidebar-toggle"

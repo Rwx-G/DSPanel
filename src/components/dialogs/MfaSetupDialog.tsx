@@ -80,11 +80,11 @@ export function MfaSetupDialog({
           )}
         </div>
         <div className="flex justify-end gap-2 border-t border-[var(--color-border-subtle)] px-4 py-3">
-          <button className="btn-secondary" onClick={onCancel} data-testid="setup-cancel">
+          <button className="btn btn-secondary" onClick={onCancel} data-testid="setup-cancel">
             Cancel
           </button>
           <button
-            className="btn-primary"
+            className="btn btn-primary"
             onClick={handleSetup}
             disabled={loading}
             data-testid="setup-begin"
@@ -144,9 +144,9 @@ export function MfaSetupDialog({
           )}
         </div>
         <div className="flex justify-end gap-2 border-t border-[var(--color-border-subtle)] px-4 py-3">
-          <button className="btn-secondary" onClick={onCancel}>Cancel</button>
+          <button className="btn btn-secondary" onClick={onCancel}>Cancel</button>
           <button
-            className="btn-primary"
+            className="btn btn-primary"
             onClick={handleVerify}
             disabled={verifyCode.length < 6}
             data-testid="verify-btn"
@@ -186,7 +186,7 @@ export function MfaSetupDialog({
         </div>
         <div className="flex justify-end border-t border-[var(--color-border-subtle)] px-4 py-3">
           <button
-            className="btn-primary"
+            className="btn btn-primary"
             onClick={onComplete}
             data-testid="setup-complete"
           >

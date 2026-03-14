@@ -99,7 +99,7 @@ export function UserActions({
         data-testid="user-actions"
       >
         <button
-          className="btn-primary flex items-center gap-1.5"
+          className="btn btn-primary flex items-center gap-1.5"
           onClick={onResetPassword}
           data-testid="reset-password-btn"
         >
@@ -109,7 +109,7 @@ export function UserActions({
 
         {user.lockedOut && (
           <button
-            className="btn-secondary flex items-center gap-1.5"
+            className="btn btn-secondary flex items-center gap-1.5"
             onClick={handleUnlock}
             disabled={loading === "Unlock"}
             data-testid="unlock-btn"
@@ -121,7 +121,7 @@ export function UserActions({
 
         {user.enabled ? (
           <button
-            className="btn-secondary flex items-center gap-1.5 text-[var(--color-error)]"
+            className="btn btn-secondary flex items-center gap-1.5 text-[var(--color-error)]"
             onClick={handleDisable}
             disabled={loading === "Disable"}
             data-testid="disable-btn"
@@ -131,7 +131,7 @@ export function UserActions({
           </button>
         ) : (
           <button
-            className="btn-secondary flex items-center gap-1.5 text-[var(--color-success)]"
+            className="btn btn-secondary flex items-center gap-1.5 text-[var(--color-success)]"
             onClick={handleEnable}
             disabled={loading === "Enable"}
             data-testid="enable-btn"

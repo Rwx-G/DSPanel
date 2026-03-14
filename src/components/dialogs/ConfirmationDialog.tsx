@@ -92,7 +92,7 @@ export function ConfirmationDialog({
       <div className="flex justify-end gap-2 border-t border-[var(--color-border-subtle)] px-4 py-3">
         {cancelLabel && (
           <button
-            className="btn-secondary"
+            className="btn btn-secondary"
             onClick={onCancel}
             data-testid="dialog-cancel"
           >
@@ -100,7 +100,7 @@ export function ConfirmationDialog({
           </button>
         )}
         <button
-          className="btn-primary"
+          className="btn btn-primary"
           onClick={onConfirm}
           data-testid="dialog-confirm"
         >

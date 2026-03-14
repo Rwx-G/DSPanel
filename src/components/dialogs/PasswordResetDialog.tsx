@@ -170,7 +170,7 @@ export function PasswordResetDialog({
         </div>
         <div className="flex justify-end px-4 py-3 border-t border-[var(--color-border-subtle)]">
           <button
-            className="btn-primary"
+            className="btn btn-primary"
             onClick={onClose}
             data-testid="close-result"
           >
@@ -271,7 +271,7 @@ export function PasswordResetDialog({
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <button
-                className="btn-secondary"
+                className="btn btn-secondary"
                 onClick={handleGenerate}
                 disabled={generating}
                 data-testid="generate-btn"
@@ -341,14 +341,14 @@ export function PasswordResetDialog({
 
       <div className="flex justify-end gap-2 px-4 py-3 border-t border-[var(--color-border-subtle)]">
         <button
-          className="btn-secondary"
+          className="btn btn-secondary"
           onClick={onClose}
           data-testid="cancel-btn"
         >
           Cancel
         </button>
         <button
-          className="btn-primary"
+          className="btn btn-primary"
           onClick={handleReset}
           disabled={!canReset || loading}
           data-testid="reset-btn"

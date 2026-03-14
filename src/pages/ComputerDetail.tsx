@@ -145,7 +145,7 @@ export function ComputerDetail({ computer }: { computer: DirectoryComputer }) {
 
       <div className="flex gap-2">
         <button
-          className="btn-secondary"
+          className="btn btn-secondary"
           onClick={handlePing}
           disabled={isPinging || !computer.dnsHostName}
           data-testid="ping-button"

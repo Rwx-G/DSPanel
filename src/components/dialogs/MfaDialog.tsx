@@ -97,14 +97,14 @@ export function MfaDialog({ onVerified, onCancel }: MfaDialogProps) {
 
       <div className="flex justify-end gap-2 border-t border-[var(--color-border-subtle)] px-4 py-3">
         <button
-          className="btn-secondary"
+          className="btn btn-secondary"
           onClick={onCancel}
           data-testid="mfa-cancel"
         >
           Cancel
         </button>
         <button
-          className="btn-primary"
+          className="btn btn-primary"
           onClick={handleVerify}
           disabled={code.length < 6 || loading}
           data-testid="mfa-verify"
