@@ -43,7 +43,7 @@ windows = { version = "0.58", features = [
 ] }
 
 [features]
-default = []
+default = ["gssapi"]
 gssapi = ["ldap3/gssapi"]
 
 [dev-dependencies]

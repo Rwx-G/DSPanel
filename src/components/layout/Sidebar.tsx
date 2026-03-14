@@ -1,6 +1,7 @@
 import {
   User,
   Monitor,
+  KeyRound,
   Settings,
   ChevronLeft,
   ChevronRight,
@@ -17,6 +18,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   home: Home,
   user: User,
   computer: Monitor,
+  key: KeyRound,
   settings: Settings,
 };
 
@@ -33,6 +35,13 @@ const MODULES: SidebarModule[] = [
     label: "Computer Lookup",
     icon: "computer",
     group: "Directory",
+    requiredLevel: "ReadOnly",
+  },
+  {
+    id: "password-generator",
+    label: "Password Generator",
+    icon: "key",
+    group: "Tools",
     requiredLevel: "ReadOnly",
   },
 ];
