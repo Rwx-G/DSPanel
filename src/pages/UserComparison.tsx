@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Search, GitCompareArrows, RotateCcw, Users, UserPlus } from "lucide-react";
 import { useComparison } from "@/hooks/useComparison";
@@ -189,29 +189,6 @@ export function UserComparison() {
   const [contextMenuPos, setContextMenuPos] = useState<{ x: number; y: number } | null>(null);
   const [contextMenuItems, setContextMenuItems] = useState<ContextMenuItem[]>([]);
   const [groupMembersDialog, setGroupMembersDialog] = useState<{ dn: string; name: string } | null>(null);
-  const pendingAction = useRef<{ userDn: string; groupDn: string; groupName: string } | null>(null);
-
-  const addUserToGroup = useCallback(
-    async (userDn: string, groupDn: string, groupName: string) => {
-      try {
-        await invoke("add_user_to_group", { userDn, groupDn });
-        notify("success", `Added to ${groupName}`);
-        compare();
-      } catch (err) {
-        notify("error", `Failed to add to group: ${err}`);
-      }
-    },
-    [compare, notify],
-  );
-
-  // Execute pending action after context menu closes
-  useEffect(() => {
-    if (contextMenuPos === null && pendingAction.current) {
-      const { userDn, groupDn, groupName } = pendingAction.current;
-      pendingAction.current = null;
-      addUserToGroup(userDn, groupDn, groupName);
-    }
-  }, [contextMenuPos, addUserToGroup]);
 
   const handleGroupContextMenu = useCallback(
     (e: React.MouseEvent, group: GroupDisplayItem) => {
@@ -228,12 +205,17 @@ export function UserComparison() {
         items.push({
           label: `Add ${userA.displayName ?? userA.samAccountName} to this group`,
           icon: <UserPlus size={14} />,
-          onClick: () => {
-            pendingAction.current = {
-              userDn: userA.distinguishedName,
-              groupDn: group.dn,
-              groupName: group.name,
-            };
+          onClick: async () => {
+            try {
+              await invoke("add_user_to_group", {
+                userDn: userA.distinguishedName,
+                groupDn: group.dn,
+              });
+              notify("success", `Added to ${group.name}`);
+              compare();
+            } catch (err) {
+              notify("error", `Failed to add to group: ${err}`);
+            }
           },
         });
       }
@@ -242,12 +224,17 @@ export function UserComparison() {
         items.push({
           label: `Add ${userB.displayName ?? userB.samAccountName} to this group`,
           icon: <UserPlus size={14} />,
-          onClick: () => {
-            pendingAction.current = {
-              userDn: userB.distinguishedName,
-              groupDn: group.dn,
-              groupName: group.name,
-            };
+          onClick: async () => {
+            try {
+              await invoke("add_user_to_group", {
+                userDn: userB.distinguishedName,
+                groupDn: group.dn,
+              });
+              notify("success", `Added to ${group.name}`);
+              compare();
+            } catch (err) {
+              notify("error", `Failed to add to group: ${err}`);
+            }
           },
         });
       }
@@ -255,7 +242,7 @@ export function UserComparison() {
       setContextMenuItems(items);
       setContextMenuPos({ x: e.clientX, y: e.clientY });
     },
-    [userA, userB],
+    [userA, userB, compare, notify],
   );
 
   const canCompare = userA !== null && userB !== null && !isComparing;
