@@ -76,6 +76,9 @@ pub trait DirectoryProvider: Send + Sync {
     /// Disables a user account by setting the ACCOUNTDISABLE flag in `userAccountControl`.
     async fn disable_account(&self, user_dn: &str) -> Result<()>;
 
+    /// Reads the "User Cannot Change Password" flag from the DACL.
+    async fn get_cannot_change_password(&self, user_dn: &str) -> Result<bool>;
+
     /// Sets password-related flags on a user account.
     async fn set_password_flags(
         &self,
@@ -109,6 +112,7 @@ pub mod tests {
         pub enable_calls: Mutex<Vec<String>>,
         pub disable_calls: Mutex<Vec<String>>,
         pub set_password_flags_calls: Mutex<Vec<(String, bool, bool)>>,
+        cannot_change_password: Mutex<bool>,
     }
 
     impl Default for MockDirectoryProvider {
@@ -134,6 +138,7 @@ pub mod tests {
                 enable_calls: Mutex::new(Vec::new()),
                 disable_calls: Mutex::new(Vec::new()),
                 set_password_flags_calls: Mutex::new(Vec::new()),
+                cannot_change_password: Mutex::new(false),
             }
         }
 
@@ -153,6 +158,7 @@ pub mod tests {
                 enable_calls: Mutex::new(Vec::new()),
                 disable_calls: Mutex::new(Vec::new()),
                 set_password_flags_calls: Mutex::new(Vec::new()),
+                cannot_change_password: Mutex::new(false),
             }
         }
 
@@ -315,6 +321,11 @@ pub mod tests {
             Ok(())
         }
 
+        async fn get_cannot_change_password(&self, _user_dn: &str) -> Result<bool> {
+            self.check_failure()?;
+            Ok(*self.cannot_change_password.lock().unwrap())
+        }
+
         async fn set_password_flags(
             &self,
             user_dn: &str,
@@ -322,6 +333,7 @@ pub mod tests {
             user_cannot_change_password: bool,
         ) -> Result<()> {
             self.check_failure()?;
+            *self.cannot_change_password.lock().unwrap() = user_cannot_change_password;
             self.set_password_flags_calls.lock().unwrap().push((
                 user_dn.to_string(),
                 password_never_expires,

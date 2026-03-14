@@ -95,6 +95,66 @@ fn is_deny_change_password_ace(ace_data: &[u8], target_sid: &[u8]) -> bool {
     ace_data[sid_start..sid_start + target_sid.len()] == *target_sid
 }
 
+/// Reads the current state of the "User Cannot Change Password" flag from a security descriptor.
+///
+/// Returns `true` if both deny ACEs (Everyone and SELF for Change Password) are present.
+pub fn is_cannot_change_password(sd_bytes: &[u8]) -> Result<bool> {
+    if sd_bytes.len() < 20 {
+        anyhow::bail!("Security descriptor too short ({} bytes)", sd_bytes.len());
+    }
+
+    let dacl_offset =
+        u32::from_le_bytes([sd_bytes[16], sd_bytes[17], sd_bytes[18], sd_bytes[19]]) as usize;
+
+    if dacl_offset == 0 {
+        return Ok(false); // No DACL means no deny ACEs
+    }
+
+    if dacl_offset >= sd_bytes.len() || dacl_offset + 8 > sd_bytes.len() {
+        anyhow::bail!("Invalid DACL offset {} in security descriptor", dacl_offset);
+    }
+
+    let acl_size =
+        u16::from_le_bytes([sd_bytes[dacl_offset + 2], sd_bytes[dacl_offset + 3]]) as usize;
+    let ace_count =
+        u16::from_le_bytes([sd_bytes[dacl_offset + 4], sd_bytes[dacl_offset + 5]]) as usize;
+
+    let acl_data_end = dacl_offset + acl_size;
+    if acl_data_end > sd_bytes.len() {
+        anyhow::bail!("DACL extends beyond security descriptor bounds");
+    }
+
+    let mut pos = dacl_offset + 8;
+    let mut has_everyone_deny = false;
+    let mut has_self_deny = false;
+
+    for _ in 0..ace_count {
+        if pos + 4 > sd_bytes.len() {
+            break;
+        }
+        let ace_size = u16::from_le_bytes([sd_bytes[pos + 2], sd_bytes[pos + 3]]) as usize;
+        if pos + ace_size > sd_bytes.len() {
+            break;
+        }
+        let ace_data = &sd_bytes[pos..pos + ace_size];
+
+        if is_deny_change_password_ace(ace_data, SID_EVERYONE) {
+            has_everyone_deny = true;
+        }
+        if is_deny_change_password_ace(ace_data, SID_SELF) {
+            has_self_deny = true;
+        }
+
+        if has_everyone_deny && has_self_deny {
+            return Ok(true);
+        }
+
+        pos += ace_size;
+    }
+
+    Ok(false)
+}
+
 /// Modifies a binary security descriptor to set or clear the "User Cannot Change Password" flag.
 ///
 /// When `deny` is true, adds deny ACEs for Everyone and SELF.

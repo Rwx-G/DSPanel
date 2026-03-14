@@ -98,6 +98,7 @@ pub fn run() {
             commands::unlock_account,
             commands::enable_account,
             commands::disable_account,
+            commands::get_cannot_change_password,
             commands::set_password_flags,
             commands::get_audit_entries,
             commands::generate_password,

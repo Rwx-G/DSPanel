@@ -70,6 +70,11 @@ describe("PasswordFlagsEditor", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockLevel = "AccountOperator";
+    // Default mock: get_cannot_change_password returns false
+    mockInvoke.mockImplementation(((cmd: string) => {
+      if (cmd === "get_cannot_change_password") return Promise.resolve(false);
+      return Promise.resolve(undefined);
+    }) as typeof invoke);
   });
 
   it("renders with correct initial state", () => {
@@ -138,7 +143,10 @@ describe("PasswordFlagsEditor", () => {
   });
 
   it("calls set_password_flags after confirming dry-run", async () => {
-    mockInvoke.mockResolvedValueOnce(undefined as never);
+    mockInvoke.mockImplementation(((cmd: string) => {
+      if (cmd === "get_cannot_change_password") return Promise.resolve(false);
+      return Promise.resolve(undefined);
+    }) as typeof invoke);
 
     render(
       <PasswordFlagsEditor user={makeUser()} onRefresh={onRefresh} />,
@@ -182,7 +190,11 @@ describe("PasswordFlagsEditor", () => {
       expect(screen.queryByTestId("dryrun-dialog")).not.toBeInTheDocument();
     });
 
-    expect(mockInvoke).not.toHaveBeenCalled();
+    // set_password_flags should NOT have been called (get_cannot_change_password is OK)
+    expect(mockInvoke).not.toHaveBeenCalledWith(
+      "set_password_flags",
+      expect.anything(),
+    );
   });
 
   it("disables checkbox for ReadOnly users", () => {

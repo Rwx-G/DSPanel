@@ -346,6 +346,18 @@ pub(crate) async fn disable_account_inner(state: &AppState, user_dn: &str) -> Re
 }
 
 /// Sets password flags on a user account via the directory provider.
+/// Reads the current "User Cannot Change Password" flag from the DACL.
+pub(crate) async fn get_cannot_change_password_inner(
+    state: &AppState,
+    user_dn: &str,
+) -> Result<bool, AppError> {
+    let provider = state.directory_provider.clone();
+    provider
+        .get_cannot_change_password(user_dn)
+        .await
+        .map_err(|e| AppError::Directory(e.to_string()))
+}
+
 pub(crate) async fn set_password_flags_inner(
     state: &AppState,
     user_dn: &str,
@@ -604,6 +616,15 @@ pub async fn enable_account(user_dn: String, state: State<'_, AppState>) -> Resu
 #[tauri::command]
 pub async fn disable_account(user_dn: String, state: State<'_, AppState>) -> Result<(), AppError> {
     disable_account_inner(&state, &user_dn).await
+}
+
+/// Reads the "User Cannot Change Password" DACL flag for a user account.
+#[tauri::command]
+pub async fn get_cannot_change_password(
+    user_dn: String,
+    state: State<'_, AppState>,
+) -> Result<bool, AppError> {
+    get_cannot_change_password_inner(&state, &user_dn).await
 }
 
 /// Sets password flags on a user account.

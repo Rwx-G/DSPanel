@@ -548,6 +548,38 @@ impl DirectoryProvider for LdapDirectoryProvider {
         Ok(())
     }
 
+    async fn get_cannot_change_password(&self, user_dn: &str) -> Result<bool> {
+        let mut ldap = self.connect().await?;
+
+        let (rs, _) = ldap
+            .search(
+                user_dn,
+                Scope::Base,
+                "(objectClass=*)",
+                vec!["nTSecurityDescriptor"],
+            )
+            .await
+            .context("Failed to read nTSecurityDescriptor")?
+            .success()
+            .context("nTSecurityDescriptor read returned error")?;
+
+        let _ = ldap.unbind().await;
+
+        let entry = rs
+            .into_iter()
+            .next()
+            .context("User not found when reading security descriptor")?;
+        let se = ldap3::SearchEntry::construct(entry);
+        let sd_bytes = se
+            .bin_attrs
+            .get("nTSecurityDescriptor")
+            .and_then(|v| v.first())
+            .context("nTSecurityDescriptor binary attribute not present")?;
+
+        crate::services::dacl::is_cannot_change_password(sd_bytes)
+            .context("Failed to parse security descriptor DACL")
+    }
+
     async fn set_password_flags(
         &self,
         user_dn: &str,

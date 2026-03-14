@@ -23,24 +23,41 @@ export function PasswordFlagsEditor({
   const [passwordNeverExpires, setPasswordNeverExpires] = useState(
     user.passwordNeverExpires,
   );
-  // userCannotChangePassword lives in the DACL, not a simple LDAP attribute.
-  // The initial value is unknown (defaults to false) until a dedicated query
-  // is implemented. Tracked as a known limitation.
-  const initialCannotChange = false;
-  const [userCannotChangePassword, setUserCannotChangePassword] = useState(initialCannotChange);
+  const [userCannotChangePassword, setUserCannotChangePassword] = useState(false);
+  const [adCannotChangePassword, setAdCannotChangePassword] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // Reset local state when a different user is selected
+  // Fetch the DACL-based "Cannot Change Password" flag and reset state on user change
   useEffect(() => {
     setPasswordNeverExpires(user.passwordNeverExpires);
-    setUserCannotChangePassword(initialCannotChange);
+
+    let cancelled = false;
+    invoke<boolean>("get_cannot_change_password", {
+      userDn: user.distinguishedName,
+    })
+      .then((value) => {
+        if (!cancelled) {
+          setAdCannotChangePassword(value);
+          setUserCannotChangePassword(value);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setAdCannotChangePassword(false);
+          setUserCannotChangePassword(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [user.distinguishedName, user.passwordNeverExpires]);
 
   const isDirty = useMemo(
     () =>
       passwordNeverExpires !== user.passwordNeverExpires ||
-      userCannotChangePassword !== initialCannotChange,
-    [passwordNeverExpires, user.passwordNeverExpires, userCannotChangePassword],
+      userCannotChangePassword !== adCannotChangePassword,
+    [passwordNeverExpires, user.passwordNeverExpires, userCannotChangePassword, adCannotChangePassword],
   );
 
   const canEdit = hasPermission("AccountOperator");
@@ -56,11 +73,11 @@ export function PasswordFlagsEditor({
       });
     }
 
-    if (userCannotChangePassword !== initialCannotChange) {
+    if (userCannotChangePassword !== adCannotChangePassword) {
       changes.push({
         type: "modify",
         targetName: "User Cannot Change Password",
-        description: `${initialCannotChange ? "Yes" : "No"} -> ${userCannotChangePassword ? "Yes" : "No"}`,
+        description: `${adCannotChangePassword ? "Yes" : "No"} -> ${userCannotChangePassword ? "Yes" : "No"}`,
       });
     }
 
@@ -91,6 +108,8 @@ export function PasswordFlagsEditor({
     }
   }, [
     passwordNeverExpires,
+    userCannotChangePassword,
+    adCannotChangePassword,
     user,
     showDryRunPreview,
     notify,

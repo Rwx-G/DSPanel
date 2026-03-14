@@ -372,6 +372,10 @@ impl DirectoryProvider for DemoDirectoryProvider {
         Ok(())
     }
 
+    async fn get_cannot_change_password(&self, _user_dn: &str) -> Result<bool> {
+        Ok(false)
+    }
+
     async fn set_password_flags(&self, user_dn: &str, pne: bool, uccp: bool) -> Result<()> {
         tracing::info!(target_dn = %user_dn, pne, uccp, "DEMO: password flags simulated");
         Ok(())
