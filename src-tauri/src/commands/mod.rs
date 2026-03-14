@@ -232,6 +232,11 @@ pub(crate) async fn reset_password_inner(
         ));
     }
 
+    state
+        .mfa_service
+        .check_mfa_for_action("PasswordReset")
+        .map_err(|e| AppError::PermissionDenied(e.to_string()))?;
+
     state.snapshot_service.capture(user_dn, "PasswordReset");
     let provider = state.directory_provider.clone();
     match provider
@@ -327,6 +332,11 @@ pub(crate) async fn disable_account_inner(state: &AppState, user_dn: &str) -> Re
         ));
     }
 
+    state
+        .mfa_service
+        .check_mfa_for_action("AccountDisable")
+        .map_err(|e| AppError::PermissionDenied(e.to_string()))?;
+
     state.snapshot_service.capture(user_dn, "AccountDisable");
     let provider = state.directory_provider.clone();
     match provider.disable_account(user_dn).await {
@@ -372,6 +382,11 @@ pub(crate) async fn set_password_flags_inner(
             "Password flag management requires AccountOperator permission or higher".to_string(),
         ));
     }
+
+    state
+        .mfa_service
+        .check_mfa_for_action("PasswordFlagsChange")
+        .map_err(|e| AppError::PermissionDenied(e.to_string()))?;
 
     state
         .snapshot_service

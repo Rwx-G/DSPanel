@@ -7,8 +7,12 @@ use sha1::Sha1;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
+use std::time::Instant;
 
 type HmacSha1 = Hmac<Sha1>;
+
+/// Duration for which a successful MFA verification remains valid.
+const MFA_SESSION_WINDOW: std::time::Duration = std::time::Duration::from_secs(300); // 5 minutes
 
 /// Result of MFA setup containing the secret and backup codes.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -57,6 +61,7 @@ pub struct MfaService {
     config: Mutex<MfaConfig>,
     persist_path: Option<PathBuf>,
     failed_attempts: Mutex<u32>,
+    last_verified: Mutex<Option<Instant>>,
 }
 
 impl Default for MfaService {
@@ -79,6 +84,7 @@ impl MfaService {
             config: Mutex::new(MfaConfig::default()),
             persist_path,
             failed_attempts: Mutex::new(0),
+            last_verified: Mutex::new(None),
         }
     }
 
@@ -91,6 +97,7 @@ impl MfaService {
             config: Mutex::new(MfaConfig::default()),
             persist_path: None,
             failed_attempts: Mutex::new(0),
+            last_verified: Mutex::new(None),
         }
     }
 
@@ -172,6 +179,29 @@ impl MfaService {
         }
     }
 
+    /// Checks whether MFA verification is required and still valid for an action.
+    ///
+    /// Returns `Ok(())` if:
+    /// - MFA is not configured, OR
+    /// - The action does not require MFA, OR
+    /// - MFA was successfully verified within the session window (5 minutes)
+    ///
+    /// Returns `Err` if MFA is required but not recently verified.
+    pub fn check_mfa_for_action(&self, action: &str) -> Result<()> {
+        if !self.requires_mfa(action) {
+            return Ok(());
+        }
+
+        let last = self.last_verified.lock().unwrap();
+        match *last {
+            Some(ts) if ts.elapsed() < MFA_SESSION_WINDOW => Ok(()),
+            _ => anyhow::bail!(
+                "MFA verification required for {}. Please verify your identity first.",
+                action
+            ),
+        }
+    }
+
     /// Generates a new TOTP secret and backup codes.
     /// Persists the secret to local storage for durability.
     pub fn setup(&self, username: &str) -> Result<MfaSetupResult> {
@@ -234,6 +264,7 @@ impl MfaService {
             if let Some(pos) = backup_codes.iter().position(|c| c == code) {
                 backup_codes.remove(pos);
                 *self.failed_attempts.lock().unwrap() = 0;
+                *self.last_verified.lock().unwrap() = Some(Instant::now());
                 self.persist();
                 tracing::info!("MFA verified via backup code");
                 return Ok(true);
@@ -253,6 +284,7 @@ impl MfaService {
             let expected = generate_totp(&secret, step)?;
             if expected == code {
                 *self.failed_attempts.lock().unwrap() = 0;
+                *self.last_verified.lock().unwrap() = Some(Instant::now());
                 return Ok(true);
             }
         }
@@ -467,5 +499,38 @@ mod tests {
         assert!(json.contains("secretBase32"));
         assert!(json.contains("qrUri"));
         assert!(json.contains("backupCodes"));
+    }
+
+    #[test]
+    fn test_check_mfa_for_action_not_configured() {
+        let svc = MfaService::new_in_memory();
+        // Not configured - should pass without verification
+        assert!(svc.check_mfa_for_action("PasswordReset").is_ok());
+    }
+
+    #[test]
+    fn test_check_mfa_for_action_configured_but_not_verified() {
+        let svc = MfaService::new_in_memory();
+        svc.setup("testuser").unwrap();
+        // Configured but never verified - should fail
+        assert!(svc.check_mfa_for_action("PasswordReset").is_err());
+    }
+
+    #[test]
+    fn test_check_mfa_for_action_after_verification() {
+        let svc = MfaService::new_in_memory();
+        let result = svc.setup("testuser").unwrap();
+        let backup = result.backup_codes[0].clone();
+        assert!(svc.verify(&backup).unwrap());
+        // Just verified - should pass
+        assert!(svc.check_mfa_for_action("PasswordReset").is_ok());
+    }
+
+    #[test]
+    fn test_check_mfa_for_action_not_required() {
+        let svc = MfaService::new_in_memory();
+        svc.setup("testuser").unwrap();
+        // PasswordFlagsChange not required by default
+        assert!(svc.check_mfa_for_action("PasswordFlagsChange").is_ok());
     }
 }
