@@ -4,6 +4,13 @@ import { DialogShell } from "@/components/dialogs/DialogShell";
 import { PasswordInput } from "@/components/form/PasswordInput";
 import { CopyButton } from "@/components/common/CopyButton";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
+import { useMfaGate } from "@/hooks/useMfaGate";
+
+interface HibpResult {
+  isBreached: boolean;
+  breachCount: number;
+  checked: boolean;
+}
 
 interface PasswordResetDialogProps {
   userDn: string;
@@ -58,6 +65,8 @@ export function PasswordResetDialog({
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [resultPassword, setResultPassword] = useState<string | null>(null);
+  const [hibpResult, setHibpResult] = useState<HibpResult | null>(null);
+  const { checkMfa } = useMfaGate();
 
   const validation = validatePassword(manualPassword);
   const manualValid = isPasswordValid(validation);
@@ -70,6 +79,7 @@ export function PasswordResetDialog({
   const handleGenerate = useCallback(async () => {
     setGenerating(true);
     setError(null);
+    setHibpResult(null);
     try {
       const password = await invoke<string>("generate_password", {
         length: 16,
@@ -80,6 +90,15 @@ export function PasswordResetDialog({
         excludeAmbiguous: true,
       });
       setGeneratedPassword(password);
+      // Auto-check HIBP after generation
+      try {
+        const hibp = await invoke<HibpResult>("check_password_hibp", {
+          password,
+        });
+        setHibpResult(hibp);
+      } catch {
+        setHibpResult({ isBreached: false, breachCount: 0, checked: false });
+      }
     } catch (e) {
       setError(
         typeof e === "string" ? e : "Failed to generate password",
@@ -91,6 +110,10 @@ export function PasswordResetDialog({
 
   const handleReset = useCallback(async () => {
     if (!activePassword) return;
+
+    const mfaAllowed = await checkMfa("PasswordReset");
+    if (!mfaAllowed) return;
+
     setLoading(true);
     setError(null);
     try {
@@ -112,7 +135,7 @@ export function PasswordResetDialog({
     } finally {
       setLoading(false);
     }
-  }, [activePassword, userDn, mustChangeAtNextLogon, onSuccess]);
+  }, [activePassword, userDn, mustChangeAtNextLogon, onSuccess, checkMfa]);
 
   if (resultPassword) {
     return (
@@ -261,14 +284,33 @@ export function PasswordResetDialog({
               </button>
             </div>
             {generatedPassword && (
-              <div className="flex items-center gap-2 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-bg)] px-3 py-2">
-                <code
-                  className="flex-1 text-body font-mono text-[var(--color-text-primary)] select-all"
-                  data-testid="generated-password"
-                >
-                  {generatedPassword}
-                </code>
-                <CopyButton text={generatedPassword} />
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-bg)] px-3 py-2">
+                  <code
+                    className="flex-1 text-body font-mono text-[var(--color-text-primary)] select-all"
+                    data-testid="generated-password"
+                  >
+                    {generatedPassword}
+                  </code>
+                  <CopyButton text={generatedPassword} />
+                </div>
+                {hibpResult && (
+                  <div data-testid="hibp-status">
+                    {!hibpResult.checked ? (
+                      <span className="text-caption text-[var(--color-warning)]">
+                        Breach check unavailable
+                      </span>
+                    ) : hibpResult.isBreached ? (
+                      <span className="text-caption text-[var(--color-error)]">
+                        Found in {hibpResult.breachCount.toLocaleString()} breaches - consider regenerating
+                      </span>
+                    ) : (
+                      <span className="text-caption text-[var(--color-success)]">
+                        Not found in any known breach
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>

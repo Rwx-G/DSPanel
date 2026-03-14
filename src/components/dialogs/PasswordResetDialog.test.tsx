@@ -1,10 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { type ReactNode } from "react";
 import { PasswordResetDialog } from "./PasswordResetDialog";
+import { DialogProvider } from "@/contexts/DialogContext";
+import { NotificationProvider } from "@/contexts/NotificationContext";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
 }));
+
+function TestProviders({ children }: { children: ReactNode }) {
+  return (
+    <NotificationProvider>
+      <DialogProvider>{children}</DialogProvider>
+    </NotificationProvider>
+  );
+}
 
 import { invoke } from "@tauri-apps/api/core";
 const mockInvoke = vi.mocked(invoke);
@@ -22,7 +33,7 @@ describe("PasswordResetDialog", () => {
   });
 
   it("renders dialog with user display name", () => {
-    render(<PasswordResetDialog {...defaultProps} />);
+    render(<PasswordResetDialog {...defaultProps} />, { wrapper: TestProviders });
     expect(screen.getByTestId("password-reset-dialog")).toBeInTheDocument();
     expect(screen.getByText("John Doe")).toBeInTheDocument();
     // "Reset Password" appears as both the header and button text
@@ -30,32 +41,32 @@ describe("PasswordResetDialog", () => {
   });
 
   it("defaults to auto-generate mode", () => {
-    render(<PasswordResetDialog {...defaultProps} />);
+    render(<PasswordResetDialog {...defaultProps} />, { wrapper: TestProviders });
     expect(screen.getByTestId("mode-generate")).toHaveClass("text-white");
     expect(screen.getByTestId("generate-btn")).toBeInTheDocument();
   });
 
   it("switches to manual mode on click", () => {
-    render(<PasswordResetDialog {...defaultProps} />);
+    render(<PasswordResetDialog {...defaultProps} />, { wrapper: TestProviders });
     fireEvent.click(screen.getByTestId("mode-manual"));
     expect(screen.getByTestId("password-input-wrapper")).toBeInTheDocument();
   });
 
   it("has must-change-at-next-logon checked by default", () => {
-    render(<PasswordResetDialog {...defaultProps} />);
+    render(<PasswordResetDialog {...defaultProps} />, { wrapper: TestProviders });
     const checkbox = screen.getByTestId("must-change-checkbox");
     expect(checkbox).toBeChecked();
   });
 
   it("can toggle must-change-at-next-logon", () => {
-    render(<PasswordResetDialog {...defaultProps} />);
+    render(<PasswordResetDialog {...defaultProps} />, { wrapper: TestProviders });
     const checkbox = screen.getByTestId("must-change-checkbox");
     fireEvent.click(checkbox);
     expect(checkbox).not.toBeChecked();
   });
 
   it("shows password validation in manual mode", () => {
-    render(<PasswordResetDialog {...defaultProps} />);
+    render(<PasswordResetDialog {...defaultProps} />, { wrapper: TestProviders });
     fireEvent.click(screen.getByTestId("mode-manual"));
     const input = screen.getByTestId("password-input-wrapper").querySelector("input")!;
     fireEvent.change(input, { target: { value: "weak" } });
@@ -63,7 +74,7 @@ describe("PasswordResetDialog", () => {
   });
 
   it("disables reset button when manual password is invalid", () => {
-    render(<PasswordResetDialog {...defaultProps} />);
+    render(<PasswordResetDialog {...defaultProps} />, { wrapper: TestProviders });
     fireEvent.click(screen.getByTestId("mode-manual"));
     const input = screen.getByTestId("password-input-wrapper").querySelector("input")!;
     fireEvent.change(input, { target: { value: "weak" } });
@@ -71,7 +82,7 @@ describe("PasswordResetDialog", () => {
   });
 
   it("enables reset button when manual password is valid", () => {
-    render(<PasswordResetDialog {...defaultProps} />);
+    render(<PasswordResetDialog {...defaultProps} />, { wrapper: TestProviders });
     fireEvent.click(screen.getByTestId("mode-manual"));
     const input = screen.getByTestId("password-input-wrapper").querySelector("input")!;
     fireEvent.change(input, { target: { value: "StrongP@ss1" } });
@@ -80,7 +91,7 @@ describe("PasswordResetDialog", () => {
 
   it("calls generate_password on generate click", async () => {
     mockInvoke.mockResolvedValueOnce("GeneratedP@ss1" as never);
-    render(<PasswordResetDialog {...defaultProps} />);
+    render(<PasswordResetDialog {...defaultProps} />, { wrapper: TestProviders });
     fireEvent.click(screen.getByTestId("generate-btn"));
 
     await waitFor(() => {
@@ -100,7 +111,7 @@ describe("PasswordResetDialog", () => {
       return Promise.resolve(undefined);
     }) as typeof invoke);
 
-    render(<PasswordResetDialog {...defaultProps} />);
+    render(<PasswordResetDialog {...defaultProps} />, { wrapper: TestProviders });
     fireEvent.click(screen.getByTestId("generate-btn"));
 
     await waitFor(() => {
@@ -125,7 +136,7 @@ describe("PasswordResetDialog", () => {
       return Promise.resolve(undefined);
     }) as typeof invoke);
 
-    render(<PasswordResetDialog {...defaultProps} />);
+    render(<PasswordResetDialog {...defaultProps} />, { wrapper: TestProviders });
     fireEvent.click(screen.getByTestId("generate-btn"));
 
     await waitFor(() => {
@@ -149,7 +160,7 @@ describe("PasswordResetDialog", () => {
       return Promise.resolve(undefined);
     }) as typeof invoke);
 
-    render(<PasswordResetDialog {...defaultProps} />);
+    render(<PasswordResetDialog {...defaultProps} />, { wrapper: TestProviders });
     fireEvent.click(screen.getByTestId("generate-btn"));
 
     await waitFor(() => {
@@ -166,7 +177,7 @@ describe("PasswordResetDialog", () => {
   });
 
   it("calls onClose when cancel is clicked", () => {
-    render(<PasswordResetDialog {...defaultProps} />);
+    render(<PasswordResetDialog {...defaultProps} />, { wrapper: TestProviders });
     fireEvent.click(screen.getByTestId("cancel-btn"));
     expect(defaultProps.onClose).toHaveBeenCalled();
   });
@@ -178,7 +189,7 @@ describe("PasswordResetDialog", () => {
       return Promise.resolve(undefined);
     }) as typeof invoke);
 
-    render(<PasswordResetDialog {...defaultProps} />);
+    render(<PasswordResetDialog {...defaultProps} />, { wrapper: TestProviders });
     fireEvent.click(screen.getByTestId("generate-btn"));
     await waitFor(() => {
       expect(screen.getByTestId("generated-password")).toBeInTheDocument();
