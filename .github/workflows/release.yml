@@ -56,6 +56,17 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libssl-dev libayatana-appindicator3-dev librsvg2-dev libkrb5-dev
 
+      - name: Install macOS dependencies
+        if: runner.os == 'macOS'
+        run: brew install krb5
+
+      - name: Set macOS Kerberos paths
+        if: runner.os == 'macOS'
+        run: |
+          echo "CFLAGS=-I$(brew --prefix krb5)/include" >> $GITHUB_ENV
+          echo "LDFLAGS=-L$(brew --prefix krb5)/lib" >> $GITHUB_ENV
+          echo "PKG_CONFIG_PATH=$(brew --prefix krb5)/lib/pkgconfig" >> $GITHUB_ENV
+
       - name: Install frontend dependencies
         run: pnpm install
 
