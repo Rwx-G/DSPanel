@@ -123,9 +123,15 @@ export function UserDetail({
         onResetPassword={() => setShowPasswordReset(true)}
       />
 
+      <div className="border-t border-[var(--color-border-default)]" />
+
       <PropertyGrid groups={propertyGroups} />
 
+      <div className="border-t border-[var(--color-border-default)]" />
+
       <PasswordFlagsEditor user={user} onRefresh={handleRefresh} />
+
+      <div className="border-t border-[var(--color-border-default)]" />
 
       <div data-testid="user-groups-section">
         <h3 className="mb-2 text-body font-semibold text-[var(--color-text-primary)]">

@@ -44,11 +44,12 @@ export function PropertyGrid({ groups }: PropertyGridProps) {
 
   return (
     <div className="space-y-1" data-testid="property-grid">
-      {groups.map((group) => {
+      {groups.map((group, idx) => {
         const isCollapsed = collapsed.has(group.category);
         return (
           <div
             key={group.category}
+            className={idx > 0 ? "border-t border-[var(--color-border-subtle)] pt-1" : ""}
             data-testid={`property-group-${group.category}`}
           >
             <button

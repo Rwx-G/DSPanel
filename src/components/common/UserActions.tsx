@@ -99,44 +99,44 @@ export function UserActions({
         data-testid="user-actions"
       >
         <button
-          className="btn btn-primary flex items-center gap-1.5"
+          className="btn btn-sm btn-primary flex items-center gap-1"
           onClick={onResetPassword}
           data-testid="reset-password-btn"
         >
-          <KeyRound size={14} />
+          <KeyRound size={12} />
           Reset Password
         </button>
 
         {user.lockedOut && (
           <button
-            className="btn btn-secondary flex items-center gap-1.5"
+            className="btn btn-sm btn-secondary flex items-center gap-1"
             onClick={handleUnlock}
             disabled={loading === "Unlock"}
             data-testid="unlock-btn"
           >
-            <Unlock size={14} />
+            <Unlock size={12} />
             Unlock
           </button>
         )}
 
         {user.enabled ? (
           <button
-            className="btn btn-secondary flex items-center gap-1.5 text-[var(--color-error)]"
+            className="btn btn-sm btn-secondary flex items-center gap-1 text-[var(--color-error)]"
             onClick={handleDisable}
             disabled={loading === "Disable"}
             data-testid="disable-btn"
           >
-            <PowerOff size={14} />
+            <PowerOff size={12} />
             Disable
           </button>
         ) : (
           <button
-            className="btn btn-secondary flex items-center gap-1.5 text-[var(--color-success)]"
+            className="btn btn-sm btn-secondary flex items-center gap-1 text-[var(--color-success)]"
             onClick={handleEnable}
             disabled={loading === "Enable"}
             data-testid="enable-btn"
           >
-            <Power size={14} />
+            <Power size={12} />
             Enable
           </button>
         )}
