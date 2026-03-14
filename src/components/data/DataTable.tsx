@@ -27,6 +27,7 @@ interface DataTableProps<T> {
   sortState?: SortState<T>;
   onSort?: (key: keyof T & string, direction: SortDirection) => void;
   onRowClick?: (row: T) => void;
+  onRowContextMenu?: (row: T, event: React.MouseEvent) => void;
   loading?: boolean;
   emptyMessage?: string;
   rowKey: (row: T) => string;
@@ -38,6 +39,7 @@ export function DataTable<T>({
   sortState,
   onSort,
   onRowClick,
+  onRowContextMenu,
   loading = false,
   emptyMessage = "No data available",
   rowKey,
@@ -200,6 +202,7 @@ export function DataTable<T>({
                 onRowClick ? "cursor-pointer" : ""
               }`}
               onClick={() => onRowClick?.(row)}
+              onContextMenu={onRowContextMenu ? (e) => { e.preventDefault(); onRowContextMenu(row, e); } : undefined}
               data-testid="data-table-row"
             >
               {columns.map((col) => (

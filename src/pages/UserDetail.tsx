@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { CopyButton } from "@/components/common/CopyButton";
 import { HealthBadge } from "@/components/common/HealthBadge";
 import { UserActions } from "@/components/common/UserActions";
 import { PasswordFlagsEditor } from "@/components/common/PasswordFlagsEditor";
+import { ContextMenu, type ContextMenuItem } from "@/components/common/ContextMenu";
 import {
   PropertyGrid,
   type PropertyGroup,
@@ -11,8 +12,11 @@ import {
 import { DataTable, type Column } from "@/components/data/DataTable";
 import { FilterBar, type FilterChip } from "@/components/data/FilterBar";
 import { PasswordResetDialog } from "@/components/dialogs/PasswordResetDialog";
+import { GroupMembersDialog } from "@/components/dialogs/GroupMembersDialog";
 import { type DirectoryUser } from "@/types/directory";
 import type { AccountHealthStatus } from "@/types/health";
+import { parseCnFromDn } from "@/utils/dn";
+import { Users } from "lucide-react";
 
 export interface UserDetailProps {
   user: DirectoryUser;
@@ -35,6 +39,9 @@ export function UserDetail({
 }: UserDetailProps) {
   const [groupFilters, setGroupFilters] = useState<FilterChip[]>([]);
   const [showPasswordReset, setShowPasswordReset] = useState(false);
+  const [contextMenuPos, setContextMenuPos] = useState<{ x: number; y: number } | null>(null);
+  const [contextMenuRow, setContextMenuRow] = useState<{ name: string; dn: string } | null>(null);
+  const [groupMembersDialog, setGroupMembersDialog] = useState<{ dn: string; name: string } | null>(null);
 
   const handleRefresh = onRefresh ?? (() => {});
 
@@ -96,6 +103,34 @@ export function UserDetail({
     },
   ];
 
+  const handleGroupContextMenu = useCallback(
+    (row: { name: string; dn: string }, event: React.MouseEvent) => {
+      setContextMenuRow(row);
+      setContextMenuPos({ x: event.clientX, y: event.clientY });
+    },
+    [],
+  );
+
+  const closeContextMenu = useCallback(() => {
+    setContextMenuPos(null);
+    setContextMenuRow(null);
+  }, []);
+
+  const contextMenuItems: ContextMenuItem[] = contextMenuRow
+    ? [
+        {
+          label: "View group members",
+          icon: <Users size={14} />,
+          onClick: () => {
+            setGroupMembersDialog({
+              dn: contextMenuRow.dn,
+              name: parseCnFromDn(contextMenuRow.dn),
+            });
+          },
+        },
+      ]
+    : [];
+
   return (
     <div className="space-y-4" data-testid="user-detail">
       <div className="flex items-center justify-between">
@@ -147,8 +182,15 @@ export function UserDetail({
           columns={groupColumns}
           data={groupRows}
           rowKey={(row) => row.dn}
+          onRowContextMenu={handleGroupContextMenu}
         />
       </div>
+
+      <ContextMenu
+        items={contextMenuItems}
+        position={contextMenuPos}
+        onClose={closeContextMenu}
+      />
 
       {showPasswordReset && (
         <PasswordResetDialog
@@ -156,6 +198,14 @@ export function UserDetail({
           displayName={user.displayName || user.samAccountName}
           onClose={() => setShowPasswordReset(false)}
           onSuccess={handleRefresh}
+        />
+      )}
+
+      {groupMembersDialog && (
+        <GroupMembersDialog
+          groupDn={groupMembersDialog.dn}
+          groupName={groupMembersDialog.name}
+          onClose={() => setGroupMembersDialog(null)}
         />
       )}
     </div>
