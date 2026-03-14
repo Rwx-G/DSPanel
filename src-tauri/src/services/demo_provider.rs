@@ -364,10 +364,7 @@ fn make_group(name: &str, parent_group: &str, _dept: &str) -> DirectoryEntry {
     let mut attrs = HashMap::new();
     attrs.insert(
         "memberOf".to_string(),
-        vec![format!(
-            "CN={},OU=Groups,DC=contoso,DC=com",
-            parent_group
-        )],
+        vec![format!("CN={},OU=Groups,DC=contoso,DC=com", parent_group)],
     );
     DirectoryEntry {
         distinguished_name: format!("CN={},OU=Groups,DC=contoso,DC=com", name),
@@ -379,7 +376,8 @@ fn make_group(name: &str, parent_group: &str, _dept: &str) -> DirectoryEntry {
 }
 
 fn dn_seed(dn: &str) -> u64 {
-    dn.bytes().fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64))
+    dn.bytes()
+        .fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64))
 }
 
 fn sample_replication_metadata_for(object_dn: &str) -> String {
@@ -393,17 +391,122 @@ fn sample_replication_metadata_for(object_dn: &str) -> String {
     let usn_base = 10000 + (seed % 50000);
 
     let attrs: Vec<(&str, u64, String, &str, u64)> = vec![
-        ("sAMAccountName",      1,              format!("2024-06-{}T{:02}:12:00Z", (day_offset % 28) + 1, hour), dc, usn_base),
-        ("userPrincipalName",   1,              format!("2024-06-{}T{:02}:12:00Z", (day_offset % 28) + 1, hour), dc, usn_base + 1),
-        ("mail",                v_base + 1,     format!("2025-{:02}-{}T{:02}:00:00Z", (seed % 10) + 1, (day_offset % 27) + 1, (hour + 3) % 24), dc_alt, usn_base + 5000),
-        ("displayName",         v_base + 2,     format!("2025-{:02}-{}T{:02}:30:00Z", (seed % 8) + 3, (day_offset % 26) + 1, (hour + 5) % 24), dc_alt, usn_base + 15000),
-        ("department",          v_base + 1,     format!("2025-{:02}-{}T{:02}:20:00Z", (seed % 6) + 5, (day_offset % 25) + 1, (hour + 2) % 24), dc, usn_base + 12000),
-        ("title",               v_base + 3,     format!("2026-01-{}T{:02}:45:00Z", (day_offset % 28) + 1, (hour + 1) % 24), dc, usn_base + 30000),
-        ("userAccountControl",  v_base + 2,     format!("2026-01-{}T{:02}:30:00Z", ((day_offset + 5) % 28) + 1, (hour + 4) % 24), dc, usn_base + 28000),
-        ("pwdLastSet",          v_base + 4,     format!("2026-02-{}T{:02}:00:00Z", (day_offset % 27) + 1, (hour + 6) % 24), dc, usn_base + 40000),
-        ("memberOf",            v_base + 5,     format!("2026-02-{}T{:02}:45:00Z", ((day_offset + 10) % 27) + 1, (hour + 3) % 24), dc, usn_base + 42000),
-        ("lastLogonTimestamp",  v_base + 8,     format!("2026-03-{}T{:02}:15:00Z", (day_offset % 13) + 1, (hour + 7) % 24), dc_alt, usn_base + 50000),
-        ("whenChanged",        v_base + 10,     format!("2026-03-{}T{:02}:15:00Z", (day_offset % 13) + 1, (hour + 7) % 24), dc_alt, usn_base + 50001),
+        (
+            "sAMAccountName",
+            1,
+            format!("2024-06-{}T{:02}:12:00Z", (day_offset % 28) + 1, hour),
+            dc,
+            usn_base,
+        ),
+        (
+            "userPrincipalName",
+            1,
+            format!("2024-06-{}T{:02}:12:00Z", (day_offset % 28) + 1, hour),
+            dc,
+            usn_base + 1,
+        ),
+        (
+            "mail",
+            v_base + 1,
+            format!(
+                "2025-{:02}-{}T{:02}:00:00Z",
+                (seed % 10) + 1,
+                (day_offset % 27) + 1,
+                (hour + 3) % 24
+            ),
+            dc_alt,
+            usn_base + 5000,
+        ),
+        (
+            "displayName",
+            v_base + 2,
+            format!(
+                "2025-{:02}-{}T{:02}:30:00Z",
+                (seed % 8) + 3,
+                (day_offset % 26) + 1,
+                (hour + 5) % 24
+            ),
+            dc_alt,
+            usn_base + 15000,
+        ),
+        (
+            "department",
+            v_base + 1,
+            format!(
+                "2025-{:02}-{}T{:02}:20:00Z",
+                (seed % 6) + 5,
+                (day_offset % 25) + 1,
+                (hour + 2) % 24
+            ),
+            dc,
+            usn_base + 12000,
+        ),
+        (
+            "title",
+            v_base + 3,
+            format!(
+                "2026-01-{}T{:02}:45:00Z",
+                (day_offset % 28) + 1,
+                (hour + 1) % 24
+            ),
+            dc,
+            usn_base + 30000,
+        ),
+        (
+            "userAccountControl",
+            v_base + 2,
+            format!(
+                "2026-01-{}T{:02}:30:00Z",
+                ((day_offset + 5) % 28) + 1,
+                (hour + 4) % 24
+            ),
+            dc,
+            usn_base + 28000,
+        ),
+        (
+            "pwdLastSet",
+            v_base + 4,
+            format!(
+                "2026-02-{}T{:02}:00:00Z",
+                (day_offset % 27) + 1,
+                (hour + 6) % 24
+            ),
+            dc,
+            usn_base + 40000,
+        ),
+        (
+            "memberOf",
+            v_base + 5,
+            format!(
+                "2026-02-{}T{:02}:45:00Z",
+                ((day_offset + 10) % 27) + 1,
+                (hour + 3) % 24
+            ),
+            dc,
+            usn_base + 42000,
+        ),
+        (
+            "lastLogonTimestamp",
+            v_base + 8,
+            format!(
+                "2026-03-{}T{:02}:15:00Z",
+                (day_offset % 13) + 1,
+                (hour + 7) % 24
+            ),
+            dc_alt,
+            usn_base + 50000,
+        ),
+        (
+            "whenChanged",
+            v_base + 10,
+            format!(
+                "2026-03-{}T{:02}:15:00Z",
+                (day_offset % 13) + 1,
+                (hour + 7) % 24
+            ),
+            dc_alt,
+            usn_base + 50001,
+        ),
     ];
 
     attrs
@@ -418,7 +521,12 @@ fn sample_replication_metadata_for(object_dn: &str) -> String {
     <usnOriginatingChange>{}</usnOriginatingChange>
     <usnLocalChange>{}</usnLocalChange>
 </DS_REPL_ATTR_META_DATA>"#,
-                name, ver, time, originating_dc, usn, usn + 300
+                name,
+                ver,
+                time,
+                originating_dc,
+                usn,
+                usn + 300
             )
         })
         .collect::<Vec<_>>()

@@ -445,7 +445,6 @@ async fn resolve_user(
     results
         .into_iter()
         .find(|u| u.sam_account_name.as_deref() == Some(sam))
-        .or_else(|| None)
         .ok_or_else(|| AppError::Directory(format!("User not found: {}", sam)))
 }
 
