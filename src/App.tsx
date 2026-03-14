@@ -13,6 +13,7 @@ import { UserLookup } from "@/pages/UserLookup";
 import { ComputerLookup } from "@/pages/ComputerLookup";
 import { HomePage } from "@/pages/HomePage";
 import { PasswordGenerator } from "@/pages/PasswordGenerator";
+import { UserComparison } from "@/pages/UserComparison";
 
 const APP_VERSION = __APP_VERSION__;
 
@@ -128,6 +129,8 @@ function ModuleRouter({ status }: { status: AppStatus }) {
       return <UserLookup />;
     case "computers":
       return <ComputerLookup />;
+    case "user-comparison":
+      return <UserComparison />;
     case "password-generator":
       return <PasswordGenerator />;
     default:

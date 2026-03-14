@@ -109,6 +109,7 @@ pub fn run() {
             commands::mfa_get_config,
             commands::mfa_set_config,
             commands::mfa_requires,
+            commands::compare_users,
         ])
         .run(tauri::generate_context!())
         .unwrap_or_else(|e| {

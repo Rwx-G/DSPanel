@@ -5,6 +5,7 @@ use std::time::{Duration, Instant};
 use crate::error::AppError;
 use crate::models::DirectoryEntry;
 use crate::services::audit::AuditEntry;
+use crate::services::comparison::GroupComparisonResult;
 use crate::services::mfa::{MfaConfig, MfaSetupResult};
 use crate::services::password::{HibpResult, PasswordOptions};
 use crate::services::{AccountHealthStatus, HealthInput, PermissionLevel};
@@ -415,6 +416,38 @@ pub(crate) fn get_audit_entries_inner(state: &AppState) -> Vec<AuditEntry> {
     state.audit_service.get_entries()
 }
 
+/// Compares the group memberships of two users identified by sAMAccountName.
+pub(crate) async fn compare_users_inner(
+    state: &AppState,
+    sam_a: &str,
+    sam_b: &str,
+) -> Result<GroupComparisonResult, AppError> {
+    let provider = state.directory_provider.clone();
+
+    let user_a = provider
+        .get_user_by_identity(sam_a)
+        .await
+        .map_err(|e| AppError::Directory(e.to_string()))?
+        .ok_or_else(|| AppError::Directory(format!("User not found: {}", sam_a)))?;
+
+    let user_b = provider
+        .get_user_by_identity(sam_b)
+        .await
+        .map_err(|e| AppError::Directory(e.to_string()))?
+        .ok_or_else(|| AppError::Directory(format!("User not found: {}", sam_b)))?;
+
+    let groups_a: Vec<String> = user_a
+        .get_attribute_values("memberOf")
+        .to_vec();
+    let groups_b: Vec<String> = user_b
+        .get_attribute_values("memberOf")
+        .to_vec();
+
+    Ok(crate::services::comparison::compute_group_diff(
+        &groups_a, &groups_b,
+    ))
+}
+
 // ---------------------------------------------------------------------------
 // Tauri commands - thin wrappers
 // ---------------------------------------------------------------------------
@@ -657,6 +690,16 @@ pub async fn set_password_flags(
 #[tauri::command]
 pub fn get_audit_entries(state: State<'_, AppState>) -> Vec<AuditEntry> {
     get_audit_entries_inner(&state)
+}
+
+/// Compares group memberships of two users, returning shared/unique groups.
+#[tauri::command]
+pub async fn compare_users(
+    sam_a: String,
+    sam_b: String,
+    state: State<'_, AppState>,
+) -> Result<GroupComparisonResult, AppError> {
+    compare_users_inner(&state, &sam_a, &sam_b).await
 }
 
 /// Generates a secure password with optional HIBP breach check.
@@ -1493,5 +1536,101 @@ mod tests {
         let state = make_state_with_failure();
         let result = get_group_members_inner(&state, "CN=G,DC=test").await;
         assert!(result.is_err());
+    }
+
+    // -----------------------------------------------------------------------
+    // Epic 3 command tests - compare_users_inner
+    // -----------------------------------------------------------------------
+
+    fn make_user_with_groups(sam: &str, display: &str, groups: Vec<&str>) -> DirectoryEntry {
+        let mut attrs = HashMap::new();
+        attrs.insert("mail".to_string(), vec![format!("{}@example.com", sam)]);
+        attrs.insert(
+            "memberOf".to_string(),
+            groups.iter().map(|g| g.to_string()).collect(),
+        );
+        DirectoryEntry {
+            distinguished_name: format!("CN={},OU=Users,DC=example,DC=com", display),
+            sam_account_name: Some(sam.to_string()),
+            display_name: Some(display.to_string()),
+            object_class: Some("user".to_string()),
+            attributes: attrs,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_compare_users_returns_diff() {
+        let users = vec![
+            make_user_with_groups(
+                "jdoe",
+                "John Doe",
+                vec![
+                    "CN=Group1,DC=example,DC=com",
+                    "CN=Group2,DC=example,DC=com",
+                    "CN=Group3,DC=example,DC=com",
+                ],
+            ),
+            make_user_with_groups(
+                "asmith",
+                "Alice Smith",
+                vec![
+                    "CN=Group2,DC=example,DC=com",
+                    "CN=Group4,DC=example,DC=com",
+                ],
+            ),
+        ];
+        let state = make_state_with_users(users);
+        let result = compare_users_inner(&state, "jdoe", "asmith")
+            .await
+            .unwrap();
+        assert_eq!(result.shared_groups.len(), 1);
+        assert_eq!(result.only_a_groups.len(), 2);
+        assert_eq!(result.only_b_groups.len(), 1);
+        assert_eq!(result.total_a, 3);
+        assert_eq!(result.total_b, 2);
+    }
+
+    #[tokio::test]
+    async fn test_compare_users_user_a_not_found() {
+        let users = vec![make_user_entry("jdoe", "John Doe")];
+        let state = make_state_with_users(users);
+        let result = compare_users_inner(&state, "unknown", "jdoe").await;
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("User not found: unknown"));
+    }
+
+    #[tokio::test]
+    async fn test_compare_users_user_b_not_found() {
+        let users = vec![make_user_entry("jdoe", "John Doe")];
+        let state = make_state_with_users(users);
+        let result = compare_users_inner(&state, "jdoe", "unknown").await;
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("User not found: unknown"));
+    }
+
+    #[tokio::test]
+    async fn test_compare_users_provider_failure() {
+        let state = make_state_with_failure();
+        let result = compare_users_inner(&state, "jdoe", "asmith").await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_compare_users_no_groups() {
+        let users = vec![
+            make_user_entry("jdoe", "John Doe"),
+            make_user_entry("asmith", "Alice Smith"),
+        ];
+        let state = make_state_with_users(users);
+        let result = compare_users_inner(&state, "jdoe", "asmith")
+            .await
+            .unwrap();
+        assert!(result.shared_groups.is_empty());
+        assert!(result.only_a_groups.is_empty());
+        assert!(result.only_b_groups.is_empty());
+        assert_eq!(result.total_a, 0);
+        assert_eq!(result.total_b, 0);
     }
 }

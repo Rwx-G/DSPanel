@@ -8,6 +8,7 @@ import {
   Home,
   Sun,
   Moon,
+  GitCompareArrows,
   type LucideIcon,
 } from "lucide-react";
 import { useNavigation } from "@/contexts/NavigationContext";
@@ -20,6 +21,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   computer: Monitor,
   key: KeyRound,
   settings: Settings,
+  compare: GitCompareArrows,
 };
 
 const MODULES: SidebarModule[] = [
@@ -34,6 +36,13 @@ const MODULES: SidebarModule[] = [
     id: "computers",
     label: "Computer Lookup",
     icon: "computer",
+    group: "Directory",
+    requiredLevel: "ReadOnly",
+  },
+  {
+    id: "user-comparison",
+    label: "User Comparison",
+    icon: "compare",
     group: "Directory",
     requiredLevel: "ReadOnly",
   },

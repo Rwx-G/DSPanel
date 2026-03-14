@@ -1,4 +1,5 @@
 pub mod audit;
+pub mod comparison;
 pub mod dacl;
 #[cfg(feature = "demo")]
 pub mod demo_provider;
