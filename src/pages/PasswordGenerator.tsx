@@ -98,14 +98,14 @@ export function PasswordGenerator() {
           </div>
         </div>
 
-        {/* Password display - always visible */}
+        {/* Password display - always visible, fixed layout */}
         <div
           className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-4 space-y-3"
           data-testid="password-result"
         >
-          <div className="flex items-center gap-2 rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-bg)] px-4 py-3 min-h-[52px]">
+          <div className="flex items-start gap-2 rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-bg)] px-4 py-3 min-h-[76px]">
             {password ? (
-              <code className="flex-1 text-lg font-mono text-[var(--color-text-primary)] select-all break-all tracking-wide">
+              <code className="flex-1 text-lg font-mono text-[var(--color-text-primary)] select-all break-all tracking-wide leading-relaxed">
                 {password}
               </code>
             ) : (
@@ -116,7 +116,7 @@ export function PasswordGenerator() {
             {password && <CopyButton text={password} />}
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
             <button
               className="btn btn-primary btn-sm"
               onClick={generate}
@@ -140,7 +140,18 @@ export function PasswordGenerator() {
                 </>
               )}
             </button>
-            {hibpResult && <HibpStatusBadge result={hibpResult} />}
+            <HibpInfoTooltip />
+          </div>
+
+          {/* HIBP result - fixed height slot to prevent layout shift */}
+          <div className="min-h-[28px] flex items-center" data-testid="hibp-result-slot">
+            {hibpResult ? (
+              <HibpStatusBadge result={hibpResult} />
+            ) : (
+              <span className="text-caption text-[var(--color-text-disabled)]">
+                Click "Check Breach Database" to verify against known breaches
+              </span>
+            )}
           </div>
 
           {error && (
@@ -282,6 +293,53 @@ function CheckboxOption({
         {label}
       </span>
     </label>
+  );
+}
+
+function HibpInfoTooltip() {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="relative" data-testid="hibp-info">
+      <button
+        className="flex h-6 w-6 items-center justify-center rounded-full text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors"
+        onClick={() => setOpen(!open)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        aria-label="About breach database"
+        data-testid="hibp-info-btn"
+      >
+        <Info size={14} />
+      </button>
+      {open && (
+        <div
+          className="absolute left-0 top-full z-50 mt-1 w-72 rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-3 shadow-lg"
+          data-testid="hibp-info-popup"
+        >
+          <p className="text-caption font-semibold text-[var(--color-text-primary)] mb-1">
+            Have I Been Pwned (HIBP)
+          </p>
+          <p className="text-caption text-[var(--color-text-secondary)] mb-2">
+            Breach data is provided by{" "}
+            <strong>haveibeenpwned.com</strong>, a free service created
+            by Troy Hunt that aggregates data from publicly disclosed
+            security breaches.
+          </p>
+          <p className="text-caption text-[var(--color-text-secondary)] mb-2">
+            The database contains over <strong>14 billion</strong> compromised
+            credentials from thousands of data breaches worldwide.
+          </p>
+          <div className="rounded-md bg-[var(--color-surface-bg)] p-2">
+            <p className="text-caption text-[var(--color-success)] font-medium">
+              Privacy: k-anonymity protocol
+            </p>
+            <p className="text-caption text-[var(--color-text-secondary)]">
+              Only the first 5 characters of the password's SHA-1 hash
+              are sent to the API. Your full password never leaves your machine.
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
