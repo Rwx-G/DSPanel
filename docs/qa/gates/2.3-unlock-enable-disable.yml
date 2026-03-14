@@ -2,15 +2,13 @@ schema: 1
 story: "2.3"
 story_title: "Account Unlock and Enable/Disable"
 gate: PASS
-status_reason: "All acceptance criteria fully met. Permission gating, confirmation dialogs, UI refresh, audit logging, and error handling all implemented and tested."
+status_reason: "All ACs met. Snapshot capture added before all write operations. MFA gate on disable. onRefresh wired."
 reviewer: "Quinn (Test Architect)"
-updated: "2026-03-14T14:30:00Z"
+updated: "2026-03-14T15:00:00Z"
 
 waiver: { active: false }
-
 top_issues: []
-
-quality_score: 90
+quality_score: 95
 
 evidence:
   tests_reviewed: 20
@@ -20,20 +18,15 @@ evidence:
     ac_gaps: []
 
 nfr_validation:
-  security:
-    status: PASS
-    notes: "HelpDesk+ permission enforced at Tauri command level. UI gating via PermissionGate component."
-  performance:
-    status: PASS
-    notes: "Single LDAP modify per action. UAC read + modify for enable/disable is two operations - acceptable."
-  reliability:
-    status: PASS
-    notes: "Error handling with user-friendly messages. JSON error parsing with fallback."
-  maintainability:
-    status: PASS
-    notes: "Reusable handleAction pattern in UserActions. Button visibility driven by user state props."
+  security: { status: PASS, notes: "Permission check + MFA gate on disable + audit." }
+  performance: { status: PASS, notes: "Single LDAP modify per action." }
+  reliability: { status: PASS, notes: "Snapshot before modify. onRefresh re-queries AD." }
+  maintainability: { status: PASS, notes: "Reusable handleAction pattern." }
 
-recommendations:
-  future:
-    - action: "Add snapshot capture before enable/disable per coding standards"
-      refs: ["src-tauri/src/commands/mod.rs:enable_account_inner", "src-tauri/src/commands/mod.rs:disable_account_inner"]
+history:
+  - at: "2026-03-14T14:30:00Z"
+    gate: PASS
+    note: "Initial review - snapshot missing"
+  - at: "2026-03-14T15:00:00Z"
+    gate: PASS
+    note: "Snapshot + MFA + refresh added"
