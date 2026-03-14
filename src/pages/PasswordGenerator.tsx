@@ -18,7 +18,7 @@ interface HibpResult {
 }
 
 export function PasswordGenerator() {
-  const [length, setLength] = useState(16);
+  const [length, setLength] = useState(20);
   const [includeUppercase, setIncludeUppercase] = useState(true);
   const [includeLowercase, setIncludeLowercase] = useState(true);
   const [includeDigits, setIncludeDigits] = useState(true);
@@ -248,7 +248,7 @@ export function PasswordGenerator() {
             </p>
           </div>
           <ul className="text-caption text-[var(--color-text-secondary)] space-y-1 ml-6 list-disc">
-            <li>Use at least <strong>16 characters</strong> for administrative accounts</li>
+            <li>Use at least <strong>20 characters</strong> for administrative accounts (16 minimum for standard users)</li>
             <li>Include <strong>3+ character categories</strong> (uppercase, lowercase, digits, special)</li>
             <li>Never reuse passwords across different accounts or services</li>
             <li>Use the <strong>breach check</strong> to verify the password has not appeared in known data breaches (HIBP k-anonymity - your password never leaves your machine)</li>
@@ -264,9 +264,10 @@ export function PasswordGenerator() {
 
 function getStrengthLabel(length: number): { text: string; class: string } {
   if (length >= 24) return { text: "Excellent", class: "bg-green-100 text-[var(--color-success)]" };
-  if (length >= 16) return { text: "Strong", class: "bg-blue-100 text-[var(--color-info)]" };
-  if (length >= 12) return { text: "Good", class: "bg-yellow-100 text-[var(--color-warning)]" };
-  return { text: "Minimum", class: "bg-red-100 text-[var(--color-error)]" };
+  if (length >= 20) return { text: "Strong", class: "bg-blue-100 text-[var(--color-info)]" };
+  if (length >= 16) return { text: "Good", class: "bg-green-100 text-[var(--color-success)]" };
+  if (length >= 12) return { text: "Fair", class: "bg-yellow-100 text-[var(--color-warning)]" };
+  return { text: "Weak", class: "bg-red-100 text-[var(--color-error)]" };
 }
 
 function CheckboxOption({

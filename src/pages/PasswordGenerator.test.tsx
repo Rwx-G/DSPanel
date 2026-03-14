@@ -33,7 +33,7 @@ describe("PasswordGenerator", () => {
     await waitFor(() => {
       expect(mockInvoke).toHaveBeenCalledWith(
         "generate_password",
-        expect.objectContaining({ length: 16 }),
+        expect.objectContaining({ length: 20 }),
       );
     });
 
@@ -48,7 +48,7 @@ describe("PasswordGenerator", () => {
 
   it("shows default length of 16", () => {
     render(<PasswordGenerator />);
-    expect(screen.getByTestId("length-value")).toHaveTextContent("16");
+    expect(screen.getByTestId("length-value")).toHaveTextContent("20");
   });
 
   it("regenerates when length changes", async () => {
@@ -215,7 +215,7 @@ describe("PasswordGenerator", () => {
   it("displays best practices section", () => {
     render(<PasswordGenerator />);
     expect(screen.getByText("Password Best Practices")).toBeInTheDocument();
-    expect(screen.getByText(/16 characters/)).toBeInTheDocument();
+    expect(screen.getByText(/20 characters/)).toBeInTheDocument();
   });
 
   it("page is scrollable", () => {

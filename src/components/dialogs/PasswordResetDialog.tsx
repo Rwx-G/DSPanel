@@ -82,7 +82,7 @@ export function PasswordResetDialog({
     setHibpResult(null);
     try {
       const password = await invoke<string>("generate_password", {
-        length: 16,
+        length: 20,
         includeUppercase: true,
         includeLowercase: true,
         includeDigits: true,

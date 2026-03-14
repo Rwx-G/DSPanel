@@ -96,7 +96,7 @@ describe("PasswordResetDialog", () => {
 
     await waitFor(() => {
       expect(mockInvoke).toHaveBeenCalledWith("generate_password", expect.objectContaining({
-        length: 16,
+        length: 20,
         includeUppercase: true,
       }));
     });

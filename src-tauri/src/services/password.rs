@@ -25,7 +25,7 @@ pub struct PasswordOptions {
 impl Default for PasswordOptions {
     fn default() -> Self {
         Self {
-            length: 16,
+            length: 20,
             include_uppercase: true,
             include_lowercase: true,
             include_digits: true,
@@ -215,7 +215,7 @@ mod tests {
     fn test_generate_password_default_options() {
         let options = PasswordOptions::default();
         let password = generate_password(&options).unwrap();
-        assert_eq!(password.len(), 16);
+        assert_eq!(password.len(), 20);
     }
 
     #[test]
@@ -317,7 +317,7 @@ mod tests {
     #[test]
     fn test_password_options_default() {
         let opts = PasswordOptions::default();
-        assert_eq!(opts.length, 16);
+        assert_eq!(opts.length, 20);
         assert!(opts.include_uppercase);
         assert!(opts.include_lowercase);
         assert!(opts.include_digits);
