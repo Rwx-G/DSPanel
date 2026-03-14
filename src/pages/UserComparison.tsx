@@ -211,10 +211,10 @@ export function UserComparison() {
                 userDn: userA.distinguishedName,
                 groupDn: group.dn,
               });
-              notify("success", `Added to ${group.name}`);
+              notify(`Added to ${group.name}`, "success");
               compare();
             } catch (err) {
-              notify("error", `Failed to add to group: ${err}`);
+              notify(`Failed to add to group: ${err}`, "error");
             }
           },
         });
@@ -230,10 +230,10 @@ export function UserComparison() {
                 userDn: userB.distinguishedName,
                 groupDn: group.dn,
               });
-              notify("success", `Added to ${group.name}`);
+              notify(`Added to ${group.name}`, "success");
               compare();
             } catch (err) {
-              notify("error", `Failed to add to group: ${err}`);
+              notify(`Failed to add to group: ${err}`, "error");
             }
           },
         });
