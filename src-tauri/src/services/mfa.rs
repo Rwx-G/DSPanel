@@ -1,8 +1,11 @@
 use anyhow::{Context, Result};
 use hmac::{Hmac, Mac};
+use rand::rngs::OsRng;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use sha1::Sha1;
+use std::fs;
+use std::path::PathBuf;
 use std::sync::Mutex;
 
 type HmacSha1 = Hmac<Sha1>;
@@ -37,11 +40,23 @@ impl Default for MfaConfig {
     }
 }
 
+/// Persisted MFA data (secret + backup codes).
+#[derive(Serialize, Deserialize)]
+struct MfaPersistedData {
+    secret_b64: String,
+    backup_codes: Vec<String>,
+}
+
 /// TOTP-based MFA service implementing RFC 6238.
+///
+/// The shared secret and backup codes are persisted to a local file
+/// in the user's app data directory for durability across restarts.
 pub struct MfaService {
     secret: Mutex<Option<Vec<u8>>>,
     backup_codes: Mutex<Vec<String>>,
     config: Mutex<MfaConfig>,
+    persist_path: Option<PathBuf>,
+    failed_attempts: Mutex<u32>,
 }
 
 impl Default for MfaService {
@@ -52,10 +67,70 @@ impl Default for MfaService {
 
 impl MfaService {
     pub fn new() -> Self {
+        let persist_path = Self::resolve_persist_path();
+        let (secret, backup_codes) = persist_path
+            .as_ref()
+            .and_then(Self::load_from_file)
+            .unwrap_or((None, Vec::new()));
+
+        Self {
+            secret: Mutex::new(secret),
+            backup_codes: Mutex::new(backup_codes),
+            config: Mutex::new(MfaConfig::default()),
+            persist_path,
+            failed_attempts: Mutex::new(0),
+        }
+    }
+
+    /// Creates an MfaService without file persistence (for testing).
+    #[cfg(test)]
+    pub fn new_in_memory() -> Self {
         Self {
             secret: Mutex::new(None),
             backup_codes: Mutex::new(Vec::new()),
             config: Mutex::new(MfaConfig::default()),
+            persist_path: None,
+            failed_attempts: Mutex::new(0),
+        }
+    }
+
+    fn resolve_persist_path() -> Option<PathBuf> {
+        let base = std::env::var("LOCALAPPDATA")
+            .or_else(|_| std::env::var("HOME"))
+            .ok()?;
+        let dir = PathBuf::from(base).join("DSPanel");
+        if !dir.exists() {
+            fs::create_dir_all(&dir).ok()?;
+        }
+        Some(dir.join("mfa.dat"))
+    }
+
+    fn load_from_file(path: &PathBuf) -> Option<(Option<Vec<u8>>, Vec<String>)> {
+        let data = fs::read_to_string(path).ok()?;
+        let persisted: MfaPersistedData = serde_json::from_str(&data).ok()?;
+        use base64::Engine;
+        let secret = base64::engine::general_purpose::STANDARD
+            .decode(&persisted.secret_b64)
+            .ok()?;
+        tracing::info!("MFA secret loaded from persistent storage");
+        Some((Some(secret), persisted.backup_codes))
+    }
+
+    fn persist(&self) {
+        if let Some(ref path) = self.persist_path {
+            let secret = self.secret.lock().unwrap();
+            if let Some(ref s) = *secret {
+                use base64::Engine;
+                let data = MfaPersistedData {
+                    secret_b64: base64::engine::general_purpose::STANDARD.encode(s),
+                    backup_codes: self.backup_codes.lock().unwrap().clone(),
+                };
+                if let Ok(json) = serde_json::to_string(&data) {
+                    if let Err(e) = fs::write(path, json) {
+                        tracing::warn!("Failed to persist MFA data: {}", e);
+                    }
+                }
+            }
         }
     }
 
@@ -90,8 +165,9 @@ impl MfaService {
     }
 
     /// Generates a new TOTP secret and backup codes.
+    /// Persists the secret to local storage for durability.
     pub fn setup(&self, username: &str) -> Result<MfaSetupResult> {
-        let mut rng = rand::thread_rng();
+        let mut rng = OsRng;
         let secret: Vec<u8> = (0..20).map(|_| rng.gen()).collect();
         let secret_b32 = base32::encode(base32::Alphabet::Rfc4648 { padding: false }, &secret);
 
@@ -109,6 +185,8 @@ impl MfaService {
 
         *self.secret.lock().unwrap() = Some(secret);
         *self.backup_codes.lock().unwrap() = backup_codes.clone();
+        *self.failed_attempts.lock().unwrap() = 0;
+        self.persist();
 
         Ok(MfaSetupResult {
             secret_base32: secret_b32,
@@ -117,10 +195,24 @@ impl MfaService {
         })
     }
 
+    /// Maximum consecutive failed attempts before temporary lockout.
+    const MAX_FAILED_ATTEMPTS: u32 = 5;
+
     /// Verifies a TOTP code against the stored secret.
     ///
     /// Accepts codes from T-1, T, and T+1 time steps (90-second window).
+    /// Rate-limited: after 5 consecutive failures, verification is blocked.
     pub fn verify(&self, code: &str) -> Result<bool> {
+        {
+            let attempts = self.failed_attempts.lock().unwrap();
+            if *attempts >= Self::MAX_FAILED_ATTEMPTS {
+                anyhow::bail!(
+                    "Too many failed MFA attempts ({}). Please wait before retrying.",
+                    *attempts
+                );
+            }
+        }
+
         let secret = self
             .secret
             .lock()
@@ -133,6 +225,8 @@ impl MfaService {
             let mut backup_codes = self.backup_codes.lock().unwrap();
             if let Some(pos) = backup_codes.iter().position(|c| c == code) {
                 backup_codes.remove(pos);
+                *self.failed_attempts.lock().unwrap() = 0;
+                self.persist();
                 tracing::info!("MFA verified via backup code");
                 return Ok(true);
             }
@@ -150,17 +244,28 @@ impl MfaService {
             let step = (current_step as i64 + offset) as u64;
             let expected = generate_totp(&secret, step)?;
             if expected == code {
+                *self.failed_attempts.lock().unwrap() = 0;
                 return Ok(true);
             }
         }
 
+        *self.failed_attempts.lock().unwrap() += 1;
         Ok(false)
     }
 
-    /// Revokes MFA setup by removing the stored secret.
+    /// Resets the failed attempt counter (e.g., after a cooldown period).
+    pub fn reset_failed_attempts(&self) {
+        *self.failed_attempts.lock().unwrap() = 0;
+    }
+
+    /// Revokes MFA setup by removing the stored secret and persisted file.
     pub fn revoke(&self) {
         *self.secret.lock().unwrap() = None;
         self.backup_codes.lock().unwrap().clear();
+        *self.failed_attempts.lock().unwrap() = 0;
+        if let Some(ref path) = self.persist_path {
+            let _ = fs::remove_file(path);
+        }
     }
 }
 
@@ -225,13 +330,13 @@ mod tests {
 
     #[test]
     fn test_mfa_service_not_configured_initially() {
-        let svc = MfaService::new();
+        let svc = MfaService::new_in_memory();
         assert!(!svc.is_configured());
     }
 
     #[test]
     fn test_mfa_setup_configures_service() {
-        let svc = MfaService::new();
+        let svc = MfaService::new_in_memory();
         let result = svc.setup("testuser").unwrap();
         assert!(svc.is_configured());
         assert!(!result.secret_base32.is_empty());
@@ -241,7 +346,7 @@ mod tests {
 
     #[test]
     fn test_mfa_setup_produces_valid_qr_uri() {
-        let svc = MfaService::new();
+        let svc = MfaService::new_in_memory();
         let result = svc.setup("admin").unwrap();
         assert!(result.qr_uri.contains("secret="));
         assert!(result.qr_uri.contains("issuer=DSPanel"));
@@ -252,7 +357,7 @@ mod tests {
 
     #[test]
     fn test_mfa_backup_codes_are_unique() {
-        let svc = MfaService::new();
+        let svc = MfaService::new_in_memory();
         let result = svc.setup("testuser").unwrap();
         let mut codes = result.backup_codes.clone();
         codes.sort();
@@ -263,7 +368,7 @@ mod tests {
 
     #[test]
     fn test_mfa_verify_backup_code() {
-        let svc = MfaService::new();
+        let svc = MfaService::new_in_memory();
         let result = svc.setup("testuser").unwrap();
         let backup = result.backup_codes[0].clone();
         assert!(svc.verify(&backup).unwrap());
@@ -271,7 +376,7 @@ mod tests {
 
     #[test]
     fn test_mfa_backup_code_single_use() {
-        let svc = MfaService::new();
+        let svc = MfaService::new_in_memory();
         let result = svc.setup("testuser").unwrap();
         let backup = result.backup_codes[0].clone();
         assert!(svc.verify(&backup).unwrap());
@@ -281,20 +386,20 @@ mod tests {
 
     #[test]
     fn test_mfa_verify_wrong_code() {
-        let svc = MfaService::new();
+        let svc = MfaService::new_in_memory();
         svc.setup("testuser").unwrap();
         assert!(!svc.verify("000000").unwrap());
     }
 
     #[test]
     fn test_mfa_verify_not_configured_fails() {
-        let svc = MfaService::new();
+        let svc = MfaService::new_in_memory();
         assert!(svc.verify("123456").is_err());
     }
 
     #[test]
     fn test_mfa_revoke() {
-        let svc = MfaService::new();
+        let svc = MfaService::new_in_memory();
         svc.setup("testuser").unwrap();
         assert!(svc.is_configured());
         svc.revoke();
@@ -312,13 +417,13 @@ mod tests {
 
     #[test]
     fn test_mfa_requires_mfa_when_not_configured() {
-        let svc = MfaService::new();
+        let svc = MfaService::new_in_memory();
         assert!(!svc.requires_mfa("PasswordReset"));
     }
 
     #[test]
     fn test_mfa_requires_mfa_when_configured() {
-        let svc = MfaService::new();
+        let svc = MfaService::new_in_memory();
         svc.setup("testuser").unwrap();
         assert!(svc.requires_mfa("PasswordReset"));
         assert!(svc.requires_mfa("AccountDisable"));
@@ -335,7 +440,7 @@ mod tests {
 
     #[test]
     fn test_mfa_set_config() {
-        let svc = MfaService::new();
+        let svc = MfaService::new_in_memory();
         let mut config = MfaConfig::default();
         config.require_for_flag_changes = true;
         svc.set_config(config);
