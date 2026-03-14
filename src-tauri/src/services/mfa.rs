@@ -481,8 +481,10 @@ mod tests {
     #[test]
     fn test_mfa_set_config() {
         let svc = MfaService::new_in_memory();
-        let mut config = MfaConfig::default();
-        config.require_for_flag_changes = true;
+        let config = MfaConfig {
+            require_for_flag_changes: true,
+            ..Default::default()
+        };
         svc.set_config(config);
         svc.setup("testuser").unwrap();
         assert!(svc.requires_mfa("PasswordFlagsChange"));
@@ -608,8 +610,10 @@ mod tests {
     #[test]
     fn test_mfa_requires_bulk_operations_when_configured() {
         let svc = MfaService::new_in_memory();
-        let mut config = MfaConfig::default();
-        config.require_for_bulk_operations = true;
+        let config = MfaConfig {
+            require_for_bulk_operations: true,
+            ..Default::default()
+        };
         svc.set_config(config);
         svc.setup("testuser").unwrap();
         assert!(svc.requires_mfa("BulkOperation"));
@@ -620,7 +624,7 @@ mod tests {
         // Test Default trait implementation
         let svc = MfaService::new_in_memory();
         assert!(!svc.is_configured());
-        assert_eq!(svc.config().require_for_password_reset, true);
+        assert!(svc.config().require_for_password_reset);
     }
 
     #[test]
