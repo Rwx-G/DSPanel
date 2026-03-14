@@ -7,6 +7,7 @@ pub mod password;
 pub mod permissions;
 pub mod resilience;
 pub mod resilient_directory;
+pub mod snapshot;
 
 pub use audit::AuditService;
 pub use directory::DirectoryProvider;
@@ -16,3 +17,4 @@ pub use mfa::MfaService;
 pub use permissions::{PermissionConfig, PermissionLevel, PermissionService};
 pub use resilience::{CircuitBreaker, CircuitBreakerConfig, RetryConfig, TimeoutConfig};
 pub use resilient_directory::ResilientDirectoryProvider;
+pub use snapshot::SnapshotService;

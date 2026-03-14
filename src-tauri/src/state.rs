@@ -2,6 +2,7 @@ use std::sync::{Arc, Mutex};
 
 use crate::services::{
     AuditService, DirectoryProvider, MfaService, PermissionConfig, PermissionService,
+    SnapshotService,
 };
 
 /// Global application state managed by Tauri.
@@ -23,6 +24,8 @@ pub struct AppState {
     pub mfa_service: MfaService,
     /// HTTP client for external API calls (HIBP, etc.).
     pub http_client: reqwest::Client,
+    /// Snapshot service for capturing object state before modifications.
+    pub snapshot_service: SnapshotService,
 }
 
 impl AppState {
@@ -41,6 +44,25 @@ impl AppState {
             audit_service: AuditService::new(),
             mfa_service: MfaService::new(),
             http_client,
+            snapshot_service: SnapshotService::new(),
+        }
+    }
+
+    /// Creates an AppState with in-memory services (no file I/O) for testing.
+    #[cfg(test)]
+    pub fn new_for_test(
+        provider: Arc<dyn DirectoryProvider>,
+        permission_config: PermissionConfig,
+    ) -> Self {
+        Self {
+            title: Mutex::new("DSPanel".to_string()),
+            initialized: Mutex::new(false),
+            directory_provider: provider,
+            permission_service: PermissionService::new(permission_config),
+            audit_service: AuditService::new_in_memory(),
+            mfa_service: MfaService::new_in_memory(),
+            http_client: reqwest::Client::new(),
+            snapshot_service: SnapshotService::new(),
         }
     }
 }
@@ -53,7 +75,7 @@ mod tests {
 
     fn make_state() -> AppState {
         let provider = Arc::new(MockDirectoryProvider::new());
-        AppState::new(provider, PermissionConfig::default())
+        AppState::new_for_test(provider, PermissionConfig::default())
     }
 
     #[test]
@@ -86,7 +108,7 @@ mod tests {
     #[test]
     fn test_app_state_with_disconnected_provider() {
         let provider = Arc::new(MockDirectoryProvider::disconnected());
-        let state = AppState::new(provider, PermissionConfig::default());
+        let state = AppState::new_for_test(provider, PermissionConfig::default());
         assert!(!state.directory_provider.is_connected());
     }
 

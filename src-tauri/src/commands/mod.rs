@@ -102,6 +102,7 @@ pub(crate) async fn reset_password_inner(
         ));
     }
 
+    state.snapshot_service.capture(user_dn, "PasswordReset");
     let provider = state.directory_provider.clone();
     match provider
         .reset_password(user_dn, new_password, must_change_at_next_logon)
@@ -138,6 +139,7 @@ pub(crate) async fn unlock_account_inner(state: &AppState, user_dn: &str) -> Res
         ));
     }
 
+    state.snapshot_service.capture(user_dn, "AccountUnlock");
     let provider = state.directory_provider.clone();
     match provider.unlock_account(user_dn).await {
         Ok(()) => {
@@ -166,6 +168,7 @@ pub(crate) async fn enable_account_inner(state: &AppState, user_dn: &str) -> Res
         ));
     }
 
+    state.snapshot_service.capture(user_dn, "AccountEnable");
     let provider = state.directory_provider.clone();
     match provider.enable_account(user_dn).await {
         Ok(()) => {
@@ -194,6 +197,7 @@ pub(crate) async fn disable_account_inner(state: &AppState, user_dn: &str) -> Re
         ));
     }
 
+    state.snapshot_service.capture(user_dn, "AccountDisable");
     let provider = state.directory_provider.clone();
     match provider.disable_account(user_dn).await {
         Ok(()) => {
@@ -227,6 +231,9 @@ pub(crate) async fn set_password_flags_inner(
         ));
     }
 
+    state
+        .snapshot_service
+        .capture(user_dn, "PasswordFlagsChange");
     let provider = state.directory_provider.clone();
     match provider
         .set_password_flags(user_dn, password_never_expires, user_cannot_change_password)
@@ -578,7 +585,7 @@ mod tests {
 
     fn make_state() -> AppState {
         let provider = Arc::new(MockDirectoryProvider::new());
-        AppState::new(provider, PermissionConfig::default())
+        AppState::new_for_test(provider, PermissionConfig::default())
     }
 
     use crate::models::DirectoryEntry;
@@ -598,12 +605,12 @@ mod tests {
 
     fn make_state_with_users(users: Vec<DirectoryEntry>) -> AppState {
         let provider = Arc::new(MockDirectoryProvider::new().with_users(users));
-        AppState::new(provider, PermissionConfig::default())
+        AppState::new_for_test(provider, PermissionConfig::default())
     }
 
     fn make_state_with_failure() -> AppState {
         let provider = Arc::new(MockDirectoryProvider::new().with_failure());
-        AppState::new(provider, PermissionConfig::default())
+        AppState::new_for_test(provider, PermissionConfig::default())
     }
 
     // -----------------------------------------------------------------------
@@ -691,7 +698,7 @@ mod tests {
             attributes: HashMap::new(),
         }];
         let provider = Arc::new(MockDirectoryProvider::new().with_computers(computers));
-        let state = AppState::new(provider, PermissionConfig::default());
+        let state = AppState::new_for_test(provider, PermissionConfig::default());
         let results = search_computers_inner(&state, "WS").await.unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].sam_account_name, Some("WS01$".to_string()));
@@ -897,7 +904,7 @@ mod tests {
     #[test]
     fn test_get_domain_info_disconnected() {
         let provider = Arc::new(MockDirectoryProvider::disconnected());
-        let state = AppState::new(provider, PermissionConfig::default());
+        let state = AppState::new_for_test(provider, PermissionConfig::default());
         let info = get_domain_info_inner(&state);
         assert!(info.domain_name.is_none());
         assert!(!info.is_connected);
@@ -925,7 +932,7 @@ mod tests {
             attributes: HashMap::new(),
         }];
         let provider = Arc::new(MockDirectoryProvider::new().with_computers(computers));
-        let state = AppState::new(provider, PermissionConfig::default());
+        let state = AppState::new_for_test(provider, PermissionConfig::default());
         let results = search_computers_inner(&state, "WS").await.unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].sam_account_name, Some("WS01$".to_string()));
@@ -944,7 +951,7 @@ mod tests {
 
     fn make_state_with_level(level: PermissionLevel) -> AppState {
         let provider = Arc::new(MockDirectoryProvider::new());
-        let state = AppState::new(provider, PermissionConfig::default());
+        let state = AppState::new_for_test(provider, PermissionConfig::default());
         state.permission_service.set_level(level);
         state
     }
@@ -956,14 +963,14 @@ mod tests {
     ) -> (AppState, Arc<MockDirectoryProvider>) {
         let provider = Arc::new(MockDirectoryProvider::new());
         let provider_ref = Arc::clone(&provider);
-        let state = AppState::new(provider, PermissionConfig::default());
+        let state = AppState::new_for_test(provider, PermissionConfig::default());
         state.permission_service.set_level(level);
         (state, provider_ref)
     }
 
     fn make_state_with_level_and_failure(level: PermissionLevel) -> AppState {
         let provider = Arc::new(MockDirectoryProvider::new().with_failure());
-        let state = AppState::new(provider, PermissionConfig::default());
+        let state = AppState::new_for_test(provider, PermissionConfig::default());
         state.permission_service.set_level(level);
         state
     }

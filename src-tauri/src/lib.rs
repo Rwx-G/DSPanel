@@ -102,14 +102,14 @@ mod tests {
     #[test]
     fn test_app_state_builds_without_panic() {
         let provider = Arc::new(MockDirectoryProvider::new());
-        let state = AppState::new(provider, PermissionConfig::default());
+        let state = AppState::new_for_test(provider, PermissionConfig::default());
         assert_eq!(*state.title.lock().unwrap(), "DSPanel");
     }
 
     #[test]
     fn test_modules_are_accessible() {
         let provider = Arc::new(MockDirectoryProvider::new());
-        let _ = AppState::new(provider, PermissionConfig::default());
+        let _ = AppState::new_for_test(provider, PermissionConfig::default());
         let _ = error::AppError::Internal("test".to_string());
     }
 

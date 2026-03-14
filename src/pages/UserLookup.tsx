@@ -1,10 +1,15 @@
 import { useState, useCallback, useEffect } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { SearchBar } from "@/components/common/SearchBar";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { EmptyState } from "@/components/common/EmptyState";
 import { HealthBadge } from "@/components/common/HealthBadge";
 import { type Column } from "@/components/data/DataTable";
-import { type DirectoryUser, mapEntryToUser } from "@/types/directory";
+import {
+  type DirectoryEntry,
+  type DirectoryUser,
+  mapEntryToUser,
+} from "@/types/directory";
 import type { AccountHealthStatus } from "@/types/health";
 import { evaluateHealth } from "@/services/healthcheck";
 import { parseCnFromDn } from "@/utils/dn";
@@ -76,6 +81,27 @@ export function UserLookup() {
     },
     [handleSearch],
   );
+
+  const refreshSelectedUser = useCallback(async () => {
+    if (!selectedUser) return;
+    try {
+      const entry = await invoke<DirectoryEntry | null>("get_user", {
+        samAccountName: selectedUser.samAccountName,
+      });
+      if (entry) {
+        const updated = mapEntryToUser(entry);
+        setSelectedUser(updated);
+        const health = await evaluateHealth(updated);
+        setHealthMap((prev) => {
+          const next = new Map(prev);
+          next.set(updated.samAccountName, health);
+          return next;
+        });
+      }
+    } catch (e) {
+      console.warn("Failed to refresh user:", e);
+    }
+  }, [selectedUser, setSelectedUser]);
 
   const filteredGroups = selectedUser
     ? selectedUser.memberOf.filter((dn) =>
@@ -207,6 +233,7 @@ export function UserLookup() {
                   groupRows={groupRows}
                   groupFilterText={groupFilterText}
                   onGroupFilterText={setGroupFilterText}
+                  onRefresh={refreshSelectedUser}
                 />
               ) : (
                 <div className="flex h-full items-center justify-center">
