@@ -1,0 +1,39 @@
+schema: 1
+story: "2.3"
+story_title: "Account Unlock and Enable/Disable"
+gate: PASS
+status_reason: "All acceptance criteria fully met. Permission gating, confirmation dialogs, UI refresh, audit logging, and error handling all implemented and tested."
+reviewer: "Quinn (Test Architect)"
+updated: "2026-03-14T14:30:00Z"
+
+waiver: { active: false }
+
+top_issues: []
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 20
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9]
+    ac_gaps: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "HelpDesk+ permission enforced at Tauri command level. UI gating via PermissionGate component."
+  performance:
+    status: PASS
+    notes: "Single LDAP modify per action. UAC read + modify for enable/disable is two operations - acceptable."
+  reliability:
+    status: PASS
+    notes: "Error handling with user-friendly messages. JSON error parsing with fallback."
+  maintainability:
+    status: PASS
+    notes: "Reusable handleAction pattern in UserActions. Button visibility driven by user state props."
+
+recommendations:
+  future:
+    - action: "Add snapshot capture before enable/disable per coding standards"
+      refs: ["src-tauri/src/commands/mod.rs:enable_account_inner", "src-tauri/src/commands/mod.rs:disable_account_inner"]

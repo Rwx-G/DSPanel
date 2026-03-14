@@ -1,0 +1,61 @@
+schema: 1
+story: "2.5"
+story_title: "MFA Gate for Sensitive Actions"
+gate: CONCERNS
+status_reason: "TOTP service correctly implements RFC 6238 with backup codes and per-action config. MFA dialog functional. However, MFA gate is not yet wired into sensitive action flows (reset_password, disable_account). Secret storage uses in-memory Mutex, not encrypted DPAPI persistence."
+reviewer: "Quinn (Test Architect)"
+updated: "2026-03-14T14:30:00Z"
+
+waiver: { active: false }
+
+top_issues:
+  - id: "SEC-002"
+    severity: high
+    finding: "MFA shared secret stored in-memory (Mutex<Option<Vec<u8>>>). Lost on app restart. Story AC#7 requires encrypted storage via DPAPI in local app data."
+    suggested_action: "Implement encrypted secret persistence using tauri-plugin-store or platform keychain."
+    suggested_owner: dev
+  - id: "IMPL-002"
+    severity: high
+    finding: "MfaGate pattern (AC#3) not integrated into sensitive action commands. MFA dialog exists but is never shown before reset_password/disable_account."
+    suggested_action: "Add MFA check in frontend before invoking sensitive Tauri commands. Use mfa_requires + showCustomDialog(MfaDialog)."
+    suggested_owner: dev
+  - id: "UI-002"
+    severity: medium
+    finding: "MFA setup wizard (AC#6) not implemented - no QR code display, no step-by-step setup flow."
+    suggested_action: "Create MfaSetupDialog with QR display, initial code verification, and backup codes."
+    suggested_owner: dev
+
+quality_score: 50
+
+evidence:
+  tests_reviewed: 19
+  risks_identified: 3
+  trace:
+    ac_covered: [1, 2, 4, 5, 8]
+    ac_gaps: [3, 6, 7]
+
+nfr_validation:
+  security:
+    status: FAIL
+    notes: "Secret not persisted/encrypted. MFA gate not wired to actions. Core security feature incomplete."
+  performance:
+    status: PASS
+    notes: "TOTP verification is sub-millisecond. No concerns."
+  reliability:
+    status: CONCERNS
+    notes: "MFA config and secret lost on restart. Backup codes also in-memory only."
+  maintainability:
+    status: PASS
+    notes: "Service design is clean and testable. Good separation of concerns."
+
+recommendations:
+  immediate:
+    - action: "Wire MfaDialog into PasswordResetDialog and UserActions before sensitive invokes"
+      refs: ["src/components/dialogs/PasswordResetDialog.tsx", "src/components/common/UserActions.tsx"]
+    - action: "Implement encrypted secret storage (DPAPI or tauri-plugin-store)"
+      refs: ["src-tauri/src/services/mfa.rs"]
+  future:
+    - action: "Create MfaSetupDialog with QR code rendering and step-by-step wizard"
+      refs: ["src/components/dialogs/"]
+    - action: "Add rate limiting on MFA verification attempts"
+      refs: ["src-tauri/src/services/mfa.rs:verify"]
