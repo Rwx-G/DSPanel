@@ -7,10 +7,12 @@ import {
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import { NotificationHost } from "@/components/common/NotificationHost";
 import { ErrorBoundary } from "@/components/common/ErrorBoundary";
+import { DialogProvider } from "@/contexts/DialogContext";
 import { AppShell } from "@/components/layout/AppShell";
 import { UserLookup } from "@/pages/UserLookup";
 import { ComputerLookup } from "@/pages/ComputerLookup";
 import { HomePage } from "@/pages/HomePage";
+import { PasswordGenerator } from "@/pages/PasswordGenerator";
 
 const APP_VERSION = __APP_VERSION__;
 
@@ -95,6 +97,7 @@ export function App() {
   return (
     <ErrorBoundary>
       <NotificationProvider>
+        <DialogProvider>
         <NavigationProvider>
           <AppShell
             statusBarProps={{
@@ -108,6 +111,7 @@ export function App() {
             <ModuleRouter status={status} />
           </AppShell>
         </NavigationProvider>
+        </DialogProvider>
         <NotificationHost />
       </NotificationProvider>
     </ErrorBoundary>
@@ -124,6 +128,8 @@ function ModuleRouter({ status }: { status: AppStatus }) {
       return <UserLookup />;
     case "computers":
       return <ComputerLookup />;
+    case "password-generator":
+      return <PasswordGenerator />;
     default:
       return <HomePage status={status} />;
   }

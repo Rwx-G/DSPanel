@@ -1,8 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { type ReactNode } from "react";
 import { UserLookup } from "./UserLookup";
+import { DialogProvider } from "@/contexts/DialogContext";
+import { NotificationProvider } from "@/contexts/NotificationContext";
 import type { DirectoryEntry } from "@/types/directory";
 import type { AccountHealthStatus } from "@/types/health";
+
+function TestProviders({ children }: { children: ReactNode }) {
+  return (
+    <NotificationProvider>
+      <DialogProvider>{children}</DialogProvider>
+    </NotificationProvider>
+  );
+}
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
@@ -79,7 +90,7 @@ describe("UserLookup", () => {
   });
 
   it("renders initial state with search bar and empty state", () => {
-    render(<UserLookup />);
+    render(<UserLookup />, { wrapper: TestProviders });
     expect(screen.getByTestId("user-lookup")).toBeInTheDocument();
     expect(screen.getByTestId("search-bar")).toBeInTheDocument();
     expect(screen.getByText("Search for a user")).toBeInTheDocument();
@@ -87,7 +98,7 @@ describe("UserLookup", () => {
 
   it("shows loading state during search", async () => {
     mockInvoke.mockImplementation((() => new Promise(() => {})) as typeof invoke);
-    render(<UserLookup />);
+    render(<UserLookup />, { wrapper: TestProviders });
 
     const input = screen.getByTestId("search-input");
     fireEvent.change(input, { target: { value: "jdoe" } });
@@ -104,7 +115,7 @@ describe("UserLookup", () => {
     ];
     mockInvokeWith(entries);
 
-    render(<UserLookup />);
+    render(<UserLookup />, { wrapper: TestProviders });
     const input = screen.getByTestId("search-input");
     fireEvent.change(input, { target: { value: "doe" } });
 
@@ -120,7 +131,7 @@ describe("UserLookup", () => {
     const entries = [makeEntry("jdoe", "John Doe")];
     mockInvokeWith(entries);
 
-    render(<UserLookup />);
+    render(<UserLookup />, { wrapper: TestProviders });
     const input = screen.getByTestId("search-input");
     fireEvent.change(input, { target: { value: "jdoe" } });
 
@@ -132,7 +143,7 @@ describe("UserLookup", () => {
   it("shows empty state when no results", async () => {
     mockInvokeWith([]);
 
-    render(<UserLookup />);
+    render(<UserLookup />, { wrapper: TestProviders });
     const input = screen.getByTestId("search-input");
     fireEvent.change(input, { target: { value: "nobody" } });
 
@@ -147,7 +158,7 @@ describe("UserLookup", () => {
       return Promise.resolve(HEALTHY_STATUS);
     }) as typeof invoke);
 
-    render(<UserLookup />);
+    render(<UserLookup />, { wrapper: TestProviders });
     const input = screen.getByTestId("search-input");
     fireEvent.change(input, { target: { value: "test" } });
 
@@ -167,7 +178,7 @@ describe("UserLookup", () => {
       return Promise.resolve([makeEntry("jdoe", "John Doe")]);
     }) as typeof invoke);
 
-    render(<UserLookup />);
+    render(<UserLookup />, { wrapper: TestProviders });
     const input = screen.getByTestId("search-input");
     fireEvent.change(input, { target: { value: "test" } });
 
@@ -189,7 +200,7 @@ describe("UserLookup", () => {
     ];
     mockInvokeWith(entries);
 
-    render(<UserLookup />);
+    render(<UserLookup />, { wrapper: TestProviders });
     const input = screen.getByTestId("search-input");
     fireEvent.change(input, { target: { value: "test" } });
 
@@ -211,7 +222,7 @@ describe("UserLookup", () => {
     const entries = [makeEntry("jdoe", "John Doe")];
     mockInvokeWith(entries);
 
-    render(<UserLookup />);
+    render(<UserLookup />, { wrapper: TestProviders });
     const input = screen.getByTestId("search-input");
     fireEvent.change(input, { target: { value: "jdoe" } });
 
@@ -230,7 +241,7 @@ describe("UserLookup", () => {
     const entries = [makeEntry("jdoe", "John Doe")];
     mockInvokeWith(entries);
 
-    render(<UserLookup />);
+    render(<UserLookup />, { wrapper: TestProviders });
     const input = screen.getByTestId("search-input");
     fireEvent.change(input, { target: { value: "jdoe" } });
 
@@ -252,7 +263,7 @@ describe("UserLookup", () => {
     ];
     mockInvokeWith(entries);
 
-    render(<UserLookup />);
+    render(<UserLookup />, { wrapper: TestProviders });
     const input = screen.getByTestId("search-input");
     fireEvent.change(input, { target: { value: "test" } });
 
@@ -276,7 +287,7 @@ describe("UserLookup", () => {
   });
 
   it("does not search with empty query", async () => {
-    render(<UserLookup />);
+    render(<UserLookup />, { wrapper: TestProviders });
     const input = screen.getByTestId("search-input");
     fireEvent.change(input, { target: { value: "" } });
 
@@ -289,7 +300,7 @@ describe("UserLookup", () => {
   it("calls invoke with correct command and arguments", async () => {
     mockInvokeWith([]);
 
-    render(<UserLookup />);
+    render(<UserLookup />, { wrapper: TestProviders });
     const input = screen.getByTestId("search-input");
     fireEvent.change(input, { target: { value: "jdoe" } });
 

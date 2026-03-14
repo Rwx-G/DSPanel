@@ -2,12 +2,15 @@ import { useState } from "react";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { CopyButton } from "@/components/common/CopyButton";
 import { HealthBadge } from "@/components/common/HealthBadge";
+import { UserActions } from "@/components/common/UserActions";
+import { PasswordFlagsEditor } from "@/components/common/PasswordFlagsEditor";
 import {
   PropertyGrid,
   type PropertyGroup,
 } from "@/components/data/PropertyGrid";
 import { DataTable, type Column } from "@/components/data/DataTable";
 import { FilterBar, type FilterChip } from "@/components/data/FilterBar";
+import { PasswordResetDialog } from "@/components/dialogs/PasswordResetDialog";
 import { type DirectoryUser } from "@/types/directory";
 import type { AccountHealthStatus } from "@/types/health";
 
@@ -18,6 +21,7 @@ export interface UserDetailProps {
   groupRows: { name: string; dn: string }[];
   groupFilterText: string;
   onGroupFilterText: (value: string) => void;
+  onRefresh?: () => void;
 }
 
 export function UserDetail({
@@ -27,8 +31,12 @@ export function UserDetail({
   groupRows,
   groupFilterText: _groupFilterText,
   onGroupFilterText,
+  onRefresh,
 }: UserDetailProps) {
   const [groupFilters, setGroupFilters] = useState<FilterChip[]>([]);
+  const [showPasswordReset, setShowPasswordReset] = useState(false);
+
+  const handleRefresh = onRefresh ?? (() => {});
 
   const propertyGroups: PropertyGroup[] = [
     {
@@ -109,7 +117,15 @@ export function UserDetail({
         <CopyButton text={user.samAccountName} />
       </div>
 
+      <UserActions
+        user={user}
+        onRefresh={handleRefresh}
+        onResetPassword={() => setShowPasswordReset(true)}
+      />
+
       <PropertyGrid groups={propertyGroups} />
+
+      <PasswordFlagsEditor user={user} onRefresh={handleRefresh} />
 
       <div data-testid="user-groups-section">
         <h3 className="mb-2 text-body font-semibold text-[var(--color-text-primary)]">
@@ -127,6 +143,15 @@ export function UserDetail({
           rowKey={(row) => row.dn}
         />
       </div>
+
+      {showPasswordReset && (
+        <PasswordResetDialog
+          userDn={user.distinguishedName}
+          displayName={user.displayName || user.samAccountName}
+          onClose={() => setShowPasswordReset(false)}
+          onSuccess={handleRefresh}
+        />
+      )}
     </div>
   );
 }
