@@ -10,10 +10,10 @@ waiver: { active: false }
 
 top_issues: []
 
-quality_score: 90
+quality_score: 95
 
 evidence:
-  tests_reviewed: 22
+  tests_reviewed: 27
   risks_identified: 1
   trace:
     ac_covered: [1, 2, 3, 4, 5, 6, 7]

@@ -140,4 +140,89 @@ describe("UncPermissionsAudit", () => {
       expect(screen.getByTestId("export-csv-button")).toBeInTheDocument();
     });
   });
+
+  it("shows access summary when cross-reference is available", async () => {
+    const userA = makeEntry("jdoe", ["S-1-5-21-100"]);
+    userA.displayName = "John Doe";
+    const userB = makeEntry("asmith", ["S-1-5-21-200"]);
+    userB.displayName = "Alice Smith";
+
+    mockInvoke
+      .mockResolvedValueOnce(MOCK_AUDIT_RESULT)
+      .mockResolvedValueOnce(MOCK_CROSS_REF);
+
+    render(<UncPermissionsAudit userA={userA} userB={userB} />);
+
+    fireEvent.change(screen.getByTestId("unc-path-input"), {
+      target: { value: "\\\\server\\share" },
+    });
+    fireEvent.click(screen.getByTestId("audit-button"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("access-summary")).toBeInTheDocument();
+    });
+  });
+
+  it("shows color legend when cross-reference is available", async () => {
+    const userA = makeEntry("jdoe", ["S-1-5-21-100"]);
+    userA.displayName = "John Doe";
+    const userB = makeEntry("asmith", ["S-1-5-21-200"]);
+    userB.displayName = "Alice Smith";
+
+    mockInvoke
+      .mockResolvedValueOnce(MOCK_AUDIT_RESULT)
+      .mockResolvedValueOnce(MOCK_CROSS_REF);
+
+    render(<UncPermissionsAudit userA={userA} userB={userB} />);
+
+    fireEvent.change(screen.getByTestId("unc-path-input"), {
+      target: { value: "\\\\server\\share" },
+    });
+    fireEvent.click(screen.getByTestId("audit-button"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("ace-legend")).toBeInTheDocument();
+      expect(screen.getByText(/John Doe only/)).toBeInTheDocument();
+      expect(screen.getByText(/Alice Smith only/)).toBeInTheDocument();
+    });
+  });
+
+  it("displays user names in table headers", async () => {
+    const userA = makeEntry("jdoe", ["S-1-5-21-100"]);
+    userA.displayName = "John Doe";
+    const userB = makeEntry("asmith", ["S-1-5-21-200"]);
+    userB.displayName = "Alice Smith";
+
+    mockInvoke
+      .mockResolvedValueOnce(MOCK_AUDIT_RESULT)
+      .mockResolvedValueOnce(MOCK_CROSS_REF);
+
+    render(<UncPermissionsAudit userA={userA} userB={userB} />);
+
+    fireEvent.change(screen.getByTestId("unc-path-input"), {
+      target: { value: "\\\\server\\share" },
+    });
+    fireEvent.click(screen.getByTestId("audit-button"));
+
+    await waitFor(() => {
+      expect(screen.getAllByText("John Doe").length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText("Alice Smith").length).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  it("triggers audit on Enter key", async () => {
+    mockInvoke.mockResolvedValueOnce(MOCK_AUDIT_RESULT);
+
+    render(<UncPermissionsAudit userA={null} userB={null} />);
+
+    const input = screen.getByTestId("unc-path-input");
+    fireEvent.change(input, { target: { value: "\\\\server\\share" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith("audit_ntfs_permissions", {
+        path: "\\\\server\\share",
+      });
+    });
+  });
 });
