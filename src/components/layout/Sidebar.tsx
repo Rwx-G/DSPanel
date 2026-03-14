@@ -9,6 +9,7 @@ import {
   Sun,
   Moon,
   GitCompareArrows,
+  FolderSearch,
   type LucideIcon,
 } from "lucide-react";
 import { useNavigation } from "@/contexts/NavigationContext";
@@ -22,6 +23,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   key: KeyRound,
   settings: Settings,
   compare: GitCompareArrows,
+  "folder-search": FolderSearch,
 };
 
 const MODULES: SidebarModule[] = [
@@ -44,6 +46,13 @@ const MODULES: SidebarModule[] = [
     label: "User Comparison",
     icon: "compare",
     group: "Directory",
+    requiredLevel: "ReadOnly",
+  },
+  {
+    id: "ntfs-analyzer",
+    label: "NTFS Analyzer",
+    icon: "folder-search",
+    group: "Tools",
     requiredLevel: "ReadOnly",
   },
   {

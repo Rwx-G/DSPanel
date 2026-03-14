@@ -14,6 +14,7 @@ import { ComputerLookup } from "@/pages/ComputerLookup";
 import { HomePage } from "@/pages/HomePage";
 import { PasswordGenerator } from "@/pages/PasswordGenerator";
 import { UserComparison } from "@/pages/UserComparison";
+import { NtfsAnalyzer } from "@/pages/NtfsAnalyzer";
 
 const APP_VERSION = __APP_VERSION__;
 
@@ -131,6 +132,8 @@ function ModuleRouter({ status }: { status: AppStatus }) {
       return <ComputerLookup />;
     case "user-comparison":
       return <UserComparison />;
+    case "ntfs-analyzer":
+      return <NtfsAnalyzer />;
     case "password-generator":
       return <PasswordGenerator />;
     default:

@@ -7,6 +7,7 @@ use crate::models::DirectoryEntry;
 use crate::services::audit::AuditEntry;
 use crate::services::comparison::GroupComparisonResult;
 use crate::services::ntfs::{AceCrossReference, AceEntry, NtfsAuditResult};
+use crate::services::ntfs_analyzer::NtfsAnalysisResult;
 use crate::services::mfa::{MfaConfig, MfaSetupResult};
 use crate::services::password::{HibpResult, PasswordOptions};
 use crate::services::{AccountHealthStatus, HealthInput, PermissionLevel};
@@ -473,6 +474,17 @@ pub(crate) fn cross_reference_ntfs_inner(
     crate::services::ntfs::cross_reference_aces(aces, user_a_sids, user_b_sids)
 }
 
+/// Performs a recursive NTFS permissions analysis on a UNC path.
+pub(crate) fn analyze_ntfs_inner(
+    path: &str,
+    depth: usize,
+) -> Result<NtfsAnalysisResult, AppError> {
+    crate::services::ntfs::validate_unc_path(path)
+        .map_err(|e| AppError::Configuration(e))?;
+
+    Ok(crate::services::ntfs_analyzer::analyze(path, depth))
+}
+
 // ---------------------------------------------------------------------------
 // Tauri commands - thin wrappers
 // ---------------------------------------------------------------------------
@@ -715,6 +727,12 @@ pub async fn set_password_flags(
 #[tauri::command]
 pub fn get_audit_entries(state: State<'_, AppState>) -> Vec<AuditEntry> {
     get_audit_entries_inner(&state)
+}
+
+/// Performs a recursive NTFS permissions analysis.
+#[tauri::command]
+pub fn analyze_ntfs(path: String, depth: usize) -> Result<NtfsAnalysisResult, AppError> {
+    analyze_ntfs_inner(&path, depth)
 }
 
 /// Reads NTFS ACL from a UNC path and returns parsed ACE entries.
