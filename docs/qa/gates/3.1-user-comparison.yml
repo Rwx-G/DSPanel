@@ -1,33 +1,23 @@
 schema: 1
 story: "3.1"
 story_title: "Side-by-Side User Comparison"
-gate: CONCERNS
-status_reason: "Core comparison logic and UX are strong. AC #2 partially met - user cards missing OU, last logon, account status attributes. AC #3 nested group resolution not implemented."
+gate: PASS
+status_reason: "All critical ACs met. User cards now display OU, last logon, and account status. Array mutation fix applied. Only nested group resolution (tokenGroups) remains as future enhancement."
 reviewer: "Quinn (Test Architect)"
-updated: "2026-03-14T23:15:00Z"
+updated: "2026-03-14T23:45:00Z"
 
 waiver: { active: false }
 
-top_issues:
-  - id: "AC-001"
-    severity: medium
-    finding: "User comparison cards show limited attributes (SAM, title, department, group count) but AC #2 requires OU, last logon, and account status"
-    suggested_action: "Add missing attributes to the selected user card display"
-    suggested_owner: dev
-  - id: "AC-002"
-    severity: low
-    finding: "Nested group resolution via tokenGroups not implemented - only direct memberOf is compared"
-    suggested_action: "Can be deferred - direct memberOf covers most use cases"
-    suggested_owner: dev
+top_issues: []
 
-quality_score: 80
+quality_score: 95
 
 evidence:
   tests_reviewed: 15
   risks_identified: 2
   trace:
-    ac_covered: [1, 3, 4, 5, 6, 7]
-    ac_gaps: [2]
+    ac_covered: [1, 2, 3, 4, 5, 6, 7]
+    ac_gaps: []
 
 nfr_validation:
   security: { status: PASS, notes: "add_user_to_group gated by HelpDesk permission with audit logging" }
@@ -36,9 +26,6 @@ nfr_validation:
   maintainability: { status: PASS, notes: "Clean separation - comparison.rs service, useComparison hook, UserComparison page" }
 
 recommendations:
-  immediate:
-    - action: "Add OU, last logon, account status to user comparison cards"
-      refs: ["src/pages/UserComparison.tsx"]
   future:
     - action: "Consider tokenGroups-based nested group resolution"
       refs: ["src-tauri/src/services/comparison.rs"]

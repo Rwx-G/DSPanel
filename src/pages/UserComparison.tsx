@@ -6,12 +6,29 @@ import { useDebounce } from "@/hooks/useDebounce";
 import { useNavigation } from "@/contexts/NavigationContext";
 import { type DirectoryEntry } from "@/types/directory";
 import { type GroupCategory, type GroupDisplayItem } from "@/types/comparison";
-import { parseCnFromDn } from "@/utils/dn";
+import { parseCnFromDn, formatOuPath } from "@/utils/dn";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { ContextMenu, type ContextMenuItem } from "@/components/common/ContextMenu";
 import { GroupMembersDialog } from "@/components/dialogs/GroupMembersDialog";
 import { UncPermissionsAudit } from "@/components/comparison/UncPermissionsAudit";
 import { useNotifications } from "@/contexts/NotificationContext";
+
+function parseDnOu(dn: string): string {
+  const ou = formatOuPath(dn);
+  return ou || "-";
+}
+
+function formatAccountStatus(entry: DirectoryEntry): string {
+  const uac = parseInt(entry.attributes?.userAccountControl?.[0] ?? "0", 10);
+  const disabled = (uac & 0x0002) !== 0;
+  const locked = entry.attributes?.lockoutTime?.[0] !== undefined
+    && entry.attributes.lockoutTime[0] !== ""
+    && entry.attributes.lockoutTime[0] !== "0";
+  if (disabled && locked) return "Disabled, Locked";
+  if (disabled) return "Disabled";
+  if (locked) return "Locked";
+  return "Active";
+}
 
 const CATEGORY_STYLES: Record<GroupCategory, { bg: string; text: string; label: string }> = {
   shared: {
@@ -156,6 +173,9 @@ function UserSearchField({
             <div>SAM: {selectedUser.samAccountName}</div>
             <div>Title: {selectedUser.attributes?.title?.[0] ?? "-"}</div>
             <div>Department: {selectedUser.attributes?.department?.[0] ?? "-"}</div>
+            <div>OU: {selectedUser.distinguishedName ? parseDnOu(selectedUser.distinguishedName) : "-"}</div>
+            <div>Last Logon: {selectedUser.attributes?.lastLogon?.[0] ?? "-"}</div>
+            <div>Status: {formatAccountStatus(selectedUser)}</div>
             <div>
               Groups: {selectedUser.attributes?.memberOf?.length ?? 0}
             </div>

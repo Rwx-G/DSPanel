@@ -89,7 +89,7 @@ export function useComparison() {
   }, [comparisonResult]);
 
   const filteredGroups = useMemo(() => {
-    let groups = allGroups;
+    let groups = [...allGroups];
     if (filter) {
       const lowerFilter = filter.toLowerCase();
       groups = groups.filter((g) => g.name.toLowerCase().includes(lowerFilter));
