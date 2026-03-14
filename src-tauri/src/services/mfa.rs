@@ -106,13 +106,14 @@ impl MfaService {
     }
 
     fn load_from_file(path: &PathBuf) -> Option<(Option<Vec<u8>>, Vec<String>)> {
-        let data = fs::read_to_string(path).ok()?;
-        let persisted: MfaPersistedData = serde_json::from_str(&data).ok()?;
+        let encrypted = fs::read(path).ok()?;
+        let decrypted = crate::services::dpapi::unprotect(&encrypted).ok()?;
+        let persisted: MfaPersistedData = serde_json::from_slice(&decrypted).ok()?;
         use base64::Engine;
         let secret = base64::engine::general_purpose::STANDARD
             .decode(&persisted.secret_b64)
             .ok()?;
-        tracing::info!("MFA secret loaded from persistent storage");
+        tracing::info!("MFA secret loaded from DPAPI-protected storage");
         Some((Some(secret), persisted.backup_codes))
     }
 
@@ -126,8 +127,15 @@ impl MfaService {
                     backup_codes: self.backup_codes.lock().unwrap().clone(),
                 };
                 if let Ok(json) = serde_json::to_string(&data) {
-                    if let Err(e) = fs::write(path, json) {
-                        tracing::warn!("Failed to persist MFA data: {}", e);
+                    match crate::services::dpapi::protect(json.as_bytes()) {
+                        Ok(encrypted) => {
+                            if let Err(e) = fs::write(path, encrypted) {
+                                tracing::warn!("Failed to persist MFA data: {}", e);
+                            }
+                        }
+                        Err(e) => {
+                            tracing::warn!("DPAPI encryption failed: {}", e);
+                        }
                     }
                 }
             }

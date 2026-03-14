@@ -23,14 +23,14 @@ export function PasswordFlagsEditor({
   const [passwordNeverExpires, setPasswordNeverExpires] = useState(
     user.passwordNeverExpires,
   );
-  // User Cannot Change Password is read-only (DACL modification not yet implemented)
-  const userCannotChangePassword = false;
-
+  const [userCannotChangePassword, setUserCannotChangePassword] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const isDirty = useMemo(
-    () => passwordNeverExpires !== user.passwordNeverExpires,
-    [passwordNeverExpires, user.passwordNeverExpires],
+    () =>
+      passwordNeverExpires !== user.passwordNeverExpires ||
+      userCannotChangePassword !== false,
+    [passwordNeverExpires, user.passwordNeverExpires, userCannotChangePassword],
   );
 
   const canEdit = hasPermission("AccountOperator");
@@ -46,6 +46,14 @@ export function PasswordFlagsEditor({
       });
     }
 
+    if (userCannotChangePassword !== false) {
+      changes.push({
+        type: "modify",
+        targetName: "User Cannot Change Password",
+        description: `No -> ${userCannotChangePassword ? "Yes" : "No"}`,
+      });
+    }
+
     if (changes.length === 0) return;
 
     const confirmed = await showDryRunPreview(changes);
@@ -56,7 +64,7 @@ export function PasswordFlagsEditor({
       await invoke("set_password_flags", {
         userDn: user.distinguishedName,
         passwordNeverExpires,
-        userCannotChangePassword: false,
+        userCannotChangePassword,
       });
       notify("Password flags updated successfully", "success");
       onRefresh();
@@ -102,19 +110,17 @@ export function PasswordFlagsEditor({
         </span>
       </label>
 
-      <label className="flex items-center gap-2">
+      <label className="flex items-center gap-2 cursor-pointer">
         <input
           type="checkbox"
           checked={userCannotChangePassword}
-          disabled
-          className="rounded border-[var(--color-border-default)] opacity-50"
+          onChange={(e) => setUserCannotChangePassword(e.target.checked)}
+          disabled={!canEdit}
+          className="rounded border-[var(--color-border-default)]"
           data-testid="user-cannot-change-password-checkbox"
         />
-        <span className="text-body text-[var(--color-text-secondary)]">
+        <span className="text-body text-[var(--color-text-primary)]">
           User Cannot Change Password
-        </span>
-        <span className="text-caption text-[var(--color-text-secondary)] italic">
-          (requires DACL - not yet supported)
         </span>
       </label>
 

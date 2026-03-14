@@ -195,6 +195,63 @@ impl LdapDirectoryProvider {
         Ok(ldap)
     }
 
+    /// Modifies the DACL to set or clear the "User Cannot Change Password" deny ACEs.
+    async fn set_cannot_change_password(
+        &self,
+        user_dn: &str,
+        deny: bool,
+        ldap: &mut ldap3::Ldap,
+    ) -> Result<()> {
+        // Read the current security descriptor (binary attribute)
+        let (rs, _) = ldap
+            .search(
+                user_dn,
+                Scope::Base,
+                "(objectClass=*)",
+                vec!["nTSecurityDescriptor"],
+            )
+            .await
+            .context("Failed to read nTSecurityDescriptor")?
+            .success()
+            .context("nTSecurityDescriptor read returned error")?;
+
+        let entry = rs
+            .into_iter()
+            .next()
+            .context("User not found when reading security descriptor")?;
+        let se = ldap3::SearchEntry::construct(entry);
+
+        // nTSecurityDescriptor is a binary attribute
+        let sd_bytes = se
+            .bin_attrs
+            .get("nTSecurityDescriptor")
+            .and_then(|v| v.first())
+            .context("nTSecurityDescriptor binary attribute not present")?;
+
+        // Modify the DACL
+        let modified_sd = crate::services::dacl::set_cannot_change_password(sd_bytes, deny)
+            .context("Failed to modify security descriptor DACL")?;
+
+        // Write back the modified security descriptor
+        let mods: Vec<Mod<Vec<u8>>> = vec![Mod::Replace(
+            b"nTSecurityDescriptor".to_vec(),
+            HashSet::from([modified_sd]),
+        )];
+
+        ldap.modify(user_dn, mods)
+            .await
+            .context("Failed to write modified nTSecurityDescriptor")?
+            .success()
+            .context("nTSecurityDescriptor write returned error")?;
+
+        tracing::info!(
+            target_dn = %user_dn,
+            deny,
+            "DACL modified for User Cannot Change Password"
+        );
+        Ok(())
+    }
+
     /// Reads the current `userAccountControl` value for a user.
     async fn get_user_account_control(&self, user_dn: &str) -> Result<u32> {
         let mut ldap = self.connect().await?;
@@ -485,7 +542,7 @@ impl DirectoryProvider for LdapDirectoryProvider {
         &self,
         user_dn: &str,
         password_never_expires: bool,
-        _user_cannot_change_password: bool,
+        user_cannot_change_password: bool,
     ) -> Result<()> {
         let uac = self.get_user_account_control(user_dn).await?;
         let mut new_uac = uac;
@@ -510,18 +567,18 @@ impl DirectoryProvider for LdapDirectoryProvider {
         .success()
         .context("Set password flags LDAP operation returned error")?;
 
-        // Note: PASSWD_CANT_CHANGE requires modifying the object's DACL (security descriptor),
-        // which is significantly more complex. This flag is tracked in the UI but the
-        // DACL modification is not yet implemented.
-        if _user_cannot_change_password {
-            tracing::warn!(
-                target_dn = %user_dn,
-                "PASSWD_CANT_CHANGE requires DACL modification - not yet implemented"
-            );
-        }
+        // PASSWD_CANT_CHANGE: modify the object's DACL to add/remove deny ACEs
+        // for the "Change Password" extended right (ab721a53-1e2f-11d0-9819-00aa0040529b)
+        self.set_cannot_change_password(user_dn, user_cannot_change_password, &mut ldap)
+            .await?;
 
         let _ = ldap.unbind().await;
-        tracing::info!(target_dn = %user_dn, password_never_expires, "Password flags updated");
+        tracing::info!(
+            target_dn = %user_dn,
+            password_never_expires,
+            user_cannot_change_password,
+            "Password flags updated"
+        );
         Ok(())
     }
 

@@ -1,5 +1,7 @@
 pub mod audit;
+pub mod dacl;
 pub mod directory;
+pub mod dpapi;
 pub mod health;
 pub mod ldap_directory;
 pub mod mfa;
