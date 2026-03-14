@@ -1,9 +1,9 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
-use ldap3::{LdapConnAsync, LdapConnSettings, Scope, SearchEntry};
+use ldap3::{LdapConnAsync, LdapConnSettings, Mod, Scope, SearchEntry};
 
 use crate::models::DirectoryEntry;
 use crate::services::directory::DirectoryProvider;
@@ -195,6 +195,40 @@ impl LdapDirectoryProvider {
         Ok(ldap)
     }
 
+    /// Reads the current `userAccountControl` value for a user.
+    async fn get_user_account_control(&self, user_dn: &str) -> Result<u32> {
+        let mut ldap = self.connect().await?;
+        let base = user_dn;
+
+        let (rs, _) = ldap
+            .search(
+                base,
+                Scope::Base,
+                "(objectClass=*)",
+                vec!["userAccountControl"],
+            )
+            .await
+            .context("Failed to read userAccountControl")?
+            .success()
+            .context("userAccountControl read returned error")?;
+
+        let _ = ldap.unbind().await;
+
+        let entry = rs
+            .into_iter()
+            .next()
+            .context("User not found when reading userAccountControl")?;
+        let se = SearchEntry::construct(entry);
+        let uac_str = se
+            .attrs
+            .get("userAccountControl")
+            .and_then(|v| v.first())
+            .context("userAccountControl attribute not present")?;
+        uac_str
+            .parse::<u32>()
+            .context("Failed to parse userAccountControl value")
+    }
+
     /// Performs an LDAP search and maps results to `DirectoryEntry` objects.
     async fn search(
         &self,
@@ -342,6 +376,153 @@ impl DirectoryProvider for LdapDirectoryProvider {
         let escaped = ldap_escape(validated);
         let ldap_filter = format!("(&(objectClass=user)(memberOf={}))", escaped);
         self.search(&ldap_filter, USER_ATTRS, max_results).await
+    }
+
+    async fn reset_password(
+        &self,
+        user_dn: &str,
+        new_password: &str,
+        must_change_at_next_logon: bool,
+    ) -> Result<()> {
+        let mut ldap = self.connect().await?;
+
+        // AD requires unicodePwd as a quoted UTF-16LE byte array
+        let quoted = format!("\"{}\"", new_password);
+        let utf16le: Vec<u8> = quoted
+            .encode_utf16()
+            .flat_map(|c| c.to_le_bytes())
+            .collect();
+
+        // Use Vec<u8> as the generic S type for Mod so we can mix binary and string values
+        let mut mods: Vec<Mod<Vec<u8>>> = vec![Mod::Replace(
+            b"unicodePwd".to_vec(),
+            HashSet::from([utf16le]),
+        )];
+
+        if must_change_at_next_logon {
+            mods.push(Mod::Replace(
+                b"pwdLastSet".to_vec(),
+                HashSet::from([b"0".to_vec()]),
+            ));
+        }
+
+        ldap.modify(user_dn, mods)
+            .await
+            .context("Failed to reset password")?
+            .success()
+            .context("Password reset LDAP operation returned error")?;
+
+        let _ = ldap.unbind().await;
+        tracing::info!(target_dn = %user_dn, "Password reset completed");
+        Ok(())
+    }
+
+    async fn unlock_account(&self, user_dn: &str) -> Result<()> {
+        let mut ldap = self.connect().await?;
+
+        ldap.modify(
+            user_dn,
+            vec![Mod::Replace(
+                "lockoutTime".to_string(),
+                HashSet::from(["0".to_string()]),
+            )],
+        )
+        .await
+        .context("Failed to unlock account")?
+        .success()
+        .context("Unlock LDAP operation returned error")?;
+
+        let _ = ldap.unbind().await;
+        tracing::info!(target_dn = %user_dn, "Account unlocked");
+        Ok(())
+    }
+
+    async fn enable_account(&self, user_dn: &str) -> Result<()> {
+        let uac = self.get_user_account_control(user_dn).await?;
+        let new_uac = uac & !0x0002; // Clear ACCOUNTDISABLE flag
+
+        let mut ldap = self.connect().await?;
+        ldap.modify(
+            user_dn,
+            vec![Mod::Replace(
+                "userAccountControl".to_string(),
+                HashSet::from([new_uac.to_string()]),
+            )],
+        )
+        .await
+        .context("Failed to enable account")?
+        .success()
+        .context("Enable LDAP operation returned error")?;
+
+        let _ = ldap.unbind().await;
+        tracing::info!(target_dn = %user_dn, "Account enabled");
+        Ok(())
+    }
+
+    async fn disable_account(&self, user_dn: &str) -> Result<()> {
+        let uac = self.get_user_account_control(user_dn).await?;
+        let new_uac = uac | 0x0002; // Set ACCOUNTDISABLE flag
+
+        let mut ldap = self.connect().await?;
+        ldap.modify(
+            user_dn,
+            vec![Mod::Replace(
+                "userAccountControl".to_string(),
+                HashSet::from([new_uac.to_string()]),
+            )],
+        )
+        .await
+        .context("Failed to disable account")?
+        .success()
+        .context("Disable LDAP operation returned error")?;
+
+        let _ = ldap.unbind().await;
+        tracing::info!(target_dn = %user_dn, "Account disabled");
+        Ok(())
+    }
+
+    async fn set_password_flags(
+        &self,
+        user_dn: &str,
+        password_never_expires: bool,
+        _user_cannot_change_password: bool,
+    ) -> Result<()> {
+        let uac = self.get_user_account_control(user_dn).await?;
+        let mut new_uac = uac;
+
+        // DONT_EXPIRE_PASSWD = 0x10000
+        if password_never_expires {
+            new_uac |= 0x10000;
+        } else {
+            new_uac &= !0x10000;
+        }
+
+        let mut ldap = self.connect().await?;
+        ldap.modify(
+            user_dn,
+            vec![Mod::Replace(
+                "userAccountControl".to_string(),
+                HashSet::from([new_uac.to_string()]),
+            )],
+        )
+        .await
+        .context("Failed to set password flags")?
+        .success()
+        .context("Set password flags LDAP operation returned error")?;
+
+        // Note: PASSWD_CANT_CHANGE requires modifying the object's DACL (security descriptor),
+        // which is significantly more complex. This flag is tracked in the UI but the
+        // DACL modification is not yet implemented.
+        if _user_cannot_change_password {
+            tracing::warn!(
+                target_dn = %user_dn,
+                "PASSWD_CANT_CHANGE requires DACL modification - not yet implemented"
+            );
+        }
+
+        let _ = ldap.unbind().await;
+        tracing::info!(target_dn = %user_dn, password_never_expires, "Password flags updated");
+        Ok(())
     }
 
     async fn get_current_user_groups(&self) -> Result<Vec<String>> {

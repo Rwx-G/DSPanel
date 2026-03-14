@@ -202,6 +202,65 @@ where
     async fn get_current_user_groups(&self) -> Result<Vec<String>> {
         resilient_call!(self, |inner| inner.get_current_user_groups().await)
     }
+
+    async fn reset_password(
+        &self,
+        user_dn: &str,
+        new_password: &str,
+        must_change_at_next_logon: bool,
+    ) -> Result<()> {
+        let dn = user_dn.to_string();
+        let pwd = new_password.to_string();
+        let inner_ref = self.inner.clone();
+        self.execute_with_resilience(|| {
+            let inner = inner_ref.clone();
+            let d = dn.clone();
+            let p = pwd.clone();
+            async move {
+                inner
+                    .reset_password(&d, &p, must_change_at_next_logon)
+                    .await
+            }
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!(e))
+    }
+
+    async fn unlock_account(&self, user_dn: &str) -> Result<()> {
+        let dn = user_dn.to_string();
+        resilient_call!(self, dn, |inner, d| inner.unlock_account(&d).await)
+    }
+
+    async fn enable_account(&self, user_dn: &str) -> Result<()> {
+        let dn = user_dn.to_string();
+        resilient_call!(self, dn, |inner, d| inner.enable_account(&d).await)
+    }
+
+    async fn disable_account(&self, user_dn: &str) -> Result<()> {
+        let dn = user_dn.to_string();
+        resilient_call!(self, dn, |inner, d| inner.disable_account(&d).await)
+    }
+
+    async fn set_password_flags(
+        &self,
+        user_dn: &str,
+        password_never_expires: bool,
+        user_cannot_change_password: bool,
+    ) -> Result<()> {
+        let dn = user_dn.to_string();
+        let inner_ref = self.inner.clone();
+        self.execute_with_resilience(|| {
+            let inner = inner_ref.clone();
+            let d = dn.clone();
+            async move {
+                inner
+                    .set_password_flags(&d, password_never_expires, user_cannot_change_password)
+                    .await
+            }
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!(e))
+    }
 }
 
 #[cfg(test)]

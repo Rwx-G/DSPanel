@@ -46,6 +46,34 @@ pub trait DirectoryProvider: Send + Sync {
 
     /// Returns the current user's group memberships (DNs).
     async fn get_current_user_groups(&self) -> Result<Vec<String>>;
+
+    /// Resets the password for a user account.
+    ///
+    /// Sets the `unicodePwd` attribute to the new password (quoted UTF-16LE).
+    /// If `must_change_at_next_logon` is true, sets `pwdLastSet = 0`.
+    async fn reset_password(
+        &self,
+        user_dn: &str,
+        new_password: &str,
+        must_change_at_next_logon: bool,
+    ) -> Result<()>;
+
+    /// Unlocks a user account by setting `lockoutTime = 0`.
+    async fn unlock_account(&self, user_dn: &str) -> Result<()>;
+
+    /// Enables a user account by clearing the ACCOUNTDISABLE flag in `userAccountControl`.
+    async fn enable_account(&self, user_dn: &str) -> Result<()>;
+
+    /// Disables a user account by setting the ACCOUNTDISABLE flag in `userAccountControl`.
+    async fn disable_account(&self, user_dn: &str) -> Result<()>;
+
+    /// Sets password-related flags on a user account.
+    async fn set_password_flags(
+        &self,
+        user_dn: &str,
+        password_never_expires: bool,
+        user_cannot_change_password: bool,
+    ) -> Result<()>;
 }
 
 #[cfg(test)]
@@ -67,6 +95,11 @@ pub mod tests {
         members: Mutex<Vec<DirectoryEntry>>,
         user_groups: Mutex<Vec<String>>,
         should_fail: Mutex<bool>,
+        pub reset_password_calls: Mutex<Vec<(String, String, bool)>>,
+        pub unlock_calls: Mutex<Vec<String>>,
+        pub enable_calls: Mutex<Vec<String>>,
+        pub disable_calls: Mutex<Vec<String>>,
+        pub set_password_flags_calls: Mutex<Vec<(String, bool, bool)>>,
     }
 
     impl Default for MockDirectoryProvider {
@@ -87,6 +120,11 @@ pub mod tests {
                 members: Mutex::new(Vec::new()),
                 user_groups: Mutex::new(Vec::new()),
                 should_fail: Mutex::new(false),
+                reset_password_calls: Mutex::new(Vec::new()),
+                unlock_calls: Mutex::new(Vec::new()),
+                enable_calls: Mutex::new(Vec::new()),
+                disable_calls: Mutex::new(Vec::new()),
+                set_password_flags_calls: Mutex::new(Vec::new()),
             }
         }
 
@@ -101,6 +139,11 @@ pub mod tests {
                 members: Mutex::new(Vec::new()),
                 user_groups: Mutex::new(Vec::new()),
                 should_fail: Mutex::new(false),
+                reset_password_calls: Mutex::new(Vec::new()),
+                unlock_calls: Mutex::new(Vec::new()),
+                enable_calls: Mutex::new(Vec::new()),
+                disable_calls: Mutex::new(Vec::new()),
+                set_password_flags_calls: Mutex::new(Vec::new()),
             }
         }
 
@@ -216,6 +259,54 @@ pub mod tests {
         async fn get_current_user_groups(&self) -> Result<Vec<String>> {
             self.check_failure()?;
             Ok(self.user_groups.lock().unwrap().clone())
+        }
+
+        async fn reset_password(
+            &self,
+            user_dn: &str,
+            new_password: &str,
+            must_change_at_next_logon: bool,
+        ) -> Result<()> {
+            self.check_failure()?;
+            self.reset_password_calls.lock().unwrap().push((
+                user_dn.to_string(),
+                new_password.to_string(),
+                must_change_at_next_logon,
+            ));
+            Ok(())
+        }
+
+        async fn unlock_account(&self, user_dn: &str) -> Result<()> {
+            self.check_failure()?;
+            self.unlock_calls.lock().unwrap().push(user_dn.to_string());
+            Ok(())
+        }
+
+        async fn enable_account(&self, user_dn: &str) -> Result<()> {
+            self.check_failure()?;
+            self.enable_calls.lock().unwrap().push(user_dn.to_string());
+            Ok(())
+        }
+
+        async fn disable_account(&self, user_dn: &str) -> Result<()> {
+            self.check_failure()?;
+            self.disable_calls.lock().unwrap().push(user_dn.to_string());
+            Ok(())
+        }
+
+        async fn set_password_flags(
+            &self,
+            user_dn: &str,
+            password_never_expires: bool,
+            user_cannot_change_password: bool,
+        ) -> Result<()> {
+            self.check_failure()?;
+            self.set_password_flags_calls.lock().unwrap().push((
+                user_dn.to_string(),
+                password_never_expires,
+                user_cannot_change_password,
+            ));
+            Ok(())
         }
     }
 
