@@ -57,6 +57,35 @@ const GROUP_ATTRS: &[&str] = &[
     "description",
 ];
 
+/// Maximum allowed length for search input queries.
+const MAX_SEARCH_INPUT_LENGTH: usize = 256;
+
+/// Validates and sanitizes search input before LDAP query construction.
+///
+/// Applies defense-in-depth checks ported from the C# v0.1.0 implementation:
+/// - Trims leading/trailing whitespace
+/// - Rejects inputs exceeding 256 characters
+/// - Rejects inputs containing ASCII control characters (U+0000..U+001F, U+007F)
+///
+/// Returns the trimmed input on success, or an error describing the validation failure.
+pub fn validate_search_input(input: &str) -> Result<&str> {
+    let trimmed = input.trim();
+
+    if trimmed.len() > MAX_SEARCH_INPUT_LENGTH {
+        anyhow::bail!(
+            "Search query too long ({} chars, max {})",
+            trimmed.len(),
+            MAX_SEARCH_INPUT_LENGTH
+        );
+    }
+
+    if trimmed.chars().any(|c| c.is_ascii_control()) {
+        anyhow::bail!("Search query contains invalid control characters");
+    }
+
+    Ok(trimmed)
+}
+
 /// Escapes special characters in LDAP filter values.
 ///
 /// LDAP filters must escape: `*`, `(`, `)`, `\`, and NUL.
@@ -259,7 +288,8 @@ impl DirectoryProvider for LdapDirectoryProvider {
     }
 
     async fn search_users(&self, filter: &str, max_results: usize) -> Result<Vec<DirectoryEntry>> {
-        let escaped = ldap_escape(filter);
+        let validated = validate_search_input(filter)?;
+        let escaped = ldap_escape(validated);
         let ldap_filter = format!(
             "(&(objectClass=user)(objectCategory=person)\
              (|(sAMAccountName=*{}*)(displayName=*{}*)(userPrincipalName=*{}*)))",
@@ -273,7 +303,8 @@ impl DirectoryProvider for LdapDirectoryProvider {
         filter: &str,
         max_results: usize,
     ) -> Result<Vec<DirectoryEntry>> {
-        let escaped = ldap_escape(filter);
+        let validated = validate_search_input(filter)?;
+        let escaped = ldap_escape(validated);
         let ldap_filter = format!(
             "(&(objectClass=computer)(|(cn=*{}*)(dNSHostName=*{}*)))",
             escaped, escaped
@@ -282,7 +313,8 @@ impl DirectoryProvider for LdapDirectoryProvider {
     }
 
     async fn search_groups(&self, filter: &str, max_results: usize) -> Result<Vec<DirectoryEntry>> {
-        let escaped = ldap_escape(filter);
+        let validated = validate_search_input(filter)?;
+        let escaped = ldap_escape(validated);
         let ldap_filter = format!(
             "(&(objectClass=group)(|(sAMAccountName=*{}*)(displayName=*{}*)))",
             escaped, escaped
@@ -291,7 +323,8 @@ impl DirectoryProvider for LdapDirectoryProvider {
     }
 
     async fn get_user_by_identity(&self, sam_account_name: &str) -> Result<Option<DirectoryEntry>> {
-        let escaped = ldap_escape(sam_account_name);
+        let validated = validate_search_input(sam_account_name)?;
+        let escaped = ldap_escape(validated);
         let ldap_filter = format!(
             "(&(objectClass=user)(objectCategory=person)(sAMAccountName={}))",
             escaped
@@ -305,7 +338,8 @@ impl DirectoryProvider for LdapDirectoryProvider {
         group_dn: &str,
         max_results: usize,
     ) -> Result<Vec<DirectoryEntry>> {
-        let escaped = ldap_escape(group_dn);
+        let validated = validate_search_input(group_dn)?;
+        let escaped = ldap_escape(validated);
         let ldap_filter = format!("(&(objectClass=user)(memberOf={}))", escaped);
         self.search(&ldap_filter, USER_ATTRS, max_results).await
     }
@@ -327,6 +361,57 @@ impl DirectoryProvider for LdapDirectoryProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_validate_search_input_trims_whitespace() {
+        assert_eq!(validate_search_input("  hello  ").unwrap(), "hello");
+    }
+
+    #[test]
+    fn test_validate_search_input_accepts_normal_input() {
+        assert_eq!(validate_search_input("john.doe").unwrap(), "john.doe");
+    }
+
+    #[test]
+    fn test_validate_search_input_rejects_too_long() {
+        let long_input = "a".repeat(257);
+        let result = validate_search_input(&long_input);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("too long"));
+    }
+
+    #[test]
+    fn test_validate_search_input_accepts_max_length() {
+        let max_input = "a".repeat(256);
+        assert!(validate_search_input(&max_input).is_ok());
+    }
+
+    #[test]
+    fn test_validate_search_input_rejects_control_chars() {
+        let result = validate_search_input("hello\x07world");
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("control characters"));
+    }
+
+    #[test]
+    fn test_validate_search_input_rejects_tab() {
+        let result = validate_search_input("hello\tworld");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_search_input_rejects_newline() {
+        let result = validate_search_input("hello\nworld");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_search_input_allows_unicode() {
+        assert_eq!(validate_search_input("Jean-Pierre").unwrap(), "Jean-Pierre");
+    }
 
     #[test]
     fn test_ldap_escape_plain_text() {

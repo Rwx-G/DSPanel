@@ -8,7 +8,7 @@ import {
 import { Sidebar } from "./Sidebar";
 
 function renderWithNavigation(
-  ui: ReactNode,
+  _ui: ReactNode,
   props?: { expanded?: boolean; onToggle?: () => void },
 ) {
   const defaultProps = {
