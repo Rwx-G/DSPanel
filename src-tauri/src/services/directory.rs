@@ -44,6 +44,12 @@ pub trait DirectoryProvider: Send + Sync {
         max_results: usize,
     ) -> Result<Vec<DirectoryEntry>>;
 
+    /// Fetches all user accounts (up to `max_results`) for browsing.
+    ///
+    /// Unlike `search_users`, this uses a broad filter without a search term.
+    /// The caller is responsible for paging and sorting the results.
+    async fn browse_users(&self, max_results: usize) -> Result<Vec<DirectoryEntry>>;
+
     /// Returns the current user's group memberships (DNs).
     async fn get_current_user_groups(&self) -> Result<Vec<String>>;
 
@@ -246,6 +252,12 @@ pub mod tests {
                 .cloned())
         }
 
+        async fn browse_users(&self, max_results: usize) -> Result<Vec<DirectoryEntry>> {
+            self.check_failure()?;
+            let users = self.users.lock().unwrap();
+            Ok(users.iter().take(max_results).cloned().collect())
+        }
+
         async fn get_group_members(
             &self,
             _group_dn: &str,
@@ -430,6 +442,29 @@ pub mod tests {
         let provider = MockDirectoryProvider::new().with_users(users);
         let result = provider.get_user_by_identity("unknown").await.unwrap();
         assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_browse_users_returns_all_users() {
+        let users = vec![
+            make_user_entry("jdoe", "John Doe"),
+            make_user_entry("asmith", "Alice Smith"),
+        ];
+        let provider = MockDirectoryProvider::new().with_users(users);
+        let results = provider.browse_users(500).await.unwrap();
+        assert_eq!(results.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_browse_users_respects_max_results() {
+        let users = vec![
+            make_user_entry("u1", "User 1"),
+            make_user_entry("u2", "User 2"),
+            make_user_entry("u3", "User 3"),
+        ];
+        let provider = MockDirectoryProvider::new().with_users(users);
+        let results = provider.browse_users(2).await.unwrap();
+        assert_eq!(results.len(), 2);
     }
 
     #[tokio::test]

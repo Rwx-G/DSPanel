@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Browse users command with server-side caching (60s TTL) and pagination for directory listing
+- Get group members Tauri command to list members of a group by DN
+- 26 sample users in demo mode for scroll/browse testing
 - Password reset with manual/auto-generate modes via PasswordResetDialog (2.1)
 - Secure password generator with configurable criteria and HIBP k-anonymity breach checking (2.2)
 - Standalone Password Generator page accessible to all permission levels (2.2)

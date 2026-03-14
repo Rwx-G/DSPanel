@@ -1,5 +1,7 @@
 use tauri::State;
 
+use std::time::{Duration, Instant};
+
 use crate::error::AppError;
 use crate::models::DirectoryEntry;
 use crate::services::audit::AuditEntry;
@@ -64,6 +66,79 @@ pub(crate) async fn search_computers_inner(
     let provider = state.directory_provider.clone();
     provider
         .search_computers(query, 50)
+        .await
+        .map_err(|e| AppError::Directory(e.to_string()))
+}
+
+/// Browse users with server-side caching and pagination.
+///
+/// Fetches up to 500 users, caches for 60 seconds, sorts by displayName,
+/// and returns a page slice.
+pub(crate) async fn browse_users_inner(
+    state: &AppState,
+    page: usize,
+    page_size: usize,
+) -> Result<BrowseResult, AppError> {
+    const CACHE_TTL: Duration = Duration::from_secs(60);
+    const MAX_BROWSE: usize = 500;
+
+    // Check cache validity
+    let cached = {
+        let cache = state.browse_cache.lock().unwrap();
+        cache
+            .as_ref()
+            .filter(|(ts, _)| ts.elapsed() < CACHE_TTL)
+            .map(|(_, entries)| entries.clone())
+    };
+
+    let entries = match cached {
+        Some(entries) => entries,
+        None => {
+            let provider = state.directory_provider.clone();
+            let mut fresh = provider
+                .browse_users(MAX_BROWSE)
+                .await
+                .map_err(|e| AppError::Directory(e.to_string()))?;
+
+            // Sort by display name (case-insensitive)
+            fresh.sort_by(|a, b| {
+                let da = a.display_name.as_deref().unwrap_or("").to_lowercase();
+                let db = b.display_name.as_deref().unwrap_or("").to_lowercase();
+                da.cmp(&db)
+            });
+
+            // Update cache
+            let mut cache = state.browse_cache.lock().unwrap();
+            *cache = Some((Instant::now(), fresh.clone()));
+
+            fresh
+        }
+    };
+
+    let total_count = entries.len();
+    let start = page * page_size;
+    let page_entries: Vec<DirectoryEntry> = entries
+        .into_iter()
+        .skip(start)
+        .take(page_size)
+        .collect();
+    let has_more = start + page_entries.len() < total_count;
+
+    Ok(BrowseResult {
+        entries: page_entries,
+        total_count,
+        has_more,
+    })
+}
+
+/// Returns members of a group by its DN.
+pub(crate) async fn get_group_members_inner(
+    state: &AppState,
+    group_dn: &str,
+) -> Result<Vec<DirectoryEntry>, AppError> {
+    let provider = state.directory_provider.clone();
+    provider
+        .get_group_members(group_dn, 200)
         .await
         .map_err(|e| AppError::Directory(e.to_string()))
 }
@@ -379,6 +454,34 @@ pub fn get_domain_info(state: State<'_, AppState>) -> DomainInfo {
 pub struct DomainInfo {
     pub domain_name: Option<String>,
     pub is_connected: bool,
+}
+
+/// Paginated browse result for user listing.
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowseResult {
+    pub entries: Vec<DirectoryEntry>,
+    pub total_count: usize,
+    pub has_more: bool,
+}
+
+/// Browses all users with pagination (cached server-side for 60s).
+#[tauri::command]
+pub async fn browse_users(
+    page: usize,
+    page_size: usize,
+    state: State<'_, AppState>,
+) -> Result<BrowseResult, AppError> {
+    browse_users_inner(&state, page, page_size).await
+}
+
+/// Returns the members of a group identified by its DN.
+#[tauri::command]
+pub async fn get_group_members(
+    group_dn: String,
+    state: State<'_, AppState>,
+) -> Result<Vec<DirectoryEntry>, AppError> {
+    get_group_members_inner(&state, &group_dn).await
 }
 
 /// Returns the current Windows username from the environment.
@@ -1190,5 +1293,110 @@ mod tests {
         // Most recent first
         assert_eq!(entries[0].action, "Action2");
         assert_eq!(entries[1].action, "Action1");
+    }
+
+    // -----------------------------------------------------------------------
+    // Browse users tests
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_browse_users_inner_returns_sorted_page() {
+        let users = vec![
+            make_user_entry("zuser", "Zara User"),
+            make_user_entry("auser", "Alice User"),
+            make_user_entry("muser", "Mary User"),
+        ];
+        let state = make_state_with_users(users);
+        let result = browse_users_inner(&state, 0, 10).await.unwrap();
+        assert_eq!(result.total_count, 3);
+        assert_eq!(result.entries.len(), 3);
+        assert!(!result.has_more);
+        // Sorted by display name
+        assert_eq!(
+            result.entries[0].display_name,
+            Some("Alice User".to_string())
+        );
+        assert_eq!(
+            result.entries[1].display_name,
+            Some("Mary User".to_string())
+        );
+        assert_eq!(
+            result.entries[2].display_name,
+            Some("Zara User".to_string())
+        );
+    }
+
+    #[tokio::test]
+    async fn test_browse_users_inner_pagination() {
+        let users = vec![
+            make_user_entry("a", "Alice"),
+            make_user_entry("b", "Bob"),
+            make_user_entry("c", "Carol"),
+            make_user_entry("d", "Dave"),
+            make_user_entry("e", "Eve"),
+        ];
+        let state = make_state_with_users(users);
+
+        let page0 = browse_users_inner(&state, 0, 2).await.unwrap();
+        assert_eq!(page0.entries.len(), 2);
+        assert_eq!(page0.total_count, 5);
+        assert!(page0.has_more);
+        assert_eq!(page0.entries[0].display_name, Some("Alice".to_string()));
+
+        let page1 = browse_users_inner(&state, 1, 2).await.unwrap();
+        assert_eq!(page1.entries.len(), 2);
+        assert!(page1.has_more);
+        assert_eq!(page1.entries[0].display_name, Some("Carol".to_string()));
+
+        let page2 = browse_users_inner(&state, 2, 2).await.unwrap();
+        assert_eq!(page2.entries.len(), 1);
+        assert!(!page2.has_more);
+        assert_eq!(page2.entries[0].display_name, Some("Eve".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_browse_users_inner_uses_cache() {
+        let users = vec![make_user_entry("jdoe", "John Doe")];
+        let state = make_state_with_users(users);
+
+        // First call populates cache
+        let r1 = browse_users_inner(&state, 0, 10).await.unwrap();
+        assert_eq!(r1.total_count, 1);
+
+        // Cache should be populated
+        let cache = state.browse_cache.lock().unwrap();
+        assert!(cache.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_browse_users_inner_failure() {
+        let state = make_state_with_failure();
+        let result = browse_users_inner(&state, 0, 10).await;
+        assert!(result.is_err());
+    }
+
+    // -----------------------------------------------------------------------
+    // Get group members tests
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_get_group_members_inner_returns_members() {
+        let members = vec![
+            make_user_entry("jdoe", "John Doe"),
+            make_user_entry("asmith", "Alice Smith"),
+        ];
+        let provider = Arc::new(MockDirectoryProvider::new().with_members(members));
+        let state = AppState::new_for_test(provider, PermissionConfig::default());
+        let result = get_group_members_inner(&state, "CN=TestGroup,DC=example,DC=com")
+            .await
+            .unwrap();
+        assert_eq!(result.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_get_group_members_inner_failure() {
+        let state = make_state_with_failure();
+        let result = get_group_members_inner(&state, "CN=G,DC=test").await;
+        assert!(result.is_err());
     }
 }

@@ -85,6 +85,8 @@ pub fn run() {
             commands::get_domain_info,
             commands::search_users,
             commands::get_user,
+            commands::browse_users,
+            commands::get_group_members,
             commands::search_computers,
             commands::ping_host,
             commands::resolve_dns,

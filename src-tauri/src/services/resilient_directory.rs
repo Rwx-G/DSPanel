@@ -183,6 +183,10 @@ where
             .await)
     }
 
+    async fn browse_users(&self, max_results: usize) -> Result<Vec<DirectoryEntry>> {
+        resilient_call!(self, |inner| inner.browse_users(max_results).await)
+    }
+
     async fn get_user_by_identity(&self, sam_account_name: &str) -> Result<Option<DirectoryEntry>> {
         let sam = sam_account_name.to_string();
         resilient_call!(self, sam, |inner, s| inner.get_user_by_identity(&s).await)
@@ -518,6 +522,20 @@ mod tests {
         );
 
         let results = provider.search_computers("WS", 50).await.unwrap();
+        assert_eq!(results.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_resilient_browse_users() {
+        let inner = Arc::new(MockDirectoryProvider::new().with_users(vec![make_entry("jdoe")]));
+        let provider = ResilientDirectoryProvider::new(
+            inner,
+            RetryConfig::default(),
+            CircuitBreaker::new(CircuitBreakerConfig::default()),
+            noop_delay,
+        );
+
+        let results = provider.browse_users(500).await.unwrap();
         assert_eq!(results.len(), 1);
     }
 

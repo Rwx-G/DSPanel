@@ -1,5 +1,7 @@
 use std::sync::{Arc, Mutex};
+use std::time::Instant;
 
+use crate::models::DirectoryEntry;
 use crate::services::{
     AuditService, DirectoryProvider, MfaService, PermissionConfig, PermissionService,
     SnapshotService,
@@ -26,6 +28,8 @@ pub struct AppState {
     pub http_client: reqwest::Client,
     /// Snapshot service for capturing object state before modifications.
     pub snapshot_service: SnapshotService,
+    /// Cache for browse_users: (fetch_time, sorted_entries). TTL: 60 seconds.
+    pub browse_cache: Mutex<Option<(Instant, Vec<DirectoryEntry>)>>,
 }
 
 impl AppState {
@@ -45,6 +49,7 @@ impl AppState {
             mfa_service: MfaService::new(),
             http_client,
             snapshot_service: SnapshotService::new(),
+            browse_cache: Mutex::new(None),
         }
     }
 
@@ -63,6 +68,7 @@ impl AppState {
             mfa_service: MfaService::new_in_memory(),
             http_client: reqwest::Client::new(),
             snapshot_service: SnapshotService::new(),
+            browse_cache: Mutex::new(None),
         }
     }
 }

@@ -413,6 +413,11 @@ impl DirectoryProvider for LdapDirectoryProvider {
         self.search(&ldap_filter, GROUP_ATTRS, max_results).await
     }
 
+    async fn browse_users(&self, max_results: usize) -> Result<Vec<DirectoryEntry>> {
+        let ldap_filter = "(&(objectClass=user)(objectCategory=person))";
+        self.search(ldap_filter, USER_ATTRS, max_results).await
+    }
+
     async fn get_user_by_identity(&self, sam_account_name: &str) -> Result<Option<DirectoryEntry>> {
         let validated = validate_search_input(sam_account_name)?;
         let escaped = ldap_escape(validated);

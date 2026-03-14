@@ -54,6 +54,119 @@ fn sample_users() -> Vec<DirectoryEntry> {
     ]
 }
 
+fn sample_browse_users() -> Vec<DirectoryEntry> {
+    let mut users = sample_users();
+    users.extend(vec![
+        make_user(
+            "fchen", "Fiona Chen", "Engineering", "Frontend Developer",
+            "fchen@contoso.com", "512", "0",
+            "133500000000000000", "133511000000000000", "0",
+        ),
+        make_user(
+            "gkumar", "Gaurav Kumar", "Engineering", "Backend Developer",
+            "gkumar@contoso.com", "512", "0",
+            "133490000000000000", "133512000000000000", "1",
+        ),
+        make_user(
+            "hpark", "Hannah Park", "Marketing", "Brand Manager",
+            "hpark@contoso.com", "512", "0",
+            "133480000000000000", "133510000000000000", "0",
+        ),
+        make_user(
+            "inovak", "Ivan Novak", "IT", "Network Engineer",
+            "inovak@contoso.com", "66048", "0",
+            "133500000000000000", "133512000000000000", "0",
+        ),
+        make_user(
+            "jlee", "Julia Lee", "Finance", "Financial Analyst",
+            "jlee@contoso.com", "512", "0",
+            "133490000000000000", "133511000000000000", "0",
+        ),
+        make_user(
+            "kbrown", "Kevin Brown", "Sales", "Sales Director",
+            "kbrown@contoso.com", "512", "0",
+            "133480000000000000", "133512000000000000", "0",
+        ),
+        make_user(
+            "lgarcia", "Laura Garcia", "HR", "Recruiter",
+            "lgarcia@contoso.com", "514", "0",
+            "133400000000000000", "133490000000000000", "0",
+        ),
+        make_user(
+            "mwong", "Michael Wong", "Engineering", "QA Lead",
+            "mwong@contoso.com", "512", "0",
+            "133500000000000000", "133512000000000000", "0",
+        ),
+        make_user(
+            "nsilva", "Nina Silva", "Marketing", "Content Strategist",
+            "nsilva@contoso.com", "512", "0",
+            "133490000000000000", "133510000000000000", "0",
+        ),
+        make_user(
+            "omueller", "Oscar Mueller", "IT", "Security Analyst",
+            "omueller@contoso.com", "512", "133512600000000000",
+            "133500000000000000", "133512000000000000", "3",
+        ),
+        make_user(
+            "pjohnson", "Patricia Johnson", "Finance", "Controller",
+            "pjohnson@contoso.com", "66048", "0",
+            "133400000000000000", "133512000000000000", "0",
+        ),
+        make_user(
+            "qnguyen", "Quentin Nguyen", "Engineering", "SRE",
+            "qnguyen@contoso.com", "512", "0",
+            "133500000000000000", "133512000000000000", "0",
+        ),
+        make_user(
+            "rthompson", "Rachel Thompson", "Sales", "Account Manager",
+            "rthompson@contoso.com", "512", "0",
+            "133490000000000000", "133511000000000000", "0",
+        ),
+        make_user(
+            "sjackson", "Samuel Jackson", "IT", "Help Desk Lead",
+            "sjackson@contoso.com", "512", "0",
+            "133500000000000000", "133512000000000000", "0",
+        ),
+        make_user(
+            "tanderson", "Tina Anderson", "HR", "Training Coordinator",
+            "tanderson@contoso.com", "514", "0",
+            "133400000000000000", "133480000000000000", "0",
+        ),
+        make_user(
+            "uroberts", "Ulrich Roberts", "Engineering", "Data Engineer",
+            "uroberts@contoso.com", "512", "0",
+            "133500000000000000", "133512000000000000", "0",
+        ),
+        make_user(
+            "vmorales", "Vanessa Morales", "Marketing", "Creative Director",
+            "vmorales@contoso.com", "512", "0",
+            "133490000000000000", "133510000000000000", "0",
+        ),
+        make_user(
+            "wkim", "William Kim", "Finance", "Auditor",
+            "wkim@contoso.com", "512", "0",
+            "133490000000000000", "133511000000000000", "0",
+        ),
+        make_user(
+            "xzhang", "Xin Zhang", "Engineering", "ML Engineer",
+            "xzhang@contoso.com", "512", "0",
+            "133500000000000000", "133512000000000000", "0",
+        ),
+        make_user(
+            "yadams", "Yolanda Adams", "Sales", "VP Sales",
+            "yadams@contoso.com", "66048", "0",
+            "133400000000000000", "133512000000000000", "0",
+        ),
+    ]);
+    // Sort by display name for browse consistency
+    users.sort_by(|a, b| {
+        let da = a.display_name.as_deref().unwrap_or("");
+        let db = b.display_name.as_deref().unwrap_or("");
+        da.cmp(db)
+    });
+    users
+}
+
 fn sample_computers() -> Vec<DirectoryEntry> {
     vec![
         make_computer("WS-PC001", "PC001.contoso.com", "Windows 11 Enterprise", "10.0 (22631)"),
@@ -165,14 +278,34 @@ impl DirectoryProvider for DemoDirectoryProvider {
         Ok(vec![])
     }
 
+    async fn browse_users(&self, max_results: usize) -> Result<Vec<DirectoryEntry>> {
+        Ok(sample_browse_users().into_iter().take(max_results).collect())
+    }
+
     async fn get_user_by_identity(&self, sam_account_name: &str) -> Result<Option<DirectoryEntry>> {
         Ok(sample_users()
             .into_iter()
             .find(|u| u.sam_account_name.as_deref() == Some(sam_account_name)))
     }
 
-    async fn get_group_members(&self, _group_dn: &str, _max_results: usize) -> Result<Vec<DirectoryEntry>> {
-        Ok(vec![])
+    async fn get_group_members(&self, group_dn: &str, max_results: usize) -> Result<Vec<DirectoryEntry>> {
+        // Return a subset of users as group members based on group DN
+        let all = sample_browse_users();
+        let members: Vec<DirectoryEntry> = all
+            .into_iter()
+            .filter(|u| {
+                u.get_attribute_values("memberOf")
+                    .iter()
+                    .any(|m| m == group_dn)
+            })
+            .take(max_results)
+            .collect();
+        // If no exact match, return first few users as a demo fallback
+        if members.is_empty() {
+            Ok(sample_users().into_iter().take(max_results.min(3)).collect())
+        } else {
+            Ok(members)
+        }
     }
 
     async fn get_current_user_groups(&self) -> Result<Vec<String>> {
