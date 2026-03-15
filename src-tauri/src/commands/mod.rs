@@ -2100,4 +2100,898 @@ mod tests {
         assert_eq!(diff.len(), 1);
         assert_eq!(diff[0].attribute_name, "displayName");
     }
+
+    // -----------------------------------------------------------------------
+    // search_groups_inner tests
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_search_groups_inner_returns_results() {
+        let groups = vec![DirectoryEntry {
+            distinguished_name: "CN=Admins,DC=example,DC=com".to_string(),
+            sam_account_name: Some("Admins".to_string()),
+            display_name: Some("Admins".to_string()),
+            object_class: Some("group".to_string()),
+            attributes: HashMap::new(),
+        }];
+        let provider = Arc::new(MockDirectoryProvider::new().with_groups(groups));
+        let state = AppState::new_for_test(provider, PermissionConfig::default());
+        let results = search_groups_inner(&state, "Admin").await.unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].sam_account_name, Some("Admins".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_search_groups_inner_empty_query_rejected() {
+        let state = make_state();
+        let result = search_groups_inner(&state, "   ").await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_search_groups_inner_failure() {
+        let state = make_state_with_failure();
+        let result = search_groups_inner(&state, "test").await;
+        assert!(result.is_err());
+    }
+
+    // -----------------------------------------------------------------------
+    // get_ou_tree_inner tests
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_get_ou_tree_inner_returns_empty() {
+        let state = make_state();
+        let result = get_ou_tree_inner(&state).await.unwrap();
+        assert!(result.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_get_ou_tree_inner_failure() {
+        let state = make_state_with_failure();
+        let result = get_ou_tree_inner(&state).await;
+        assert!(result.is_err());
+    }
+
+    // -----------------------------------------------------------------------
+    // browse_computers_inner tests
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_browse_computers_inner_returns_sorted_page() {
+        let computers = vec![
+            DirectoryEntry {
+                distinguished_name: "CN=WS03,DC=test".to_string(),
+                sam_account_name: Some("WS03$".to_string()),
+                display_name: Some("Zulu Workstation".to_string()),
+                object_class: Some("computer".to_string()),
+                attributes: HashMap::new(),
+            },
+            DirectoryEntry {
+                distinguished_name: "CN=WS01,DC=test".to_string(),
+                sam_account_name: Some("WS01$".to_string()),
+                display_name: Some("Alpha Workstation".to_string()),
+                object_class: Some("computer".to_string()),
+                attributes: HashMap::new(),
+            },
+        ];
+        let provider = Arc::new(MockDirectoryProvider::new().with_computers(computers));
+        let state = AppState::new_for_test(provider, PermissionConfig::default());
+        let result = browse_computers_inner(&state, 0, 10).await.unwrap();
+        assert_eq!(result.total_count, 2);
+        assert_eq!(result.entries.len(), 2);
+        assert!(!result.has_more);
+        // Sorted by display name
+        assert_eq!(
+            result.entries[0].display_name,
+            Some("Alpha Workstation".to_string())
+        );
+        assert_eq!(
+            result.entries[1].display_name,
+            Some("Zulu Workstation".to_string())
+        );
+    }
+
+    #[tokio::test]
+    async fn test_browse_computers_inner_pagination() {
+        let computers = vec![
+            DirectoryEntry {
+                distinguished_name: "CN=A,DC=test".to_string(),
+                sam_account_name: Some("A$".to_string()),
+                display_name: Some("Alpha".to_string()),
+                object_class: Some("computer".to_string()),
+                attributes: HashMap::new(),
+            },
+            DirectoryEntry {
+                distinguished_name: "CN=B,DC=test".to_string(),
+                sam_account_name: Some("B$".to_string()),
+                display_name: Some("Bravo".to_string()),
+                object_class: Some("computer".to_string()),
+                attributes: HashMap::new(),
+            },
+            DirectoryEntry {
+                distinguished_name: "CN=C,DC=test".to_string(),
+                sam_account_name: Some("C$".to_string()),
+                display_name: Some("Charlie".to_string()),
+                object_class: Some("computer".to_string()),
+                attributes: HashMap::new(),
+            },
+        ];
+        let provider = Arc::new(MockDirectoryProvider::new().with_computers(computers));
+        let state = AppState::new_for_test(provider, PermissionConfig::default());
+
+        let page0 = browse_computers_inner(&state, 0, 2).await.unwrap();
+        assert_eq!(page0.entries.len(), 2);
+        assert_eq!(page0.total_count, 3);
+        assert!(page0.has_more);
+
+        let page1 = browse_computers_inner(&state, 1, 2).await.unwrap();
+        assert_eq!(page1.entries.len(), 1);
+        assert!(!page1.has_more);
+    }
+
+    #[tokio::test]
+    async fn test_browse_computers_inner_failure() {
+        let state = make_state_with_failure();
+        let result = browse_computers_inner(&state, 0, 10).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_browse_computers_inner_uses_cache() {
+        let computers = vec![DirectoryEntry {
+            distinguished_name: "CN=WS01,DC=test".to_string(),
+            sam_account_name: Some("WS01$".to_string()),
+            display_name: Some("WS01".to_string()),
+            object_class: Some("computer".to_string()),
+            attributes: HashMap::new(),
+        }];
+        let provider = Arc::new(MockDirectoryProvider::new().with_computers(computers));
+        let state = AppState::new_for_test(provider, PermissionConfig::default());
+
+        let r1 = browse_computers_inner(&state, 0, 10).await.unwrap();
+        assert_eq!(r1.total_count, 1);
+
+        let cache = state.browse_computers_cache.lock().unwrap();
+        assert!(cache.is_some());
+    }
+
+    // -----------------------------------------------------------------------
+    // get_cannot_change_password_inner tests
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_get_cannot_change_password_inner_returns_false() {
+        let state = make_state();
+        let result = get_cannot_change_password_inner(&state, "CN=User,DC=test")
+            .await
+            .unwrap();
+        assert!(!result);
+    }
+
+    #[tokio::test]
+    async fn test_get_cannot_change_password_inner_failure() {
+        let state = make_state_with_failure();
+        let result = get_cannot_change_password_inner(&state, "CN=User,DC=test").await;
+        assert!(result.is_err());
+    }
+
+    // -----------------------------------------------------------------------
+    // add_user_to_group_inner tests
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_add_user_to_group_requires_helpdesk() {
+        let state = make_state(); // ReadOnly
+        let result =
+            add_user_to_group_inner(&state, "CN=User,DC=test", "CN=Group,DC=test").await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            AppError::PermissionDenied(msg) => assert!(msg.contains("HelpDesk")),
+            other => panic!("Expected PermissionDenied, got: {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_add_user_to_group_succeeds_with_helpdesk() {
+        let (state, _provider) = make_state_with_level_and_provider(PermissionLevel::HelpDesk);
+        let result =
+            add_user_to_group_inner(&state, "CN=User,DC=test", "CN=Group,DC=test").await;
+        assert!(result.is_ok());
+        let entries = state.audit_service.get_entries();
+        assert_eq!(entries.len(), 1);
+        assert!(entries[0].success);
+        assert_eq!(entries[0].action, "AddedToGroup");
+    }
+
+    #[tokio::test]
+    async fn test_add_user_to_group_failure_logs_audit() {
+        let state = make_state_with_level_and_failure(PermissionLevel::HelpDesk);
+        let result =
+            add_user_to_group_inner(&state, "CN=User,DC=test", "CN=Group,DC=test").await;
+        assert!(result.is_err());
+        let entries = state.audit_service.get_entries();
+        assert_eq!(entries.len(), 1);
+        assert!(!entries[0].success);
+        assert_eq!(entries[0].action, "AddToGroupFailed");
+    }
+
+    // -----------------------------------------------------------------------
+    // analyze_ntfs_inner tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_analyze_ntfs_inner_invalid_path() {
+        let result = analyze_ntfs_inner("C:\\local\\path", 2);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_analyze_ntfs_inner_traversal_rejected() {
+        let result = analyze_ntfs_inner("\\\\server\\share\\..\\..\\secret", 1);
+        assert!(result.is_err());
+    }
+
+    // -----------------------------------------------------------------------
+    // Failure audit paths for account operations
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_unlock_account_failure_logs_audit() {
+        let state = make_state_with_level_and_failure(PermissionLevel::HelpDesk);
+        let result = unlock_account_inner(&state, "CN=User,DC=test").await;
+        assert!(result.is_err());
+        let entries = state.audit_service.get_entries();
+        assert_eq!(entries.len(), 1);
+        assert!(!entries[0].success);
+        assert_eq!(entries[0].action, "AccountUnlockFailed");
+    }
+
+    #[tokio::test]
+    async fn test_enable_account_failure_logs_audit() {
+        let state = make_state_with_level_and_failure(PermissionLevel::HelpDesk);
+        let result = enable_account_inner(&state, "CN=User,DC=test").await;
+        assert!(result.is_err());
+        let entries = state.audit_service.get_entries();
+        assert_eq!(entries.len(), 1);
+        assert!(!entries[0].success);
+        assert_eq!(entries[0].action, "AccountEnableFailed");
+    }
+
+    #[tokio::test]
+    async fn test_disable_account_failure_logs_audit() {
+        let state = make_state_with_level_and_failure(PermissionLevel::HelpDesk);
+        let result = disable_account_inner(&state, "CN=User,DC=test").await;
+        assert!(result.is_err());
+        let entries = state.audit_service.get_entries();
+        assert_eq!(entries.len(), 1);
+        assert!(!entries[0].success);
+        assert_eq!(entries[0].action, "AccountDisableFailed");
+    }
+
+    #[tokio::test]
+    async fn test_set_password_flags_failure_logs_audit() {
+        let state = make_state_with_level_and_failure(PermissionLevel::AccountOperator);
+        let result =
+            set_password_flags_inner(&state, "CN=User,DC=test", true, false).await;
+        assert!(result.is_err());
+        let entries = state.audit_service.get_entries();
+        assert_eq!(entries.len(), 1);
+        assert!(!entries[0].success);
+        assert_eq!(entries[0].action, "PasswordFlagsChangeFailed");
+    }
+
+    // -----------------------------------------------------------------------
+    // Admin-level permission succeeds for HelpDesk operations
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_reset_password_succeeds_with_admin() {
+        let state = make_state_with_level(PermissionLevel::DomainAdmin);
+        let result =
+            reset_password_inner(&state, "CN=Test,DC=example,DC=com", "Pass1!", false).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_unlock_account_succeeds_with_admin() {
+        let state = make_state_with_level(PermissionLevel::DomainAdmin);
+        let result = unlock_account_inner(&state, "CN=Test,DC=example,DC=com").await;
+        assert!(result.is_ok());
+    }
+
+    // -----------------------------------------------------------------------
+    // BrowseResult and DomainInfo struct tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_browse_result_serialization() {
+        let br = BrowseResult {
+            entries: vec![],
+            total_count: 42,
+            has_more: true,
+        };
+        let json = serde_json::to_string(&br).unwrap();
+        assert!(json.contains("totalCount"));
+        assert!(json.contains("hasMore"));
+        assert!(json.contains("42"));
+    }
+
+    #[test]
+    fn test_domain_info_disconnected_serialization() {
+        let info = DomainInfo {
+            domain_name: None,
+            is_connected: false,
+        };
+        let json = serde_json::to_string(&info).unwrap();
+        assert!(json.contains("null"));
+        assert!(json.contains("false"));
+    }
+
+    // -----------------------------------------------------------------------
+    // validate_search_input boundary tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_validate_search_input_max_length_exact() {
+        let exact = "a".repeat(MAX_SEARCH_QUERY_LEN);
+        assert!(validate_search_input(&exact).is_ok());
+    }
+
+    #[test]
+    fn test_validate_search_input_tab_is_control() {
+        assert!(validate_search_input("john\tdoe").is_err());
+    }
+
+    // -----------------------------------------------------------------------
+    // check_connection_inner failure test
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_check_connection_inner_failure() {
+        let state = make_state_with_failure();
+        let result = check_connection_inner(&state).await;
+        assert!(result.is_err());
+    }
+
+    // -----------------------------------------------------------------------
+    // browse_users_inner page beyond range
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_browse_users_inner_page_beyond_range() {
+        let users = vec![make_user_entry("jdoe", "John Doe")];
+        let state = make_state_with_users(users);
+        let result = browse_users_inner(&state, 100, 10).await.unwrap();
+        assert_eq!(result.total_count, 1);
+        assert!(result.entries.is_empty());
+        assert!(!result.has_more);
+    }
+
+    // -----------------------------------------------------------------------
+    // get_replication_metadata_inner - value metadata branch
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_get_replication_metadata_no_attr_no_value() {
+        // Mock returns None for both attribute and value metadata
+        let state = make_state();
+        let result = get_replication_metadata_inner(&state, "CN=EmptyObj,DC=test")
+            .await
+            .unwrap();
+        assert!(!result.is_available);
+        assert!(result.attributes.is_empty());
+        assert!(result.value_metadata.is_empty());
+        assert!(result.message.is_some());
+        assert!(result
+            .message
+            .unwrap()
+            .contains("not available"));
+    }
+
+    #[tokio::test]
+    async fn test_get_replication_metadata_with_attr_metadata_has_correct_object_dn() {
+        let xml = r#"<DS_REPL_ATTR_META_DATA>
+    <pszAttributeName>sn</pszAttributeName>
+    <dwVersion>1</dwVersion>
+    <ftimeLastOriginatingChange>2026-01-01T00:00:00Z</ftimeLastOriginatingChange>
+    <pszLastOriginatingDsaDN>CN=DC1</pszLastOriginatingDsaDN>
+    <usnOriginatingChange>111</usnOriginatingChange>
+    <usnLocalChange>222</usnLocalChange>
+</DS_REPL_ATTR_META_DATA>"#;
+        let provider =
+            Arc::new(MockDirectoryProvider::new().with_replication_metadata(xml.to_string()));
+        let state = AppState::new_for_test(provider, PermissionConfig::default());
+        let result = get_replication_metadata_inner(&state, "CN=User1,DC=example,DC=com")
+            .await
+            .unwrap();
+        assert!(result.is_available);
+        assert_eq!(result.object_dn, "CN=User1,DC=example,DC=com");
+        assert!(result.message.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_get_replication_metadata_multiple_attributes() {
+        let xml = r#"<DS_REPL_ATTR_META_DATA>
+    <pszAttributeName>displayName</pszAttributeName>
+    <dwVersion>3</dwVersion>
+    <ftimeLastOriginatingChange>2026-02-15T14:30:00Z</ftimeLastOriginatingChange>
+    <pszLastOriginatingDsaDN>CN=DC1</pszLastOriginatingDsaDN>
+    <usnOriginatingChange>100</usnOriginatingChange>
+    <usnLocalChange>200</usnLocalChange>
+</DS_REPL_ATTR_META_DATA>
+<DS_REPL_ATTR_META_DATA>
+    <pszAttributeName>title</pszAttributeName>
+    <dwVersion>5</dwVersion>
+    <ftimeLastOriginatingChange>2026-03-01T08:00:00Z</ftimeLastOriginatingChange>
+    <pszLastOriginatingDsaDN>CN=DC2</pszLastOriginatingDsaDN>
+    <usnOriginatingChange>300</usnOriginatingChange>
+    <usnLocalChange>400</usnLocalChange>
+</DS_REPL_ATTR_META_DATA>"#;
+        let provider =
+            Arc::new(MockDirectoryProvider::new().with_replication_metadata(xml.to_string()));
+        let state = AppState::new_for_test(provider, PermissionConfig::default());
+        let result = get_replication_metadata_inner(&state, "CN=User1,DC=test")
+            .await
+            .unwrap();
+        assert!(result.is_available);
+        assert_eq!(result.attributes.len(), 2);
+        // Parser may return in any order - check both are present
+        let names: Vec<&str> = result.attributes.iter().map(|a| a.attribute_name.as_str()).collect();
+        assert!(names.contains(&"displayName"));
+        assert!(names.contains(&"title"));
+    }
+
+    // -----------------------------------------------------------------------
+    // compute_attribute_diff_inner - edge cases
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_compute_attribute_diff_inner_empty_metadata() {
+        let diff = compute_attribute_diff_inner(&[], "2026-01-01T00:00:00Z", "2026-12-31T23:59:59Z");
+        assert!(diff.is_empty());
+    }
+
+    #[test]
+    fn test_compute_attribute_diff_inner_all_outside_range() {
+        let metadata = vec![
+            crate::services::replication::AttributeMetadata {
+                attribute_name: "displayName".to_string(),
+                version: 3,
+                last_originating_change_time: "2025-01-01T00:00:00Z".to_string(),
+                last_originating_dsa_dn: String::new(),
+                local_usn: 0,
+                originating_usn: 0,
+            },
+        ];
+        let diff = compute_attribute_diff_inner(&metadata, "2026-01-01T00:00:00Z", "2026-12-31T23:59:59Z");
+        assert!(diff.is_empty());
+    }
+
+    #[test]
+    fn test_compute_attribute_diff_inner_all_inside_range() {
+        let metadata = vec![
+            crate::services::replication::AttributeMetadata {
+                attribute_name: "sn".to_string(),
+                version: 2,
+                last_originating_change_time: "2026-06-15T10:00:00Z".to_string(),
+                last_originating_dsa_dn: String::new(),
+                local_usn: 0,
+                originating_usn: 0,
+            },
+            crate::services::replication::AttributeMetadata {
+                attribute_name: "givenName".to_string(),
+                version: 1,
+                last_originating_change_time: "2026-03-01T08:00:00Z".to_string(),
+                last_originating_dsa_dn: String::new(),
+                local_usn: 0,
+                originating_usn: 0,
+            },
+        ];
+        let diff = compute_attribute_diff_inner(&metadata, "2026-01-01T00:00:00Z", "2026-12-31T23:59:59Z");
+        assert_eq!(diff.len(), 2);
+        assert_eq!(diff[0].attribute_name, "sn");
+        assert_eq!(diff[0].version_before, 1); // saturating_sub(1) of 2
+        assert_eq!(diff[0].version_after, 2);
+        assert_eq!(diff[1].attribute_name, "givenName");
+        assert_eq!(diff[1].version_before, 0); // saturating_sub(1) of 1
+        assert_eq!(diff[1].version_after, 1);
+    }
+
+    #[test]
+    fn test_compute_attribute_diff_inner_boundary_timestamps() {
+        let metadata = vec![
+            crate::services::replication::AttributeMetadata {
+                attribute_name: "attr_at_start".to_string(),
+                version: 1,
+                last_originating_change_time: "2026-01-01T00:00:00Z".to_string(),
+                last_originating_dsa_dn: String::new(),
+                local_usn: 0,
+                originating_usn: 0,
+            },
+            crate::services::replication::AttributeMetadata {
+                attribute_name: "attr_at_end".to_string(),
+                version: 1,
+                last_originating_change_time: "2026-12-31T23:59:59Z".to_string(),
+                last_originating_dsa_dn: String::new(),
+                local_usn: 0,
+                originating_usn: 0,
+            },
+        ];
+        // Both boundary timestamps should be included (>=, <=)
+        let diff = compute_attribute_diff_inner(&metadata, "2026-01-01T00:00:00Z", "2026-12-31T23:59:59Z");
+        assert_eq!(diff.len(), 2);
+    }
+
+    #[test]
+    fn test_compute_attribute_diff_inner_version_zero() {
+        let metadata = vec![
+            crate::services::replication::AttributeMetadata {
+                attribute_name: "new_attr".to_string(),
+                version: 0,
+                last_originating_change_time: "2026-06-01T00:00:00Z".to_string(),
+                last_originating_dsa_dn: String::new(),
+                local_usn: 0,
+                originating_usn: 0,
+            },
+        ];
+        let diff = compute_attribute_diff_inner(&metadata, "2026-01-01T00:00:00Z", "2026-12-31T23:59:59Z");
+        assert_eq!(diff.len(), 1);
+        // version 0 saturating_sub(1) = 0
+        assert_eq!(diff[0].version_before, 0);
+        assert_eq!(diff[0].version_after, 0);
+    }
+
+    // -----------------------------------------------------------------------
+    // set_password_flags_inner - all flag combinations
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_set_password_flags_false_true() {
+        let (state, provider) =
+            make_state_with_level_and_provider(PermissionLevel::AccountOperator);
+        set_password_flags_inner(&state, "CN=User2,DC=test", false, true)
+            .await
+            .unwrap();
+        let calls = provider.set_password_flags_calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+        assert!(!calls[0].1); // password_never_expires = false
+        assert!(calls[0].2); // user_cannot_change_password = true
+        let entries = state.audit_service.get_entries();
+        assert!(entries[0].details.contains("password_never_expires=false"));
+        assert!(entries[0].details.contains("user_cannot_change_password=true"));
+    }
+
+    #[tokio::test]
+    async fn test_set_password_flags_true_true() {
+        let (state, provider) =
+            make_state_with_level_and_provider(PermissionLevel::AccountOperator);
+        set_password_flags_inner(&state, "CN=User3,DC=test", true, true)
+            .await
+            .unwrap();
+        let calls = provider.set_password_flags_calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+        assert!(calls[0].1);
+        assert!(calls[0].2);
+        let entries = state.audit_service.get_entries();
+        assert!(entries[0].details.contains("password_never_expires=true"));
+        assert!(entries[0].details.contains("user_cannot_change_password=true"));
+    }
+
+    #[tokio::test]
+    async fn test_set_password_flags_false_false() {
+        let (state, provider) =
+            make_state_with_level_and_provider(PermissionLevel::AccountOperator);
+        set_password_flags_inner(&state, "CN=User4,DC=test", false, false)
+            .await
+            .unwrap();
+        let calls = provider.set_password_flags_calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+        assert!(!calls[0].1);
+        assert!(!calls[0].2);
+        let entries = state.audit_service.get_entries();
+        assert!(entries[0].details.contains("password_never_expires=false"));
+        assert!(entries[0].details.contains("user_cannot_change_password=false"));
+    }
+
+    #[tokio::test]
+    async fn test_set_password_flags_requires_readonly_denied() {
+        let state = make_state_with_level(PermissionLevel::ReadOnly);
+        let result =
+            set_password_flags_inner(&state, "CN=Test,DC=test", true, true).await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            AppError::PermissionDenied(msg) => assert!(msg.contains("AccountOperator")),
+            other => panic!("Expected PermissionDenied, got: {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_set_password_flags_succeeds_with_domain_admin() {
+        let (state, _provider) =
+            make_state_with_level_and_provider(PermissionLevel::DomainAdmin);
+        let result =
+            set_password_flags_inner(&state, "CN=User5,DC=test", true, false).await;
+        assert!(result.is_ok());
+    }
+
+    // -----------------------------------------------------------------------
+    // NTFS audit - valid demo path
+    // -----------------------------------------------------------------------
+
+    #[cfg(feature = "demo")]
+    #[test]
+    fn test_audit_ntfs_permissions_demo_valid_path() {
+        let result = audit_ntfs_permissions_inner("\\\\server\\share");
+        assert!(result.is_ok());
+        let audit = result.unwrap();
+        assert_eq!(audit.path, "\\\\server\\share");
+        assert!(!audit.aces.is_empty());
+    }
+
+    #[cfg(feature = "demo")]
+    #[test]
+    fn test_analyze_ntfs_inner_demo_valid_path() {
+        let result = analyze_ntfs_inner("\\\\server\\share", 2);
+        assert!(result.is_ok());
+        let analysis = result.unwrap();
+        assert!(analysis.total_paths_scanned > 0);
+        assert_eq!(analysis.total_errors, 0);
+    }
+
+    // -----------------------------------------------------------------------
+    // analyze_ntfs_inner - additional invalid path patterns
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_analyze_ntfs_inner_empty_path() {
+        let result = analyze_ntfs_inner("", 1);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_analyze_ntfs_inner_single_backslash() {
+        let result = analyze_ntfs_inner("\\", 1);
+        assert!(result.is_err());
+    }
+
+    // -----------------------------------------------------------------------
+    // audit_ntfs_permissions_inner - more invalid paths
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_audit_ntfs_permissions_empty_path() {
+        let result = audit_ntfs_permissions_inner("");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_audit_ntfs_permissions_traversal_attack() {
+        let result = audit_ntfs_permissions_inner("\\\\server\\share\\..\\..\\etc");
+        assert!(result.is_err());
+    }
+
+    // -----------------------------------------------------------------------
+    // cross_reference_ntfs_inner - additional scenarios
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_cross_reference_ntfs_inner_shared_sid() {
+        let aces = vec![crate::services::ntfs::AceEntry {
+            trustee_sid: "S-1-5-21-100".to_string(),
+            trustee_display_name: "SharedGroup".to_string(),
+            access_type: crate::services::ntfs::AceAccessType::Allow,
+            permissions: vec!["Read".to_string()],
+            is_inherited: false,
+        }];
+        // Both users share the same SID
+        let user_a_sids = vec!["S-1-5-21-100".to_string()];
+        let user_b_sids = vec!["S-1-5-21-100".to_string()];
+        let results = cross_reference_ntfs_inner(&aces, &user_a_sids, &user_b_sids);
+        assert_eq!(results.len(), 1);
+        assert_eq!(
+            results[0].user_a_access,
+            crate::services::ntfs::AccessIndicator::Allowed
+        );
+        assert_eq!(
+            results[0].user_b_access,
+            crate::services::ntfs::AccessIndicator::Allowed
+        );
+    }
+
+    #[test]
+    fn test_cross_reference_ntfs_inner_no_matching_sids() {
+        let aces = vec![crate::services::ntfs::AceEntry {
+            trustee_sid: "S-1-5-21-999".to_string(),
+            trustee_display_name: "OtherGroup".to_string(),
+            access_type: crate::services::ntfs::AceAccessType::Allow,
+            permissions: vec!["Read".to_string()],
+            is_inherited: false,
+        }];
+        let user_a_sids = vec!["S-1-5-21-100".to_string()];
+        let user_b_sids = vec!["S-1-5-21-200".to_string()];
+        let results = cross_reference_ntfs_inner(&aces, &user_a_sids, &user_b_sids);
+        assert_eq!(results.len(), 1);
+        assert_eq!(
+            results[0].user_a_access,
+            crate::services::ntfs::AccessIndicator::NoMatch
+        );
+        assert_eq!(
+            results[0].user_b_access,
+            crate::services::ntfs::AccessIndicator::NoMatch
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // compare_users_inner - same user comparison
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_compare_users_same_user() {
+        let users = vec![make_user_with_groups(
+            "jdoe",
+            "John Doe",
+            vec!["CN=Group1,DC=test", "CN=Group2,DC=test"],
+        )];
+        let state = make_state_with_users(users);
+        let result = compare_users_inner(&state, "jdoe", "jdoe").await.unwrap();
+        // All groups should be shared
+        assert_eq!(result.shared_groups.len(), 2);
+        assert!(result.only_a_groups.is_empty());
+        assert!(result.only_b_groups.is_empty());
+        assert_eq!(result.total_a, 2);
+        assert_eq!(result.total_b, 2);
+    }
+
+    // -----------------------------------------------------------------------
+    // browse_computers_inner - page beyond range
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_browse_computers_inner_page_beyond_range() {
+        let computers = vec![DirectoryEntry {
+            distinguished_name: "CN=WS01,DC=test".to_string(),
+            sam_account_name: Some("WS01$".to_string()),
+            display_name: Some("WS01".to_string()),
+            object_class: Some("computer".to_string()),
+            attributes: HashMap::new(),
+        }];
+        let provider = Arc::new(MockDirectoryProvider::new().with_computers(computers));
+        let state = AppState::new_for_test(provider, PermissionConfig::default());
+        let result = browse_computers_inner(&state, 100, 10).await.unwrap();
+        assert_eq!(result.total_count, 1);
+        assert!(result.entries.is_empty());
+        assert!(!result.has_more);
+    }
+
+    // -----------------------------------------------------------------------
+    // validate_search_input - additional edge cases
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_validate_search_input_unicode_allowed() {
+        let result = validate_search_input("utilisateur-francais");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "utilisateur-francais");
+    }
+
+    #[test]
+    fn test_validate_search_input_single_char() {
+        let result = validate_search_input("a");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "a");
+    }
+
+    #[test]
+    fn test_validate_search_input_newline_rejected() {
+        assert!(validate_search_input("line1\nline2").is_err());
+    }
+
+    #[test]
+    fn test_validate_search_input_carriage_return_rejected() {
+        assert!(validate_search_input("line1\rline2").is_err());
+    }
+
+    // -----------------------------------------------------------------------
+    // DomainInfo and BrowseResult - additional serialization
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_browse_result_empty_entries() {
+        let br = BrowseResult {
+            entries: vec![],
+            total_count: 0,
+            has_more: false,
+        };
+        let json = serde_json::to_string(&br).unwrap();
+        assert!(json.contains("\"entries\":[]"));
+        assert!(json.contains("\"totalCount\":0"));
+        assert!(json.contains("\"hasMore\":false"));
+    }
+
+    // -----------------------------------------------------------------------
+    // Account operations - snapshot capture verification
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_reset_password_captures_snapshot() {
+        let state = make_state_with_level(PermissionLevel::HelpDesk);
+        assert_eq!(state.snapshot_service.count(), 0);
+        reset_password_inner(&state, "CN=UserSnap,DC=test", "Pass1!", true)
+            .await
+            .unwrap();
+        assert_eq!(state.snapshot_service.count(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_disable_account_captures_snapshot() {
+        let state = make_state_with_level(PermissionLevel::HelpDesk);
+        assert_eq!(state.snapshot_service.count(), 0);
+        disable_account_inner(&state, "CN=UserSnap,DC=test")
+            .await
+            .unwrap();
+        assert_eq!(state.snapshot_service.count(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_unlock_account_captures_snapshot() {
+        let state = make_state_with_level(PermissionLevel::HelpDesk);
+        assert_eq!(state.snapshot_service.count(), 0);
+        unlock_account_inner(&state, "CN=UserSnap,DC=test")
+            .await
+            .unwrap();
+        assert_eq!(state.snapshot_service.count(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_enable_account_captures_snapshot() {
+        let state = make_state_with_level(PermissionLevel::HelpDesk);
+        assert_eq!(state.snapshot_service.count(), 0);
+        enable_account_inner(&state, "CN=UserSnap,DC=test")
+            .await
+            .unwrap();
+        assert_eq!(state.snapshot_service.count(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_set_password_flags_captures_snapshot() {
+        let state = make_state_with_level(PermissionLevel::AccountOperator);
+        assert_eq!(state.snapshot_service.count(), 0);
+        set_password_flags_inner(&state, "CN=UserSnap,DC=test", true, false)
+            .await
+            .unwrap();
+        assert_eq!(state.snapshot_service.count(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_add_user_to_group_captures_snapshot() {
+        let state = make_state_with_level(PermissionLevel::HelpDesk);
+        assert_eq!(state.snapshot_service.count(), 0);
+        add_user_to_group_inner(&state, "CN=User,DC=test", "CN=Group,DC=test")
+            .await
+            .unwrap();
+        assert_eq!(state.snapshot_service.count(), 1);
+    }
+
+    // -----------------------------------------------------------------------
+    // add_user_to_group_inner - additional permission levels
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_add_user_to_group_succeeds_with_admin() {
+        let (state, _provider) =
+            make_state_with_level_and_provider(PermissionLevel::DomainAdmin);
+        let result =
+            add_user_to_group_inner(&state, "CN=User,DC=test", "CN=Group,DC=test").await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_add_user_to_group_succeeds_with_account_operator() {
+        let (state, _provider) =
+            make_state_with_level_and_provider(PermissionLevel::AccountOperator);
+        let result =
+            add_user_to_group_inner(&state, "CN=User,DC=test", "CN=Group,DC=test").await;
+        assert!(result.is_ok());
+    }
 }

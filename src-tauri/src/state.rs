@@ -141,4 +141,53 @@ mod tests {
             .permission_service
             .has_permission(PermissionLevel::HelpDesk));
     }
+
+    #[test]
+    fn test_app_state_audit_service_works() {
+        let state = make_state();
+        state
+            .audit_service
+            .log_success("Test", "dn", "test detail");
+        assert_eq!(state.audit_service.count(), 1);
+    }
+
+    #[test]
+    fn test_app_state_mfa_service_not_configured() {
+        let state = make_state();
+        assert!(!state.mfa_service.is_configured());
+    }
+
+    #[test]
+    fn test_app_state_snapshot_service_works() {
+        let state = make_state();
+        state.snapshot_service.capture("dn", "Op");
+        assert_eq!(state.snapshot_service.count(), 1);
+    }
+
+    #[test]
+    fn test_app_state_browse_cache_initially_none() {
+        let state = make_state();
+        assert!(state.browse_cache.lock().unwrap().is_none());
+    }
+
+    #[test]
+    fn test_app_state_browse_computers_cache_initially_none() {
+        let state = make_state();
+        assert!(state.browse_computers_cache.lock().unwrap().is_none());
+    }
+
+    #[test]
+    fn test_app_state_browse_cache_can_be_set() {
+        let state = make_state();
+        let now = Instant::now();
+        *state.browse_cache.lock().unwrap() = Some((now, Vec::new()));
+        assert!(state.browse_cache.lock().unwrap().is_some());
+    }
+
+    #[test]
+    fn test_app_state_http_client_exists() {
+        let state = make_state();
+        // Verify the HTTP client was created (no panic)
+        let _ = &state.http_client;
+    }
 }

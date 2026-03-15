@@ -361,4 +361,109 @@ mod tests {
         assert_eq!(entry.target_dn, "CN=X");
         assert!(entry.success);
     }
+
+    #[test]
+    fn test_init_schema_idempotent() {
+        // Calling init_schema twice must not error
+        let conn = Connection::open_in_memory().expect("open in-memory");
+        let svc = AuditService {
+            conn: Mutex::new(conn),
+            operator: "test".to_string(),
+        };
+        svc.init_schema();
+        svc.init_schema(); // second call - should be a no-op
+        // Service still works after double init
+        svc.log_success("Check", "dn", "idempotent");
+        assert_eq!(svc.count(), 1);
+    }
+
+    #[test]
+    fn test_empty_action_and_details() {
+        let svc = AuditService::new_in_memory();
+        svc.log_success("", "", "");
+        let entries = svc.get_entries();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].action, "");
+        assert_eq!(entries[0].details, "");
+        assert_eq!(entries[0].target_dn, "");
+    }
+
+    #[test]
+    fn test_count_after_mixed_success_and_failure() {
+        let svc = AuditService::new_in_memory();
+        svc.log_success("A", "dn1", "ok");
+        svc.log_failure("B", "dn2", "fail");
+        svc.log_success("C", "dn3", "ok2");
+        svc.log_failure("D", "dn4", "fail2");
+        svc.log_failure("E", "dn5", "fail3");
+        assert_eq!(svc.count(), 5);
+
+        let entries = svc.get_entries();
+        let success_count = entries.iter().filter(|e| e.success).count();
+        let failure_count = entries.iter().filter(|e| !e.success).count();
+        assert_eq!(success_count, 2);
+        assert_eq!(failure_count, 3);
+    }
+
+    #[test]
+    fn test_resolve_persist_path_returns_some_or_none() {
+        // resolve_persist_path depends on env vars; verify it does not panic
+        let result = AuditService::resolve_persist_path();
+        // On CI or local, either Some or None is valid
+        if let Some(path) = &result {
+            assert!(path.to_string_lossy().contains("DSPanel"));
+            assert!(path.to_string_lossy().contains("audit.db"));
+        }
+    }
+
+    #[test]
+    fn test_default_trait() {
+        let svc = AuditService::default();
+        assert_eq!(svc.count(), 0);
+    }
+
+    #[test]
+    fn test_get_entries_empty() {
+        let svc = AuditService::new_in_memory();
+        let entries = svc.get_entries();
+        assert!(entries.is_empty());
+    }
+
+    #[test]
+    fn test_entry_success_field_false_roundtrip() {
+        let svc = AuditService::new_in_memory();
+        svc.log_failure("Fail", "dn", "error msg");
+        let entries = svc.get_entries();
+        assert!(!entries[0].success);
+    }
+
+    #[test]
+    fn test_unicode_in_fields() {
+        let svc = AuditService::new_in_memory();
+        svc.log_success(
+            "MotDePasseReset",
+            "CN=\u{00e9}l\u{00e8}ve,DC=example,DC=com",
+            "R\u{00e9}initialisation du mot de passe",
+        );
+        let entries = svc.get_entries();
+        assert!(entries[0].target_dn.contains('\u{00e9}'));
+        assert!(entries[0].details.contains('\u{00e9}'));
+    }
+
+    #[test]
+    fn test_large_batch_entries() {
+        let svc = AuditService::new_in_memory();
+        for i in 0..100 {
+            if i % 2 == 0 {
+                svc.log_success(&format!("Action{}", i), "dn", "ok");
+            } else {
+                svc.log_failure(&format!("Action{}", i), "dn", "err");
+            }
+        }
+        assert_eq!(svc.count(), 100);
+        let entries = svc.get_entries();
+        assert_eq!(entries.len(), 100);
+        // Most recent first
+        assert_eq!(entries[0].action, "Action99");
+    }
 }

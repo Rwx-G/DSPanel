@@ -474,4 +474,194 @@ mod tests {
         assert_eq!(result.breach_count, 100);
         assert!(result.checked);
     }
+
+    #[test]
+    fn test_generate_password_lowercase_only() {
+        let options = PasswordOptions {
+            length: 15,
+            include_uppercase: false,
+            include_lowercase: true,
+            include_digits: false,
+            include_special: false,
+            exclude_ambiguous: false,
+        };
+        let password = generate_password(&options).unwrap();
+        assert_eq!(password.len(), 15);
+        assert!(password.chars().all(|c| c.is_ascii_lowercase()));
+    }
+
+    #[test]
+    fn test_generate_password_length_equals_one_category() {
+        // length=1 with one category - should produce exactly 1 char
+        let options = PasswordOptions {
+            length: 1,
+            include_uppercase: true,
+            include_lowercase: false,
+            include_digits: false,
+            include_special: false,
+            exclude_ambiguous: false,
+        };
+        let password = generate_password(&options).unwrap();
+        assert_eq!(password.len(), 1);
+        assert!(password.chars().all(|c| c.is_ascii_uppercase()));
+    }
+
+    #[test]
+    fn test_generate_password_very_long() {
+        let options = PasswordOptions {
+            length: 256,
+            include_uppercase: true,
+            include_lowercase: true,
+            include_digits: true,
+            include_special: true,
+            exclude_ambiguous: false,
+        };
+        let password = generate_password(&options).unwrap();
+        assert_eq!(password.len(), 256);
+        // With 256 chars and all categories, each should appear
+        assert!(password.chars().any(|c| c.is_ascii_uppercase()));
+        assert!(password.chars().any(|c| c.is_ascii_lowercase()));
+        assert!(password.chars().any(|c| c.is_ascii_digit()));
+        assert!(password.chars().any(|c| !c.is_ascii_alphanumeric()));
+    }
+
+    #[test]
+    fn test_generate_password_length_two_with_two_categories() {
+        let options = PasswordOptions {
+            length: 2,
+            include_uppercase: true,
+            include_lowercase: true,
+            include_digits: false,
+            include_special: false,
+            exclude_ambiguous: false,
+        };
+        let password = generate_password(&options).unwrap();
+        assert_eq!(password.len(), 2);
+        assert!(password.chars().any(|c| c.is_ascii_uppercase()));
+        assert!(password.chars().any(|c| c.is_ascii_lowercase()));
+    }
+
+    #[test]
+    fn test_generate_password_excludes_ambiguous_from_lowercase() {
+        let options = PasswordOptions {
+            length: 200,
+            include_uppercase: false,
+            include_lowercase: true,
+            include_digits: false,
+            include_special: false,
+            exclude_ambiguous: true,
+        };
+        let password = generate_password(&options).unwrap();
+        assert!(!password.contains('o'));
+        assert!(!password.contains('l'));
+    }
+
+    #[test]
+    fn test_generate_password_excludes_ambiguous_from_special() {
+        let options = PasswordOptions {
+            length: 200,
+            include_uppercase: false,
+            include_lowercase: false,
+            include_digits: false,
+            include_special: true,
+            exclude_ambiguous: true,
+        };
+        let password = generate_password(&options).unwrap();
+        assert!(!password.contains('|'));
+        assert!(!password.contains('`'));
+    }
+
+    #[test]
+    fn test_generate_password_all_categories_exclude_ambiguous() {
+        let options = PasswordOptions {
+            length: 200,
+            include_uppercase: true,
+            include_lowercase: true,
+            include_digits: true,
+            include_special: true,
+            exclude_ambiguous: true,
+        };
+        let password = generate_password(&options).unwrap();
+        for ch in "0OolI1|`".chars() {
+            assert!(
+                !password.contains(ch),
+                "Password should not contain ambiguous char '{}'",
+                ch
+            );
+        }
+    }
+
+    #[test]
+    fn test_generate_password_shuffle_distributes_required_chars() {
+        // With length=20 and all 4 categories, the required chars should not
+        // always be at the start. Run a few times to verify shuffle works.
+        let options = PasswordOptions {
+            length: 20,
+            include_uppercase: true,
+            include_lowercase: true,
+            include_digits: true,
+            include_special: true,
+            exclude_ambiguous: false,
+        };
+        let mut first_chars_same = true;
+        let first_password = generate_password(&options).unwrap();
+        for _ in 0..5 {
+            let p = generate_password(&options).unwrap();
+            if p.chars().next() != first_password.chars().next() {
+                first_chars_same = false;
+                break;
+            }
+        }
+        // Statistically, the first char should differ at least once in 5 tries
+        assert!(
+            !first_chars_same,
+            "Shuffle does not appear to randomize positions"
+        );
+    }
+
+    #[test]
+    fn test_generate_password_min_length_enforced_two_categories() {
+        let options = PasswordOptions {
+            length: 1,
+            include_uppercase: true,
+            include_lowercase: true,
+            include_digits: false,
+            include_special: false,
+            exclude_ambiguous: false,
+        };
+        let password = generate_password(&options).unwrap();
+        // Should be at least 2 (one per category)
+        assert!(password.len() >= 2);
+    }
+
+    #[test]
+    fn test_generate_password_min_length_enforced_three_categories() {
+        let options = PasswordOptions {
+            length: 1,
+            include_uppercase: true,
+            include_lowercase: true,
+            include_digits: true,
+            include_special: false,
+            exclude_ambiguous: false,
+        };
+        let password = generate_password(&options).unwrap();
+        assert!(password.len() >= 3);
+    }
+
+    #[tokio::test]
+    async fn test_generate_safe_password_with_zero_retries() {
+        let options = PasswordOptions::default();
+        let (password, result) = generate_safe_password(&options, None, 0).await.unwrap();
+        assert!(!password.is_empty());
+        assert!(!result.checked);
+    }
+
+    #[test]
+    fn test_password_all_ascii() {
+        let options = PasswordOptions::default();
+        for _ in 0..10 {
+            let password = generate_password(&options).unwrap();
+            assert!(password.is_ascii());
+        }
+    }
 }

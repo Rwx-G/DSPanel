@@ -466,4 +466,843 @@ mod tests {
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].as_ref().unwrap(), "\\\\server\\share");
     }
+
+    // -----------------------------------------------------------------------
+    // Multiple conflicts - same trustee across many paths
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_detect_conflicts_multiple_paths_same_trustee() {
+        let paths = vec![
+            PathAclResult {
+                path: "\\\\server\\share\\dir1".to_string(),
+                aces: vec![make_ace(
+                    "S-1-5-21-100",
+                    "Admins",
+                    AceAccessType::Allow,
+                    vec!["Read", "Write"],
+                    false,
+                )],
+                error: None,
+            },
+            PathAclResult {
+                path: "\\\\server\\share\\dir2".to_string(),
+                aces: vec![make_ace(
+                    "S-1-5-21-100",
+                    "Admins",
+                    AceAccessType::Deny,
+                    vec!["Read"],
+                    false,
+                )],
+                error: None,
+            },
+            PathAclResult {
+                path: "\\\\server\\share\\dir3".to_string(),
+                aces: vec![make_ace(
+                    "S-1-5-21-100",
+                    "Admins",
+                    AceAccessType::Deny,
+                    vec!["Write"],
+                    false,
+                )],
+                error: None,
+            },
+        ];
+
+        let conflicts = detect_conflicts(&paths);
+        // dir1 Allow vs dir2 Deny (overlap: Read)
+        // dir1 Allow vs dir3 Deny (overlap: Write)
+        assert_eq!(conflicts.len(), 2);
+    }
+
+    // -----------------------------------------------------------------------
+    // Duplicate conflict deduplication
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_detect_conflicts_deduplicates() {
+        // Two identical Allow ACEs at the same path should not produce duplicate conflicts
+        let paths = vec![
+            PathAclResult {
+                path: "\\\\server\\share".to_string(),
+                aces: vec![
+                    make_ace(
+                        "S-1-5-21-100",
+                        "Admins",
+                        AceAccessType::Allow,
+                        vec!["Read"],
+                        false,
+                    ),
+                    make_ace(
+                        "S-1-5-21-100",
+                        "Admins",
+                        AceAccessType::Allow,
+                        vec!["Read"],
+                        true,
+                    ),
+                ],
+                error: None,
+            },
+            PathAclResult {
+                path: "\\\\server\\share\\sub".to_string(),
+                aces: vec![make_ace(
+                    "S-1-5-21-100",
+                    "Admins",
+                    AceAccessType::Deny,
+                    vec!["Read"],
+                    false,
+                )],
+                error: None,
+            },
+        ];
+
+        let conflicts = detect_conflicts(&paths);
+        // Two Allow ACEs at path1 both match the single Deny at path2
+        // but conflict struct is identical so only 1 should remain
+        assert_eq!(conflicts.len(), 1);
+    }
+
+    // -----------------------------------------------------------------------
+    // Only allow ACEs - no conflicts
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_detect_conflicts_only_allows() {
+        let paths = vec![
+            PathAclResult {
+                path: "\\\\server\\share".to_string(),
+                aces: vec![make_ace(
+                    "S-1-5-21-100",
+                    "Admins",
+                    AceAccessType::Allow,
+                    vec!["Read"],
+                    false,
+                )],
+                error: None,
+            },
+            PathAclResult {
+                path: "\\\\server\\share\\sub".to_string(),
+                aces: vec![make_ace(
+                    "S-1-5-21-200",
+                    "Users",
+                    AceAccessType::Allow,
+                    vec!["Read"],
+                    false,
+                )],
+                error: None,
+            },
+        ];
+
+        let conflicts = detect_conflicts(&paths);
+        assert!(conflicts.is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // Only deny ACEs - no conflicts
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_detect_conflicts_only_denies() {
+        let paths = vec![
+            PathAclResult {
+                path: "\\\\server\\share".to_string(),
+                aces: vec![make_ace(
+                    "S-1-5-21-100",
+                    "Admins",
+                    AceAccessType::Deny,
+                    vec!["Write"],
+                    false,
+                )],
+                error: None,
+            },
+            PathAclResult {
+                path: "\\\\server\\share\\sub".to_string(),
+                aces: vec![make_ace(
+                    "S-1-5-21-100",
+                    "Admins",
+                    AceAccessType::Deny,
+                    vec!["Read"],
+                    false,
+                )],
+                error: None,
+            },
+        ];
+
+        let conflicts = detect_conflicts(&paths);
+        assert!(conflicts.is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // Multiple ACEs per path
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_detect_conflicts_multiple_aces_per_path() {
+        let paths = vec![
+            PathAclResult {
+                path: "\\\\server\\share".to_string(),
+                aces: vec![
+                    make_ace(
+                        "S-1-5-21-100",
+                        "Admins",
+                        AceAccessType::Allow,
+                        vec!["Read"],
+                        false,
+                    ),
+                    make_ace(
+                        "S-1-5-21-200",
+                        "Users",
+                        AceAccessType::Allow,
+                        vec!["Write"],
+                        true,
+                    ),
+                ],
+                error: None,
+            },
+            PathAclResult {
+                path: "\\\\server\\share\\sub".to_string(),
+                aces: vec![
+                    make_ace(
+                        "S-1-5-21-100",
+                        "Admins",
+                        AceAccessType::Deny,
+                        vec!["Read"],
+                        false,
+                    ),
+                    make_ace(
+                        "S-1-5-21-200",
+                        "Users",
+                        AceAccessType::Deny,
+                        vec!["Write"],
+                        false,
+                    ),
+                ],
+                error: None,
+            },
+        ];
+
+        let conflicts = detect_conflicts(&paths);
+        // Admins: Allow Read vs Deny Read = conflict
+        // Users: Allow Write vs Deny Write = conflict
+        assert_eq!(conflicts.len(), 2);
+    }
+
+    // -----------------------------------------------------------------------
+    // Path with error field - no ACEs
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_detect_conflicts_path_with_error_no_aces() {
+        let paths = vec![
+            PathAclResult {
+                path: "\\\\server\\share".to_string(),
+                aces: vec![make_ace(
+                    "S-1-5-21-100",
+                    "Admins",
+                    AceAccessType::Allow,
+                    vec!["Read"],
+                    false,
+                )],
+                error: None,
+            },
+            PathAclResult {
+                path: "\\\\server\\share\\denied".to_string(),
+                aces: vec![],
+                error: Some("Access denied".to_string()),
+            },
+        ];
+
+        let conflicts = detect_conflicts(&paths);
+        assert!(conflicts.is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // NtfsAnalysisResult construction
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_ntfs_analysis_result_with_data() {
+        let result = NtfsAnalysisResult {
+            paths: vec![PathAclResult {
+                path: "\\\\server\\share".to_string(),
+                aces: vec![make_ace(
+                    "S-1-5-21-100",
+                    "Admins",
+                    AceAccessType::Allow,
+                    vec!["FullControl"],
+                    false,
+                )],
+                error: None,
+            }],
+            conflicts: vec![],
+            total_aces: 1,
+            total_paths_scanned: 1,
+            total_errors: 0,
+        };
+        assert_eq!(result.total_aces, 1);
+        assert_eq!(result.total_paths_scanned, 1);
+        assert_eq!(result.total_errors, 0);
+        assert_eq!(result.paths.len(), 1);
+        assert!(result.conflicts.is_empty());
+    }
+
+    #[test]
+    fn test_ntfs_analysis_result_with_errors() {
+        let result = NtfsAnalysisResult {
+            paths: vec![PathAclResult {
+                path: String::new(),
+                aces: vec![],
+                error: Some("Cannot read directory".to_string()),
+            }],
+            conflicts: vec![],
+            total_aces: 0,
+            total_paths_scanned: 1,
+            total_errors: 1,
+        };
+        assert_eq!(result.total_errors, 1);
+        assert!(result.paths[0].error.is_some());
+    }
+
+    // -----------------------------------------------------------------------
+    // Inherited vs explicit ACEs - detect_conflicts is ACE-type agnostic
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_detect_conflicts_inherited_aces_also_conflict() {
+        let paths = vec![
+            PathAclResult {
+                path: "\\\\server\\share".to_string(),
+                aces: vec![make_ace(
+                    "S-1-5-21-100",
+                    "Admins",
+                    AceAccessType::Allow,
+                    vec!["Read"],
+                    true, // inherited
+                )],
+                error: None,
+            },
+            PathAclResult {
+                path: "\\\\server\\share\\sub".to_string(),
+                aces: vec![make_ace(
+                    "S-1-5-21-100",
+                    "Admins",
+                    AceAccessType::Deny,
+                    vec!["Read"],
+                    false, // explicit
+                )],
+                error: None,
+            },
+        ];
+
+        let conflicts = detect_conflicts(&paths);
+        assert_eq!(conflicts.len(), 1);
+    }
+
+    // -----------------------------------------------------------------------
+    // Single path with no ACEs
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_detect_conflicts_single_path_empty_aces() {
+        let paths = vec![PathAclResult {
+            path: "\\\\server\\share".to_string(),
+            aces: vec![],
+            error: None,
+        }];
+        let conflicts = detect_conflicts(&paths);
+        assert!(conflicts.is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // Conflict fields correctness
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_conflict_contains_correct_permissions() {
+        let paths = vec![
+            PathAclResult {
+                path: "\\\\server\\root".to_string(),
+                aces: vec![make_ace(
+                    "S-1-5-21-300",
+                    "Finance",
+                    AceAccessType::Allow,
+                    vec!["Read", "Write", "Execute"],
+                    false,
+                )],
+                error: None,
+            },
+            PathAclResult {
+                path: "\\\\server\\root\\child".to_string(),
+                aces: vec![make_ace(
+                    "S-1-5-21-300",
+                    "Finance",
+                    AceAccessType::Deny,
+                    vec!["Write", "Delete"],
+                    false,
+                )],
+                error: None,
+            },
+        ];
+
+        let conflicts = detect_conflicts(&paths);
+        assert_eq!(conflicts.len(), 1);
+        // allow_permissions should be the full allow list
+        assert_eq!(
+            conflicts[0].allow_permissions,
+            vec!["Read", "Write", "Execute"]
+        );
+        // deny_permissions should be the full deny list
+        assert_eq!(
+            conflicts[0].deny_permissions,
+            vec!["Write", "Delete"]
+        );
+        assert_eq!(conflicts[0].trustee_display_name, "Finance");
+    }
+
+    // -----------------------------------------------------------------------
+    // PathAclResult serialization camelCase
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_path_acl_result_serialization_camel_case() {
+        let result = PathAclResult {
+            path: "\\\\server\\share".to_string(),
+            aces: vec![make_ace(
+                "S-1-5-21-100",
+                "Group",
+                AceAccessType::Allow,
+                vec!["Read"],
+                true,
+            )],
+            error: None,
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        // Check that fields are camelCase or at least present
+        assert!(json.contains("\"path\""));
+        assert!(json.contains("\"aces\""));
+    }
+
+    // -----------------------------------------------------------------------
+    // AclConflict equality (used for dedup)
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_acl_conflict_equality() {
+        let c1 = AclConflict {
+            trustee_sid: "S-1-5-21-100".to_string(),
+            trustee_display_name: "Admins".to_string(),
+            allow_path: "\\\\server\\a".to_string(),
+            deny_path: "\\\\server\\b".to_string(),
+            allow_permissions: vec!["Read".to_string()],
+            deny_permissions: vec!["Read".to_string()],
+        };
+        let c2 = c1.clone();
+        assert_eq!(c1, c2);
+    }
+
+    #[test]
+    fn test_acl_conflict_inequality() {
+        let c1 = AclConflict {
+            trustee_sid: "S-1-5-21-100".to_string(),
+            trustee_display_name: "Admins".to_string(),
+            allow_path: "\\\\server\\a".to_string(),
+            deny_path: "\\\\server\\b".to_string(),
+            allow_permissions: vec!["Read".to_string()],
+            deny_permissions: vec!["Read".to_string()],
+        };
+        let c2 = AclConflict {
+            trustee_sid: "S-1-5-21-200".to_string(),
+            trustee_display_name: "Users".to_string(),
+            allow_path: "\\\\server\\a".to_string(),
+            deny_path: "\\\\server\\b".to_string(),
+            allow_permissions: vec!["Read".to_string()],
+            deny_permissions: vec!["Read".to_string()],
+        };
+        assert_ne!(c1, c2);
+    }
+
+    // -----------------------------------------------------------------------
+    // detect_conflicts - many trustees across many paths
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_detect_conflicts_three_trustees_partial_overlap() {
+        let paths = vec![
+            PathAclResult {
+                path: "\\\\server\\dir1".to_string(),
+                aces: vec![
+                    make_ace("S-1-5-21-100", "GroupA", AceAccessType::Allow, vec!["Read", "Write"], false),
+                    make_ace("S-1-5-21-200", "GroupB", AceAccessType::Allow, vec!["Execute"], false),
+                ],
+                error: None,
+            },
+            PathAclResult {
+                path: "\\\\server\\dir2".to_string(),
+                aces: vec![
+                    make_ace("S-1-5-21-100", "GroupA", AceAccessType::Deny, vec!["Write"], false),
+                    make_ace("S-1-5-21-300", "GroupC", AceAccessType::Deny, vec!["Read"], false),
+                ],
+                error: None,
+            },
+        ];
+
+        let conflicts = detect_conflicts(&paths);
+        // Only GroupA has Allow at dir1 and Deny at dir2 with overlap (Write)
+        assert_eq!(conflicts.len(), 1);
+        assert_eq!(conflicts[0].trustee_sid, "S-1-5-21-100");
+    }
+
+    // -----------------------------------------------------------------------
+    // detect_conflicts - reverse direction (deny at parent, allow at child)
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_detect_conflicts_deny_parent_allow_child() {
+        let paths = vec![
+            PathAclResult {
+                path: "\\\\server\\share".to_string(),
+                aces: vec![make_ace(
+                    "S-1-5-21-100",
+                    "Admins",
+                    AceAccessType::Deny,
+                    vec!["Write"],
+                    false,
+                )],
+                error: None,
+            },
+            PathAclResult {
+                path: "\\\\server\\share\\sub".to_string(),
+                aces: vec![make_ace(
+                    "S-1-5-21-100",
+                    "Admins",
+                    AceAccessType::Allow,
+                    vec!["Write", "Read"],
+                    false,
+                )],
+                error: None,
+            },
+        ];
+
+        let conflicts = detect_conflicts(&paths);
+        assert_eq!(conflicts.len(), 1);
+        // Reversed direction: allow is at child, deny is at parent
+        assert_eq!(conflicts[0].allow_path, "\\\\server\\share\\sub");
+        assert_eq!(conflicts[0].deny_path, "\\\\server\\share");
+    }
+
+    // -----------------------------------------------------------------------
+    // detect_conflicts - many permissions partial overlap
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_detect_conflicts_multi_permission_partial_overlap() {
+        let paths = vec![
+            PathAclResult {
+                path: "\\\\server\\a".to_string(),
+                aces: vec![make_ace(
+                    "S-1-5-21-100",
+                    "Group",
+                    AceAccessType::Allow,
+                    vec!["Read", "Write", "Execute", "Delete"],
+                    false,
+                )],
+                error: None,
+            },
+            PathAclResult {
+                path: "\\\\server\\b".to_string(),
+                aces: vec![make_ace(
+                    "S-1-5-21-100",
+                    "Group",
+                    AceAccessType::Deny,
+                    vec!["Delete", "TakeOwnership"],
+                    false,
+                )],
+                error: None,
+            },
+        ];
+
+        let conflicts = detect_conflicts(&paths);
+        assert_eq!(conflicts.len(), 1);
+        // Overlap on "Delete"
+        assert_eq!(conflicts[0].allow_permissions, vec!["Read", "Write", "Execute", "Delete"]);
+        assert_eq!(conflicts[0].deny_permissions, vec!["Delete", "TakeOwnership"]);
+    }
+
+    // -----------------------------------------------------------------------
+    // NtfsAnalysisResult - full serialization with data
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_ntfs_analysis_result_full_serialization() {
+        let result = NtfsAnalysisResult {
+            paths: vec![PathAclResult {
+                path: "\\\\server\\share".to_string(),
+                aces: vec![make_ace(
+                    "S-1-5-21-100",
+                    "Group",
+                    AceAccessType::Allow,
+                    vec!["Read"],
+                    true,
+                )],
+                error: None,
+            }],
+            conflicts: vec![AclConflict {
+                trustee_sid: "S-1-5-21-100".to_string(),
+                trustee_display_name: "Group".to_string(),
+                allow_path: "\\\\server\\a".to_string(),
+                deny_path: "\\\\server\\b".to_string(),
+                allow_permissions: vec!["Read".to_string()],
+                deny_permissions: vec!["Read".to_string()],
+            }],
+            total_aces: 1,
+            total_paths_scanned: 1,
+            total_errors: 0,
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        assert!(json.contains("\"totalAces\":1"));
+        assert!(json.contains("\"totalPathsScanned\":1"));
+        assert!(json.contains("\"totalErrors\":0"));
+        assert!(json.contains("trusteeSid"));
+        assert!(json.contains("allowPermissions"));
+        assert!(json.contains("denyPermissions"));
+    }
+
+    // -----------------------------------------------------------------------
+    // PathAclResult - serialization with ACE data
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_path_acl_result_serialization_with_multiple_aces() {
+        let result = PathAclResult {
+            path: "\\\\server\\share".to_string(),
+            aces: vec![
+                make_ace("S-1-5-21-100", "Admins", AceAccessType::Allow, vec!["Read"], false),
+                make_ace("S-1-5-21-200", "Users", AceAccessType::Deny, vec!["Write"], true),
+            ],
+            error: None,
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        assert!(json.contains("S-1-5-21-100"));
+        assert!(json.contains("S-1-5-21-200"));
+        assert!(json.contains("\"error\":null"));
+    }
+
+    // -----------------------------------------------------------------------
+    // detect_conflicts - large number of paths
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_detect_conflicts_many_paths_no_conflict() {
+        let paths: Vec<PathAclResult> = (0..20)
+            .map(|i| PathAclResult {
+                path: format!("\\\\server\\dir{}", i),
+                aces: vec![make_ace(
+                    &format!("S-1-5-21-{}", i),
+                    &format!("Group{}", i),
+                    AceAccessType::Allow,
+                    vec!["Read"],
+                    false,
+                )],
+                error: None,
+            })
+            .collect();
+
+        let conflicts = detect_conflicts(&paths);
+        // Each path has a unique trustee, so no conflicts
+        assert!(conflicts.is_empty());
+    }
+
+    #[test]
+    fn test_detect_conflicts_many_paths_with_single_conflict() {
+        let mut paths: Vec<PathAclResult> = (0..10)
+            .map(|i| PathAclResult {
+                path: format!("\\\\server\\dir{}", i),
+                aces: vec![make_ace(
+                    &format!("S-1-5-21-{}", i),
+                    &format!("Group{}", i),
+                    AceAccessType::Allow,
+                    vec!["Read"],
+                    false,
+                )],
+                error: None,
+            })
+            .collect();
+        // Add a deny for the first trustee at a different path
+        paths.push(PathAclResult {
+            path: "\\\\server\\conflict".to_string(),
+            aces: vec![make_ace(
+                "S-1-5-21-0",
+                "Group0",
+                AceAccessType::Deny,
+                vec!["Read"],
+                false,
+            )],
+            error: None,
+        });
+
+        let conflicts = detect_conflicts(&paths);
+        assert_eq!(conflicts.len(), 1);
+        assert_eq!(conflicts[0].trustee_sid, "S-1-5-21-0");
+    }
+
+    // -----------------------------------------------------------------------
+    // AclConflict - field-level inequality checks
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_acl_conflict_inequality_different_paths() {
+        let c1 = AclConflict {
+            trustee_sid: "S-1-5-21-100".to_string(),
+            trustee_display_name: "Admins".to_string(),
+            allow_path: "\\\\server\\a".to_string(),
+            deny_path: "\\\\server\\b".to_string(),
+            allow_permissions: vec!["Read".to_string()],
+            deny_permissions: vec!["Read".to_string()],
+        };
+        let c2 = AclConflict {
+            trustee_sid: "S-1-5-21-100".to_string(),
+            trustee_display_name: "Admins".to_string(),
+            allow_path: "\\\\server\\c".to_string(),
+            deny_path: "\\\\server\\d".to_string(),
+            allow_permissions: vec!["Read".to_string()],
+            deny_permissions: vec!["Read".to_string()],
+        };
+        assert_ne!(c1, c2);
+    }
+
+    #[test]
+    fn test_acl_conflict_inequality_different_permissions() {
+        let c1 = AclConflict {
+            trustee_sid: "S-1-5-21-100".to_string(),
+            trustee_display_name: "Admins".to_string(),
+            allow_path: "\\\\server\\a".to_string(),
+            deny_path: "\\\\server\\b".to_string(),
+            allow_permissions: vec!["Read".to_string()],
+            deny_permissions: vec!["Read".to_string()],
+        };
+        let c2 = AclConflict {
+            trustee_sid: "S-1-5-21-100".to_string(),
+            trustee_display_name: "Admins".to_string(),
+            allow_path: "\\\\server\\a".to_string(),
+            deny_path: "\\\\server\\b".to_string(),
+            allow_permissions: vec!["Write".to_string()],
+            deny_permissions: vec!["Write".to_string()],
+        };
+        assert_ne!(c1, c2);
+    }
+
+    // -----------------------------------------------------------------------
+    // detect_conflicts - empty ACEs on some paths
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_detect_conflicts_mixed_empty_and_populated_aces() {
+        let paths = vec![
+            PathAclResult {
+                path: "\\\\server\\empty1".to_string(),
+                aces: vec![],
+                error: None,
+            },
+            PathAclResult {
+                path: "\\\\server\\populated".to_string(),
+                aces: vec![make_ace(
+                    "S-1-5-21-100",
+                    "Group",
+                    AceAccessType::Allow,
+                    vec!["Read"],
+                    false,
+                )],
+                error: None,
+            },
+            PathAclResult {
+                path: "\\\\server\\empty2".to_string(),
+                aces: vec![],
+                error: Some("Access denied".to_string()),
+            },
+        ];
+
+        let conflicts = detect_conflicts(&paths);
+        assert!(conflicts.is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // NtfsAnalysisResult - Debug trait
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_ntfs_analysis_result_debug() {
+        let result = NtfsAnalysisResult {
+            paths: vec![],
+            conflicts: vec![],
+            total_aces: 0,
+            total_paths_scanned: 0,
+            total_errors: 0,
+        };
+        let debug_str = format!("{:?}", result);
+        assert!(debug_str.contains("NtfsAnalysisResult"));
+    }
+
+    #[test]
+    fn test_path_acl_result_debug() {
+        let result = PathAclResult {
+            path: "\\\\server\\share".to_string(),
+            aces: vec![],
+            error: None,
+        };
+        let debug_str = format!("{:?}", result);
+        assert!(debug_str.contains("PathAclResult"));
+    }
+
+    #[test]
+    fn test_acl_conflict_debug() {
+        let conflict = AclConflict {
+            trustee_sid: "S-1-5-21-100".to_string(),
+            trustee_display_name: "Admins".to_string(),
+            allow_path: "\\\\server\\a".to_string(),
+            deny_path: "\\\\server\\b".to_string(),
+            allow_permissions: vec!["Read".to_string()],
+            deny_permissions: vec!["Read".to_string()],
+        };
+        let debug_str = format!("{:?}", conflict);
+        assert!(debug_str.contains("AclConflict"));
+        assert!(debug_str.contains("S-1-5-21-100"));
+    }
+
+    // -----------------------------------------------------------------------
+    // NtfsAnalysisResult and PathAclResult - Clone trait
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_ntfs_analysis_result_clone() {
+        let result = NtfsAnalysisResult {
+            paths: vec![PathAclResult {
+                path: "\\\\server\\share".to_string(),
+                aces: vec![make_ace("S-1-5-21-100", "G", AceAccessType::Allow, vec!["Read"], false)],
+                error: None,
+            }],
+            conflicts: vec![],
+            total_aces: 1,
+            total_paths_scanned: 1,
+            total_errors: 0,
+        };
+        let cloned = result.clone();
+        assert_eq!(cloned.total_aces, result.total_aces);
+        assert_eq!(cloned.paths.len(), result.paths.len());
+        assert_eq!(cloned.paths[0].path, result.paths[0].path);
+    }
+
+    #[test]
+    fn test_acl_conflict_clone() {
+        let conflict = AclConflict {
+            trustee_sid: "S-1-5-21-100".to_string(),
+            trustee_display_name: "Admins".to_string(),
+            allow_path: "\\\\server\\a".to_string(),
+            deny_path: "\\\\server\\b".to_string(),
+            allow_permissions: vec!["Read".to_string(), "Write".to_string()],
+            deny_permissions: vec!["Read".to_string()],
+        };
+        let cloned = conflict.clone();
+        assert_eq!(cloned, conflict);
+        assert_eq!(cloned.allow_permissions.len(), 2);
+    }
 }

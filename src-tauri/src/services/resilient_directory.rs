@@ -549,6 +549,68 @@ mod tests {
         assert!(!dir_err.is_transient());
     }
 
+    #[test]
+    fn test_classify_anyhow_error_server_down_variant() {
+        let err = anyhow::anyhow!("LDAP server down");
+        let dir_err = classify_anyhow_error(err);
+        assert!(matches!(dir_err, DirectoryError::ServerDown));
+        assert!(dir_err.is_transient());
+    }
+
+    #[test]
+    fn test_classify_anyhow_error_timeout_variant() {
+        let err = anyhow::anyhow!("request timeout exceeded");
+        let dir_err = classify_anyhow_error(err);
+        assert!(matches!(dir_err, DirectoryError::Timeout));
+        assert!(dir_err.is_transient());
+    }
+
+    #[test]
+    fn test_classify_anyhow_error_insufficient_rights() {
+        let err = anyhow::anyhow!("insufficient permissions for this operation");
+        let dir_err = classify_anyhow_error(err);
+        assert!(matches!(dir_err, DirectoryError::InsufficientRights(_)));
+        assert!(!dir_err.is_transient());
+    }
+
+    #[test]
+    fn test_classify_anyhow_error_no_domain() {
+        let err = anyhow::anyhow!("this machine has no domain controller");
+        let dir_err = classify_anyhow_error(err);
+        assert!(matches!(dir_err, DirectoryError::NotDomainJoined));
+    }
+
+    #[test]
+    fn test_classify_anyhow_error_unavailable() {
+        let err = anyhow::anyhow!("service unavailable");
+        let dir_err = classify_anyhow_error(err);
+        assert!(matches!(dir_err, DirectoryError::ServerDown));
+    }
+
+    #[test]
+    fn test_classify_preserves_original_message_for_insufficient() {
+        let err = anyhow::anyhow!("Access denied to resource CN=User,DC=test");
+        let dir_err = classify_anyhow_error(err);
+        match dir_err {
+            DirectoryError::InsufficientRights(msg) => {
+                assert!(msg.contains("CN=User,DC=test"));
+            }
+            other => panic!("Expected InsufficientRights, got: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_classify_preserves_original_message_for_other() {
+        let err = anyhow::anyhow!("random weird error 42");
+        let dir_err = classify_anyhow_error(err);
+        match dir_err {
+            DirectoryError::Other(msg) => {
+                assert!(msg.contains("random weird error 42"));
+            }
+            other => panic!("Expected Other, got: {:?}", other),
+        }
+    }
+
     #[tokio::test]
     async fn test_resilient_test_connection() {
         let inner = Arc::new(MockDirectoryProvider::new());
@@ -678,5 +740,314 @@ mod tests {
 
         let results = provider.get_current_user_groups().await.unwrap();
         assert_eq!(results.len(), 1);
+    }
+
+    // -----------------------------------------------------------------------
+    // Circuit breaker accessor
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_circuit_breaker_accessor() {
+        let inner = Arc::new(MockDirectoryProvider::new());
+        let cb = CircuitBreaker::new(CircuitBreakerConfig::default());
+        let provider = ResilientDirectoryProvider::new(
+            inner,
+            RetryConfig::default(),
+            cb.clone(),
+            noop_delay,
+        );
+        assert_eq!(provider.circuit_breaker().state(), CircuitState::Closed);
+    }
+
+    // -----------------------------------------------------------------------
+    // Resilient browse_computers passthrough
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_resilient_browse_computers() {
+        let computers = vec![DirectoryEntry {
+            distinguished_name: "CN=WS01,DC=test".to_string(),
+            sam_account_name: Some("WS01$".to_string()),
+            display_name: Some("WS01".to_string()),
+            object_class: Some("computer".to_string()),
+            attributes: HashMap::new(),
+        }];
+        let inner = Arc::new(MockDirectoryProvider::new().with_computers(computers));
+        let provider = ResilientDirectoryProvider::new(
+            inner,
+            RetryConfig::default(),
+            CircuitBreaker::new(CircuitBreakerConfig::default()),
+            noop_delay,
+        );
+
+        let results = provider.browse_computers(500).await.unwrap();
+        assert_eq!(results.len(), 1);
+    }
+
+    // -----------------------------------------------------------------------
+    // Resilient unlock_account passthrough
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_resilient_unlock_account() {
+        let inner = Arc::new(MockDirectoryProvider::new());
+        let provider = ResilientDirectoryProvider::new(
+            inner,
+            RetryConfig::default(),
+            CircuitBreaker::new(CircuitBreakerConfig::default()),
+            noop_delay,
+        );
+
+        let result = provider.unlock_account("CN=User,DC=test").await;
+        assert!(result.is_ok());
+    }
+
+    // -----------------------------------------------------------------------
+    // Resilient enable_account passthrough
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_resilient_enable_account() {
+        let inner = Arc::new(MockDirectoryProvider::new());
+        let provider = ResilientDirectoryProvider::new(
+            inner,
+            RetryConfig::default(),
+            CircuitBreaker::new(CircuitBreakerConfig::default()),
+            noop_delay,
+        );
+
+        let result = provider.enable_account("CN=User,DC=test").await;
+        assert!(result.is_ok());
+    }
+
+    // -----------------------------------------------------------------------
+    // Resilient disable_account passthrough
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_resilient_disable_account() {
+        let inner = Arc::new(MockDirectoryProvider::new());
+        let provider = ResilientDirectoryProvider::new(
+            inner,
+            RetryConfig::default(),
+            CircuitBreaker::new(CircuitBreakerConfig::default()),
+            noop_delay,
+        );
+
+        let result = provider.disable_account("CN=User,DC=test").await;
+        assert!(result.is_ok());
+    }
+
+    // -----------------------------------------------------------------------
+    // Resilient reset_password passthrough
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_resilient_reset_password() {
+        let inner = Arc::new(MockDirectoryProvider::new());
+        let provider = ResilientDirectoryProvider::new(
+            inner,
+            RetryConfig::default(),
+            CircuitBreaker::new(CircuitBreakerConfig::default()),
+            noop_delay,
+        );
+
+        let result = provider
+            .reset_password("CN=User,DC=test", "NewPass1!", false)
+            .await;
+        assert!(result.is_ok());
+    }
+
+    // -----------------------------------------------------------------------
+    // Resilient get_cannot_change_password passthrough
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_resilient_get_cannot_change_password() {
+        let inner = Arc::new(MockDirectoryProvider::new());
+        let provider = ResilientDirectoryProvider::new(
+            inner,
+            RetryConfig::default(),
+            CircuitBreaker::new(CircuitBreakerConfig::default()),
+            noop_delay,
+        );
+
+        let result = provider
+            .get_cannot_change_password("CN=User,DC=test")
+            .await
+            .unwrap();
+        assert!(!result);
+    }
+
+    // -----------------------------------------------------------------------
+    // Resilient set_password_flags passthrough
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_resilient_set_password_flags() {
+        let inner = Arc::new(MockDirectoryProvider::new());
+        let provider = ResilientDirectoryProvider::new(
+            inner,
+            RetryConfig::default(),
+            CircuitBreaker::new(CircuitBreakerConfig::default()),
+            noop_delay,
+        );
+
+        let result = provider
+            .set_password_flags("CN=User,DC=test", true, false)
+            .await;
+        assert!(result.is_ok());
+    }
+
+    // -----------------------------------------------------------------------
+    // Resilient add_user_to_group passthrough
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_resilient_add_user_to_group() {
+        let inner = Arc::new(MockDirectoryProvider::new());
+        let provider = ResilientDirectoryProvider::new(
+            inner,
+            RetryConfig::default(),
+            CircuitBreaker::new(CircuitBreakerConfig::default()),
+            noop_delay,
+        );
+
+        let result = provider
+            .add_user_to_group("CN=User,DC=test", "CN=Group,DC=test")
+            .await;
+        assert!(result.is_ok());
+    }
+
+    // -----------------------------------------------------------------------
+    // Resilient get_nested_groups passthrough
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_resilient_get_nested_groups() {
+        let inner = Arc::new(MockDirectoryProvider::new());
+        let provider = ResilientDirectoryProvider::new(
+            inner,
+            RetryConfig::default(),
+            CircuitBreaker::new(CircuitBreakerConfig::default()),
+            noop_delay,
+        );
+
+        let results = provider
+            .get_nested_groups("CN=User,DC=test")
+            .await
+            .unwrap();
+        assert!(results.is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // Resilient get_ou_tree passthrough
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_resilient_get_ou_tree() {
+        let inner = Arc::new(MockDirectoryProvider::new());
+        let provider = ResilientDirectoryProvider::new(
+            inner,
+            RetryConfig::default(),
+            CircuitBreaker::new(CircuitBreakerConfig::default()),
+            noop_delay,
+        );
+
+        let results = provider.get_ou_tree().await.unwrap();
+        assert!(results.is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // Resilient get_replication_metadata passthrough
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_resilient_get_replication_metadata() {
+        let inner = Arc::new(MockDirectoryProvider::new());
+        let provider = ResilientDirectoryProvider::new(
+            inner,
+            RetryConfig::default(),
+            CircuitBreaker::new(CircuitBreakerConfig::default()),
+            noop_delay,
+        );
+
+        let result = provider
+            .get_replication_metadata("CN=User,DC=test")
+            .await
+            .unwrap();
+        assert!(result.is_none());
+    }
+
+    // -----------------------------------------------------------------------
+    // Resilient get_replication_value_metadata passthrough
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_resilient_get_replication_value_metadata() {
+        let inner = Arc::new(MockDirectoryProvider::new());
+        let provider = ResilientDirectoryProvider::new(
+            inner,
+            RetryConfig::default(),
+            CircuitBreaker::new(CircuitBreakerConfig::default()),
+            noop_delay,
+        );
+
+        let result = provider
+            .get_replication_value_metadata("CN=User,DC=test")
+            .await
+            .unwrap();
+        assert!(result.is_none());
+    }
+
+    // -----------------------------------------------------------------------
+    // Failure propagation through resilient provider
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_resilient_failure_propagates() {
+        let inner = Arc::new(MockDirectoryProvider::new().with_failure());
+        let provider = ResilientDirectoryProvider::new(
+            inner,
+            RetryConfig {
+                max_retries: 0,
+                initial_delay: Duration::from_millis(1),
+                multiplier: 1.0,
+            },
+            CircuitBreaker::new(CircuitBreakerConfig::default()),
+            noop_delay,
+        );
+
+        assert!(provider.browse_users(100).await.is_err());
+        assert!(provider.browse_computers(100).await.is_err());
+        assert!(provider.search_groups("test", 50).await.is_err());
+        assert!(provider.get_ou_tree().await.is_err());
+    }
+
+    // -----------------------------------------------------------------------
+    // Circuit breaker open rejects immediately
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_circuit_breaker_open_rejects_all_operations() {
+        let inner = Arc::new(MockDirectoryProvider::new());
+        let cb_config = CircuitBreakerConfig {
+            failure_threshold: 1,
+            recovery_timeout: Duration::from_secs(60),
+        };
+        let cb = CircuitBreaker::new(cb_config);
+        cb.record_failure(); // opens the circuit
+        assert_eq!(cb.state(), CircuitState::Open);
+
+        let provider = ResilientDirectoryProvider::new(
+            inner,
+            RetryConfig::default(),
+            cb,
+            noop_delay,
+        );
+
+        assert!(provider.test_connection().await.is_err());
+        assert!(provider.search_users("test", 50).await.is_err());
+        assert!(provider.get_ou_tree().await.is_err());
     }
 }

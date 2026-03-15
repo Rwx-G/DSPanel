@@ -643,4 +643,312 @@ mod tests {
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("only supported on Windows"));
     }
+
+    // -----------------------------------------------------------------------
+    // format_permissions - additional coverage
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_format_permissions_execute_file() {
+        // ExecuteFile flag without ReadAndExecute
+        let perms = format_permissions(0x000020);
+        assert!(perms.contains(&"ExecuteFile".to_string()));
+    }
+
+    #[test]
+    fn test_format_permissions_write_dac() {
+        let perms = format_permissions(0x040000);
+        assert!(perms.contains(&"WriteDAC".to_string()));
+    }
+
+    #[test]
+    fn test_format_permissions_write_owner() {
+        let perms = format_permissions(0x080000);
+        assert!(perms.contains(&"WriteOwner".to_string()));
+    }
+
+    #[test]
+    fn test_format_permissions_combined_read_write_delete() {
+        // Read + Write + Delete combined
+        let mask = 0x120089 | 0x120116 | 0x010000;
+        let perms = format_permissions(mask);
+        assert!(perms.contains(&"Read".to_string()));
+        assert!(perms.contains(&"Write".to_string()));
+        assert!(perms.contains(&"Delete".to_string()));
+    }
+
+    #[test]
+    fn test_format_permissions_read_and_execute_includes_read() {
+        // ReadAndExecute mask includes Read, so only ReadAndExecute should appear
+        let perms = format_permissions(0x1200A9);
+        assert_eq!(perms.len(), 1);
+        assert_eq!(perms[0], "ReadAndExecute");
+    }
+
+    #[test]
+    fn test_format_permissions_zero_returns_special() {
+        let perms = format_permissions(0x000000);
+        assert_eq!(perms.len(), 1);
+        assert!(perms[0].starts_with("Special"));
+    }
+
+    #[test]
+    fn test_format_permissions_full_control_overrides_others() {
+        // Full control mask should return only FullControl
+        let perms = format_permissions(0x1F01FF);
+        assert_eq!(perms.len(), 1);
+        assert_eq!(perms[0], "FullControl");
+    }
+
+    #[test]
+    fn test_format_permissions_modify_overrides_read_write() {
+        let perms = format_permissions(0x1301BF);
+        assert_eq!(perms.len(), 1);
+        assert_eq!(perms[0], "Modify");
+    }
+
+    // -----------------------------------------------------------------------
+    // validate_unc_path - additional edge cases
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_validate_unc_path_just_slashes() {
+        let result = validate_unc_path("\\\\");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_unc_path_deep_path() {
+        assert!(validate_unc_path("\\\\server\\share\\a\\b\\c\\d\\e").is_ok());
+    }
+
+    #[test]
+    fn test_validate_unc_path_traversal_in_middle() {
+        let result = validate_unc_path("\\\\server\\share\\a\\..\\b");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("traversal"));
+    }
+
+    // -----------------------------------------------------------------------
+    // cross_reference_aces - more combinations
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_cross_reference_aces_both_users_match() {
+        let aces = vec![AceEntry {
+            trustee_sid: "S-1-5-21-100".to_string(),
+            trustee_display_name: "SharedGroup".to_string(),
+            access_type: AceAccessType::Allow,
+            permissions: vec!["Read".to_string()],
+            is_inherited: false,
+        }];
+
+        let user_a_sids = vec!["S-1-5-21-100".to_string()];
+        let user_b_sids = vec!["S-1-5-21-100".to_string()];
+
+        let results = cross_reference_aces(&aces, &user_a_sids, &user_b_sids);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].user_a_access, AccessIndicator::Allowed);
+        assert_eq!(results[0].user_b_access, AccessIndicator::Allowed);
+    }
+
+    #[test]
+    fn test_cross_reference_aces_neither_user_matches() {
+        let aces = vec![AceEntry {
+            trustee_sid: "S-1-5-21-999".to_string(),
+            trustee_display_name: "Unknown".to_string(),
+            access_type: AceAccessType::Deny,
+            permissions: vec!["Write".to_string()],
+            is_inherited: false,
+        }];
+
+        let user_a_sids = vec!["S-1-5-21-100".to_string()];
+        let user_b_sids = vec!["S-1-5-21-200".to_string()];
+
+        let results = cross_reference_aces(&aces, &user_a_sids, &user_b_sids);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].user_a_access, AccessIndicator::NoMatch);
+        assert_eq!(results[0].user_b_access, AccessIndicator::NoMatch);
+    }
+
+    #[test]
+    fn test_cross_reference_aces_multiple_aces() {
+        let aces = vec![
+            AceEntry {
+                trustee_sid: "S-1-5-21-100".to_string(),
+                trustee_display_name: "GroupA".to_string(),
+                access_type: AceAccessType::Allow,
+                permissions: vec!["Read".to_string()],
+                is_inherited: false,
+            },
+            AceEntry {
+                trustee_sid: "S-1-5-21-200".to_string(),
+                trustee_display_name: "GroupB".to_string(),
+                access_type: AceAccessType::Allow,
+                permissions: vec!["Write".to_string()],
+                is_inherited: true,
+            },
+            AceEntry {
+                trustee_sid: "S-1-5-21-300".to_string(),
+                trustee_display_name: "GroupC".to_string(),
+                access_type: AceAccessType::Deny,
+                permissions: vec!["Delete".to_string()],
+                is_inherited: false,
+            },
+        ];
+
+        let user_a_sids = vec![
+            "S-1-5-21-100".to_string(),
+            "S-1-5-21-300".to_string(),
+        ];
+        let user_b_sids = vec!["S-1-5-21-200".to_string()];
+
+        let results = cross_reference_aces(&aces, &user_a_sids, &user_b_sids);
+        assert_eq!(results.len(), 3);
+        assert_eq!(results[0].user_a_access, AccessIndicator::Allowed);
+        assert_eq!(results[0].user_b_access, AccessIndicator::NoMatch);
+        assert_eq!(results[1].user_a_access, AccessIndicator::NoMatch);
+        assert_eq!(results[1].user_b_access, AccessIndicator::Allowed);
+        assert_eq!(results[2].user_a_access, AccessIndicator::Denied);
+        assert_eq!(results[2].user_b_access, AccessIndicator::NoMatch);
+    }
+
+    // -----------------------------------------------------------------------
+    // check_user_access with multiple SIDs
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_check_user_access_multiple_sids() {
+        let ace = AceEntry {
+            trustee_sid: "S-1-5-21-300".to_string(),
+            trustee_display_name: "GroupC".to_string(),
+            access_type: AceAccessType::Allow,
+            permissions: vec!["Read".to_string()],
+            is_inherited: false,
+        };
+        let sids = vec![
+            "S-1-5-21-100".to_string(),
+            "S-1-5-21-200".to_string(),
+            "S-1-5-21-300".to_string(),
+        ];
+        assert_eq!(check_user_access(&ace, &sids), AccessIndicator::Allowed);
+    }
+
+    #[test]
+    fn test_check_user_access_empty_sids() {
+        let ace = AceEntry {
+            trustee_sid: "S-1-5-21-100".to_string(),
+            trustee_display_name: "Group".to_string(),
+            access_type: AceAccessType::Allow,
+            permissions: vec!["Read".to_string()],
+            is_inherited: false,
+        };
+        assert_eq!(check_user_access(&ace, &[]), AccessIndicator::NoMatch);
+    }
+
+    // -----------------------------------------------------------------------
+    // AceCrossReference serialization
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_ace_cross_reference_serialization() {
+        let xref = AceCrossReference {
+            ace: AceEntry {
+                trustee_sid: "S-1-5-21-100".to_string(),
+                trustee_display_name: "Admins".to_string(),
+                access_type: AceAccessType::Allow,
+                permissions: vec!["Read".to_string()],
+                is_inherited: false,
+            },
+            user_a_access: AccessIndicator::Allowed,
+            user_b_access: AccessIndicator::NoMatch,
+        };
+        let json = serde_json::to_string(&xref).unwrap();
+        assert!(json.contains("userAAccess"));
+        assert!(json.contains("userBAccess"));
+        assert!(json.contains("ace"));
+    }
+
+    // -----------------------------------------------------------------------
+    // AceAccessType serialization/deserialization roundtrip
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_ace_access_type_roundtrip() {
+        let allow_json = serde_json::to_string(&AceAccessType::Allow).unwrap();
+        let deny_json = serde_json::to_string(&AceAccessType::Deny).unwrap();
+        let allow: AceAccessType = serde_json::from_str(&allow_json).unwrap();
+        let deny: AceAccessType = serde_json::from_str(&deny_json).unwrap();
+        assert_eq!(allow, AceAccessType::Allow);
+        assert_eq!(deny, AceAccessType::Deny);
+    }
+
+    // -----------------------------------------------------------------------
+    // AceEntry deserialization
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_ace_entry_deserialization() {
+        let json = r#"{
+            "trusteeSid": "S-1-5-21-999",
+            "trusteeDisplayName": "TestGroup",
+            "accessType": "Deny",
+            "permissions": ["Write", "Delete"],
+            "isInherited": true
+        }"#;
+        let ace: AceEntry = serde_json::from_str(json).unwrap();
+        assert_eq!(ace.trustee_sid, "S-1-5-21-999");
+        assert_eq!(ace.access_type, AceAccessType::Deny);
+        assert_eq!(ace.permissions.len(), 2);
+        assert!(ace.is_inherited);
+    }
+
+    // -----------------------------------------------------------------------
+    // NtfsAuditResult with errors
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_ntfs_audit_result_with_errors() {
+        let result = NtfsAuditResult {
+            path: "\\\\server\\share".to_string(),
+            aces: vec![],
+            errors: vec!["Error 1".to_string(), "Error 2".to_string()],
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        assert!(json.contains("Error 1"));
+        assert!(json.contains("Error 2"));
+    }
+
+    // -----------------------------------------------------------------------
+    // AceEntry equality
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_ace_entry_equality() {
+        let a = AceEntry {
+            trustee_sid: "S-1-5-21-100".to_string(),
+            trustee_display_name: "G".to_string(),
+            access_type: AceAccessType::Allow,
+            permissions: vec!["Read".to_string()],
+            is_inherited: false,
+        };
+        let b = a.clone();
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn test_ace_entry_inequality_different_type() {
+        let a = AceEntry {
+            trustee_sid: "S-1-5-21-100".to_string(),
+            trustee_display_name: "G".to_string(),
+            access_type: AceAccessType::Allow,
+            permissions: vec!["Read".to_string()],
+            is_inherited: false,
+        };
+        let b = AceEntry {
+            access_type: AceAccessType::Deny,
+            ..a.clone()
+        };
+        assert_ne!(a, b);
+    }
 }
