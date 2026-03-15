@@ -1,6 +1,14 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { History, ArrowRight, AlertTriangle, Clock, Server, Hash, Link } from "lucide-react";
+import {
+  History,
+  ArrowRight,
+  AlertTriangle,
+  Clock,
+  Server,
+  Hash,
+  Link,
+} from "lucide-react";
 import {
   type ReplicationMetadataResult,
   type AttributeChangeDiff,
@@ -12,8 +20,13 @@ interface StateInTimeViewProps {
   objectType: "user" | "computer" | "group";
 }
 
-export function StateInTimeView({ objectDn, objectType }: StateInTimeViewProps) {
-  const [metadata, setMetadata] = useState<ReplicationMetadataResult | null>(null);
+export function StateInTimeView({
+  objectDn,
+  objectType: _objectType,
+}: StateInTimeViewProps) {
+  const [metadata, setMetadata] = useState<ReplicationMetadataResult | null>(
+    null,
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedFrom, setSelectedFrom] = useState<string>("");
@@ -50,7 +63,9 @@ export function StateInTimeView({ objectDn, objectType }: StateInTimeViewProps) 
   const timestamps = useMemo(() => {
     if (!metadata?.attributes) return [];
     const ts = new Set(
-      metadata.attributes.map((a) => a.lastOriginatingChangeTime).filter(Boolean),
+      metadata.attributes
+        .map((a) => a.lastOriginatingChangeTime)
+        .filter(Boolean),
     );
     return Array.from(ts).sort().reverse();
   }, [metadata]);
@@ -104,8 +119,12 @@ export function StateInTimeView({ objectDn, objectType }: StateInTimeViewProps) 
           className="rounded-md border border-[var(--color-warning)] bg-[var(--color-warning-bg)] px-4 py-2 text-body text-[var(--color-text-primary)]"
           data-testid="metadata-unavailable"
         >
-          <AlertTriangle size={14} className="mr-1 inline text-[var(--color-warning)]" />
-          {metadata.message ?? "Replication metadata is not available for this object."}
+          <AlertTriangle
+            size={14}
+            className="mr-1 inline text-[var(--color-warning)]"
+          />
+          {metadata.message ??
+            "Replication metadata is not available for this object."}
         </div>
       )}
 
@@ -188,7 +207,10 @@ export function StateInTimeView({ objectDn, objectType }: StateInTimeViewProps) 
                     </option>
                   ))}
                 </select>
-                <ArrowRight size={16} className="text-[var(--color-text-secondary)]" />
+                <ArrowRight
+                  size={16}
+                  className="text-[var(--color-text-secondary)]"
+                />
                 <select
                   className="flex-1 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-bg)] px-3 py-1.5 text-body text-[var(--color-text-primary)]"
                   value={selectedTo}
@@ -309,8 +331,12 @@ export function StateInTimeView({ objectDn, objectType }: StateInTimeViewProps) 
                         <td className="px-3 py-1.5 font-medium text-[var(--color-text-primary)]">
                           {vm.attributeName}
                         </td>
-                        <td className="px-3 py-1.5 text-caption text-[var(--color-text-primary)] truncate max-w-[250px]" title={vm.objectDn}>
-                          {vm.objectDn.match(/^CN=([^,]+)/i)?.[1] ?? vm.objectDn}
+                        <td
+                          className="px-3 py-1.5 text-caption text-[var(--color-text-primary)] truncate max-w-[250px]"
+                          title={vm.objectDn}
+                        >
+                          {vm.objectDn.match(/^CN=([^,]+)/i)?.[1] ??
+                            vm.objectDn}
                         </td>
                         <td className="px-3 py-1.5 text-[var(--color-text-primary)]">
                           {vm.lastOriginatingChangeTime || "Unknown"}

@@ -12,6 +12,12 @@ use crate::services::directory::DirectoryProvider;
 
 pub struct DemoDirectoryProvider;
 
+impl Default for DemoDirectoryProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DemoDirectoryProvider {
     pub fn new() -> Self {
         tracing::info!("DEMO MODE: using DemoDirectoryProvider with sample data");
@@ -385,9 +391,17 @@ fn sample_replication_metadata_for(object_dn: &str) -> String {
     // Vary dates and versions per user using the seed
     let day_offset = (seed % 28) as u32 + 1;
     let hour = (seed % 20) as u32 + 4;
-    let v_base = (seed % 5) as u64;
-    let dc = if seed % 2 == 0 { "DC01" } else { "DC02" };
-    let dc_alt = if seed % 2 == 0 { "DC02" } else { "DC01" };
+    let v_base = seed % 5;
+    let dc = if seed.is_multiple_of(2) {
+        "DC01"
+    } else {
+        "DC02"
+    };
+    let dc_alt = if seed.is_multiple_of(2) {
+        "DC02"
+    } else {
+        "DC01"
+    };
     let usn_base = 10000 + (seed % 50000);
 
     let attrs: Vec<(&str, u64, String, &str, u64)> = vec![
@@ -562,6 +576,7 @@ fn sample_computers() -> Vec<DirectoryEntry> {
     ]
 }
 
+#[allow(clippy::too_many_arguments)]
 fn make_user(
     sam: &str,
     display: &str,
@@ -587,7 +602,7 @@ fn make_user(
     );
     attrs.insert(
         "sn".to_string(),
-        vec![display.split(' ').last().unwrap_or("").to_string()],
+        vec![display.split(' ').next_back().unwrap_or("").to_string()],
     );
     attrs.insert("mail".to_string(), vec![mail.to_string()]);
     attrs.insert("department".to_string(), vec![dept.to_string()]);
@@ -829,8 +844,8 @@ impl DirectoryProvider for DemoDirectoryProvider {
         // Search users, computers, and sub-groups for members of this group
         let mut members: Vec<DirectoryEntry> = sample_browse_users()
             .into_iter()
-            .chain(sample_computers().into_iter())
-            .chain(sample_group_entries().into_iter())
+            .chain(sample_computers())
+            .chain(sample_group_entries())
             .filter(|entry| {
                 entry
                     .get_attribute_values("memberOf")

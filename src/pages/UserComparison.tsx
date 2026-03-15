@@ -1,14 +1,24 @@
 import { useState, useCallback, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Search, GitCompareArrows, RotateCcw, Users, UserPlus, Info } from "lucide-react";
+import {
+  Search,
+  GitCompareArrows,
+  RotateCcw,
+  Users,
+  UserPlus,
+  Info,
+} from "lucide-react";
 import { useComparison } from "@/hooks/useComparison";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useNavigation } from "@/contexts/NavigationContext";
 import { type DirectoryEntry } from "@/types/directory";
 import { type GroupCategory, type GroupDisplayItem } from "@/types/comparison";
-import { parseCnFromDn, formatOuPath } from "@/utils/dn";
+import { formatOuPath } from "@/utils/dn";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
-import { ContextMenu, type ContextMenuItem } from "@/components/common/ContextMenu";
+import {
+  ContextMenu,
+  type ContextMenuItem,
+} from "@/components/common/ContextMenu";
 import { GroupMembersDialog } from "@/components/dialogs/GroupMembersDialog";
 import { UncPermissionsAudit } from "@/components/comparison/UncPermissionsAudit";
 import { useNotifications } from "@/contexts/NotificationContext";
@@ -21,16 +31,20 @@ function parseDnOu(dn: string): string {
 function formatAccountStatus(entry: DirectoryEntry): string {
   const uac = parseInt(entry.attributes?.userAccountControl?.[0] ?? "0", 10);
   const disabled = (uac & 0x0002) !== 0;
-  const locked = entry.attributes?.lockoutTime?.[0] !== undefined
-    && entry.attributes.lockoutTime[0] !== ""
-    && entry.attributes.lockoutTime[0] !== "0";
+  const locked =
+    entry.attributes?.lockoutTime?.[0] !== undefined &&
+    entry.attributes.lockoutTime[0] !== "" &&
+    entry.attributes.lockoutTime[0] !== "0";
   if (disabled && locked) return "Disabled, Locked";
   if (disabled) return "Disabled";
   if (locked) return "Locked";
   return "Active";
 }
 
-const CATEGORY_STYLES: Record<GroupCategory, { bg: string; text: string; label: string }> = {
+const CATEGORY_STYLES: Record<
+  GroupCategory,
+  { bg: string; text: string; label: string }
+> = {
   shared: {
     bg: "bg-[var(--color-success-bg)]",
     text: "text-[var(--color-success)]",
@@ -65,25 +79,24 @@ function UserSearchField({
   const [showDropdown, setShowDropdown] = useState(false);
   const debouncedQuery = useDebounce(query, 300);
 
-  const search = useCallback(
-    async (q: string) => {
-      if (q.length < 2) {
-        setResults([]);
-        return;
-      }
-      setIsSearching(true);
-      try {
-        const entries = await invoke<DirectoryEntry[]>("search_users", { query: q });
-        setResults(entries);
-        setShowDropdown(true);
-      } catch {
-        setResults([]);
-      } finally {
-        setIsSearching(false);
-      }
-    },
-    [],
-  );
+  const search = useCallback(async (q: string) => {
+    if (q.length < 2) {
+      setResults([]);
+      return;
+    }
+    setIsSearching(true);
+    try {
+      const entries = await invoke<DirectoryEntry[]>("search_users", {
+        query: q,
+      });
+      setResults(entries);
+      setShowDropdown(true);
+    } catch {
+      setResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  }, []);
 
   // Trigger search on debounced query change
   useState(() => {
@@ -172,13 +185,20 @@ function UserSearchField({
           <div className="mt-1 space-y-0.5 text-caption text-[var(--color-text-secondary)]">
             <div>SAM: {selectedUser.samAccountName}</div>
             <div>Title: {selectedUser.attributes?.title?.[0] ?? "-"}</div>
-            <div>Department: {selectedUser.attributes?.department?.[0] ?? "-"}</div>
-            <div>OU: {selectedUser.distinguishedName ? parseDnOu(selectedUser.distinguishedName) : "-"}</div>
-            <div>Last Logon: {selectedUser.attributes?.lastLogon?.[0] ?? "-"}</div>
-            <div>Status: {formatAccountStatus(selectedUser)}</div>
             <div>
-              Groups: {selectedUser.attributes?.memberOf?.length ?? 0}
+              Department: {selectedUser.attributes?.department?.[0] ?? "-"}
             </div>
+            <div>
+              OU:{" "}
+              {selectedUser.distinguishedName
+                ? parseDnOu(selectedUser.distinguishedName)
+                : "-"}
+            </div>
+            <div>
+              Last Logon: {selectedUser.attributes?.lastLogon?.[0] ?? "-"}
+            </div>
+            <div>Status: {formatAccountStatus(selectedUser)}</div>
+            <div>Groups: {selectedUser.attributes?.memberOf?.length ?? 0}</div>
           </div>
         </div>
       )}
@@ -226,7 +246,8 @@ function UncPermissionsSection({
                 Enter a UNC path to see its NTFS permissions cross-referenced
                 with both users. Each ACE shows whether User A and User B have
                 access through their group memberships, helping you quickly
-                identify why one user can access a resource and the other cannot.
+                identify why one user can access a resource and the other
+                cannot.
               </p>
             </div>
           )}
@@ -263,7 +284,9 @@ export function UserComparison() {
 
   // React to prefill data passed via tab navigation
   useEffect(() => {
-    const tab = openTabs.find((t) => t.id === activeTabId && t.moduleId === "user-comparison");
+    const tab = openTabs.find(
+      (t) => t.id === activeTabId && t.moduleId === "user-comparison",
+    );
     if (tab?.data?.compareSamA && tab?.data?.compareSamB) {
       const samA = tab.data.compareSamA as string;
       const samB = tab.data.compareSamB as string;
@@ -273,9 +296,17 @@ export function UserComparison() {
     }
   }, [activeTabId, openTabs, prefill, clearTabData]);
 
-  const [contextMenuPos, setContextMenuPos] = useState<{ x: number; y: number } | null>(null);
-  const [contextMenuItems, setContextMenuItems] = useState<ContextMenuItem[]>([]);
-  const [groupMembersDialog, setGroupMembersDialog] = useState<{ dn: string; name: string } | null>(null);
+  const [contextMenuPos, setContextMenuPos] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
+  const [contextMenuItems, setContextMenuItems] = useState<ContextMenuItem[]>(
+    [],
+  );
+  const [groupMembersDialog, setGroupMembersDialog] = useState<{
+    dn: string;
+    name: string;
+  } | null>(null);
 
   const handleGroupContextMenu = useCallback(
     (e: React.MouseEvent, group: GroupDisplayItem) => {
@@ -284,7 +315,8 @@ export function UserComparison() {
         {
           label: "View group members",
           icon: <Users size={14} />,
-          onClick: () => setGroupMembersDialog({ dn: group.dn, name: group.name }),
+          onClick: () =>
+            setGroupMembersDialog({ dn: group.dn, name: group.name }),
         },
       ];
 
@@ -298,7 +330,10 @@ export function UserComparison() {
                 userDn: userA.distinguishedName,
                 groupDn: group.dn,
               });
-              notify(`${userA.displayName ?? userA.samAccountName} added to ${group.name}`, "success");
+              notify(
+                `${userA.displayName ?? userA.samAccountName} added to ${group.name}`,
+                "success",
+              );
               compare();
             } catch (err) {
               notify(`Failed to add to group: ${err}`, "error");
@@ -317,7 +352,10 @@ export function UserComparison() {
                 userDn: userB.distinguishedName,
                 groupDn: group.dn,
               });
-              notify(`${userB.displayName ?? userB.samAccountName} added to ${group.name}`, "success");
+              notify(
+                `${userB.displayName ?? userB.samAccountName} added to ${group.name}`,
+                "success",
+              );
               compare();
             } catch (err) {
               notify(`Failed to add to group: ${err}`, "error");
@@ -338,7 +376,10 @@ export function UserComparison() {
   const canCompare = userA !== null && userB !== null && !isComparing;
 
   return (
-    <div className="flex h-full flex-col gap-4 overflow-y-auto p-4" data-testid="user-comparison-page">
+    <div
+      className="flex h-full flex-col gap-4 overflow-y-auto p-4"
+      data-testid="user-comparison-page"
+    >
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold text-[var(--color-text-primary)]">
@@ -414,17 +455,20 @@ export function UserComparison() {
             <div className="flex items-center gap-2">
               <span className="inline-block h-3 w-3 rounded-full bg-[var(--color-error)]" />
               <span className="text-body text-[var(--color-text-primary)]">
-                <strong>{comparisonResult.onlyAGroups.length}</strong> {userAName} only
+                <strong>{comparisonResult.onlyAGroups.length}</strong>{" "}
+                {userAName} only
               </span>
             </div>
             <div className="flex items-center gap-2">
               <span className="inline-block h-3 w-3 rounded-full bg-[var(--color-primary)]" />
               <span className="text-body text-[var(--color-text-primary)]">
-                <strong>{comparisonResult.onlyBGroups.length}</strong> {userBName} only
+                <strong>{comparisonResult.onlyBGroups.length}</strong>{" "}
+                {userBName} only
               </span>
             </div>
             <div className="ml-auto text-caption text-[var(--color-text-secondary)]">
-              {userAName}: {comparisonResult.totalA} groups | {userBName}: {comparisonResult.totalB} groups
+              {userAName}: {comparisonResult.totalA} groups | {userBName}:{" "}
+              {comparisonResult.totalB} groups
             </div>
           </div>
 
@@ -447,7 +491,9 @@ export function UserComparison() {
             <select
               className="rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-bg)] px-3 py-1.5 text-body text-[var(--color-text-primary)]"
               value={sortField}
-              onChange={(e) => setSortField(e.target.value as "name" | "category")}
+              onChange={(e) =>
+                setSortField(e.target.value as "name" | "category")
+              }
               data-testid="sort-field"
             >
               <option value="name">Sort by Name</option>

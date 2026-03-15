@@ -1,7 +1,18 @@
 import { useState, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { FolderSearch, Download, Shield, ShieldAlert, ShieldX, Minus } from "lucide-react";
-import { type AceEntry, type NtfsAuditResult, type AceCrossReference, type AccessIndicator } from "@/types/ntfs";
+import {
+  FolderSearch,
+  Download,
+  Shield,
+  ShieldAlert,
+  ShieldX,
+  Minus,
+} from "lucide-react";
+import {
+  type NtfsAuditResult,
+  type AceCrossReference,
+  type AccessIndicator,
+} from "@/types/ntfs";
 import { type DirectoryEntry } from "@/types/directory";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { formatCsv, downloadCsv } from "@/utils/csvExport";
@@ -15,11 +26,26 @@ const ACCESS_TOOLTIPS: Record<AccessIndicator, string> = {
 function AccessIcon({ indicator }: { indicator: AccessIndicator }) {
   switch (indicator) {
     case "Allowed":
-      return <Shield size={14} className="text-[var(--color-success)]" data-testid="access-allowed" title={ACCESS_TOOLTIPS.Allowed} />;
+      return (
+        <span title={ACCESS_TOOLTIPS.Allowed} data-testid="access-allowed">
+          <Shield size={14} className="text-[var(--color-success)]" />
+        </span>
+      );
     case "Denied":
-      return <ShieldAlert size={14} className="text-[var(--color-error)]" data-testid="access-denied" title={ACCESS_TOOLTIPS.Denied} />;
+      return (
+        <span title={ACCESS_TOOLTIPS.Denied} data-testid="access-denied">
+          <ShieldAlert size={14} className="text-[var(--color-error)]" />
+        </span>
+      );
     case "NoMatch":
-      return <Minus size={14} className="text-[var(--color-text-secondary)]" data-testid="access-nomatch" title={ACCESS_TOOLTIPS.NoMatch} />;
+      return (
+        <span title={ACCESS_TOOLTIPS.NoMatch} data-testid="access-nomatch">
+          <Minus
+            size={14}
+            className="text-[var(--color-text-secondary)]"
+          />
+        </span>
+      );
   }
 }
 
@@ -28,7 +54,10 @@ interface UncPermissionsAuditProps {
   userB: DirectoryEntry | null;
 }
 
-export function UncPermissionsAudit({ userA, userB }: UncPermissionsAuditProps) {
+export function UncPermissionsAudit({
+  userA,
+  userB,
+}: UncPermissionsAuditProps) {
   const [uncPath, setUncPath] = useState("");
   const [isAuditing, setIsAuditing] = useState(false);
   const [auditResult, setAuditResult] = useState<NtfsAuditResult | null>(null);
@@ -51,8 +80,10 @@ export function UncPermissionsAudit({ userA, userB }: UncPermissionsAuditProps) 
       // Cross-reference if both users are selected
       // Use tokenGroups (SIDs) for ACL matching, fallback to memberOf (DNs)
       if (userA && userB && result.aces.length > 0) {
-        const userASids = userA.attributes?.tokenGroups ?? userA.attributes?.memberOf ?? [];
-        const userBSids = userB.attributes?.tokenGroups ?? userB.attributes?.memberOf ?? [];
+        const userASids =
+          userA.attributes?.tokenGroups ?? userA.attributes?.memberOf ?? [];
+        const userBSids =
+          userB.attributes?.tokenGroups ?? userB.attributes?.memberOf ?? [];
         const refs = await invoke<AceCrossReference[]>("cross_reference_ntfs", {
           aces: result.aces,
           userASids,
@@ -171,7 +202,10 @@ export function UncPermissionsAudit({ userA, userB }: UncPermissionsAuditProps) 
           </div>
 
           {userA && userB && crossRef.length > 0 && (
-            <div className="mb-2 flex items-center gap-4 text-caption text-[var(--color-text-primary)]" data-testid="ace-legend">
+            <div
+              className="mb-2 flex items-center gap-4 text-caption text-[var(--color-text-primary)]"
+              data-testid="ace-legend"
+            >
               <div className="flex items-center gap-2">
                 <span className="inline-block h-3 w-3 rounded-full bg-[var(--color-success)]" />
                 Both users
@@ -226,8 +260,10 @@ export function UncPermissionsAudit({ userA, userB }: UncPermissionsAuditProps) 
                     const aHas = ref.userAAccess === "Allowed";
                     const bHas = ref.userBAccess === "Allowed";
                     if (aHas && bHas) rowBg = "bg-[var(--color-success-bg)]";
-                    else if (aHas && !bHas) rowBg = "bg-[var(--color-error-bg)]";
-                    else if (!aHas && bHas) rowBg = "bg-[var(--color-primary-subtle)]";
+                    else if (aHas && !bHas)
+                      rowBg = "bg-[var(--color-error-bg)]";
+                    else if (!aHas && bHas)
+                      rowBg = "bg-[var(--color-primary-subtle)]";
                   }
                   return (
                     <tr
@@ -241,8 +277,12 @@ export function UncPermissionsAudit({ userA, userB }: UncPermissionsAuditProps) 
                           {ace.trusteeSid}
                         </div>
                       </td>
-                      <td className={`px-3 py-2 font-medium ${isDeny ? "text-[var(--color-error)]" : "text-[var(--color-success)]"}`}>
-                        {isDeny && <ShieldX size={12} className="mr-1 inline" />}
+                      <td
+                        className={`px-3 py-2 font-medium ${isDeny ? "text-[var(--color-error)]" : "text-[var(--color-success)]"}`}
+                      >
+                        {isDeny && (
+                          <ShieldX size={12} className="mr-1 inline" />
+                        )}
                         {ace.accessType}
                       </td>
                       <td className="px-3 py-2 text-[var(--color-text-primary)]">
@@ -311,12 +351,18 @@ function AccessSummary({
 
       <div className="grid grid-cols-2 gap-3 text-caption">
         <div>
-          <p className="font-medium text-[var(--color-text-primary)] mb-1">{userAName}</p>
+          <p className="font-medium text-[var(--color-text-primary)] mb-1">
+            {userAName}
+          </p>
           <p className="text-[var(--color-success)]">
             {userAAllowed.length} rule(s) grant access
             {userAAllowed.length > 0 && (
               <span className="text-[var(--color-text-secondary)]">
-                {" "}via {userAAllowed.map((r) => r.ace.trusteeDisplayName.split("\\").pop()).join(", ")}
+                {" "}
+                via{" "}
+                {userAAllowed
+                  .map((r) => r.ace.trusteeDisplayName.split("\\").pop())
+                  .join(", ")}
               </span>
             )}
           </p>
@@ -324,18 +370,28 @@ function AccessSummary({
             <p className="text-[var(--color-error)]">
               {userADenied.length} rule(s) deny access
               <span className="text-[var(--color-text-secondary)]">
-                {" "}via {userADenied.map((r) => r.ace.trusteeDisplayName.split("\\").pop()).join(", ")}
+                {" "}
+                via{" "}
+                {userADenied
+                  .map((r) => r.ace.trusteeDisplayName.split("\\").pop())
+                  .join(", ")}
               </span>
             </p>
           )}
         </div>
         <div>
-          <p className="font-medium text-[var(--color-text-primary)] mb-1">{userBName}</p>
+          <p className="font-medium text-[var(--color-text-primary)] mb-1">
+            {userBName}
+          </p>
           <p className="text-[var(--color-success)]">
             {userBAllowed.length} rule(s) grant access
             {userBAllowed.length > 0 && (
               <span className="text-[var(--color-text-secondary)]">
-                {" "}via {userBAllowed.map((r) => r.ace.trusteeDisplayName.split("\\").pop()).join(", ")}
+                {" "}
+                via{" "}
+                {userBAllowed
+                  .map((r) => r.ace.trusteeDisplayName.split("\\").pop())
+                  .join(", ")}
               </span>
             )}
           </p>
@@ -343,7 +399,11 @@ function AccessSummary({
             <p className="text-[var(--color-error)]">
               {userBDenied.length} rule(s) deny access
               <span className="text-[var(--color-text-secondary)]">
-                {" "}via {userBDenied.map((r) => r.ace.trusteeDisplayName.split("\\").pop()).join(", ")}
+                {" "}
+                via{" "}
+                {userBDenied
+                  .map((r) => r.ace.trusteeDisplayName.split("\\").pop())
+                  .join(", ")}
               </span>
             </p>
           )}
@@ -353,21 +413,47 @@ function AccessSummary({
       {/* Differences explanation */}
       {(onlyA.length > 0 || onlyB.length > 0) && (
         <div className="border-t border-[var(--color-border-subtle)] pt-2">
-          <p className="font-medium text-[var(--color-text-primary)] mb-1">Differences</p>
+          <p className="font-medium text-[var(--color-text-primary)] mb-1">
+            Differences
+          </p>
           {onlyA.map((r, i) => (
             <p key={`a-${i}`} className="text-[var(--color-text-secondary)]">
-              <span className="font-medium text-[var(--color-text-primary)]">{userAName}</span> has{" "}
-              <span className="font-medium">{r.ace.permissions.join(", ")}</span> access via{" "}
-              <span className="font-medium">{r.ace.trusteeDisplayName.split("\\").pop()}</span>
-              {" "}- <span className="font-medium text-[var(--color-text-primary)]">{userBName}</span> does not
+              <span className="font-medium text-[var(--color-text-primary)]">
+                {userAName}
+              </span>{" "}
+              has{" "}
+              <span className="font-medium">
+                {r.ace.permissions.join(", ")}
+              </span>{" "}
+              access via{" "}
+              <span className="font-medium">
+                {r.ace.trusteeDisplayName.split("\\").pop()}
+              </span>{" "}
+              -{" "}
+              <span className="font-medium text-[var(--color-text-primary)]">
+                {userBName}
+              </span>{" "}
+              does not
             </p>
           ))}
           {onlyB.map((r, i) => (
             <p key={`b-${i}`} className="text-[var(--color-text-secondary)]">
-              <span className="font-medium text-[var(--color-text-primary)]">{userBName}</span> has{" "}
-              <span className="font-medium">{r.ace.permissions.join(", ")}</span> access via{" "}
-              <span className="font-medium">{r.ace.trusteeDisplayName.split("\\").pop()}</span>
-              {" "}- <span className="font-medium text-[var(--color-text-primary)]">{userAName}</span> does not
+              <span className="font-medium text-[var(--color-text-primary)]">
+                {userBName}
+              </span>{" "}
+              has{" "}
+              <span className="font-medium">
+                {r.ace.permissions.join(", ")}
+              </span>{" "}
+              access via{" "}
+              <span className="font-medium">
+                {r.ace.trusteeDisplayName.split("\\").pop()}
+              </span>{" "}
+              -{" "}
+              <span className="font-medium text-[var(--color-text-primary)]">
+                {userAName}
+              </span>{" "}
+              does not
             </p>
           ))}
         </div>
