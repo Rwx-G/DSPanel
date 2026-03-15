@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { CopyButton } from "@/components/common/CopyButton";
@@ -7,14 +7,219 @@ import {
   PropertyGrid,
   type PropertyGroup,
 } from "@/components/data/PropertyGrid";
-import { DataTable, type Column } from "@/components/data/DataTable";
 import { type DirectoryEntry, type DirectoryGroup } from "@/types/directory";
 import { parseCnFromDn } from "@/utils/dn";
 import {
   type MemberChange,
   MemberChangePreviewDialog,
 } from "@/components/dialogs/MemberChangePreviewDialog";
-import { UserPlus, UserMinus, Eye, Search, Info } from "lucide-react";
+import {
+  ContextMenu,
+  type ContextMenuItem,
+} from "@/components/common/ContextMenu";
+import { useNavigation } from "@/contexts/NavigationContext";
+import {
+  UserPlus,
+  UserMinus,
+  Eye,
+  Search,
+  Info,
+  ChevronDown,
+  ChevronRight,
+  Users,
+  User,
+  FolderOpen,
+  X,
+} from "lucide-react";
+
+interface NestedMemberItemProps {
+  entry: DirectoryEntry;
+  depth: number;
+  ancestors: Set<string>;
+  expandedGroups: Set<string>;
+  nestedGroupMembers: Record<string, DirectoryEntry[]>;
+  nestedGroupLoading: Set<string>;
+  selectedMembers?: Set<string>;
+  onToggleExpand: (dn: string) => void;
+  onToggleSelect?: (dn: string, checked: boolean) => void;
+  onRowContextMenu?: (e: React.MouseEvent, entry: DirectoryEntry) => void;
+}
+
+function NestedMemberItem({
+  entry,
+  depth,
+  ancestors,
+  expandedGroups,
+  nestedGroupMembers,
+  nestedGroupLoading,
+  selectedMembers,
+  onToggleExpand,
+  onToggleSelect,
+  onRowContextMenu,
+}: NestedMemberItemProps) {
+  const name =
+    entry.displayName ??
+    entry.samAccountName ??
+    parseCnFromDn(entry.distinguishedName);
+  const isGroup = entry.objectClass === "group";
+  const isExpanded = expandedGroups.has(entry.distinguishedName);
+  const isCircular = ancestors.has(entry.distinguishedName);
+  const subMembers = nestedGroupMembers[entry.distinguishedName];
+  const isLoading = nestedGroupLoading.has(entry.distinguishedName);
+  const isSelected = selectedMembers?.has(entry.distinguishedName) ?? false;
+  const canSelect = !!onToggleSelect;
+
+  // Ancestors for children: current ancestors + this group
+  const childAncestors = useMemo(() => {
+    if (!isGroup) return ancestors;
+    return new Set([...ancestors, entry.distinguishedName]);
+  }, [ancestors, entry.distinguishedName, isGroup]);
+
+  // Sort sub-members: groups first
+  const sortedSubs = useMemo(() => {
+    if (!subMembers) return [];
+    const groups = subMembers.filter((m) => m.objectClass === "group");
+    const others = subMembers.filter((m) => m.objectClass !== "group");
+    return [...groups, ...others];
+  }, [subMembers]);
+
+  const iconSize = depth === 0 ? 14 : 12;
+  const paddingLeft = depth === 0 ? 12 : 8 + depth * 20;
+
+  return (
+    <div
+      className="border-b border-[var(--color-border-subtle)] last:border-b-0"
+      data-testid={
+        isGroup ? `nested-group-${name}` : `member-row-${name}`
+      }
+    >
+      {/* Row */}
+      <div
+        className={`flex items-center gap-2 py-1.5 pr-3 transition-colors hover:bg-[var(--color-surface-hover)] ${
+          isSelected ? "bg-[var(--color-surface-selected)]" : ""
+        } ${canSelect ? "cursor-pointer" : ""}`}
+        style={{ paddingLeft }}
+        onClick={() => {
+          if (canSelect) {
+            onToggleSelect(entry.distinguishedName, !isSelected);
+          }
+        }}
+        onContextMenu={(e) => {
+          if (onRowContextMenu) {
+            e.preventDefault();
+            onRowContextMenu(e, entry);
+          }
+        }}
+      >
+        {canSelect && depth === 0 && (
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={(e) => {
+              e.stopPropagation();
+              onToggleSelect(entry.distinguishedName, e.target.checked);
+            }}
+            onClick={(e) => e.stopPropagation()}
+            data-testid={`member-checkbox-${name}`}
+            aria-label={`Select ${name}`}
+          />
+        )}
+        {isGroup ? (
+          <button
+            className="shrink-0 rounded-sm p-0.5 hover:bg-[var(--color-surface-hover)] transition-colors"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!isCircular || isExpanded) {
+                onToggleExpand(entry.distinguishedName);
+              }
+            }}
+            disabled={isCircular && !isExpanded}
+            title={
+              isCircular && !isExpanded
+                ? "Circular reference detected"
+                : isExpanded
+                  ? "Collapse"
+                  : "Expand"
+            }
+            data-testid={`expand-${name}`}
+          >
+            {isExpanded ? (
+              <ChevronDown size={iconSize} />
+            ) : (
+              <ChevronRight
+                size={iconSize}
+                className={
+                  isCircular ? "text-[var(--color-text-disabled)]" : ""
+                }
+              />
+            )}
+          </button>
+        ) : (
+          <span style={{ width: iconSize + 4 }} />
+        )}
+        {isGroup ? (
+          <Users
+            size={iconSize}
+            className="shrink-0 text-[var(--color-primary)]"
+          />
+        ) : (
+          <span
+            className="shrink-0 rounded-full bg-[var(--color-text-secondary)] opacity-40"
+            style={{ width: iconSize, height: iconSize }}
+          />
+        )}
+        <span className={`flex-1 truncate text-[var(--color-text-primary)] ${depth === 0 ? "text-body" : "text-caption"}`}>
+          {name}
+        </span>
+        <span className="shrink-0 text-caption text-[var(--color-text-secondary)]">
+          {isGroup ? "group" : entry.objectClass ?? "user"}
+        </span>
+        {isGroup && subMembers && !isCircular && (
+          <span className="shrink-0 text-caption text-[var(--color-text-secondary)]">
+            ({subMembers.length})
+          </span>
+        )}
+        {isGroup && isCircular && !isExpanded && (
+          <span className="shrink-0 text-caption text-[var(--color-warning)]">
+            circular
+          </span>
+        )}
+      </div>
+
+      {/* Expanded children (recursive) */}
+      {isGroup && isExpanded && (
+        <div
+          className="border-t border-[var(--color-border-subtle)] bg-[var(--color-surface-bg)]"
+          data-testid={`nested-group-members-${name}`}
+        >
+          {isLoading ? (
+            <div className="py-2 pl-8">
+              <LoadingSpinner message="Loading..." />
+            </div>
+          ) : sortedSubs.length > 0 ? (
+            sortedSubs.map((sub) => (
+              <NestedMemberItem
+                key={sub.distinguishedName}
+                entry={sub}
+                depth={depth + 1}
+                ancestors={childAncestors}
+                expandedGroups={expandedGroups}
+                nestedGroupMembers={nestedGroupMembers}
+                nestedGroupLoading={nestedGroupLoading}
+                onToggleExpand={onToggleExpand}
+                onRowContextMenu={onRowContextMenu}
+              />
+            ))
+          ) : (
+            <p className="py-2 pl-8 text-caption text-[var(--color-text-secondary)]">
+              No members
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export interface GroupDetailProps {
   group: DirectoryGroup;
@@ -38,12 +243,133 @@ export function GroupDetail({
   const [pendingChanges, setPendingChanges] = useState<MemberChange[]>([]);
   const [showPreview, setShowPreview] = useState(false);
   const [applying, setApplying] = useState(false);
+  const [showAddDropdown, setShowAddDropdown] = useState(false);
   const [memberSearchText, setMemberSearchText] = useState("");
   const [memberSearchResults, setMemberSearchResults] = useState<
     DirectoryEntry[]
   >([]);
   const [memberSearchLoading, setMemberSearchLoading] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [contextMenuPos, setContextMenuPos] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
+  const [contextMenuItems, setContextMenuItems] = useState<ContextMenuItem[]>(
+    [],
+  );
+  const addDropdownRef = useRef<HTMLDivElement>(null);
+  const { openTab } = useNavigation();
+
+  // Nested group expansion state
+  const [expandedNestedGroups, setExpandedNestedGroups] = useState<Set<string>>(new Set());
+  const [nestedGroupMembers, setNestedGroupMembers] = useState<Record<string, DirectoryEntry[]>>({});
+  const [nestedGroupLoading, setNestedGroupLoading] = useState<Set<string>>(new Set());
+
+  // Split members into nested groups and direct members
+  const nestedGroups = members.filter((m) => m.objectClass === "group");
+  const directMembers = members.filter((m) => m.objectClass !== "group");
+  // Sorted: groups first, then others
+  const sortedMembers = useMemo(
+    () => [...nestedGroups, ...directMembers],
+    [nestedGroups, directMembers],
+  );
+  // The root group DN is always an ancestor for circular detection
+  const rootAncestors = useMemo(
+    () => new Set([group.distinguishedName]),
+    [group.distinguishedName],
+  );
+
+  const toggleNestedGroup = useCallback(
+    (dn: string) => {
+      setExpandedNestedGroups((prev) => {
+        const next = new Set(prev);
+        if (next.has(dn)) {
+          next.delete(dn);
+        } else {
+          next.add(dn);
+          // Load members if not already loaded
+          if (!nestedGroupMembers[dn]) {
+            setNestedGroupLoading((p) => new Set(p).add(dn));
+            invoke<DirectoryEntry[]>("get_group_members", { groupDn: dn })
+              .then((result) => {
+                setNestedGroupMembers((p) => ({ ...p, [dn]: result }));
+              })
+              .catch(() => {
+                setNestedGroupMembers((p) => ({ ...p, [dn]: [] }));
+              })
+              .finally(() => {
+                setNestedGroupLoading((p) => {
+                  const n = new Set(p);
+                  n.delete(dn);
+                  return n;
+                });
+              });
+          }
+        }
+        return next;
+      });
+    },
+    [nestedGroupMembers],
+  );
+
+  const closeAddDropdown = useCallback(() => {
+    setShowAddDropdown(false);
+    setMemberSearchText("");
+    setMemberSearchResults([]);
+  }, []);
+
+  const handleMemberContextMenu = useCallback(
+    (e: React.MouseEvent, entry: DirectoryEntry) => {
+      const entryName =
+        entry.displayName ??
+        entry.samAccountName ??
+        parseCnFromDn(entry.distinguishedName);
+      const isGroup = entry.objectClass === "group";
+
+      const items: ContextMenuItem[] = isGroup
+        ? [
+            {
+              label: `Open "${entryName}" in Group Management`,
+              icon: <FolderOpen size={14} />,
+              onClick: () => {
+                openTab("Group Management", "groups", "users-group", {
+                  selectedGroupDn: entry.distinguishedName,
+                });
+              },
+            },
+          ]
+        : [
+            {
+              label: `Open "${entryName}" in User Lookup`,
+              icon: <User size={14} />,
+              onClick: () => {
+                openTab("User Lookup", "users", "user", {
+                  selectedUserSam: entry.samAccountName,
+                });
+              },
+            },
+          ];
+
+      setContextMenuItems(items);
+      setContextMenuPos({ x: e.clientX, y: e.clientY });
+    },
+    [openTab],
+  );
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    if (!showAddDropdown) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (
+        addDropdownRef.current &&
+        !addDropdownRef.current.contains(e.target as Node)
+      ) {
+        closeAddDropdown();
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showAddDropdown, closeAddDropdown]);
 
   const propertyGroups: PropertyGroup[] = [
     {
@@ -90,12 +416,12 @@ export function GroupDetail({
   const handleSelectAll = useCallback(
     (checked: boolean) => {
       if (checked) {
-        setSelectedMembers(new Set(members.map((m) => m.distinguishedName)));
+        setSelectedMembers(new Set(sortedMembers.map((m) => m.distinguishedName)));
       } else {
         setSelectedMembers(new Set());
       }
     },
-    [members],
+    [directMembers],
   );
 
   const allSelected =
@@ -109,7 +435,7 @@ export function GroupDetail({
   // Remove selected members (add to pending changes)
   const handleRemoveSelected = useCallback(() => {
     const removals: MemberChange[] = Array.from(selectedMembers).map((dn) => {
-      const member = members.find((m) => m.distinguishedName === dn);
+      const member = directMembers.find((m) => m.distinguishedName === dn);
       const name =
         member?.displayName ?? member?.samAccountName ?? parseCnFromDn(dn);
       return { memberDn: dn, memberName: name, action: "remove" as const };
@@ -123,9 +449,9 @@ export function GroupDetail({
       return [...prev, ...newChanges];
     });
     setSelectedMembers(new Set());
-  }, [selectedMembers, members]);
+  }, [selectedMembers, directMembers]);
 
-  // Member search for adding
+  // Member search for adding (searches both users and groups)
   const handleMemberSearch = useCallback((query: string) => {
     setMemberSearchText(query);
     if (!query.trim()) {
@@ -134,12 +460,15 @@ export function GroupDetail({
     }
 
     setMemberSearchLoading(true);
-    invoke<DirectoryEntry[]>("search_users", { query })
-      .then((results) => {
-        setMemberSearchResults(results);
+    Promise.all([
+      invoke<DirectoryEntry[]>("search_users", { query }),
+      invoke<DirectoryEntry[]>("search_groups", { query }),
+    ])
+      .then(([users, groups]) => {
+        setMemberSearchResults([...groups, ...users]);
       })
       .catch((err) => {
-        console.warn("Failed to search users:", err);
+        console.warn("Failed to search:", err);
         setMemberSearchResults([]);
       })
       .finally(() => {
@@ -207,56 +536,14 @@ export function GroupDetail({
       setPendingChanges([]);
       setSelectedMembers(new Set());
       setShowPreview(false);
+      closeAddDropdown();
       onMembersRefresh();
     } catch (err) {
       console.warn("Failed to apply member changes:", err);
     } finally {
       setApplying(false);
     }
-  }, [group.distinguishedName, pendingChanges, onMembersRefresh]);
-
-  const memberColumns: Column<{
-    name: string;
-    type: string;
-    dn: string;
-  }>[] = useMemo(() => {
-    const cols: Column<{ name: string; type: string; dn: string }>[] = [];
-
-    if (canManageMembers) {
-      cols.push({
-        key: "name" as const,
-        header: "",
-        sortable: false,
-        width: 40,
-        resizable: false,
-        render: (_value, row) => (
-          <input
-            type="checkbox"
-            checked={selectedMembers.has(row.dn)}
-            onChange={(e) => handleMemberSelect(row.dn, e.target.checked)}
-            onClick={(e) => e.stopPropagation()}
-            data-testid={`member-checkbox-${row.name}`}
-            aria-label={`Select ${row.name}`}
-          />
-        ),
-      });
-    }
-
-    cols.push(
-      { key: "name", header: "Name", sortable: true },
-      { key: "type", header: "Type", sortable: true },
-      { key: "dn", header: "Distinguished Name", sortable: true },
-    );
-
-    return cols;
-  }, [canManageMembers, selectedMembers, handleMemberSelect]);
-
-  const memberRows = members.map((m) => ({
-    name:
-      m.displayName ?? m.samAccountName ?? parseCnFromDn(m.distinguishedName),
-    type: m.objectClass ?? "unknown",
-    dn: m.distinguishedName,
-  }));
+  }, [group.distinguishedName, pendingChanges, onMembersRefresh, closeAddDropdown]);
 
   return (
     <div className="space-y-4" data-testid="group-detail">
@@ -285,11 +572,15 @@ export function GroupDetail({
       <div className="border-t border-[var(--color-border-default)]" />
 
       <div data-testid="group-members-section">
-        {/* Header: title + action buttons (always visible) */}
+        {/* Action bar: title + buttons */}
         <div className="mb-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <h3 className="text-body font-semibold text-[var(--color-text-primary)]">
-              Members ({members.length})
+            <h3
+              className="text-body font-semibold text-[var(--color-text-primary)]"
+              data-testid="members-title"
+            >
+              Members ({directMembers.length})
+              {nestedGroups.length > 0 && ` and ${nestedGroups.length} nested group(s)`}
             </h3>
             {canManageMembers && (
               <div className="relative">
@@ -311,10 +602,10 @@ export function GroupDetail({
                       Member Management
                     </p>
                     <p className="text-caption text-[var(--color-text-secondary)]">
-                      Use the search bar to find and add members, or select
-                      existing members with checkboxes and click "Remove
-                      Selected" to stage removals. Click "Preview" to review all
-                      pending changes, then "Apply" to execute them.
+                      Click "+ Add" to search and stage new members. Select
+                      existing members and click "Remove" to stage removals.
+                      Click "Preview" to review all pending changes, then
+                      "Apply" to execute them.
                     </p>
                   </div>
                 )}
@@ -326,6 +617,127 @@ export function GroupDetail({
               className="flex items-center gap-2"
               data-testid="member-management-controls"
             >
+              <div className="relative" ref={addDropdownRef}>
+                <button
+                  className={`btn btn-outline btn-sm flex items-center gap-1 ${showAddDropdown ? "bg-[var(--color-primary-subtle)] border-[var(--color-primary)]" : ""}`}
+                  onClick={() =>
+                    setShowAddDropdown((prev) => {
+                      if (prev) {
+                        setMemberSearchText("");
+                        setMemberSearchResults([]);
+                      }
+                      return !prev;
+                    })
+                  }
+                  data-testid="add-member-btn"
+                >
+                  <UserPlus size={14} />
+                  Add
+                </button>
+                {showAddDropdown && (
+                  <div
+                    className="absolute right-0 top-full z-50 mt-1 w-80 rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-elevated)] shadow-lg"
+                    data-testid="add-member-section"
+                  >
+                    <div className="flex items-center gap-2 border-b border-[var(--color-border-subtle)] px-3 py-2">
+                      <Search
+                        size={14}
+                        className="shrink-0 text-[var(--color-text-secondary)]"
+                        aria-hidden="true"
+                      />
+                      <input
+                        type="text"
+                        value={memberSearchText}
+                        onChange={(e) => {
+                          setMemberSearchText(e.target.value);
+                          handleMemberSearch(e.target.value);
+                        }}
+                        placeholder="Search users or groups to add..."
+                        aria-label="Search users or groups to add"
+                        className="flex-1 bg-transparent text-body text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)]"
+                        style={{ outline: "none", boxShadow: "none" }}
+                        data-testid="member-search-input"
+                        autoFocus
+                      />
+                      <button
+                        onClick={closeAddDropdown}
+                        className="rounded-sm p-0.5 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
+                        aria-label="Close"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+
+                    {memberSearchLoading && (
+                      <div className="px-3 py-3">
+                        <LoadingSpinner message="Searching..." />
+                      </div>
+                    )}
+
+                    {!memberSearchLoading &&
+                      memberSearchText.length > 0 &&
+                      memberSearchResults.length === 0 && (
+                        <div className="px-3 py-3 text-center text-caption text-[var(--color-text-secondary)]">
+                          No results found
+                        </div>
+                      )}
+
+                    {memberSearchResults.length > 0 && (
+                      <div
+                        className="max-h-52 overflow-auto"
+                        data-testid="member-search-results"
+                      >
+                        {memberSearchResults.map((entry) => {
+                          const name =
+                            entry.displayName ??
+                            entry.samAccountName ??
+                            parseCnFromDn(entry.distinguishedName);
+                          const isAlreadyMember = members.some(
+                            (m) =>
+                              m.distinguishedName === entry.distinguishedName,
+                          );
+                          const isPending = pendingChanges.some(
+                            (c) =>
+                              c.memberDn === entry.distinguishedName &&
+                              c.action === "add",
+                          );
+                          return (
+                            <button
+                              key={entry.distinguishedName}
+                              className="flex w-full items-center justify-between border-b border-[var(--color-border-subtle)] px-3 py-2 text-left transition-colors hover:bg-[var(--color-surface-hover)] last:border-b-0 disabled:opacity-50"
+                              onClick={() => handleAddToGroup(entry)}
+                              disabled={isAlreadyMember || isPending}
+                              data-testid={`add-member-btn-${name}`}
+                            >
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-body text-[var(--color-text-primary)]">
+                                  {name}
+                                </p>
+                                <p className="truncate text-caption text-[var(--color-text-secondary)]">
+                                  {entry.samAccountName}
+                                </p>
+                              </div>
+                              <span className="ml-2 shrink-0 text-caption text-[var(--color-text-secondary)]">
+                                {isAlreadyMember
+                                  ? "Member"
+                                  : isPending
+                                    ? "Pending"
+                                    : ""}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {!memberSearchText && (
+                      <div className="px-3 py-3 text-center text-caption text-[var(--color-text-secondary)]">
+                        Type to search for users or groups
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
               <button
                 className="btn btn-outline btn-sm flex items-center gap-1"
                 onClick={handleRemoveSelected}
@@ -333,7 +745,7 @@ export function GroupDetail({
                 data-testid="remove-selected-btn"
               >
                 <UserMinus size={14} />
-                Remove Selected
+                Remove
                 {selectedMembers.size > 0 && ` (${selectedMembers.size})`}
               </button>
               <button
@@ -368,104 +780,8 @@ export function GroupDetail({
           </div>
         )}
 
-        {/* Add members section - above current members */}
-        {canManageMembers && (
-          <div
-            className="mb-3 rounded-lg border border-[var(--color-border-default)] p-3"
-            data-testid="add-member-section"
-          >
-            <h4 className="mb-2 flex items-center gap-1.5 text-body font-medium text-[var(--color-text-primary)]">
-              <UserPlus size={16} />
-              Add Members
-            </h4>
-            <div className="flex items-center gap-2">
-              <div className="flex-1">
-                <div
-                  className="flex items-center gap-2 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5"
-                  data-testid="member-search-bar"
-                >
-                  <Search
-                    size={16}
-                    className="shrink-0 text-[var(--color-text-secondary)]"
-                    aria-hidden="true"
-                  />
-                  <input
-                    type="text"
-                    value={memberSearchText}
-                    onChange={(e) => {
-                      setMemberSearchText(e.target.value);
-                      handleMemberSearch(e.target.value);
-                    }}
-                    placeholder="Search users to add..."
-                    aria-label="Search users to add"
-                    className="flex-1 bg-transparent text-body text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-secondary)]"
-                    data-testid="member-search-input"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {memberSearchLoading && (
-              <div className="mt-2">
-                <LoadingSpinner message="Searching..." />
-              </div>
-            )}
-
-            {memberSearchResults.length > 0 && (
-              <div
-                className="mt-2 max-h-40 overflow-auto rounded border border-[var(--color-border-subtle)]"
-                data-testid="member-search-results"
-              >
-                {memberSearchResults.map((entry) => {
-                  const name =
-                    entry.displayName ??
-                    entry.samAccountName ??
-                    parseCnFromDn(entry.distinguishedName);
-                  const isAlreadyMember = members.some(
-                    (m) => m.distinguishedName === entry.distinguishedName,
-                  );
-                  const isPending = pendingChanges.some(
-                    (c) =>
-                      c.memberDn === entry.distinguishedName &&
-                      c.action === "add",
-                  );
-                  return (
-                    <div
-                      key={entry.distinguishedName}
-                      className="flex items-center justify-between border-b border-[var(--color-border-subtle)] px-3 py-1.5 last:border-b-0"
-                      data-testid={`search-result-${name}`}
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-body text-[var(--color-text-primary)]">
-                          {name}
-                        </p>
-                        <p className="truncate text-caption text-[var(--color-text-secondary)]">
-                          {entry.samAccountName}
-                        </p>
-                      </div>
-                      <button
-                        className="btn btn-ghost flex items-center gap-1 text-caption"
-                        onClick={() => handleAddToGroup(entry)}
-                        disabled={isAlreadyMember || isPending}
-                        data-testid={`add-member-btn-${name}`}
-                      >
-                        <UserPlus size={14} />
-                        {isAlreadyMember
-                          ? "Member"
-                          : isPending
-                            ? "Pending"
-                            : "Add"}
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Select all + member list */}
-        {canManageMembers && members.length > 0 && (
+        {/* Select all */}
+        {canManageMembers && members.length > 0 && !membersLoading && (
           <div className="mb-2 flex items-center gap-2">
             <label className="flex items-center gap-1.5 text-caption text-[var(--color-text-secondary)]">
               <input
@@ -479,14 +795,30 @@ export function GroupDetail({
           </div>
         )}
 
+        {/* Unified member list: groups first (with chevron), then users */}
         {membersLoading ? (
           <LoadingSpinner message="Loading members..." />
         ) : members.length > 0 ? (
-          <DataTable
-            columns={memberColumns}
-            data={memberRows}
-            rowKey={(row) => row.dn}
-          />
+          <div
+            className="rounded-lg border border-[var(--color-border-default)] overflow-hidden"
+            data-testid="member-list"
+          >
+            {sortedMembers.map((m) => (
+              <NestedMemberItem
+                key={m.distinguishedName}
+                entry={m}
+                depth={0}
+                ancestors={rootAncestors}
+                expandedGroups={expandedNestedGroups}
+                nestedGroupMembers={nestedGroupMembers}
+                nestedGroupLoading={nestedGroupLoading}
+                selectedMembers={canManageMembers ? selectedMembers : undefined}
+                onToggleExpand={toggleNestedGroup}
+                onToggleSelect={canManageMembers ? handleMemberSelect : undefined}
+                onRowContextMenu={handleMemberContextMenu}
+              />
+            ))}
+          </div>
         ) : (
           <p className="text-caption text-[var(--color-text-secondary)]">
             No members found
@@ -504,6 +836,12 @@ export function GroupDetail({
           loading={applying}
         />
       )}
+
+      <ContextMenu
+        items={contextMenuItems}
+        position={contextMenuPos}
+        onClose={() => setContextMenuPos(null)}
+      />
     </div>
   );
 }

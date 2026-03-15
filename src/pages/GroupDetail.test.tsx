@@ -1,7 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { type ReactNode } from "react";
 import { GroupDetail, type GroupDetailProps } from "./GroupDetail";
+import { NavigationProvider } from "@/contexts/NavigationContext";
+import { NotificationProvider } from "@/contexts/NotificationContext";
+import { DialogProvider } from "@/contexts/DialogContext";
 import type { DirectoryEntry, DirectoryGroup } from "@/types/directory";
+
+function TestProviders({ children }: { children: ReactNode }) {
+  return (
+    <NotificationProvider>
+      <DialogProvider>
+        <NavigationProvider>{children}</NavigationProvider>
+      </DialogProvider>
+    </NotificationProvider>
+  );
+}
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
@@ -50,7 +64,9 @@ function renderGroupDetail(props: Partial<GroupDetailProps> = {}) {
     onMembersRefresh: vi.fn(),
     ...props,
   };
-  return render(<GroupDetail {...defaultProps} />);
+  return render(<GroupDetail {...defaultProps} />, {
+    wrapper: TestProviders,
+  });
 }
 
 describe("GroupDetail", () => {
@@ -58,8 +74,10 @@ describe("GroupDetail", () => {
     vi.clearAllMocks();
     mockInvoke.mockImplementation(((cmd: string) => {
       if (cmd === "search_users") return Promise.resolve([]);
+      if (cmd === "search_groups") return Promise.resolve([]);
       if (cmd === "add_user_to_group") return Promise.resolve(null);
       if (cmd === "remove_group_member") return Promise.resolve(null);
+      if (cmd === "get_group_members") return Promise.resolve([]);
       return Promise.resolve(null);
     }) as typeof invoke);
   });
@@ -139,7 +157,7 @@ describe("GroupDetail", () => {
     expect(
       screen.getByTestId("member-management-controls"),
     ).toBeInTheDocument();
-    expect(screen.getByTestId("add-member-section")).toBeInTheDocument();
+    expect(screen.getByTestId("add-member-btn")).toBeInTheDocument();
     expect(screen.getByTestId("select-all-checkbox")).toBeInTheDocument();
     // Buttons always visible but disabled by default
     expect(screen.getByTestId("remove-selected-btn")).toBeDisabled();
@@ -164,7 +182,7 @@ describe("GroupDetail", () => {
     expect(
       screen.queryByTestId("member-management-controls"),
     ).not.toBeInTheDocument();
-    expect(screen.queryByTestId("add-member-section")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("add-member-btn")).not.toBeInTheDocument();
     expect(screen.queryByTestId("select-all-checkbox")).not.toBeInTheDocument();
   });
 
@@ -202,11 +220,11 @@ describe("GroupDetail", () => {
     });
 
     expect(screen.getByTestId("remove-selected-btn")).toHaveTextContent(
-      "Remove Selected (1)",
+      "Remove (1)",
     );
   });
 
-  it("add member search returns results", async () => {
+  it("add member dropdown opens and search returns results", async () => {
     const searchResults: DirectoryEntry[] = [
       {
         distinguishedName: "CN=New User,OU=Users,OU=Corp,DC=example,DC=com",
@@ -219,10 +237,18 @@ describe("GroupDetail", () => {
 
     mockInvoke.mockImplementation(((cmd: string) => {
       if (cmd === "search_users") return Promise.resolve(searchResults);
+      if (cmd === "search_groups") return Promise.resolve([]);
       return Promise.resolve(null);
     }) as typeof invoke);
 
     renderGroupDetail({ canManageMembers: true });
+
+    // Open the add dropdown
+    fireEvent.click(screen.getByTestId("add-member-btn"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("add-member-section")).toBeInTheDocument();
+    });
 
     const searchInput = screen.getByTestId("member-search-input");
     fireEvent.change(searchInput, { target: { value: "New" } });
@@ -244,7 +270,161 @@ describe("GroupDetail", () => {
     });
 
     expect(screen.getByTestId("remove-selected-btn")).toHaveTextContent(
-      "Remove Selected (2)",
+      "Remove (2)",
     );
+  });
+
+  it("shows members title with direct members count", () => {
+    renderGroupDetail();
+    const title = screen.getByTestId("members-title");
+    expect(title).toHaveTextContent("Members (2)");
+  });
+
+  it("shows nested groups count in members title", () => {
+    const membersWithGroup: DirectoryEntry[] = [
+      ...defaultMembers,
+      {
+        distinguishedName: "CN=SubGroup,OU=Groups,DC=example,DC=com",
+        samAccountName: "SubGroup",
+        displayName: "SubGroup",
+        objectClass: "group",
+        attributes: {},
+      },
+    ];
+
+    renderGroupDetail({ members: membersWithGroup });
+    const title = screen.getByTestId("members-title");
+    expect(title).toHaveTextContent("Members (2)");
+    expect(title).toHaveTextContent("and 1 nested group(s)");
+  });
+
+  it("shows nested groups in unified member list", () => {
+    const membersWithGroup: DirectoryEntry[] = [
+      ...defaultMembers,
+      {
+        distinguishedName: "CN=SubGroup,OU=Groups,DC=example,DC=com",
+        samAccountName: "SubGroup",
+        displayName: "SubGroup",
+        objectClass: "group",
+        attributes: {},
+      },
+    ];
+
+    renderGroupDetail({ members: membersWithGroup });
+    expect(screen.getByTestId("member-list")).toBeInTheDocument();
+    // Group appears first with expand button
+    expect(screen.getByTestId("nested-group-SubGroup")).toBeInTheDocument();
+    expect(screen.getByTestId("expand-SubGroup")).toBeInTheDocument();
+  });
+
+  it("expands nested group and loads members on click", async () => {
+    const nestedMembers: DirectoryEntry[] = [
+      {
+        distinguishedName: "CN=Nested User,OU=Users,DC=example,DC=com",
+        samAccountName: "nuser",
+        displayName: "Nested User",
+        objectClass: "user",
+        attributes: {},
+      },
+    ];
+
+    mockInvoke.mockImplementation(((cmd: string) => {
+      if (cmd === "get_group_members") return Promise.resolve(nestedMembers);
+      if (cmd === "search_users") return Promise.resolve([]);
+      if (cmd === "search_groups") return Promise.resolve([]);
+      return Promise.resolve(null);
+    }) as typeof invoke);
+
+    const membersWithGroup: DirectoryEntry[] = [
+      ...defaultMembers,
+      {
+        distinguishedName: "CN=SubGroup,OU=Groups,DC=example,DC=com",
+        samAccountName: "SubGroup",
+        displayName: "SubGroup",
+        objectClass: "group",
+        attributes: {},
+      },
+    ];
+
+    renderGroupDetail({ members: membersWithGroup });
+
+    fireEvent.click(screen.getByTestId("expand-SubGroup"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("nested-group-members-SubGroup")).toBeInTheDocument();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("Nested User")).toBeInTheDocument();
+    });
+
+    expect(mockInvoke).toHaveBeenCalledWith("get_group_members", {
+      groupDn: "CN=SubGroup,OU=Groups,DC=example,DC=com",
+    });
+  });
+
+  it("shows groups before users in unified list", () => {
+    const membersWithGroup: DirectoryEntry[] = [
+      ...defaultMembers,
+      {
+        distinguishedName: "CN=SubGroup,OU=Groups,DC=example,DC=com",
+        samAccountName: "SubGroup",
+        displayName: "SubGroup",
+        objectClass: "group",
+        attributes: {},
+      },
+    ];
+
+    renderGroupDetail({ members: membersWithGroup });
+    const list = screen.getByTestId("member-list");
+    const items = list.querySelectorAll("[data-testid^='nested-group-'], [data-testid^='member-row-']");
+    // First item should be the group
+    expect(items[0]).toHaveAttribute("data-testid", "nested-group-SubGroup");
+    // Users follow
+    expect(items[1]).toHaveAttribute("data-testid", "member-row-John Doe");
+  });
+
+  it("does not show expand buttons when no group members exist", () => {
+    renderGroupDetail();
+    // No expand chevrons since no groups in members
+    expect(screen.queryByTestId("expand-John Doe")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("expand-Alice Smith")).not.toBeInTheDocument();
+  });
+
+  it("shows search placeholder for users or groups", async () => {
+    renderGroupDetail({ canManageMembers: true });
+
+    fireEvent.click(screen.getByTestId("add-member-btn"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("add-member-section")).toBeInTheDocument();
+    });
+
+    const input = screen.getByTestId("member-search-input");
+    expect(input).toHaveAttribute("placeholder", "Search users or groups to add...");
+    expect(screen.getByText("Type to search for users or groups")).toBeInTheDocument();
+  });
+
+  it("shows no results found when search returns empty", async () => {
+    mockInvoke.mockImplementation(((cmd: string) => {
+      if (cmd === "search_users") return Promise.resolve([]);
+      if (cmd === "search_groups") return Promise.resolve([]);
+      return Promise.resolve(null);
+    }) as typeof invoke);
+
+    renderGroupDetail({ canManageMembers: true });
+
+    fireEvent.click(screen.getByTestId("add-member-btn"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("add-member-section")).toBeInTheDocument();
+    });
+
+    const searchInput = screen.getByTestId("member-search-input");
+    fireEvent.change(searchInput, { target: { value: "nonexistent" } });
+
+    await waitFor(() => {
+      expect(screen.getByText("No results found")).toBeInTheDocument();
+    });
   });
 });

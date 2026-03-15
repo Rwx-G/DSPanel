@@ -619,9 +619,7 @@ describe("NtfsAnalyzer", () => {
     fireEvent.contextMenu(trusteeTd!);
 
     await waitFor(() => {
-      expect(
-        screen.getByText("Open in Group Management"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("Open in Group Management")).toBeInTheDocument();
     });
   });
 

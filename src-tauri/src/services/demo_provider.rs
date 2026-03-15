@@ -358,13 +358,54 @@ fn sample_browse_users() -> Vec<DirectoryEntry> {
 fn sample_group_entries() -> Vec<DirectoryEntry> {
     // Groups match user memberOf attributes: "CN={dept} Team,OU=Groups,DC=contoso,DC=com"
     let users = sample_browse_users();
+
+    // Sub-groups with specific user subsets
+    let it_admins = make_subgroup(
+        "IT-Admins",
+        "IT administrator sub-group",
+        &users,
+        &["cjones", "inovak"],
+    );
+    let it_support = make_subgroup(
+        "IT-Support",
+        "IT support sub-group",
+        &users,
+        &["sjackson"],
+    );
+    let dev_frontend = make_subgroup(
+        "Dev-Frontend",
+        "Frontend developers sub-group",
+        &users,
+        &["fchen", "egupta"],
+    );
+    let dev_backend = make_subgroup(
+        "Dev-Backend",
+        "Backend developers sub-group",
+        &users,
+        &["gkumar", "qnguyen", "uroberts"],
+    );
+
+    // Parent groups: contain users + nested sub-groups
+    let mut it_team = make_group("IT Team", "IT", &users);
+    // Add sub-groups as members of IT Team
+    add_group_member(&mut it_team, &it_admins);
+    add_group_member(&mut it_team, &it_support);
+
+    let mut eng_team = make_group("Engineering Team", "Engineering", &users);
+    add_group_member(&mut eng_team, &dev_frontend);
+    add_group_member(&mut eng_team, &dev_backend);
+
     vec![
-        make_group("IT Team", "IT", &users),
+        it_team,
         make_group("HR Team", "HR", &users),
         make_group("Finance Team", "Finance", &users),
-        make_group("Engineering Team", "Engineering", &users),
+        eng_team,
         make_group("Sales Team", "Sales", &users),
         make_group("Marketing Team", "Marketing", &users),
+        it_admins,
+        it_support,
+        dev_frontend,
+        dev_backend,
         make_group_empty("Deprecated-Printers"),
         make_group_empty("Legacy-VPN"),
     ]
@@ -400,6 +441,45 @@ fn make_group(name: &str, dept: &str, all_users: &[DirectoryEntry]) -> Directory
         object_class: Some("group".to_string()),
         attributes: attrs,
     }
+}
+
+fn make_subgroup(
+    name: &str,
+    description: &str,
+    all_users: &[DirectoryEntry],
+    sam_filter: &[&str],
+) -> DirectoryEntry {
+    let members: Vec<String> = all_users
+        .iter()
+        .filter(|u| {
+            u.sam_account_name
+                .as_deref()
+                .map(|s| sam_filter.contains(&s))
+                .unwrap_or(false)
+        })
+        .map(|u| u.distinguished_name.clone())
+        .collect();
+
+    let mut attrs = HashMap::new();
+    attrs.insert("groupType".to_string(), vec!["-2147483646".to_string()]);
+    attrs.insert("description".to_string(), vec![description.to_string()]);
+    attrs.insert("member".to_string(), members);
+
+    DirectoryEntry {
+        distinguished_name: format!("CN={},OU=Groups,DC=contoso,DC=com", name),
+        sam_account_name: Some(name.to_string()),
+        display_name: Some(name.to_string()),
+        object_class: Some("group".to_string()),
+        attributes: attrs,
+    }
+}
+
+fn add_group_member(parent: &mut DirectoryEntry, child: &DirectoryEntry) {
+    let members = parent
+        .attributes
+        .entry("member".to_string())
+        .or_insert_with(Vec::new);
+    members.push(child.distinguished_name.clone());
 }
 
 fn make_group_empty(name: &str) -> DirectoryEntry {
@@ -902,16 +982,28 @@ impl DirectoryProvider for DemoDirectoryProvider {
         group_dn: &str,
         max_results: usize,
     ) -> Result<Vec<DirectoryEntry>> {
-        // Search users, computers, and sub-groups for members of this group
-        let mut members: Vec<DirectoryEntry> = sample_browse_users()
+        // Find the group and read its "member" attribute to get member DNs
+        let groups = sample_group_entries();
+        let member_dns: Vec<String> = groups
+            .iter()
+            .find(|g| g.distinguished_name.eq_ignore_ascii_case(group_dn))
+            .map(|g| g.get_attribute_values("member").to_vec())
+            .unwrap_or_default();
+
+        // Resolve member DNs to full entries (users, computers, or sub-groups)
+        let all_entries: Vec<DirectoryEntry> = sample_browse_users()
             .into_iter()
             .chain(sample_computers())
-            .chain(sample_group_entries())
-            .filter(|entry| {
-                entry
-                    .get_attribute_values("memberOf")
+            .chain(groups)
+            .collect();
+
+        let mut members: Vec<DirectoryEntry> = member_dns
+            .iter()
+            .filter_map(|dn| {
+                all_entries
                     .iter()
-                    .any(|m| m == group_dn)
+                    .find(|e| e.distinguished_name.eq_ignore_ascii_case(dn))
+                    .cloned()
             })
             .take(max_results)
             .collect();

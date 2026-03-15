@@ -1,11 +1,10 @@
-import { useState, useCallback, useEffect, useMemo, useRef } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { SearchBar } from "@/components/common/SearchBar";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { EmptyState } from "@/components/common/EmptyState";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { VirtualizedList } from "@/components/data/VirtualizedList";
-import { TreeView, type TreeNode } from "@/components/data/TreeView";
 import {
   type DirectoryEntry,
   type DirectoryGroup,
@@ -13,32 +12,19 @@ import {
 } from "@/types/directory";
 import { parseCnFromDn } from "@/utils/dn";
 import { useGroupBrowse } from "@/hooks/useGroupBrowse";
-import { useOUTree } from "@/hooks/useOUTree";
 import { useNavigation } from "@/contexts/NavigationContext";
 import { usePermissions } from "@/hooks/usePermissions";
-import { type OUNode } from "@/components/form/OUPicker";
 import { BulkOperations } from "@/pages/BulkOperations";
 import { GroupHygiene } from "@/pages/GroupHygiene";
 import { GroupDetail } from "@/pages/GroupDetail";
 import {
   Users,
   AlertCircle,
-  FolderTree,
-  List,
   Layers,
   ShieldAlert,
 } from "lucide-react";
 
-type ViewMode = "flat" | "tree" | "bulk" | "hygiene";
-
-function ouNodesToTreeNodes(nodes: OUNode[]): TreeNode[] {
-  return nodes.map((ou) => ({
-    id: ou.distinguishedName,
-    label: ou.name,
-    hasChildren: ou.hasChildren,
-    children: ou.children ? ouNodesToTreeNodes(ou.children) : undefined,
-  }));
-}
+type ViewMode = "list" | "bulk" | "hygiene";
 
 export function GroupManagement() {
   const {
@@ -64,14 +50,9 @@ export function GroupManagement() {
   const { hasPermission } = usePermissions();
   const canManageMembers = hasPermission("AccountOperator");
 
-  const [viewMode, setViewMode] = useState<ViewMode>("flat");
-  const [selectedOU, setSelectedOU] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [members, setMembers] = useState<DirectoryEntry[]>([]);
   const [membersLoading, setMembersLoading] = useState(false);
-
-  const { nodes: ouNodes, loading: ouLoading, error: ouError } = useOUTree();
-
-  const treeNodes = useMemo(() => ouNodesToTreeNodes(ouNodes), [ouNodes]);
 
   // Handle cross-module deep-linking: select group by DN
   const deepLinkHandled = useRef<string | null>(null);
@@ -148,17 +129,6 @@ export function GroupManagement() {
     [setFilterText],
   );
 
-  const filteredGroupsForOU = useMemo(() => {
-    if (!selectedOU) return groups;
-    return groups.filter((g) =>
-      g.distinguishedName.toLowerCase().includes(selectedOU.toLowerCase()),
-    );
-  }, [groups, selectedOU]);
-
-  const handleOUSelect = useCallback((id: string) => {
-    setSelectedOU(id);
-  }, []);
-
   const renderGroupItem = useCallback(
     (group: DirectoryGroup) => (
       <button
@@ -191,19 +161,50 @@ export function GroupManagement() {
     [selectedGroup, setSelectedGroup],
   );
 
-  const displayedGroups = viewMode === "tree" ? filteredGroupsForOU : groups;
-  const isListView = viewMode === "flat" || viewMode === "tree";
+  const isListView = viewMode === "list";
 
   return (
     <div className="flex h-full flex-col" data-testid="group-management">
       <div className="border-b border-[var(--color-border-subtle)] p-3">
-        <SearchBar
-          value={filterText}
-          onChange={handleFilterChange}
-          onSearch={handleFilterChange}
-          placeholder="Search groups by name or description..."
-          debounceMs={300}
-        />
+        <div className="flex items-center gap-2">
+          <div className="flex-1">
+            <SearchBar
+              value={filterText}
+              onChange={handleFilterChange}
+              onSearch={handleFilterChange}
+              placeholder="Search groups by name or description..."
+              debounceMs={300}
+            />
+          </div>
+          {canManageMembers && (
+            <div className="flex items-center gap-1">
+              <button
+                className={`flex h-7 w-7 items-center justify-center rounded-md transition-colors ${
+                  viewMode === "bulk"
+                    ? "bg-[var(--color-surface-selected)] text-[var(--color-primary)]"
+                    : "text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]"
+                }`}
+                onClick={() => setViewMode(viewMode === "bulk" ? "list" : "bulk")}
+                title="Bulk operations"
+                data-testid="view-toggle-bulk"
+              >
+                <Layers size={16} />
+              </button>
+              <button
+                className={`flex h-7 w-7 items-center justify-center rounded-md transition-colors ${
+                  viewMode === "hygiene"
+                    ? "bg-[var(--color-surface-selected)] text-[var(--color-primary)]"
+                    : "text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]"
+                }`}
+                onClick={() => setViewMode(viewMode === "hygiene" ? "list" : "hygiene")}
+                title="Group hygiene"
+                data-testid="view-toggle-hygiene"
+              >
+                <ShieldAlert size={16} />
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       <div
@@ -217,62 +218,6 @@ export function GroupManagement() {
           `${groups.length} group${groups.length > 1 ? "s" : ""} found`}
         {!loading && groups.length === 0 && !error && "No groups found"}
         {error && `Error: ${error}`}
-      </div>
-
-      <div className="flex items-center gap-1 border-b border-[var(--color-border-subtle)] px-3 py-1">
-        <button
-          className={`btn btn-ghost flex h-7 w-7 items-center justify-center rounded-md p-0 ${
-            viewMode === "flat"
-              ? "bg-[var(--color-surface-selected)] text-[var(--color-primary)]"
-              : ""
-          }`}
-          onClick={() => setViewMode("flat")}
-          title="Flat view"
-          data-testid="view-toggle-flat"
-        >
-          <List size={16} />
-        </button>
-        <button
-          className={`btn btn-ghost flex h-7 w-7 items-center justify-center rounded-md p-0 ${
-            viewMode === "tree"
-              ? "bg-[var(--color-surface-selected)] text-[var(--color-primary)]"
-              : ""
-          }`}
-          onClick={() => setViewMode("tree")}
-          title="Tree view"
-          data-testid="view-toggle-tree"
-        >
-          <FolderTree size={16} />
-        </button>
-        {canManageMembers && (
-          <>
-            <div className="mx-1 h-4 w-px bg-[var(--color-border-subtle)]" />
-            <button
-              className={`btn btn-ghost flex h-7 w-7 items-center justify-center rounded-md p-0 ${
-                viewMode === "bulk"
-                  ? "bg-[var(--color-surface-selected)] text-[var(--color-primary)]"
-                  : ""
-              }`}
-              onClick={() => setViewMode("bulk")}
-              title="Bulk operations"
-              data-testid="view-toggle-bulk"
-            >
-              <Layers size={16} />
-            </button>
-            <button
-              className={`btn btn-ghost flex h-7 w-7 items-center justify-center rounded-md p-0 ${
-                viewMode === "hygiene"
-                  ? "bg-[var(--color-surface-selected)] text-[var(--color-primary)]"
-                  : ""
-              }`}
-              onClick={() => setViewMode("hygiene")}
-              title="Group hygiene"
-              data-testid="view-toggle-hygiene"
-            >
-              <ShieldAlert size={16} />
-            </button>
-          </>
-        )}
       </div>
 
       <div className="flex flex-1 overflow-hidden">
@@ -314,7 +259,7 @@ export function GroupManagement() {
           </div>
         )}
 
-        {isListView && !loading && !error && displayedGroups.length === 0 && (
+        {isListView && !loading && !error && groups.length === 0 && (
           <div
             className="flex flex-1 items-center justify-center"
             data-testid="group-management-empty"
@@ -331,38 +276,15 @@ export function GroupManagement() {
           </div>
         )}
 
-        {isListView && !loading && !error && displayedGroups.length > 0 && (
+        {isListView && !loading && !error && groups.length > 0 && (
           <>
             <div className="flex w-64 shrink-0 flex-col overflow-hidden border-r border-[var(--color-border-subtle)]">
-              {viewMode === "tree" && (
-                <div
-                  className="overflow-auto border-b border-[var(--color-border-subtle)] p-2"
-                  data-testid="group-tree-panel"
-                  style={{ maxHeight: "40%" }}
-                >
-                  {ouLoading && <LoadingSpinner message="Loading OU tree..." />}
-                  {ouError && (
-                    <p className="text-caption text-[var(--color-text-secondary)]">
-                      Failed to load OU tree
-                    </p>
-                  )}
-                  {!ouLoading && !ouError && (
-                    <TreeView
-                      nodes={treeNodes}
-                      selectedIds={
-                        selectedOU ? new Set([selectedOU]) : new Set()
-                      }
-                      onSelect={handleOUSelect}
-                    />
-                  )}
-                </div>
-              )}
               <div
                 className="flex-1 overflow-hidden"
                 data-testid="group-results-list"
               >
                 <VirtualizedList
-                  items={displayedGroups}
+                  items={groups}
                   renderItem={renderGroupItem}
                   estimateSize={52}
                   itemKey={(group) => group.distinguishedName}

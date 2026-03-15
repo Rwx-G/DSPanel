@@ -125,7 +125,9 @@ async function selectTargetGroup() {
   fireEvent.change(targetInput, { target: { value: "Finance" } });
 
   await waitFor(() => {
-    expect(screen.getByTestId("group-option-Finance-Analysts")).toBeInTheDocument();
+    expect(
+      screen.getByTestId("group-option-Finance-Analysts"),
+    ).toBeInTheDocument();
   });
 
   fireEvent.click(screen.getByTestId("group-option-Finance-Analysts"));

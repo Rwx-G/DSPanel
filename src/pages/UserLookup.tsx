@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { SearchBar } from "@/components/common/SearchBar";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
@@ -38,7 +38,52 @@ export function UserLookup() {
     refresh,
   } = useUserBrowse();
 
-  const { openTab } = useNavigation();
+  const { openTab, openTabs, activeTabId, clearTabData } = useNavigation();
+
+  // Deep-link: select a user by SAM account name from another module
+  const deepLinkHandled = useRef<string | null>(null);
+  const activeTab = openTabs.find((t) => t.id === activeTabId);
+  const selectedUserSam = activeTab?.data?.selectedUserSam as
+    | string
+    | undefined;
+
+  useEffect(() => {
+    if (!selectedUserSam || deepLinkHandled.current === selectedUserSam) return;
+
+    // Try to find in loaded users first
+    const found = users.find((u) => u.samAccountName === selectedUserSam);
+    if (found) {
+      setSelectedUser(found);
+      deepLinkHandled.current = selectedUserSam;
+      if (activeTabId) clearTabData(activeTabId);
+      return;
+    }
+
+    // Otherwise fetch via get_user command
+    if (!loading) {
+      invoke<DirectoryEntry | null>("get_user", {
+        samAccountName: selectedUserSam,
+      })
+        .then((entry) => {
+          if (entry) {
+            setSelectedUser(mapEntryToUser(entry));
+          }
+        })
+        .catch((err) => console.warn("Deep-link user lookup failed:", err))
+        .finally(() => {
+          deepLinkHandled.current = selectedUserSam;
+          if (activeTabId) clearTabData(activeTabId);
+        });
+    }
+  }, [
+    selectedUserSam,
+    users,
+    loading,
+    setSelectedUser,
+    activeTabId,
+    clearTabData,
+  ]);
+
   const [contextMenuPos, setContextMenuPos] = useState<{
     x: number;
     y: number;

@@ -102,7 +102,6 @@ function mockBrowseWith(
       return Promise.resolve(makeBrowseResult(entries));
     if (cmd === "search_groups") return Promise.resolve(entries);
     if (cmd === "get_group_members") return Promise.resolve(memberEntries);
-    if (cmd === "get_ou_tree") return Promise.resolve([]);
     if (cmd === "get_permission_level") return Promise.resolve(permLevel);
     if (cmd === "get_user_groups") return Promise.resolve([]);
     if (cmd === "search_users") return Promise.resolve(searchResults);
@@ -117,7 +116,7 @@ describe("GroupManagement", () => {
     mockInvoke.mockReset();
   });
 
-  it("renders with search bar and loads groups on mount (flat view default)", async () => {
+  it("renders with search bar and loads groups on mount (list view default)", async () => {
     const entries = [
       makeGroupEntry("Developers"),
       makeGroupEntry("Finance-Analysts"),
@@ -150,7 +149,6 @@ describe("GroupManagement", () => {
     mockInvoke.mockImplementation(((cmd: string) => {
       if (cmd === "browse_groups")
         return Promise.reject(new Error("Connection failed"));
-      if (cmd === "get_ou_tree") return Promise.resolve([]);
       if (cmd === "get_permission_level") return Promise.resolve("ReadOnly");
       if (cmd === "get_user_groups") return Promise.resolve([]);
       return Promise.resolve(null);
@@ -168,7 +166,6 @@ describe("GroupManagement", () => {
   it("shows empty state when no groups", async () => {
     mockInvoke.mockImplementation(((cmd: string) => {
       if (cmd === "browse_groups") return Promise.resolve(makeBrowseResult([]));
-      if (cmd === "get_ou_tree") return Promise.resolve([]);
       if (cmd === "get_permission_level") return Promise.resolve("ReadOnly");
       if (cmd === "get_user_groups") return Promise.resolve([]);
       return Promise.resolve(null);
@@ -221,7 +218,6 @@ describe("GroupManagement", () => {
       if (cmd === "browse_groups")
         return Promise.resolve(makeBrowseResult(entries));
       if (cmd === "get_group_members") return Promise.resolve(memberEntries);
-      if (cmd === "get_ou_tree") return Promise.resolve([]);
       if (cmd === "get_permission_level") return Promise.resolve("ReadOnly");
       if (cmd === "get_user_groups") return Promise.resolve([]);
       return Promise.resolve(null);
@@ -244,35 +240,7 @@ describe("GroupManagement", () => {
     });
   });
 
-  it("toggles between tree and flat views", async () => {
-    const entries = [makeGroupEntry("Developers")];
-    mockBrowseWith(entries);
-
-    render(<GroupManagement />, { wrapper: TestProviders });
-
-    await waitFor(() => {
-      expect(screen.getByTestId("group-results-list")).toBeInTheDocument();
-    });
-
-    // Default is flat - no tree panel
-    expect(screen.queryByTestId("group-tree-panel")).not.toBeInTheDocument();
-
-    // Switch to tree
-    fireEvent.click(screen.getByTestId("view-toggle-tree"));
-
-    await waitFor(() => {
-      expect(screen.getByTestId("group-tree-panel")).toBeInTheDocument();
-    });
-
-    // Switch back to flat
-    fireEvent.click(screen.getByTestId("view-toggle-flat"));
-
-    await waitFor(() => {
-      expect(screen.queryByTestId("group-tree-panel")).not.toBeInTheDocument();
-    });
-  });
-
-  it("search filters groups in flat view", async () => {
+  it("search filters groups in list view", async () => {
     const entries = [
       makeGroupEntry("Developers"),
       makeGroupEntry("Finance-Analysts"),
@@ -289,42 +257,6 @@ describe("GroupManagement", () => {
       page: 0,
       pageSize: 50,
     });
-  });
-
-  it("tree view renders OU tree", async () => {
-    const entries = [makeGroupEntry("Developers")];
-    const ouTree = [
-      {
-        distinguishedName: "OU=Groups,DC=example,DC=com",
-        name: "Groups",
-        children: [],
-        hasChildren: false,
-      },
-    ];
-
-    mockInvoke.mockImplementation(((cmd: string) => {
-      if (cmd === "browse_groups")
-        return Promise.resolve(makeBrowseResult(entries));
-      if (cmd === "get_ou_tree") return Promise.resolve(ouTree);
-      if (cmd === "get_group_members") return Promise.resolve([]);
-      if (cmd === "get_permission_level") return Promise.resolve("ReadOnly");
-      if (cmd === "get_user_groups") return Promise.resolve([]);
-      return Promise.resolve(null);
-    }) as typeof invoke);
-
-    render(<GroupManagement />, { wrapper: TestProviders });
-
-    await waitFor(() => {
-      expect(screen.getByTestId("group-results-list")).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByTestId("view-toggle-tree"));
-
-    await waitFor(() => {
-      expect(screen.getByTestId("group-tree-panel")).toBeInTheDocument();
-    });
-
-    expect(screen.getByText("Groups")).toBeInTheDocument();
   });
 
   it("group detail shows correct scope and category values via badges", async () => {
@@ -379,19 +311,31 @@ describe("GroupManagement", () => {
     expect(status).toHaveAttribute("aria-live", "polite");
   });
 
-  it("shows view mode toolbar with all buttons", async () => {
+  it("shows bulk and hygiene toggle buttons for AccountOperator users", async () => {
     const entries = [makeGroupEntry("Developers")];
     mockBrowseWith(entries, { permissionLevel: "AccountOperator" });
 
     render(<GroupManagement />, { wrapper: TestProviders });
 
     await waitFor(() => {
-      expect(screen.getByTestId("view-toggle-flat")).toBeInTheDocument();
+      expect(screen.getByTestId("view-toggle-bulk")).toBeInTheDocument();
     });
 
-    expect(screen.getByTestId("view-toggle-tree")).toBeInTheDocument();
-    expect(screen.getByTestId("view-toggle-bulk")).toBeInTheDocument();
     expect(screen.getByTestId("view-toggle-hygiene")).toBeInTheDocument();
+  });
+
+  it("hides bulk and hygiene toggle buttons for ReadOnly users", async () => {
+    const entries = [makeGroupEntry("Developers")];
+    mockBrowseWith(entries, { permissionLevel: "ReadOnly" });
+
+    render(<GroupManagement />, { wrapper: TestProviders });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("group-results-list")).toBeInTheDocument();
+    });
+
+    expect(screen.queryByTestId("view-toggle-bulk")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("view-toggle-hygiene")).not.toBeInTheDocument();
   });
 
   it("shows category badge on list items", async () => {
@@ -474,7 +418,7 @@ describe("GroupManagement", () => {
         ).toBeInTheDocument();
       });
 
-      expect(screen.getByTestId("add-member-section")).toBeInTheDocument();
+      expect(screen.getByTestId("add-member-btn")).toBeInTheDocument();
       expect(screen.getByTestId("select-all-checkbox")).toBeInTheDocument();
     });
 
@@ -489,7 +433,7 @@ describe("GroupManagement", () => {
         screen.queryByTestId("member-management-controls"),
       ).not.toBeInTheDocument();
       expect(
-        screen.queryByTestId("add-member-section"),
+        screen.queryByTestId("add-member-btn"),
       ).not.toBeInTheDocument();
       expect(
         screen.queryByTestId("select-all-checkbox"),
@@ -511,7 +455,7 @@ describe("GroupManagement", () => {
       });
 
       expect(screen.getByTestId("remove-selected-btn")).toHaveTextContent(
-        "Remove Selected (1)",
+        "Remove (1)",
       );
     });
 
@@ -607,6 +551,9 @@ describe("GroupManagement", () => {
     it("add member search returns results", async () => {
       await selectGroupWithMembers("AccountOperator");
 
+      // Open the add dropdown
+      fireEvent.click(screen.getByTestId("add-member-btn"));
+
       await waitFor(() => {
         expect(screen.getByTestId("add-member-section")).toBeInTheDocument();
       });
@@ -623,6 +570,9 @@ describe("GroupManagement", () => {
 
     it("add to group adds pending change", async () => {
       await selectGroupWithMembers("AccountOperator");
+
+      // Open the add dropdown
+      fireEvent.click(screen.getByTestId("add-member-btn"));
 
       await waitFor(() => {
         expect(screen.getByTestId("add-member-section")).toBeInTheDocument();
@@ -660,7 +610,7 @@ describe("GroupManagement", () => {
       });
 
       expect(screen.getByTestId("remove-selected-btn")).toHaveTextContent(
-        "Remove Selected (2)",
+        "Remove (2)",
       );
     });
   });
@@ -673,10 +623,8 @@ describe("GroupManagement", () => {
       render(<GroupManagement />, { wrapper: TestProviders });
 
       await waitFor(() => {
-        expect(screen.getByTestId("group-results-list")).toBeInTheDocument();
+        expect(screen.getByTestId("view-toggle-hygiene")).toBeInTheDocument();
       });
-
-      expect(screen.getByTestId("view-toggle-hygiene")).toBeInTheDocument();
     });
 
     it("hides hygiene toggle for ReadOnly users", async () => {
@@ -722,10 +670,8 @@ describe("GroupManagement", () => {
       render(<GroupManagement />, { wrapper: TestProviders });
 
       await waitFor(() => {
-        expect(screen.getByTestId("group-results-list")).toBeInTheDocument();
+        expect(screen.getByTestId("view-toggle-bulk")).toBeInTheDocument();
       });
-
-      expect(screen.getByTestId("view-toggle-bulk")).toBeInTheDocument();
     });
 
     it("hides bulk operations toggle for ReadOnly users", async () => {

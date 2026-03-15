@@ -242,12 +242,16 @@ describe("UserDetail", () => {
       level: "Healthy",
       activeFlags: [],
     };
-    render(<UserDetail {...makeProps({ healthStatus })} />, { wrapper: TestProviders });
+    render(<UserDetail {...makeProps({ healthStatus })} />, {
+      wrapper: TestProviders,
+    });
     expect(screen.getByTestId("health-badge")).toBeInTheDocument();
   });
 
   it("does not show HealthBadge when healthStatus is undefined", () => {
-    render(<UserDetail {...makeProps({ healthStatus: undefined })} />, { wrapper: TestProviders });
+    render(<UserDetail {...makeProps({ healthStatus: undefined })} />, {
+      wrapper: TestProviders,
+    });
     expect(screen.queryByTestId("health-badge")).not.toBeInTheDocument();
   });
 
@@ -275,7 +279,9 @@ describe("UserDetail", () => {
 
   it("calls onRefresh callback when provided", () => {
     const onRefresh = vi.fn();
-    render(<UserDetail {...makeProps({ onRefresh })} />, { wrapper: TestProviders });
+    render(<UserDetail {...makeProps({ onRefresh })} />, {
+      wrapper: TestProviders,
+    });
     // onRefresh is wired to UserActions, which we mocked
     expect(screen.getByTestId("user-actions")).toBeInTheDocument();
   });
@@ -482,9 +488,7 @@ describe("UserDetail", () => {
     fireEvent.contextMenu(dataRow!);
 
     await waitFor(() => {
-      expect(
-        screen.getByText("Open in Group Management"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("Open in Group Management")).toBeInTheDocument();
     });
   });
 
