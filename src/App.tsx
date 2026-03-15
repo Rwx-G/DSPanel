@@ -120,7 +120,10 @@ export function App() {
   );
 }
 
-const MODULE_COMPONENTS: Record<string, React.ComponentType<Record<string, never>>> = {
+const MODULE_COMPONENTS: Record<
+  string,
+  React.ComponentType<Record<string, never>>
+> = {
   users: UserLookup,
   computers: ComputerLookup,
   "user-comparison": UserComparison,

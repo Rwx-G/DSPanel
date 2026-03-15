@@ -122,7 +122,10 @@ describe("UncPermissionsAudit", () => {
     await waitFor(() => {
       expect(screen.getByTestId("ace-results")).toBeInTheDocument();
       // Should have User A and User B columns
-      expect(mockInvoke).toHaveBeenCalledWith("cross_reference_ntfs", expect.any(Object));
+      expect(mockInvoke).toHaveBeenCalledWith(
+        "cross_reference_ntfs",
+        expect.any(Object),
+      );
     });
   });
 
@@ -206,7 +209,9 @@ describe("UncPermissionsAudit", () => {
 
     await waitFor(() => {
       expect(screen.getAllByText("John Doe").length).toBeGreaterThanOrEqual(1);
-      expect(screen.getAllByText("Alice Smith").length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText("Alice Smith").length).toBeGreaterThanOrEqual(
+        1,
+      );
     });
   });
 

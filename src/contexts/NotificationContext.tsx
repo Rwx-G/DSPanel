@@ -91,7 +91,12 @@ export function NotificationProvider({
 
   return (
     <NotificationContext.Provider
-      value={{ notifications, addNotification, removeNotification, autoDismissMs }}
+      value={{
+        notifications,
+        addNotification,
+        removeNotification,
+        autoDismissMs,
+      }}
     >
       {children}
     </NotificationContext.Provider>

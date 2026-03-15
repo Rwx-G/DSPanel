@@ -10,11 +10,29 @@ export default meta;
 type Story = StoryObj<typeof GroupPicker>;
 
 const SAMPLE_GROUPS: GroupOption[] = [
-  { distinguishedName: "CN=IT-Admins,OU=Groups,DC=contoso,DC=com", name: "IT-Admins", description: "IT administrators group" },
-  { distinguishedName: "CN=Dev-Frontend,OU=Groups,DC=contoso,DC=com", name: "Dev-Frontend", description: "Frontend developers" },
-  { distinguishedName: "CN=Dev-Backend,OU=Groups,DC=contoso,DC=com", name: "Dev-Backend", description: "Backend developers" },
-  { distinguishedName: "CN=Finance-Analysts,OU=Groups,DC=contoso,DC=com", name: "Finance-Analysts" },
-  { distinguishedName: "CN=Sales-EMEA,OU=Groups,DC=contoso,DC=com", name: "Sales-EMEA" },
+  {
+    distinguishedName: "CN=IT-Admins,OU=Groups,DC=contoso,DC=com",
+    name: "IT-Admins",
+    description: "IT administrators group",
+  },
+  {
+    distinguishedName: "CN=Dev-Frontend,OU=Groups,DC=contoso,DC=com",
+    name: "Dev-Frontend",
+    description: "Frontend developers",
+  },
+  {
+    distinguishedName: "CN=Dev-Backend,OU=Groups,DC=contoso,DC=com",
+    name: "Dev-Backend",
+    description: "Backend developers",
+  },
+  {
+    distinguishedName: "CN=Finance-Analysts,OU=Groups,DC=contoso,DC=com",
+    name: "Finance-Analysts",
+  },
+  {
+    distinguishedName: "CN=Sales-EMEA,OU=Groups,DC=contoso,DC=com",
+    name: "Sales-EMEA",
+  },
 ];
 
 export const Default: Story = {

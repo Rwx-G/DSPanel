@@ -21,37 +21,31 @@ export function useComparison() {
   const [sortField, setSortField] = useState<GroupSortField>("name");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
 
-  const selectUserA = useCallback(
-    async (samAccountName: string) => {
-      try {
-        const entry = await invoke<DirectoryEntry | null>("get_user", {
-          samAccountName,
-        });
-        setUserA(entry);
-        setComparisonResult(null);
-        setError(null);
-      } catch (e) {
-        setError(`Failed to load user A: ${e}`);
-      }
-    },
-    [],
-  );
+  const selectUserA = useCallback(async (samAccountName: string) => {
+    try {
+      const entry = await invoke<DirectoryEntry | null>("get_user", {
+        samAccountName,
+      });
+      setUserA(entry);
+      setComparisonResult(null);
+      setError(null);
+    } catch (e) {
+      setError(`Failed to load user A: ${e}`);
+    }
+  }, []);
 
-  const selectUserB = useCallback(
-    async (samAccountName: string) => {
-      try {
-        const entry = await invoke<DirectoryEntry | null>("get_user", {
-          samAccountName,
-        });
-        setUserB(entry);
-        setComparisonResult(null);
-        setError(null);
-      } catch (e) {
-        setError(`Failed to load user B: ${e}`);
-      }
-    },
-    [],
-  );
+  const selectUserB = useCallback(async (samAccountName: string) => {
+    try {
+      const entry = await invoke<DirectoryEntry | null>("get_user", {
+        samAccountName,
+      });
+      setUserB(entry);
+      setComparisonResult(null);
+      setError(null);
+    } catch (e) {
+      setError(`Failed to load user B: ${e}`);
+    }
+  }, []);
 
   const compare = useCallback(async () => {
     if (!userA?.samAccountName || !userB?.samAccountName) {
@@ -125,46 +119,45 @@ export function useComparison() {
     setFilter("");
   }, []);
 
-  const prefill = useCallback(
-    async (samA: string, samB: string) => {
-      setError(null);
-      setComparisonResult(null);
+  const prefill = useCallback(async (samA: string, samB: string) => {
+    setError(null);
+    setComparisonResult(null);
 
-      // Load both users via search (more reliable than get_user for all users)
-      try {
-        const [resultsA, resultsB] = await Promise.all([
-          invoke<DirectoryEntry[]>("search_users", { query: samA }),
-          invoke<DirectoryEntry[]>("search_users", { query: samB }),
-        ]);
-        const entryA = resultsA.find((e) => e.samAccountName === samA) ?? resultsA[0] ?? null;
-        const entryB = resultsB.find((e) => e.samAccountName === samB) ?? resultsB[0] ?? null;
-        setUserA(entryA);
-        setUserB(entryB);
+    // Load both users via search (more reliable than get_user for all users)
+    try {
+      const [resultsA, resultsB] = await Promise.all([
+        invoke<DirectoryEntry[]>("search_users", { query: samA }),
+        invoke<DirectoryEntry[]>("search_users", { query: samB }),
+      ]);
+      const entryA =
+        resultsA.find((e) => e.samAccountName === samA) ?? resultsA[0] ?? null;
+      const entryB =
+        resultsB.find((e) => e.samAccountName === samB) ?? resultsB[0] ?? null;
+      setUserA(entryA);
+      setUserB(entryB);
 
-        if (entryA?.samAccountName && entryB?.samAccountName) {
-          setIsComparing(true);
-          try {
-            const result = await invoke<GroupComparisonResult>("compare_users", {
-              samA: entryA.samAccountName,
-              samB: entryB.samAccountName,
-            });
-            setComparisonResult(result);
-          } catch (e) {
-            setError(`Comparison failed: ${e}`);
-          } finally {
-            setIsComparing(false);
-          }
-        } else {
-          setError(
-            `User not found: ${!entryA ? samA : ""}${!entryA && !entryB ? ", " : ""}${!entryB ? samB : ""}`,
-          );
+      if (entryA?.samAccountName && entryB?.samAccountName) {
+        setIsComparing(true);
+        try {
+          const result = await invoke<GroupComparisonResult>("compare_users", {
+            samA: entryA.samAccountName,
+            samB: entryB.samAccountName,
+          });
+          setComparisonResult(result);
+        } catch (e) {
+          setError(`Comparison failed: ${e}`);
+        } finally {
+          setIsComparing(false);
         }
-      } catch (e) {
-        setError(`Failed to load users: ${e}`);
+      } else {
+        setError(
+          `User not found: ${!entryA ? samA : ""}${!entryA && !entryB ? ", " : ""}${!entryB ? samB : ""}`,
+        );
       }
-    },
-    [],
-  );
+    } catch (e) {
+      setError(`Failed to load users: ${e}`);
+    }
+  }, []);
 
   return {
     userA,

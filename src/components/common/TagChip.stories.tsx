@@ -9,4 +9,6 @@ export default meta;
 type Story = StoryObj<typeof TagChip>;
 
 export const Default: Story = { args: { text: "IT-Admins" } };
-export const Removable: Story = { args: { text: "Dev-Backend", onRemove: () => {} } };
+export const Removable: Story = {
+  args: { text: "Dev-Backend", onRemove: () => {} },
+};

@@ -16,7 +16,10 @@ import { evaluateHealth } from "@/services/healthcheck";
 import { parseCnFromDn } from "@/utils/dn";
 import { useUserBrowse } from "@/hooks/useUserBrowse";
 import { useNavigation } from "@/contexts/NavigationContext";
-import { ContextMenu, type ContextMenuItem } from "@/components/common/ContextMenu";
+import {
+  ContextMenu,
+  type ContextMenuItem,
+} from "@/components/common/ContextMenu";
 import { UserDetail } from "@/pages/UserDetail";
 import { UserX, AlertCircle, User, GitCompareArrows } from "lucide-react";
 
@@ -36,8 +39,13 @@ export function UserLookup() {
   } = useUserBrowse();
 
   const { openTab } = useNavigation();
-  const [contextMenuPos, setContextMenuPos] = useState<{ x: number; y: number } | null>(null);
-  const [contextMenuItems, setContextMenuItems] = useState<ContextMenuItem[]>([]);
+  const [contextMenuPos, setContextMenuPos] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
+  const [contextMenuItems, setContextMenuItems] = useState<ContextMenuItem[]>(
+    [],
+  );
   const [groupFilterText, setGroupFilterText] = useState("");
   const [healthMap, setHealthMap] = useState<Map<string, AccountHealthStatus>>(
     new Map(),
@@ -156,7 +164,8 @@ export function UserLookup() {
         return;
       }
 
-      const selectedName = selectedUser.displayName || selectedUser.samAccountName;
+      const selectedName =
+        selectedUser.displayName || selectedUser.samAccountName;
       const targetName = user.displayName || user.samAccountName;
 
       setContextMenuItems([

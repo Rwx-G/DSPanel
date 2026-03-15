@@ -78,7 +78,10 @@ export function ContextMenu({ items, position, onClose }: ContextMenuProps) {
         Promise.resolve().then(() => {
           try {
             const result = item.onClick();
-            if (result && typeof (result as Promise<void>).catch === "function") {
+            if (
+              result &&
+              typeof (result as Promise<void>).catch === "function"
+            ) {
               (result as Promise<void>).catch((err) => {
                 console.error("[ContextMenu] Action failed:", err);
               });

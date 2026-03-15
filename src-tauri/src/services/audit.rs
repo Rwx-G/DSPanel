@@ -39,7 +39,11 @@ impl AuditService {
 
         let conn = match &persist_path {
             Some(path) => Connection::open(path).unwrap_or_else(|e| {
-                tracing::warn!("Failed to open audit DB at {}: {}, using in-memory", path.display(), e);
+                tracing::warn!(
+                    "Failed to open audit DB at {}: {}, using in-memory",
+                    path.display(),
+                    e
+                );
                 Connection::open_in_memory().expect("Failed to open in-memory SQLite")
             }),
             None => Connection::open_in_memory().expect("Failed to open in-memory SQLite"),
@@ -357,5 +361,4 @@ mod tests {
         assert_eq!(entry.target_dn, "CN=X");
         assert!(entry.success);
     }
-
 }

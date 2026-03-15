@@ -1,6 +1,12 @@
 import { useState, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { ChevronRight, ChevronDown, Users, User, AlertTriangle } from "lucide-react";
+import {
+  ChevronRight,
+  ChevronDown,
+  Users,
+  User,
+  AlertTriangle,
+} from "lucide-react";
 import { type DirectoryEntry } from "@/types/directory";
 import { parseCnFromDn } from "@/utils/dn";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
@@ -21,7 +27,12 @@ interface GroupChainNodeProps {
   ancestors: Set<string>;
 }
 
-function GroupChainNode({ groupDn, groupName, depth, ancestors }: GroupChainNodeProps) {
+function GroupChainNode({
+  groupDn,
+  groupName,
+  depth,
+  ancestors,
+}: GroupChainNodeProps) {
   const [expanded, setExpanded] = useState(false);
   const [members, setMembers] = useState<DirectoryEntry[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -81,16 +92,27 @@ function GroupChainNode({ groupDn, groupName, depth, ancestors }: GroupChainNode
         data-testid={`group-chain-toggle-${groupName}`}
       >
         {isCircular ? (
-          <AlertTriangle size={12} className="shrink-0 text-[var(--color-warning)]" />
+          <AlertTriangle
+            size={12}
+            className="shrink-0 text-[var(--color-warning)]"
+          />
         ) : loading ? (
           <LoadingSpinner size="sm" />
         ) : expanded ? (
-          <ChevronDown size={12} className="shrink-0 text-[var(--color-text-secondary)]" />
+          <ChevronDown
+            size={12}
+            className="shrink-0 text-[var(--color-text-secondary)]"
+          />
         ) : (
-          <ChevronRight size={12} className="shrink-0 text-[var(--color-text-secondary)]" />
+          <ChevronRight
+            size={12}
+            className="shrink-0 text-[var(--color-text-secondary)]"
+          />
         )}
         <Users size={12} className="shrink-0 text-[var(--color-primary)]" />
-        <span className="text-[var(--color-text-primary)] font-medium">{groupName}</span>
+        <span className="text-[var(--color-text-primary)] font-medium">
+          {groupName}
+        </span>
         {isCircular && (
           <span
             className="text-[11px] text-[var(--color-warning)] italic"
@@ -108,57 +130,62 @@ function GroupChainNode({ groupDn, groupName, depth, ancestors }: GroupChainNode
           {error}
         </div>
       )}
-      {expanded && members && (() => {
-        const sorted = [...members].sort((a, b) => {
-          const aGroup = a.objectClass === "group" ? 0 : 1;
-          const bGroup = b.objectClass === "group" ? 0 : 1;
-          if (aGroup !== bGroup) return aGroup - bGroup;
-          const aName = a.displayName ?? a.samAccountName ?? "";
-          const bName = b.displayName ?? b.samAccountName ?? "";
-          return aName.localeCompare(bName);
-        });
-        return (
-        <div>
-          {sorted.length === 0 && (
-            <div
-              className="text-[11px] text-[var(--color-text-secondary)]"
-              style={{ paddingLeft: `${(depth + 1) * 16 + 8}px` }}
-            >
-              No members
+      {expanded &&
+        members &&
+        (() => {
+          const sorted = [...members].sort((a, b) => {
+            const aGroup = a.objectClass === "group" ? 0 : 1;
+            const bGroup = b.objectClass === "group" ? 0 : 1;
+            if (aGroup !== bGroup) return aGroup - bGroup;
+            const aName = a.displayName ?? a.samAccountName ?? "";
+            const bName = b.displayName ?? b.samAccountName ?? "";
+            return aName.localeCompare(bName);
+          });
+          return (
+            <div>
+              {sorted.length === 0 && (
+                <div
+                  className="text-[11px] text-[var(--color-text-secondary)]"
+                  style={{ paddingLeft: `${(depth + 1) * 16 + 8}px` }}
+                >
+                  No members
+                </div>
+              )}
+              {sorted.map((member) => {
+                const isGroup = member.objectClass === "group";
+                const name =
+                  member.displayName ?? parseCnFromDn(member.distinguishedName);
+                if (isGroup) {
+                  return (
+                    <GroupChainNode
+                      key={member.distinguishedName}
+                      groupDn={member.distinguishedName}
+                      groupName={name}
+                      depth={depth + 1}
+                      ancestors={childAncestors}
+                    />
+                  );
+                }
+                return (
+                  <div
+                    key={member.distinguishedName}
+                    className="flex items-center gap-1.5 py-0.5 text-caption text-[var(--color-text-secondary)]"
+                    style={{ paddingLeft: `${(depth + 1) * 16 + 8}px` }}
+                    data-testid={`group-chain-member-${member.samAccountName}`}
+                  >
+                    <User size={12} className="shrink-0" />
+                    <span>{name}</span>
+                    {member.samAccountName && (
+                      <span className="text-[11px]">
+                        ({member.samAccountName})
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
             </div>
-          )}
-          {sorted.map((member) => {
-            const isGroup = member.objectClass === "group";
-            const name = member.displayName ?? parseCnFromDn(member.distinguishedName);
-            if (isGroup) {
-              return (
-                <GroupChainNode
-                  key={member.distinguishedName}
-                  groupDn={member.distinguishedName}
-                  groupName={name}
-                  depth={depth + 1}
-                  ancestors={childAncestors}
-                />
-              );
-            }
-            return (
-              <div
-                key={member.distinguishedName}
-                className="flex items-center gap-1.5 py-0.5 text-caption text-[var(--color-text-secondary)]"
-                style={{ paddingLeft: `${(depth + 1) * 16 + 8}px` }}
-                data-testid={`group-chain-member-${member.samAccountName}`}
-              >
-                <User size={12} className="shrink-0" />
-                <span>{name}</span>
-                {member.samAccountName && (
-                  <span className="text-[11px]">({member.samAccountName})</span>
-                )}
-              </div>
-            );
-          })}
-        </div>
-        );
-      })()}
+          );
+        })()}
     </div>
   );
 }

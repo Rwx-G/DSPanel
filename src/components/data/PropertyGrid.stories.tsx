@@ -25,7 +25,11 @@ export const Default: Story = {
         items: [
           { label: "Enabled", value: "Yes", severity: "Success" as const },
           { label: "Locked Out", value: "No" },
-          { label: "Password Expired", value: "Yes", severity: "Warning" as const },
+          {
+            label: "Password Expired",
+            value: "Yes",
+            severity: "Warning" as const,
+          },
         ],
       },
     ],

@@ -22,11 +22,36 @@ const COLUMNS = [
 ];
 
 const SAMPLE_DATA: User[] = [
-  { name: "John Doe", email: "jdoe@contoso.com", department: "IT", status: "Active" },
-  { name: "Alice Smith", email: "asmith@contoso.com", department: "HR", status: "Active" },
-  { name: "Bob Wilson", email: "bwilson@contoso.com", department: "Finance", status: "Disabled" },
-  { name: "Carol Davis", email: "cdavis@contoso.com", department: "Sales", status: "Active" },
-  { name: "Dan Brown", email: "dbrown@contoso.com", department: "Engineering", status: "Locked" },
+  {
+    name: "John Doe",
+    email: "jdoe@contoso.com",
+    department: "IT",
+    status: "Active",
+  },
+  {
+    name: "Alice Smith",
+    email: "asmith@contoso.com",
+    department: "HR",
+    status: "Active",
+  },
+  {
+    name: "Bob Wilson",
+    email: "bwilson@contoso.com",
+    department: "Finance",
+    status: "Disabled",
+  },
+  {
+    name: "Carol Davis",
+    email: "cdavis@contoso.com",
+    department: "Sales",
+    status: "Active",
+  },
+  {
+    name: "Dan Brown",
+    email: "dbrown@contoso.com",
+    department: "Engineering",
+    status: "Locked",
+  },
 ];
 
 export const Default: StoryObj = {

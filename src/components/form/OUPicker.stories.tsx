@@ -49,7 +49,11 @@ export const Default: Story = {
     const [selected, setSelected] = useState<string | undefined>();
     return (
       <div className="w-80">
-        <OUPicker nodes={SAMPLE_TREE} selectedOU={selected} onSelect={setSelected} />
+        <OUPicker
+          nodes={SAMPLE_TREE}
+          selectedOU={selected}
+          onSelect={setSelected}
+        />
       </div>
     );
   },

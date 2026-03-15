@@ -17,7 +17,11 @@ export const Warning: Story = {
     healthStatus: {
       level: "Warning",
       activeFlags: [
-        { name: "PasswordExpiring", description: "Password expires in 5 days", severity: "Warning" },
+        {
+          name: "PasswordExpiring",
+          description: "Password expires in 5 days",
+          severity: "Warning",
+        },
       ],
     },
   },
@@ -28,8 +32,16 @@ export const Critical: Story = {
     healthStatus: {
       level: "Critical",
       activeFlags: [
-        { name: "AccountDisabled", description: "Account is disabled", severity: "Critical" },
-        { name: "AccountLockedOut", description: "Account is locked out", severity: "Critical" },
+        {
+          name: "AccountDisabled",
+          description: "Account is disabled",
+          severity: "Critical",
+        },
+        {
+          name: "AccountLockedOut",
+          description: "Account is locked out",
+          severity: "Critical",
+        },
       ],
     },
   },

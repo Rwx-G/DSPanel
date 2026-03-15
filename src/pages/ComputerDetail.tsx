@@ -150,7 +150,8 @@ export function ComputerDetail({ computer }: { computer: DirectoryComputer }) {
             : resolvedAddresses.length > 0
               ? resolvedAddresses.join(", ")
               : "N/A",
-          severity: isResolvingDns && dnsTimedOut ? ("Warning" as const) : undefined,
+          severity:
+            isResolvingDns && dnsTimedOut ? ("Warning" as const) : undefined,
         },
         {
           label: "Ping",
@@ -259,7 +260,10 @@ export function ComputerDetail({ computer }: { computer: DirectoryComputer }) {
         <h3 className="mb-2 text-body font-semibold text-[var(--color-text-primary)]">
           Replication History
         </h3>
-        <StateInTimeView objectDn={computer.distinguishedName} objectType="computer" />
+        <StateInTimeView
+          objectDn={computer.distinguishedName}
+          objectType="computer"
+        />
       </div>
 
       <ContextMenu

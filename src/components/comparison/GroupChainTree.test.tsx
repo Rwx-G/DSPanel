@@ -44,7 +44,9 @@ describe("GroupChainTree", () => {
       />,
     );
     expect(screen.getByTestId("group-chain-tree")).toBeInTheDocument();
-    expect(screen.getByTestId("group-chain-toggle-IT Team")).toBeInTheDocument();
+    expect(
+      screen.getByTestId("group-chain-toggle-IT Team"),
+    ).toBeInTheDocument();
   });
 
   it("expands to show members on click", async () => {
@@ -65,15 +67,14 @@ describe("GroupChainTree", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("group-chain-member-jdoe")).toBeInTheDocument();
-      expect(screen.getByTestId("group-chain-member-cjones")).toBeInTheDocument();
+      expect(
+        screen.getByTestId("group-chain-member-cjones"),
+      ).toBeInTheDocument();
     });
   });
 
   it("shows sub-groups as expandable nodes", async () => {
-    const members = [
-      makeGroup("IT-Admins"),
-      makeUser("jdoe", "John Doe"),
-    ];
+    const members = [makeGroup("IT-Admins"), makeUser("jdoe", "John Doe")];
     mockInvoke.mockResolvedValueOnce(members);
 
     render(
@@ -86,7 +87,9 @@ describe("GroupChainTree", () => {
     fireEvent.click(screen.getByTestId("group-chain-toggle-IT Team"));
 
     await waitFor(() => {
-      expect(screen.getByTestId("group-chain-toggle-IT-Admins")).toBeInTheDocument();
+      expect(
+        screen.getByTestId("group-chain-toggle-IT-Admins"),
+      ).toBeInTheDocument();
       expect(screen.getByTestId("group-chain-member-jdoe")).toBeInTheDocument();
     });
   });
@@ -109,13 +112,17 @@ describe("GroupChainTree", () => {
     fireEvent.click(screen.getByTestId("group-chain-toggle-IT Team"));
 
     await waitFor(() => {
-      expect(screen.getByTestId("group-chain-toggle-IT-Admins")).toBeInTheDocument();
+      expect(
+        screen.getByTestId("group-chain-toggle-IT-Admins"),
+      ).toBeInTheDocument();
     });
 
     fireEvent.click(screen.getByTestId("group-chain-toggle-IT-Admins"));
 
     await waitFor(() => {
-      expect(screen.getByTestId("group-chain-member-admin1")).toBeInTheDocument();
+      expect(
+        screen.getByTestId("group-chain-member-admin1"),
+      ).toBeInTheDocument();
     });
   });
 
@@ -155,7 +162,9 @@ describe("GroupChainTree", () => {
     // Expand IT Team
     fireEvent.click(screen.getByTestId("group-chain-toggle-IT Team"));
     await waitFor(() => {
-      expect(screen.getByTestId("group-chain-toggle-Sub-Group")).toBeInTheDocument();
+      expect(
+        screen.getByTestId("group-chain-toggle-Sub-Group"),
+      ).toBeInTheDocument();
     });
 
     // Expand Sub-Group
@@ -185,6 +194,8 @@ describe("GroupChainTree", () => {
 
     fireEvent.click(screen.getByTestId("group-chain-toggle-Test"));
 
-    expect(screen.queryByTestId("group-chain-member-jdoe")).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("group-chain-member-jdoe"),
+    ).not.toBeInTheDocument();
   });
 });

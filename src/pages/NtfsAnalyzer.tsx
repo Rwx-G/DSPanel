@@ -9,10 +9,16 @@ import {
   ChevronRight,
   Users,
 } from "lucide-react";
-import { type NtfsAnalysisResult, type PathAclResult } from "@/types/ntfs-analyzer";
+import {
+  type NtfsAnalysisResult,
+  type PathAclResult,
+} from "@/types/ntfs-analyzer";
 import { type AceEntry } from "@/types/ntfs";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
-import { ContextMenu, type ContextMenuItem } from "@/components/common/ContextMenu";
+import {
+  ContextMenu,
+  type ContextMenuItem,
+} from "@/components/common/ContextMenu";
 import { GroupMembersDialog } from "@/components/dialogs/GroupMembersDialog";
 import { GroupChainTree } from "@/components/comparison/GroupChainTree";
 import { formatCsv, downloadCsv } from "@/utils/csvExport";
@@ -25,7 +31,9 @@ function PathAclSection({
   onTrusteeContextMenu: (e: React.MouseEvent, ace: AceEntry) => void;
 }) {
   const [expanded, setExpanded] = useState(true);
-  const [expandedTrustees, setExpandedTrustees] = useState<Set<number>>(new Set());
+  const [expandedTrustees, setExpandedTrustees] = useState<Set<number>>(
+    new Set(),
+  );
 
   const toggleTrustee = (idx: number) => {
     setExpandedTrustees((prev) => {
@@ -110,23 +118,39 @@ function PathAclSection({
                           data-testid={`trustee-expand-${idx}`}
                         >
                           {expandedTrustees.has(idx) ? (
-                            <ChevronDown size={12} className="shrink-0 text-[var(--color-text-secondary)]" />
+                            <ChevronDown
+                              size={12}
+                              className="shrink-0 text-[var(--color-text-secondary)]"
+                            />
                           ) : (
-                            <ChevronRight size={12} className="shrink-0 text-[var(--color-text-secondary)]" />
+                            <ChevronRight
+                              size={12}
+                              className="shrink-0 text-[var(--color-text-secondary)]"
+                            />
                           )}
-                          <span className="truncate">{ace.trusteeDisplayName}</span>
+                          <span className="truncate">
+                            {ace.trusteeDisplayName}
+                          </span>
                         </button>
                         {expandedTrustees.has(idx) && (
                           <div className="mt-1">
                             <GroupChainTree
                               groupDn={`CN=${ace.trusteeDisplayName.includes("\\") ? ace.trusteeDisplayName.split("\\").pop()! : ace.trusteeDisplayName},OU=Groups,DC=contoso,DC=com`}
-                              groupName={ace.trusteeDisplayName.includes("\\") ? ace.trusteeDisplayName.split("\\").pop()! : ace.trusteeDisplayName}
+                              groupName={
+                                ace.trusteeDisplayName.includes("\\")
+                                  ? ace.trusteeDisplayName.split("\\").pop()!
+                                  : ace.trusteeDisplayName
+                              }
                             />
                           </div>
                         )}
                       </td>
-                      <td className={`px-3 py-1.5 font-medium ${isDeny ? "text-[var(--color-error)]" : "text-[var(--color-success)]"}`}>
-                        {isDeny && <ShieldX size={12} className="mr-1 inline" />}
+                      <td
+                        className={`px-3 py-1.5 font-medium ${isDeny ? "text-[var(--color-error)]" : "text-[var(--color-success)]"}`}
+                      >
+                        {isDeny && (
+                          <ShieldX size={12} className="mr-1 inline" />
+                        )}
                         {ace.accessType}
                       </td>
                       <td className="truncate px-3 py-1.5 text-[var(--color-text-primary)]">
@@ -157,9 +181,17 @@ export function NtfsAnalyzer() {
   const [depth, setDepth] = useState(0);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<NtfsAnalysisResult | null>(null);
-  const [contextMenuPos, setContextMenuPos] = useState<{ x: number; y: number } | null>(null);
-  const [contextMenuItems, setContextMenuItems] = useState<ContextMenuItem[]>([]);
-  const [groupMembersDialog, setGroupMembersDialog] = useState<{ dn: string; name: string } | null>(null);
+  const [contextMenuPos, setContextMenuPos] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
+  const [contextMenuItems, setContextMenuItems] = useState<ContextMenuItem[]>(
+    [],
+  );
+  const [groupMembersDialog, setGroupMembersDialog] = useState<{
+    dn: string;
+    name: string;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showExplicitOnly, setShowExplicitOnly] = useState(false);
 
@@ -171,9 +203,10 @@ export function NtfsAnalyzer() {
         ? ace.trusteeDisplayName.split("\\").pop()!
         : ace.trusteeDisplayName;
       // Build group DN matching the demo data convention
-      const groupDn = name === "Domain Users"
-        ? `CN=${name},CN=Users,DC=contoso,DC=com`
-        : `CN=${name},OU=Groups,DC=contoso,DC=com`;
+      const groupDn =
+        name === "Domain Users"
+          ? `CN=${name},CN=Users,DC=contoso,DC=com`
+          : `CN=${name},OU=Groups,DC=contoso,DC=com`;
 
       setContextMenuItems([
         {
@@ -208,7 +241,15 @@ export function NtfsAnalyzer() {
 
   const exportCsv = useCallback(async () => {
     if (!result) return;
-    const headers = ["Path", "Trustee", "Trustee SID", "Type", "Permissions", "Inherited", "Source"];
+    const headers = [
+      "Path",
+      "Trustee",
+      "Trustee SID",
+      "Type",
+      "Permissions",
+      "Inherited",
+      "Source",
+    ];
     const rows: string[][] = [];
     for (const pr of result.paths) {
       for (const ace of pr.aces) {
@@ -236,7 +277,10 @@ export function NtfsAnalyzer() {
   });
 
   return (
-    <div className="flex h-full flex-col gap-4 p-4" data-testid="ntfs-analyzer-page">
+    <div
+      className="flex h-full flex-col gap-4 p-4"
+      data-testid="ntfs-analyzer-page"
+    >
       <h1 className="text-lg font-semibold text-[var(--color-text-primary)]">
         NTFS Permissions Analyzer
       </h1>
@@ -268,16 +312,16 @@ export function NtfsAnalyzer() {
             </label>
             <select
               className="w-40 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-bg)] px-3 py-1.5 text-body text-[var(--color-text-primary)]"
-            value={depth}
-            onChange={(e) => setDepth(Number(e.target.value))}
-            data-testid="depth-selector"
-          >
-            <option value={0}>Current only</option>
-            <option value={1}>1 level</option>
-            <option value={2}>2 levels</option>
-            <option value={3}>3 levels</option>
-            <option value={5}>5 levels</option>
-          </select>
+              value={depth}
+              onChange={(e) => setDepth(Number(e.target.value))}
+              data-testid="depth-selector"
+            >
+              <option value={0}>Current only</option>
+              <option value={1}>1 level</option>
+              <option value={2}>2 levels</option>
+              <option value={3}>3 levels</option>
+              <option value={5}>5 levels</option>
+            </select>
           </div>
           <button
             className="btn btn-primary btn-sm flex items-center gap-1.5"
@@ -286,7 +330,11 @@ export function NtfsAnalyzer() {
             disabled={!uncPath.trim() || isAnalyzing}
             data-testid="analyze-button"
           >
-            {isAnalyzing ? <LoadingSpinner size="sm" /> : <FolderSearch size={14} />}
+            {isAnalyzing ? (
+              <LoadingSpinner size="sm" />
+            ) : (
+              <FolderSearch size={14} />
+            )}
             Analyze
           </button>
         </div>
@@ -304,7 +352,10 @@ export function NtfsAnalyzer() {
 
       {/* Results */}
       {result && (
-        <div className="flex flex-1 flex-col gap-3 overflow-hidden" data-testid="analyzer-results">
+        <div
+          className="flex flex-1 flex-col gap-3 overflow-hidden"
+          data-testid="analyzer-results"
+        >
           {/* Summary */}
           <div className="flex items-center gap-4 rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-4 py-3">
             <span className="text-body text-[var(--color-text-primary)]">
@@ -362,10 +413,16 @@ export function NtfsAnalyzer() {
                   className="mb-1 text-caption text-[var(--color-text-primary)]"
                   data-testid={`conflict-${idx}`}
                 >
-                  <strong>{c.trusteeDisplayName}</strong> ({c.trusteeSid}): Allow at{" "}
-                  <code className="text-[var(--color-success)]">{c.allowPath}</code> vs Deny at{" "}
-                  <code className="text-[var(--color-error)]">{c.denyPath}</code> for{" "}
-                  {c.denyPermissions.join(", ")}
+                  <strong>{c.trusteeDisplayName}</strong> ({c.trusteeSid}):
+                  Allow at{" "}
+                  <code className="text-[var(--color-success)]">
+                    {c.allowPath}
+                  </code>{" "}
+                  vs Deny at{" "}
+                  <code className="text-[var(--color-error)]">
+                    {c.denyPath}
+                  </code>{" "}
+                  for {c.denyPermissions.join(", ")}
                 </div>
               ))}
             </div>
@@ -374,7 +431,11 @@ export function NtfsAnalyzer() {
           {/* Path results */}
           <div className="flex-1 space-y-2 overflow-y-auto">
             {filteredPaths?.map((pr, idx) => (
-              <PathAclSection key={`${pr.path}-${idx}`} result={pr} onTrusteeContextMenu={handleTrusteeContextMenu} />
+              <PathAclSection
+                key={`${pr.path}-${idx}`}
+                result={pr}
+                onTrusteeContextMenu={handleTrusteeContextMenu}
+              />
             ))}
           </div>
         </div>

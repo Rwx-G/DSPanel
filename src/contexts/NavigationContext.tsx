@@ -13,7 +13,12 @@ interface NavigationState {
   breadcrumbs: BreadcrumbSegment[];
   sidebarExpanded: boolean;
   navigateTo: (moduleId: string, title: string) => void;
-  openTab: (title: string, moduleId: string, icon?: string, data?: Record<string, unknown>) => TabItem;
+  openTab: (
+    title: string,
+    moduleId: string,
+    icon?: string,
+    data?: Record<string, unknown>,
+  ) => TabItem;
   clearTabData: (tabId: string) => void;
   closeTab: (tabId: string) => void;
   closeAllTabs: () => void;
@@ -59,7 +64,12 @@ export function NavigationProvider({ children }: NavigationProviderProps) {
   const [sidebarExpanded, setSidebarExpanded] = useState(true);
 
   const openTab = useCallback(
-    (title: string, moduleId: string, icon?: string, data?: Record<string, unknown>): TabItem => {
+    (
+      title: string,
+      moduleId: string,
+      icon?: string,
+      data?: Record<string, unknown>,
+    ): TabItem => {
       // Check if tab with same moduleId already exists
       const existing = openTabs.find((t) => t.moduleId === moduleId);
       if (existing) {

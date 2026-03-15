@@ -1,7 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { StateInTimeView } from "./StateInTimeView";
-import type { ReplicationMetadataResult, AttributeChangeDiff } from "@/types/replication";
+import type {
+  ReplicationMetadataResult,
+  AttributeChangeDiff,
+} from "@/types/replication";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
@@ -90,7 +93,9 @@ describe("StateInTimeView", () => {
     await waitFor(() => {
       expect(screen.getByTestId("metadata-timeline")).toBeInTheDocument();
       expect(screen.getByTestId("metadata-row-title")).toBeInTheDocument();
-      expect(screen.getByTestId("metadata-row-displayName")).toBeInTheDocument();
+      expect(
+        screen.getByTestId("metadata-row-displayName"),
+      ).toBeInTheDocument();
       expect(screen.getByTestId("metadata-row-department")).toBeInTheDocument();
     });
   });
@@ -163,9 +168,7 @@ describe("StateInTimeView", () => {
   });
 
   it("shows empty diff message when no changes", async () => {
-    mockInvoke
-      .mockResolvedValueOnce(MOCK_METADATA)
-      .mockResolvedValueOnce([]); // empty diff
+    mockInvoke.mockResolvedValueOnce(MOCK_METADATA).mockResolvedValueOnce([]); // empty diff
 
     render(
       <StateInTimeView
