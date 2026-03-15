@@ -356,25 +356,59 @@ fn sample_browse_users() -> Vec<DirectoryEntry> {
 }
 
 fn sample_group_entries() -> Vec<DirectoryEntry> {
+    // Groups match user memberOf attributes: "CN={dept} Team,OU=Groups,DC=contoso,DC=com"
+    let users = sample_browse_users();
     vec![
-        make_group("IT-Admins", "IT Team", "IT"),
-        make_group("IT-Support", "IT Team", "IT"),
-        make_group("Dev-Frontend", "Engineering Team", "Engineering"),
-        make_group("Dev-Backend", "Engineering Team", "Engineering"),
-        make_group("Finance-Analysts", "Finance Team", "Finance"),
-        make_group("Sales-EMEA", "Sales Team", "Sales"),
+        make_group("IT Team", "IT", &users),
+        make_group("HR Team", "HR", &users),
+        make_group("Finance Team", "Finance", &users),
+        make_group("Engineering Team", "Engineering", &users),
+        make_group("Sales Team", "Sales", &users),
+        make_group("Marketing Team", "Marketing", &users),
+        make_group_empty("Deprecated-Printers"),
+        make_group_empty("Legacy-VPN"),
     ]
 }
 
-fn make_group(name: &str, parent_group: &str, _dept: &str) -> DirectoryEntry {
+fn make_group(name: &str, dept: &str, all_users: &[DirectoryEntry]) -> DirectoryEntry {
+    let group_dn = format!("CN={},OU=Groups,DC=contoso,DC=com", name);
+
+    // Collect members: users whose memberOf contains this group's DN
+    let members: Vec<String> = all_users
+        .iter()
+        .filter(|u| {
+            u.get_attribute_values("memberOf")
+                .iter()
+                .any(|m| m.eq_ignore_ascii_case(&group_dn))
+        })
+        .map(|u| u.distinguished_name.clone())
+        .collect();
+
     let mut attrs = HashMap::new();
-    attrs.insert(
-        "memberOf".to_string(),
-        vec![format!("CN={},OU=Groups,DC=contoso,DC=com", parent_group)],
-    );
     // Global Security group by default: 0x80000002 = -2147483646
     attrs.insert("groupType".to_string(), vec!["-2147483646".to_string()]);
-    attrs.insert("description".to_string(), vec![format!("{} group", name)]);
+    attrs.insert(
+        "description".to_string(),
+        vec![format!("{} department security group", dept)],
+    );
+    attrs.insert("member".to_string(), members);
+
+    DirectoryEntry {
+        distinguished_name: group_dn,
+        sam_account_name: Some(name.replace(' ', "-")),
+        display_name: Some(name.to_string()),
+        object_class: Some("group".to_string()),
+        attributes: attrs,
+    }
+}
+
+fn make_group_empty(name: &str) -> DirectoryEntry {
+    let mut attrs = HashMap::new();
+    attrs.insert("groupType".to_string(), vec!["-2147483646".to_string()]);
+    attrs.insert(
+        "description".to_string(),
+        vec![format!("{} (unused)", name)],
+    );
     DirectoryEntry {
         distinguished_name: format!("CN={},OU=Groups,DC=contoso,DC=com", name),
         sam_account_name: Some(name.to_string()),
