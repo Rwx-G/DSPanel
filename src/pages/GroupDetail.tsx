@@ -602,10 +602,12 @@ export function GroupDetail({
                       Member Management
                     </p>
                     <p className="text-caption text-[var(--color-text-secondary)]">
-                      Click "+ Add" to search and stage new members. Select
-                      existing members and click "Remove" to stage removals.
+                      Click "+ Add" to search and stage new users or groups
+                      as members. Select existing members or nested groups
+                      with checkboxes and click "Remove" to stage removals.
                       Click "Preview" to review all pending changes, then
-                      "Apply" to execute them.
+                      "Apply" to execute them. Nested groups can be expanded
+                      with the chevron to inspect their content.
                     </p>
                   </div>
                 )}
