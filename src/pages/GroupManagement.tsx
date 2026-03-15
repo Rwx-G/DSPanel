@@ -219,9 +219,9 @@ export function GroupManagement() {
         {error && `Error: ${error}`}
       </div>
 
-      <div className="flex items-center gap-1 border-b border-[var(--color-border-subtle)] px-3 py-1.5">
+      <div className="flex items-center gap-1 border-b border-[var(--color-border-subtle)] px-3 py-1">
         <button
-          className={`btn btn-ghost flex h-8 w-8 items-center justify-center rounded-md p-0 ${
+          className={`btn btn-ghost flex h-7 w-7 items-center justify-center rounded-md p-0 ${
             viewMode === "flat"
               ? "bg-[var(--color-surface-selected)] text-[var(--color-primary)]"
               : ""
@@ -233,7 +233,7 @@ export function GroupManagement() {
           <List size={16} />
         </button>
         <button
-          className={`btn btn-ghost flex h-8 w-8 items-center justify-center rounded-md p-0 ${
+          className={`btn btn-ghost flex h-7 w-7 items-center justify-center rounded-md p-0 ${
             viewMode === "tree"
               ? "bg-[var(--color-surface-selected)] text-[var(--color-primary)]"
               : ""
@@ -248,7 +248,7 @@ export function GroupManagement() {
           <>
             <div className="mx-1 h-4 w-px bg-[var(--color-border-subtle)]" />
             <button
-              className={`btn btn-ghost flex h-8 w-8 items-center justify-center rounded-md p-0 ${
+              className={`btn btn-ghost flex h-7 w-7 items-center justify-center rounded-md p-0 ${
                 viewMode === "bulk"
                   ? "bg-[var(--color-surface-selected)] text-[var(--color-primary)]"
                   : ""
@@ -260,7 +260,7 @@ export function GroupManagement() {
               <Layers size={16} />
             </button>
             <button
-              className={`btn btn-ghost flex h-8 w-8 items-center justify-center rounded-md p-0 ${
+              className={`btn btn-ghost flex h-7 w-7 items-center justify-center rounded-md p-0 ${
                 viewMode === "hygiene"
                   ? "bg-[var(--color-surface-selected)] text-[var(--color-primary)]"
                   : ""

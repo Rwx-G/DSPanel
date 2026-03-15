@@ -141,6 +141,22 @@ describe("GroupDetail", () => {
     ).toBeInTheDocument();
     expect(screen.getByTestId("add-member-section")).toBeInTheDocument();
     expect(screen.getByTestId("select-all-checkbox")).toBeInTheDocument();
+    // Buttons always visible but disabled by default
+    expect(screen.getByTestId("remove-selected-btn")).toBeDisabled();
+    expect(screen.getByTestId("preview-changes-btn")).toBeDisabled();
+  });
+
+  it("shows help button with info popup", async () => {
+    renderGroupDetail({ canManageMembers: true });
+    expect(screen.getByTestId("member-help-btn")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("member-help-btn"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("member-help-popup")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("Member Management")).toBeInTheDocument();
   });
 
   it("hides management controls for ReadOnly", () => {
@@ -173,13 +189,16 @@ describe("GroupDetail", () => {
     expect(screen.getByText("TestOU")).toBeInTheDocument();
   });
 
-  it("multi-select and remove works", async () => {
+  it("multi-select enables remove button", async () => {
     renderGroupDetail({ canManageMembers: true });
+
+    // Button starts disabled
+    expect(screen.getByTestId("remove-selected-btn")).toBeDisabled();
 
     fireEvent.click(screen.getByTestId("member-checkbox-John Doe"));
 
     await waitFor(() => {
-      expect(screen.getByTestId("remove-selected-btn")).toBeInTheDocument();
+      expect(screen.getByTestId("remove-selected-btn")).not.toBeDisabled();
     });
 
     expect(screen.getByTestId("remove-selected-btn")).toHaveTextContent(
@@ -221,7 +240,7 @@ describe("GroupDetail", () => {
     fireEvent.click(screen.getByTestId("select-all-checkbox"));
 
     await waitFor(() => {
-      expect(screen.getByTestId("remove-selected-btn")).toBeInTheDocument();
+      expect(screen.getByTestId("remove-selected-btn")).not.toBeDisabled();
     });
 
     expect(screen.getByTestId("remove-selected-btn")).toHaveTextContent(

@@ -14,7 +14,7 @@ import {
   type MemberChange,
   MemberChangePreviewDialog,
 } from "@/components/dialogs/MemberChangePreviewDialog";
-import { UserPlus, UserMinus, Eye, Search } from "lucide-react";
+import { UserPlus, UserMinus, Eye, Search, Info } from "lucide-react";
 
 export interface GroupDetailProps {
   group: DirectoryGroup;
@@ -43,6 +43,7 @@ export function GroupDetail({
     DirectoryEntry[]
   >([]);
   const [memberSearchLoading, setMemberSearchLoading] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
 
   const propertyGroups: PropertyGroup[] = [
     {
@@ -99,6 +100,11 @@ export function GroupDetail({
 
   const allSelected =
     members.length > 0 && selectedMembers.size === members.length;
+
+  const pendingAdds = pendingChanges.filter((c) => c.action === "add").length;
+  const pendingRemoves = pendingChanges.filter(
+    (c) => c.action === "remove",
+  ).length;
 
   // Remove selected members (add to pending changes)
   const handleRemoveSelected = useCallback(() => {
@@ -279,70 +285,93 @@ export function GroupDetail({
       <div className="border-t border-[var(--color-border-default)]" />
 
       <div data-testid="group-members-section">
-        <div className="mb-2 flex items-center justify-between">
-          <h3 className="text-body font-semibold text-[var(--color-text-primary)]">
-            Members ({members.length})
-          </h3>
+        {/* Header: title + action buttons (always visible) */}
+        <div className="mb-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <h3 className="text-body font-semibold text-[var(--color-text-primary)]">
+              Members ({members.length})
+            </h3>
+            {canManageMembers && (
+              <div className="relative">
+                <button
+                  className="flex h-5 w-5 items-center justify-center rounded-full text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors"
+                  onClick={() => setShowHelp(!showHelp)}
+                  onBlur={() => setTimeout(() => setShowHelp(false), 150)}
+                  aria-label="Member management help"
+                  data-testid="member-help-btn"
+                >
+                  <Info size={13} />
+                </button>
+                {showHelp && (
+                  <div
+                    className="absolute left-0 top-full z-50 mt-1 w-72 rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-3 shadow-lg"
+                    data-testid="member-help-popup"
+                  >
+                    <p className="text-caption font-semibold text-[var(--color-text-primary)] mb-1">
+                      Member Management
+                    </p>
+                    <p className="text-caption text-[var(--color-text-secondary)]">
+                      Use the search bar to find and add members, or select
+                      existing members with checkboxes and click "Remove
+                      Selected" to stage removals. Click "Preview" to review all
+                      pending changes, then "Apply" to execute them.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
           {canManageMembers && (
             <div
               className="flex items-center gap-2"
               data-testid="member-management-controls"
             >
-              {selectedMembers.size > 0 && (
-                <button
-                  className="btn btn-secondary flex items-center gap-1 text-caption"
-                  onClick={handleRemoveSelected}
-                  data-testid="remove-selected-btn"
-                >
-                  <UserMinus size={14} />
-                  Remove Selected ({selectedMembers.size})
-                </button>
-              )}
-              {pendingChanges.length > 0 && (
-                <button
-                  className="btn btn-primary flex items-center gap-1 text-caption"
-                  onClick={() => setShowPreview(true)}
-                  data-testid="preview-changes-btn"
-                >
-                  <Eye size={14} />
-                  Preview ({pendingChanges.length})
-                </button>
-              )}
+              <button
+                className="btn btn-sm flex items-center gap-1"
+                onClick={handleRemoveSelected}
+                disabled={selectedMembers.size === 0}
+                data-testid="remove-selected-btn"
+              >
+                <UserMinus size={14} />
+                Remove Selected
+                {selectedMembers.size > 0 && ` (${selectedMembers.size})`}
+              </button>
+              <button
+                className="btn btn-sm flex items-center gap-1"
+                onClick={() => setShowPreview(true)}
+                disabled={pendingChanges.length === 0}
+                data-testid="preview-changes-btn"
+              >
+                <Eye size={14} />
+                Preview
+                {pendingChanges.length > 0 && ` (${pendingChanges.length})`}
+              </button>
             </div>
           )}
         </div>
 
-        {canManageMembers && members.length > 0 && (
-          <div className="mb-2 flex items-center gap-2">
-            <label className="flex items-center gap-1.5 text-caption text-[var(--color-text-secondary)]">
-              <input
-                type="checkbox"
-                checked={allSelected}
-                onChange={(e) => handleSelectAll(e.target.checked)}
-                data-testid="select-all-checkbox"
-              />
-              Select all
-            </label>
+        {/* Pending changes summary */}
+        {canManageMembers && pendingChanges.length > 0 && (
+          <div className="mb-3 flex items-center gap-3 rounded-md border border-[var(--color-primary)] bg-[var(--color-primary-subtle)] px-3 py-1.5 text-caption text-[var(--color-primary)]">
+            <span>
+              {pendingAdds > 0 && `${pendingAdds} to add`}
+              {pendingAdds > 0 && pendingRemoves > 0 && ", "}
+              {pendingRemoves > 0 && `${pendingRemoves} to remove`}
+            </span>
+            <button
+              className="ml-auto text-caption underline hover:no-underline"
+              onClick={() => setPendingChanges([])}
+              data-testid="clear-pending-btn"
+            >
+              Clear
+            </button>
           </div>
         )}
 
-        {membersLoading ? (
-          <LoadingSpinner message="Loading members..." />
-        ) : members.length > 0 ? (
-          <DataTable
-            columns={memberColumns}
-            data={memberRows}
-            rowKey={(row) => row.dn}
-          />
-        ) : (
-          <p className="text-caption text-[var(--color-text-secondary)]">
-            No members found
-          </p>
-        )}
-
+        {/* Add members section - above current members */}
         {canManageMembers && (
           <div
-            className="mt-4 rounded-lg border border-[var(--color-border-default)] p-3"
+            className="mb-3 rounded-lg border border-[var(--color-border-default)] p-3"
             data-testid="add-member-section"
           >
             <h4 className="mb-2 flex items-center gap-1.5 text-body font-medium text-[var(--color-text-primary)]">
@@ -433,6 +462,35 @@ export function GroupDetail({
               </div>
             )}
           </div>
+        )}
+
+        {/* Select all + member list */}
+        {canManageMembers && members.length > 0 && (
+          <div className="mb-2 flex items-center gap-2">
+            <label className="flex items-center gap-1.5 text-caption text-[var(--color-text-secondary)]">
+              <input
+                type="checkbox"
+                checked={allSelected}
+                onChange={(e) => handleSelectAll(e.target.checked)}
+                data-testid="select-all-checkbox"
+              />
+              Select all
+            </label>
+          </div>
+        )}
+
+        {membersLoading ? (
+          <LoadingSpinner message="Loading members..." />
+        ) : members.length > 0 ? (
+          <DataTable
+            columns={memberColumns}
+            data={memberRows}
+            rowKey={(row) => row.dn}
+          />
+        ) : (
+          <p className="text-caption text-[var(--color-text-secondary)]">
+            No members found
+          </p>
         )}
       </div>
 
