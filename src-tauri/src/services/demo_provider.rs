@@ -849,6 +849,14 @@ impl DirectoryProvider for DemoDirectoryProvider {
         Ok(())
     }
 
+    async fn delete_object(&self, dn: &str) -> Result<()> {
+        tracing::info!(
+            dn = %dn,
+            "DEMO: delete object simulated"
+        );
+        Ok(())
+    }
+
     async fn get_user_by_identity(&self, sam_account_name: &str) -> Result<Option<DirectoryEntry>> {
         Ok(sample_browse_users()
             .into_iter()

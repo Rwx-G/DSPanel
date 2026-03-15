@@ -195,6 +195,11 @@ where
         resilient_call!(self, |inner| inner.browse_groups(max_results).await)
     }
 
+    async fn delete_object(&self, dn: &str) -> Result<()> {
+        let dn_owned = dn.to_string();
+        resilient_call!(self, dn_owned, |inner, d| inner.delete_object(&d).await)
+    }
+
     async fn remove_group_member(&self, group_dn: &str, member_dn: &str) -> Result<()> {
         let g = group_dn.to_string();
         let m = member_dn.to_string();

@@ -490,6 +490,24 @@ impl DirectoryProvider for LdapDirectoryProvider {
         self.search(ldap_filter, GROUP_ATTRS, max_results).await
     }
 
+    async fn delete_object(&self, dn: &str) -> Result<()> {
+        let dn_owned = dn.to_string();
+        self.with_connection(|mut ldap| {
+            let dn_owned = dn_owned.clone();
+            async move {
+                ldap.delete(&dn_owned)
+                    .await
+                    .context("Failed to delete object")?
+                    .success()
+                    .context("Delete object LDAP operation returned error")?;
+
+                tracing::info!(dn = %dn_owned, "Object deleted");
+                Ok(())
+            }
+        })
+        .await
+    }
+
     async fn remove_group_member(&self, group_dn: &str, member_dn: &str) -> Result<()> {
         let g = group_dn.to_string();
         let m = member_dn.to_string();

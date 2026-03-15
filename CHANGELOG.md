@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Group hygiene scan detecting empty groups and circular group nesting (4.4)
+- One-click navigation from hygiene findings to group browser (4.4)
+- Bulk delete of empty groups with dry-run preview and DomainAdmin gating (4.4)
+- `delete_object` trait method on DirectoryProvider for AD object deletion (4.4)
+- `detect_empty_groups`, `detect_circular_groups`, `delete_group` Tauri commands (4.4)
+- DFS-based circular nesting detection with three-color graph marking (4.4)
+- Hygiene tab in GroupManagement view (AccountOperator+ gated) (4.4)
 - Bulk operations panel for Delete/Add/Transfer members across groups (4.3)
 - Dry-run preview of planned changes before execution (4.3)
 - Progress indicator with step-by-step status during bulk execution (4.3)

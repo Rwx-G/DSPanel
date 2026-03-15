@@ -120,6 +120,9 @@ pub fn run() {
             commands::search_groups,
             commands::browse_groups,
             commands::remove_group_member,
+            commands::detect_empty_groups,
+            commands::detect_circular_groups,
+            commands::delete_group,
             commands::get_ou_tree,
         ])
         .run(tauri::generate_context!())

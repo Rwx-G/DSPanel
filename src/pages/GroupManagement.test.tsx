@@ -635,6 +635,55 @@ describe("GroupManagement", () => {
     });
   });
 
+  describe("Hygiene Tab (Story 4.4)", () => {
+    it("shows hygiene toggle for AccountOperator users", async () => {
+      const entries = [makeGroupEntry("IT-Admins")];
+      mockBrowseWith(entries, { permissionLevel: "AccountOperator" });
+
+      render(<GroupManagement />, { wrapper: TestProviders });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("group-results-list")).toBeInTheDocument();
+      });
+
+      expect(screen.getByTestId("view-toggle-hygiene")).toBeInTheDocument();
+    });
+
+    it("hides hygiene toggle for ReadOnly users", async () => {
+      const entries = [makeGroupEntry("IT-Admins")];
+      mockBrowseWith(entries, { permissionLevel: "ReadOnly" });
+
+      render(<GroupManagement />, { wrapper: TestProviders });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("group-results-list")).toBeInTheDocument();
+      });
+
+      expect(
+        screen.queryByTestId("view-toggle-hygiene"),
+      ).not.toBeInTheDocument();
+    });
+
+    it("switches to hygiene view when hygiene toggle is clicked", async () => {
+      const entries = [makeGroupEntry("IT-Admins")];
+      mockBrowseWith(entries, { permissionLevel: "AccountOperator" });
+
+      render(<GroupManagement />, { wrapper: TestProviders });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("view-toggle-hygiene")).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByTestId("view-toggle-hygiene"));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("hygiene-view")).toBeInTheDocument();
+      });
+
+      expect(screen.getByTestId("group-hygiene")).toBeInTheDocument();
+    });
+  });
+
   describe("Bulk Operations (Story 4.3)", () => {
     it("shows bulk operations toggle for AccountOperator users", async () => {
       const entries = [makeGroupEntry("IT-Admins")];

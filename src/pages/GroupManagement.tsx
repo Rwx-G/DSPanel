@@ -18,6 +18,7 @@ import {
 } from "@/components/dialogs/MemberChangePreviewDialog";
 import { type OUNode } from "@/components/form/OUPicker";
 import { BulkOperations } from "@/pages/BulkOperations";
+import { GroupHygiene } from "@/pages/GroupHygiene";
 import {
   Users,
   AlertCircle,
@@ -28,9 +29,10 @@ import {
   Eye,
   Search,
   Layers,
+  ShieldAlert,
 } from "lucide-react";
 
-type ViewMode = "flat" | "tree" | "bulk";
+type ViewMode = "flat" | "tree" | "bulk" | "hygiene";
 
 function ouNodesToTreeNodes(nodes: OUNode[]): TreeNode[] {
   return nodes.map((ou) => ({
@@ -423,6 +425,20 @@ export function GroupManagement() {
               <Layers size={16} />
             </button>
           )}
+          {canManageMembers && (
+            <button
+              className={`btn btn-ghost flex h-8 w-8 items-center justify-center rounded-md p-0 ${
+                viewMode === "hygiene"
+                  ? "bg-[var(--color-surface-selected)] text-[var(--color-primary)]"
+                  : ""
+              }`}
+              onClick={() => setViewMode("hygiene")}
+              title="Group hygiene"
+              data-testid="view-toggle-hygiene"
+            >
+              <ShieldAlert size={16} />
+            </button>
+          )}
         </div>
       </div>
 
@@ -436,7 +452,13 @@ export function GroupManagement() {
           </div>
         )}
 
-        {viewMode !== "bulk" && loading && (
+        {viewMode === "hygiene" && (
+          <div className="flex-1 overflow-hidden" data-testid="hygiene-view">
+            <GroupHygiene />
+          </div>
+        )}
+
+        {viewMode !== "bulk" && viewMode !== "hygiene" && loading && (
           <div
             className="flex flex-1 items-center justify-center"
             data-testid="group-management-loading"
@@ -445,7 +467,7 @@ export function GroupManagement() {
           </div>
         )}
 
-        {viewMode !== "bulk" && !loading && error && (
+        {viewMode !== "bulk" && viewMode !== "hygiene" && !loading && error && (
           <div
             className="flex flex-1 items-center justify-center"
             data-testid="group-management-error"
@@ -460,6 +482,7 @@ export function GroupManagement() {
         )}
 
         {viewMode !== "bulk" &&
+          viewMode !== "hygiene" &&
           !loading &&
           !error &&
           displayedGroups.length === 0 && (
@@ -480,6 +503,7 @@ export function GroupManagement() {
           )}
 
         {viewMode !== "bulk" &&
+          viewMode !== "hygiene" &&
           !loading &&
           !error &&
           displayedGroups.length > 0 && (

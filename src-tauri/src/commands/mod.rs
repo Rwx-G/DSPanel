@@ -746,6 +746,143 @@ pub(crate) fn analyze_ntfs_inner(path: &str, depth: usize) -> Result<NtfsAnalysi
     Ok(crate::services::ntfs_analyzer::analyze(path, depth))
 }
 
+/// Detects empty groups (groups with no members).
+pub(crate) async fn detect_empty_groups_inner(
+    state: &AppState,
+) -> Result<Vec<DirectoryEntry>, AppError> {
+    let provider = state.directory_provider.clone();
+    let groups = provider
+        .browse_groups(5000)
+        .await
+        .map_err(|e| AppError::Directory(e.to_string()))?;
+
+    // Filter groups with no "member" attribute or empty member list
+    let empty: Vec<DirectoryEntry> = groups
+        .into_iter()
+        .filter(|g| {
+            let members = g.get_attribute_values("member");
+            members.is_empty()
+        })
+        .filter(|g| {
+            // Exclude built-in groups (those in CN=Builtin or CN=Users containers)
+            let dn = &g.distinguished_name;
+            !dn.contains("CN=Builtin,") && !dn.contains("CN=Users,DC=")
+        })
+        .collect();
+
+    Ok(empty)
+}
+
+/// Detects circular group nesting using DFS cycle detection.
+pub(crate) async fn detect_circular_groups_inner(
+    state: &AppState,
+) -> Result<Vec<Vec<String>>, AppError> {
+    let provider = state.directory_provider.clone();
+    let groups = provider
+        .browse_groups(5000)
+        .await
+        .map_err(|e| AppError::Directory(e.to_string()))?;
+
+    // Build adjacency list: group DN -> member group DNs
+    let mut graph: std::collections::HashMap<String, Vec<String>> =
+        std::collections::HashMap::new();
+    for group in &groups {
+        let members = group.get_attribute_values("member");
+        let member_groups: Vec<String> = members
+            .iter()
+            .filter(|m| groups.iter().any(|g| g.distinguished_name == **m))
+            .cloned()
+            .collect();
+        graph.insert(group.distinguished_name.clone(), member_groups);
+    }
+
+    // DFS cycle detection with three-color marking
+    let mut cycles = Vec::new();
+    let mut white: std::collections::HashSet<String> = graph.keys().cloned().collect();
+    let mut gray: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut black: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut path: Vec<String> = Vec::new();
+
+    fn dfs(
+        node: &str,
+        graph: &std::collections::HashMap<String, Vec<String>>,
+        white: &mut std::collections::HashSet<String>,
+        gray: &mut std::collections::HashSet<String>,
+        black: &mut std::collections::HashSet<String>,
+        path: &mut Vec<String>,
+        cycles: &mut Vec<Vec<String>>,
+    ) {
+        white.remove(node);
+        gray.insert(node.to_string());
+        path.push(node.to_string());
+
+        if let Some(neighbors) = graph.get(node) {
+            for neighbor in neighbors {
+                if gray.contains(neighbor.as_str()) {
+                    // Found cycle - extract the cycle from path
+                    if let Some(cycle_start) = path.iter().position(|p| p == neighbor) {
+                        let mut cycle: Vec<String> = path[cycle_start..].to_vec();
+                        cycle.push(neighbor.clone()); // close the cycle
+                        cycles.push(cycle);
+                    }
+                } else if white.contains(neighbor.as_str()) {
+                    dfs(neighbor, graph, white, gray, black, path, cycles);
+                }
+            }
+        }
+
+        path.pop();
+        gray.remove(node);
+        black.insert(node.to_string());
+    }
+
+    let start_nodes: Vec<String> = white.iter().cloned().collect();
+    for node in start_nodes {
+        if white.contains(&node) {
+            dfs(
+                &node,
+                &graph,
+                &mut white,
+                &mut gray,
+                &mut black,
+                &mut path,
+                &mut cycles,
+            );
+        }
+    }
+
+    Ok(cycles)
+}
+
+/// Deletes a group by DN (requires DomainAdmin).
+pub(crate) async fn delete_group_inner(state: &AppState, group_dn: &str) -> Result<(), AppError> {
+    if !state
+        .permission_service
+        .has_permission(PermissionLevel::DomainAdmin)
+    {
+        return Err(AppError::PermissionDenied(
+            "Group deletion requires DomainAdmin permission".to_string(),
+        ));
+    }
+
+    state.snapshot_service.capture(group_dn, "GroupDelete");
+    let provider = state.directory_provider.clone();
+    match provider.delete_object(group_dn).await {
+        Ok(()) => {
+            state
+                .audit_service
+                .log_success("GroupDeleted", group_dn, "Group deleted");
+            Ok(())
+        }
+        Err(e) => {
+            state
+                .audit_service
+                .log_failure("GroupDeleteFailed", group_dn, &e.to_string());
+            Err(AppError::Directory(e.to_string()))
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Tauri commands - thin wrappers
 // ---------------------------------------------------------------------------
@@ -934,6 +1071,28 @@ pub async fn get_group_members(
     state: State<'_, AppState>,
 ) -> Result<Vec<DirectoryEntry>, AppError> {
     get_group_members_inner(&state, &group_dn).await
+}
+
+/// Detects empty groups (groups with no members).
+#[tauri::command]
+pub async fn detect_empty_groups(
+    state: State<'_, AppState>,
+) -> Result<Vec<DirectoryEntry>, AppError> {
+    detect_empty_groups_inner(&state).await
+}
+
+/// Detects circular group nesting.
+#[tauri::command]
+pub async fn detect_circular_groups(
+    state: State<'_, AppState>,
+) -> Result<Vec<Vec<String>>, AppError> {
+    detect_circular_groups_inner(&state).await
+}
+
+/// Deletes a group by DN.
+#[tauri::command]
+pub async fn delete_group(group_dn: String, state: State<'_, AppState>) -> Result<(), AppError> {
+    delete_group_inner(&state, &group_dn).await
 }
 
 /// Returns the current Windows username from the environment.
@@ -3200,5 +3359,119 @@ mod tests {
             make_state_with_level_and_provider(PermissionLevel::AccountOperator);
         let result = add_user_to_group_inner(&state, "CN=User,DC=test", "CN=Group,DC=test").await;
         assert!(result.is_ok());
+    }
+
+    // -----------------------------------------------------------------------
+    // Story 4.4 - Group hygiene command tests
+    // -----------------------------------------------------------------------
+
+    fn make_group_entry_with_members(name: &str, members: Vec<&str>) -> DirectoryEntry {
+        let mut attrs = HashMap::new();
+        attrs.insert("groupType".to_string(), vec!["-2147483646".to_string()]);
+        attrs.insert("description".to_string(), vec![format!("{} group", name)]);
+        if !members.is_empty() {
+            attrs.insert(
+                "member".to_string(),
+                members.iter().map(|m| m.to_string()).collect(),
+            );
+        }
+        DirectoryEntry {
+            distinguished_name: format!("CN={},OU=Groups,DC=example,DC=com", name),
+            sam_account_name: Some(name.to_string()),
+            display_name: Some(name.to_string()),
+            object_class: Some("group".to_string()),
+            attributes: attrs,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_detect_empty_groups_inner_filters_empty() {
+        let groups = vec![
+            make_group_entry_with_members("EmptyGroup", vec![]),
+            make_group_entry_with_members(
+                "PopulatedGroup",
+                vec!["CN=User1,OU=Users,DC=example,DC=com"],
+            ),
+            make_group_entry_with_members("AnotherEmpty", vec![]),
+        ];
+        let state = make_state_with_groups(groups);
+        let result = detect_empty_groups_inner(&state).await.unwrap();
+        assert_eq!(result.len(), 2);
+        let names: Vec<&str> = result
+            .iter()
+            .filter_map(|g| g.sam_account_name.as_deref())
+            .collect();
+        assert!(names.contains(&"EmptyGroup"));
+        assert!(names.contains(&"AnotherEmpty"));
+    }
+
+    #[tokio::test]
+    async fn test_detect_empty_groups_inner_excludes_builtin() {
+        let mut builtin_group = make_group_entry_with_members("Guests", vec![]);
+        builtin_group.distinguished_name = "CN=Guests,CN=Builtin,DC=example,DC=com".to_string();
+        let mut users_group = make_group_entry_with_members("Domain Users", vec![]);
+        users_group.distinguished_name = "CN=Domain Users,CN=Users,DC=example,DC=com".to_string();
+        let normal_empty = make_group_entry_with_members("CustomEmpty", vec![]);
+        let groups = vec![builtin_group, users_group, normal_empty];
+        let state = make_state_with_groups(groups);
+        let result = detect_empty_groups_inner(&state).await.unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].sam_account_name, Some("CustomEmpty".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_detect_circular_groups_inner_detects_simple_cycle() {
+        // GroupA has member GroupB, GroupB has member GroupA
+        let group_a =
+            make_group_entry_with_members("GroupA", vec!["CN=GroupB,OU=Groups,DC=example,DC=com"]);
+        let group_b =
+            make_group_entry_with_members("GroupB", vec!["CN=GroupA,OU=Groups,DC=example,DC=com"]);
+        let groups = vec![group_a, group_b];
+        let state = make_state_with_groups(groups);
+        let result = detect_circular_groups_inner(&state).await.unwrap();
+        assert!(!result.is_empty(), "Should detect at least one cycle");
+        // Verify cycle contains both groups
+        let cycle = &result[0];
+        assert!(cycle.iter().any(|dn| dn.contains("GroupA")));
+        assert!(cycle.iter().any(|dn| dn.contains("GroupB")));
+    }
+
+    #[tokio::test]
+    async fn test_detect_circular_groups_inner_no_cycle() {
+        let group_a =
+            make_group_entry_with_members("GroupA", vec!["CN=GroupB,OU=Groups,DC=example,DC=com"]);
+        let group_b = make_group_entry_with_members("GroupB", vec![]);
+        let groups = vec![group_a, group_b];
+        let state = make_state_with_groups(groups);
+        let result = detect_circular_groups_inner(&state).await.unwrap();
+        assert!(result.is_empty(), "Should not detect any cycles");
+    }
+
+    #[tokio::test]
+    async fn test_delete_group_inner_requires_domain_admin() {
+        let state = make_state_with_level(PermissionLevel::AccountOperator);
+        let result = delete_group_inner(&state, "CN=TestGroup,DC=example,DC=com").await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            AppError::PermissionDenied(msg) => {
+                assert!(msg.contains("DomainAdmin"));
+            }
+            other => panic!("Expected PermissionDenied, got: {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_delete_group_inner_audits_success() {
+        let (state, provider) = make_state_with_level_and_provider(PermissionLevel::DomainAdmin);
+        delete_group_inner(&state, "CN=OldGroup,DC=example,DC=com")
+            .await
+            .unwrap();
+        let calls = provider.delete_calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0], "CN=OldGroup,DC=example,DC=com");
+        let entries = state.audit_service.get_entries();
+        assert_eq!(entries.len(), 1);
+        assert!(entries[0].success);
+        assert_eq!(entries[0].action, "GroupDeleted");
     }
 }

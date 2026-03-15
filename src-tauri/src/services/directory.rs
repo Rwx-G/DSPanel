@@ -120,6 +120,9 @@ pub trait DirectoryProvider: Send + Sync {
 
     /// Removes a member from a group.
     async fn remove_group_member(&self, group_dn: &str, member_dn: &str) -> Result<()>;
+
+    /// Deletes an AD object by its DN.
+    async fn delete_object(&self, dn: &str) -> Result<()>;
 }
 
 #[cfg(test)]
@@ -147,6 +150,7 @@ pub mod tests {
         pub disable_calls: Mutex<Vec<String>>,
         pub set_password_flags_calls: Mutex<Vec<(String, bool, bool)>>,
         pub remove_group_member_calls: Mutex<Vec<(String, String)>>,
+        pub delete_calls: Mutex<Vec<String>>,
         cannot_change_password: Mutex<bool>,
         replication_metadata: Mutex<Option<String>>,
         ou_tree: Mutex<Vec<OUNode>>,
@@ -176,6 +180,7 @@ pub mod tests {
                 disable_calls: Mutex::new(Vec::new()),
                 set_password_flags_calls: Mutex::new(Vec::new()),
                 remove_group_member_calls: Mutex::new(Vec::new()),
+                delete_calls: Mutex::new(Vec::new()),
                 cannot_change_password: Mutex::new(false),
                 replication_metadata: Mutex::new(None),
                 ou_tree: Mutex::new(Vec::new()),
@@ -199,6 +204,7 @@ pub mod tests {
                 disable_calls: Mutex::new(Vec::new()),
                 set_password_flags_calls: Mutex::new(Vec::new()),
                 remove_group_member_calls: Mutex::new(Vec::new()),
+                delete_calls: Mutex::new(Vec::new()),
                 cannot_change_password: Mutex::new(false),
                 replication_metadata: Mutex::new(None),
                 ou_tree: Mutex::new(Vec::new()),
@@ -438,6 +444,12 @@ pub mod tests {
                 .lock()
                 .unwrap()
                 .push((group_dn.to_string(), member_dn.to_string()));
+            Ok(())
+        }
+
+        async fn delete_object(&self, dn: &str) -> Result<()> {
+            self.check_failure()?;
+            self.delete_calls.lock().unwrap().push(dn.to_string());
             Ok(())
         }
     }
@@ -694,5 +706,17 @@ pub mod tests {
         assert_eq!(calls.len(), 1);
         assert_eq!(calls[0].0, "CN=TestGroup,DC=example,DC=com");
         assert_eq!(calls[0].1, "CN=User,DC=example,DC=com");
+    }
+
+    #[tokio::test]
+    async fn test_delete_object_records_call() {
+        let provider = MockDirectoryProvider::new();
+        provider
+            .delete_object("CN=OldGroup,OU=Groups,DC=example,DC=com")
+            .await
+            .unwrap();
+        let calls = provider.delete_calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0], "CN=OldGroup,OU=Groups,DC=example,DC=com");
     }
 }
