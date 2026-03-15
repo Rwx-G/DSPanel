@@ -7,10 +7,16 @@ use anyhow::Result;
 use async_trait::async_trait;
 use std::collections::HashMap;
 
-use crate::models::DirectoryEntry;
+use crate::models::{DirectoryEntry, OUNode};
 use crate::services::directory::DirectoryProvider;
 
 pub struct DemoDirectoryProvider;
+
+impl Default for DemoDirectoryProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl DemoDirectoryProvider {
     pub fn new() -> Self {
@@ -349,6 +355,198 @@ fn sample_browse_users() -> Vec<DirectoryEntry> {
     users
 }
 
+fn sample_group_entries() -> Vec<DirectoryEntry> {
+    vec![
+        make_group("IT-Admins", "IT Team", "IT"),
+        make_group("IT-Support", "IT Team", "IT"),
+        make_group("Dev-Frontend", "Engineering Team", "Engineering"),
+        make_group("Dev-Backend", "Engineering Team", "Engineering"),
+        make_group("Finance-Analysts", "Finance Team", "Finance"),
+        make_group("Sales-EMEA", "Sales Team", "Sales"),
+    ]
+}
+
+fn make_group(name: &str, parent_group: &str, _dept: &str) -> DirectoryEntry {
+    let mut attrs = HashMap::new();
+    attrs.insert(
+        "memberOf".to_string(),
+        vec![format!("CN={},OU=Groups,DC=contoso,DC=com", parent_group)],
+    );
+    DirectoryEntry {
+        distinguished_name: format!("CN={},OU=Groups,DC=contoso,DC=com", name),
+        sam_account_name: Some(name.to_string()),
+        display_name: Some(name.to_string()),
+        object_class: Some("group".to_string()),
+        attributes: attrs,
+    }
+}
+
+fn dn_seed(dn: &str) -> u64 {
+    dn.bytes()
+        .fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64))
+}
+
+fn sample_replication_metadata_for(object_dn: &str) -> String {
+    let seed = dn_seed(object_dn);
+    // Vary dates and versions per user using the seed
+    let day_offset = (seed % 28) as u32 + 1;
+    let hour = (seed % 20) as u32 + 4;
+    let v_base = seed % 5;
+    let dc = if seed.is_multiple_of(2) {
+        "DC01"
+    } else {
+        "DC02"
+    };
+    let dc_alt = if seed.is_multiple_of(2) {
+        "DC02"
+    } else {
+        "DC01"
+    };
+    let usn_base = 10000 + (seed % 50000);
+
+    let attrs: Vec<(&str, u64, String, &str, u64)> = vec![
+        (
+            "sAMAccountName",
+            1,
+            format!("2024-06-{}T{:02}:12:00Z", (day_offset % 28) + 1, hour),
+            dc,
+            usn_base,
+        ),
+        (
+            "userPrincipalName",
+            1,
+            format!("2024-06-{}T{:02}:12:00Z", (day_offset % 28) + 1, hour),
+            dc,
+            usn_base + 1,
+        ),
+        (
+            "mail",
+            v_base + 1,
+            format!(
+                "2025-{:02}-{}T{:02}:00:00Z",
+                (seed % 10) + 1,
+                (day_offset % 27) + 1,
+                (hour + 3) % 24
+            ),
+            dc_alt,
+            usn_base + 5000,
+        ),
+        (
+            "displayName",
+            v_base + 2,
+            format!(
+                "2025-{:02}-{}T{:02}:30:00Z",
+                (seed % 8) + 3,
+                (day_offset % 26) + 1,
+                (hour + 5) % 24
+            ),
+            dc_alt,
+            usn_base + 15000,
+        ),
+        (
+            "department",
+            v_base + 1,
+            format!(
+                "2025-{:02}-{}T{:02}:20:00Z",
+                (seed % 6) + 5,
+                (day_offset % 25) + 1,
+                (hour + 2) % 24
+            ),
+            dc,
+            usn_base + 12000,
+        ),
+        (
+            "title",
+            v_base + 3,
+            format!(
+                "2026-01-{}T{:02}:45:00Z",
+                (day_offset % 28) + 1,
+                (hour + 1) % 24
+            ),
+            dc,
+            usn_base + 30000,
+        ),
+        (
+            "userAccountControl",
+            v_base + 2,
+            format!(
+                "2026-01-{}T{:02}:30:00Z",
+                ((day_offset + 5) % 28) + 1,
+                (hour + 4) % 24
+            ),
+            dc,
+            usn_base + 28000,
+        ),
+        (
+            "pwdLastSet",
+            v_base + 4,
+            format!(
+                "2026-02-{}T{:02}:00:00Z",
+                (day_offset % 27) + 1,
+                (hour + 6) % 24
+            ),
+            dc,
+            usn_base + 40000,
+        ),
+        (
+            "memberOf",
+            v_base + 5,
+            format!(
+                "2026-02-{}T{:02}:45:00Z",
+                ((day_offset + 10) % 27) + 1,
+                (hour + 3) % 24
+            ),
+            dc,
+            usn_base + 42000,
+        ),
+        (
+            "lastLogonTimestamp",
+            v_base + 8,
+            format!(
+                "2026-03-{}T{:02}:15:00Z",
+                (day_offset % 13) + 1,
+                (hour + 7) % 24
+            ),
+            dc_alt,
+            usn_base + 50000,
+        ),
+        (
+            "whenChanged",
+            v_base + 10,
+            format!(
+                "2026-03-{}T{:02}:15:00Z",
+                (day_offset % 13) + 1,
+                (hour + 7) % 24
+            ),
+            dc_alt,
+            usn_base + 50001,
+        ),
+    ];
+
+    attrs
+        .iter()
+        .map(|(name, ver, time, originating_dc, usn)| {
+            format!(
+                r#"<DS_REPL_ATTR_META_DATA>
+    <pszAttributeName>{}</pszAttributeName>
+    <dwVersion>{}</dwVersion>
+    <ftimeLastOriginatingChange>{}</ftimeLastOriginatingChange>
+    <pszLastOriginatingDsaDN>CN={},OU=Domain Controllers,DC=contoso,DC=com</pszLastOriginatingDsaDN>
+    <usnOriginatingChange>{}</usnOriginatingChange>
+    <usnLocalChange>{}</usnLocalChange>
+</DS_REPL_ATTR_META_DATA>"#,
+                name,
+                ver,
+                time,
+                originating_dc,
+                usn,
+                usn + 300
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 fn sample_computers() -> Vec<DirectoryEntry> {
     vec![
         make_computer(
@@ -378,6 +576,7 @@ fn sample_computers() -> Vec<DirectoryEntry> {
     ]
 }
 
+#[allow(clippy::too_many_arguments)]
 fn make_user(
     sam: &str,
     display: &str,
@@ -403,7 +602,7 @@ fn make_user(
     );
     attrs.insert(
         "sn".to_string(),
-        vec![display.split(' ').last().unwrap_or("").to_string()],
+        vec![display.split(' ').next_back().unwrap_or("").to_string()],
     );
     attrs.insert("mail".to_string(), vec![mail.to_string()]);
     attrs.insert("department".to_string(), vec![dept.to_string()]);
@@ -426,6 +625,24 @@ fn make_user(
         vec![
             "CN=Domain Users,CN=Users,DC=contoso,DC=com".to_string(),
             format!("CN={} Team,OU=Groups,DC=contoso,DC=com", dept),
+        ],
+    );
+
+    // Token groups: SIDs of all groups the user is a member of (used for ACL cross-reference)
+    let dept_group_sid = match dept {
+        "IT" => "S-1-5-21-1234567890-9876543210-1111111111-1102",
+        "Finance" => "S-1-5-21-1234567890-9876543210-1111111111-1105",
+        "Engineering" => "S-1-5-21-1234567890-9876543210-1111111111-1106",
+        "Sales" => "S-1-5-21-1234567890-9876543210-1111111111-1108",
+        "Marketing" => "S-1-5-21-1234567890-9876543210-1111111111-1109",
+        "HR" => "S-1-5-21-1234567890-9876543210-1111111111-1110",
+        _ => "S-1-5-21-1234567890-9876543210-1111111111-1199",
+    };
+    attrs.insert(
+        "tokenGroups".to_string(),
+        vec![
+            "S-1-5-21-1234567890-9876543210-1111111111-513".to_string(), // Domain Users
+            dept_group_sid.to_string(),
         ],
     );
 
@@ -560,7 +777,7 @@ impl DirectoryProvider for DemoDirectoryProvider {
 
     async fn search_users(&self, filter: &str, max_results: usize) -> Result<Vec<DirectoryEntry>> {
         let lower = filter.to_lowercase();
-        Ok(sample_users()
+        Ok(sample_browse_users()
             .into_iter()
             .filter(|u| {
                 let sam = u.sam_account_name.as_deref().unwrap_or("").to_lowercase();
@@ -589,12 +806,17 @@ impl DirectoryProvider for DemoDirectoryProvider {
             .collect())
     }
 
-    async fn search_groups(
-        &self,
-        _filter: &str,
-        _max_results: usize,
-    ) -> Result<Vec<DirectoryEntry>> {
-        Ok(vec![])
+    async fn search_groups(&self, filter: &str, max_results: usize) -> Result<Vec<DirectoryEntry>> {
+        let lower = filter.to_lowercase();
+        Ok(sample_group_entries()
+            .into_iter()
+            .filter(|g| {
+                let name = g.display_name.as_deref().unwrap_or("").to_lowercase();
+                let sam = g.sam_account_name.as_deref().unwrap_or("").to_lowercase();
+                name.contains(&lower) || sam.contains(&lower)
+            })
+            .take(max_results)
+            .collect())
     }
 
     async fn browse_users(&self, max_results: usize) -> Result<Vec<DirectoryEntry>> {
@@ -609,7 +831,7 @@ impl DirectoryProvider for DemoDirectoryProvider {
     }
 
     async fn get_user_by_identity(&self, sam_account_name: &str) -> Result<Option<DirectoryEntry>> {
-        Ok(sample_users()
+        Ok(sample_browse_users()
             .into_iter()
             .find(|u| u.sam_account_name.as_deref() == Some(sam_account_name)))
     }
@@ -619,10 +841,11 @@ impl DirectoryProvider for DemoDirectoryProvider {
         group_dn: &str,
         max_results: usize,
     ) -> Result<Vec<DirectoryEntry>> {
-        // Search both users and computers for members of this group
+        // Search users, computers, and sub-groups for members of this group
         let mut members: Vec<DirectoryEntry> = sample_browse_users()
             .into_iter()
-            .chain(sample_computers().into_iter())
+            .chain(sample_computers())
+            .chain(sample_group_entries())
             .filter(|entry| {
                 entry
                     .get_attribute_values("memberOf")
@@ -683,4 +906,139 @@ impl DirectoryProvider for DemoDirectoryProvider {
         tracing::info!(target_dn = %user_dn, pne, uccp, "DEMO: password flags simulated");
         Ok(())
     }
+
+    async fn add_user_to_group(&self, user_dn: &str, group_dn: &str) -> Result<()> {
+        tracing::info!(user_dn = %user_dn, group_dn = %group_dn, "DEMO: add user to group simulated");
+        Ok(())
+    }
+
+    async fn get_replication_metadata(&self, object_dn: &str) -> Result<Option<String>> {
+        Ok(Some(sample_replication_metadata_for(object_dn)))
+    }
+
+    async fn get_replication_value_metadata(&self, _object_dn: &str) -> Result<Option<String>> {
+        // Demo: return sample value metadata for linked attributes
+        Ok(Some(
+            r#"
+<DS_REPL_VALUE_META_DATA>
+    <pszAttributeName>member</pszAttributeName>
+    <pszObjectDn>CN=John Doe,OU=Users,DC=contoso,DC=com</pszObjectDn>
+    <dwVersion>1</dwVersion>
+    <ftimeLastOriginatingChange>2026-02-10T09:30:00Z</ftimeLastOriginatingChange>
+    <pszLastOriginatingDsaDN>CN=DC01,OU=Domain Controllers,DC=contoso,DC=com</pszLastOriginatingDsaDN>
+    <usnOriginatingChange>55001</usnOriginatingChange>
+    <usnLocalChange>55002</usnLocalChange>
+    <ftimeDeleted></ftimeDeleted>
+</DS_REPL_VALUE_META_DATA>
+<DS_REPL_VALUE_META_DATA>
+    <pszAttributeName>member</pszAttributeName>
+    <pszObjectDn>CN=Alice Smith,OU=Users,DC=contoso,DC=com</pszObjectDn>
+    <dwVersion>1</dwVersion>
+    <ftimeLastOriginatingChange>2026-01-15T14:00:00Z</ftimeLastOriginatingChange>
+    <pszLastOriginatingDsaDN>CN=DC02,OU=Domain Controllers,DC=contoso,DC=com</pszLastOriginatingDsaDN>
+    <usnOriginatingChange>44001</usnOriginatingChange>
+    <usnLocalChange>44002</usnLocalChange>
+    <ftimeDeleted></ftimeDeleted>
+</DS_REPL_VALUE_META_DATA>
+"#
+            .to_string(),
+        ))
+    }
+
+    async fn get_nested_groups(&self, user_dn: &str) -> Result<Vec<String>> {
+        // Demo: return direct memberOf + simulate one level of nesting
+        let users = sample_users();
+        if let Some(user) = users.iter().find(|u| u.distinguished_name == user_dn) {
+            let mut groups: Vec<String> = user.get_attribute_values("memberOf").to_vec();
+            // Add parent groups from sample_group_entries memberOf
+            let group_entries = sample_group_entries();
+            let extra: Vec<String> = group_entries
+                .iter()
+                .filter(|g| {
+                    groups
+                        .iter()
+                        .any(|dn| dn.to_lowercase() == g.distinguished_name.to_lowercase())
+                })
+                .flat_map(|g| g.get_attribute_values("memberOf").to_vec())
+                .collect();
+            groups.extend(extra);
+            groups.sort();
+            groups.dedup();
+            Ok(groups)
+        } else {
+            Ok(Vec::new())
+        }
+    }
+
+    async fn get_ou_tree(&self) -> Result<Vec<OUNode>> {
+        Ok(sample_ou_tree())
+    }
+}
+
+fn sample_ou_tree() -> Vec<OUNode> {
+    vec![
+        OUNode {
+            distinguished_name: "OU=Users,DC=contoso,DC=com".to_string(),
+            name: "Users".to_string(),
+            has_children: Some(true),
+            children: Some(vec![
+                OUNode {
+                    distinguished_name: "OU=IT,OU=Users,DC=contoso,DC=com".to_string(),
+                    name: "IT".to_string(),
+                    children: None,
+                    has_children: None,
+                },
+                OUNode {
+                    distinguished_name: "OU=HR,OU=Users,DC=contoso,DC=com".to_string(),
+                    name: "HR".to_string(),
+                    children: None,
+                    has_children: None,
+                },
+                OUNode {
+                    distinguished_name: "OU=Finance,OU=Users,DC=contoso,DC=com".to_string(),
+                    name: "Finance".to_string(),
+                    children: None,
+                    has_children: None,
+                },
+                OUNode {
+                    distinguished_name: "OU=Sales,OU=Users,DC=contoso,DC=com".to_string(),
+                    name: "Sales".to_string(),
+                    children: None,
+                    has_children: None,
+                },
+            ]),
+        },
+        OUNode {
+            distinguished_name: "OU=Computers,DC=contoso,DC=com".to_string(),
+            name: "Computers".to_string(),
+            has_children: Some(true),
+            children: Some(vec![
+                OUNode {
+                    distinguished_name: "OU=Workstations,OU=Computers,DC=contoso,DC=com"
+                        .to_string(),
+                    name: "Workstations".to_string(),
+                    children: None,
+                    has_children: None,
+                },
+                OUNode {
+                    distinguished_name: "OU=Servers,OU=Computers,DC=contoso,DC=com".to_string(),
+                    name: "Servers".to_string(),
+                    children: None,
+                    has_children: None,
+                },
+            ]),
+        },
+        OUNode {
+            distinguished_name: "OU=Groups,DC=contoso,DC=com".to_string(),
+            name: "Groups".to_string(),
+            children: None,
+            has_children: None,
+        },
+        OUNode {
+            distinguished_name: "OU=Service Accounts,DC=contoso,DC=com".to_string(),
+            name: "Service Accounts".to_string(),
+            children: None,
+            has_children: None,
+        },
+    ]
 }

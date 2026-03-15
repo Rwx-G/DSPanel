@@ -145,4 +145,44 @@ mod tests {
         drop(guard);
         let _ = fs::remove_dir_all(test_dir);
     }
+
+    #[test]
+    fn test_env_filter_custom_string() {
+        let filter = EnvFilter::new("debug,hyper=error");
+        let filter_str = format!("{}", filter);
+        assert!(filter_str.contains("debug"));
+    }
+
+    #[test]
+    fn test_env_filter_trace_level() {
+        let filter = EnvFilter::new("trace");
+        let filter_str = format!("{}", filter);
+        assert!(filter_str.contains("trace"));
+    }
+
+    #[test]
+    fn test_rolling_appender_created_for_different_dirs() {
+        let test_dir = "target/test-logs-multi";
+        let _ = fs::remove_dir_all(test_dir);
+        fs::create_dir_all(test_dir).unwrap();
+
+        let appender1 = rolling::daily(test_dir, "app1.log");
+        let appender2 = rolling::daily(test_dir, "app2.log");
+        let (nb1, g1) = tracing_appender::non_blocking(appender1);
+        let (nb2, g2) = tracing_appender::non_blocking(appender2);
+
+        drop(nb1);
+        drop(nb2);
+        drop(g1);
+        drop(g2);
+        let _ = fs::remove_dir_all(test_dir);
+    }
+
+    #[test]
+    fn test_init_test_logging_is_idempotent() {
+        // Call three times - should never panic
+        init_test_logging();
+        init_test_logging();
+        init_test_logging();
+    }
 }

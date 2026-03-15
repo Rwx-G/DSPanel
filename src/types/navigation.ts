@@ -6,6 +6,7 @@ export interface TabItem {
   moduleId: string;
   icon?: string;
   isPinned: boolean;
+  data?: Record<string, unknown>;
 }
 
 export interface BreadcrumbSegment {

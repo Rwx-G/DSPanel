@@ -79,4 +79,48 @@ mod tests {
         let svc = SnapshotService::new();
         assert_eq!(svc.count(), 0);
     }
+
+    #[test]
+    fn test_default_trait() {
+        let svc = SnapshotService::default();
+        assert_eq!(svc.count(), 0);
+    }
+
+    #[test]
+    fn test_snapshot_fields_populated() {
+        let svc = SnapshotService::new();
+        svc.capture("CN=User,DC=example,DC=com", "PasswordReset");
+        // Access the internal snapshots to verify fields
+        let snapshots = svc.snapshots.lock().unwrap();
+        assert_eq!(snapshots[0].target_dn, "CN=User,DC=example,DC=com");
+        assert_eq!(snapshots[0].operation, "PasswordReset");
+        assert!(!snapshots[0].timestamp.is_empty());
+        assert!(snapshots[0].attributes.is_empty());
+    }
+
+    #[test]
+    fn test_snapshot_clone() {
+        let snapshot = Snapshot {
+            timestamp: "2026-03-15T00:00:00Z".to_string(),
+            target_dn: "CN=Test".to_string(),
+            operation: "Modify".to_string(),
+            attributes: vec![("attr1".to_string(), "val1".to_string())],
+        };
+        let cloned = snapshot.clone();
+        assert_eq!(cloned.target_dn, snapshot.target_dn);
+        assert_eq!(cloned.attributes.len(), 1);
+    }
+
+    #[test]
+    fn test_snapshot_debug_format() {
+        let snapshot = Snapshot {
+            timestamp: "t".to_string(),
+            target_dn: "dn".to_string(),
+            operation: "op".to_string(),
+            attributes: Vec::new(),
+        };
+        let debug = format!("{:?}", snapshot);
+        assert!(debug.contains("Snapshot"));
+        assert!(debug.contains("dn"));
+    }
 }

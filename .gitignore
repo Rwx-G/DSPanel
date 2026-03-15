@@ -35,6 +35,9 @@ Desktop.ini
 logs/
 *.err
 
+# Storybook
+storybook-static/
+
 # Claude Code
 .claude/memory/
 coverage/

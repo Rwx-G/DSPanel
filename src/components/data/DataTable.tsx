@@ -1,7 +1,12 @@
 import { type ReactNode, useState, useCallback, useRef } from "react";
-import { ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
+import { ArrowUp, ArrowDown, ArrowUpDown, Download } from "lucide-react";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { EmptyState } from "@/components/common/EmptyState";
+import {
+  ContextMenu,
+  type ContextMenuItem,
+} from "@/components/common/ContextMenu";
+import { exportTableToCsv } from "@/utils/csvExport";
 
 export interface Column<T> {
   key: keyof T & string;
@@ -31,6 +36,8 @@ interface DataTableProps<T> {
   loading?: boolean;
   emptyMessage?: string;
   rowKey: (row: T) => string;
+  /** When set, adds "Export to CSV" to the right-click context menu. */
+  csvFilename?: string;
 }
 
 export function DataTable<T>({
@@ -43,7 +50,12 @@ export function DataTable<T>({
   loading = false,
   emptyMessage = "No data available",
   rowKey,
+  csvFilename,
 }: DataTableProps<T>) {
+  const [csvMenuPos, setCsvMenuPos] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() =>
     Object.fromEntries(
       columns.filter((c) => c.width).map((c) => [c.key, c.width!]),
@@ -106,6 +118,18 @@ export function DataTable<T>({
     },
     [columnWidths],
   );
+
+  const csvMenuItems: ContextMenuItem[] = csvFilename
+    ? [
+        {
+          label: "Export to CSV",
+          icon: <Download size={14} />,
+          onClick: async () => {
+            await exportTableToCsv(columns, data, csvFilename);
+          },
+        },
+      ]
+    : [];
 
   if (loading) {
     return (
@@ -223,7 +247,12 @@ export function DataTable<T>({
                       e.preventDefault();
                       onRowContextMenu(row, e);
                     }
-                  : undefined
+                  : csvFilename
+                    ? (e) => {
+                        e.preventDefault();
+                        setCsvMenuPos({ x: e.clientX, y: e.clientY });
+                      }
+                    : undefined
               }
               data-testid="data-table-row"
             >
@@ -251,6 +280,13 @@ export function DataTable<T>({
           ))}
         </tbody>
       </table>
+      {csvFilename && (
+        <ContextMenu
+          items={csvMenuItems}
+          position={csvMenuPos}
+          onClose={() => setCsvMenuPos(null)}
+        />
+      )}
     </div>
   );
 }

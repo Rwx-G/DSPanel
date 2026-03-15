@@ -32,7 +32,7 @@ describe("ContextMenu", () => {
     expect(screen.getByText("Copy DN")).toBeInTheDocument();
   });
 
-  it("calls item onClick and onClose when clicked", () => {
+  it("calls item onClick and onClose when clicked", async () => {
     const onClose = vi.fn();
     const items: ContextMenuItem[] = [{ label: "Action", onClick: vi.fn() }];
 
@@ -41,8 +41,11 @@ describe("ContextMenu", () => {
     );
 
     fireEvent.click(screen.getByText("Action"));
-    expect(items[0].onClick).toHaveBeenCalled();
     expect(onClose).toHaveBeenCalled();
+    // onClick is deferred to next microtask
+    await vi.waitFor(() => {
+      expect(items[0].onClick).toHaveBeenCalled();
+    });
   });
 
   it("does not call onClick for disabled items", () => {

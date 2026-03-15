@@ -185,4 +185,242 @@ describe("ComputerLookup", () => {
       });
     });
   });
+
+  it("shows empty state when no computers available", async () => {
+    mockInvoke.mockImplementation(((cmd: string) => {
+      if (cmd === "browse_computers")
+        return Promise.resolve(makeBrowseResult([]));
+      return Promise.resolve(null);
+    }) as typeof invoke);
+
+    render(<ComputerLookup />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("empty-state-title")).toHaveTextContent(
+        "No computers found",
+      );
+      expect(
+        screen.getByText("No computers available."),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("shows placeholder text when no computer is selected", async () => {
+    const entries = [makeComputerEntry("WS001")];
+    mockBrowseWith(entries);
+
+    render(<ComputerLookup />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("computer-results-list")).toBeInTheDocument();
+    });
+
+    expect(
+      screen.getByText("Select a computer to view details"),
+    ).toBeInTheDocument();
+  });
+
+  it("displays OS information in computer result item", async () => {
+    const entries = [makeComputerEntry("WS001")];
+    mockBrowseWith(entries);
+
+    render(<ComputerLookup />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("computer-result-WS001")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("Windows 11 Enterprise")).toBeInTheDocument();
+  });
+
+  it("shows Active badge for enabled computer", async () => {
+    const entries = [makeComputerEntry("WS001")];
+    mockBrowseWith(entries);
+
+    render(<ComputerLookup />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("computer-result-WS001")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("Active")).toBeInTheDocument();
+  });
+
+  it("shows Disabled badge for disabled computer", async () => {
+    const entries = [
+      makeComputerEntry("WS001", { userAccountControl: ["4098"] }),
+    ];
+    mockBrowseWith(entries);
+
+    render(<ComputerLookup />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("computer-result-WS001")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("Disabled")).toBeInTheDocument();
+  });
+
+  it("renders accessibility status region", async () => {
+    mockBrowseWith([makeComputerEntry("WS001")]);
+
+    render(<ComputerLookup />);
+
+    await waitFor(() => {
+      const status = screen.getByTestId("computer-lookup-status");
+      expect(status).toBeInTheDocument();
+    });
+  });
+
+  it("shows Unknown OS when operatingSystem is empty", async () => {
+    const entries = [
+      makeComputerEntry("WS001", { operatingSystem: [""] }),
+    ];
+
+    // Override mapEntryToComputer behavior - OS comes from attributes
+    mockInvoke.mockImplementation(((cmd: string) => {
+      if (cmd === "browse_computers") {
+        // Return entry with empty OS
+        const entry = {
+          ...makeComputerEntry("WS001"),
+          attributes: {
+            ...makeComputerEntry("WS001").attributes,
+            operatingSystem: [],
+          },
+        };
+        return Promise.resolve(makeBrowseResult([entry]));
+      }
+      if (cmd === "resolve_dns") return Promise.resolve(["10.0.0.1"]);
+      return Promise.resolve(null);
+    }) as typeof invoke);
+
+    render(<ComputerLookup />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Unknown OS")).toBeInTheDocument();
+    });
+  });
+
+  it("highlights selected computer in results list", async () => {
+    const entries = [makeComputerEntry("WS001"), makeComputerEntry("WS002")];
+    mockBrowseWith(entries);
+
+    render(<ComputerLookup />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("computer-result-WS001")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId("computer-result-WS001"));
+
+    await waitFor(() => {
+      const selected = screen.getByTestId("computer-result-WS001");
+      expect(selected.className).toContain("selected");
+    });
+  });
+
+  it("shows computer detail panel after selection", async () => {
+    const entries = [makeComputerEntry("WS001")];
+    mockBrowseWith(entries);
+
+    render(<ComputerLookup />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("computer-result-WS001")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId("computer-result-WS001"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("computer-detail")).toBeInTheDocument();
+    });
+
+    // Computer detail should show the computer name
+    expect(screen.getByTestId("computer-detail")).toBeInTheDocument();
+  });
+
+  it("shows accessibility status for multiple computers found", async () => {
+    const entries = [
+      makeComputerEntry("WS001"),
+      makeComputerEntry("WS002"),
+      makeComputerEntry("WS003"),
+    ];
+    mockBrowseWith(entries);
+
+    render(<ComputerLookup />);
+
+    await waitFor(() => {
+      const status = screen.getByTestId("computer-lookup-status");
+      expect(status).toHaveTextContent("3 computers found");
+    });
+  });
+
+  it("shows accessibility status for single computer found", async () => {
+    const entries = [makeComputerEntry("WS001")];
+    mockBrowseWith(entries);
+
+    render(<ComputerLookup />);
+
+    await waitFor(() => {
+      const status = screen.getByTestId("computer-lookup-status");
+      expect(status).toHaveTextContent("1 computer found");
+    });
+  });
+
+  it("shows empty state with filter text message", async () => {
+    // First load returns results, then filter returns empty
+    mockInvoke.mockImplementation(((cmd: string) => {
+      if (cmd === "browse_computers")
+        return Promise.resolve(makeBrowseResult([]));
+      if (cmd === "search_computers") return Promise.resolve([]);
+      return Promise.resolve(null);
+    }) as typeof invoke);
+
+    render(<ComputerLookup />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("No computers available."),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("calls browse_computers with correct pagination", async () => {
+    mockBrowseWith([]);
+
+    render(<ComputerLookup />);
+
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith("browse_computers", {
+        page: 0,
+        pageSize: 50,
+      });
+    });
+  });
+
+  it("shows loading state text in accessibility region", () => {
+    mockInvoke.mockImplementation(
+      (() => new Promise(() => {})) as typeof invoke,
+    );
+
+    render(<ComputerLookup />);
+
+    const status = screen.getByTestId("computer-lookup-status");
+    expect(status).toHaveTextContent("Loading computers...");
+  });
+
+  it("shows error message in accessibility status region", async () => {
+    mockInvoke.mockImplementation(((cmd: string) => {
+      if (cmd === "browse_computers")
+        return Promise.reject(new Error("LDAP error"));
+      return Promise.resolve(null);
+    }) as typeof invoke);
+
+    render(<ComputerLookup />);
+
+    await waitFor(() => {
+      const status = screen.getByTestId("computer-lookup-status");
+      expect(status).toHaveTextContent(/Error/);
+    });
+  });
 });

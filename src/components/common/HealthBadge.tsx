@@ -64,6 +64,14 @@ export function HealthBadge({ healthStatus }: HealthBadgeProps) {
       onMouseLeave={() => setShowTooltip(false)}
       onFocus={() => setShowTooltip(true)}
       onBlur={() => setShowTooltip(false)}
+      onKeyDown={(e) => {
+        if (e.key === "Escape" && showTooltip) {
+          setShowTooltip(false);
+        } else if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          setShowTooltip((prev) => !prev);
+        }
+      }}
       tabIndex={0}
       role="status"
       aria-label={`Health: ${healthStatus.level}${flagCount > 0 ? `, ${flagCount} issue${flagCount > 1 ? "s" : ""}` : ""}`}

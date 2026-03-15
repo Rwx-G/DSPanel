@@ -1,5 +1,6 @@
-import { renderHook } from "@testing-library/react";
-import { describe, it, expect, beforeEach } from "vitest";
+import { renderHook, render, screen } from "@testing-library/react";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { createElement, useEffect } from "react";
 import { useFocusTrap } from "./useFocusTrap";
 
 describe("useFocusTrap", () => {
@@ -31,69 +32,146 @@ describe("useFocusTrap", () => {
     expect(document.activeElement).toBe(button);
   });
 
-  it("focuses the first focusable element in the container", () => {
-    const container = document.createElement("div");
-    container.setAttribute("tabindex", "-1");
-    const btn1 = document.createElement("button");
-    btn1.textContent = "First";
-    const btn2 = document.createElement("button");
-    btn2.textContent = "Second";
-    container.appendChild(btn1);
-    container.appendChild(btn2);
-    document.body.appendChild(container);
+  // Helper component that wires up the ref properly
+  function TrapTestComponent({
+    active = true,
+    onRef,
+  }: {
+    active?: boolean;
+    onRef?: (el: HTMLDivElement | null) => void;
+  }) {
+    const ref = useFocusTrap<HTMLDivElement>(active);
 
-    const { result } = renderHook(() => useFocusTrap<HTMLDivElement>());
-    // Manually set the ref to the container
-    Object.defineProperty(result.current, "current", {
-      value: container,
-      writable: true,
+    useEffect(() => {
+      if (onRef) onRef(ref.current);
     });
 
-    // Re-render to trigger effect with ref set
-    // Since we can't easily set the ref before mount, verify ref is returned
-    expect(result.current.current).toBe(container);
+    return createElement(
+      "div",
+      { ref, "data-testid": "trap" },
+      createElement("button", { "data-testid": "btn1" }, "First"),
+      createElement("button", { "data-testid": "btn2" }, "Second"),
+      createElement("button", { "data-testid": "btn3" }, "Third"),
+    );
+  }
+
+  it("focuses the first focusable element on mount", () => {
+    render(createElement(TrapTestComponent));
+    expect(document.activeElement).toBe(screen.getByTestId("btn1"));
   });
 
-  it("wraps focus from last to first element on Tab", () => {
-    const container = document.createElement("div");
-    const btn1 = document.createElement("button");
-    const btn2 = document.createElement("button");
-    container.appendChild(btn1);
-    container.appendChild(btn2);
-    document.body.appendChild(container);
+  it("wraps focus from last to first on Tab at last element", () => {
+    render(createElement(TrapTestComponent));
 
-    btn2.focus();
-    expect(document.activeElement).toBe(btn2);
+    // Focus the last button
+    const btn3 = screen.getByTestId("btn3");
+    btn3.focus();
+    expect(document.activeElement).toBe(btn3);
 
-    // Simulate Tab keydown
-    const event = new KeyboardEvent("keydown", { key: "Tab", bubbles: true });
+    // Dispatch Tab
+    const event = new KeyboardEvent("keydown", {
+      key: "Tab",
+      bubbles: true,
+      cancelable: true,
+    });
+    const spy = vi.spyOn(event, "preventDefault");
     document.dispatchEvent(event);
 
-    // The focus trap event listener is not attached since ref is null in renderHook,
-    // but we verify the hook handles this case without errors
-    const { result } = renderHook(() => useFocusTrap<HTMLDivElement>());
-    expect(result.current).toBeDefined();
+    expect(spy).toHaveBeenCalled();
+    expect(document.activeElement).toBe(screen.getByTestId("btn1"));
   });
 
-  it("wraps focus from first to last element on Shift+Tab", () => {
-    const container = document.createElement("div");
-    const btn1 = document.createElement("button");
-    const btn2 = document.createElement("button");
-    container.appendChild(btn1);
-    container.appendChild(btn2);
-    document.body.appendChild(container);
+  it("wraps focus from first to last on Shift+Tab at first element", () => {
+    render(createElement(TrapTestComponent));
 
-    btn1.focus();
+    // Focus is already on btn1 after mount
+    expect(document.activeElement).toBe(screen.getByTestId("btn1"));
 
     const event = new KeyboardEvent("keydown", {
       key: "Tab",
       shiftKey: true,
       bubbles: true,
+      cancelable: true,
+    });
+    const spy = vi.spyOn(event, "preventDefault");
+    document.dispatchEvent(event);
+
+    expect(spy).toHaveBeenCalled();
+    expect(document.activeElement).toBe(screen.getByTestId("btn3"));
+  });
+
+  it("does not wrap focus when Tab pressed on middle element", () => {
+    render(createElement(TrapTestComponent));
+
+    const btn2 = screen.getByTestId("btn2");
+    btn2.focus();
+
+    const event = new KeyboardEvent("keydown", {
+      key: "Tab",
+      bubbles: true,
+      cancelable: true,
+    });
+    const spy = vi.spyOn(event, "preventDefault");
+    document.dispatchEvent(event);
+
+    // Should NOT prevent default since we are not at the boundary
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it("does not wrap focus on Shift+Tab when not at first element", () => {
+    render(createElement(TrapTestComponent));
+
+    const btn2 = screen.getByTestId("btn2");
+    btn2.focus();
+
+    const event = new KeyboardEvent("keydown", {
+      key: "Tab",
+      shiftKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    const spy = vi.spyOn(event, "preventDefault");
+    document.dispatchEvent(event);
+
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it("ignores non-Tab keys", () => {
+    render(createElement(TrapTestComponent));
+
+    const btn1 = screen.getByTestId("btn1");
+    expect(document.activeElement).toBe(btn1);
+
+    const event = new KeyboardEvent("keydown", {
+      key: "Escape",
+      bubbles: true,
+      cancelable: true,
     });
     document.dispatchEvent(event);
 
-    const { result } = renderHook(() => useFocusTrap<HTMLDivElement>());
-    expect(result.current).toBeDefined();
+    // Focus should remain on btn1
+    expect(document.activeElement).toBe(btn1);
+  });
+
+  it("does not trap focus when active is false", () => {
+    render(createElement(TrapTestComponent, { active: false }));
+
+    // Focus should NOT be moved to btn1 when inactive
+    expect(document.activeElement).not.toBe(screen.getByTestId("btn1"));
+  });
+
+  it("focuses container when no focusable elements are inside", () => {
+    function EmptyTrap() {
+      const ref = useFocusTrap<HTMLDivElement>(true);
+      return createElement("div", {
+        ref,
+        tabIndex: -1,
+        "data-testid": "empty-trap",
+      });
+    }
+
+    render(createElement(EmptyTrap));
+    expect(document.activeElement).toBe(screen.getByTestId("empty-trap"));
   });
 
   it("cleans up event listener on deactivation", () => {
@@ -107,5 +185,22 @@ describe("useFocusTrap", () => {
     // Deactivate
     rerender({ active: false });
     expect(result.current).toBeDefined();
+  });
+
+  it("restores focus to previous element on unmount", () => {
+    const externalButton = document.createElement("button");
+    externalButton.textContent = "External";
+    document.body.appendChild(externalButton);
+    externalButton.focus();
+
+    const { unmount } = render(createElement(TrapTestComponent));
+
+    // Focus should be on btn1 inside the trap
+    expect(document.activeElement).toBe(screen.getByTestId("btn1"));
+
+    unmount();
+
+    // Focus should be restored to external button
+    expect(document.activeElement).toBe(externalButton);
   });
 });

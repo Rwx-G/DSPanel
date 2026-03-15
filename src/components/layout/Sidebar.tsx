@@ -3,11 +3,11 @@ import {
   Monitor,
   KeyRound,
   Settings,
-  ChevronLeft,
-  ChevronRight,
   Home,
   Sun,
   Moon,
+  GitCompareArrows,
+  FolderSearch,
   type LucideIcon,
 } from "lucide-react";
 import { useNavigation } from "@/contexts/NavigationContext";
@@ -20,6 +20,8 @@ const ICON_MAP: Record<string, LucideIcon> = {
   computer: Monitor,
   key: KeyRound,
   settings: Settings,
+  compare: GitCompareArrows,
+  "folder-search": FolderSearch,
 };
 
 const MODULES: SidebarModule[] = [
@@ -31,10 +33,24 @@ const MODULES: SidebarModule[] = [
     requiredLevel: "ReadOnly",
   },
   {
+    id: "user-comparison",
+    label: "User Comparison",
+    icon: "compare",
+    group: "Directory",
+    requiredLevel: "ReadOnly",
+  },
+  {
     id: "computers",
     label: "Computer Lookup",
     icon: "computer",
     group: "Directory",
+    requiredLevel: "ReadOnly",
+  },
+  {
+    id: "ntfs-analyzer",
+    label: "NTFS Analyzer",
+    icon: "folder-search",
+    group: "Tools",
     requiredLevel: "ReadOnly",
   },
   {
@@ -94,7 +110,9 @@ export function Sidebar({ expanded, onToggle }: SidebarProps) {
           aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
           data-testid="sidebar-toggle"
         >
-          {expanded ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
+          <span className="text-[16px] leading-none text-[var(--color-text-secondary)]">
+            {expanded ? "\u276E" : "\u276F"}
+          </span>
         </button>
       </div>
 

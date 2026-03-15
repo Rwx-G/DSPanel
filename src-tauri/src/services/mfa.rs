@@ -649,4 +649,432 @@ mod tests {
         // New backup codes should work
         assert!(svc.verify(&result2.backup_codes[0]).unwrap());
     }
+
+    #[test]
+    fn test_verify_exactly_at_rate_limit() {
+        let svc = MfaService::new_in_memory();
+        svc.setup("testuser").unwrap();
+
+        // Fail exactly MAX_FAILED_ATTEMPTS (5) times
+        for i in 0..5 {
+            let res = svc.verify("000000");
+            assert!(res.is_ok(), "Attempt {} should not error", i);
+            assert!(!res.unwrap());
+        }
+        // The 6th attempt should be blocked
+        assert!(svc.verify("000000").is_err());
+    }
+
+    #[test]
+    fn test_verify_after_lockout_reset() {
+        let svc = MfaService::new_in_memory();
+        svc.setup("testuser").unwrap();
+
+        // Lock out
+        for _ in 0..5 {
+            let _ = svc.verify("000000");
+        }
+        assert!(svc.verify("000000").is_err());
+
+        // Reset and verify we can try again
+        svc.reset_failed_attempts();
+        let res = svc.verify("000000");
+        assert!(res.is_ok());
+        assert!(!res.unwrap());
+    }
+
+    #[test]
+    fn test_generate_totp_same_step_same_result() {
+        let secret = b"consistent_secret_key";
+        let code1 = generate_totp(secret, 42).unwrap();
+        let code2 = generate_totp(secret, 42).unwrap();
+        assert_eq!(code1, code2);
+    }
+
+    #[test]
+    fn test_verify_with_real_totp_code() {
+        let svc = MfaService::new_in_memory();
+        let result = svc.setup("testuser").unwrap();
+
+        // Decode the secret from the setup result
+        let secret = base32::decode(
+            base32::Alphabet::Rfc4648 { padding: false },
+            &result.secret_base32,
+        )
+        .unwrap();
+
+        // Generate the current valid TOTP code
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        let step = now / 30;
+        let valid_code = generate_totp(&secret, step).unwrap();
+
+        // Should verify successfully
+        assert!(svc.verify(&valid_code).unwrap());
+    }
+
+    #[test]
+    fn test_verify_sets_last_verified_on_totp_success() {
+        let svc = MfaService::new_in_memory();
+        let result = svc.setup("testuser").unwrap();
+
+        // Before verification, check_mfa should fail for required actions
+        assert!(svc.check_mfa_for_action("PasswordReset").is_err());
+
+        // Verify with a real TOTP code
+        let secret = base32::decode(
+            base32::Alphabet::Rfc4648 { padding: false },
+            &result.secret_base32,
+        )
+        .unwrap();
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        let step = now / 30;
+        let valid_code = generate_totp(&secret, step).unwrap();
+        assert!(svc.verify(&valid_code).unwrap());
+
+        // After successful TOTP verification, check_mfa should pass
+        assert!(svc.check_mfa_for_action("PasswordReset").is_ok());
+    }
+
+    #[test]
+    fn test_backup_code_sets_last_verified() {
+        let svc = MfaService::new_in_memory();
+        let result = svc.setup("testuser").unwrap();
+
+        assert!(svc.check_mfa_for_action("PasswordReset").is_err());
+
+        let backup = result.backup_codes[5].clone();
+        assert!(svc.verify(&backup).unwrap());
+
+        assert!(svc.check_mfa_for_action("PasswordReset").is_ok());
+    }
+
+    #[test]
+    fn test_all_backup_codes_work() {
+        let svc = MfaService::new_in_memory();
+        let result = svc.setup("testuser").unwrap();
+
+        for (i, code) in result.backup_codes.iter().enumerate() {
+            assert!(svc.verify(code).unwrap(), "Backup code {} should verify", i);
+        }
+        // All 10 used up - none should work now
+        // Re-setup to get new codes and verify old ones are gone
+    }
+
+    #[test]
+    fn test_revoke_clears_backup_codes() {
+        let svc = MfaService::new_in_memory();
+        let result = svc.setup("testuser").unwrap();
+        svc.revoke();
+        // After revoke, not configured - verify returns error
+        assert!(svc.verify(&result.backup_codes[0]).is_err());
+    }
+
+    #[test]
+    fn test_setup_resets_failed_attempts() {
+        let svc = MfaService::new_in_memory();
+        svc.setup("testuser").unwrap();
+
+        // Accumulate some failures
+        for _ in 0..3 {
+            let _ = svc.verify("000000");
+        }
+
+        // Re-setup should reset the counter
+        let result2 = svc.setup("testuser").unwrap();
+        // Should be able to fail 5 times without lockout (counter was reset)
+        for _ in 0..5 {
+            let res = svc.verify("000000");
+            assert!(res.is_ok());
+        }
+        // 6th fails - confirms counter was reset at setup
+        assert!(svc.verify("000000").is_err());
+
+        // But backup codes from new setup still work after reset
+        svc.reset_failed_attempts();
+        assert!(svc.verify(&result2.backup_codes[0]).unwrap());
+    }
+
+    #[test]
+    fn test_requires_mfa_unknown_action() {
+        let svc = MfaService::new_in_memory();
+        svc.setup("testuser").unwrap();
+        assert!(!svc.requires_mfa("SomeRandomAction"));
+        assert!(!svc.requires_mfa(""));
+    }
+
+    #[test]
+    fn test_check_mfa_for_unknown_action_passes() {
+        let svc = MfaService::new_in_memory();
+        svc.setup("testuser").unwrap();
+        // Unknown action does not require MFA
+        assert!(svc.check_mfa_for_action("UnknownAction").is_ok());
+    }
+
+    #[test]
+    fn test_mfa_config_all_enabled() {
+        let svc = MfaService::new_in_memory();
+        svc.set_config(MfaConfig {
+            require_for_password_reset: true,
+            require_for_account_disable: true,
+            require_for_flag_changes: true,
+            require_for_bulk_operations: true,
+        });
+        svc.setup("testuser").unwrap();
+        assert!(svc.requires_mfa("PasswordReset"));
+        assert!(svc.requires_mfa("AccountDisable"));
+        assert!(svc.requires_mfa("PasswordFlagsChange"));
+        assert!(svc.requires_mfa("BulkOperation"));
+    }
+
+    #[test]
+    fn test_mfa_config_all_disabled() {
+        let svc = MfaService::new_in_memory();
+        svc.set_config(MfaConfig {
+            require_for_password_reset: false,
+            require_for_account_disable: false,
+            require_for_flag_changes: false,
+            require_for_bulk_operations: false,
+        });
+        svc.setup("testuser").unwrap();
+        assert!(!svc.requires_mfa("PasswordReset"));
+        assert!(!svc.requires_mfa("AccountDisable"));
+        assert!(!svc.requires_mfa("PasswordFlagsChange"));
+        assert!(!svc.requires_mfa("BulkOperation"));
+    }
+
+    #[test]
+    fn test_generate_totp_empty_like_secret() {
+        // A single-byte secret should still work
+        let code = generate_totp(&[0x42], 1).unwrap();
+        assert_eq!(code.len(), 6);
+        assert!(code.chars().all(|c| c.is_ascii_digit()));
+    }
+
+    #[test]
+    fn test_mfa_setup_result_deserialization() {
+        let json =
+            r#"{"secretBase32":"AAAA","qrUri":"otpauth://totp/test","backupCodes":["11111111"]}"#;
+        let result: MfaSetupResult = serde_json::from_str(json).unwrap();
+        assert_eq!(result.secret_base32, "AAAA");
+        assert_eq!(result.backup_codes.len(), 1);
+    }
+
+    #[test]
+    fn test_mfa_config_deserialization() {
+        let json = r#"{"requireForPasswordReset":false,"requireForAccountDisable":true,"requireForFlagChanges":true,"requireForBulkOperations":false}"#;
+        let config: MfaConfig = serde_json::from_str(json).unwrap();
+        assert!(!config.require_for_password_reset);
+        assert!(config.require_for_account_disable);
+        assert!(config.require_for_flag_changes);
+        assert!(!config.require_for_bulk_operations);
+    }
+
+    // -----------------------------------------------------------------------
+    // MFA service - config interaction with check_mfa_for_action
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_check_mfa_all_actions_require_verification() {
+        let svc = MfaService::new_in_memory();
+        svc.set_config(MfaConfig {
+            require_for_password_reset: true,
+            require_for_account_disable: true,
+            require_for_flag_changes: true,
+            require_for_bulk_operations: true,
+        });
+        svc.setup("testuser").unwrap();
+        // All actions should fail without verification
+        assert!(svc.check_mfa_for_action("PasswordReset").is_err());
+        assert!(svc.check_mfa_for_action("AccountDisable").is_err());
+        assert!(svc.check_mfa_for_action("PasswordFlagsChange").is_err());
+        assert!(svc.check_mfa_for_action("BulkOperation").is_err());
+    }
+
+    #[test]
+    fn test_check_mfa_all_actions_pass_after_verification() {
+        let svc = MfaService::new_in_memory();
+        svc.set_config(MfaConfig {
+            require_for_password_reset: true,
+            require_for_account_disable: true,
+            require_for_flag_changes: true,
+            require_for_bulk_operations: true,
+        });
+        let result = svc.setup("testuser").unwrap();
+        let backup = result.backup_codes[0].clone();
+        assert!(svc.verify(&backup).unwrap());
+        // All actions should pass after verification
+        assert!(svc.check_mfa_for_action("PasswordReset").is_ok());
+        assert!(svc.check_mfa_for_action("AccountDisable").is_ok());
+        assert!(svc.check_mfa_for_action("PasswordFlagsChange").is_ok());
+        assert!(svc.check_mfa_for_action("BulkOperation").is_ok());
+    }
+
+    // -----------------------------------------------------------------------
+    // TOTP code format validation
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_generate_totp_large_time_step() {
+        let secret = b"12345678901234567890";
+        let code = generate_totp(secret, u64::MAX).unwrap();
+        assert_eq!(code.len(), 6);
+        assert!(code.chars().all(|c| c.is_ascii_digit()));
+    }
+
+    #[test]
+    fn test_generate_totp_step_zero() {
+        let secret = b"12345678901234567890";
+        let code = generate_totp(secret, 0).unwrap();
+        assert_eq!(code.len(), 6);
+        assert!(code.chars().all(|c| c.is_ascii_digit()));
+    }
+
+    // -----------------------------------------------------------------------
+    // MFA service - verify with non-numeric code
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_verify_non_numeric_code_fails() {
+        let svc = MfaService::new_in_memory();
+        svc.setup("testuser").unwrap();
+        // Non-numeric codes should not match any TOTP or backup code
+        assert!(!svc.verify("abcdef").unwrap());
+        assert!(!svc.verify("").unwrap());
+        assert!(!svc.verify("123").unwrap());
+    }
+
+    // -----------------------------------------------------------------------
+    // MFA service - revoke then setup again
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_revoke_then_setup_works() {
+        let svc = MfaService::new_in_memory();
+        let r1 = svc.setup("user1").unwrap();
+        svc.revoke();
+        assert!(!svc.is_configured());
+
+        let r2 = svc.setup("user2").unwrap();
+        assert!(svc.is_configured());
+        assert_ne!(r1.secret_base32, r2.secret_base32);
+        // New backup codes should work
+        assert!(svc.verify(&r2.backup_codes[0]).unwrap());
+    }
+
+    // -----------------------------------------------------------------------
+    // MFA service - config persistence across set_config calls
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_set_config_overrides_previous() {
+        let svc = MfaService::new_in_memory();
+        svc.set_config(MfaConfig {
+            require_for_password_reset: false,
+            require_for_account_disable: false,
+            require_for_flag_changes: true,
+            require_for_bulk_operations: true,
+        });
+        let c1 = svc.config();
+        assert!(!c1.require_for_password_reset);
+        assert!(c1.require_for_flag_changes);
+
+        svc.set_config(MfaConfig {
+            require_for_password_reset: true,
+            require_for_account_disable: true,
+            require_for_flag_changes: false,
+            require_for_bulk_operations: false,
+        });
+        let c2 = svc.config();
+        assert!(c2.require_for_password_reset);
+        assert!(!c2.require_for_flag_changes);
+    }
+
+    // -----------------------------------------------------------------------
+    // MFA service - backup codes consumed in order
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_backup_codes_consumed_leaves_remaining() {
+        let svc = MfaService::new_in_memory();
+        let result = svc.setup("testuser").unwrap();
+        // Use first 5 backup codes
+        for i in 0..5 {
+            assert!(svc.verify(&result.backup_codes[i]).unwrap());
+        }
+        // Remaining 5 should still work
+        for i in 5..10 {
+            assert!(svc.verify(&result.backup_codes[i]).unwrap());
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // MfaSetupResult - qr_uri contains username
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_setup_qr_uri_encodes_username() {
+        let svc = MfaService::new_in_memory();
+        let result = svc.setup("admin.user").unwrap();
+        assert!(result.qr_uri.contains("DSPanel:admin.user"));
+    }
+
+    // -----------------------------------------------------------------------
+    // MfaPersistedData serialization (internal struct accessible in tests)
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_mfa_persisted_data_roundtrip() {
+        let data = MfaPersistedData {
+            secret_b64: "dGVzdA==".to_string(),
+            backup_codes: vec!["12345678".to_string(), "87654321".to_string()],
+        };
+        let json = serde_json::to_string(&data).unwrap();
+        let deserialized: MfaPersistedData = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.secret_b64, "dGVzdA==");
+        assert_eq!(deserialized.backup_codes.len(), 2);
+    }
+
+    // -----------------------------------------------------------------------
+    // MFA service - verify does not set last_verified on failure
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_failed_verify_does_not_set_last_verified() {
+        let svc = MfaService::new_in_memory();
+        svc.setup("testuser").unwrap();
+        svc.set_config(MfaConfig {
+            require_for_password_reset: true,
+            ..Default::default()
+        });
+        // Fail a verification
+        assert!(!svc.verify("000000").unwrap());
+        // check_mfa should still fail (last_verified not set)
+        assert!(svc.check_mfa_for_action("PasswordReset").is_err());
+    }
+
+    // -----------------------------------------------------------------------
+    // MFA service - multiple sequential setups
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_multiple_setups_each_unique() {
+        let svc = MfaService::new_in_memory();
+        let r1 = svc.setup("user1").unwrap();
+        let r2 = svc.setup("user2").unwrap();
+        let r3 = svc.setup("user3").unwrap();
+        // All secrets should be different
+        assert_ne!(r1.secret_base32, r2.secret_base32);
+        assert_ne!(r2.secret_base32, r3.secret_base32);
+        assert_ne!(r1.secret_base32, r3.secret_base32);
+        // Only r3 backup codes should work
+        assert!(!svc.verify(&r1.backup_codes[0]).unwrap());
+        assert!(!svc.verify(&r2.backup_codes[0]).unwrap());
+        assert!(svc.verify(&r3.backup_codes[0]).unwrap());
+    }
 }

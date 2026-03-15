@@ -194,7 +194,7 @@ describe("useUserBrowse", () => {
     expect(result.current.items).toHaveLength(1);
   });
 
-  it("auto-selects when search returns single result", async () => {
+  it("does not auto-select when search returns single result", async () => {
     const browseEntries = [makeEntry("a", "Alice"), makeEntry("b", "Bob")];
     mockInvoke.mockResolvedValueOnce(makeBrowseResult(browseEntries));
 
@@ -214,8 +214,8 @@ describe("useUserBrowse", () => {
       expect(result.current.loading).toBe(false);
     });
 
-    expect(result.current.selectedItem).not.toBeNull();
-    expect(result.current.selectedItem?.samAccountName).toBe("jdoe");
+    // Selection should not change - user must click to select
+    expect(result.current.selectedItem).toBeNull();
   });
 
   it("refresh resets state and reloads", async () => {

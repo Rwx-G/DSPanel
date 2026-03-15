@@ -1,7 +1,7 @@
 {
   "name": "dspanel",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
   "packageManager": "pnpm@10.28.1",
   "scripts": {
@@ -14,7 +14,9 @@
     "lint": "eslint src/",
     "format": "prettier --write src/",
     "format:check": "prettier --check src/",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.2.1",
@@ -28,6 +30,9 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@storybook/addon-a11y": "^10.2.19",
+    "@storybook/addon-docs": "^10.2.19",
+    "@storybook/react-vite": "^10.2.19",
     "@tauri-apps/cli": "^2",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
@@ -39,6 +44,7 @@
     "eslint": "^10.0.3",
     "jsdom": "^28.1.0",
     "prettier": "^3.8.1",
+    "storybook": "^10.2.19",
     "typescript": "~5.8.3",
     "typescript-eslint": "^8.57.0",
     "vite": "^7.0.4",

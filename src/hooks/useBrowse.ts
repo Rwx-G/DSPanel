@@ -146,10 +146,6 @@ export function useBrowse<T>({
         setDisplayedItems(mapped);
         setTotalCount(mapped.length);
         setHasMore(false);
-
-        if (mapped.length === 1) {
-          setSelectedItem(mapped[0]);
-        }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Search failed");
         setDisplayedItems([]);

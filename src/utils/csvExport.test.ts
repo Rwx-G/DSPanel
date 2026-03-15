@@ -1,5 +1,12 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { escapeCsvField, formatCsv, downloadCsv } from "./csvExport";
+
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke: vi.fn(),
+}));
+
+import { invoke } from "@tauri-apps/api/core";
+const mockInvoke = vi.mocked(invoke);
 
 describe("escapeCsvField", () => {
   it("should return plain text unchanged", () => {
@@ -56,65 +63,111 @@ describe("formatCsv", () => {
 });
 
 describe("downloadCsv", () => {
-  const mockLink = {
-    href: "",
-    download: "",
-    click: vi.fn(),
-  };
-
-  let createObjectURLSpy: ReturnType<typeof vi.spyOn>;
-  let revokeObjectURLSpy: ReturnType<typeof vi.spyOn>;
-  let createElementSpy: ReturnType<typeof vi.spyOn>;
-
-  afterEach(() => {
-    vi.restoreAllMocks();
+  beforeEach(() => {
+    vi.clearAllMocks();
   });
 
-  function setupMocks() {
-    createObjectURLSpy = vi
-      .spyOn(URL, "createObjectURL")
-      .mockReturnValue("blob:test");
-    revokeObjectURLSpy = vi
-      .spyOn(URL, "revokeObjectURL")
-      .mockImplementation(() => {});
-    createElementSpy = vi
-      .spyOn(document, "createElement")
-      .mockReturnValue(mockLink as unknown as HTMLAnchorElement);
-    mockLink.href = "";
-    mockLink.download = "";
-    mockLink.click.mockClear();
-  }
+  it("should invoke save_file_dialog with correct params", async () => {
+    mockInvoke.mockResolvedValueOnce("/path/to/file.csv");
 
-  it("should create a Blob with CSV content", () => {
-    setupMocks();
-    downloadCsv("test.csv", "Name,Age\nAlice,30");
+    await downloadCsv("export.csv", "Name,Age\nAlice,30");
 
-    expect(createObjectURLSpy).toHaveBeenCalledTimes(1);
-    const blob = createObjectURLSpy.mock.calls[0][0] as Blob;
-    expect(blob).toBeInstanceOf(Blob);
-    expect(blob.type).toBe("text/csv;charset=utf-8;");
+    expect(mockInvoke).toHaveBeenCalledWith("save_file_dialog", {
+      content: "Name,Age\nAlice,30",
+      defaultName: "export.csv",
+      filterName: "CSV files",
+      filterExtensions: ["csv"],
+    });
   });
 
-  it("should set correct filename on link", () => {
-    setupMocks();
-    downloadCsv("export-data.csv", "a,b");
+  it("should return the saved path", async () => {
+    mockInvoke.mockResolvedValueOnce("/downloads/data.csv");
 
-    expect(createElementSpy).toHaveBeenCalledWith("a");
-    expect(mockLink.download).toBe("export-data.csv");
-    expect(mockLink.href).toBe("blob:test");
+    const result = await downloadCsv("data.csv", "a,b");
+    expect(result).toBe("/downloads/data.csv");
   });
 
-  it("should click the link to trigger download", () => {
-    setupMocks();
-    downloadCsv("test.csv", "x");
+  it("should return null when user cancels", async () => {
+    mockInvoke.mockResolvedValueOnce(null);
 
-    expect(mockLink.click).toHaveBeenCalledTimes(1);
+    const result = await downloadCsv("data.csv", "a,b");
+    expect(result).toBeNull();
   });
 
-  it("should revoke the object URL after download", () => {
-    setupMocks();
-    downloadCsv("test.csv", "x");
+  it("should propagate error when invoke rejects", async () => {
+    mockInvoke.mockRejectedValueOnce(new Error("Write failed"));
 
-    expect(revokeObjectURLSpy).toHaveBeenCalledWith("blob:test");
+    await expect(downloadCsv("data.csv", "a,b")).rejects.toThrow(
+      "Write failed",
+    );
+  });
+});
+
+describe("exportTableToCsv", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should format columns and data into CSV and call downloadCsv", async () => {
+    mockInvoke.mockResolvedValueOnce("/path/to/file.csv");
+
+    const { exportTableToCsv } = await import("./csvExport");
+
+    const columns = [
+      { key: "name" as const, header: "Name" },
+      { key: "age" as const, header: "Age" },
+    ];
+    const data = [
+      { name: "Alice", age: "30" },
+      { name: "Bob", age: "25" },
+    ];
+
+    const result = await exportTableToCsv(columns, data, "test.csv");
+
+    expect(mockInvoke).toHaveBeenCalledWith("save_file_dialog", {
+      content: "Name,Age\nAlice,30\nBob,25",
+      defaultName: "test.csv",
+      filterName: "CSV files",
+      filterExtensions: ["csv"],
+    });
+    expect(result).toBe("/path/to/file.csv");
+  });
+
+  it("should handle empty data array", async () => {
+    mockInvoke.mockResolvedValueOnce("/path/to/file.csv");
+
+    const { exportTableToCsv } = await import("./csvExport");
+
+    const columns = [{ key: "name" as const, header: "Name" }];
+    const result = await exportTableToCsv(columns, [], "test.csv");
+
+    expect(mockInvoke).toHaveBeenCalledWith("save_file_dialog", {
+      content: "Name",
+      defaultName: "test.csv",
+      filterName: "CSV files",
+      filterExtensions: ["csv"],
+    });
+    expect(result).toBe("/path/to/file.csv");
+  });
+
+  it("should convert null/undefined values to empty string", async () => {
+    mockInvoke.mockResolvedValueOnce("/path/to/file.csv");
+
+    const { exportTableToCsv } = await import("./csvExport");
+
+    const columns = [
+      { key: "name" as const, header: "Name" },
+      { key: "value" as const, header: "Value" },
+    ];
+    const data = [{ name: "Test", value: undefined as unknown as string }];
+
+    await exportTableToCsv(columns, data, "test.csv");
+
+    expect(mockInvoke).toHaveBeenCalledWith("save_file_dialog", {
+      content: "Name,Value\nTest,",
+      defaultName: "test.csv",
+      filterName: "CSV files",
+      filterExtensions: ["csv"],
+    });
   });
 });

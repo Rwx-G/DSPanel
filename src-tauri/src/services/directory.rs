@@ -1,4 +1,4 @@
-use crate::models::DirectoryEntry;
+use crate::models::{DirectoryEntry, OUNode};
 use anyhow::Result;
 use async_trait::async_trait;
 
@@ -86,6 +86,34 @@ pub trait DirectoryProvider: Send + Sync {
         password_never_expires: bool,
         user_cannot_change_password: bool,
     ) -> Result<()>;
+
+    /// Adds a user to a group by modifying the group's `member` attribute.
+    async fn add_user_to_group(&self, user_dn: &str, group_dn: &str) -> Result<()>;
+
+    /// Returns the raw `msDS-ReplAttributeMetaData` value for an object.
+    ///
+    /// This is an operational attribute that must be explicitly requested.
+    /// Returns None if the attribute is not available.
+    async fn get_replication_metadata(&self, object_dn: &str) -> Result<Option<String>>;
+
+    /// Returns the raw `msDS-ReplValueMetaData` value for an object.
+    ///
+    /// Tracks individual linked-attribute values (e.g. group members).
+    /// Returns None if the attribute is not available.
+    async fn get_replication_value_metadata(&self, object_dn: &str) -> Result<Option<String>>;
+
+    /// Returns all groups a user belongs to, including nested (transitive) memberships.
+    ///
+    /// Uses LDAP_MATCHING_RULE_IN_CHAIN (OID 1.2.840.113556.1.4.1941) to resolve
+    /// the full group chain in a single query. Falls back to direct `memberOf` if
+    /// the matching rule is not supported.
+    async fn get_nested_groups(&self, user_dn: &str) -> Result<Vec<String>>;
+
+    /// Returns the OU tree starting from the base DN.
+    ///
+    /// Each node contains the OU name and DN. Children are populated
+    /// for the first level; deeper levels use `has_children` for lazy loading.
+    async fn get_ou_tree(&self) -> Result<Vec<OUNode>>;
 }
 
 #[cfg(test)]
@@ -113,6 +141,8 @@ pub mod tests {
         pub disable_calls: Mutex<Vec<String>>,
         pub set_password_flags_calls: Mutex<Vec<(String, bool, bool)>>,
         cannot_change_password: Mutex<bool>,
+        replication_metadata: Mutex<Option<String>>,
+        ou_tree: Mutex<Vec<OUNode>>,
     }
 
     impl Default for MockDirectoryProvider {
@@ -139,6 +169,8 @@ pub mod tests {
                 disable_calls: Mutex::new(Vec::new()),
                 set_password_flags_calls: Mutex::new(Vec::new()),
                 cannot_change_password: Mutex::new(false),
+                replication_metadata: Mutex::new(None),
+                ou_tree: Mutex::new(Vec::new()),
             }
         }
 
@@ -159,6 +191,8 @@ pub mod tests {
                 disable_calls: Mutex::new(Vec::new()),
                 set_password_flags_calls: Mutex::new(Vec::new()),
                 cannot_change_password: Mutex::new(false),
+                replication_metadata: Mutex::new(None),
+                ou_tree: Mutex::new(Vec::new()),
             }
         }
 
@@ -184,6 +218,11 @@ pub mod tests {
 
         pub fn with_user_groups(self, groups: Vec<String>) -> Self {
             *self.user_groups.lock().unwrap() = groups;
+            self
+        }
+
+        pub fn with_replication_metadata(self, xml: String) -> Self {
+            *self.replication_metadata.lock().unwrap() = Some(xml);
             self
         }
 
@@ -340,6 +379,37 @@ pub mod tests {
                 user_cannot_change_password,
             ));
             Ok(())
+        }
+
+        async fn add_user_to_group(&self, _user_dn: &str, _group_dn: &str) -> Result<()> {
+            self.check_failure()?;
+            Ok(())
+        }
+
+        async fn get_replication_metadata(&self, _object_dn: &str) -> Result<Option<String>> {
+            self.check_failure()?;
+            Ok(self.replication_metadata.lock().unwrap().clone())
+        }
+
+        async fn get_replication_value_metadata(&self, _object_dn: &str) -> Result<Option<String>> {
+            self.check_failure()?;
+            Ok(None)
+        }
+
+        async fn get_nested_groups(&self, user_dn: &str) -> Result<Vec<String>> {
+            self.check_failure()?;
+            // Mock: return memberOf from the matching user
+            let users = self.users.lock().unwrap();
+            if let Some(user) = users.iter().find(|u| u.distinguished_name == user_dn) {
+                Ok(user.get_attribute_values("memberOf").to_vec())
+            } else {
+                Ok(Vec::new())
+            }
+        }
+
+        async fn get_ou_tree(&self) -> Result<Vec<OUNode>> {
+            self.check_failure()?;
+            Ok(self.ou_tree.lock().unwrap().clone())
         }
     }
 

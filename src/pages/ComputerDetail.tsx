@@ -16,6 +16,7 @@ import { GroupMembersDialog } from "@/components/dialogs/GroupMembersDialog";
 import { type DirectoryComputer } from "@/types/directory";
 import { parseCnFromDn } from "@/utils/dn";
 import { Users } from "lucide-react";
+import { StateInTimeView } from "@/components/comparison/StateInTimeView";
 
 export function ComputerDetail({ computer }: { computer: DirectoryComputer }) {
   const [groupFilterText, setGroupFilterText] = useState("");
@@ -36,12 +37,14 @@ export function ComputerDetail({ computer }: { computer: DirectoryComputer }) {
   const [isPinging, setIsPinging] = useState(false);
   const [resolvedAddresses, setResolvedAddresses] = useState<string[]>([]);
   const [isResolvingDns, setIsResolvingDns] = useState(false);
+  const [dnsTimedOut, setDnsTimedOut] = useState(false);
   const dnsCacheRef = useRef<Map<string, string[]>>(new Map());
 
   useEffect(() => {
     if (!computer.dnsHostName) {
       setResolvedAddresses([]);
       setPingResult(null);
+      setDnsTimedOut(false);
       return;
     }
 
@@ -49,12 +52,17 @@ export function ComputerDetail({ computer }: { computer: DirectoryComputer }) {
     if (cached) {
       setResolvedAddresses(cached);
       setPingResult(null);
+      setDnsTimedOut(false);
       return;
     }
 
     setIsResolvingDns(true);
     setResolvedAddresses([]);
     setPingResult(null);
+    setDnsTimedOut(false);
+
+    // Timeout indicator after 10 seconds
+    const timeoutTimer = setTimeout(() => setDnsTimedOut(true), 10_000);
 
     invoke<string[]>("resolve_dns", { hostname: computer.dnsHostName })
       .then((addrs) => {
@@ -62,7 +70,13 @@ export function ComputerDetail({ computer }: { computer: DirectoryComputer }) {
         setResolvedAddresses(addrs);
       })
       .catch(() => setResolvedAddresses(["DNS resolution failed"]))
-      .finally(() => setIsResolvingDns(false));
+      .finally(() => {
+        clearTimeout(timeoutTimer);
+        setIsResolvingDns(false);
+        setDnsTimedOut(false);
+      });
+
+    return () => clearTimeout(timeoutTimer);
   }, [computer.dnsHostName]);
 
   const handlePing = async () => {
@@ -130,10 +144,14 @@ export function ComputerDetail({ computer }: { computer: DirectoryComputer }) {
         {
           label: "IP Address(es)",
           value: isResolvingDns
-            ? "Resolving..."
+            ? dnsTimedOut
+              ? "Resolving... (taking longer than expected)"
+              : "Resolving..."
             : resolvedAddresses.length > 0
               ? resolvedAddresses.join(", ")
               : "N/A",
+          severity:
+            isResolvingDns && dnsTimedOut ? ("Warning" as const) : undefined,
         },
         {
           label: "Ping",
@@ -233,6 +251,18 @@ export function ComputerDetail({ computer }: { computer: DirectoryComputer }) {
           data={groupRows}
           rowKey={(row) => row.dn}
           onRowContextMenu={handleGroupContextMenu}
+        />
+      </div>
+
+      <div className="border-t border-[var(--color-border-default)]" />
+
+      <div data-testid="computer-history-section">
+        <h3 className="mb-2 text-body font-semibold text-[var(--color-text-primary)]">
+          Replication History
+        </h3>
+        <StateInTimeView
+          objectDn={computer.distinguishedName}
+          objectType="computer"
         />
       </div>
 

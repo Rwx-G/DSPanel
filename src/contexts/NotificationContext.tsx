@@ -28,6 +28,7 @@ interface NotificationContextValue {
     action?: NotificationAction,
   ) => void;
   removeNotification: (id: string) => void;
+  autoDismissMs: number;
 }
 
 const NotificationContext = createContext<NotificationContextValue | null>(
@@ -51,6 +52,7 @@ export function useNotifications() {
     notify: ctx.addNotification,
     dismiss: ctx.removeNotification,
     notifications: ctx.notifications,
+    autoDismissMs: ctx.autoDismissMs,
   };
 }
 
@@ -89,7 +91,12 @@ export function NotificationProvider({
 
   return (
     <NotificationContext.Provider
-      value={{ notifications, addNotification, removeNotification }}
+      value={{
+        notifications,
+        addNotification,
+        removeNotification,
+        autoDismissMs,
+      }}
     >
       {children}
     </NotificationContext.Provider>

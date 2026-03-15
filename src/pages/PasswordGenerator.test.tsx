@@ -234,4 +234,152 @@ describe("PasswordGenerator", () => {
     const page = screen.getByTestId("password-generator-page");
     expect(page.className).toContain("overflow-y-auto");
   });
+
+  it("shows strength label 'Excellent' for length >= 24", async () => {
+    render(<PasswordGenerator />);
+
+    fireEvent.change(screen.getByTestId("length-slider"), {
+      target: { value: "24" },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("Excellent")).toBeInTheDocument();
+    });
+  });
+
+  it("shows strength label 'Strong' for length 20", async () => {
+    render(<PasswordGenerator />);
+
+    // Default is 20
+    expect(screen.getByText("Strong")).toBeInTheDocument();
+  });
+
+  it("shows strength label 'Good' for length 16", async () => {
+    render(<PasswordGenerator />);
+
+    fireEvent.change(screen.getByTestId("length-slider"), {
+      target: { value: "16" },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("Good")).toBeInTheDocument();
+    });
+  });
+
+  it("shows strength label 'Fair' for length 12", async () => {
+    render(<PasswordGenerator />);
+
+    fireEvent.change(screen.getByTestId("length-slider"), {
+      target: { value: "12" },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("Fair")).toBeInTheDocument();
+    });
+  });
+
+  it("shows strength label 'Weak' for length 8", async () => {
+    render(<PasswordGenerator />);
+
+    fireEvent.change(screen.getByTestId("length-slider"), {
+      target: { value: "8" },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("Weak")).toBeInTheDocument();
+    });
+  });
+
+  it("toggles HIBP info tooltip on click", async () => {
+    render(<PasswordGenerator />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("hibp-info-btn")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId("hibp-info-btn"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("hibp-info-popup")).toBeInTheDocument();
+      expect(
+        screen.getByText(/Have I Been Pwned/),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("HIBP button is disabled when no password", async () => {
+    mockInvoke.mockImplementation(((cmd: string) => {
+      if (cmd === "generate_password") return Promise.resolve("");
+      return Promise.resolve(undefined);
+    }) as typeof invoke);
+
+    render(<PasswordGenerator />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("check-hibp-btn")).toBeDisabled();
+    });
+  });
+
+  it("shows error string directly when error is a string", async () => {
+    mockInvoke.mockRejectedValue("Custom error text");
+
+    render(<PasswordGenerator />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("error-message")).toHaveTextContent(
+        "Custom error text",
+      );
+    });
+  });
+
+  it("shows fallback error for non-string errors", async () => {
+    mockInvoke.mockRejectedValue(42);
+
+    render(<PasswordGenerator />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("error-message")).toHaveTextContent(
+        "Failed to generate password",
+      );
+    });
+  });
+
+  it("resets HIBP result when regenerating", async () => {
+    let callCount = 0;
+    mockInvoke.mockImplementation(((cmd: string) => {
+      if (cmd === "generate_password") {
+        callCount++;
+        return Promise.resolve(`Pass${callCount}`);
+      }
+      if (cmd === "check_password_hibp")
+        return Promise.resolve({
+          isBreached: false,
+          breachCount: 0,
+          checked: true,
+        });
+      return Promise.resolve(undefined);
+    }) as typeof invoke);
+
+    render(<PasswordGenerator />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Pass1")).toBeInTheDocument();
+    });
+
+    // Check HIBP
+    fireEvent.click(screen.getByTestId("check-hibp-btn"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("hibp-clean")).toBeInTheDocument();
+    });
+
+    // Regenerate
+    fireEvent.click(screen.getByTestId("generate-btn"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Pass2")).toBeInTheDocument();
+      // HIBP result should be cleared
+      expect(screen.queryByTestId("hibp-clean")).not.toBeInTheDocument();
+    });
+  });
 });
