@@ -38,6 +38,7 @@ const MOCK_METADATA: ReplicationMetadataResult = {
       originatingUsn: 11111,
     },
   ],
+  valueMetadata: [],
   isAvailable: true,
   message: null,
 };
@@ -45,6 +46,7 @@ const MOCK_METADATA: ReplicationMetadataResult = {
 const MOCK_METADATA_UNAVAILABLE: ReplicationMetadataResult = {
   objectDn: "CN=Test,DC=example,DC=com",
   attributes: [],
+  valueMetadata: [],
   isAvailable: false,
   message: "Replication metadata not available for this object",
 };

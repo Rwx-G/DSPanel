@@ -16,12 +16,31 @@ pub struct AttributeMetadata {
     pub originating_usn: u64,
 }
 
+/// Metadata about a single linked-attribute value from AD replication data.
+///
+/// Parsed from the `msDS-ReplValueMetaData` operational attribute.
+/// Unlike `AttributeMetadata`, this tracks individual values (e.g. each
+/// member in a group's `member` attribute).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ValueMetadata {
+    pub attribute_name: String,
+    pub object_dn: String,
+    pub version: u64,
+    pub last_originating_change_time: String,
+    pub last_originating_dsa_dn: String,
+    pub local_usn: u64,
+    pub originating_usn: u64,
+    pub is_deleted: bool,
+}
+
 /// Result of querying replication metadata for an object.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ReplicationMetadataResult {
     pub object_dn: String,
     pub attributes: Vec<AttributeMetadata>,
+    pub value_metadata: Vec<ValueMetadata>,
     pub is_available: bool,
     pub message: Option<String>,
 }
@@ -115,6 +134,100 @@ pub fn parse_replication_metadata(raw_xml: &str) -> Vec<AttributeMetadata> {
     }
 
     // Sort by change time descending (most recent first)
+    results.sort_by(|a, b| {
+        b.last_originating_change_time
+            .cmp(&a.last_originating_change_time)
+    });
+
+    results
+}
+
+/// Parses `msDS-ReplValueMetaData` XML fragments into structured value metadata.
+///
+/// This attribute tracks individual linked-attribute values (e.g. each member
+/// in a group's `member` attribute). The XML structure uses `DS_REPL_VALUE_META_DATA`
+/// elements with child fields including the linked object's DN.
+pub fn parse_replication_value_metadata(raw_xml: &str) -> Vec<ValueMetadata> {
+    let mut results = Vec::new();
+
+    let wrapped = format!("<root>{}</root>", raw_xml);
+    let mut reader = Reader::from_str(&wrapped);
+
+    let mut in_entry = false;
+    let mut current_tag = String::new();
+    let mut attr_name = String::new();
+    let mut object_dn = String::new();
+    let mut version: u64 = 0;
+    let mut change_time = String::new();
+    let mut dsa_dn = String::new();
+    let mut local_usn: u64 = 0;
+    let mut originating_usn: u64 = 0;
+    let mut is_deleted = false;
+
+    loop {
+        match reader.read_event() {
+            Ok(Event::Start(e)) => {
+                let tag = String::from_utf8_lossy(e.name().as_ref()).to_string();
+                if tag == "DS_REPL_VALUE_META_DATA" {
+                    in_entry = true;
+                    attr_name.clear();
+                    object_dn.clear();
+                    version = 0;
+                    change_time.clear();
+                    dsa_dn.clear();
+                    local_usn = 0;
+                    originating_usn = 0;
+                    is_deleted = false;
+                } else if in_entry {
+                    current_tag = tag;
+                }
+            }
+            Ok(Event::Text(e)) => {
+                if in_entry && !current_tag.is_empty() {
+                    let text = e.unescape().unwrap_or_default().trim().to_string();
+                    match current_tag.as_str() {
+                        "pszAttributeName" => attr_name = text,
+                        "pszObjectDn" => object_dn = text,
+                        "dwVersion" => version = text.parse().unwrap_or(0),
+                        "ftimeLastOriginatingChange" => change_time = text,
+                        "pszLastOriginatingDsaDN" => dsa_dn = text,
+                        "usnLocalChange" => local_usn = text.parse().unwrap_or(0),
+                        "usnOriginatingChange" => originating_usn = text.parse().unwrap_or(0),
+                        "ftimeDeleted" => {
+                            is_deleted = !text.is_empty() && text != "1601-01-01T00:00:00Z"
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            Ok(Event::End(e)) => {
+                let tag = String::from_utf8_lossy(e.name().as_ref()).to_string();
+                if tag == "DS_REPL_VALUE_META_DATA" {
+                    in_entry = false;
+                    if !attr_name.is_empty() {
+                        results.push(ValueMetadata {
+                            attribute_name: attr_name.clone(),
+                            object_dn: object_dn.clone(),
+                            version,
+                            last_originating_change_time: change_time.clone(),
+                            last_originating_dsa_dn: dsa_dn.clone(),
+                            local_usn,
+                            originating_usn,
+                            is_deleted,
+                        });
+                    }
+                }
+                current_tag.clear();
+            }
+            Ok(Event::Eof) => break,
+            Err(e) => {
+                tracing::warn!("XML parse error in value metadata: {}", e);
+                break;
+            }
+            _ => {}
+        }
+    }
+
     results.sort_by(|a, b| {
         b.last_originating_change_time
             .cmp(&a.last_originating_change_time)
@@ -371,12 +484,14 @@ mod tests {
         let result = ReplicationMetadataResult {
             object_dn: "CN=Test,DC=example,DC=com".to_string(),
             attributes: vec![],
+            value_metadata: vec![],
             is_available: true,
             message: None,
         };
         let json = serde_json::to_string(&result).unwrap();
         assert!(json.contains("objectDn"));
         assert!(json.contains("isAvailable"));
+        assert!(json.contains("valueMetadata"));
     }
 
     #[test]
@@ -384,6 +499,7 @@ mod tests {
         let result = ReplicationMetadataResult {
             object_dn: "CN=Test,DC=example,DC=com".to_string(),
             attributes: vec![],
+            value_metadata: vec![],
             is_available: false,
             message: Some("Metadata not available for this object".to_string()),
         };
@@ -404,5 +520,91 @@ mod tests {
         assert!(json.contains("versionBefore"));
         assert!(json.contains("versionAfter"));
         assert!(json.contains("changeTime"));
+    }
+
+    // -----------------------------------------------------------------------
+    // Value metadata tests
+    // -----------------------------------------------------------------------
+
+    const SAMPLE_VALUE_XML: &str = r#"
+<DS_REPL_VALUE_META_DATA>
+    <pszAttributeName>member</pszAttributeName>
+    <pszObjectDn>CN=John Doe,OU=Users,DC=example,DC=com</pszObjectDn>
+    <dwVersion>1</dwVersion>
+    <ftimeLastOriginatingChange>2026-02-10T09:30:00Z</ftimeLastOriginatingChange>
+    <pszLastOriginatingDsaDN>CN=DC01</pszLastOriginatingDsaDN>
+    <usnOriginatingChange>55001</usnOriginatingChange>
+    <usnLocalChange>55002</usnLocalChange>
+    <ftimeDeleted></ftimeDeleted>
+</DS_REPL_VALUE_META_DATA>
+<DS_REPL_VALUE_META_DATA>
+    <pszAttributeName>member</pszAttributeName>
+    <pszObjectDn>CN=Alice Smith,OU=Users,DC=example,DC=com</pszObjectDn>
+    <dwVersion>2</dwVersion>
+    <ftimeLastOriginatingChange>2026-03-01T14:00:00Z</ftimeLastOriginatingChange>
+    <pszLastOriginatingDsaDN>CN=DC02</pszLastOriginatingDsaDN>
+    <usnOriginatingChange>66001</usnOriginatingChange>
+    <usnLocalChange>66002</usnLocalChange>
+    <ftimeDeleted>2026-03-05T10:00:00Z</ftimeDeleted>
+</DS_REPL_VALUE_META_DATA>
+"#;
+
+    #[test]
+    fn test_parse_value_metadata() {
+        let result = parse_replication_value_metadata(SAMPLE_VALUE_XML);
+        assert_eq!(result.len(), 2);
+        // Sorted by change time descending
+        assert_eq!(
+            result[0].object_dn,
+            "CN=Alice Smith,OU=Users,DC=example,DC=com"
+        );
+        assert_eq!(
+            result[1].object_dn,
+            "CN=John Doe,OU=Users,DC=example,DC=com"
+        );
+    }
+
+    #[test]
+    fn test_parse_value_metadata_fields() {
+        let result = parse_replication_value_metadata(SAMPLE_VALUE_XML);
+        let john = result
+            .iter()
+            .find(|v| v.object_dn.contains("John"))
+            .unwrap();
+        assert_eq!(john.attribute_name, "member");
+        assert_eq!(john.version, 1);
+        assert_eq!(john.originating_usn, 55001);
+        assert!(!john.is_deleted);
+
+        let alice = result
+            .iter()
+            .find(|v| v.object_dn.contains("Alice"))
+            .unwrap();
+        assert!(alice.is_deleted);
+        assert_eq!(alice.version, 2);
+    }
+
+    #[test]
+    fn test_parse_value_metadata_empty() {
+        let result = parse_replication_value_metadata("");
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_value_metadata_serialization() {
+        let vm = ValueMetadata {
+            attribute_name: "member".to_string(),
+            object_dn: "CN=Test,DC=example,DC=com".to_string(),
+            version: 1,
+            last_originating_change_time: "2026-01-01T00:00:00Z".to_string(),
+            last_originating_dsa_dn: "CN=DC1".to_string(),
+            local_usn: 100,
+            originating_usn: 200,
+            is_deleted: false,
+        };
+        let json = serde_json::to_string(&vm).unwrap();
+        assert!(json.contains("attributeName"));
+        assert!(json.contains("objectDn"));
+        assert!(json.contains("isDeleted"));
     }
 }

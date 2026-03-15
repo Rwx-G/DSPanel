@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Highlight matching search text in ComboBox dropdown options (1.8)
 - Keyboard accessibility on HealthBadge tooltip: Escape to close, Enter/Space to toggle (1.11)
 - DNS resolution timeout indicator after 10s in ComputerDetail (1.12)
+- CSV export via context menu in DataTable with `csvFilename` prop and `exportTableToCsv` utility (1.7)
+- `msDS-ReplValueMetaData` parser for linked-attribute replication (member, memberOf) with Active/Removed status (3.4)
+- Linked Attribute Changes section in StateInTimeView displaying value-level replication history
 
 ### Changed
 

@@ -790,6 +790,39 @@ impl DirectoryProvider for LdapDirectoryProvider {
         .await
     }
 
+    async fn get_replication_value_metadata(&self, object_dn: &str) -> Result<Option<String>> {
+        let _base_dn = self.base_dn().context("Not connected - no base DN")?;
+        let dn = object_dn.to_string();
+        self.with_connection(|mut ldap| {
+            let dn = dn.clone();
+            async move {
+                let (entries, _) = ldap
+                    .search(
+                        &dn,
+                        ldap3::Scope::Base,
+                        "(objectClass=*)",
+                        vec!["msDS-ReplValueMetaData"],
+                    )
+                    .await
+                    .context("Failed to query replication value metadata")?
+                    .success()
+                    .context("Replication value metadata LDAP query returned error")?;
+
+                if let Some(entry) = entries.into_iter().next() {
+                    let se = ldap3::SearchEntry::construct(entry);
+                    if let Some(values) = se.attrs.get("msDS-ReplValueMetaData") {
+                        if let Some(raw) = values.first() {
+                            return Ok(Some(raw.clone()));
+                        }
+                    }
+                }
+
+                Ok(None)
+            }
+        })
+        .await
+    }
+
     async fn get_nested_groups(&self, user_dn: &str) -> Result<Vec<String>> {
         if self.domain.is_none() {
             return Ok(Vec::new());

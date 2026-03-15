@@ -600,22 +600,41 @@ pub(crate) async fn get_replication_metadata_inner(
         .await
         .map_err(|e| AppError::Directory(e.to_string()))?;
 
+    // Also fetch value metadata for linked attributes
+    let value_raw = provider
+        .get_replication_value_metadata(object_dn)
+        .await
+        .unwrap_or(None);
+
+    let value_metadata = value_raw
+        .map(|xml| crate::services::replication::parse_replication_value_metadata(&xml))
+        .unwrap_or_default();
+
     match raw {
         Some(xml) => {
             let attributes = crate::services::replication::parse_replication_metadata(&xml);
             Ok(ReplicationMetadataResult {
                 object_dn: object_dn.to_string(),
                 attributes,
+                value_metadata,
                 is_available: true,
                 message: None,
             })
         }
-        None => Ok(ReplicationMetadataResult {
-            object_dn: object_dn.to_string(),
-            attributes: vec![],
-            is_available: false,
-            message: Some("Replication metadata not available for this object".to_string()),
-        }),
+        None => {
+            let has_values = !value_metadata.is_empty();
+            Ok(ReplicationMetadataResult {
+                object_dn: object_dn.to_string(),
+                attributes: vec![],
+                value_metadata,
+                is_available: has_values,
+                message: if !has_values {
+                    Some("Replication metadata not available for this object".to_string())
+                } else {
+                    None
+                },
+            })
+        }
     }
 }
 

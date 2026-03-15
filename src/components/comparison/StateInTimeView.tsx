@@ -1,9 +1,8 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { History, ArrowRight, AlertTriangle, Clock, Server, Hash } from "lucide-react";
+import { History, ArrowRight, AlertTriangle, Clock, Server, Hash, Link } from "lucide-react";
 import {
   type ReplicationMetadataResult,
-  type AttributeMetadata,
   type AttributeChangeDiff,
 } from "@/types/replication";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
@@ -266,6 +265,72 @@ export function StateInTimeView({ objectDn, objectType }: StateInTimeViewProps) 
                   )}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Linked attribute value changes */}
+          {metadata.valueMetadata.length > 0 && (
+            <div data-testid="value-metadata-section">
+              <h3 className="mb-2 mt-4 text-body font-semibold text-[var(--color-text-primary)] flex items-center gap-1.5">
+                <Link size={14} />
+                Linked Attribute Changes ({metadata.valueMetadata.length})
+              </h3>
+              <div
+                className="max-h-[300px] overflow-y-auto rounded-lg border border-[var(--color-border-default)]"
+                data-testid="value-metadata-table"
+              >
+                <table className="w-full text-body">
+                  <thead className="sticky top-0">
+                    <tr className="border-b border-[var(--color-border-default)] bg-[var(--color-surface-card)]">
+                      <th className="px-3 py-2 text-left text-caption font-medium text-[var(--color-text-secondary)]">
+                        Attribute
+                      </th>
+                      <th className="px-3 py-2 text-left text-caption font-medium text-[var(--color-text-secondary)]">
+                        Linked Object
+                      </th>
+                      <th className="px-3 py-2 text-left text-caption font-medium text-[var(--color-text-secondary)]">
+                        <Clock size={12} className="mr-1 inline" />
+                        Changed
+                      </th>
+                      <th className="px-3 py-2 text-center text-caption font-medium text-[var(--color-text-secondary)]">
+                        Status
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {metadata.valueMetadata.map((vm, idx) => (
+                      <tr
+                        key={`${vm.attributeName}-${vm.objectDn}-${idx}`}
+                        className={`border-b border-[var(--color-border-subtle)] last:border-b-0 ${
+                          idx % 2 === 0 ? "" : "bg-[var(--color-surface-bg)]"
+                        }`}
+                        data-testid={`value-metadata-row-${idx}`}
+                      >
+                        <td className="px-3 py-1.5 font-medium text-[var(--color-text-primary)]">
+                          {vm.attributeName}
+                        </td>
+                        <td className="px-3 py-1.5 text-caption text-[var(--color-text-primary)] truncate max-w-[250px]" title={vm.objectDn}>
+                          {vm.objectDn.match(/^CN=([^,]+)/i)?.[1] ?? vm.objectDn}
+                        </td>
+                        <td className="px-3 py-1.5 text-[var(--color-text-primary)]">
+                          {vm.lastOriginatingChangeTime || "Unknown"}
+                        </td>
+                        <td className="px-3 py-1.5 text-center">
+                          <span
+                            className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                              vm.isDeleted
+                                ? "bg-[var(--color-error)]/10 text-[var(--color-error)]"
+                                : "bg-[var(--color-success)]/10 text-[var(--color-success)]"
+                            }`}
+                          >
+                            {vm.isDeleted ? "Removed" : "Active"}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </>

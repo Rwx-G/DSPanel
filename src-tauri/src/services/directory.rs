@@ -96,6 +96,12 @@ pub trait DirectoryProvider: Send + Sync {
     /// Returns None if the attribute is not available.
     async fn get_replication_metadata(&self, object_dn: &str) -> Result<Option<String>>;
 
+    /// Returns the raw `msDS-ReplValueMetaData` value for an object.
+    ///
+    /// Tracks individual linked-attribute values (e.g. group members).
+    /// Returns None if the attribute is not available.
+    async fn get_replication_value_metadata(&self, object_dn: &str) -> Result<Option<String>>;
+
     /// Returns all groups a user belongs to, including nested (transitive) memberships.
     ///
     /// Uses LDAP_MATCHING_RULE_IN_CHAIN (OID 1.2.840.113556.1.4.1941) to resolve
@@ -383,6 +389,11 @@ pub mod tests {
         async fn get_replication_metadata(&self, _object_dn: &str) -> Result<Option<String>> {
             self.check_failure()?;
             Ok(self.replication_metadata.lock().unwrap().clone())
+        }
+
+        async fn get_replication_value_metadata(&self, _object_dn: &str) -> Result<Option<String>> {
+            self.check_failure()?;
+            Ok(None)
         }
 
         async fn get_nested_groups(&self, user_dn: &str) -> Result<Vec<String>> {

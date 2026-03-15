@@ -901,6 +901,35 @@ impl DirectoryProvider for DemoDirectoryProvider {
         Ok(Some(sample_replication_metadata_for(object_dn)))
     }
 
+    async fn get_replication_value_metadata(&self, _object_dn: &str) -> Result<Option<String>> {
+        // Demo: return sample value metadata for linked attributes
+        Ok(Some(
+            r#"
+<DS_REPL_VALUE_META_DATA>
+    <pszAttributeName>member</pszAttributeName>
+    <pszObjectDn>CN=John Doe,OU=Users,DC=contoso,DC=com</pszObjectDn>
+    <dwVersion>1</dwVersion>
+    <ftimeLastOriginatingChange>2026-02-10T09:30:00Z</ftimeLastOriginatingChange>
+    <pszLastOriginatingDsaDN>CN=DC01,OU=Domain Controllers,DC=contoso,DC=com</pszLastOriginatingDsaDN>
+    <usnOriginatingChange>55001</usnOriginatingChange>
+    <usnLocalChange>55002</usnLocalChange>
+    <ftimeDeleted></ftimeDeleted>
+</DS_REPL_VALUE_META_DATA>
+<DS_REPL_VALUE_META_DATA>
+    <pszAttributeName>member</pszAttributeName>
+    <pszObjectDn>CN=Alice Smith,OU=Users,DC=contoso,DC=com</pszObjectDn>
+    <dwVersion>1</dwVersion>
+    <ftimeLastOriginatingChange>2026-01-15T14:00:00Z</ftimeLastOriginatingChange>
+    <pszLastOriginatingDsaDN>CN=DC02,OU=Domain Controllers,DC=contoso,DC=com</pszLastOriginatingDsaDN>
+    <usnOriginatingChange>44001</usnOriginatingChange>
+    <usnLocalChange>44002</usnLocalChange>
+    <ftimeDeleted></ftimeDeleted>
+</DS_REPL_VALUE_META_DATA>
+"#
+            .to_string(),
+        ))
+    }
+
     async fn get_nested_groups(&self, user_dn: &str) -> Result<Vec<String>> {
         // Demo: return direct memberOf + simulate one level of nesting
         let users = sample_users();

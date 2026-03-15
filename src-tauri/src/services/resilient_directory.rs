@@ -303,6 +303,18 @@ where
         .map_err(|e| anyhow::anyhow!(e))
     }
 
+    async fn get_replication_value_metadata(&self, object_dn: &str) -> Result<Option<String>> {
+        let dn = object_dn.to_string();
+        let inner_ref = self.inner.clone();
+        self.execute_with_resilience(|| {
+            let inner = inner_ref.clone();
+            let d = dn.clone();
+            async move { inner.get_replication_value_metadata(&d).await }
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!(e))
+    }
+
     async fn get_nested_groups(&self, user_dn: &str) -> Result<Vec<String>> {
         let dn = user_dn.to_string();
         resilient_call!(self, dn, |inner, d| inner.get_nested_groups(&d).await)
