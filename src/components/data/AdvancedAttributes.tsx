@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
-import { Star, ChevronDown, ChevronRight, Search, X } from "lucide-react";
+import { Star, ChevronDown, ChevronRight, Filter, X } from "lucide-react";
 import { CopyButton } from "@/components/common/CopyButton";
 
 const STORAGE_KEY = "dspanel-favorite-attributes";
@@ -159,7 +159,7 @@ export function AdvancedAttributes({ rawAttributes }: AdvancedAttributesProps) {
       {!collapsed && totalCount > 0 && (
         <>
           <div className="mb-2 flex items-center gap-2 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2 py-1">
-            <Search
+            <Filter
               size={14}
               className="shrink-0 text-[var(--color-text-secondary)]"
             />
