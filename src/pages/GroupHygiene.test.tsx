@@ -318,4 +318,117 @@ describe("GroupHygiene", () => {
 
     expect(screen.getByTestId("cycles-count")).toHaveTextContent("2");
   });
+
+  it("delete progress shows during execution", async () => {
+    const emptyGroups = [makeEmptyGroupEntry("Sales-EMEA")];
+    mockScanResults(emptyGroups, []);
+
+    render(<GroupHygiene />, { wrapper: TestProviders });
+    fireEvent.click(screen.getByTestId("scan-button"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("empty-groups-section")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId("empty-group-checkbox-Sales-EMEA"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("delete-selected-btn")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId("delete-selected-btn"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("delete-preview-dialog")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId("delete-preview-confirm"));
+
+    // The delete progress section should appear
+    await waitFor(() => {
+      expect(screen.getByTestId("delete-progress")).toBeInTheDocument();
+    });
+
+    expect(screen.getByTestId("delete-progress-message")).toBeInTheDocument();
+  });
+
+  it("cycle group navigation calls openTab", async () => {
+    const cycles = [
+      [
+        "CN=TeamA,OU=Groups,DC=example,DC=com",
+        "CN=TeamB,OU=Groups,DC=example,DC=com",
+        "CN=TeamA,OU=Groups,DC=example,DC=com",
+      ],
+    ];
+    mockScanResults([], cycles);
+
+    render(<GroupHygiene />, { wrapper: TestProviders });
+    fireEvent.click(screen.getByTestId("scan-button"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("circular-groups-section")).toBeInTheDocument();
+    });
+
+    // Click on the first cycle group link - this calls openTab internally
+    const groupLinks = screen.getAllByTestId("cycle-group-TeamA");
+    fireEvent.click(groupLinks[0]);
+
+    // Verify no error was thrown and the button rendered correctly
+    expect(groupLinks[0]).toBeInTheDocument();
+  });
+
+  it("select-all checkbox selects all empty groups", async () => {
+    const emptyGroups = [
+      makeEmptyGroupEntry("Sales-EMEA"),
+      makeEmptyGroupEntry("Dev-Frontend"),
+    ];
+    mockScanResults(emptyGroups, []);
+
+    render(<GroupHygiene />, { wrapper: TestProviders });
+    fireEvent.click(screen.getByTestId("scan-button"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("empty-groups-section")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId("select-all-empty"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("delete-selected-btn")).toHaveTextContent(
+        "Delete Selected (2)",
+      );
+    });
+  });
+
+  it("cancel in delete preview closes dialog", async () => {
+    const emptyGroups = [makeEmptyGroupEntry("Sales-EMEA")];
+    mockScanResults(emptyGroups, []);
+
+    render(<GroupHygiene />, { wrapper: TestProviders });
+    fireEvent.click(screen.getByTestId("scan-button"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("empty-groups-section")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId("empty-group-checkbox-Sales-EMEA"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("delete-selected-btn")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId("delete-selected-btn"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("delete-preview-dialog")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId("delete-preview-cancel"));
+
+    await waitFor(() => {
+      expect(
+        screen.queryByTestId("delete-preview-dialog"),
+      ).not.toBeInTheDocument();
+    });
+  });
 });

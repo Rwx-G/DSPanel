@@ -1,10 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { type ReactNode } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 import { GroupManagement } from "./GroupManagement";
 import { DialogProvider } from "@/contexts/DialogContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
-import { NavigationProvider } from "@/contexts/NavigationContext";
+import {
+  NavigationProvider,
+  useNavigation,
+} from "@/contexts/NavigationContext";
 import type { DirectoryEntry } from "@/types/directory";
 
 function TestProviders({ children }: { children: ReactNode }) {
@@ -15,6 +18,31 @@ function TestProviders({ children }: { children: ReactNode }) {
       </DialogProvider>
     </NotificationProvider>
   );
+}
+
+/**
+ * Wrapper that opens a "groups" tab with data for deep-link testing.
+ */
+function DeepLinkWrapper({
+  children,
+  selectedGroupDn,
+}: {
+  children: ReactNode;
+  selectedGroupDn: string;
+}) {
+  const { openTab } = useNavigation();
+  const opened = useRef(false);
+
+  useEffect(() => {
+    if (!opened.current) {
+      opened.current = true;
+      openTab("Group Management", "groups", "users-group", {
+        selectedGroupDn,
+      });
+    }
+  }, [openTab, selectedGroupDn]);
+
+  return <>{children}</>;
 }
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -326,6 +354,123 @@ describe("GroupManagement", () => {
     const badge = listItem.querySelector("[data-testid='status-badge']");
     expect(badge).toBeInTheDocument();
     expect(badge?.textContent).toBe("Security");
+  });
+
+  describe("Deep-link and member loading", () => {
+    it("deep-link selects group from browse results when selectedGroupDn matches", async () => {
+      const entries = [
+        makeGroupEntry("Developers"),
+        makeGroupEntry("Finance-Analysts"),
+      ];
+      mockBrowseWith(entries);
+
+      // We need to render with NavigationProvider and set tab data
+      // First render the component, open a tab with data, then mount GroupManagement
+      const { unmount } = render(
+        <TestProviders>
+          <DeepLinkWrapper selectedGroupDn="CN=Finance-Analysts,OU=Groups,DC=example,DC=com">
+            <GroupManagement />
+          </DeepLinkWrapper>
+        </TestProviders>,
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId("group-detail")).toBeInTheDocument();
+      });
+
+      const detail = screen.getByTestId("group-detail");
+      expect(detail.querySelector("h2")).toHaveTextContent("Finance-Analysts");
+      unmount();
+    });
+
+    it("deep-link searches via search_groups when group not in browse results", async () => {
+      const browseEntries = [makeGroupEntry("Developers")];
+      const searchEntry: DirectoryEntry = {
+        distinguishedName: "CN=Remote-Group,OU=Groups,DC=example,DC=com",
+        samAccountName: "Remote-Group",
+        displayName: "Remote-Group",
+        objectClass: "group",
+        attributes: {
+          groupType: ["-2147483646"],
+          description: ["Remote group"],
+        },
+      };
+
+      mockInvoke.mockImplementation(((cmd: string, args?: Record<string, unknown>) => {
+        if (cmd === "browse_groups") return Promise.resolve(makeBrowseResult(browseEntries));
+        if (cmd === "search_groups") return Promise.resolve([searchEntry]);
+        if (cmd === "get_group_members") return Promise.resolve([]);
+        if (cmd === "get_permission_level") return Promise.resolve("ReadOnly");
+        if (cmd === "get_user_groups") return Promise.resolve([]);
+        return Promise.resolve(null);
+      }) as typeof invoke);
+
+      render(
+        <TestProviders>
+          <DeepLinkWrapper selectedGroupDn="CN=Remote-Group,OU=Groups,DC=example,DC=com">
+            <GroupManagement />
+          </DeepLinkWrapper>
+        </TestProviders>,
+      );
+
+      await waitFor(() => {
+        expect(mockInvoke).toHaveBeenCalledWith("search_groups", { query: "Remote-Group" });
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("group-detail")).toBeInTheDocument();
+      });
+
+      const detail = screen.getByTestId("group-detail");
+      expect(detail.querySelector("h2")).toHaveTextContent("Remote-Group");
+    });
+
+    it("members load when a group is selected", async () => {
+      const entries = [makeGroupEntry("Developers")];
+      const memberEntries: DirectoryEntry[] = [
+        {
+          distinguishedName: "CN=John Doe,OU=Users,OU=Corp,DC=example,DC=com",
+          samAccountName: "jdoe",
+          displayName: "John Doe",
+          objectClass: "user",
+          attributes: {},
+        },
+      ];
+      mockBrowseWith(entries, { members: memberEntries });
+
+      render(<GroupManagement />, { wrapper: TestProviders });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("group-result-Developers")).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByTestId("group-result-Developers"));
+
+      await waitFor(() => {
+        expect(mockInvoke).toHaveBeenCalledWith("get_group_members", {
+          groupDn: "CN=Developers,OU=Groups,DC=example,DC=com",
+        });
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText("John Doe")).toBeInTheDocument();
+      });
+    });
+
+    it("members clear when no group is selected (placeholder shown)", async () => {
+      const entries = [makeGroupEntry("Developers")];
+      mockBrowseWith(entries);
+
+      render(<GroupManagement />, { wrapper: TestProviders });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("group-results-list")).toBeInTheDocument();
+      });
+
+      // No group selected - should show placeholder
+      expect(screen.getByText("Select a group to view details")).toBeInTheDocument();
+      expect(screen.queryByTestId("group-members-section")).not.toBeInTheDocument();
+    });
   });
 
   describe("Member Management (Story 4.2)", () => {

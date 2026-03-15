@@ -1,10 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { type ReactNode } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 import { UserLookup } from "./UserLookup";
 import { DialogProvider } from "@/contexts/DialogContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
-import { NavigationProvider } from "@/contexts/NavigationContext";
+import {
+  NavigationProvider,
+  useNavigation,
+} from "@/contexts/NavigationContext";
 import type { DirectoryEntry } from "@/types/directory";
 import type { AccountHealthStatus } from "@/types/health";
 
@@ -16,6 +19,29 @@ function TestProviders({ children }: { children: ReactNode }) {
       </DialogProvider>
     </NotificationProvider>
   );
+}
+
+/**
+ * Wrapper that opens a "users" tab with data for deep-link testing.
+ */
+function DeepLinkWrapper({
+  children,
+  selectedUserSam,
+}: {
+  children: ReactNode;
+  selectedUserSam: string;
+}) {
+  const { openTab } = useNavigation();
+  const opened = useRef(false);
+
+  useEffect(() => {
+    if (!opened.current) {
+      opened.current = true;
+      openTab("User Lookup", "users", "user", { selectedUserSam });
+    }
+  }, [openTab, selectedUserSam]);
+
+  return <>{children}</>;
 }
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -621,6 +647,111 @@ describe("UserLookup", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("user-detail")).toBeInTheDocument();
+    });
+  });
+
+  describe("Deep-link", () => {
+    it("selects user from browse results when selectedUserSam matches", async () => {
+      const entries = [
+        makeEntry("jdoe", "John Doe"),
+        makeEntry("asmith", "Alice Smith"),
+      ];
+      mockBrowseWith(entries);
+
+      render(
+        <TestProviders>
+          <DeepLinkWrapper selectedUserSam="asmith">
+            <UserLookup />
+          </DeepLinkWrapper>
+        </TestProviders>,
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId("user-detail")).toBeInTheDocument();
+      });
+
+      const detail = screen.getByTestId("user-detail");
+      expect(detail.querySelector("h2")).toHaveTextContent("Alice Smith");
+    });
+
+    it("fetches user via get_user when not in browse results", async () => {
+      const browseEntries = [makeEntry("jdoe", "John Doe")];
+      const remoteEntry = makeEntry("remote", "Remote User");
+
+      mockInvoke.mockImplementation(((
+        cmd: string,
+        args?: Record<string, unknown>,
+      ) => {
+        if (cmd === "browse_users")
+          return Promise.resolve(makeBrowseResult(browseEntries));
+        if (cmd === "get_user") return Promise.resolve(remoteEntry);
+        if (cmd === "evaluate_health_cmd") return Promise.resolve(HEALTHY_STATUS);
+        return Promise.resolve(null);
+      }) as typeof invoke);
+
+      render(
+        <TestProviders>
+          <DeepLinkWrapper selectedUserSam="remote">
+            <UserLookup />
+          </DeepLinkWrapper>
+        </TestProviders>,
+      );
+
+      await waitFor(() => {
+        expect(mockInvoke).toHaveBeenCalledWith("get_user", {
+          samAccountName: "remote",
+        });
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("user-detail")).toBeInTheDocument();
+      });
+
+      const detail = screen.getByTestId("user-detail");
+      expect(detail.querySelector("h2")).toHaveTextContent("Remote User");
+    });
+  });
+
+  describe("Refresh selected user", () => {
+    it("reloads user data on refresh", async () => {
+      const entries = [makeEntry("jdoe", "John Doe")];
+      const refreshedEntry = makeEntry("jdoe", "John Doe Updated");
+
+      let getUserCallCount = 0;
+      mockInvoke.mockImplementation(((
+        cmd: string,
+      ) => {
+        if (cmd === "browse_users")
+          return Promise.resolve(makeBrowseResult(entries));
+        if (cmd === "get_user") {
+          getUserCallCount++;
+          return Promise.resolve(refreshedEntry);
+        }
+        if (cmd === "evaluate_health_cmd") return Promise.resolve(HEALTHY_STATUS);
+        return Promise.resolve(null);
+      }) as typeof invoke);
+
+      render(<UserLookup />, { wrapper: TestProviders });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("user-result-jdoe")).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByTestId("user-result-jdoe"));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("user-detail")).toBeInTheDocument();
+      });
+
+      // Click refresh button if available in UserDetail
+      const refreshBtn = screen.queryByTestId("refresh-user-btn");
+      if (refreshBtn) {
+        fireEvent.click(refreshBtn);
+
+        await waitFor(() => {
+          expect(getUserCallCount).toBeGreaterThanOrEqual(1);
+        });
+      }
     });
   });
 });

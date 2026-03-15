@@ -427,4 +427,178 @@ describe("GroupDetail", () => {
       expect(screen.getByText("No results found")).toBeInTheDocument();
     });
   });
+
+  describe("Context menu on members", () => {
+    it("shows 'Open in Group Management' for group members", async () => {
+      const membersWithGroup: DirectoryEntry[] = [
+        ...defaultMembers,
+        {
+          distinguishedName: "CN=SubGroup,OU=Groups,DC=example,DC=com",
+          samAccountName: "SubGroup",
+          displayName: "SubGroup",
+          objectClass: "group",
+          attributes: {},
+        },
+      ];
+
+      renderGroupDetail({ members: membersWithGroup, canManageMembers: false });
+
+      const groupRow = screen.getByTestId("nested-group-SubGroup");
+      const rowDiv = groupRow.querySelector("[class*='hover']");
+      if (rowDiv) {
+        fireEvent.contextMenu(rowDiv);
+      } else {
+        fireEvent.contextMenu(groupRow);
+      }
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(/Open "SubGroup" in Group Management/),
+        ).toBeInTheDocument();
+      });
+    });
+
+    it("shows 'Open in User Lookup' for user members", async () => {
+      renderGroupDetail({ canManageMembers: false });
+
+      const userRow = screen.getByTestId("member-row-John Doe");
+      const rowDiv = userRow.querySelector("[class*='hover']");
+      if (rowDiv) {
+        fireEvent.contextMenu(rowDiv);
+      } else {
+        fireEvent.contextMenu(userRow);
+      }
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(/Open "John Doe" in User Lookup/),
+        ).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("Apply changes flow", () => {
+    it("apply changes calls add_user_to_group and remove_group_member", async () => {
+      const searchResults: DirectoryEntry[] = [
+        {
+          distinguishedName: "CN=New User,OU=Users,OU=Corp,DC=example,DC=com",
+          samAccountName: "nuser",
+          displayName: "New User",
+          objectClass: "user",
+          attributes: {},
+        },
+      ];
+
+      mockInvoke.mockImplementation(((cmd: string) => {
+        if (cmd === "search_users") return Promise.resolve(searchResults);
+        if (cmd === "search_groups") return Promise.resolve([]);
+        if (cmd === "add_user_to_group") return Promise.resolve(null);
+        if (cmd === "remove_group_member") return Promise.resolve(null);
+        if (cmd === "get_group_members") return Promise.resolve([]);
+        return Promise.resolve(null);
+      }) as typeof invoke);
+
+      const onMembersRefresh = vi.fn();
+      renderGroupDetail({ canManageMembers: true, onMembersRefresh });
+
+      // Stage a removal
+      fireEvent.click(screen.getByTestId("member-checkbox-John Doe"));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("remove-selected-btn")).not.toBeDisabled();
+      });
+
+      fireEvent.click(screen.getByTestId("remove-selected-btn"));
+
+      // Stage an addition
+      fireEvent.click(screen.getByTestId("add-member-btn"));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("add-member-section")).toBeInTheDocument();
+      });
+
+      const searchInput = screen.getByTestId("member-search-input");
+      fireEvent.change(searchInput, { target: { value: "New" } });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("member-search-results")).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByTestId("add-member-btn-New User"));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("preview-changes-btn")).toHaveTextContent(
+          "Preview (2)",
+        );
+      });
+
+      // Open preview and apply
+      fireEvent.click(screen.getByTestId("preview-changes-btn"));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("member-change-preview")).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByTestId("member-change-apply"));
+
+      await waitFor(() => {
+        expect(mockInvoke).toHaveBeenCalledWith("add_user_to_group", {
+          userDn: "CN=New User,OU=Users,OU=Corp,DC=example,DC=com",
+          groupDn: "CN=Developers,OU=Groups,DC=example,DC=com",
+        });
+        expect(mockInvoke).toHaveBeenCalledWith("remove_group_member", {
+          memberDn: "CN=John Doe,OU=Users,OU=Corp,DC=example,DC=com",
+          groupDn: "CN=Developers,OU=Groups,DC=example,DC=com",
+        });
+      });
+
+      // Verify refresh was called
+      await waitFor(() => {
+        expect(onMembersRefresh).toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("Close dropdown on outside click", () => {
+    it("closes add-member dropdown on mousedown outside", async () => {
+      renderGroupDetail({ canManageMembers: true });
+
+      // Open the add dropdown
+      fireEvent.click(screen.getByTestId("add-member-btn"));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("add-member-section")).toBeInTheDocument();
+      });
+
+      // Simulate mousedown outside the dropdown
+      fireEvent.mouseDown(document.body);
+
+      await waitFor(() => {
+        expect(
+          screen.queryByTestId("add-member-section"),
+        ).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("Circular reference detection", () => {
+    it("shows circular label for nested group that references its ancestor", async () => {
+      // The root group is Developers. Make a member group that is actually
+      // the same as root to trigger circular detection.
+      const membersWithCircular: DirectoryEntry[] = [
+        {
+          distinguishedName: "CN=Developers,OU=Groups,DC=example,DC=com",
+          samAccountName: "Developers",
+          displayName: "Developers",
+          objectClass: "group",
+          attributes: {},
+        },
+      ];
+
+      renderGroupDetail({ members: membersWithCircular });
+
+      // The circular group should be rendered with a "circular" label
+      expect(screen.getByText("circular")).toBeInTheDocument();
+    });
+  });
 });
