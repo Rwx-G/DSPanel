@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { parseBackendError } from "@/utils/errorMapping";
 import {
   FolderSearch,
+  FolderOpen,
   Download,
   AlertTriangle,
   ShieldX,
@@ -15,6 +16,7 @@ import {
   type PathAclResult,
 } from "@/types/ntfs-analyzer";
 import { type AceEntry } from "@/types/ntfs";
+import { useNavigation } from "@/contexts/NavigationContext";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import {
   ContextMenu,
@@ -195,6 +197,7 @@ export function NtfsAnalyzer() {
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showExplicitOnly, setShowExplicitOnly] = useState(false);
+  const { openTab } = useNavigation();
 
   const handleTrusteeContextMenu = useCallback(
     (e: React.MouseEvent, ace: AceEntry) => {
@@ -214,6 +217,15 @@ export function NtfsAnalyzer() {
           label: `View members of ${name}`,
           icon: <Users size={14} />,
           onClick: () => setGroupMembersDialog({ dn: groupDn, name }),
+        },
+        {
+          label: "Open in Group Management",
+          icon: <FolderOpen size={14} />,
+          onClick: () => {
+            openTab("Group Management", "groups", "users-group", {
+              selectedGroupDn: groupDn,
+            });
+          },
         },
       ]);
       setContextMenuPos({ x: e.clientX, y: e.clientY });

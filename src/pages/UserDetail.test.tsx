@@ -1,8 +1,22 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { type ReactNode } from "react";
 import { UserDetail, type UserDetailProps } from "./UserDetail";
+import { NavigationProvider } from "@/contexts/NavigationContext";
+import { NotificationProvider } from "@/contexts/NotificationContext";
+import { DialogProvider } from "@/contexts/DialogContext";
 import type { DirectoryUser } from "@/types/directory";
 import type { AccountHealthStatus } from "@/types/health";
+
+function TestProviders({ children }: { children: ReactNode }) {
+  return (
+    <NotificationProvider>
+      <DialogProvider>
+        <NavigationProvider>{children}</NavigationProvider>
+      </DialogProvider>
+    </NotificationProvider>
+  );
+}
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
@@ -122,12 +136,12 @@ describe("UserDetail", () => {
   });
 
   it("renders user detail container", () => {
-    render(<UserDetail {...makeProps()} />);
+    render(<UserDetail {...makeProps()} />, { wrapper: TestProviders });
     expect(screen.getByTestId("user-detail")).toBeInTheDocument();
   });
 
   it("displays user display name as heading", () => {
-    render(<UserDetail {...makeProps()} />);
+    render(<UserDetail {...makeProps()} />, { wrapper: TestProviders });
     const heading = screen.getByTestId("user-detail").querySelector("h2");
     expect(heading).toHaveTextContent("John Doe");
   });
@@ -135,13 +149,14 @@ describe("UserDetail", () => {
   it("falls back to samAccountName when displayName is empty", () => {
     render(
       <UserDetail {...makeProps({ user: makeUser({ displayName: "" }) })} />,
+      { wrapper: TestProviders },
     );
     const heading = screen.getByTestId("user-detail").querySelector("h2");
     expect(heading).toHaveTextContent("jdoe");
   });
 
   it("shows Enabled status badge for enabled user", () => {
-    render(<UserDetail {...makeProps()} />);
+    render(<UserDetail {...makeProps()} />, { wrapper: TestProviders });
     const badges = screen.getAllByText("Enabled");
     expect(badges.length).toBeGreaterThanOrEqual(1);
   });
@@ -149,6 +164,7 @@ describe("UserDetail", () => {
   it("shows Disabled status badge for disabled user", () => {
     render(
       <UserDetail {...makeProps({ user: makeUser({ enabled: false }) })} />,
+      { wrapper: TestProviders },
     );
     const badges = screen.getAllByText("Disabled");
     expect(badges.length).toBeGreaterThanOrEqual(1);
@@ -157,6 +173,7 @@ describe("UserDetail", () => {
   it("shows Locked badge when user is locked out", () => {
     render(
       <UserDetail {...makeProps({ user: makeUser({ lockedOut: true }) })} />,
+      { wrapper: TestProviders },
     );
     expect(screen.getByText("Locked")).toBeInTheDocument();
   });
@@ -164,18 +181,19 @@ describe("UserDetail", () => {
   it("does not show Locked badge when user is not locked out", () => {
     render(
       <UserDetail {...makeProps({ user: makeUser({ lockedOut: false }) })} />,
+      { wrapper: TestProviders },
     );
     expect(screen.queryByText("Locked")).not.toBeInTheDocument();
   });
 
   it("displays samAccountName with copy button", () => {
-    render(<UserDetail {...makeProps()} />);
+    render(<UserDetail {...makeProps()} />, { wrapper: TestProviders });
     const allJdoe = screen.getAllByText("jdoe");
     expect(allJdoe.length).toBeGreaterThanOrEqual(1);
   });
 
   it("renders property groups for Identity, Location, Account Status, Authentication, Dates", () => {
-    render(<UserDetail {...makeProps()} />);
+    render(<UserDetail {...makeProps()} />, { wrapper: TestProviders });
     expect(screen.getByText("Identity")).toBeInTheDocument();
     expect(screen.getByText("Location")).toBeInTheDocument();
     expect(screen.getByText("Account Status")).toBeInTheDocument();
@@ -184,7 +202,7 @@ describe("UserDetail", () => {
   });
 
   it("displays property values from user object", () => {
-    render(<UserDetail {...makeProps()} />);
+    render(<UserDetail {...makeProps()} />, { wrapper: TestProviders });
     // Email appears both in Email and UPN fields
     const emails = screen.getAllByText("jdoe@example.com");
     expect(emails.length).toBeGreaterThanOrEqual(1);
@@ -193,28 +211,28 @@ describe("UserDetail", () => {
   });
 
   it("renders UserActions component", () => {
-    render(<UserDetail {...makeProps()} />);
+    render(<UserDetail {...makeProps()} />, { wrapper: TestProviders });
     expect(screen.getByTestId("user-actions")).toBeInTheDocument();
   });
 
   it("renders PasswordFlagsEditor component", () => {
-    render(<UserDetail {...makeProps()} />);
+    render(<UserDetail {...makeProps()} />, { wrapper: TestProviders });
     expect(screen.getByTestId("password-flags-editor")).toBeInTheDocument();
   });
 
   it("renders group memberships section with correct count", () => {
-    render(<UserDetail {...makeProps()} />);
+    render(<UserDetail {...makeProps()} />, { wrapper: TestProviders });
     expect(screen.getByTestId("user-groups-section")).toBeInTheDocument();
     expect(screen.getByText("Group Memberships (2)")).toBeInTheDocument();
   });
 
   it("renders AdvancedAttributes component", () => {
-    render(<UserDetail {...makeProps()} />);
+    render(<UserDetail {...makeProps()} />, { wrapper: TestProviders });
     expect(screen.getByTestId("advanced-attributes")).toBeInTheDocument();
   });
 
   it("renders Replication History section", () => {
-    render(<UserDetail {...makeProps()} />);
+    render(<UserDetail {...makeProps()} />, { wrapper: TestProviders });
     expect(screen.getByTestId("user-history-section")).toBeInTheDocument();
     expect(screen.getByText("Replication History")).toBeInTheDocument();
   });
@@ -224,17 +242,17 @@ describe("UserDetail", () => {
       level: "Healthy",
       activeFlags: [],
     };
-    render(<UserDetail {...makeProps({ healthStatus })} />);
+    render(<UserDetail {...makeProps({ healthStatus })} />, { wrapper: TestProviders });
     expect(screen.getByTestId("health-badge")).toBeInTheDocument();
   });
 
   it("does not show HealthBadge when healthStatus is undefined", () => {
-    render(<UserDetail {...makeProps({ healthStatus: undefined })} />);
+    render(<UserDetail {...makeProps({ healthStatus: undefined })} />, { wrapper: TestProviders });
     expect(screen.queryByTestId("health-badge")).not.toBeInTheDocument();
   });
 
   it("opens password reset dialog when trigger is clicked", async () => {
-    render(<UserDetail {...makeProps()} />);
+    render(<UserDetail {...makeProps()} />, { wrapper: TestProviders });
     fireEvent.click(screen.getByTestId("reset-password-trigger"));
     await waitFor(() => {
       expect(screen.getByTestId("password-reset-dialog")).toBeInTheDocument();
@@ -242,7 +260,7 @@ describe("UserDetail", () => {
   });
 
   it("closes password reset dialog when close is clicked", async () => {
-    render(<UserDetail {...makeProps()} />);
+    render(<UserDetail {...makeProps()} />, { wrapper: TestProviders });
     fireEvent.click(screen.getByTestId("reset-password-trigger"));
     await waitFor(() => {
       expect(screen.getByTestId("password-reset-dialog")).toBeInTheDocument();
@@ -257,7 +275,7 @@ describe("UserDetail", () => {
 
   it("calls onRefresh callback when provided", () => {
     const onRefresh = vi.fn();
-    render(<UserDetail {...makeProps({ onRefresh })} />);
+    render(<UserDetail {...makeProps({ onRefresh })} />, { wrapper: TestProviders });
     // onRefresh is wired to UserActions, which we mocked
     expect(screen.getByTestId("user-actions")).toBeInTheDocument();
   });
@@ -285,6 +303,7 @@ describe("UserDetail", () => {
           healthStatus,
         })}
       />,
+      { wrapper: TestProviders },
     );
     // The component should still render without error
     expect(screen.getByTestId("user-detail")).toBeInTheDocument();
@@ -297,6 +316,7 @@ describe("UserDetail", () => {
           user: makeUser({ lastLogonWorkstation: "" }),
         })}
       />,
+      { wrapper: TestProviders },
     );
     expect(screen.getByText("N/A")).toBeInTheDocument();
   });
@@ -308,6 +328,7 @@ describe("UserDetail", () => {
           user: makeUser({ accountExpires: null }),
         })}
       />,
+      { wrapper: TestProviders },
     );
     // "Never" appears in Account Expires property
     const neverTexts = screen.getAllByText("Never");
@@ -323,6 +344,7 @@ describe("UserDetail", () => {
           groupRows: [],
         })}
       />,
+      { wrapper: TestProviders },
     );
     expect(screen.getByText("Group Memberships (0)")).toBeInTheDocument();
   });
@@ -345,6 +367,7 @@ describe("UserDetail", () => {
           healthStatus,
         })}
       />,
+      { wrapper: TestProviders },
     );
     // Component should render the severity info without errors
     expect(screen.getByTestId("user-detail")).toBeInTheDocument();
@@ -371,6 +394,7 @@ describe("UserDetail", () => {
           healthStatus,
         })}
       />,
+      { wrapper: TestProviders },
     );
     expect(screen.getByTestId("user-detail")).toBeInTheDocument();
   });
@@ -393,6 +417,7 @@ describe("UserDetail", () => {
           healthStatus,
         })}
       />,
+      { wrapper: TestProviders },
     );
     // "Never" should appear for both passwordLastSet and other null fields
     const neverTexts = screen.getAllByText("Never");
@@ -401,7 +426,7 @@ describe("UserDetail", () => {
 
   it("opens group members dialog via context menu", async () => {
     const props = makeProps();
-    render(<UserDetail {...props} />);
+    render(<UserDetail {...props} />, { wrapper: TestProviders });
 
     // The DataTable renders rows - right-click on a row
     const rows = screen.getAllByRole("row");
@@ -423,7 +448,7 @@ describe("UserDetail", () => {
 
   it("closes group members dialog", async () => {
     const props = makeProps();
-    render(<UserDetail {...props} />);
+    render(<UserDetail {...props} />, { wrapper: TestProviders });
 
     const rows = screen.getAllByRole("row");
     const dataRow = rows.find((r) => r.querySelector("td"));
@@ -448,6 +473,21 @@ describe("UserDetail", () => {
     });
   });
 
+  it("shows Open in Group Management option in context menu", async () => {
+    const props = makeProps();
+    render(<UserDetail {...props} />, { wrapper: TestProviders });
+
+    const rows = screen.getAllByRole("row");
+    const dataRow = rows.find((r) => r.querySelector("td"));
+    fireEvent.contextMenu(dataRow!);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Open in Group Management"),
+      ).toBeInTheDocument();
+    });
+  });
+
   it("shows accountExpires value when set", () => {
     render(
       <UserDetail
@@ -455,6 +495,7 @@ describe("UserDetail", () => {
           user: makeUser({ accountExpires: "2026-12-31T00:00:00Z" }),
         })}
       />,
+      { wrapper: TestProviders },
     );
     expect(screen.getByText("2026-12-31T00:00:00Z")).toBeInTheDocument();
   });
@@ -466,6 +507,7 @@ describe("UserDetail", () => {
           user: makeUser({ passwordNeverExpires: true }),
         })}
       />,
+      { wrapper: TestProviders },
     );
     // "Yes" appears in Password Never Expires and possibly Password Expired
     const yesTexts = screen.getAllByText("Yes");
@@ -479,6 +521,7 @@ describe("UserDetail", () => {
           user: makeUser({ badPasswordCount: 5 }),
         })}
       />,
+      { wrapper: TestProviders },
     );
     expect(screen.getByText("5")).toBeInTheDocument();
   });
@@ -490,6 +533,7 @@ describe("UserDetail", () => {
           user: makeUser({ lastLogon: null }),
         })}
       />,
+      { wrapper: TestProviders },
     );
     const neverTexts = screen.getAllByText("Never");
     expect(neverTexts.length).toBeGreaterThanOrEqual(1);
@@ -518,6 +562,7 @@ describe("UserDetail", () => {
           healthStatus,
         })}
       />,
+      { wrapper: TestProviders },
     );
     // Both map to "Last Logon" - Critical should win
     expect(screen.getByTestId("user-detail")).toBeInTheDocument();

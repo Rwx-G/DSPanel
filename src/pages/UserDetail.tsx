@@ -21,7 +21,8 @@ import { GroupMembersDialog } from "@/components/dialogs/GroupMembersDialog";
 import { type DirectoryUser } from "@/types/directory";
 import type { AccountHealthStatus, HealthLevel } from "@/types/health";
 import { parseCnFromDn } from "@/utils/dn";
-import { Users } from "lucide-react";
+import { Users, FolderOpen } from "lucide-react";
+import { useNavigation } from "@/contexts/NavigationContext";
 import { StateInTimeView } from "@/components/comparison/StateInTimeView";
 
 /** Maps health flag names to the PropertyGrid label they correspond to. */
@@ -76,6 +77,7 @@ export function UserDetail({
     dn: string;
     name: string;
   } | null>(null);
+  const { openTab } = useNavigation();
 
   const handleRefresh = onRefresh ?? (() => {});
 
@@ -201,6 +203,15 @@ export function UserDetail({
             setGroupMembersDialog({
               dn: contextMenuRow.dn,
               name: parseCnFromDn(contextMenuRow.dn),
+            });
+          },
+        },
+        {
+          label: "Open in Group Management",
+          icon: <FolderOpen size={14} />,
+          onClick: () => {
+            openTab("Group Management", "groups", "users-group", {
+              selectedGroupDn: contextMenuRow.dn,
             });
           },
         },
