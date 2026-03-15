@@ -82,4 +82,71 @@ describe("useMfaGate", () => {
     });
     expect(typeof result.current.checkMfa).toBe("function");
   });
+
+  it("calls both mfa_is_configured and mfa_requires when MFA is needed", async () => {
+    mockInvoke
+      .mockResolvedValueOnce(true as never) // mfa_is_configured
+      .mockResolvedValueOnce(true as never); // mfa_requires
+
+    const { result } = renderHook(() => useMfaGate(), {
+      wrapper: TestProviders,
+    });
+
+    // Start checkMfa - it will call showCustomDialog which opens a dialog.
+    // The dialog promise never resolves in this test, but we can verify
+    // both invoke calls were made before the dialog opened.
+    let promise: Promise<boolean>;
+    await act(async () => {
+      promise = result.current.checkMfa("PasswordReset");
+      // Allow the async invoke calls to settle
+      await new Promise((r) => setTimeout(r, 0));
+    });
+
+    expect(mockInvoke).toHaveBeenCalledWith("mfa_is_configured");
+    expect(mockInvoke).toHaveBeenCalledWith("mfa_requires", {
+      action: "PasswordReset",
+    });
+  });
+
+  it("allows action when mfa_requires invoke fails", async () => {
+    mockInvoke
+      .mockResolvedValueOnce(true as never) // mfa_is_configured
+      .mockRejectedValueOnce(new Error("command not found") as never); // mfa_requires
+
+    const { result } = renderHook(() => useMfaGate(), {
+      wrapper: TestProviders,
+    });
+
+    let allowed: boolean | undefined;
+    await act(async () => {
+      allowed = await result.current.checkMfa("SomeAction");
+    });
+
+    // Falls into catch block, returns true
+    expect(allowed).toBe(true);
+  });
+
+  it("can be called multiple times", async () => {
+    // First call: not configured
+    mockInvoke.mockResolvedValueOnce(false as never);
+    // Second call: not configured
+    mockInvoke.mockResolvedValueOnce(false as never);
+
+    const { result } = renderHook(() => useMfaGate(), {
+      wrapper: TestProviders,
+    });
+
+    let allowed1: boolean | undefined;
+    let allowed2: boolean | undefined;
+    await act(async () => {
+      allowed1 = await result.current.checkMfa("Action1");
+    });
+    await act(async () => {
+      allowed2 = await result.current.checkMfa("Action2");
+    });
+
+    expect(allowed1).toBe(true);
+    expect(allowed2).toBe(true);
+    expect(mockInvoke).toHaveBeenCalledTimes(2);
+  });
 });
