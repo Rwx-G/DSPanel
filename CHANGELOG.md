@@ -22,6 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CSV export via context menu in DataTable with `csvFilename` prop and `exportTableToCsv` utility (1.7)
 - `msDS-ReplValueMetaData` parser for linked-attribute replication (member, memberOf) with Active/Removed status (3.4)
 - Linked Attribute Changes section in StateInTimeView displaying value-level replication history
+- Storybook setup with Vite builder, theme switcher (light/dark), and a11y addon (1.6)
+- Stories for 15 components: TextInput, PasswordInput, FormField, ComboBox, OUPicker, GroupPicker, StatusBadge, TagChip, LoadingSpinner, EmptyState, CopyButton, HealthBadge, DataTable, PropertyGrid, TreeView, FilterBar, DialogShell
 
 ### Changed
 

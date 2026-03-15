@@ -12,4 +12,3 @@ Items deferred from QA reviews. None are blocking - all stories are PASS.
 
 | Source | Item | Refs |
 |--------|------|------|
-| 1.6 | Set up Storybook or visual regression testing | - |
