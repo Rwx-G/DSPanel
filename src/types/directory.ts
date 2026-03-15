@@ -99,6 +99,54 @@ export function mapEntryToComputer(entry: DirectoryEntry): DirectoryComputer {
   };
 }
 
+export interface DirectoryGroup {
+  distinguishedName: string;
+  samAccountName: string;
+  displayName: string;
+  description: string;
+  scope: "Global" | "DomainLocal" | "Universal" | "Unknown";
+  category: "Security" | "Distribution";
+  memberCount: number;
+  organizationalUnit: string;
+}
+
+export function parseGroupScope(groupType: number): DirectoryGroup["scope"] {
+  if (groupType & 0x2) return "Global";
+  if (groupType & 0x4) return "DomainLocal";
+  if (groupType & 0x8) return "Universal";
+  return "Unknown";
+}
+
+export function parseGroupCategory(
+  groupType: number,
+): DirectoryGroup["category"] {
+  return (groupType & 0x80000000) !== 0 ? "Security" : "Distribution";
+}
+
+export function mapEntryToGroup(entry: DirectoryEntry): DirectoryGroup {
+  const attr = (name: string): string => entry.attributes[name]?.[0] ?? "";
+  const groupType = parseInt(attr("groupType") || "0", 10);
+  const members = entry.attributes["member"] ?? [];
+
+  return {
+    distinguishedName: entry.distinguishedName,
+    samAccountName: entry.samAccountName ?? "",
+    displayName:
+      entry.displayName || attr("cn") || parseCnFromDn(entry.distinguishedName),
+    description: attr("description"),
+    scope: parseGroupScope(groupType),
+    category: parseGroupCategory(groupType),
+    memberCount: members.length,
+    organizationalUnit: parseOuFromDn(entry.distinguishedName),
+  };
+}
+
+function parseCnFromDn(dn: string): string {
+  if (!dn) return "";
+  const match = dn.match(/^CN=([^,]+)/i);
+  return match ? match[1] : dn;
+}
+
 function parseOuFromDn(dn: string): string {
   const parts = dn.split(",");
   const ous = parts

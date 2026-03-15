@@ -114,6 +114,12 @@ pub trait DirectoryProvider: Send + Sync {
     /// Each node contains the OU name and DN. Children are populated
     /// for the first level; deeper levels use `has_children` for lazy loading.
     async fn get_ou_tree(&self) -> Result<Vec<OUNode>>;
+
+    /// Fetches all groups (up to `max_results`) for browsing.
+    async fn browse_groups(&self, max_results: usize) -> Result<Vec<DirectoryEntry>>;
+
+    /// Removes a member from a group.
+    async fn remove_group_member(&self, group_dn: &str, member_dn: &str) -> Result<()>;
 }
 
 #[cfg(test)]
@@ -140,6 +146,7 @@ pub mod tests {
         pub enable_calls: Mutex<Vec<String>>,
         pub disable_calls: Mutex<Vec<String>>,
         pub set_password_flags_calls: Mutex<Vec<(String, bool, bool)>>,
+        pub remove_group_member_calls: Mutex<Vec<(String, String)>>,
         cannot_change_password: Mutex<bool>,
         replication_metadata: Mutex<Option<String>>,
         ou_tree: Mutex<Vec<OUNode>>,
@@ -168,6 +175,7 @@ pub mod tests {
                 enable_calls: Mutex::new(Vec::new()),
                 disable_calls: Mutex::new(Vec::new()),
                 set_password_flags_calls: Mutex::new(Vec::new()),
+                remove_group_member_calls: Mutex::new(Vec::new()),
                 cannot_change_password: Mutex::new(false),
                 replication_metadata: Mutex::new(None),
                 ou_tree: Mutex::new(Vec::new()),
@@ -190,6 +198,7 @@ pub mod tests {
                 enable_calls: Mutex::new(Vec::new()),
                 disable_calls: Mutex::new(Vec::new()),
                 set_password_flags_calls: Mutex::new(Vec::new()),
+                remove_group_member_calls: Mutex::new(Vec::new()),
                 cannot_change_password: Mutex::new(false),
                 replication_metadata: Mutex::new(None),
                 ou_tree: Mutex::new(Vec::new()),
@@ -223,6 +232,11 @@ pub mod tests {
 
         pub fn with_replication_metadata(self, xml: String) -> Self {
             *self.replication_metadata.lock().unwrap() = Some(xml);
+            self
+        }
+
+        pub fn with_ou_tree(self, tree: Vec<OUNode>) -> Self {
+            *self.ou_tree.lock().unwrap() = tree;
             self
         }
 
@@ -410,6 +424,21 @@ pub mod tests {
         async fn get_ou_tree(&self) -> Result<Vec<OUNode>> {
             self.check_failure()?;
             Ok(self.ou_tree.lock().unwrap().clone())
+        }
+
+        async fn browse_groups(&self, max_results: usize) -> Result<Vec<DirectoryEntry>> {
+            self.check_failure()?;
+            let groups = self.groups.lock().unwrap();
+            Ok(groups.iter().take(max_results).cloned().collect())
+        }
+
+        async fn remove_group_member(&self, group_dn: &str, member_dn: &str) -> Result<()> {
+            self.check_failure()?;
+            self.remove_group_member_calls
+                .lock()
+                .unwrap()
+                .push((group_dn.to_string(), member_dn.to_string()));
+            Ok(())
         }
     }
 
@@ -622,5 +651,48 @@ pub mod tests {
         let provider = MockDirectoryProvider::new().with_failure();
         let result = provider.get_current_user_groups().await;
         assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_browse_groups_returns_configured_groups() {
+        let groups = vec![
+            make_group_entry("Domain Admins"),
+            make_group_entry("IT Support"),
+        ];
+        let provider = MockDirectoryProvider::new().with_groups(groups);
+        let results = provider.browse_groups(500).await.unwrap();
+        assert_eq!(results.len(), 2);
+        assert_eq!(
+            results[0].sam_account_name,
+            Some("Domain Admins".to_string())
+        );
+    }
+
+    #[tokio::test]
+    async fn test_browse_groups_respects_max_results() {
+        let groups = vec![
+            make_group_entry("Group1"),
+            make_group_entry("Group2"),
+            make_group_entry("Group3"),
+        ];
+        let provider = MockDirectoryProvider::new().with_groups(groups);
+        let results = provider.browse_groups(2).await.unwrap();
+        assert_eq!(results.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_remove_group_member_success() {
+        let provider = MockDirectoryProvider::new();
+        provider
+            .remove_group_member(
+                "CN=TestGroup,DC=example,DC=com",
+                "CN=User,DC=example,DC=com",
+            )
+            .await
+            .unwrap();
+        let calls = provider.remove_group_member_calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].0, "CN=TestGroup,DC=example,DC=com");
+        assert_eq!(calls[0].1, "CN=User,DC=example,DC=com");
     }
 }

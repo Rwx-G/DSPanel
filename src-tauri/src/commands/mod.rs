@@ -237,6 +237,98 @@ pub(crate) async fn browse_computers_inner(
     })
 }
 
+/// Browse groups with server-side caching and pagination.
+pub(crate) async fn browse_groups_inner(
+    state: &AppState,
+    page: usize,
+    page_size: usize,
+) -> Result<BrowseResult, AppError> {
+    const CACHE_TTL: Duration = Duration::from_secs(60);
+    const MAX_BROWSE: usize = 500;
+
+    let cached = {
+        let cache = state.browse_groups_cache.lock().unwrap();
+        cache
+            .as_ref()
+            .filter(|(ts, _)| ts.elapsed() < CACHE_TTL)
+            .map(|(_, entries)| entries.clone())
+    };
+
+    let entries = match cached {
+        Some(entries) => entries,
+        None => {
+            let provider = state.directory_provider.clone();
+            let mut fresh = provider
+                .browse_groups(MAX_BROWSE)
+                .await
+                .map_err(|e| AppError::Directory(e.to_string()))?;
+
+            fresh.sort_by(|a, b| {
+                let da = a.display_name.as_deref().unwrap_or("").to_lowercase();
+                let db = b.display_name.as_deref().unwrap_or("").to_lowercase();
+                da.cmp(&db)
+            });
+
+            let mut cache = state.browse_groups_cache.lock().unwrap();
+            *cache = Some((Instant::now(), fresh.clone()));
+
+            fresh
+        }
+    };
+
+    let total_count = entries.len();
+    let start = page * page_size;
+    let page_entries: Vec<DirectoryEntry> =
+        entries.into_iter().skip(start).take(page_size).collect();
+    let has_more = start + page_entries.len() < total_count;
+
+    Ok(BrowseResult {
+        entries: page_entries,
+        total_count,
+        has_more,
+    })
+}
+
+/// Removes a member from a group.
+pub(crate) async fn remove_group_member_inner(
+    state: &AppState,
+    group_dn: &str,
+    member_dn: &str,
+) -> Result<(), AppError> {
+    if !state
+        .permission_service
+        .has_permission(PermissionLevel::AccountOperator)
+    {
+        return Err(AppError::PermissionDenied(
+            "Removing group members requires AccountOperator permission or higher".to_string(),
+        ));
+    }
+
+    state
+        .snapshot_service
+        .capture(group_dn, "RemoveGroupMember");
+
+    let provider = state.directory_provider.clone();
+    match provider.remove_group_member(group_dn, member_dn).await {
+        Ok(()) => {
+            state.audit_service.log_success(
+                "GroupMemberRemoved",
+                group_dn,
+                &format!("Removed member {} from group", member_dn),
+            );
+            Ok(())
+        }
+        Err(e) => {
+            state.audit_service.log_failure(
+                "RemoveGroupMemberFailed",
+                group_dn,
+                &format!("Failed to remove member {} from group: {}", member_dn, e),
+            );
+            Err(AppError::Directory(e.to_string()))
+        }
+    }
+}
+
 /// Returns members of a group by its DN.
 pub(crate) async fn get_group_members_inner(
     state: &AppState,
@@ -813,6 +905,26 @@ pub async fn browse_computers(
     state: State<'_, AppState>,
 ) -> Result<BrowseResult, AppError> {
     browse_computers_inner(&state, page, page_size).await
+}
+
+/// Browses all groups with pagination (cached server-side for 60s).
+#[tauri::command]
+pub async fn browse_groups(
+    page: usize,
+    page_size: usize,
+    state: State<'_, AppState>,
+) -> Result<BrowseResult, AppError> {
+    browse_groups_inner(&state, page, page_size).await
+}
+
+/// Removes a member from a group.
+#[tauri::command]
+pub async fn remove_group_member(
+    group_dn: String,
+    member_dn: String,
+    state: State<'_, AppState>,
+) -> Result<(), AppError> {
+    remove_group_member_inner(&state, &group_dn, &member_dn).await
 }
 
 /// Returns the members of a group identified by its DN.
@@ -1852,6 +1964,103 @@ mod tests {
         let state = make_state_with_failure();
         let result = browse_users_inner(&state, 0, 10).await;
         assert!(result.is_err());
+    }
+
+    // -----------------------------------------------------------------------
+    // Browse groups tests
+    // -----------------------------------------------------------------------
+
+    fn make_group_entry(name: &str) -> DirectoryEntry {
+        let mut attrs = HashMap::new();
+        attrs.insert("groupType".to_string(), vec!["-2147483646".to_string()]);
+        attrs.insert("description".to_string(), vec![format!("{} group", name)]);
+        DirectoryEntry {
+            distinguished_name: format!("CN={},OU=Groups,DC=example,DC=com", name),
+            sam_account_name: Some(name.to_string()),
+            display_name: Some(name.to_string()),
+            object_class: Some("group".to_string()),
+            attributes: attrs,
+        }
+    }
+
+    fn make_state_with_groups(groups: Vec<DirectoryEntry>) -> AppState {
+        let provider = Arc::new(MockDirectoryProvider::new().with_groups(groups));
+        AppState::new_for_test(provider, PermissionConfig::default())
+    }
+
+    #[tokio::test]
+    async fn test_browse_groups_inner_returns_paginated_results() {
+        let groups = vec![
+            make_group_entry("Alpha Group"),
+            make_group_entry("Beta Group"),
+            make_group_entry("Gamma Group"),
+        ];
+        let state = make_state_with_groups(groups);
+        let result = browse_groups_inner(&state, 0, 2).await.unwrap();
+        assert_eq!(result.entries.len(), 2);
+        assert_eq!(result.total_count, 3);
+        assert!(result.has_more);
+    }
+
+    #[tokio::test]
+    async fn test_browse_groups_inner_uses_cache() {
+        let groups = vec![make_group_entry("TestGroup")];
+        let state = make_state_with_groups(groups);
+
+        let r1 = browse_groups_inner(&state, 0, 10).await.unwrap();
+        assert_eq!(r1.total_count, 1);
+
+        let cache = state.browse_groups_cache.lock().unwrap();
+        assert!(cache.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_browse_groups_inner_sorts_by_display_name() {
+        let groups = vec![
+            make_group_entry("Zeta"),
+            make_group_entry("Alpha"),
+            make_group_entry("Mid"),
+        ];
+        let state = make_state_with_groups(groups);
+        let result = browse_groups_inner(&state, 0, 10).await.unwrap();
+        assert_eq!(result.entries[0].display_name, Some("Alpha".to_string()));
+        assert_eq!(result.entries[1].display_name, Some("Mid".to_string()));
+        assert_eq!(result.entries[2].display_name, Some("Zeta".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_remove_group_member_inner_requires_account_operator() {
+        let state = make_state(); // ReadOnly
+        let result = remove_group_member_inner(
+            &state,
+            "CN=Group,DC=example,DC=com",
+            "CN=User,DC=example,DC=com",
+        )
+        .await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            AppError::PermissionDenied(msg) => assert!(msg.contains("AccountOperator")),
+            other => panic!("Expected PermissionDenied, got: {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_remove_group_member_inner_audits_success() {
+        let (state, provider) =
+            make_state_with_level_and_provider(PermissionLevel::AccountOperator);
+        remove_group_member_inner(
+            &state,
+            "CN=Group,DC=example,DC=com",
+            "CN=User,DC=example,DC=com",
+        )
+        .await
+        .unwrap();
+        let calls = provider.remove_group_member_calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+        let entries = state.audit_service.get_entries();
+        assert_eq!(entries.len(), 1);
+        assert!(entries[0].success);
+        assert_eq!(entries[0].action, "GroupMemberRemoved");
     }
 
     // -----------------------------------------------------------------------

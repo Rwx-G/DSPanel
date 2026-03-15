@@ -191,6 +191,24 @@ where
         resilient_call!(self, |inner| inner.browse_computers(max_results).await)
     }
 
+    async fn browse_groups(&self, max_results: usize) -> Result<Vec<DirectoryEntry>> {
+        resilient_call!(self, |inner| inner.browse_groups(max_results).await)
+    }
+
+    async fn remove_group_member(&self, group_dn: &str, member_dn: &str) -> Result<()> {
+        let g = group_dn.to_string();
+        let m = member_dn.to_string();
+        let inner_ref = self.inner.clone();
+        self.execute_with_resilience(|| {
+            let inner = inner_ref.clone();
+            let g = g.clone();
+            let m = m.clone();
+            async move { inner.remove_group_member(&g, &m).await }
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!(e))
+    }
+
     async fn get_user_by_identity(&self, sam_account_name: &str) -> Result<Option<DirectoryEntry>> {
         let sam = sam_account_name.to_string();
         resilient_call!(self, sam, |inner, s| inner.get_user_by_identity(&s).await)

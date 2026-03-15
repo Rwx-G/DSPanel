@@ -372,6 +372,9 @@ fn make_group(name: &str, parent_group: &str, _dept: &str) -> DirectoryEntry {
         "memberOf".to_string(),
         vec![format!("CN={},OU=Groups,DC=contoso,DC=com", parent_group)],
     );
+    // Global Security group by default: 0x80000002 = -2147483646
+    attrs.insert("groupType".to_string(), vec!["-2147483646".to_string()]);
+    attrs.insert("description".to_string(), vec![format!("{} group", name)]);
     DirectoryEntry {
         distinguished_name: format!("CN={},OU=Groups,DC=contoso,DC=com", name),
         sam_account_name: Some(name.to_string()),
@@ -828,6 +831,22 @@ impl DirectoryProvider for DemoDirectoryProvider {
 
     async fn browse_computers(&self, max_results: usize) -> Result<Vec<DirectoryEntry>> {
         Ok(sample_computers().into_iter().take(max_results).collect())
+    }
+
+    async fn browse_groups(&self, max_results: usize) -> Result<Vec<DirectoryEntry>> {
+        Ok(sample_group_entries()
+            .into_iter()
+            .take(max_results)
+            .collect())
+    }
+
+    async fn remove_group_member(&self, group_dn: &str, member_dn: &str) -> Result<()> {
+        tracing::info!(
+            group_dn = %group_dn,
+            member_dn = %member_dn,
+            "DEMO: remove group member simulated"
+        );
+        Ok(())
     }
 
     async fn get_user_by_identity(&self, sam_account_name: &str) -> Result<Option<DirectoryEntry>> {

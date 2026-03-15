@@ -118,6 +118,8 @@ pub fn run() {
             commands::audit_ntfs_permissions,
             commands::cross_reference_ntfs,
             commands::search_groups,
+            commands::browse_groups,
+            commands::remove_group_member,
             commands::get_ou_tree,
         ])
         .run(tauri::generate_context!())

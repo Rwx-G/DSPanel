@@ -485,6 +485,41 @@ impl DirectoryProvider for LdapDirectoryProvider {
         self.search(ldap_filter, COMPUTER_ATTRS, max_results).await
     }
 
+    async fn browse_groups(&self, max_results: usize) -> Result<Vec<DirectoryEntry>> {
+        let ldap_filter = "(objectClass=group)";
+        self.search(ldap_filter, GROUP_ATTRS, max_results).await
+    }
+
+    async fn remove_group_member(&self, group_dn: &str, member_dn: &str) -> Result<()> {
+        let g = group_dn.to_string();
+        let m = member_dn.to_string();
+        self.with_connection(|mut ldap| {
+            let g = g.clone();
+            let m = m.clone();
+            async move {
+                ldap.modify(
+                    &g,
+                    vec![Mod::Delete(
+                        "member".to_string(),
+                        HashSet::from([m.clone()]),
+                    )],
+                )
+                .await
+                .context("Failed to remove member from group")?
+                .success()
+                .context("Remove group member LDAP operation returned error")?;
+
+                tracing::info!(
+                    group_dn = %g,
+                    member_dn = %m,
+                    "Member removed from group"
+                );
+                Ok(())
+            }
+        })
+        .await
+    }
+
     async fn get_user_by_identity(&self, sam_account_name: &str) -> Result<Option<DirectoryEntry>> {
         let validated = validate_search_input(sam_account_name)?;
         let escaped = ldap_escape(validated);

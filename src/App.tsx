@@ -15,6 +15,7 @@ import { HomePage } from "@/pages/HomePage";
 import { PasswordGenerator } from "@/pages/PasswordGenerator";
 import { UserComparison } from "@/pages/UserComparison";
 import { NtfsAnalyzer } from "@/pages/NtfsAnalyzer";
+import { GroupManagement } from "@/pages/GroupManagement";
 
 const APP_VERSION = __APP_VERSION__;
 
@@ -127,6 +128,7 @@ const MODULE_COMPONENTS: Record<
   users: UserLookup,
   computers: ComputerLookup,
   "user-comparison": UserComparison,
+  groups: GroupManagement,
   "ntfs-analyzer": NtfsAnalyzer,
   "password-generator": PasswordGenerator,
 };

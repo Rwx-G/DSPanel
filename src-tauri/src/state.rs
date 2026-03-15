@@ -32,6 +32,8 @@ pub struct AppState {
     pub browse_cache: Mutex<Option<(Instant, Vec<DirectoryEntry>)>>,
     /// Cache for browse_computers: (fetch_time, sorted_entries). TTL: 60 seconds.
     pub browse_computers_cache: Mutex<Option<(Instant, Vec<DirectoryEntry>)>>,
+    /// Cache for browse_groups: (fetch_time, sorted_entries). TTL: 60 seconds.
+    pub browse_groups_cache: Mutex<Option<(Instant, Vec<DirectoryEntry>)>>,
 }
 
 impl AppState {
@@ -53,6 +55,7 @@ impl AppState {
             snapshot_service: SnapshotService::new(),
             browse_cache: Mutex::new(None),
             browse_computers_cache: Mutex::new(None),
+            browse_groups_cache: Mutex::new(None),
         }
     }
 
@@ -73,6 +76,7 @@ impl AppState {
             snapshot_service: SnapshotService::new(),
             browse_cache: Mutex::new(None),
             browse_computers_cache: Mutex::new(None),
+            browse_groups_cache: Mutex::new(None),
         }
     }
 }
@@ -172,6 +176,12 @@ mod tests {
     fn test_app_state_browse_computers_cache_initially_none() {
         let state = make_state();
         assert!(state.browse_computers_cache.lock().unwrap().is_none());
+    }
+
+    #[test]
+    fn test_app_state_browse_groups_cache_initially_none() {
+        let state = make_state();
+        assert!(state.browse_groups_cache.lock().unwrap().is_none());
     }
 
     #[test]

@@ -1,5 +1,6 @@
 import {
   User,
+  Users,
   Monitor,
   KeyRound,
   Settings,
@@ -21,6 +22,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   key: KeyRound,
   settings: Settings,
   compare: GitCompareArrows,
+  "users-group": Users,
   "folder-search": FolderSearch,
 };
 
@@ -43,6 +45,13 @@ const MODULES: SidebarModule[] = [
     id: "computers",
     label: "Computer Lookup",
     icon: "computer",
+    group: "Directory",
+    requiredLevel: "ReadOnly",
+  },
+  {
+    id: "groups",
+    label: "Group Management",
+    icon: "users-group",
     group: "Directory",
     requiredLevel: "ReadOnly",
   },
