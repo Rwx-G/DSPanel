@@ -56,6 +56,10 @@ pub fn validate_unc_path(path: &str) -> Result<(), String> {
     if without_prefix.is_empty() || !without_prefix.contains('\\') {
         return Err("Path must contain at least a server and share name".to_string());
     }
+    // Reject path traversal segments
+    if path.split('\\').any(|seg| seg == "..") {
+        return Err("Path must not contain '..' traversal segments".to_string());
+    }
     Ok(())
 }
 
@@ -206,10 +210,13 @@ pub fn read_acl(path: &str) -> Result<Vec<AceEntry>, String> {
                     // ACCESS_ALLOWED_ACE_TYPE
                     let ace = unsafe { &*(acl_bytes.add(offset) as *const ACCESS_ALLOWED_ACE) };
                     let sid_ptr = &ace.SidStart as *const u32;
-                    let sid_string = sid_to_string(sid_ptr as *const _);
+                    let sid_raw = sid_ptr as *const std::ffi::c_void;
+                    let sid_string = sid_to_string(sid_raw);
+                    let display_name =
+                        lookup_account_name(sid_raw).unwrap_or_else(|| sid_string.clone());
                     entries.push(AceEntry {
-                        trustee_sid: sid_string.clone(),
-                        trustee_display_name: sid_string,
+                        trustee_sid: sid_string,
+                        trustee_display_name: display_name,
                         access_type: AceAccessType::Allow,
                         permissions: format_permissions(ace.Mask),
                         is_inherited,
@@ -219,10 +226,13 @@ pub fn read_acl(path: &str) -> Result<Vec<AceEntry>, String> {
                     // ACCESS_DENIED_ACE_TYPE
                     let ace = unsafe { &*(acl_bytes.add(offset) as *const ACCESS_DENIED_ACE) };
                     let sid_ptr = &ace.SidStart as *const u32;
-                    let sid_string = sid_to_string(sid_ptr as *const _);
+                    let sid_raw = sid_ptr as *const std::ffi::c_void;
+                    let sid_string = sid_to_string(sid_raw);
+                    let display_name =
+                        lookup_account_name(sid_raw).unwrap_or_else(|| sid_string.clone());
                     entries.push(AceEntry {
-                        trustee_sid: sid_string.clone(),
-                        trustee_display_name: sid_string,
+                        trustee_sid: sid_string,
+                        trustee_display_name: display_name,
                         access_type: AceAccessType::Deny,
                         permissions: format_permissions(ace.Mask),
                         is_inherited,
@@ -264,6 +274,63 @@ fn sid_to_string(sid: *const std::ffi::c_void) -> String {
         s
     } else {
         "Unknown SID".to_string()
+    }
+}
+
+/// Resolves a SID to a DOMAIN\Username display name via LookupAccountSidW.
+/// Falls back to the raw SID string if resolution fails.
+#[cfg(windows)]
+fn lookup_account_name(sid: *const std::ffi::c_void) -> Option<String> {
+    use windows::Win32::Security::{LookupAccountSidW, PSID, SID_NAME_USE};
+
+    let psid = PSID(sid as *mut _);
+
+    // First call to get buffer sizes
+    let mut name_len: u32 = 0;
+    let mut domain_len: u32 = 0;
+    let mut sid_type = SID_NAME_USE::default();
+
+    let _ = unsafe {
+        LookupAccountSidW(
+            None,
+            psid,
+            windows::core::PWSTR::null(),
+            &mut name_len,
+            windows::core::PWSTR::null(),
+            &mut domain_len,
+            &mut sid_type,
+        )
+    };
+
+    if name_len == 0 {
+        return None;
+    }
+
+    let mut name_buf: Vec<u16> = vec![0; name_len as usize];
+    let mut domain_buf: Vec<u16> = vec![0; domain_len as usize];
+
+    let result = unsafe {
+        LookupAccountSidW(
+            None,
+            psid,
+            windows::core::PWSTR(name_buf.as_mut_ptr()),
+            &mut name_len,
+            windows::core::PWSTR(domain_buf.as_mut_ptr()),
+            &mut domain_len,
+            &mut sid_type,
+        )
+    };
+
+    if result.is_ok() {
+        let name = String::from_utf16_lossy(&name_buf[..name_len as usize]);
+        let domain = String::from_utf16_lossy(&domain_buf[..domain_len as usize]);
+        if domain.is_empty() {
+            Some(name)
+        } else {
+            Some(format!("{}\\{}", domain, name))
+        }
+    } else {
+        None
     }
 }
 
@@ -380,6 +447,19 @@ mod tests {
     fn test_validate_unc_path_single_slash() {
         let result = validate_unc_path("\\server\\share");
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_unc_path_rejects_traversal() {
+        let result = validate_unc_path("\\\\server\\share\\..\\..\\Windows\\System32");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("traversal"));
+    }
+
+    #[test]
+    fn test_validate_unc_path_allows_dots_in_names() {
+        assert!(validate_unc_path("\\\\server\\share\\folder.name").is_ok());
+        assert!(validate_unc_path("\\\\server\\share\\.hidden").is_ok());
     }
 
     #[test]

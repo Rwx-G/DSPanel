@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- LDAP connection pooling: reuse a single multiplexed connection instead of connect/bind per operation
+- Automatic reconnect on stale LDAP connection with one retry before propagating errors
+- Replace fragile string-split XML parsing in replication metadata with `quick-xml` crate (3.4)
+
+### Fixed
+
+- Resolve NTFS ACE trustee SIDs to DOMAIN\Username via LookupAccountSidW instead of showing raw SIDs (3.2)
+- Reject path traversal (`..` segments) in UNC path validation (3.2)
+- Add search input validation: trim, max 256 chars, reject control characters (defense-in-depth)
+
 ## [0.3.0] - 2026-03-15
 
 Epic 3 - Comparison & Permissions Audit. Side-by-side user comparison, NTFS permissions

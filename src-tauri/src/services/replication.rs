@@ -1,3 +1,5 @@
+use quick_xml::events::Event;
+use quick_xml::Reader;
 use serde::{Deserialize, Serialize};
 
 /// Metadata about a single attribute from AD replication data.
@@ -37,40 +39,78 @@ pub struct AttributeChangeDiff {
 /// Parses `msDS-ReplAttributeMetaData` XML fragments into structured metadata.
 ///
 /// The input is the raw string value of the operational attribute, which
-/// contains multiple XML fragments of `DS_REPL_ATTR_META_DATA` elements.
+/// contains multiple `<DS_REPL_ATTR_META_DATA>` XML elements. Uses `quick-xml`
+/// for robust parsing that handles whitespace variations, XML attributes,
+/// and namespace prefixes.
 pub fn parse_replication_metadata(raw_xml: &str) -> Vec<AttributeMetadata> {
     let mut results = Vec::new();
 
-    // The metadata is a series of XML fragments, one per attribute
-    for fragment in raw_xml.split("</DS_REPL_ATTR_META_DATA>") {
-        let fragment = fragment.trim();
-        if fragment.is_empty() || !fragment.contains("<DS_REPL_ATTR_META_DATA>") {
-            continue;
-        }
+    // Wrap in a root element to form valid XML for the parser
+    let wrapped = format!("<root>{}</root>", raw_xml);
+    let mut reader = Reader::from_str(&wrapped);
 
-        let attr_name = extract_xml_value(fragment, "pszAttributeName").unwrap_or_default();
-        let version = extract_xml_value(fragment, "dwVersion")
-            .and_then(|v| v.parse::<u64>().ok())
-            .unwrap_or(0);
-        let change_time =
-            extract_xml_value(fragment, "ftimeLastOriginatingChange").unwrap_or_default();
-        let dsa_dn = extract_xml_value(fragment, "pszLastOriginatingDsaDN").unwrap_or_default();
-        let local_usn = extract_xml_value(fragment, "usnLocalChange")
-            .and_then(|v| v.parse::<u64>().ok())
-            .unwrap_or(0);
-        let originating_usn = extract_xml_value(fragment, "usnOriginatingChange")
-            .and_then(|v| v.parse::<u64>().ok())
-            .unwrap_or(0);
+    let mut in_entry = false;
+    let mut current_tag = String::new();
+    let mut attr_name = String::new();
+    let mut version: u64 = 0;
+    let mut change_time = String::new();
+    let mut dsa_dn = String::new();
+    let mut local_usn: u64 = 0;
+    let mut originating_usn: u64 = 0;
 
-        if !attr_name.is_empty() {
-            results.push(AttributeMetadata {
-                attribute_name: attr_name,
-                version,
-                last_originating_change_time: change_time,
-                last_originating_dsa_dn: dsa_dn,
-                local_usn,
-                originating_usn,
-            });
+    loop {
+        match reader.read_event() {
+            Ok(Event::Start(e)) => {
+                let tag = String::from_utf8_lossy(e.name().as_ref()).to_string();
+                if tag == "DS_REPL_ATTR_META_DATA" {
+                    in_entry = true;
+                    attr_name.clear();
+                    version = 0;
+                    change_time.clear();
+                    dsa_dn.clear();
+                    local_usn = 0;
+                    originating_usn = 0;
+                } else if in_entry {
+                    current_tag = tag;
+                }
+            }
+            Ok(Event::Text(e)) => {
+                if in_entry && !current_tag.is_empty() {
+                    let text = e.unescape().unwrap_or_default().trim().to_string();
+                    match current_tag.as_str() {
+                        "pszAttributeName" => attr_name = text,
+                        "dwVersion" => version = text.parse().unwrap_or(0),
+                        "ftimeLastOriginatingChange" => change_time = text,
+                        "pszLastOriginatingDsaDN" => dsa_dn = text,
+                        "usnLocalChange" => local_usn = text.parse().unwrap_or(0),
+                        "usnOriginatingChange" => originating_usn = text.parse().unwrap_or(0),
+                        _ => {}
+                    }
+                }
+            }
+            Ok(Event::End(e)) => {
+                let tag = String::from_utf8_lossy(e.name().as_ref()).to_string();
+                if tag == "DS_REPL_ATTR_META_DATA" {
+                    in_entry = false;
+                    if !attr_name.is_empty() {
+                        results.push(AttributeMetadata {
+                            attribute_name: attr_name.clone(),
+                            version,
+                            last_originating_change_time: change_time.clone(),
+                            last_originating_dsa_dn: dsa_dn.clone(),
+                            local_usn,
+                            originating_usn,
+                        });
+                    }
+                }
+                current_tag.clear();
+            }
+            Ok(Event::Eof) => break,
+            Err(e) => {
+                tracing::warn!("XML parse error in replication metadata: {}", e);
+                break;
+            }
+            _ => {}
         }
     }
 
@@ -81,21 +121,6 @@ pub fn parse_replication_metadata(raw_xml: &str) -> Vec<AttributeMetadata> {
     });
 
     results
-}
-
-/// Extracts a value from a simple XML element: `<tag>value</tag>`.
-fn extract_xml_value(xml: &str, tag: &str) -> Option<String> {
-    let open = format!("<{}>", tag);
-    let close = format!("</{}>", tag);
-
-    let start = xml.find(&open)? + open.len();
-    let end = xml.find(&close)?;
-
-    if start <= end {
-        Some(xml[start..end].trim().to_string())
-    } else {
-        None
-    }
 }
 
 /// Computes which attributes changed between two timestamps.
@@ -223,24 +248,43 @@ mod tests {
     }
 
     #[test]
-    fn test_extract_xml_value() {
-        let xml = "<tag>hello world</tag>";
+    fn test_parse_xml_with_extra_whitespace() {
+        let xml = r#"
+<DS_REPL_ATTR_META_DATA>
+    <pszAttributeName>  cn  </pszAttributeName>
+    <dwVersion>  7  </dwVersion>
+    <ftimeLastOriginatingChange>  2026-03-10T12:00:00Z  </ftimeLastOriginatingChange>
+    <pszLastOriginatingDsaDN></pszLastOriginatingDsaDN>
+    <usnOriginatingChange>100</usnOriginatingChange>
+    <usnLocalChange>200</usnLocalChange>
+</DS_REPL_ATTR_META_DATA>
+"#;
+        let result = parse_replication_metadata(xml);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].attribute_name, "cn");
+        assert_eq!(result[0].version, 7);
         assert_eq!(
-            extract_xml_value(xml, "tag"),
-            Some("hello world".to_string())
+            result[0].last_originating_change_time,
+            "2026-03-10T12:00:00Z"
         );
     }
 
     #[test]
-    fn test_extract_xml_value_missing() {
-        let xml = "<other>value</other>";
-        assert_eq!(extract_xml_value(xml, "tag"), None);
-    }
-
-    #[test]
-    fn test_extract_xml_value_with_whitespace() {
-        let xml = "<tag>  trimmed  </tag>";
-        assert_eq!(extract_xml_value(xml, "tag"), Some("trimmed".to_string()));
+    fn test_parse_xml_with_unknown_extra_tags() {
+        let xml = r#"
+<DS_REPL_ATTR_META_DATA>
+    <pszAttributeName>mail</pszAttributeName>
+    <dwVersion>1</dwVersion>
+    <ftimeLastOriginatingChange>2026-01-01T00:00:00Z</ftimeLastOriginatingChange>
+    <pszLastOriginatingDsaDN>CN=DC1</pszLastOriginatingDsaDN>
+    <usnOriginatingChange>50</usnOriginatingChange>
+    <usnLocalChange>60</usnLocalChange>
+    <someUnknownTag>ignored</someUnknownTag>
+</DS_REPL_ATTR_META_DATA>
+"#;
+        let result = parse_replication_metadata(xml);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].attribute_name, "mail");
     }
 
     #[test]

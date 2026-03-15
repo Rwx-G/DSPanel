@@ -40,14 +40,43 @@ pub(crate) fn has_permission_inner(state: &AppState, required: PermissionLevel) 
     state.permission_service.has_permission(required)
 }
 
+/// Maximum allowed length for a search query.
+const MAX_SEARCH_QUERY_LEN: usize = 256;
+
+/// Validates and sanitizes a search query string.
+///
+/// Trims whitespace, rejects empty queries, enforces a maximum length,
+/// and rejects control characters (null bytes, etc.) for defense-in-depth.
+fn validate_search_input(query: &str) -> Result<String, AppError> {
+    let trimmed = query.trim();
+    if trimmed.is_empty() {
+        return Err(AppError::Validation(
+            "Search query must not be empty".to_string(),
+        ));
+    }
+    if trimmed.len() > MAX_SEARCH_QUERY_LEN {
+        return Err(AppError::Validation(format!(
+            "Search query exceeds maximum length of {} characters",
+            MAX_SEARCH_QUERY_LEN
+        )));
+    }
+    if trimmed.chars().any(|c| c.is_control()) {
+        return Err(AppError::Validation(
+            "Search query must not contain control characters".to_string(),
+        ));
+    }
+    Ok(trimmed.to_string())
+}
+
 /// Searches for user accounts matching the query string.
 pub(crate) async fn search_users_inner(
     state: &AppState,
     query: &str,
 ) -> Result<Vec<DirectoryEntry>, AppError> {
+    let sanitized = validate_search_input(query)?;
     let provider = state.directory_provider.clone();
     provider
-        .search_users(query, 50)
+        .search_users(&sanitized, 50)
         .await
         .map_err(|e| AppError::Directory(e.to_string()))
 }
@@ -1231,6 +1260,46 @@ mod tests {
     async fn test_search_users_failure_returns_error() {
         let state = make_state_with_failure();
         let result = search_users_inner(&state, "test").await;
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_search_input_trims_whitespace() {
+        let result = validate_search_input("  john  ").unwrap();
+        assert_eq!(result, "john");
+    }
+
+    #[test]
+    fn test_validate_search_input_rejects_empty() {
+        assert!(validate_search_input("").is_err());
+        assert!(validate_search_input("   ").is_err());
+    }
+
+    #[test]
+    fn test_validate_search_input_rejects_too_long() {
+        let long_query = "a".repeat(MAX_SEARCH_QUERY_LEN + 1);
+        let result = validate_search_input(&long_query);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("maximum length"));
+    }
+
+    #[test]
+    fn test_validate_search_input_rejects_control_chars() {
+        assert!(validate_search_input("john\0doe").is_err());
+        assert!(validate_search_input("test\x01").is_err());
+    }
+
+    #[test]
+    fn test_validate_search_input_accepts_valid() {
+        assert!(validate_search_input("john.doe").is_ok());
+        assert!(validate_search_input("user@domain.com").is_ok());
+        assert!(validate_search_input("CN=Test User,OU=Users").is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_search_users_inner_rejects_empty_query() {
+        let state = make_state_with_users(vec![make_user_entry("jdoe", "John Doe")]);
+        let result = search_users_inner(&state, "   ").await;
         assert!(result.is_err());
     }
 

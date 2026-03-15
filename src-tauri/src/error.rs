@@ -21,6 +21,9 @@ pub enum AppError {
     #[error("Configuration error: {0}")]
     Configuration(String),
 
+    #[error("Validation error: {0}")]
+    Validation(String),
+
     #[error("Internal error: {0}")]
     Internal(String),
 
@@ -49,6 +52,7 @@ impl From<AppError> for ErrorResponse {
             AppError::Network(_) => ("network", true, "A network error occurred. Please check your connection.".to_string()),
             AppError::PermissionDenied(_) => ("permission_denied", false, "You do not have permission to perform this action.".to_string()),
             AppError::Configuration(_) => ("configuration", false, "A configuration error occurred.".to_string()),
+            AppError::Validation(msg) => ("validation", false, msg.clone()),
             AppError::Internal(_) => ("internal", false, "An unexpected error occurred.".to_string()),
             AppError::CircuitBreakerOpen => ("circuit_breaker", true, "The directory service is temporarily unavailable. Please wait a moment and try again.".to_string()),
         };
@@ -217,6 +221,21 @@ mod tests {
     fn test_app_error_configuration_display() {
         let err = AppError::Configuration("missing config file".to_string());
         assert_eq!(err.to_string(), "Configuration error: missing config file");
+    }
+
+    #[test]
+    fn test_app_error_validation_display() {
+        let err = AppError::Validation("query too long".to_string());
+        assert_eq!(err.to_string(), "Validation error: query too long");
+    }
+
+    #[test]
+    fn test_error_response_from_validation_error() {
+        let err = AppError::Validation("bad input".to_string());
+        let response = ErrorResponse::from(err);
+        assert_eq!(response.kind, "validation");
+        assert!(!response.retryable);
+        assert_eq!(response.user_message, "bad input");
     }
 
     #[test]

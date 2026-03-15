@@ -107,11 +107,15 @@ pub fn ldap_escape(input: &str) -> String {
 /// `DirectoryProvider` implementation using on-premises Active Directory via LDAP.
 ///
 /// Uses `ldap3` crate for LDAP operations with Kerberos (GSSAPI) authentication.
-/// The connection is established lazily on first use.
+/// The connection is established lazily on first use and reused across operations.
+/// `ldap3::Ldap` supports multiplexing, so a single connection handles concurrent
+/// requests efficiently without per-operation connect/bind overhead.
 pub struct LdapDirectoryProvider {
     domain: Option<String>,
     base_dn: Mutex<Option<String>>,
     connected: Mutex<bool>,
+    /// Pooled LDAP connection. Reused across operations; recreated on failure.
+    pool: tokio::sync::Mutex<Option<ldap3::Ldap>>,
 }
 
 impl Default for LdapDirectoryProvider {
@@ -138,11 +142,69 @@ impl LdapDirectoryProvider {
             domain,
             base_dn: Mutex::new(None),
             connected: Mutex::new(false),
+            pool: tokio::sync::Mutex::new(None),
+        }
+    }
+
+    /// Returns a pooled LDAP connection, creating one if needed.
+    ///
+    /// The returned `Ldap` handle is a clone of the pooled connection.
+    /// `ldap3::Ldap` supports multiplexing, so concurrent operations share
+    /// the same underlying TCP connection and GSSAPI session.
+    ///
+    /// If the pooled connection is stale (operation fails), the caller should
+    /// call `invalidate_connection()` to force a reconnect on the next call.
+    async fn get_connection(&self) -> Result<ldap3::Ldap> {
+        let mut guard = self.pool.lock().await;
+        if let Some(ref ldap) = *guard {
+            return Ok(ldap.clone());
+        }
+        let ldap = self.create_connection().await?;
+        *guard = Some(ldap.clone());
+        Ok(ldap)
+    }
+
+    /// Discards the pooled connection, forcing a fresh connect on next use.
+    async fn invalidate_connection(&self) {
+        let mut guard = self.pool.lock().await;
+        *guard = None;
+        *self.connected.lock().unwrap() = false;
+        tracing::info!("LDAP connection pool invalidated - will reconnect on next operation");
+    }
+
+    /// Executes an LDAP operation with automatic reconnect on stale connection.
+    ///
+    /// On connection-level failure, invalidates the pool and retries once with
+    /// a fresh connection before propagating the error.
+    async fn with_connection<T, Op, Fut>(&self, operation: Op) -> Result<T>
+    where
+        Op: Fn(ldap3::Ldap) -> Fut,
+        Fut: std::future::Future<Output = Result<T>>,
+    {
+        let ldap = self.get_connection().await?;
+        match operation(ldap).await {
+            Ok(result) => Ok(result),
+            Err(err) => {
+                let msg = err.to_string().to_lowercase();
+                let is_connection_error = msg.contains("connection")
+                    || msg.contains("timeout")
+                    || msg.contains("broken pipe")
+                    || msg.contains("reset")
+                    || msg.contains("closed");
+                if is_connection_error {
+                    tracing::warn!("LDAP connection error, reconnecting: {}", err);
+                    self.invalidate_connection().await;
+                    let ldap = self.get_connection().await?;
+                    operation(ldap).await
+                } else {
+                    Err(err)
+                }
+            }
         }
     }
 
     /// Establishes a new LDAP connection with GSSAPI authentication.
-    async fn connect(&self) -> Result<ldap3::Ldap> {
+    async fn create_connection(&self) -> Result<ldap3::Ldap> {
         let domain = self
             .domain
             .as_ref()
@@ -195,95 +257,40 @@ impl LdapDirectoryProvider {
         Ok(ldap)
     }
 
-    /// Modifies the DACL to set or clear the "User Cannot Change Password" deny ACEs.
-    async fn set_cannot_change_password(
-        &self,
-        user_dn: &str,
-        deny: bool,
-        ldap: &mut ldap3::Ldap,
-    ) -> Result<()> {
-        // Read the current security descriptor (binary attribute)
-        let (rs, _) = ldap
-            .search(
-                user_dn,
-                Scope::Base,
-                "(objectClass=*)",
-                vec!["nTSecurityDescriptor"],
-            )
-            .await
-            .context("Failed to read nTSecurityDescriptor")?
-            .success()
-            .context("nTSecurityDescriptor read returned error")?;
-
-        let entry = rs
-            .into_iter()
-            .next()
-            .context("User not found when reading security descriptor")?;
-        let se = ldap3::SearchEntry::construct(entry);
-
-        // nTSecurityDescriptor is a binary attribute
-        let sd_bytes = se
-            .bin_attrs
-            .get("nTSecurityDescriptor")
-            .and_then(|v| v.first())
-            .context("nTSecurityDescriptor binary attribute not present")?;
-
-        // Modify the DACL
-        let modified_sd = crate::services::dacl::set_cannot_change_password(sd_bytes, deny)
-            .context("Failed to modify security descriptor DACL")?;
-
-        // Write back the modified security descriptor
-        let mods: Vec<Mod<Vec<u8>>> = vec![Mod::Replace(
-            b"nTSecurityDescriptor".to_vec(),
-            HashSet::from([modified_sd]),
-        )];
-
-        ldap.modify(user_dn, mods)
-            .await
-            .context("Failed to write modified nTSecurityDescriptor")?
-            .success()
-            .context("nTSecurityDescriptor write returned error")?;
-
-        tracing::info!(
-            target_dn = %user_dn,
-            deny,
-            "DACL modified for User Cannot Change Password"
-        );
-        Ok(())
-    }
-
     /// Reads the current `userAccountControl` value for a user.
     async fn get_user_account_control(&self, user_dn: &str) -> Result<u32> {
-        let mut ldap = self.connect().await?;
-        let base = user_dn;
+        let dn = user_dn.to_string();
+        self.with_connection(|mut ldap| {
+            let dn = dn.clone();
+            async move {
+                let (rs, _) = ldap
+                    .search(
+                        &dn,
+                        Scope::Base,
+                        "(objectClass=*)",
+                        vec!["userAccountControl"],
+                    )
+                    .await
+                    .context("Failed to read userAccountControl")?
+                    .success()
+                    .context("userAccountControl read returned error")?;
 
-        let (rs, _) = ldap
-            .search(
-                base,
-                Scope::Base,
-                "(objectClass=*)",
-                vec!["userAccountControl"],
-            )
-            .await
-            .context("Failed to read userAccountControl")?
-            .success()
-            .context("userAccountControl read returned error")?;
-
-        let _ = ldap.unbind().await;
-
-        let entry = rs
-            .into_iter()
-            .next()
-            .context("User not found when reading userAccountControl")?;
-        let se = SearchEntry::construct(entry);
-        let uac_str = se
-            .attrs
-            .get("userAccountControl")
-            .and_then(|v| v.first())
-            .context("userAccountControl attribute not present")?;
-        uac_str
-            .parse::<u32>()
-            .context("Failed to parse userAccountControl value")
+                let entry = rs
+                    .into_iter()
+                    .next()
+                    .context("User not found when reading userAccountControl")?;
+                let se = SearchEntry::construct(entry);
+                let uac_str = se
+                    .attrs
+                    .get("userAccountControl")
+                    .and_then(|v| v.first())
+                    .context("userAccountControl attribute not present")?;
+                uac_str
+                    .parse::<u32>()
+                    .context("Failed to parse userAccountControl value")
+            }
+        })
+        .await
     }
 
     /// Performs an LDAP search and maps results to `DirectoryEntry` objects.
@@ -298,30 +305,88 @@ impl LdapDirectoryProvider {
             return Ok(Vec::new());
         }
 
-        let mut ldap = self.connect().await?;
-
         let base = self.base_dn.lock().unwrap().clone().unwrap_or_default();
+        let filter = filter.to_string();
+        let attrs: Vec<String> = attrs.iter().map(|a| a.to_string()).collect();
 
-        let (rs, _) = ldap
-            .search(&base, Scope::Subtree, filter, attrs.to_vec())
-            .await
-            .context("LDAP search failed")?
-            .success()
-            .context("LDAP search returned error")?;
+        self.with_connection(|mut ldap| {
+            let base = base.clone();
+            let filter = filter.clone();
+            let attrs = attrs.clone();
+            async move {
+                let (rs, _) = ldap
+                    .search(&base, Scope::Subtree, &filter, attrs)
+                    .await
+                    .context("LDAP search failed")?
+                    .success()
+                    .context("LDAP search returned error")?;
 
-        let entries: Vec<DirectoryEntry> = rs
-            .into_iter()
-            .take(max_results)
-            .map(|entry| {
-                let se = SearchEntry::construct(entry);
-                search_entry_to_directory_entry(se)
-            })
-            .collect();
+                let entries: Vec<DirectoryEntry> = rs
+                    .into_iter()
+                    .take(max_results)
+                    .map(|entry| {
+                        let se = SearchEntry::construct(entry);
+                        search_entry_to_directory_entry(se)
+                    })
+                    .collect();
 
-        let _ = ldap.unbind().await;
-
-        Ok(entries)
+                Ok(entries)
+            }
+        })
+        .await
     }
+}
+
+/// Modifies the DACL to set or clear the "User Cannot Change Password" deny ACEs.
+async fn set_cannot_change_password_with_ldap(
+    user_dn: &str,
+    deny: bool,
+    ldap: &mut ldap3::Ldap,
+) -> Result<()> {
+    let (rs, _) = ldap
+        .search(
+            user_dn,
+            Scope::Base,
+            "(objectClass=*)",
+            vec!["nTSecurityDescriptor"],
+        )
+        .await
+        .context("Failed to read nTSecurityDescriptor")?
+        .success()
+        .context("nTSecurityDescriptor read returned error")?;
+
+    let entry = rs
+        .into_iter()
+        .next()
+        .context("User not found when reading security descriptor")?;
+    let se = ldap3::SearchEntry::construct(entry);
+
+    let sd_bytes = se
+        .bin_attrs
+        .get("nTSecurityDescriptor")
+        .and_then(|v| v.first())
+        .context("nTSecurityDescriptor binary attribute not present")?;
+
+    let modified_sd = crate::services::dacl::set_cannot_change_password(sd_bytes, deny)
+        .context("Failed to modify security descriptor DACL")?;
+
+    let mods: Vec<Mod<Vec<u8>>> = vec![Mod::Replace(
+        b"nTSecurityDescriptor".to_vec(),
+        HashSet::from([modified_sd]),
+    )];
+
+    ldap.modify(user_dn, mods)
+        .await
+        .context("Failed to write modified nTSecurityDescriptor")?
+        .success()
+        .context("nTSecurityDescriptor write returned error")?;
+
+    tracing::info!(
+        target_dn = %user_dn,
+        deny,
+        "DACL modified for User Cannot Change Password"
+    );
+    Ok(())
 }
 
 /// Converts an `ldap3::SearchEntry` to a `DirectoryEntry`.
@@ -365,14 +430,11 @@ impl DirectoryProvider for LdapDirectoryProvider {
         if self.domain.is_none() {
             return Ok(false);
         }
-        match self.connect().await {
-            Ok(mut ldap) => {
-                let _ = ldap.unbind().await;
-                Ok(true)
-            }
+        match self.get_connection().await {
+            Ok(_) => Ok(true),
             Err(e) => {
                 tracing::warn!("Connection test failed: {}", e);
-                *self.connected.lock().unwrap() = false;
+                self.invalidate_connection().await;
                 Ok(false)
             }
         }
@@ -454,133 +516,156 @@ impl DirectoryProvider for LdapDirectoryProvider {
         new_password: &str,
         must_change_at_next_logon: bool,
     ) -> Result<()> {
-        let mut ldap = self.connect().await?;
+        let dn = user_dn.to_string();
+        let password = new_password.to_string();
 
-        // AD requires unicodePwd as a quoted UTF-16LE byte array
-        let quoted = format!("\"{}\"", new_password);
-        let utf16le: Vec<u8> = quoted
-            .encode_utf16()
-            .flat_map(|c| c.to_le_bytes())
-            .collect();
+        self.with_connection(|mut ldap| {
+            let dn = dn.clone();
+            let password = password.clone();
+            async move {
+                // AD requires unicodePwd as a quoted UTF-16LE byte array
+                let quoted = format!("\"{}\"", password);
+                let utf16le: Vec<u8> = quoted
+                    .encode_utf16()
+                    .flat_map(|c| c.to_le_bytes())
+                    .collect();
 
-        // Use Vec<u8> as the generic S type for Mod so we can mix binary and string values
-        let mut mods: Vec<Mod<Vec<u8>>> = vec![Mod::Replace(
-            b"unicodePwd".to_vec(),
-            HashSet::from([utf16le]),
-        )];
+                let mut mods: Vec<Mod<Vec<u8>>> = vec![Mod::Replace(
+                    b"unicodePwd".to_vec(),
+                    HashSet::from([utf16le]),
+                )];
 
-        if must_change_at_next_logon {
-            mods.push(Mod::Replace(
-                b"pwdLastSet".to_vec(),
-                HashSet::from([b"0".to_vec()]),
-            ));
-        }
+                if must_change_at_next_logon {
+                    mods.push(Mod::Replace(
+                        b"pwdLastSet".to_vec(),
+                        HashSet::from([b"0".to_vec()]),
+                    ));
+                }
 
-        ldap.modify(user_dn, mods)
-            .await
-            .context("Failed to reset password")?
-            .success()
-            .context("Password reset LDAP operation returned error")?;
+                ldap.modify(&dn, mods)
+                    .await
+                    .context("Failed to reset password")?
+                    .success()
+                    .context("Password reset LDAP operation returned error")?;
 
-        let _ = ldap.unbind().await;
-        tracing::info!(target_dn = %user_dn, "Password reset completed");
-        Ok(())
+                tracing::info!(target_dn = %dn, "Password reset completed");
+                Ok(())
+            }
+        })
+        .await
     }
 
     async fn unlock_account(&self, user_dn: &str) -> Result<()> {
-        let mut ldap = self.connect().await?;
+        let dn = user_dn.to_string();
+        self.with_connection(|mut ldap| {
+            let dn = dn.clone();
+            async move {
+                ldap.modify(
+                    &dn,
+                    vec![Mod::Replace(
+                        "lockoutTime".to_string(),
+                        HashSet::from(["0".to_string()]),
+                    )],
+                )
+                .await
+                .context("Failed to unlock account")?
+                .success()
+                .context("Unlock LDAP operation returned error")?;
 
-        ldap.modify(
-            user_dn,
-            vec![Mod::Replace(
-                "lockoutTime".to_string(),
-                HashSet::from(["0".to_string()]),
-            )],
-        )
+                tracing::info!(target_dn = %dn, "Account unlocked");
+                Ok(())
+            }
+        })
         .await
-        .context("Failed to unlock account")?
-        .success()
-        .context("Unlock LDAP operation returned error")?;
-
-        let _ = ldap.unbind().await;
-        tracing::info!(target_dn = %user_dn, "Account unlocked");
-        Ok(())
     }
 
     async fn enable_account(&self, user_dn: &str) -> Result<()> {
         let uac = self.get_user_account_control(user_dn).await?;
         let new_uac = uac & !0x0002; // Clear ACCOUNTDISABLE flag
 
-        let mut ldap = self.connect().await?;
-        ldap.modify(
-            user_dn,
-            vec![Mod::Replace(
-                "userAccountControl".to_string(),
-                HashSet::from([new_uac.to_string()]),
-            )],
-        )
-        .await
-        .context("Failed to enable account")?
-        .success()
-        .context("Enable LDAP operation returned error")?;
+        let dn = user_dn.to_string();
+        self.with_connection(|mut ldap| {
+            let dn = dn.clone();
+            async move {
+                ldap.modify(
+                    &dn,
+                    vec![Mod::Replace(
+                        "userAccountControl".to_string(),
+                        HashSet::from([new_uac.to_string()]),
+                    )],
+                )
+                .await
+                .context("Failed to enable account")?
+                .success()
+                .context("Enable LDAP operation returned error")?;
 
-        let _ = ldap.unbind().await;
-        tracing::info!(target_dn = %user_dn, "Account enabled");
-        Ok(())
+                tracing::info!(target_dn = %dn, "Account enabled");
+                Ok(())
+            }
+        })
+        .await
     }
 
     async fn disable_account(&self, user_dn: &str) -> Result<()> {
         let uac = self.get_user_account_control(user_dn).await?;
         let new_uac = uac | 0x0002; // Set ACCOUNTDISABLE flag
 
-        let mut ldap = self.connect().await?;
-        ldap.modify(
-            user_dn,
-            vec![Mod::Replace(
-                "userAccountControl".to_string(),
-                HashSet::from([new_uac.to_string()]),
-            )],
-        )
-        .await
-        .context("Failed to disable account")?
-        .success()
-        .context("Disable LDAP operation returned error")?;
+        let dn = user_dn.to_string();
+        self.with_connection(|mut ldap| {
+            let dn = dn.clone();
+            async move {
+                ldap.modify(
+                    &dn,
+                    vec![Mod::Replace(
+                        "userAccountControl".to_string(),
+                        HashSet::from([new_uac.to_string()]),
+                    )],
+                )
+                .await
+                .context("Failed to disable account")?
+                .success()
+                .context("Disable LDAP operation returned error")?;
 
-        let _ = ldap.unbind().await;
-        tracing::info!(target_dn = %user_dn, "Account disabled");
-        Ok(())
+                tracing::info!(target_dn = %dn, "Account disabled");
+                Ok(())
+            }
+        })
+        .await
     }
 
     async fn get_cannot_change_password(&self, user_dn: &str) -> Result<bool> {
-        let mut ldap = self.connect().await?;
+        let dn = user_dn.to_string();
+        self.with_connection(|mut ldap| {
+            let dn = dn.clone();
+            async move {
+                let (rs, _) = ldap
+                    .search(
+                        &dn,
+                        Scope::Base,
+                        "(objectClass=*)",
+                        vec!["nTSecurityDescriptor"],
+                    )
+                    .await
+                    .context("Failed to read nTSecurityDescriptor")?
+                    .success()
+                    .context("nTSecurityDescriptor read returned error")?;
 
-        let (rs, _) = ldap
-            .search(
-                user_dn,
-                Scope::Base,
-                "(objectClass=*)",
-                vec!["nTSecurityDescriptor"],
-            )
-            .await
-            .context("Failed to read nTSecurityDescriptor")?
-            .success()
-            .context("nTSecurityDescriptor read returned error")?;
+                let entry = rs
+                    .into_iter()
+                    .next()
+                    .context("User not found when reading security descriptor")?;
+                let se = ldap3::SearchEntry::construct(entry);
+                let sd_bytes = se
+                    .bin_attrs
+                    .get("nTSecurityDescriptor")
+                    .and_then(|v| v.first())
+                    .context("nTSecurityDescriptor binary attribute not present")?;
 
-        let _ = ldap.unbind().await;
-
-        let entry = rs
-            .into_iter()
-            .next()
-            .context("User not found when reading security descriptor")?;
-        let se = ldap3::SearchEntry::construct(entry);
-        let sd_bytes = se
-            .bin_attrs
-            .get("nTSecurityDescriptor")
-            .and_then(|v| v.first())
-            .context("nTSecurityDescriptor binary attribute not present")?;
-
-        crate::services::dacl::is_cannot_change_password(sd_bytes)
-            .context("Failed to parse security descriptor DACL")
+                crate::services::dacl::is_cannot_change_password(sd_bytes)
+                    .context("Failed to parse security descriptor DACL")
+            }
+        })
+        .await
     }
 
     async fn set_password_flags(
@@ -599,32 +684,37 @@ impl DirectoryProvider for LdapDirectoryProvider {
             new_uac &= !0x10000;
         }
 
-        let mut ldap = self.connect().await?;
-        ldap.modify(
-            user_dn,
-            vec![Mod::Replace(
-                "userAccountControl".to_string(),
-                HashSet::from([new_uac.to_string()]),
-            )],
-        )
+        let dn = user_dn.to_string();
+        self.with_connection(|mut ldap| {
+            let dn = dn.clone();
+            async move {
+                ldap.modify(
+                    &dn,
+                    vec![Mod::Replace(
+                        "userAccountControl".to_string(),
+                        HashSet::from([new_uac.to_string()]),
+                    )],
+                )
+                .await
+                .context("Failed to set password flags")?
+                .success()
+                .context("Set password flags LDAP operation returned error")?;
+
+                // PASSWD_CANT_CHANGE: modify the object's DACL to add/remove deny ACEs
+                // for the "Change Password" extended right
+                set_cannot_change_password_with_ldap(&dn, user_cannot_change_password, &mut ldap)
+                    .await?;
+
+                tracing::info!(
+                    target_dn = %dn,
+                    password_never_expires,
+                    user_cannot_change_password,
+                    "Password flags updated"
+                );
+                Ok(())
+            }
+        })
         .await
-        .context("Failed to set password flags")?
-        .success()
-        .context("Set password flags LDAP operation returned error")?;
-
-        // PASSWD_CANT_CHANGE: modify the object's DACL to add/remove deny ACEs
-        // for the "Change Password" extended right (ab721a53-1e2f-11d0-9819-00aa0040529b)
-        self.set_cannot_change_password(user_dn, user_cannot_change_password, &mut ldap)
-            .await?;
-
-        let _ = ldap.unbind().await;
-        tracing::info!(
-            target_dn = %user_dn,
-            password_never_expires,
-            user_cannot_change_password,
-            "Password flags updated"
-        );
-        Ok(())
     }
 
     async fn get_current_user_groups(&self) -> Result<Vec<String>> {
@@ -641,59 +731,63 @@ impl DirectoryProvider for LdapDirectoryProvider {
     }
 
     async fn add_user_to_group(&self, user_dn: &str, group_dn: &str) -> Result<()> {
-        use ldap3::Mod;
-        use std::collections::HashSet;
+        let u = user_dn.to_string();
+        let g = group_dn.to_string();
+        self.with_connection(|mut ldap| {
+            let u = u.clone();
+            let g = g.clone();
+            async move {
+                ldap.modify(
+                    &g,
+                    vec![Mod::Add("member".to_string(), HashSet::from([u.clone()]))],
+                )
+                .await
+                .context("Failed to add user to group")?
+                .success()
+                .context("Add user to group LDAP operation returned error")?;
 
-        let mut ldap = self.connect().await?;
-        ldap.modify(
-            group_dn,
-            vec![Mod::Add(
-                "member".to_string(),
-                HashSet::from([user_dn.to_string()]),
-            )],
-        )
+                tracing::info!(
+                    user_dn = %u,
+                    group_dn = %g,
+                    "User added to group"
+                );
+                Ok(())
+            }
+        })
         .await
-        .context("Failed to add user to group")?
-        .success()
-        .context("Add user to group LDAP operation returned error")?;
-
-        let _ = ldap.unbind().await;
-        tracing::info!(
-            user_dn = %user_dn,
-            group_dn = %group_dn,
-            "User added to group"
-        );
-        Ok(())
     }
 
     async fn get_replication_metadata(&self, object_dn: &str) -> Result<Option<String>> {
         let _base_dn = self.base_dn().context("Not connected - no base DN")?;
-        let mut ldap = self.connect().await?;
+        let dn = object_dn.to_string();
+        self.with_connection(|mut ldap| {
+            let dn = dn.clone();
+            async move {
+                let (entries, _) = ldap
+                    .search(
+                        &dn,
+                        ldap3::Scope::Base,
+                        "(objectClass=*)",
+                        vec!["msDS-ReplAttributeMetaData"],
+                    )
+                    .await
+                    .context("Failed to query replication metadata")?
+                    .success()
+                    .context("Replication metadata LDAP query returned error")?;
 
-        let (entries, _) = ldap
-            .search(
-                object_dn,
-                ldap3::Scope::Base,
-                "(objectClass=*)",
-                vec!["msDS-ReplAttributeMetaData"],
-            )
-            .await
-            .context("Failed to query replication metadata")?
-            .success()
-            .context("Replication metadata LDAP query returned error")?;
-
-        let _ = ldap.unbind().await;
-
-        if let Some(entry) = entries.into_iter().next() {
-            let se = ldap3::SearchEntry::construct(entry);
-            if let Some(values) = se.attrs.get("msDS-ReplAttributeMetaData") {
-                if let Some(raw) = values.first() {
-                    return Ok(Some(raw.clone()));
+                if let Some(entry) = entries.into_iter().next() {
+                    let se = ldap3::SearchEntry::construct(entry);
+                    if let Some(values) = se.attrs.get("msDS-ReplAttributeMetaData") {
+                        if let Some(raw) = values.first() {
+                            return Ok(Some(raw.clone()));
+                        }
+                    }
                 }
-            }
-        }
 
-        Ok(None)
+                Ok(None)
+            }
+        })
+        .await
     }
 }
 
