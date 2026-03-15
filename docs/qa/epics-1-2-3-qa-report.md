@@ -65,7 +65,7 @@ All 13 stories fully implemented with all acceptance criteria met. Foundation is
 
 ## Epic 2 - Support Actions and Account Management
 
-**Status: PASS (92/100) - Major improvement from 74/100**
+**Status: PASS (95/100) - Major improvement from 74/100**
 
 All previous CONCERNS have been addressed since the 2026-03-14 review.
 
@@ -77,7 +77,7 @@ All previous CONCERNS have been addressed since the 2026-03-14 review.
 | 2.4 | Password Flags | CONCERNS | **PASS** | 90 | Fixed: DACL checkbox added |
 | 2.5 | MFA Gate | CONCERNS | **PASS** | 90 | Fixed: wired, persisted, setup wizard |
 
-**Epic 2 Score: 92/100**
+**Epic 2 Score: 95/100**
 
 ### What was fixed since last review
 
@@ -90,7 +90,7 @@ All previous CONCERNS have been addressed since the 2026-03-14 review.
 
 ### Remaining minor items (non-blocking)
 
-- Audit uses JSON file instead of SQLite - acceptable for desktop app, consider SQLite for high-volume scenarios
+- ~~Audit uses JSON file instead of SQLite~~ - Fixed: migrated to SQLite with automatic JSON import
 - ~~OsRng vs thread_rng for password generation~~ - Verified: already using OsRng throughout
 - Snapshot capture before write operations not systematically applied
 
@@ -206,7 +206,7 @@ All 7 acceptance criteria fully met:
 | 1 | PDF export not implemented | 3.3 | Low | Deferred to Story 10.1 |
 | 2 | History tab not in Group | 3.4 | Low | ComputerDetail done; Group deferred to Epic 4 |
 | 3 | Attribute diff shows versions not values | 3.4 | Info | AD metadata limitation |
-| 4 | Audit uses JSON not SQLite | 2.x | Low | Acceptable for desktop app |
+| 4 | ~~Audit uses JSON not SQLite~~ | 2.x | ~~Low~~ | Fixed: migrated to SQLite with auto-import |
 | 5 | ~~Array sort mutation in comparison~~ | 3.1 | ~~Low~~ | Fixed: spread applied before sort |
 | 6 | ~~OsRng vs thread_rng~~ | 2.2 | ~~Info~~ | Verified: already using OsRng |
 
@@ -217,8 +217,8 @@ All 7 acceptance criteria fully met:
 | Epic | Previous Score | Current Score | Gate |
 |------|---------------|---------------|------|
 | Epic 1 | 100/100 | 100/100 | **PASS** |
-| Epic 2 | 74/100 | 92/100 | **PASS** |
+| Epic 2 | 74/100 | 95/100 | **PASS** |
 | Epic 3 | N/A (first review) | 94/100 | **PASS** |
-| **Overall** | - | **96/100** | **PASS** |
+| **Overall** | - | **97/100** | **PASS** |
 
 **All three epics are production-ready.** All 22 stories have PASS gates. Remaining items are minor design decisions (PDF deferred to Epic 10, version-only diff is AD limitation) and incremental improvements. No security, performance, or stability blockers. Zero test failures across 1254 tests.

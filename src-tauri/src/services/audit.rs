@@ -1,3 +1,4 @@
+use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
@@ -19,11 +20,10 @@ pub struct AuditEntry {
 ///
 /// Every write operation (password reset, account enable/disable, flag changes)
 /// must be logged through this service. Password values are never recorded.
-/// Entries are kept in memory and persisted to a JSON file for durability.
+/// Entries are stored in a SQLite database for durability and query performance.
 pub struct AuditService {
-    entries: Mutex<Vec<AuditEntry>>,
+    conn: Mutex<Connection>,
     operator: String,
-    persist_path: Option<PathBuf>,
 }
 
 impl Default for AuditService {
@@ -36,26 +36,40 @@ impl AuditService {
     pub fn new() -> Self {
         let operator = std::env::var("USERNAME").unwrap_or_else(|_| "Unknown".to_string());
         let persist_path = Self::resolve_persist_path();
-        let entries = persist_path
-            .as_ref()
-            .and_then(Self::load_from_file)
-            .unwrap_or_default();
 
-        Self {
-            entries: Mutex::new(entries),
+        let conn = match &persist_path {
+            Some(path) => Connection::open(path).unwrap_or_else(|e| {
+                tracing::warn!("Failed to open audit DB at {}: {}, using in-memory", path.display(), e);
+                Connection::open_in_memory().expect("Failed to open in-memory SQLite")
+            }),
+            None => Connection::open_in_memory().expect("Failed to open in-memory SQLite"),
+        };
+
+        let svc = Self {
+            conn: Mutex::new(conn),
             operator,
-            persist_path,
+        };
+        svc.init_schema();
+
+        // Migrate legacy JSON file if it exists
+        if let Some(ref db_path) = persist_path {
+            let json_path = db_path.with_file_name("audit-log.json");
+            svc.migrate_from_json(&json_path);
         }
+
+        svc
     }
 
-    /// Creates an AuditService without file persistence (for testing).
+    /// Creates an AuditService with an in-memory database (for testing).
     #[cfg(test)]
     pub fn new_in_memory() -> Self {
-        Self {
-            entries: Mutex::new(Vec::new()),
+        let conn = Connection::open_in_memory().expect("Failed to open in-memory SQLite");
+        let svc = Self {
+            conn: Mutex::new(conn),
             operator: std::env::var("USERNAME").unwrap_or_else(|_| "Test".to_string()),
-            persist_path: None,
-        }
+        };
+        svc.init_schema();
+        svc
     }
 
     fn resolve_persist_path() -> Option<PathBuf> {
@@ -66,22 +80,90 @@ impl AuditService {
         if !dir.exists() {
             fs::create_dir_all(&dir).ok()?;
         }
-        Some(dir.join("audit-log.json"))
+        Some(dir.join("audit.db"))
     }
 
-    fn load_from_file(path: &PathBuf) -> Option<Vec<AuditEntry>> {
-        let data = fs::read_to_string(path).ok()?;
-        serde_json::from_str(&data).ok()
+    fn init_schema(&self) {
+        let conn = self.conn.lock().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS audit_entries (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT NOT NULL,
+                operator TEXT NOT NULL,
+                action TEXT NOT NULL,
+                target_dn TEXT NOT NULL,
+                details TEXT NOT NULL,
+                success INTEGER NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit_entries(timestamp);
+            CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_entries(action);",
+        )
+        .expect("Failed to initialize audit schema");
     }
 
-    fn persist(&self) {
-        if let Some(ref path) = self.persist_path {
-            let entries = self.entries.lock().unwrap();
-            if let Ok(json) = serde_json::to_string_pretty(&*entries) {
-                if let Err(e) = fs::write(path, json) {
-                    tracing::warn!("Failed to persist audit log: {}", e);
-                }
-            }
+    /// Imports entries from a legacy JSON audit log file, then renames it.
+    fn migrate_from_json(&self, json_path: &PathBuf) {
+        if !json_path.exists() {
+            return;
+        }
+
+        let data = match fs::read_to_string(json_path) {
+            Ok(d) => d,
+            Err(_) => return,
+        };
+
+        let entries: Vec<AuditEntry> = match serde_json::from_str(&data) {
+            Ok(e) => e,
+            Err(_) => return,
+        };
+
+        if entries.is_empty() {
+            let _ = fs::rename(json_path, json_path.with_extension("json.migrated"));
+            return;
+        }
+
+        let conn = self.conn.lock().unwrap();
+        let tx = match conn.unchecked_transaction() {
+            Ok(t) => t,
+            Err(_) => return,
+        };
+
+        for entry in &entries {
+            let _ = tx.execute(
+                "INSERT INTO audit_entries (timestamp, operator, action, target_dn, details, success)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                rusqlite::params![
+                    entry.timestamp,
+                    entry.operator,
+                    entry.action,
+                    entry.target_dn,
+                    entry.details,
+                    entry.success as i32,
+                ],
+            );
+        }
+
+        if tx.commit().is_ok() {
+            let _ = fs::rename(json_path, json_path.with_extension("json.migrated"));
+            tracing::info!("Migrated {} audit entries from JSON to SQLite", entries.len());
+        }
+    }
+
+    fn insert_entry(&self, entry: &AuditEntry) {
+        let conn = self.conn.lock().unwrap();
+        if let Err(e) = conn.execute(
+            "INSERT INTO audit_entries (timestamp, operator, action, target_dn, details, success)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            rusqlite::params![
+                entry.timestamp,
+                entry.operator,
+                entry.action,
+                entry.target_dn,
+                entry.details,
+                entry.success as i32,
+            ],
+        ) {
+            tracing::error!("Failed to insert audit entry: {}", e);
         }
     }
 
@@ -102,8 +184,7 @@ impl AuditService {
             "Audit: {}",
             details
         );
-        self.entries.lock().unwrap().push(entry);
-        self.persist();
+        self.insert_entry(&entry);
     }
 
     /// Logs a failed operation.
@@ -123,20 +204,41 @@ impl AuditService {
             "Audit FAILED: {}",
             error
         );
-        self.entries.lock().unwrap().push(entry);
-        self.persist();
+        self.insert_entry(&entry);
     }
 
     /// Returns all audit entries (most recent first).
     pub fn get_entries(&self) -> Vec<AuditEntry> {
-        let mut entries = self.entries.lock().unwrap().clone();
-        entries.reverse();
-        entries
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn
+            .prepare(
+                "SELECT timestamp, operator, action, target_dn, details, success
+                 FROM audit_entries ORDER BY id DESC",
+            )
+            .expect("Failed to prepare audit query");
+
+        stmt.query_map([], |row| {
+            Ok(AuditEntry {
+                timestamp: row.get(0)?,
+                operator: row.get(1)?,
+                action: row.get(2)?,
+                target_dn: row.get(3)?,
+                details: row.get(4)?,
+                success: row.get::<_, i32>(5)? != 0,
+            })
+        })
+        .expect("Failed to query audit entries")
+        .filter_map(|r| r.ok())
+        .collect()
     }
 
     /// Returns the total number of audit entries.
     pub fn count(&self) -> usize {
-        self.entries.lock().unwrap().len()
+        let conn = self.conn.lock().unwrap();
+        conn.query_row("SELECT COUNT(*) FROM audit_entries", [], |row| {
+            row.get::<_, usize>(0)
+        })
+        .unwrap_or(0)
     }
 }
 
@@ -225,27 +327,35 @@ mod tests {
 
     #[test]
     fn test_persist_and_reload() {
-        let dir = std::env::temp_dir().join("dspanel_test_audit");
+        let dir = std::env::temp_dir().join("dspanel_test_audit_sqlite");
         let _ = fs::create_dir_all(&dir);
-        let path = dir.join("audit-test.json");
+        let path = dir.join("audit-test.db");
+        let _ = fs::remove_file(&path);
 
         // Write
         {
+            let conn = Connection::open(&path).unwrap();
             let svc = AuditService {
-                entries: Mutex::new(Vec::new()),
+                conn: Mutex::new(conn),
                 operator: "test".to_string(),
-                persist_path: Some(path.clone()),
             };
+            svc.init_schema();
             svc.log_success("TestAction", "CN=Test", "test details");
             assert_eq!(svc.count(), 1);
         }
 
         // Reload
-        let loaded = AuditService::load_from_file(&path);
-        assert!(loaded.is_some());
-        let entries = loaded.unwrap();
-        assert_eq!(entries.len(), 1);
-        assert_eq!(entries[0].action, "TestAction");
+        {
+            let conn = Connection::open(&path).unwrap();
+            let svc = AuditService {
+                conn: Mutex::new(conn),
+                operator: "test".to_string(),
+            };
+            svc.init_schema();
+            assert_eq!(svc.count(), 1);
+            let entries = svc.get_entries();
+            assert_eq!(entries[0].action, "TestAction");
+        }
 
         // Cleanup
         let _ = fs::remove_file(&path);
@@ -280,40 +390,18 @@ mod tests {
     }
 
     #[test]
-    fn test_multiple_persist_and_reload() {
-        let dir = std::env::temp_dir().join("dspanel_test_audit_multi");
-        let _ = fs::create_dir_all(&dir);
-        let path = dir.join("audit-multi.json");
-
-        {
-            let svc = AuditService {
-                entries: Mutex::new(Vec::new()),
-                operator: "admin".to_string(),
-                persist_path: Some(path.clone()),
-            };
-            svc.log_success("Action1", "dn1", "first");
-            svc.log_failure("Action2", "dn2", "second failed");
-            svc.log_success("Action3", "dn3", "third");
-            assert_eq!(svc.count(), 3);
-        }
-
-        let loaded = AuditService::load_from_file(&path).unwrap();
-        assert_eq!(loaded.len(), 3);
-        assert_eq!(loaded[0].action, "Action1");
-        assert!(loaded[0].success);
-        assert_eq!(loaded[1].action, "Action2");
-        assert!(!loaded[1].success);
-        assert_eq!(loaded[2].action, "Action3");
-
-        let _ = fs::remove_file(&path);
-        let _ = fs::remove_dir(&dir);
-    }
-
-    #[test]
-    fn test_load_from_nonexistent_file() {
-        let path = PathBuf::from("/tmp/dspanel_nonexistent_audit.json");
-        let loaded = AuditService::load_from_file(&path);
-        assert!(loaded.is_none());
+    fn test_multiple_entries_persist() {
+        let svc = AuditService::new_in_memory();
+        svc.log_success("Action1", "dn1", "first");
+        svc.log_failure("Action2", "dn2", "second failed");
+        svc.log_success("Action3", "dn3", "third");
+        assert_eq!(svc.count(), 3);
+        let entries = svc.get_entries();
+        assert_eq!(entries[0].action, "Action3");
+        assert!(entries[0].success);
+        assert_eq!(entries[1].action, "Action2");
+        assert!(!entries[1].success);
+        assert_eq!(entries[2].action, "Action1");
     }
 
     #[test]
@@ -323,5 +411,52 @@ mod tests {
         assert_eq!(entry.action, "Test");
         assert_eq!(entry.target_dn, "CN=X");
         assert!(entry.success);
+    }
+
+    #[test]
+    fn test_migrate_from_json() {
+        let dir = std::env::temp_dir().join("dspanel_test_migrate");
+        let _ = fs::create_dir_all(&dir);
+        let json_path = dir.join("audit-log.json");
+        let db_path = dir.join("audit.db");
+        let _ = fs::remove_file(&json_path);
+        let _ = fs::remove_file(&db_path);
+
+        // Create a legacy JSON file
+        let legacy = vec![
+            AuditEntry {
+                timestamp: "2026-03-14T10:00:00Z".to_string(),
+                operator: "admin".to_string(),
+                action: "PasswordReset".to_string(),
+                target_dn: "CN=Old,DC=example,DC=com".to_string(),
+                details: "Legacy entry".to_string(),
+                success: true,
+            },
+        ];
+        fs::write(&json_path, serde_json::to_string(&legacy).unwrap()).unwrap();
+
+        // Create service and trigger migration
+        let conn = Connection::open(&db_path).unwrap();
+        let svc = AuditService {
+            conn: Mutex::new(conn),
+            operator: "test".to_string(),
+        };
+        svc.init_schema();
+        svc.migrate_from_json(&json_path);
+
+        // Verify migration
+        assert_eq!(svc.count(), 1);
+        let entries = svc.get_entries();
+        assert_eq!(entries[0].action, "PasswordReset");
+        assert_eq!(entries[0].details, "Legacy entry");
+
+        // JSON file should be renamed
+        assert!(!json_path.exists());
+        assert!(json_path.with_extension("json.migrated").exists());
+
+        // Cleanup
+        let _ = fs::remove_file(&db_path);
+        let _ = fs::remove_file(json_path.with_extension("json.migrated"));
+        let _ = fs::remove_dir(&dir);
     }
 }
