@@ -228,16 +228,16 @@ function makeGroupEntry(
   overrides: Partial<DirectoryEntry> = {},
 ): DirectoryEntry {
   return {
-    distinguishedName: "CN=IT-Admins,OU=Groups,DC=corp,DC=local",
-    samAccountName: "IT-Admins",
-    displayName: "IT-Admins",
+    distinguishedName: "CN=Developers,OU=Groups,DC=example,DC=com",
+    samAccountName: "Developers",
+    displayName: "Developers",
     objectClass: "group",
     attributes: {
       groupType: ["-2147483646"],
-      description: ["IT Administrators group"],
+      description: ["Development team group"],
       member: [
-        "CN=John Doe,OU=Users,DC=corp,DC=local",
-        "CN=Alice Smith,OU=Users,DC=corp,DC=local",
+        "CN=John Doe,OU=Users,OU=Corp,DC=example,DC=com",
+        "CN=Alice Smith,OU=Users,OU=Corp,DC=example,DC=com",
       ],
     },
     ...overrides,
@@ -283,11 +283,11 @@ describe("mapEntryToGroup", () => {
   it("maps all fields correctly", () => {
     const group = mapEntryToGroup(makeGroupEntry());
     expect(group.distinguishedName).toBe(
-      "CN=IT-Admins,OU=Groups,DC=corp,DC=local",
+      "CN=Developers,OU=Groups,DC=example,DC=com",
     );
-    expect(group.samAccountName).toBe("IT-Admins");
-    expect(group.displayName).toBe("IT-Admins");
-    expect(group.description).toBe("IT Administrators group");
+    expect(group.samAccountName).toBe("Developers");
+    expect(group.displayName).toBe("Developers");
+    expect(group.description).toBe("Development team group");
     expect(group.scope).toBe("Global");
     expect(group.category).toBe("Security");
     expect(group.memberCount).toBe(2);
@@ -309,7 +309,7 @@ describe("mapEntryToGroup", () => {
         attributes: { groupType: ["-2147483646"] },
       }),
     );
-    expect(group.displayName).toBe("IT-Admins");
+    expect(group.displayName).toBe("Developers");
   });
 
   it("handles null samAccountName", () => {

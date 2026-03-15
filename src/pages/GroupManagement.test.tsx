@@ -61,7 +61,7 @@ function makeGroupEntry(
 
   const members = Array.from(
     { length: memberCount },
-    (_, i) => `CN=Member${i},OU=Users,DC=example,DC=com`,
+    (_, i) => `CN=Member${i},OU=Users,OU=Corp,DC=example,DC=com`,
   );
 
   return {
@@ -118,7 +118,7 @@ describe("GroupManagement", () => {
   });
 
   it("renders with search bar and loads groups on mount (flat view default)", async () => {
-    const entries = [makeGroupEntry("IT-Admins"), makeGroupEntry("HR-Team")];
+    const entries = [makeGroupEntry("Developers"), makeGroupEntry("Finance-Analysts")];
     mockBrowseWith(entries);
 
     render(<GroupManagement />, { wrapper: TestProviders });
@@ -129,8 +129,8 @@ describe("GroupManagement", () => {
       expect(screen.getByTestId("group-results-list")).toBeInTheDocument();
     });
 
-    expect(screen.getByTestId("group-result-IT-Admins")).toBeInTheDocument();
-    expect(screen.getByTestId("group-result-HR-Team")).toBeInTheDocument();
+    expect(screen.getByTestId("group-result-Developers")).toBeInTheDocument();
+    expect(screen.getByTestId("group-result-Finance-Analysts")).toBeInTheDocument();
   });
 
   it("shows loading state during initial load", () => {
@@ -179,32 +179,32 @@ describe("GroupManagement", () => {
   });
 
   it("displays group details when a group is selected", async () => {
-    const entries = [makeGroupEntry("IT-Admins", "Global", "Security", 3)];
+    const entries = [makeGroupEntry("Developers", "Global", "Security", 3)];
     mockBrowseWith(entries);
 
     render(<GroupManagement />, { wrapper: TestProviders });
 
     await waitFor(() => {
-      expect(screen.getByTestId("group-result-IT-Admins")).toBeInTheDocument();
+      expect(screen.getByTestId("group-result-Developers")).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByTestId("group-result-IT-Admins"));
+    fireEvent.click(screen.getByTestId("group-result-Developers"));
 
     await waitFor(() => {
       expect(screen.getByTestId("group-detail")).toBeInTheDocument();
     });
 
     const detail = screen.getByTestId("group-detail");
-    expect(detail.querySelector("h2")).toHaveTextContent("IT-Admins");
+    expect(detail.querySelector("h2")).toHaveTextContent("Developers");
     expect(screen.getByTestId("group-scope")).toHaveTextContent("Global");
     expect(screen.getByTestId("group-category")).toHaveTextContent("Security");
   });
 
   it("shows member list in detail panel", async () => {
-    const entries = [makeGroupEntry("IT-Admins")];
+    const entries = [makeGroupEntry("Developers")];
     const memberEntries: DirectoryEntry[] = [
       {
-        distinguishedName: "CN=John Doe,OU=Users,DC=example,DC=com",
+        distinguishedName: "CN=John Doe,OU=Users,OU=Corp,DC=example,DC=com",
         samAccountName: "jdoe",
         displayName: "John Doe",
         objectClass: "user",
@@ -225,10 +225,10 @@ describe("GroupManagement", () => {
     render(<GroupManagement />, { wrapper: TestProviders });
 
     await waitFor(() => {
-      expect(screen.getByTestId("group-result-IT-Admins")).toBeInTheDocument();
+      expect(screen.getByTestId("group-result-Developers")).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByTestId("group-result-IT-Admins"));
+    fireEvent.click(screen.getByTestId("group-result-Developers"));
 
     await waitFor(() => {
       expect(screen.getByTestId("group-members-section")).toBeInTheDocument();
@@ -240,7 +240,7 @@ describe("GroupManagement", () => {
   });
 
   it("toggles between tree and flat views", async () => {
-    const entries = [makeGroupEntry("IT-Admins")];
+    const entries = [makeGroupEntry("Developers")];
     mockBrowseWith(entries);
 
     render(<GroupManagement />, { wrapper: TestProviders });
@@ -268,7 +268,7 @@ describe("GroupManagement", () => {
   });
 
   it("search filters groups in flat view", async () => {
-    const entries = [makeGroupEntry("IT-Admins"), makeGroupEntry("HR-Team")];
+    const entries = [makeGroupEntry("Developers"), makeGroupEntry("Finance-Analysts")];
     mockBrowseWith(entries);
 
     render(<GroupManagement />, { wrapper: TestProviders });
@@ -284,7 +284,7 @@ describe("GroupManagement", () => {
   });
 
   it("tree view renders OU tree", async () => {
-    const entries = [makeGroupEntry("IT-Admins")];
+    const entries = [makeGroupEntry("Developers")];
     const ouTree = [
       {
         distinguishedName: "OU=Groups,DC=example,DC=com",
@@ -361,7 +361,7 @@ describe("GroupManagement", () => {
   });
 
   it("shows placeholder when no group is selected", async () => {
-    const entries = [makeGroupEntry("IT-Admins")];
+    const entries = [makeGroupEntry("Developers")];
     mockBrowseWith(entries);
 
     render(<GroupManagement />, { wrapper: TestProviders });
@@ -378,16 +378,16 @@ describe("GroupManagement", () => {
   describe("Member Management (Story 4.2)", () => {
     const memberEntries: DirectoryEntry[] = [
       {
-        distinguishedName: "CN=John Doe,OU=Users,DC=example,DC=com",
+        distinguishedName: "CN=John Doe,OU=Users,OU=Corp,DC=example,DC=com",
         samAccountName: "jdoe",
         displayName: "John Doe",
         objectClass: "user",
         attributes: {},
       },
       {
-        distinguishedName: "CN=Jane Smith,OU=Users,DC=example,DC=com",
-        samAccountName: "jsmith",
-        displayName: "Jane Smith",
+        distinguishedName: "CN=Alice Smith,OU=Users,OU=Corp,DC=example,DC=com",
+        samAccountName: "asmith",
+        displayName: "Alice Smith",
         objectClass: "user",
         attributes: {},
       },
@@ -395,7 +395,7 @@ describe("GroupManagement", () => {
 
     const searchResults: DirectoryEntry[] = [
       {
-        distinguishedName: "CN=New User,OU=Users,DC=example,DC=com",
+        distinguishedName: "CN=New User,OU=Users,OU=Corp,DC=example,DC=com",
         samAccountName: "nuser",
         displayName: "New User",
         objectClass: "user",
@@ -407,7 +407,7 @@ describe("GroupManagement", () => {
       permissionLevel: string,
       members: DirectoryEntry[] = memberEntries,
     ) {
-      const entries = [makeGroupEntry("IT-Admins")];
+      const entries = [makeGroupEntry("Developers")];
       mockBrowseWith(entries, {
         permissionLevel,
         members,
@@ -418,11 +418,11 @@ describe("GroupManagement", () => {
 
       await waitFor(() => {
         expect(
-          screen.getByTestId("group-result-IT-Admins"),
+          screen.getByTestId("group-result-Developers"),
         ).toBeInTheDocument();
       });
 
-      fireEvent.click(screen.getByTestId("group-result-IT-Admins"));
+      fireEvent.click(screen.getByTestId("group-result-Developers"));
 
       await waitFor(() => {
         expect(screen.getByTestId("group-members-section")).toBeInTheDocument();
@@ -568,8 +568,8 @@ describe("GroupManagement", () => {
 
       await waitFor(() => {
         expect(mockInvoke).toHaveBeenCalledWith("remove_group_member", {
-          memberDn: "CN=John Doe,OU=Users,DC=example,DC=com",
-          groupDn: "CN=IT-Admins,OU=Groups,DC=example,DC=com",
+          memberDn: "CN=John Doe,OU=Users,OU=Corp,DC=example,DC=com",
+          groupDn: "CN=Developers,OU=Groups,DC=example,DC=com",
         });
       });
     });
@@ -637,7 +637,7 @@ describe("GroupManagement", () => {
 
   describe("Hygiene Tab (Story 4.4)", () => {
     it("shows hygiene toggle for AccountOperator users", async () => {
-      const entries = [makeGroupEntry("IT-Admins")];
+      const entries = [makeGroupEntry("Developers")];
       mockBrowseWith(entries, { permissionLevel: "AccountOperator" });
 
       render(<GroupManagement />, { wrapper: TestProviders });
@@ -650,7 +650,7 @@ describe("GroupManagement", () => {
     });
 
     it("hides hygiene toggle for ReadOnly users", async () => {
-      const entries = [makeGroupEntry("IT-Admins")];
+      const entries = [makeGroupEntry("Developers")];
       mockBrowseWith(entries, { permissionLevel: "ReadOnly" });
 
       render(<GroupManagement />, { wrapper: TestProviders });
@@ -665,7 +665,7 @@ describe("GroupManagement", () => {
     });
 
     it("switches to hygiene view when hygiene toggle is clicked", async () => {
-      const entries = [makeGroupEntry("IT-Admins")];
+      const entries = [makeGroupEntry("Developers")];
       mockBrowseWith(entries, { permissionLevel: "AccountOperator" });
 
       render(<GroupManagement />, { wrapper: TestProviders });
@@ -686,7 +686,7 @@ describe("GroupManagement", () => {
 
   describe("Bulk Operations (Story 4.3)", () => {
     it("shows bulk operations toggle for AccountOperator users", async () => {
-      const entries = [makeGroupEntry("IT-Admins")];
+      const entries = [makeGroupEntry("Developers")];
       mockBrowseWith(entries, { permissionLevel: "AccountOperator" });
 
       render(<GroupManagement />, { wrapper: TestProviders });
@@ -699,7 +699,7 @@ describe("GroupManagement", () => {
     });
 
     it("hides bulk operations toggle for ReadOnly users", async () => {
-      const entries = [makeGroupEntry("IT-Admins")];
+      const entries = [makeGroupEntry("Developers")];
       mockBrowseWith(entries, { permissionLevel: "ReadOnly" });
 
       render(<GroupManagement />, { wrapper: TestProviders });
@@ -712,7 +712,7 @@ describe("GroupManagement", () => {
     });
 
     it("switches to bulk operations view when bulk toggle is clicked", async () => {
-      const entries = [makeGroupEntry("IT-Admins")];
+      const entries = [makeGroupEntry("Developers")];
       mockBrowseWith(entries, { permissionLevel: "AccountOperator" });
 
       render(<GroupManagement />, { wrapper: TestProviders });

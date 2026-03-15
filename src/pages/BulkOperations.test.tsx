@@ -32,21 +32,21 @@ const mockInvoke = vi.mocked(invoke);
 
 const memberEntries: DirectoryEntry[] = [
   {
-    distinguishedName: "CN=John Doe,OU=Users,DC=example,DC=com",
+    distinguishedName: "CN=John Doe,OU=Users,OU=Corp,DC=example,DC=com",
     samAccountName: "jdoe",
     displayName: "John Doe",
     objectClass: "user",
     attributes: {},
   },
   {
-    distinguishedName: "CN=Jane Smith,OU=Users,DC=example,DC=com",
-    samAccountName: "jsmith",
-    displayName: "Jane Smith",
+    distinguishedName: "CN=Alice Smith,OU=Users,OU=Corp,DC=example,DC=com",
+    samAccountName: "asmith",
+    displayName: "Alice Smith",
     objectClass: "user",
     attributes: {},
   },
   {
-    distinguishedName: "CN=Bob Wilson,OU=Users,DC=example,DC=com",
+    distinguishedName: "CN=Bob Wilson,OU=Users,OU=Corp,DC=example,DC=com",
     samAccountName: "bwilson",
     displayName: "Bob Wilson",
     objectClass: "user",
@@ -56,18 +56,18 @@ const memberEntries: DirectoryEntry[] = [
 
 const groupSearchResults: DirectoryEntry[] = [
   {
-    distinguishedName: "CN=IT-Admins,OU=Groups,DC=example,DC=com",
-    samAccountName: "IT-Admins",
-    displayName: "IT-Admins",
+    distinguishedName: "CN=Developers,OU=Groups,DC=example,DC=com",
+    samAccountName: "Developers",
+    displayName: "Developers",
     objectClass: "group",
-    attributes: { description: ["IT administrators group"] },
+    attributes: { description: ["Development team group"] },
   },
   {
-    distinguishedName: "CN=HR-Team,OU=Groups,DC=example,DC=com",
-    samAccountName: "HR-Team",
-    displayName: "HR-Team",
+    distinguishedName: "CN=Finance-Analysts,OU=Groups,DC=example,DC=com",
+    samAccountName: "Finance-Analysts",
+    displayName: "Finance-Analysts",
     objectClass: "group",
-    attributes: { description: ["HR team group"] },
+    attributes: { description: ["Finance analysts group"] },
   },
 ];
 
@@ -106,13 +106,13 @@ function setupMocks(options?: {
 
 async function selectSourceGroup() {
   const searchInput = screen.getAllByTestId("group-picker-search")[0];
-  fireEvent.change(searchInput, { target: { value: "IT" } });
+  fireEvent.change(searchInput, { target: { value: "Dev" } });
 
   await waitFor(() => {
-    expect(screen.getByTestId("group-option-IT-Admins")).toBeInTheDocument();
+    expect(screen.getByTestId("group-option-Developers")).toBeInTheDocument();
   });
 
-  fireEvent.click(screen.getByTestId("group-option-IT-Admins"));
+  fireEvent.click(screen.getByTestId("group-option-Developers"));
 
   await waitFor(() => {
     expect(screen.getByTestId("member-list")).toBeInTheDocument();
@@ -122,13 +122,13 @@ async function selectSourceGroup() {
 async function selectTargetGroup() {
   const searchInputs = screen.getAllByTestId("group-picker-search");
   const targetInput = searchInputs[1];
-  fireEvent.change(targetInput, { target: { value: "HR" } });
+  fireEvent.change(targetInput, { target: { value: "Finance" } });
 
   await waitFor(() => {
-    expect(screen.getByTestId("group-option-HR-Team")).toBeInTheDocument();
+    expect(screen.getByTestId("group-option-Finance-Analysts")).toBeInTheDocument();
   });
 
-  fireEvent.click(screen.getByTestId("group-option-HR-Team"));
+  fireEvent.click(screen.getByTestId("group-option-Finance-Analysts"));
 }
 
 describe("BulkOperations", () => {
@@ -198,7 +198,7 @@ describe("BulkOperations", () => {
     await selectSourceGroup();
 
     expect(screen.getByText("John Doe")).toBeInTheDocument();
-    expect(screen.getByText("Jane Smith")).toBeInTheDocument();
+    expect(screen.getByText("Alice Smith")).toBeInTheDocument();
     expect(screen.getByText("Bob Wilson")).toBeInTheDocument();
   });
 
@@ -249,7 +249,7 @@ describe("BulkOperations", () => {
     expect(screen.getByTestId("planned-change-0")).toBeInTheDocument();
     expect(screen.getByText("REMOVE")).toBeInTheDocument();
     // Should show "from" the source group
-    expect(screen.getByText("from IT-Admins")).toBeInTheDocument();
+    expect(screen.getByText("from Developers")).toBeInTheDocument();
   });
 
   it("preview generates correct planned changes for Add", async () => {
@@ -263,7 +263,7 @@ describe("BulkOperations", () => {
     await selectTargetGroup();
 
     // Select a member
-    fireEvent.click(screen.getByTestId("bulk-member-Jane Smith"));
+    fireEvent.click(screen.getByTestId("bulk-member-Alice Smith"));
 
     // Click preview
     fireEvent.click(screen.getByTestId("bulk-preview-btn"));
@@ -273,7 +273,7 @@ describe("BulkOperations", () => {
     });
 
     expect(screen.getByText("ADD")).toBeInTheDocument();
-    expect(screen.getByText("to HR-Team")).toBeInTheDocument();
+    expect(screen.getByText("to Finance-Analysts")).toBeInTheDocument();
   });
 
   it("preview generates correct planned changes for Transfer (add + remove pairs)", async () => {
@@ -300,8 +300,8 @@ describe("BulkOperations", () => {
     expect(screen.getByText("Planned Changes (2)")).toBeInTheDocument();
     expect(screen.getByText("ADD")).toBeInTheDocument();
     expect(screen.getByText("REMOVE")).toBeInTheDocument();
-    expect(screen.getByText("to HR-Team")).toBeInTheDocument();
-    expect(screen.getByText("from IT-Admins")).toBeInTheDocument();
+    expect(screen.getByText("to Finance-Analysts")).toBeInTheDocument();
+    expect(screen.getByText("from Developers")).toBeInTheDocument();
   });
 
   it("execute calls correct Tauri commands for Delete", async () => {
@@ -326,8 +326,8 @@ describe("BulkOperations", () => {
 
     await waitFor(() => {
       expect(mockInvoke).toHaveBeenCalledWith("remove_group_member", {
-        memberDn: "CN=John Doe,OU=Users,DC=example,DC=com",
-        groupDn: "CN=IT-Admins,OU=Groups,DC=example,DC=com",
+        memberDn: "CN=John Doe,OU=Users,OU=Corp,DC=example,DC=com",
+        groupDn: "CN=Developers,OU=Groups,DC=example,DC=com",
       });
     });
   });
@@ -355,8 +355,8 @@ describe("BulkOperations", () => {
 
     await waitFor(() => {
       expect(mockInvoke).toHaveBeenCalledWith("add_user_to_group", {
-        userDn: "CN=John Doe,OU=Users,DC=example,DC=com",
-        groupDn: "CN=HR-Team,OU=Groups,DC=example,DC=com",
+        userDn: "CN=John Doe,OU=Users,OU=Corp,DC=example,DC=com",
+        groupDn: "CN=Finance-Analysts,OU=Groups,DC=example,DC=com",
       });
     });
   });
@@ -385,12 +385,12 @@ describe("BulkOperations", () => {
     // Transfer calls add_user_to_group first, then remove_group_member
     await waitFor(() => {
       expect(mockInvoke).toHaveBeenCalledWith("add_user_to_group", {
-        userDn: "CN=John Doe,OU=Users,DC=example,DC=com",
-        groupDn: "CN=HR-Team,OU=Groups,DC=example,DC=com",
+        userDn: "CN=John Doe,OU=Users,OU=Corp,DC=example,DC=com",
+        groupDn: "CN=Finance-Analysts,OU=Groups,DC=example,DC=com",
       });
       expect(mockInvoke).toHaveBeenCalledWith("remove_group_member", {
-        memberDn: "CN=John Doe,OU=Users,DC=example,DC=com",
-        groupDn: "CN=IT-Admins,OU=Groups,DC=example,DC=com",
+        memberDn: "CN=John Doe,OU=Users,OU=Corp,DC=example,DC=com",
+        groupDn: "CN=Developers,OU=Groups,DC=example,DC=com",
       });
     });
   });
@@ -403,7 +403,7 @@ describe("BulkOperations", () => {
 
     // Select multiple members
     fireEvent.click(screen.getByTestId("bulk-member-John Doe"));
-    fireEvent.click(screen.getByTestId("bulk-member-Jane Smith"));
+    fireEvent.click(screen.getByTestId("bulk-member-Alice Smith"));
 
     fireEvent.click(screen.getByTestId("bulk-preview-btn"));
 
@@ -436,7 +436,7 @@ describe("BulkOperations", () => {
 
     // Select two members
     fireEvent.click(screen.getByTestId("bulk-member-John Doe"));
-    fireEvent.click(screen.getByTestId("bulk-member-Jane Smith"));
+    fireEvent.click(screen.getByTestId("bulk-member-Alice Smith"));
 
     fireEvent.click(screen.getByTestId("bulk-preview-btn"));
 
@@ -458,8 +458,8 @@ describe("BulkOperations", () => {
     // Verify rollback call was made (reversal of the first successful remove)
     await waitFor(() => {
       expect(mockInvoke).toHaveBeenCalledWith("add_user_to_group", {
-        userDn: "CN=John Doe,OU=Users,DC=example,DC=com",
-        groupDn: "CN=IT-Admins,OU=Groups,DC=example,DC=com",
+        userDn: "CN=John Doe,OU=Users,OU=Corp,DC=example,DC=com",
+        groupDn: "CN=Developers,OU=Groups,DC=example,DC=com",
       });
     });
   });

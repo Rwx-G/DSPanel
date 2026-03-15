@@ -7,18 +7,18 @@ import {
 
 const mockChanges: MemberChange[] = [
   {
-    memberDn: "CN=Alice,OU=Users,DC=example,DC=com",
-    memberName: "Alice",
+    memberDn: "CN=John Doe,OU=Users,OU=Corp,DC=example,DC=com",
+    memberName: "John Doe",
     action: "add",
   },
   {
-    memberDn: "CN=Bob,OU=Users,DC=example,DC=com",
-    memberName: "Bob",
+    memberDn: "CN=Alice Smith,OU=Users,OU=Corp,DC=example,DC=com",
+    memberName: "Alice Smith",
     action: "remove",
   },
   {
-    memberDn: "CN=Charlie,OU=Users,DC=example,DC=com",
-    memberName: "Charlie",
+    memberDn: "CN=Bob Wilson,OU=Users,OU=Corp,DC=example,DC=com",
+    memberName: "Bob Wilson",
     action: "add",
   },
 ];
@@ -29,7 +29,7 @@ describe("MemberChangePreviewDialog", () => {
       <MemberChangePreviewDialog
         open={true}
         changes={mockChanges}
-        groupName="IT-Admins"
+        groupName="Developers"
         onConfirm={vi.fn()}
         onCancel={vi.fn()}
       />,
@@ -46,7 +46,7 @@ describe("MemberChangePreviewDialog", () => {
       <MemberChangePreviewDialog
         open={true}
         changes={mockChanges}
-        groupName="IT-Admins"
+        groupName="Developers"
         onConfirm={vi.fn()}
         onCancel={vi.fn()}
       />,
@@ -56,9 +56,9 @@ describe("MemberChangePreviewDialog", () => {
     expect(screen.getByTestId("member-change-1")).toBeInTheDocument();
     expect(screen.getByTestId("member-change-2")).toBeInTheDocument();
 
-    expect(screen.getByText("Alice")).toBeInTheDocument();
-    expect(screen.getByText("Bob")).toBeInTheDocument();
-    expect(screen.getByText("Charlie")).toBeInTheDocument();
+    expect(screen.getByText("John Doe")).toBeInTheDocument();
+    expect(screen.getByText("Alice Smith")).toBeInTheDocument();
+    expect(screen.getByText("Bob Wilson")).toBeInTheDocument();
   });
 
   it("calls onConfirm when Apply clicked", () => {
@@ -67,7 +67,7 @@ describe("MemberChangePreviewDialog", () => {
       <MemberChangePreviewDialog
         open={true}
         changes={mockChanges}
-        groupName="IT-Admins"
+        groupName="Developers"
         onConfirm={onConfirm}
         onCancel={vi.fn()}
       />,
@@ -83,7 +83,7 @@ describe("MemberChangePreviewDialog", () => {
       <MemberChangePreviewDialog
         open={true}
         changes={mockChanges}
-        groupName="IT-Admins"
+        groupName="Developers"
         onConfirm={vi.fn()}
         onCancel={onCancel}
       />,
@@ -98,7 +98,7 @@ describe("MemberChangePreviewDialog", () => {
       <MemberChangePreviewDialog
         open={true}
         changes={mockChanges}
-        groupName="IT-Admins"
+        groupName="Developers"
         onConfirm={vi.fn()}
         onCancel={vi.fn()}
         loading={true}
@@ -115,7 +115,7 @@ describe("MemberChangePreviewDialog", () => {
       <MemberChangePreviewDialog
         open={true}
         changes={mockChanges}
-        groupName="IT-Admins"
+        groupName="Developers"
         onConfirm={vi.fn()}
         onCancel={vi.fn()}
         loading={true}
@@ -131,7 +131,7 @@ describe("MemberChangePreviewDialog", () => {
       <MemberChangePreviewDialog
         open={false}
         changes={mockChanges}
-        groupName="IT-Admins"
+        groupName="Developers"
         onConfirm={vi.fn()}
         onCancel={vi.fn()}
       />,
@@ -147,14 +147,14 @@ describe("MemberChangePreviewDialog", () => {
       <MemberChangePreviewDialog
         open={true}
         changes={mockChanges}
-        groupName="IT-Admins"
+        groupName="Developers"
         onConfirm={vi.fn()}
         onCancel={vi.fn()}
       />,
     );
 
     expect(screen.getByTestId("member-change-title")).toHaveTextContent(
-      "Member Changes - IT-Admins",
+      "Member Changes - Developers",
     );
   });
 });

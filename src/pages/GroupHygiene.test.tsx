@@ -93,8 +93,8 @@ describe("GroupHygiene", () => {
 
   it("displays empty groups after scan", async () => {
     const emptyGroups = [
-      makeEmptyGroupEntry("OldProject"),
-      makeEmptyGroupEntry("Deprecated"),
+      makeEmptyGroupEntry("Legacy-VPN"),
+      makeEmptyGroupEntry("Old-Printers"),
     ];
     mockScanResults(emptyGroups, []);
 
@@ -105,16 +105,16 @@ describe("GroupHygiene", () => {
       expect(screen.getByTestId("empty-groups-section")).toBeInTheDocument();
     });
 
-    expect(screen.getByText("OldProject")).toBeInTheDocument();
-    expect(screen.getByText("Deprecated")).toBeInTheDocument();
+    expect(screen.getByText("Legacy-VPN")).toBeInTheDocument();
+    expect(screen.getByText("Old-Printers")).toBeInTheDocument();
   });
 
   it("displays circular nesting cycles after scan", async () => {
     const cycles = [
       [
-        "CN=GroupA,OU=Groups,DC=example,DC=com",
-        "CN=GroupB,OU=Groups,DC=example,DC=com",
-        "CN=GroupA,OU=Groups,DC=example,DC=com",
+        "CN=Developers,OU=Groups,DC=example,DC=com",
+        "CN=Finance-Analysts,OU=Groups,DC=example,DC=com",
+        "CN=Developers,OU=Groups,DC=example,DC=com",
       ],
     ];
     mockScanResults([], cycles);
@@ -127,9 +127,9 @@ describe("GroupHygiene", () => {
     });
 
     expect(screen.getByTestId("cycle-0")).toBeInTheDocument();
-    // GroupA appears twice in the cycle (start and close), so use getAllByText
-    expect(screen.getAllByText("GroupA").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText("GroupB")).toBeInTheDocument();
+    // Developers appears twice in the cycle (start and close), so use getAllByText
+    expect(screen.getAllByText("Developers").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("Finance-Analysts")).toBeInTheDocument();
   });
 
   it("shows empty state when no issues found", async () => {
@@ -167,8 +167,8 @@ describe("GroupHygiene", () => {
 
   it("multi-select on empty groups", async () => {
     const emptyGroups = [
-      makeEmptyGroupEntry("Group1"),
-      makeEmptyGroupEntry("Group2"),
+      makeEmptyGroupEntry("Sales-EMEA"),
+      makeEmptyGroupEntry("Dev-Frontend"),
     ];
     mockScanResults(emptyGroups, []);
 
@@ -179,7 +179,7 @@ describe("GroupHygiene", () => {
       expect(screen.getByTestId("empty-groups-section")).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByTestId("empty-group-checkbox-Group1"));
+    fireEvent.click(screen.getByTestId("empty-group-checkbox-Sales-EMEA"));
 
     await waitFor(() => {
       expect(screen.getByTestId("delete-selected-btn")).toBeInTheDocument();
@@ -191,7 +191,7 @@ describe("GroupHygiene", () => {
   });
 
   it("delete selected opens preview", async () => {
-    const emptyGroups = [makeEmptyGroupEntry("Group1")];
+    const emptyGroups = [makeEmptyGroupEntry("Sales-EMEA")];
     mockScanResults(emptyGroups, []);
 
     render(<GroupHygiene />, { wrapper: TestProviders });
@@ -201,7 +201,7 @@ describe("GroupHygiene", () => {
       expect(screen.getByTestId("empty-groups-section")).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByTestId("empty-group-checkbox-Group1"));
+    fireEvent.click(screen.getByTestId("empty-group-checkbox-Sales-EMEA"));
 
     await waitFor(() => {
       expect(screen.getByTestId("delete-selected-btn")).toBeInTheDocument();
@@ -213,13 +213,13 @@ describe("GroupHygiene", () => {
       expect(screen.getByTestId("delete-preview-dialog")).toBeInTheDocument();
     });
 
-    // Group1 appears in both the table and the dialog, so verify via dialog content
+    // Sales-EMEA appears in both the table and the dialog, so verify via dialog content
     const dialog = screen.getByTestId("delete-preview-dialog");
-    expect(dialog).toHaveTextContent("Group1");
+    expect(dialog).toHaveTextContent("Sales-EMEA");
   });
 
   it("delete executes and refreshes", async () => {
-    const emptyGroups = [makeEmptyGroupEntry("Group1")];
+    const emptyGroups = [makeEmptyGroupEntry("Sales-EMEA")];
     mockScanResults(emptyGroups, []);
 
     render(<GroupHygiene />, { wrapper: TestProviders });
@@ -229,7 +229,7 @@ describe("GroupHygiene", () => {
       expect(screen.getByTestId("empty-groups-section")).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByTestId("empty-group-checkbox-Group1"));
+    fireEvent.click(screen.getByTestId("empty-group-checkbox-Sales-EMEA"));
 
     await waitFor(() => {
       expect(screen.getByTestId("delete-selected-btn")).toBeInTheDocument();
@@ -245,13 +245,13 @@ describe("GroupHygiene", () => {
 
     await waitFor(() => {
       expect(mockInvoke).toHaveBeenCalledWith("delete_group", {
-        groupDn: "CN=Group1,OU=Groups,DC=example,DC=com",
+        groupDn: "CN=Sales-EMEA,OU=Groups,DC=example,DC=com",
       });
     });
   });
 
   it("go to group calls navigation", async () => {
-    const emptyGroups = [makeEmptyGroupEntry("Group1")];
+    const emptyGroups = [makeEmptyGroupEntry("Sales-EMEA")];
     mockScanResults(emptyGroups, []);
 
     render(<GroupHygiene />, { wrapper: TestProviders });
@@ -261,14 +261,14 @@ describe("GroupHygiene", () => {
       expect(screen.getByTestId("empty-groups-section")).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByTestId("go-to-group-Group1"));
+    fireEvent.click(screen.getByTestId("go-to-group-Sales-EMEA"));
 
     // The navigation should open a tab - verify it doesn't throw
     // Navigation context is tested via integration
   });
 
   it("permission gating: delete hidden for non-DomainAdmin", async () => {
-    const emptyGroups = [makeEmptyGroupEntry("Group1")];
+    const emptyGroups = [makeEmptyGroupEntry("Sales-EMEA")];
     mockScanResults(emptyGroups, [], "AccountOperator");
 
     render(<GroupHygiene />, { wrapper: TestProviders });
@@ -279,16 +279,16 @@ describe("GroupHygiene", () => {
     });
 
     expect(
-      screen.queryByTestId("empty-group-checkbox-Group1"),
+      screen.queryByTestId("empty-group-checkbox-Sales-EMEA"),
     ).not.toBeInTheDocument();
     expect(screen.queryByTestId("delete-selected-btn")).not.toBeInTheDocument();
   });
 
   it("empty group count badge shows correct number", async () => {
     const emptyGroups = [
-      makeEmptyGroupEntry("Group1"),
-      makeEmptyGroupEntry("Group2"),
-      makeEmptyGroupEntry("Group3"),
+      makeEmptyGroupEntry("Sales-EMEA"),
+      makeEmptyGroupEntry("Dev-Frontend"),
+      makeEmptyGroupEntry("Dev-Backend"),
     ];
     mockScanResults(emptyGroups, []);
 
