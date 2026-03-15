@@ -50,13 +50,6 @@ impl AuditService {
             operator,
         };
         svc.init_schema();
-
-        // Migrate legacy JSON file if it exists
-        if let Some(ref db_path) = persist_path {
-            let json_path = db_path.with_file_name("audit-log.json");
-            svc.migrate_from_json(&json_path);
-        }
-
         svc
     }
 
@@ -99,54 +92,6 @@ impl AuditService {
             CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_entries(action);",
         )
         .expect("Failed to initialize audit schema");
-    }
-
-    /// Imports entries from a legacy JSON audit log file, then renames it.
-    fn migrate_from_json(&self, json_path: &PathBuf) {
-        if !json_path.exists() {
-            return;
-        }
-
-        let data = match fs::read_to_string(json_path) {
-            Ok(d) => d,
-            Err(_) => return,
-        };
-
-        let entries: Vec<AuditEntry> = match serde_json::from_str(&data) {
-            Ok(e) => e,
-            Err(_) => return,
-        };
-
-        if entries.is_empty() {
-            let _ = fs::rename(json_path, json_path.with_extension("json.migrated"));
-            return;
-        }
-
-        let conn = self.conn.lock().unwrap();
-        let tx = match conn.unchecked_transaction() {
-            Ok(t) => t,
-            Err(_) => return,
-        };
-
-        for entry in &entries {
-            let _ = tx.execute(
-                "INSERT INTO audit_entries (timestamp, operator, action, target_dn, details, success)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-                rusqlite::params![
-                    entry.timestamp,
-                    entry.operator,
-                    entry.action,
-                    entry.target_dn,
-                    entry.details,
-                    entry.success as i32,
-                ],
-            );
-        }
-
-        if tx.commit().is_ok() {
-            let _ = fs::rename(json_path, json_path.with_extension("json.migrated"));
-            tracing::info!("Migrated {} audit entries from JSON to SQLite", entries.len());
-        }
     }
 
     fn insert_entry(&self, entry: &AuditEntry) {
@@ -413,50 +358,4 @@ mod tests {
         assert!(entry.success);
     }
 
-    #[test]
-    fn test_migrate_from_json() {
-        let dir = std::env::temp_dir().join("dspanel_test_migrate");
-        let _ = fs::create_dir_all(&dir);
-        let json_path = dir.join("audit-log.json");
-        let db_path = dir.join("audit.db");
-        let _ = fs::remove_file(&json_path);
-        let _ = fs::remove_file(&db_path);
-
-        // Create a legacy JSON file
-        let legacy = vec![
-            AuditEntry {
-                timestamp: "2026-03-14T10:00:00Z".to_string(),
-                operator: "admin".to_string(),
-                action: "PasswordReset".to_string(),
-                target_dn: "CN=Old,DC=example,DC=com".to_string(),
-                details: "Legacy entry".to_string(),
-                success: true,
-            },
-        ];
-        fs::write(&json_path, serde_json::to_string(&legacy).unwrap()).unwrap();
-
-        // Create service and trigger migration
-        let conn = Connection::open(&db_path).unwrap();
-        let svc = AuditService {
-            conn: Mutex::new(conn),
-            operator: "test".to_string(),
-        };
-        svc.init_schema();
-        svc.migrate_from_json(&json_path);
-
-        // Verify migration
-        assert_eq!(svc.count(), 1);
-        let entries = svc.get_entries();
-        assert_eq!(entries[0].action, "PasswordReset");
-        assert_eq!(entries[0].details, "Legacy entry");
-
-        // JSON file should be renamed
-        assert!(!json_path.exists());
-        assert!(json_path.with_extension("json.migrated").exists());
-
-        // Cleanup
-        let _ = fs::remove_file(&db_path);
-        let _ = fs::remove_file(json_path.with_extension("json.migrated"));
-        let _ = fs::remove_dir(&dir);
-    }
 }

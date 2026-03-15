@@ -28,7 +28,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Audit service migrated from JSON file to SQLite for durability and performance under high-volume support workflows (2.x)
-- Automatic migration of existing `audit-log.json` entries into SQLite on first launch
 - LDAP connection pooling: reuse a single multiplexed connection instead of connect/bind per operation
 - Automatic reconnect on stale LDAP connection with one retry before propagating errors
 - Replace fragile string-split XML parsing in replication metadata with `quick-xml` crate (3.4)

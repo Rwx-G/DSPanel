@@ -90,7 +90,7 @@ All previous CONCERNS have been addressed since the 2026-03-14 review.
 
 ### Remaining minor items (non-blocking)
 
-- ~~Audit uses JSON file instead of SQLite~~ - Fixed: migrated to SQLite with automatic JSON import
+- ~~Audit uses JSON file instead of SQLite~~ - Fixed: migrated to SQLite
 - ~~OsRng vs thread_rng for password generation~~ - Verified: already using OsRng throughout
 - Snapshot capture before write operations not systematically applied
 
@@ -206,7 +206,7 @@ All 7 acceptance criteria fully met:
 | 1 | PDF export not implemented | 3.3 | Low | Deferred to Story 10.1 |
 | 2 | History tab not in Group | 3.4 | Low | ComputerDetail done; Group deferred to Epic 4 |
 | 3 | Attribute diff shows versions not values | 3.4 | Info | AD metadata limitation |
-| 4 | ~~Audit uses JSON not SQLite~~ | 2.x | ~~Low~~ | Fixed: migrated to SQLite with auto-import |
+| 4 | ~~Audit uses JSON not SQLite~~ | 2.x | ~~Low~~ | Fixed: migrated to SQLite |
 | 5 | ~~Array sort mutation in comparison~~ | 3.1 | ~~Low~~ | Fixed: spread applied before sort |
 | 6 | ~~OsRng vs thread_rng~~ | 2.2 | ~~Info~~ | Verified: already using OsRng |
 
