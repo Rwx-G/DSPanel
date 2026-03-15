@@ -790,6 +790,40 @@ impl DirectoryProvider for LdapDirectoryProvider {
         .await
     }
 
+    async fn get_nested_groups(&self, user_dn: &str) -> Result<Vec<String>> {
+        if self.domain.is_none() {
+            return Ok(Vec::new());
+        }
+
+        let base = self.base_dn.lock().unwrap().clone().unwrap_or_default();
+        let dn = user_dn.to_string();
+        self.with_connection(|mut ldap| {
+            let base = base.clone();
+            let dn = dn.clone();
+            async move {
+                // LDAP_MATCHING_RULE_IN_CHAIN resolves transitive membership
+                let filter = format!(
+                    "(&(objectClass=group)(member:1.2.840.113556.1.4.1941:={}))",
+                    dn
+                );
+                let (rs, _) = ldap
+                    .search(&base, Scope::Subtree, &filter, vec!["distinguishedName"])
+                    .await
+                    .context("Failed to query nested groups")?
+                    .success()
+                    .context("Nested groups LDAP query returned error")?;
+
+                let groups: Vec<String> = rs
+                    .into_iter()
+                    .map(|entry| SearchEntry::construct(entry).dn)
+                    .collect();
+
+                Ok(groups)
+            }
+        })
+        .await
+    }
+
     async fn get_ou_tree(&self) -> Result<Vec<OUNode>> {
         if self.domain.is_none() {
             return Ok(Vec::new());

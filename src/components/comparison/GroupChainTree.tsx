@@ -1,9 +1,18 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { ChevronRight, ChevronDown, Users, User, AlertTriangle } from "lucide-react";
 import { type DirectoryEntry } from "@/types/directory";
 import { parseCnFromDn } from "@/utils/dn";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
+
+// Session-level cache shared across all GroupChainNode instances.
+// Prevents redundant LDAP queries when the same group appears in multiple branches.
+const groupMemberCache = new Map<string, DirectoryEntry[]>();
+
+/** Clears the group member cache (call on page navigation or session reset). */
+export function clearGroupMemberCache(): void {
+  groupMemberCache.clear();
+}
 
 interface GroupChainNodeProps {
   groupDn: string;
@@ -30,12 +39,21 @@ function GroupChainNode({ groupDn, groupName, depth, ancestors }: GroupChainNode
       setExpanded(true);
       return;
     }
+    // Check session cache first
+    const cacheKey = groupDn.toLowerCase();
+    const cached = groupMemberCache.get(cacheKey);
+    if (cached) {
+      setMembers(cached);
+      setExpanded(true);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
       const result = await invoke<DirectoryEntry[]>("get_group_members", {
         groupDn,
       });
+      groupMemberCache.set(cacheKey, result);
       setMembers(result);
       setExpanded(true);
     } catch (e) {

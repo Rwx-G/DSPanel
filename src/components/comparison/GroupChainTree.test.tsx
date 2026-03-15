@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { GroupChainTree } from "./GroupChainTree";
+import { GroupChainTree, clearGroupMemberCache } from "./GroupChainTree";
 import type { DirectoryEntry } from "@/types/directory";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -33,6 +33,7 @@ function makeGroup(name: string): DirectoryEntry {
 describe("GroupChainTree", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    clearGroupMemberCache();
   });
 
   it("renders the root group node", () => {

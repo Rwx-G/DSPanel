@@ -96,6 +96,13 @@ pub trait DirectoryProvider: Send + Sync {
     /// Returns None if the attribute is not available.
     async fn get_replication_metadata(&self, object_dn: &str) -> Result<Option<String>>;
 
+    /// Returns all groups a user belongs to, including nested (transitive) memberships.
+    ///
+    /// Uses LDAP_MATCHING_RULE_IN_CHAIN (OID 1.2.840.113556.1.4.1941) to resolve
+    /// the full group chain in a single query. Falls back to direct `memberOf` if
+    /// the matching rule is not supported.
+    async fn get_nested_groups(&self, user_dn: &str) -> Result<Vec<String>>;
+
     /// Returns the OU tree starting from the base DN.
     ///
     /// Each node contains the OU name and DN. Children are populated
@@ -376,6 +383,17 @@ pub mod tests {
         async fn get_replication_metadata(&self, _object_dn: &str) -> Result<Option<String>> {
             self.check_failure()?;
             Ok(self.replication_metadata.lock().unwrap().clone())
+        }
+
+        async fn get_nested_groups(&self, user_dn: &str) -> Result<Vec<String>> {
+            self.check_failure()?;
+            // Mock: return memberOf from the matching user
+            let users = self.users.lock().unwrap();
+            if let Some(user) = users.iter().find(|u| u.distinguished_name == user_dn) {
+                Ok(user.get_attribute_values("memberOf").to_vec())
+            } else {
+                Ok(Vec::new())
+            }
         }
 
         async fn get_ou_tree(&self) -> Result<Vec<OUNode>> {

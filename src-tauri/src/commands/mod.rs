@@ -510,8 +510,15 @@ pub(crate) async fn compare_users_inner(
     let user_a = resolve_user(&*provider, sam_a).await?;
     let user_b = resolve_user(&*provider, sam_b).await?;
 
-    let groups_a: Vec<String> = user_a.get_attribute_values("memberOf").to_vec();
-    let groups_b: Vec<String> = user_b.get_attribute_values("memberOf").to_vec();
+    // Use nested group resolution (transitive membership) for complete comparison
+    let groups_a = provider
+        .get_nested_groups(&user_a.distinguished_name)
+        .await
+        .unwrap_or_else(|_| user_a.get_attribute_values("memberOf").to_vec());
+    let groups_b = provider
+        .get_nested_groups(&user_b.distinguished_name)
+        .await
+        .unwrap_or_else(|_| user_b.get_attribute_values("memberOf").to_vec());
 
     Ok(crate::services::comparison::compute_group_diff(
         &groups_a, &groups_b,

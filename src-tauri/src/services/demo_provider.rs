@@ -901,6 +901,31 @@ impl DirectoryProvider for DemoDirectoryProvider {
         Ok(Some(sample_replication_metadata_for(object_dn)))
     }
 
+    async fn get_nested_groups(&self, user_dn: &str) -> Result<Vec<String>> {
+        // Demo: return direct memberOf + simulate one level of nesting
+        let users = sample_users();
+        if let Some(user) = users.iter().find(|u| u.distinguished_name == user_dn) {
+            let mut groups: Vec<String> = user.get_attribute_values("memberOf").to_vec();
+            // Add parent groups from sample_group_entries memberOf
+            let group_entries = sample_group_entries();
+            let extra: Vec<String> = group_entries
+                .iter()
+                .filter(|g| {
+                    groups
+                        .iter()
+                        .any(|dn| dn.to_lowercase() == g.distinguished_name.to_lowercase())
+                })
+                .flat_map(|g| g.get_attribute_values("memberOf").to_vec())
+                .collect();
+            groups.extend(extra);
+            groups.sort();
+            groups.dedup();
+            Ok(groups)
+        } else {
+            Ok(Vec::new())
+        }
+    }
+
     async fn get_ou_tree(&self) -> Result<Vec<OUNode>> {
         Ok(sample_ou_tree())
     }

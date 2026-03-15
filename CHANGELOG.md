@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Tauri `get_ou_tree` command wired to OUPicker component with `useOUTree` hook
 - `DirectoryProvider::get_ou_tree()` trait method with LDAP and demo implementations
 - Demo provider now returns realistic group search results (was empty)
+- Nested group resolution via LDAP_MATCHING_RULE_IN_CHAIN for transitive membership in user comparison (3.1)
+- Session-level cache for group member queries in GroupChainTree to avoid redundant LDAP calls (3.3)
 
 ### Changed
 

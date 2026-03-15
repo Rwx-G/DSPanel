@@ -303,6 +303,11 @@ where
         .map_err(|e| anyhow::anyhow!(e))
     }
 
+    async fn get_nested_groups(&self, user_dn: &str) -> Result<Vec<String>> {
+        let dn = user_dn.to_string();
+        resilient_call!(self, dn, |inner, d| inner.get_nested_groups(&d).await)
+    }
+
     async fn get_ou_tree(&self) -> Result<Vec<OUNode>> {
         resilient_call!(self, |inner| inner.get_ou_tree().await)
     }
