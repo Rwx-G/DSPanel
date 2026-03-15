@@ -634,4 +634,51 @@ describe("GroupManagement", () => {
       );
     });
   });
+
+  describe("Bulk Operations (Story 4.3)", () => {
+    it("shows bulk operations toggle for AccountOperator users", async () => {
+      const entries = [makeGroupEntry("IT-Admins")];
+      mockBrowseWith(entries, { permissionLevel: "AccountOperator" });
+
+      render(<GroupManagement />, { wrapper: TestProviders });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("group-results-list")).toBeInTheDocument();
+      });
+
+      expect(screen.getByTestId("view-toggle-bulk")).toBeInTheDocument();
+    });
+
+    it("hides bulk operations toggle for ReadOnly users", async () => {
+      const entries = [makeGroupEntry("IT-Admins")];
+      mockBrowseWith(entries, { permissionLevel: "ReadOnly" });
+
+      render(<GroupManagement />, { wrapper: TestProviders });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("group-results-list")).toBeInTheDocument();
+      });
+
+      expect(screen.queryByTestId("view-toggle-bulk")).not.toBeInTheDocument();
+    });
+
+    it("switches to bulk operations view when bulk toggle is clicked", async () => {
+      const entries = [makeGroupEntry("IT-Admins")];
+      mockBrowseWith(entries, { permissionLevel: "AccountOperator" });
+
+      render(<GroupManagement />, { wrapper: TestProviders });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("view-toggle-bulk")).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByTestId("view-toggle-bulk"));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("bulk-operations-view")).toBeInTheDocument();
+      });
+
+      expect(screen.getByTestId("bulk-operations")).toBeInTheDocument();
+    });
+  });
 });

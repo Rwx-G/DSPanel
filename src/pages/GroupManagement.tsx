@@ -17,6 +17,7 @@ import {
   type MemberChange,
 } from "@/components/dialogs/MemberChangePreviewDialog";
 import { type OUNode } from "@/components/form/OUPicker";
+import { BulkOperations } from "@/pages/BulkOperations";
 import {
   Users,
   AlertCircle,
@@ -26,9 +27,10 @@ import {
   UserMinus,
   Eye,
   Search,
+  Layers,
 } from "lucide-react";
 
-type ViewMode = "flat" | "tree";
+type ViewMode = "flat" | "tree" | "bulk";
 
 function ouNodesToTreeNodes(nodes: OUNode[]): TreeNode[] {
   return nodes.map((ou) => ({
@@ -407,11 +409,34 @@ export function GroupManagement() {
           >
             <FolderTree size={16} />
           </button>
+          {canManageMembers && (
+            <button
+              className={`btn btn-ghost flex h-8 w-8 items-center justify-center rounded-md p-0 ${
+                viewMode === "bulk"
+                  ? "bg-[var(--color-surface-selected)] text-[var(--color-primary)]"
+                  : ""
+              }`}
+              onClick={() => setViewMode("bulk")}
+              title="Bulk operations"
+              data-testid="view-toggle-bulk"
+            >
+              <Layers size={16} />
+            </button>
+          )}
         </div>
       </div>
 
       <div className="flex flex-1 overflow-hidden">
-        {loading && (
+        {viewMode === "bulk" && (
+          <div
+            className="flex-1 overflow-hidden"
+            data-testid="bulk-operations-view"
+          >
+            <BulkOperations />
+          </div>
+        )}
+
+        {viewMode !== "bulk" && loading && (
           <div
             className="flex flex-1 items-center justify-center"
             data-testid="group-management-loading"
@@ -420,7 +445,7 @@ export function GroupManagement() {
           </div>
         )}
 
-        {!loading && error && (
+        {viewMode !== "bulk" && !loading && error && (
           <div
             className="flex flex-1 items-center justify-center"
             data-testid="group-management-error"
@@ -434,310 +459,321 @@ export function GroupManagement() {
           </div>
         )}
 
-        {!loading && !error && displayedGroups.length === 0 && (
-          <div
-            className="flex flex-1 items-center justify-center"
-            data-testid="group-management-empty"
-          >
-            <EmptyState
-              icon={<Users size={48} />}
-              title="No groups found"
-              description={
-                filterText
-                  ? `No groups match "${filterText}".`
-                  : "No groups available."
-              }
-            />
-          </div>
-        )}
-
-        {!loading && !error && displayedGroups.length > 0 && (
-          <>
-            <div className="w-64 shrink-0 border-r border-[var(--color-border-subtle)] overflow-hidden flex flex-col">
-              {viewMode === "tree" && (
-                <div
-                  className="overflow-auto border-b border-[var(--color-border-subtle)] p-2"
-                  data-testid="group-tree-panel"
-                  style={{ maxHeight: "40%" }}
-                >
-                  {ouLoading && <LoadingSpinner message="Loading OU tree..." />}
-                  {ouError && (
-                    <p className="text-caption text-[var(--color-text-secondary)]">
-                      Failed to load OU tree
-                    </p>
-                  )}
-                  {!ouLoading && !ouError && (
-                    <TreeView
-                      nodes={treeNodes}
-                      selectedIds={
-                        selectedOU ? new Set([selectedOU]) : new Set()
-                      }
-                      onSelect={handleOUSelect}
-                    />
-                  )}
-                </div>
-              )}
-              <div
-                className="flex-1 overflow-hidden"
-                data-testid="group-results-list"
-              >
-                <VirtualizedList
-                  items={displayedGroups}
-                  renderItem={renderGroupItem}
-                  estimateSize={52}
-                  itemKey={(group) => group.distinguishedName}
-                  loadingMore={loadingMore}
-                  onEndReached={hasMore ? loadMore : undefined}
-                  className="h-full"
-                />
-              </div>
-            </div>
-
+        {viewMode !== "bulk" &&
+          !loading &&
+          !error &&
+          displayedGroups.length === 0 && (
             <div
-              className="flex-1 overflow-auto p-4"
-              data-testid="group-detail-panel"
+              className="flex flex-1 items-center justify-center"
+              data-testid="group-management-empty"
             >
-              {selectedGroup ? (
-                <div data-testid="group-detail">
-                  <h2 className="mb-4 text-lg font-semibold text-[var(--color-text-primary)]">
-                    {selectedGroup.displayName || selectedGroup.samAccountName}
-                  </h2>
+              <EmptyState
+                icon={<Users size={48} />}
+                title="No groups found"
+                description={
+                  filterText
+                    ? `No groups match "${filterText}".`
+                    : "No groups available."
+                }
+              />
+            </div>
+          )}
 
-                  <div className="mb-6 grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-caption font-medium text-[var(--color-text-secondary)]">
-                        Distinguished Name
+        {viewMode !== "bulk" &&
+          !loading &&
+          !error &&
+          displayedGroups.length > 0 && (
+            <>
+              <div className="w-64 shrink-0 border-r border-[var(--color-border-subtle)] overflow-hidden flex flex-col">
+                {viewMode === "tree" && (
+                  <div
+                    className="overflow-auto border-b border-[var(--color-border-subtle)] p-2"
+                    data-testid="group-tree-panel"
+                    style={{ maxHeight: "40%" }}
+                  >
+                    {ouLoading && (
+                      <LoadingSpinner message="Loading OU tree..." />
+                    )}
+                    {ouError && (
+                      <p className="text-caption text-[var(--color-text-secondary)]">
+                        Failed to load OU tree
                       </p>
-                      <p className="text-body text-[var(--color-text-primary)] break-all">
-                        {selectedGroup.distinguishedName}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-caption font-medium text-[var(--color-text-secondary)]">
-                        sAMAccountName
-                      </p>
-                      <p className="text-body text-[var(--color-text-primary)]">
-                        {selectedGroup.samAccountName}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-caption font-medium text-[var(--color-text-secondary)]">
-                        Description
-                      </p>
-                      <p className="text-body text-[var(--color-text-primary)]">
-                        {selectedGroup.description || "-"}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-caption font-medium text-[var(--color-text-secondary)]">
-                        Scope
-                      </p>
-                      <p
-                        className="text-body text-[var(--color-text-primary)]"
-                        data-testid="group-scope"
-                      >
-                        {selectedGroup.scope}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-caption font-medium text-[var(--color-text-secondary)]">
-                        Category
-                      </p>
-                      <p
-                        className="text-body text-[var(--color-text-primary)]"
-                        data-testid="group-category"
-                      >
-                        {selectedGroup.category}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-caption font-medium text-[var(--color-text-secondary)]">
-                        Member Count
-                      </p>
-                      <p className="text-body text-[var(--color-text-primary)]">
-                        {selectedGroup.memberCount}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-caption font-medium text-[var(--color-text-secondary)]">
-                        Organizational Unit
-                      </p>
-                      <p className="text-body text-[var(--color-text-primary)]">
-                        {selectedGroup.organizationalUnit || "-"}
-                      </p>
-                    </div>
+                    )}
+                    {!ouLoading && !ouError && (
+                      <TreeView
+                        nodes={treeNodes}
+                        selectedIds={
+                          selectedOU ? new Set([selectedOU]) : new Set()
+                        }
+                        onSelect={handleOUSelect}
+                      />
+                    )}
                   </div>
+                )}
+                <div
+                  className="flex-1 overflow-hidden"
+                  data-testid="group-results-list"
+                >
+                  <VirtualizedList
+                    items={displayedGroups}
+                    renderItem={renderGroupItem}
+                    estimateSize={52}
+                    itemKey={(group) => group.distinguishedName}
+                    loadingMore={loadingMore}
+                    onEndReached={hasMore ? loadMore : undefined}
+                    className="h-full"
+                  />
+                </div>
+              </div>
 
-                  <div data-testid="group-members-section">
-                    <div className="mb-2 flex items-center justify-between">
-                      <h3 className="text-body font-semibold text-[var(--color-text-primary)]">
-                        Members ({members.length})
-                      </h3>
+              <div
+                className="flex-1 overflow-auto p-4"
+                data-testid="group-detail-panel"
+              >
+                {selectedGroup ? (
+                  <div data-testid="group-detail">
+                    <h2 className="mb-4 text-lg font-semibold text-[var(--color-text-primary)]">
+                      {selectedGroup.displayName ||
+                        selectedGroup.samAccountName}
+                    </h2>
+
+                    <div className="mb-6 grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-caption font-medium text-[var(--color-text-secondary)]">
+                          Distinguished Name
+                        </p>
+                        <p className="text-body text-[var(--color-text-primary)] break-all">
+                          {selectedGroup.distinguishedName}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-caption font-medium text-[var(--color-text-secondary)]">
+                          sAMAccountName
+                        </p>
+                        <p className="text-body text-[var(--color-text-primary)]">
+                          {selectedGroup.samAccountName}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-caption font-medium text-[var(--color-text-secondary)]">
+                          Description
+                        </p>
+                        <p className="text-body text-[var(--color-text-primary)]">
+                          {selectedGroup.description || "-"}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-caption font-medium text-[var(--color-text-secondary)]">
+                          Scope
+                        </p>
+                        <p
+                          className="text-body text-[var(--color-text-primary)]"
+                          data-testid="group-scope"
+                        >
+                          {selectedGroup.scope}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-caption font-medium text-[var(--color-text-secondary)]">
+                          Category
+                        </p>
+                        <p
+                          className="text-body text-[var(--color-text-primary)]"
+                          data-testid="group-category"
+                        >
+                          {selectedGroup.category}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-caption font-medium text-[var(--color-text-secondary)]">
+                          Member Count
+                        </p>
+                        <p className="text-body text-[var(--color-text-primary)]">
+                          {selectedGroup.memberCount}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-caption font-medium text-[var(--color-text-secondary)]">
+                          Organizational Unit
+                        </p>
+                        <p className="text-body text-[var(--color-text-primary)]">
+                          {selectedGroup.organizationalUnit || "-"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div data-testid="group-members-section">
+                      <div className="mb-2 flex items-center justify-between">
+                        <h3 className="text-body font-semibold text-[var(--color-text-primary)]">
+                          Members ({members.length})
+                        </h3>
+                        {canManageMembers && (
+                          <div
+                            className="flex items-center gap-2"
+                            data-testid="member-management-controls"
+                          >
+                            {selectedMembers.size > 0 && (
+                              <button
+                                className="btn btn-secondary flex items-center gap-1 text-caption"
+                                onClick={handleRemoveSelected}
+                                data-testid="remove-selected-btn"
+                              >
+                                <UserMinus size={14} />
+                                Remove Selected ({selectedMembers.size})
+                              </button>
+                            )}
+                            {pendingChanges.length > 0 && (
+                              <button
+                                className="btn btn-primary flex items-center gap-1 text-caption"
+                                onClick={() => setShowPreview(true)}
+                                data-testid="preview-changes-btn"
+                              >
+                                <Eye size={14} />
+                                Preview ({pendingChanges.length})
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {canManageMembers && members.length > 0 && (
+                        <div className="mb-2 flex items-center gap-2">
+                          <label className="flex items-center gap-1.5 text-caption text-[var(--color-text-secondary)]">
+                            <input
+                              type="checkbox"
+                              checked={allSelected}
+                              onChange={(e) =>
+                                handleSelectAll(e.target.checked)
+                              }
+                              data-testid="select-all-checkbox"
+                            />
+                            Select all
+                          </label>
+                        </div>
+                      )}
+
+                      {membersLoading ? (
+                        <LoadingSpinner message="Loading members..." />
+                      ) : members.length > 0 ? (
+                        <DataTable
+                          columns={memberColumns}
+                          data={memberRows}
+                          rowKey={(row) => row.dn}
+                        />
+                      ) : (
+                        <p className="text-caption text-[var(--color-text-secondary)]">
+                          No members found
+                        </p>
+                      )}
+
                       {canManageMembers && (
                         <div
-                          className="flex items-center gap-2"
-                          data-testid="member-management-controls"
+                          className="mt-4 rounded-lg border border-[var(--color-border-default)] p-3"
+                          data-testid="add-member-section"
                         >
-                          {selectedMembers.size > 0 && (
-                            <button
-                              className="btn btn-secondary flex items-center gap-1 text-caption"
-                              onClick={handleRemoveSelected}
-                              data-testid="remove-selected-btn"
-                            >
-                              <UserMinus size={14} />
-                              Remove Selected ({selectedMembers.size})
-                            </button>
+                          <h4 className="mb-2 flex items-center gap-1.5 text-body font-medium text-[var(--color-text-primary)]">
+                            <UserPlus size={16} />
+                            Add Members
+                          </h4>
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1">
+                              <div
+                                className="flex items-center gap-2 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5"
+                                data-testid="member-search-bar"
+                              >
+                                <Search
+                                  size={16}
+                                  className="shrink-0 text-[var(--color-text-secondary)]"
+                                  aria-hidden="true"
+                                />
+                                <input
+                                  type="text"
+                                  value={memberSearchText}
+                                  onChange={(e) => {
+                                    setMemberSearchText(e.target.value);
+                                    handleMemberSearch(e.target.value);
+                                  }}
+                                  placeholder="Search users to add..."
+                                  aria-label="Search users to add"
+                                  className="flex-1 bg-transparent text-body text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-secondary)]"
+                                  data-testid="member-search-input"
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          {memberSearchLoading && (
+                            <div className="mt-2">
+                              <LoadingSpinner message="Searching..." />
+                            </div>
                           )}
-                          {pendingChanges.length > 0 && (
-                            <button
-                              className="btn btn-primary flex items-center gap-1 text-caption"
-                              onClick={() => setShowPreview(true)}
-                              data-testid="preview-changes-btn"
+
+                          {memberSearchResults.length > 0 && (
+                            <div
+                              className="mt-2 max-h-40 overflow-auto rounded border border-[var(--color-border-subtle)]"
+                              data-testid="member-search-results"
                             >
-                              <Eye size={14} />
-                              Preview ({pendingChanges.length})
-                            </button>
+                              {memberSearchResults.map((entry) => {
+                                const name =
+                                  entry.displayName ??
+                                  entry.samAccountName ??
+                                  parseCnFromDn(entry.distinguishedName);
+                                const isAlreadyMember = members.some(
+                                  (m) =>
+                                    m.distinguishedName ===
+                                    entry.distinguishedName,
+                                );
+                                const isPending = pendingChanges.some(
+                                  (c) =>
+                                    c.memberDn === entry.distinguishedName &&
+                                    c.action === "add",
+                                );
+                                return (
+                                  <div
+                                    key={entry.distinguishedName}
+                                    className="flex items-center justify-between border-b border-[var(--color-border-subtle)] px-3 py-1.5 last:border-b-0"
+                                    data-testid={`search-result-${name}`}
+                                  >
+                                    <div className="min-w-0 flex-1">
+                                      <p className="truncate text-body text-[var(--color-text-primary)]">
+                                        {name}
+                                      </p>
+                                      <p className="truncate text-caption text-[var(--color-text-secondary)]">
+                                        {entry.samAccountName}
+                                      </p>
+                                    </div>
+                                    <button
+                                      className="btn btn-ghost flex items-center gap-1 text-caption"
+                                      onClick={() => handleAddToGroup(entry)}
+                                      disabled={isAlreadyMember || isPending}
+                                      data-testid={`add-member-btn-${name}`}
+                                    >
+                                      <UserPlus size={14} />
+                                      {isAlreadyMember
+                                        ? "Member"
+                                        : isPending
+                                          ? "Pending"
+                                          : "Add"}
+                                    </button>
+                                  </div>
+                                );
+                              })}
+                            </div>
                           )}
                         </div>
                       )}
                     </div>
-
-                    {canManageMembers && members.length > 0 && (
-                      <div className="mb-2 flex items-center gap-2">
-                        <label className="flex items-center gap-1.5 text-caption text-[var(--color-text-secondary)]">
-                          <input
-                            type="checkbox"
-                            checked={allSelected}
-                            onChange={(e) => handleSelectAll(e.target.checked)}
-                            data-testid="select-all-checkbox"
-                          />
-                          Select all
-                        </label>
-                      </div>
-                    )}
-
-                    {membersLoading ? (
-                      <LoadingSpinner message="Loading members..." />
-                    ) : members.length > 0 ? (
-                      <DataTable
-                        columns={memberColumns}
-                        data={memberRows}
-                        rowKey={(row) => row.dn}
-                      />
-                    ) : (
-                      <p className="text-caption text-[var(--color-text-secondary)]">
-                        No members found
-                      </p>
-                    )}
-
-                    {canManageMembers && (
-                      <div
-                        className="mt-4 rounded-lg border border-[var(--color-border-default)] p-3"
-                        data-testid="add-member-section"
-                      >
-                        <h4 className="mb-2 flex items-center gap-1.5 text-body font-medium text-[var(--color-text-primary)]">
-                          <UserPlus size={16} />
-                          Add Members
-                        </h4>
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1">
-                            <div
-                              className="flex items-center gap-2 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5"
-                              data-testid="member-search-bar"
-                            >
-                              <Search
-                                size={16}
-                                className="shrink-0 text-[var(--color-text-secondary)]"
-                                aria-hidden="true"
-                              />
-                              <input
-                                type="text"
-                                value={memberSearchText}
-                                onChange={(e) => {
-                                  setMemberSearchText(e.target.value);
-                                  handleMemberSearch(e.target.value);
-                                }}
-                                placeholder="Search users to add..."
-                                aria-label="Search users to add"
-                                className="flex-1 bg-transparent text-body text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-secondary)]"
-                                data-testid="member-search-input"
-                              />
-                            </div>
-                          </div>
-                        </div>
-
-                        {memberSearchLoading && (
-                          <div className="mt-2">
-                            <LoadingSpinner message="Searching..." />
-                          </div>
-                        )}
-
-                        {memberSearchResults.length > 0 && (
-                          <div
-                            className="mt-2 max-h-40 overflow-auto rounded border border-[var(--color-border-subtle)]"
-                            data-testid="member-search-results"
-                          >
-                            {memberSearchResults.map((entry) => {
-                              const name =
-                                entry.displayName ??
-                                entry.samAccountName ??
-                                parseCnFromDn(entry.distinguishedName);
-                              const isAlreadyMember = members.some(
-                                (m) =>
-                                  m.distinguishedName ===
-                                  entry.distinguishedName,
-                              );
-                              const isPending = pendingChanges.some(
-                                (c) =>
-                                  c.memberDn === entry.distinguishedName &&
-                                  c.action === "add",
-                              );
-                              return (
-                                <div
-                                  key={entry.distinguishedName}
-                                  className="flex items-center justify-between border-b border-[var(--color-border-subtle)] px-3 py-1.5 last:border-b-0"
-                                  data-testid={`search-result-${name}`}
-                                >
-                                  <div className="min-w-0 flex-1">
-                                    <p className="truncate text-body text-[var(--color-text-primary)]">
-                                      {name}
-                                    </p>
-                                    <p className="truncate text-caption text-[var(--color-text-secondary)]">
-                                      {entry.samAccountName}
-                                    </p>
-                                  </div>
-                                  <button
-                                    className="btn btn-ghost flex items-center gap-1 text-caption"
-                                    onClick={() => handleAddToGroup(entry)}
-                                    disabled={isAlreadyMember || isPending}
-                                    data-testid={`add-member-btn-${name}`}
-                                  >
-                                    <UserPlus size={14} />
-                                    {isAlreadyMember
-                                      ? "Member"
-                                      : isPending
-                                        ? "Pending"
-                                        : "Add"}
-                                  </button>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    )}
                   </div>
-                </div>
-              ) : (
-                <div className="flex h-full items-center justify-center">
-                  <p className="text-body text-[var(--color-text-secondary)]">
-                    Select a group to view details
-                  </p>
-                </div>
-              )}
-            </div>
-          </>
-        )}
+                ) : (
+                  <div className="flex h-full items-center justify-center">
+                    <p className="text-body text-[var(--color-text-secondary)]">
+                      Select a group to view details
+                    </p>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
       </div>
 
       {showPreview && selectedGroup && (

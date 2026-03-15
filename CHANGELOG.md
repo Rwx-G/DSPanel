@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Bulk operations panel for Delete/Add/Transfer members across groups (4.3)
+- Dry-run preview of planned changes before execution (4.3)
+- Progress indicator with step-by-step status during bulk execution (4.3)
+- Rollback on failure reversing completed operations in LIFO order (4.3)
+- Bulk operations view toggle in GroupManagement (AccountOperator+ gated) (4.3)
 - Group member management with multi-select, add/remove with dry-run preview dialog (4.2)
 - Permission-gated member management controls (AccountOperator+ required) (4.2)
 - User search for adding members to groups with duplicate detection (4.2)
