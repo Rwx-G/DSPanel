@@ -64,15 +64,13 @@ describe("useOUTree", () => {
   it("reload re-fetches the OU tree", async () => {
     mockInvoke
       .mockResolvedValueOnce(sampleNodes as never)
-      .mockResolvedValueOnce(
-        [
-          {
-            distinguishedName: "OU=HR,DC=example,DC=com",
-            name: "HR",
-            children: [],
-          },
-        ] as never,
-      );
+      .mockResolvedValueOnce([
+        {
+          distinguishedName: "OU=HR,DC=example,DC=com",
+          name: "HR",
+          children: [],
+        },
+      ] as never);
 
     const { result } = renderHook(() => useOUTree(), { wrapper });
 

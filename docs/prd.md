@@ -20,9 +20,9 @@ Existing commercial solutions (ManageEngine, Quest, Netwrix) cover parts of the 
 
 ### Change Log
 
-| Date | Version | Description | Author |
-|------|---------|-------------|--------|
-| 2026-03-10 | 0.1 | Initial PRD draft | Romain G. |
+| Date       | Version | Description       | Author    |
+| ---------- | ------- | ----------------- | --------- |
+| 2026-03-10 | 0.1     | Initial PRD draft | Romain G. |
 
 ---
 
@@ -38,7 +38,7 @@ Existing commercial solutions (ManageEngine, Quest, Netwrix) cover parts of the 
 - **FR6**: Each account lookup shall display a visual healthcheck badge showing account status flags (disabled, locked out, expired, password expired, inactive 30/90 days, never logged on, password never changed).
 - **FR7**: Account lookup shall display authentication details: failed password count, last logon timestamp, last workstation used with IP address.
 - **FR8**: Users shall be able to ping a computer (ICMP) and resolve its DNS from within the tool.
-- **FR9**: The application shall query Exchange on-prem attributes via LDAP (msExch*) to display mailbox name, aliases, forwarding, quotas, and delegations in read-only mode.
+- **FR9**: The application shall query Exchange on-prem attributes via LDAP (msExch\*) to display mailbox name, aliases, forwarding, quotas, and delegations in read-only mode.
 - **FR10**: The application shall query Exchange Online via Microsoft Graph API to display the same mailbox information in read-only mode.
 - **FR11**: Users shall be able to view login/logout event history for a user or computer.
 - **FR12**: The application shall provide lockout diagnostics: trace lockout source DC, IP address, and originating process.
@@ -70,7 +70,7 @@ Existing commercial solutions (ManageEngine, Quest, Netwrix) cover parts of the 
 - **FR38**: The application shall create a snapshot of an AD object before any modification, allowing one-click rollback.
 - **FR39**: DomainAdmin users shall be able to view DC health: DNS status, AD services (NTDS, Netlogon, KDC), SYSVOL state, disk space, LDAP response time.
 - **FR40**: The application shall display AD replication status between DCs: sync state, errors, latency.
-- **FR41**: The application shall verify AD-related DNS records (_ldap._tcp, _kerberos._tcp SRV records).
+- **FR41**: The application shall verify AD-related DNS records (\_ldap.\_tcp, \_kerberos.\_tcp SRV records).
 - **FR42**: The application shall check Kerberos clock synchronization between DCs and workstations.
 - **FR43**: The application shall provide real-time remote workstation monitoring: CPU, RAM, active sessions, services, disk usage.
 - **FR44**: The application shall display a visual AD topology map: sites, DCs, replication links.
@@ -225,7 +225,7 @@ Tauri v2 hybrid app with Rust backend and React frontend:
 
 - **Epic 5: Presets, Onboarding and Offboarding Workflows** - Implement declarative presets (JSON on network share), the preset editor UI, onboarding wizard, and offboarding workflow with dry-run preview.
 
-- **Epic 6: Exchange Diagnostics** - Add Exchange on-prem (LDAP msExch*) and Exchange Online (Graph) read-only mailbox diagnostics to the user lookup view.
+- **Epic 6: Exchange Diagnostics** - Add Exchange on-prem (LDAP msExch\*) and Exchange Online (Graph) read-only mailbox diagnostics to the user lookup view.
 
 - **Epic 7: Administration and Object Management** - Deliver OU object movement, AD Recycle Bin access, contact/printer management, thumbnail photos, and object backup/restore.
 
@@ -252,6 +252,7 @@ I want a working Tauri v2 application with React frontend, Rust backend, and a n
 so that all future features plug into a consistent architecture.
 
 #### Acceptance Criteria
+
 1. Project builds and runs with `cargo tauri dev` (Rust backend + React frontend)
 2. Tauri managed state is configured for shared backend services
 3. React with TypeScript is configured with Vite bundler
@@ -268,6 +269,7 @@ I want a DirectoryProvider trait with an LDAP implementation that auto-detects t
 so that all AD queries go through a consistent abstraction.
 
 #### Acceptance Criteria
+
 1. IDirectoryProvider interface is defined with methods for user search, computer search, and group queries
 2. LdapDirectoryProvider implements IDirectoryProvider using System.DirectoryServices.Protocols
 3. At startup, the provider auto-detects the current domain via environment (USERDNSDOMAIN / rootDSE)
@@ -283,6 +285,7 @@ I want DSPanel to detect my AD group memberships at startup and determine my per
 so that I only see actions I am authorized to perform.
 
 #### Acceptance Criteria
+
 1. IPermissionService detects current user's AD group memberships at startup
 2. Groups are mapped to permission levels: ReadOnly (default), HelpDesk, AccountOperator, DomainAdmin
 3. Group names used for detection are configurable (not hardcoded)
@@ -298,6 +301,7 @@ I want to search for a user account and see their complete information,
 so that I can quickly diagnose account issues when handling tickets.
 
 #### Acceptance Criteria
+
 1. Search bar accepts SAMAccountName, UPN, display name, or partial match
 2. Search results appear in a list with name, department, and status
 3. Selecting a result opens a detail view with: display name, first/last name, email, department, title, OU (as breadcrumb), DN, account status (enabled/disabled), locked status
@@ -313,6 +317,7 @@ I want to see a visual healthcheck badge on each account,
 so that I can instantly identify problematic accounts without reading every field.
 
 #### Acceptance Criteria
+
 1. Healthcheck badge appears next to the user's name in lookup results and detail view
 2. Badge aggregates multiple status flags: Disabled, Locked Out, Expired, Password Expired, Password Never Expires, Inactive 30 days, Inactive 90 days, Never Logged On, Password Never Changed
 3. Each flag has a distinct color/icon (red for critical, orange for warning, green for healthy)
@@ -327,6 +332,7 @@ I want to search for a computer account and see its details,
 so that I can diagnose workstation issues.
 
 #### Acceptance Criteria
+
 1. Computer search works by name (exact and partial match)
 2. Detail view shows: computer name, DNS hostname, OS, OS version, last logon, OU, enabled status
 3. Group memberships are listed
@@ -341,6 +347,7 @@ I want a unified error handling and network resilience layer,
 so that all AD write operations (starting in Epic 2) fail gracefully with clear user feedback, automatic retry, and structured audit logging.
 
 #### Acceptance Criteria
+
 1. Typed error hierarchy exists: `DsPanelError`, `DirectoryError`, `NetworkError`, `PermissionDeniedError`
 2. All `DirectoryProvider` trait LDAP operations wrap raw errors into typed `DirectoryError` with user-friendly messages
 3. Transient LDAP/network failures are retried with exponential backoff (1s, 2s, 4s, max 3 attempts)
@@ -364,6 +371,7 @@ I want to reset a user's password from the lookup view,
 so that I can resolve "can't log in" tickets quickly.
 
 #### Acceptance Criteria
+
 1. "Reset Password" button is visible only to HelpDesk+ permission level
 2. Password reset dialog offers: manual entry, auto-generate, and "must change at next logon" checkbox
 3. Password is validated against complexity requirements before submission
@@ -379,6 +387,7 @@ I want to generate secure passwords and check them against compromised databases
 so that reset passwords are strong and not previously breached.
 
 #### Acceptance Criteria
+
 1. Password generator is accessible from the reset dialog and as a standalone tool
 2. Generator produces passwords matching configurable criteria (length, complexity, character sets)
 3. Generated passwords are checked against HaveIBeenPwned API using k-anonymity (only first 5 chars of SHA1 sent)
@@ -393,6 +402,7 @@ I want to unlock, enable, or disable a user account from the lookup view,
 so that I can resolve lockout and access tickets.
 
 #### Acceptance Criteria
+
 1. "Unlock" button appears only when account is locked out (HelpDesk+ permission)
 2. "Enable/Disable" toggle appears for HelpDesk+ permission level
 3. Each action shows a confirmation dialog before execution
@@ -407,6 +417,7 @@ I want to manage password policy flags on a user account,
 so that I can configure special accounts (service accounts, etc.).
 
 #### Acceptance Criteria
+
 1. "Password Never Expires" and "User Cannot Change Password" checkboxes in user detail view
 2. Visible only to AccountOperator+ permission level
 3. Changes show a confirmation dialog with dry-run preview
@@ -420,6 +431,7 @@ I want sensitive actions (password reset, account deletion) to require MFA verif
 so that compromised DSPanel sessions cannot perform critical operations.
 
 #### Acceptance Criteria
+
 1. MFA gate is configurable (can be enabled/disabled per action type in settings)
 2. MFA challenge is provider-agnostic: supports TOTP (authenticator app) as built-in method
 3. MFA dialog appears before the action executes and blocks until verified
@@ -440,6 +452,7 @@ I want to compare two user accounts side by side,
 so that I can identify differences in their group memberships.
 
 #### Acceptance Criteria
+
 1. Comparison view accepts two user accounts (search or drag from lookup)
 2. Both users' details are displayed in parallel columns
 3. Group memberships are aligned and color-coded: green (both have), red (only user A), blue (only user B)
@@ -454,6 +467,7 @@ I want to enter a network path and see which AD groups have access and how that 
 so that I can diagnose file share access issues.
 
 #### Acceptance Criteria
+
 1. Input field accepts UNC paths (\\\\server\share\folder)
 2. Tool resolves NTFS ACLs on the specified path and lists each ACE (group/user, permission type, allow/deny)
 3. Each ACE is cross-referenced with the compared users' group memberships
@@ -468,6 +482,7 @@ I want to analyze NTFS permissions on a folder and understand the full permissio
 so that I can resolve complex access issues.
 
 #### Acceptance Criteria
+
 1. Standalone view (not just comparison mode) for analyzing a single path's permissions
 2. Displays inherited vs explicit permissions separately
 3. Shows full group resolution chain (user -> group -> nested group -> ACE)
@@ -482,6 +497,7 @@ I want to compare an AD object's state between two points in time,
 so that I can investigate what changed and when.
 
 #### Acceptance Criteria
+
 1. For any AD object, display replication metadata (attribute change timestamps)
 2. User selects two timestamps and sees a diff of attribute values
 3. Changes are highlighted with before/after values
@@ -501,6 +517,7 @@ I want to browse AD groups in a tree view by OU or in a flat searchable list,
 so that I can quickly find and manage groups.
 
 #### Acceptance Criteria
+
 1. Tree view displays OU hierarchy with groups as leaf nodes
 2. Flat view shows all groups in a searchable/sortable/filterable list
 3. Toggle between tree and flat view
@@ -516,6 +533,7 @@ I want to add and remove members from groups using drag-and-drop,
 so that I can manage group memberships efficiently.
 
 #### Acceptance Criteria
+
 1. Drag users/computers/groups from search results or other groups into a target group
 2. Multi-selection supported for batch add
 3. Remove members via selection + delete or context menu
@@ -531,6 +549,7 @@ I want to perform group-centric bulk operations (Delete members, Add members, Tr
 so that I can handle batch changes like team moves efficiently.
 
 #### Acceptance Criteria
+
 1. Bulk operation panel: select source group(s), target group(s), and operation type (D/A/T)
 2. Member selection within source group with multi-select and select-all
 3. Transfer (T) = Add to target + Delete from source (atomic operation)
@@ -546,6 +565,7 @@ I want to identify empty groups and circular group nesting,
 so that I can clean up AD group hygiene issues.
 
 #### Acceptance Criteria
+
 1. "Hygiene" tab in group management shows detected issues
 2. Empty groups listed with name, OU, and creation date
 3. Circular nesting detected and displayed as a warning with the nesting chain
@@ -565,6 +585,7 @@ I want to configure a network share path for storing presets and have DSPanel re
 so that presets are centralized and shared across the team.
 
 #### Acceptance Criteria
+
 1. Settings view allows configuring the preset storage path (UNC or local path)
 2. Application validates path accessibility at startup and shows warning if unreachable
 3. Presets are stored as individual JSON files (one per preset)
@@ -578,6 +599,7 @@ I want to create and edit presets through the DSPanel UI,
 so that I do not need to manually edit JSON files.
 
 #### Acceptance Criteria
+
 1. Preset list view shows all available presets with name, type (onboarding/offboarding), and target role/team
 2. Preset editor form: name, description, type, target OU, list of AD groups (searchable picker), additional attributes
 3. Group picker allows browsing/searching AD groups and adding them to the preset
@@ -592,6 +614,7 @@ I want a guided wizard for creating a new user with a preset,
 so that onboarding is consistent, fast, and error-free.
 
 #### Acceptance Criteria
+
 1. Wizard steps: user details form, preset selection, preview diff, confirm and execute
 2. User details: first name, last name, login convention (auto-generated), password (generated), target OU (from preset or override)
 3. Preset selection shows which groups and settings will be applied
@@ -607,6 +630,7 @@ I want a guided offboarding workflow,
 so that departing users are consistently and securely deprovisioned.
 
 #### Acceptance Criteria
+
 1. Workflow triggered from user lookup view context menu
 2. Steps: confirm user, preview current state, select offboarding actions, preview changes, execute
 3. Available actions (each toggleable): disable account, remove from all groups, set mail forwarding, move to "Disabled Users" OU, reset password to random
@@ -627,7 +651,8 @@ I want to see Exchange on-prem mailbox information in the user lookup view,
 so that I can diagnose mail issues without opening the Exchange console.
 
 #### Acceptance Criteria
-1. Exchange panel appears in user detail view when msExch* attributes are detected
+
+1. Exchange panel appears in user detail view when msExch\* attributes are detected
 2. Displays: mailbox name, email aliases (proxyAddresses), forwarding address, mailbox type
 3. Displays delegations (msExchDelegateListBL) if present
 4. Panel is hidden when no Exchange attributes exist (graceful degradation)
@@ -640,6 +665,7 @@ I want to see Exchange Online mailbox information for hybrid/cloud users,
 so that I can diagnose mail issues for O365 users.
 
 #### Acceptance Criteria
+
 1. Graph provider detects Exchange Online mailbox for the user
 2. Displays: mailbox name, email aliases, forwarding rules, mailbox quota/usage, delegations
 3. Requires Azure AD App Registration with Mail.Read permissions
@@ -660,6 +686,7 @@ I want to move AD objects (users, computers, groups) between OUs,
 so that I can reorganize AD structure as needed.
 
 #### Acceptance Criteria
+
 1. "Move to OU" action available from context menu on any AD object
 2. OU picker shows the OU tree for target selection
 3. Supports single and bulk move (multi-selection)
@@ -674,6 +701,7 @@ I want to browse and restore deleted AD objects from the Recycle Bin,
 so that I can recover accidental deletions.
 
 #### Acceptance Criteria
+
 1. Recycle Bin view lists all deleted objects with name, type, deletion date, and original OU
 2. Search/filter within deleted objects
 3. Restore selected object(s) to original location or a specified OU
@@ -688,6 +716,7 @@ I want to view and manage AD contact and printer objects,
 so that DSPanel covers all common AD object types.
 
 #### Acceptance Criteria
+
 1. Contacts appear in search results with a distinct icon
 2. Contact detail view shows: name, email, phone, company, description
 3. CRUD operations on contacts (create, edit, delete) for AccountOperator+
@@ -702,6 +731,7 @@ I want to view and update user thumbnail photos in AD,
 so that directory photos stay current.
 
 #### Acceptance Criteria
+
 1. User detail view displays current thumbnail photo (or placeholder if none)
 2. "Change Photo" button allows uploading a new image (JPG/PNG)
 3. Image is resized to AD-appropriate dimensions (96x96 max) before upload
@@ -716,6 +746,7 @@ I want DSPanel to snapshot an AD object before any modification,
 so that I can rollback changes if something goes wrong.
 
 #### Acceptance Criteria
+
 1. Before any write operation, the object's current state is captured (all attributes)
 2. Snapshots stored locally with timestamp, object DN, and operation type
 3. "History" tab on object detail shows previous snapshots
@@ -737,6 +768,7 @@ I want to see the health status of all domain controllers at a glance,
 so that I can proactively identify infrastructure issues.
 
 #### Acceptance Criteria
+
 1. Infrastructure view lists all DCs with status cards
 2. Each DC card shows: DNS status, AD services (NTDS, Netlogon, KDC), SYSVOL state, disk space, LDAP response time
 3. Status color coding: green (healthy), yellow (warning), red (critical)
@@ -751,6 +783,7 @@ I want to see replication status between all domain controllers,
 so that I can detect and troubleshoot replication issues.
 
 #### Acceptance Criteria
+
 1. Replication view shows all replication partnerships
 2. Each partnership displays: source DC, target DC, last sync time, sync status, error count
 3. Failed replications highlighted in red with error details
@@ -764,7 +797,8 @@ I want to verify AD DNS records and Kerberos clock synchronization,
 so that I can prevent authentication issues.
 
 #### Acceptance Criteria
-1. DNS check validates _ldap._tcp, _kerberos._tcp, and other critical SRV records
+
+1. DNS check validates \_ldap.\_tcp, \_kerberos.\_tcp, and other critical SRV records
 2. Results show expected vs actual records with pass/fail status
 3. Kerberos check queries time offset between DCs and reports clock skew
 4. Warning threshold configurable (default: 5 minutes skew)
@@ -777,6 +811,7 @@ I want to see real-time status of a remote workstation,
 so that I can diagnose performance issues without RDP.
 
 #### Acceptance Criteria
+
 1. Accessible from computer lookup view
 2. Displays: CPU usage, RAM usage, active user sessions, running services, disk space per volume
 3. Data retrieved via WMI/CIM (requires network access to target machine)
@@ -790,6 +825,7 @@ I want to see a visual map of AD sites, domain controllers, and replication link
 so that I understand the infrastructure layout at a glance.
 
 #### Acceptance Criteria
+
 1. Visual graph/map showing AD sites as regions and DCs as nodes
 2. Replication links shown as edges with status color coding
 3. Site link costs and replication intervals displayed on edges
@@ -810,6 +846,7 @@ I want a dedicated view monitoring all privileged accounts,
 so that I can ensure high-privilege accounts are properly secured.
 
 #### Acceptance Criteria
+
 1. Lists members of Domain Admins, Enterprise Admins, Schema Admins, and other configurable privileged groups
 2. For each account: last logon, password age, password expires flag, enabled status
 3. Alerts for: password older than 90 days, password never expires on admin account, never logged on, disabled but still in privileged group
@@ -824,6 +861,7 @@ I want a single risk score summarizing the security posture of my AD domain,
 so that I can track improvements over time.
 
 #### Acceptance Criteria
+
 1. Risk score computed from weighted factors: privileged account hygiene, password policy compliance, stale accounts, dangerous configurations
 2. Score displayed as gauge (0-100) with color zones (green/yellow/orange/red)
 3. Breakdown showing individual factor scores with explanations
@@ -838,6 +876,7 @@ I want DSPanel to detect common AD attacks based on event log analysis,
 so that I can identify potential security breaches.
 
 #### Acceptance Criteria
+
 1. Monitors for: Golden Ticket indicators (TGT with unusual lifetime), DCSync (DS-Replication-Get-Changes requests from non-DC), DCShadow (rogue DC registration), abnormal Kerberos activity
 2. Detection based on Windows Security Event Log analysis (event IDs 4768, 4769, 4662, etc.)
 3. Alerts displayed in security dashboard with severity, timestamp, source, and description
@@ -852,6 +891,7 @@ I want to visualize privilege escalation paths in my AD,
 so that I can identify and remediate dangerous permission chains.
 
 #### Acceptance Criteria
+
 1. Graph visualization showing paths from standard user groups to privileged groups
 2. Paths consider: direct membership, nested groups, group ownership, delegation permissions
 3. Nodes represent groups/users, edges represent relationships
@@ -872,6 +912,7 @@ I want to export any search results, group memberships, or reports to CSV or PDF
 so that I can share data with colleagues and document findings.
 
 #### Acceptance Criteria
+
 1. Export button available in all list/table views (search results, group members, comparison, reports)
 2. CSV export with proper encoding (UTF-8 BOM) and delimiter options
 3. PDF export with headers, timestamps, and page numbers
@@ -885,6 +926,7 @@ I want to schedule recurring reports (inactive accounts, expired passwords, empt
 so that I receive regular hygiene reports without manual effort.
 
 #### Acceptance Criteria
+
 1. Report scheduler UI: select report type, frequency (daily/weekly/monthly), output format, destination (local folder or email)
 2. Available report types: inactive accounts (configurable threshold), expired passwords, password never expires, empty groups, orphaned computer accounts, privileged account summary
 3. Reports run in background (Windows Task Scheduler integration or in-app scheduler)
@@ -898,6 +940,7 @@ I want to automate cleanup of stale accounts based on configurable criteria,
 so that AD stays clean without manual intervention.
 
 #### Acceptance Criteria
+
 1. Cleanup rules: inactive for X days, never logged on + created more than Y days ago, disabled for more than Z days
 2. Actions: disable, move to cleanup OU, delete (escalating severity)
 3. Mandatory dry-run preview showing all affected objects before execution
@@ -912,6 +955,7 @@ I want predefined compliance report templates (GDPR, HIPAA, SOX),
 so that I can generate audit-ready reports for compliance reviews.
 
 #### Acceptance Criteria
+
 1. Template library with predefined compliance report types
 2. Each template specifies which data points to collect and how to present them
 3. Generated reports include: executive summary, findings, evidence tables, recommendations
@@ -932,6 +976,7 @@ I want to search and review all actions performed in DSPanel,
 so that I can verify compliance and investigate incidents.
 
 #### Acceptance Criteria
+
 1. Audit log view with searchable/filterable table: timestamp, user, action type, target object, details, result (success/failure)
 2. Log stored locally (SQLite database)
 3. Filters: date range, user, action type, target object
@@ -946,6 +991,7 @@ I want to see a timeline of changes made to any AD object,
 so that I can investigate "what changed and when" for troubleshooting.
 
 #### Acceptance Criteria
+
 1. "History" tab on any AD object detail view
 2. Timeline shows attribute changes with timestamps, before/after values
 3. Data sourced from AD replication metadata (msDS-ReplAttributeMetaData)
@@ -959,6 +1005,7 @@ I want to define automation rules (if X then Y) on AD changes,
 so that routine operations happen automatically.
 
 #### Acceptance Criteria
+
 1. Rule editor UI: trigger condition + action(s)
 2. Trigger types: object created in OU, object moved to OU, group membership changed, attribute changed
 3. Action types: apply preset, add/remove from group, send notification, execute script
@@ -974,6 +1021,7 @@ I want to execute external scripts (PowerShell/exe) with the selected AD object'
 so that I can extend DSPanel with custom actions.
 
 #### Acceptance Criteria
+
 1. "Run Script" context menu on any AD object
 2. Script library configurable in settings (path to folder with approved scripts)
 3. Object attributes passed to script as parameters (SAMAccountName, DN, email, etc.)
@@ -989,6 +1037,7 @@ I want to receive notifications (Teams, Slack, email) on configurable events,
 so that I am alerted to important AD changes without watching DSPanel.
 
 #### Acceptance Criteria
+
 1. Notification configuration UI: event type + channel + recipients
 2. Supported channels: webhook URL (Teams/Slack), SMTP email
 3. Configurable events: account lockout, privileged group change, security alert, automation rule triggered
@@ -1003,6 +1052,7 @@ I want to see which GPOs apply to a user, computer, or OU,
 so that I can troubleshoot Group Policy issues.
 
 #### Acceptance Criteria
+
 1. GPO panel accessible from user/computer/OU detail views
 2. Lists all GPOs applying to the selected scope (linked + inherited)
 3. Shows GPO name, link order, enforcement status, WMI filter
@@ -1024,6 +1074,7 @@ I want to define custom permission profiles in DSPanel beyond the 4 default leve
 so that I can precisely control who can do what, per OU if needed.
 
 #### Acceptance Criteria
+
 1. RBAC configuration UI in settings (DomainAdmin only)
 2. Custom profiles: name, base level, feature overrides (enable/disable specific actions)
 3. OU-scoped permissions: a profile can be restricted to specific OUs
@@ -1039,6 +1090,7 @@ I want a centralized settings view to configure all DSPanel options,
 so that I can customize the tool to my environment.
 
 #### Acceptance Criteria
+
 1. Settings organized by category: Connection, Presets, Security, Notifications, Reports, Appearance
 2. Connection: domain override, preferred DC, Graph tenant/app config
 3. Presets: storage path configuration
@@ -1054,6 +1106,7 @@ I want DSPanel to notify me when a newer version is available,
 so that I stay up to date.
 
 #### Acceptance Criteria
+
 1. At startup, check GitHub Releases API for the latest version
 2. If newer version available, show a non-blocking notification bar with version number and release notes link
 3. "Download" button opens the GitHub release page in browser
@@ -1068,6 +1121,7 @@ I want DSPanel to be available in French,
 so that I can use the tool in my preferred language.
 
 #### Acceptance Criteria
+
 1. All user-facing strings externalized to .resx resource files
 2. English (en) as default language
 3. French (fr) translation provided
@@ -1082,6 +1136,7 @@ I want DSPanel to feel polished and professional,
 so that it inspires confidence for daily production use.
 
 #### Acceptance Criteria
+
 1. Dark and light theme with proper contrast in all views
 2. Keyboard shortcuts for common actions (Ctrl+F search, Ctrl+R refresh, etc.)
 3. Loading indicators on all async operations

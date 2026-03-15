@@ -104,7 +104,9 @@ describe("HomePage", () => {
   });
 
   it("displays Permissions card with correct level", () => {
-    render(<HomePage status={makeStatus({ permissionLevel: "DomainAdmin" })} />);
+    render(
+      <HomePage status={makeStatus({ permissionLevel: "DomainAdmin" })} />,
+    );
     expect(screen.getByText("Permissions")).toBeInTheDocument();
     expect(screen.getByText("Domain Admin")).toBeInTheDocument();
   });
@@ -173,9 +175,7 @@ describe("HomePage", () => {
     fireEvent.click(screen.getByTestId("mfa-complete"));
 
     await waitFor(() => {
-      expect(
-        screen.queryByTestId("mfa-setup-dialog"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("mfa-setup-dialog")).not.toBeInTheDocument();
     });
   });
 
@@ -193,9 +193,7 @@ describe("HomePage", () => {
     fireEvent.click(screen.getByTestId("mfa-cancel"));
 
     await waitFor(() => {
-      expect(
-        screen.queryByTestId("mfa-setup-dialog"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("mfa-setup-dialog")).not.toBeInTheDocument();
     });
   });
 
@@ -231,9 +229,7 @@ describe("HomePage", () => {
 
   it("does not display groups section when userGroups is empty", () => {
     render(<HomePage status={makeStatus({ userGroups: [] })} />);
-    expect(
-      screen.queryByText("AD Group Memberships"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText("AD Group Memberships")).not.toBeInTheDocument();
   });
 
   it("shows disconnected hint when not connected", () => {

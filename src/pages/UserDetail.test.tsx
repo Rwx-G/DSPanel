@@ -148,9 +148,7 @@ describe("UserDetail", () => {
 
   it("shows Disabled status badge for disabled user", () => {
     render(
-      <UserDetail
-        {...makeProps({ user: makeUser({ enabled: false }) })}
-      />,
+      <UserDetail {...makeProps({ user: makeUser({ enabled: false }) })} />,
     );
     const badges = screen.getAllByText("Disabled");
     expect(badges.length).toBeGreaterThanOrEqual(1);
@@ -158,18 +156,14 @@ describe("UserDetail", () => {
 
   it("shows Locked badge when user is locked out", () => {
     render(
-      <UserDetail
-        {...makeProps({ user: makeUser({ lockedOut: true }) })}
-      />,
+      <UserDetail {...makeProps({ user: makeUser({ lockedOut: true }) })} />,
     );
     expect(screen.getByText("Locked")).toBeInTheDocument();
   });
 
   it("does not show Locked badge when user is not locked out", () => {
     render(
-      <UserDetail
-        {...makeProps({ user: makeUser({ lockedOut: false }) })}
-      />,
+      <UserDetail {...makeProps({ user: makeUser({ lockedOut: false }) })} />,
     );
     expect(screen.queryByText("Locked")).not.toBeInTheDocument();
   });
@@ -423,9 +417,7 @@ describe("UserDetail", () => {
     fireEvent.click(screen.getByText("View group members"));
 
     await waitFor(() => {
-      expect(
-        screen.getByTestId("group-members-dialog"),
-      ).toBeInTheDocument();
+      expect(screen.getByTestId("group-members-dialog")).toBeInTheDocument();
     });
   });
 
@@ -444,9 +436,7 @@ describe("UserDetail", () => {
     fireEvent.click(screen.getByText("View group members"));
 
     await waitFor(() => {
-      expect(
-        screen.getByTestId("group-members-dialog"),
-      ).toBeInTheDocument();
+      expect(screen.getByTestId("group-members-dialog")).toBeInTheDocument();
     });
 
     fireEvent.click(screen.getByTestId("close-group-dialog"));
@@ -466,9 +456,7 @@ describe("UserDetail", () => {
         })}
       />,
     );
-    expect(
-      screen.getByText("2026-12-31T00:00:00Z"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("2026-12-31T00:00:00Z")).toBeInTheDocument();
   });
 
   it("displays password never expires Yes when flag is set", () => {

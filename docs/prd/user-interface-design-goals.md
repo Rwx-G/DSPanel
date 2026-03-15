@@ -49,4 +49,3 @@ The application shall meet WCAG AA standards for accessibility: keyboard navigat
 - No mobile (potential future expansion noted in brief)
 
 ---
-

@@ -20,10 +20,16 @@ evidence:
     ac_gaps: []
 
 nfr_validation:
-  security: { status: PASS, notes: "Rate limiting. Secret DPAPI-encrypted at rest. MFA gate wired to actions." }
+  security:
+    {
+      status: PASS,
+      notes: "Rate limiting. Secret DPAPI-encrypted at rest. MFA gate wired to actions.",
+    }
   performance: { status: PASS, notes: "TOTP verification sub-millisecond." }
-  reliability: { status: PASS, notes: "Secret survives restart. Backup codes persisted." }
-  maintainability: { status: PASS, notes: "useMfaGate hook reusable across all components." }
+  reliability:
+    { status: PASS, notes: "Secret survives restart. Backup codes persisted." }
+  maintainability:
+    { status: PASS, notes: "useMfaGate hook reusable across all components." }
 
 history:
   - at: "2026-03-14T14:30:00Z"

@@ -224,7 +224,8 @@ describe("NtfsAnalyzer", () => {
   it("calls exportCsv when CSV button is clicked", async () => {
     mockInvoke.mockImplementation(((cmd: string) => {
       if (cmd === "analyze_ntfs") return Promise.resolve(MOCK_RESULT);
-      if (cmd === "save_file_dialog") return Promise.resolve("/path/to/file.csv");
+      if (cmd === "save_file_dialog")
+        return Promise.resolve("/path/to/file.csv");
       return Promise.resolve(null);
     }) as typeof invoke);
 
@@ -509,7 +510,9 @@ describe("NtfsAnalyzer", () => {
 
     // Find and click the trustee expand button within the path section
     const pathSection = screen.getByTestId("path-section-\\\\server\\share");
-    const expandBtns = pathSection.querySelectorAll('[data-testid^="trustee-expand-"]');
+    const expandBtns = pathSection.querySelectorAll(
+      '[data-testid^="trustee-expand-"]',
+    );
     expect(expandBtns.length).toBeGreaterThan(0);
 
     fireEvent.click(expandBtns[0]);

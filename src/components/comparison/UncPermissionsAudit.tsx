@@ -60,10 +60,7 @@ function AccessIcon({
     case "NoMatch":
       return (
         <span title={title} data-testid="access-nomatch">
-          <Minus
-            size={14}
-            className="text-[var(--color-text-secondary)]"
-          />
+          <Minus size={14} className="text-[var(--color-text-secondary)]" />
         </span>
       );
   }
@@ -317,14 +314,22 @@ export function UncPermissionsAudit({
                           <td className="px-3 py-2 text-center">
                             <AccessIcon
                               indicator={ref.userAAccess}
-                              userName={userA.displayName ?? userA.samAccountName ?? "User A"}
+                              userName={
+                                userA.displayName ??
+                                userA.samAccountName ??
+                                "User A"
+                              }
                               trusteeName={ace.trusteeDisplayName}
                             />
                           </td>
                           <td className="px-3 py-2 text-center">
                             <AccessIcon
                               indicator={ref.userBAccess}
-                              userName={userB.displayName ?? userB.samAccountName ?? "User B"}
+                              userName={
+                                userB.displayName ??
+                                userB.samAccountName ??
+                                "User B"
+                              }
                               trusteeName={ace.trusteeDisplayName}
                             />
                           </td>

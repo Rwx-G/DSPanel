@@ -301,9 +301,7 @@ describe("PasswordGenerator", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("hibp-info-popup")).toBeInTheDocument();
-      expect(
-        screen.getByText(/Have I Been Pwned/),
-      ).toBeInTheDocument();
+      expect(screen.getByText(/Have I Been Pwned/)).toBeInTheDocument();
     });
   });
 

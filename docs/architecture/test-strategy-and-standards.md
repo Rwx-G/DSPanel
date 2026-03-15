@@ -17,6 +17,7 @@
 - **Coverage Requirement**: 90%+ on services/, best-effort on commands/
 
 **AI Agent Requirements:**
+
 - Test all public functions
 - Cover edge cases and error conditions
 - Follow arrange/act/assert pattern
@@ -32,6 +33,7 @@
 - **Coverage Requirement**: Best-effort on pages, good coverage on hooks and utility functions
 
 **AI Agent Requirements:**
+
 - Test custom hooks with `renderHook()`
 - Test components with user-centric queries (`getByRole`, `getByText`)
 - Mock Tauri `invoke()` calls in tests

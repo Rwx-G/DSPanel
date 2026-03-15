@@ -18,9 +18,8 @@ Existing commercial solutions (ManageEngine, Quest, Netwrix) cover parts of the 
 
 ### Change Log
 
-| Date | Version | Description | Author |
-|------|---------|-------------|--------|
-| 2026-03-10 | 0.1 | Initial PRD draft | Romain G. |
+| Date       | Version | Description       | Author    |
+| ---------- | ------- | ----------------- | --------- |
+| 2026-03-10 | 0.1     | Initial PRD draft | Romain G. |
 
 ---
-

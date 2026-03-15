@@ -9,7 +9,8 @@ I want to see Exchange on-prem mailbox information in the user lookup view,
 so that I can diagnose mail issues without opening the Exchange console.
 
 #### Acceptance Criteria
-1. Exchange panel appears in user detail view when msExch* attributes are detected
+
+1. Exchange panel appears in user detail view when msExch\* attributes are detected
 2. Displays: mailbox name, email aliases (proxyAddresses), forwarding address, mailbox type
 3. Displays delegations (msExchDelegateListBL) if present
 4. Panel is hidden when no Exchange attributes exist (graceful degradation)
@@ -22,6 +23,7 @@ I want to see Exchange Online mailbox information for hybrid/cloud users,
 so that I can diagnose mail issues for O365 users.
 
 #### Acceptance Criteria
+
 1. Graph provider detects Exchange Online mailbox for the user
 2. Displays: mailbox name, email aliases, forwarding rules, mailbox quota/usage, delegations
 3. Requires Azure AD App Registration with Mail.Read permissions
@@ -30,4 +32,3 @@ so that I can diagnose mail issues for O365 users.
 6. All data is read-only
 
 ---
-

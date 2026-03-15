@@ -9,6 +9,7 @@ I want to define custom permission profiles in DSPanel beyond the 4 default leve
 so that I can precisely control who can do what, per OU if needed.
 
 #### Acceptance Criteria
+
 1. RBAC configuration UI in settings (DomainAdmin only)
 2. Custom profiles: name, base level, feature overrides (enable/disable specific actions)
 3. OU-scoped permissions: a profile can be restricted to specific OUs
@@ -24,6 +25,7 @@ I want a centralized settings view to configure all DSPanel options,
 so that I can customize the tool to my environment.
 
 #### Acceptance Criteria
+
 1. Settings organized by category: Connection, Presets, Security, Notifications, Reports, Appearance
 2. Connection: domain override, preferred DC, Graph tenant/app config
 3. Presets: storage path configuration
@@ -39,6 +41,7 @@ I want DSPanel to notify me when a newer version is available,
 so that I stay up to date.
 
 #### Acceptance Criteria
+
 1. At startup, check GitHub Releases API for the latest version
 2. If newer version available, show a non-blocking notification bar with version number and release notes link
 3. "Download" button opens the GitHub release page in browser
@@ -53,6 +56,7 @@ I want DSPanel to be available in French,
 so that I can use the tool in my preferred language.
 
 #### Acceptance Criteria
+
 1. All user-facing strings externalized to JSON translation files (i18next)
 2. English (en) as default language
 3. French (fr) translation provided
@@ -67,6 +71,7 @@ I want DSPanel to feel polished and professional,
 so that it inspires confidence for daily production use.
 
 #### Acceptance Criteria
+
 1. Dark and light theme with proper contrast in all views
 2. Keyboard shortcuts for common actions (Ctrl+F search, Ctrl+R refresh, etc.)
 3. Loading indicators on all async operations
@@ -76,4 +81,3 @@ so that it inspires confidence for daily production use.
 7. About dialog with version, license, and links
 
 ---
-

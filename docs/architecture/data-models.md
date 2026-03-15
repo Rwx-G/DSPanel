@@ -7,6 +7,7 @@ All backend data models are Rust structs with `serde::Serialize` and `serde::Des
 **Purpose**: Represents an Active Directory user account with all attributes needed for lookup, healthcheck, comparison, and actions.
 
 **Key Attributes (Rust struct):**
+
 - sam_account_name: String - Primary login identifier
 - user_principal_name: String - UPN (user@domain.com)
 - display_name: String - Full display name
@@ -30,6 +31,7 @@ All backend data models are Rust structs with `serde::Serialize` and `serde::Des
 - thumbnail_photo: Option<Vec<u8>> - Profile photo
 
 **Relationships:**
+
 - Member of multiple DirectoryGroup objects
 - Located in one OrganizationalUnit
 - Optionally has ExchangeMailbox info
@@ -39,6 +41,7 @@ All backend data models are Rust structs with `serde::Serialize` and `serde::Des
 **Purpose**: Represents an AD computer account.
 
 **Key Attributes (Rust struct):**
+
 - name: String - Computer name
 - dns_host_name: String - FQDN
 - distinguished_name: String - Full DN
@@ -51,6 +54,7 @@ All backend data models are Rust structs with `serde::Serialize` and `serde::Des
 - ipv4_address: Option<String> - Resolved IP
 
 **Relationships:**
+
 - Member of multiple DirectoryGroup objects
 - Located in one OrganizationalUnit
 
@@ -59,6 +63,7 @@ All backend data models are Rust structs with `serde::Serialize` and `serde::Des
 **Purpose**: Represents an AD security or distribution group.
 
 **Key Attributes (Rust struct):**
+
 - name: String - Group name
 - distinguished_name: String - Full DN
 - description: String - Group description
@@ -69,6 +74,7 @@ All backend data models are Rust structs with `serde::Serialize` and `serde::Des
 - member_count: i32 - Total member count
 
 **Relationships:**
+
 - Contains multiple DirectoryUser, DirectoryComputer, or nested DirectoryGroup members
 - Can be member of other DirectoryGroup objects
 
@@ -77,6 +83,7 @@ All backend data models are Rust structs with `serde::Serialize` and `serde::Des
 **Purpose**: Read-only Exchange mailbox diagnostic data (on-prem or online).
 
 **Key Attributes (Rust struct):**
+
 - mailbox_name: String - Display name
 - primary_smtp_address: String - Primary email
 - aliases: Vec<String> - All proxy addresses
@@ -92,6 +99,7 @@ All backend data models are Rust structs with `serde::Serialize` and `serde::Des
 **Purpose**: Declarative template for onboarding/offboarding operations.
 
 **Key Attributes (Rust struct):**
+
 - id: Uuid - Unique identifier
 - name: String - Preset display name
 - description: String - What this preset does
@@ -105,6 +113,7 @@ All backend data models are Rust structs with `serde::Serialize` and `serde::Des
 - modified_at: DateTime - Last modification
 
 **Relationships:**
+
 - References multiple DirectoryGroup objects
 - References one target OrganizationalUnit
 
@@ -113,6 +122,7 @@ All backend data models are Rust structs with `serde::Serialize` and `serde::Des
 **Purpose**: Internal DSPanel action log entry stored in SQLite.
 
 **Key Attributes (Rust struct):**
+
 - id: i64 - Auto-increment ID
 - timestamp: DateTime - When the action occurred
 - user_name: String - DSPanel operator (OS account)
@@ -127,6 +137,7 @@ All backend data models are Rust structs with `serde::Serialize` and `serde::Des
 **Purpose**: Point-in-time capture of an AD object's attributes for backup/restore.
 
 **Key Attributes (Rust struct):**
+
 - id: i64 - Auto-increment ID
 - timestamp: DateTime - Snapshot time
 - object_dn: String - Distinguished name
@@ -140,6 +151,7 @@ All backend data models are Rust structs with `serde::Serialize` and `serde::Des
 **Purpose**: Trigger-based automation rule definition.
 
 **Key Attributes (Rust struct):**
+
 - id: Uuid - Unique identifier
 - name: String - Rule name
 - is_enabled: bool - Active state
@@ -158,22 +170,22 @@ Example:
 ```typescript
 // src/types/directory.ts
 export interface DirectoryUser {
-  samAccountName: string;
-  userPrincipalName: string;
-  displayName: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  department: string;
-  title: string;
-  distinguishedName: string;
-  organizationalUnit: string;
-  isEnabled: boolean;
-  isLockedOut: boolean;
-  lastLogon: string | null;
-  memberOf: string[];
-  healthStatus: AccountHealthStatus;
-  // ... etc.
+    samAccountName: string;
+    userPrincipalName: string;
+    displayName: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    department: string;
+    title: string;
+    distinguishedName: string;
+    organizationalUnit: string;
+    isEnabled: boolean;
+    isLockedOut: boolean;
+    lastLogon: string | null;
+    memberOf: string[];
+    healthStatus: AccountHealthStatus;
+    // ... etc.
 }
 ```
 

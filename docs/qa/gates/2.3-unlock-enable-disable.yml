@@ -18,9 +18,11 @@ evidence:
     ac_gaps: []
 
 nfr_validation:
-  security: { status: PASS, notes: "Permission check + MFA gate on disable + audit." }
+  security:
+    { status: PASS, notes: "Permission check + MFA gate on disable + audit." }
   performance: { status: PASS, notes: "Single LDAP modify per action." }
-  reliability: { status: PASS, notes: "Snapshot before modify. onRefresh re-queries AD." }
+  reliability:
+    { status: PASS, notes: "Snapshot before modify. onRefresh re-queries AD." }
   maintainability: { status: PASS, notes: "Reusable handleAction pattern." }
 
 history:

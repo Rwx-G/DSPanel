@@ -18,19 +18,19 @@ Defined in light-theme.css / dark-theme.css as CSS custom properties.
 
 ### Level 2 - Semantic Tokens (functional role)
 
-| Token | Light | Dark | Notes |
-|-------|-------|------|-------|
-| Background.Primary | #FAFAFA-#FFFFFF | #121212-#1E1E1E | Never pure #000 |
-| Background.Surface | #FFFFFF | #1E1E1E-#1F2937 | Cards, elevated |
-| Background.Elevated | #FFFFFF | #2D2D2D-#374151 | Dropdowns, dialogs |
-| Text.Primary | #1A1A1A-#212121 | #E0E0E0-#F5F5F5 | Never pure #FFF |
-| Text.Secondary | #666666-#757575 | #A0A0A0-#B0B0B0 | Labels, captions |
-| Border.Default | #E0E0E0 | #374151-#3D3D3D | Visible separator |
-| Border.Subtle | #F0F0F0 | #2D2D2D | Very light separator |
-| Status.Error | #D32F2F | #EF5350 | Slightly lighter in dark |
-| Status.Success | #2E7D32 | #66BB6A | Slightly lighter in dark |
-| Status.Warning | #ED6C02 | #FFA726 | Slightly lighter in dark |
-| Interactive.Primary | #0066CC | #5C9CE6 | Links, accent |
+| Token               | Light           | Dark            | Notes                    |
+| ------------------- | --------------- | --------------- | ------------------------ |
+| Background.Primary  | #FAFAFA-#FFFFFF | #121212-#1E1E1E | Never pure #000          |
+| Background.Surface  | #FFFFFF         | #1E1E1E-#1F2937 | Cards, elevated          |
+| Background.Elevated | #FFFFFF         | #2D2D2D-#374151 | Dropdowns, dialogs       |
+| Text.Primary        | #1A1A1A-#212121 | #E0E0E0-#F5F5F5 | Never pure #FFF          |
+| Text.Secondary      | #666666-#757575 | #A0A0A0-#B0B0B0 | Labels, captions         |
+| Border.Default      | #E0E0E0         | #374151-#3D3D3D | Visible separator        |
+| Border.Subtle       | #F0F0F0         | #2D2D2D         | Very light separator     |
+| Status.Error        | #D32F2F         | #EF5350         | Slightly lighter in dark |
+| Status.Success      | #2E7D32         | #66BB6A         | Slightly lighter in dark |
+| Status.Warning      | #ED6C02         | #FFA726         | Slightly lighter in dark |
+| Interactive.Primary | #0066CC         | #5C9CE6         | Links, accent            |
 
 ### Level 3 - Component Tokens
 
@@ -68,21 +68,21 @@ Map semantic tokens to specific components (sidebar.background, tab.active.borde
 - **Result design**: Highlight matched terms, group by object type, show total count
 - **Keyboard nav**: Arrow keys through results, Enter to open, auto-focus first result
 - **States**:
-  - Loading: Skeleton loader in results area (not global spinner)
-  - Empty: Helpful message with search tips ("Try searching by email, SID, or display name")
-  - Error: Clear message with Retry button ("Cannot reach domain controller")
-  - Scope: Show search scope indicator
+    - Loading: Skeleton loader in results area (not global spinner)
+    - Empty: Helpful message with search tips ("Try searching by email, SID, or display name")
+    - Error: Clear message with Retry button ("Cannot reach domain controller")
+    - Scope: Show search scope indicator
 - **Future**: Command palette (Ctrl+K) with prefixes (u: users, c: computers, g: groups)
 
 ## Data-Dense Views (Property Grids)
 
 - **Sections collapsible by category**:
-  - Identity (displayName, sAMAccountName, UPN, SID)
-  - Contact (mail, phone, office)
-  - Organization (title, department, manager, company)
-  - Account (enabled, locked, password expiry, last logon)
-  - Group Membership (list with count)
-  - Advanced (DN, GUID, whenCreated, whenChanged)
+    - Identity (displayName, sAMAccountName, UPN, SID)
+    - Contact (mail, phone, office)
+    - Organization (title, department, manager, company)
+    - Account (enabled, locked, password expiry, last logon)
+    - Group Membership (list with count)
+    - Advanced (DN, GUID, whenCreated, whenChanged)
 - **Critical fields first**: Top 4-5 attributes (enabled, locked, password status) with colored badges
 - **Two-column layout**: Label (right-aligned, muted) | Value (left-aligned, full color)
 - **Copy-on-click**: Every value copiable, checkmark feedback for 1.5s
@@ -91,25 +91,27 @@ Map semantic tokens to specific components (sidebar.background, tab.active.borde
 
 ## Status & Health Indicators
 
-| Color | Meaning | Icon | Use in DSPanel |
-|-------|---------|------|----------------|
-| Green | Success | Checkmark circle | DC connected, replication OK |
-| Blue | Info | Info circle | Sync in progress |
-| Yellow | Warning | Warning triangle | Certificate expiring soon |
-| Red | Error | X circle | DC unreachable, replication failed |
-| Gray | Unknown | Dash circle | Status undetermined |
+| Color  | Meaning | Icon             | Use in DSPanel                     |
+| ------ | ------- | ---------------- | ---------------------------------- |
+| Green  | Success | Checkmark circle | DC connected, replication OK       |
+| Blue   | Info    | Info circle      | Sync in progress                   |
+| Yellow | Warning | Warning triangle | Certificate expiring soon          |
+| Red    | Error   | X circle         | DC unreachable, replication failed |
+| Gray   | Unknown | Dash circle      | Status undetermined                |
 
 **Rule**: Never use color alone. Always combine color + icon + text (minimum 3 of 4 indicators).
 
 ## Feedback & Notifications
 
 ### Toast Notifications (Snackbars)
+
 - Position: Bottom-right, stackable, auto-dismiss after 5s
 - Include "Undo" button for reversible actions
 - Types: Success (green), Error (red), Warning (orange), Info (blue)
 - Non-blocking: User can continue working
 
 ### Confirmation Dialogs
+
 - Reserve for **irreversible destructive actions only** (delete OU, reset password, bulk delete)
 - Explicit text: "Reset password for John Doe (jdoe)?" not "Are you sure?"
 - Action button named specifically: "Reset Password" not "OK"
@@ -117,6 +119,7 @@ Map semantic tokens to specific components (sidebar.background, tab.active.borde
 - For bulk destructive: require typing count or keyword to confirm
 
 ### Micro-interactions
+
 - Button press: Instant visual change (darken, scale 0.98)
 - Copy-to-clipboard: Copy icon -> checkmark green 1.5s -> back to copy icon
 - Toggle: 150ms transition for switches
@@ -134,12 +137,12 @@ Map semantic tokens to specific components (sidebar.background, tab.active.borde
 - **Focus indicators**: 2px outline, 3:1 contrast minimum
 - **aria-label**: On every interactive element (buttons, inputs, links)
 - **Shortcuts documented**: F1 or ? shows shortcut list
-  - Ctrl+K: Search
-  - Ctrl+B: Toggle sidebar
-  - Ctrl+W: Close tab
-  - Ctrl+Shift+T: Reopen tab
-  - F5: Refresh
-  - Escape: Close dialog/cancel
+    - Ctrl+K: Search
+    - Ctrl+B: Toggle sidebar
+    - Ctrl+W: Close tab
+    - Ctrl+Shift+T: Reopen tab
+    - F5: Refresh
+    - Escape: Close dialog/cancel
 - **High contrast**: Test with Windows High Contrast mode
 - **Minimum text size**: 12px secondary, 14px primary
 
@@ -155,6 +158,7 @@ Map semantic tokens to specific components (sidebar.background, tab.active.borde
 ## Implementation Priority
 
 ### High impact, low effort
+
 1. Copy-to-clipboard on all AD values
 2. Sidebar active state indicator (vertical bar)
 3. Focus indicators + keyboard navigation
@@ -163,12 +167,14 @@ Map semantic tokens to specific components (sidebar.background, tab.active.borde
 6. Toast notifications with Undo
 
 ### High impact, medium effort
+
 7. Search with debounce + fuzzy match + keyboard nav
 8. Sidebar state persistence
 9. Tab overflow + context menu
 10. Health dashboard improvements
 
 ### High impact, high effort
+
 11. Command palette (Ctrl+K)
 12. Virtualized lists (react-window/react-virtuoso)
 13. High contrast mode mapping

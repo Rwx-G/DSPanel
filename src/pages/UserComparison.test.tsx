@@ -244,7 +244,14 @@ describe("UserComparison", () => {
         return null;
       }
       if (cmd === "compare_users") return MOCK_COMPARISON;
-      if (cmd === "analyze_ntfs") return { paths: [], conflicts: [], totalAces: 0, totalPathsScanned: 0, totalErrors: 0 };
+      if (cmd === "analyze_ntfs")
+        return {
+          paths: [],
+          conflicts: [],
+          totalAces: 0,
+          totalPathsScanned: 0,
+          totalErrors: 0,
+        };
       return null;
     });
 
@@ -365,12 +372,8 @@ describe("UserComparison", () => {
   it("renders UNC permissions section after comparison", async () => {
     await renderWithComparison();
 
-    expect(
-      screen.getByTestId("unc-permissions-section"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText("UNC Path Permissions Audit"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("unc-permissions-section")).toBeInTheDocument();
+    expect(screen.getByText("UNC Path Permissions Audit")).toBeInTheDocument();
   });
 
   it("toggles UNC info popup on button click", async () => {

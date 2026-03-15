@@ -11,25 +11,25 @@
 
 #### Rust
 
-| Element | Convention | Example |
-|---------|-----------|---------|
-| Modules | snake_case | `directory_provider` |
-| Structs/Enums | PascalCase | `DirectoryUser`, `PermissionLevel` |
-| Functions | snake_case | `search_users`, `compute_risk_score` |
-| Constants | SCREAMING_SNAKE_CASE | `MAX_RETRY_COUNT` |
-| Trait names | PascalCase | `DirectoryProvider` |
-| Fields | snake_case | `sam_account_name` |
+| Element       | Convention           | Example                              |
+| ------------- | -------------------- | ------------------------------------ |
+| Modules       | snake_case           | `directory_provider`                 |
+| Structs/Enums | PascalCase           | `DirectoryUser`, `PermissionLevel`   |
+| Functions     | snake_case           | `search_users`, `compute_risk_score` |
+| Constants     | SCREAMING_SNAKE_CASE | `MAX_RETRY_COUNT`                    |
+| Trait names   | PascalCase           | `DirectoryProvider`                  |
+| Fields        | snake_case           | `sam_account_name`                   |
 
 #### TypeScript / React
 
-| Element | Convention | Example |
-|---------|-----------|---------|
-| Components | PascalCase | `UserLookupPage`, `SearchBar` |
-| Hooks | camelCase with use prefix | `usePermission`, `useDebounce` |
-| Interfaces/Types | PascalCase | `DirectoryUser`, `AuditLogEntry` |
-| Functions/variables | camelCase | `searchUsers`, `isLoading` |
-| Constants | SCREAMING_SNAKE_CASE or camelCase | `MAX_PAGE_SIZE` |
-| CSS classes | kebab-case (Tailwind utilities) | `text-sm`, `bg-primary` |
+| Element             | Convention                        | Example                          |
+| ------------------- | --------------------------------- | -------------------------------- |
+| Components          | PascalCase                        | `UserLookupPage`, `SearchBar`    |
+| Hooks               | camelCase with use prefix         | `usePermission`, `useDebounce`   |
+| Interfaces/Types    | PascalCase                        | `DirectoryUser`, `AuditLogEntry` |
+| Functions/variables | camelCase                         | `searchUsers`, `isLoading`       |
+| Constants           | SCREAMING_SNAKE_CASE or camelCase | `MAX_PAGE_SIZE`                  |
+| CSS classes         | kebab-case (Tailwind utilities)   | `text-sm`, `bg-primary`          |
 
 ### Critical Rules
 

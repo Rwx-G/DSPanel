@@ -10,9 +10,9 @@ N/A - This is a greenfield project scaffolded with `cargo create-tauri-app` usin
 
 ### Change Log
 
-| Date | Version | Description | Author |
-|------|---------|-------------|--------|
-| 2026-03-10 | 0.1 | Initial architecture document | Romain G. |
-| 2026-03-13 | 0.2 | Migration to Rust/Tauri v2 + React/TypeScript | Romain G. |
+| Date       | Version | Description                                   | Author    |
+| ---------- | ------- | --------------------------------------------- | --------- |
+| 2026-03-10 | 0.1     | Initial architecture document                 | Romain G. |
+| 2026-03-13 | 0.2     | Migration to Rust/Tauri v2 + React/TypeScript | Romain G. |
 
 ---

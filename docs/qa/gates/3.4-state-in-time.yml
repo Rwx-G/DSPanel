@@ -20,10 +20,20 @@ evidence:
     ac_gaps: []
 
 nfr_validation:
-  security: { status: PASS, notes: "Read-only replication data, no write operations" }
-  performance: { status: PASS, notes: "Single LDAP query, lightweight XML parsing" }
-  reliability: { status: PASS, notes: "Graceful handling of missing/malformed metadata, state reset on user change" }
-  maintainability: { status: PASS, notes: "Reusable StateInTimeView component with objectType prop ready for computer/group" }
+  security:
+    { status: PASS, notes: "Read-only replication data, no write operations" }
+  performance:
+    { status: PASS, notes: "Single LDAP query, lightweight XML parsing" }
+  reliability:
+    {
+      status: PASS,
+      notes: "Graceful handling of missing/malformed metadata, state reset on user change",
+    }
+  maintainability:
+    {
+      status: PASS,
+      notes: "Reusable StateInTimeView component with objectType prop ready for computer/group",
+    }
 
 recommendations:
   future:

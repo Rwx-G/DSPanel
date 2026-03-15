@@ -10,7 +10,7 @@
 - **FR6**: Each account lookup shall display a visual healthcheck badge showing account status flags (disabled, locked out, expired, password expired, inactive 30/90 days, never logged on, password never changed).
 - **FR7**: Account lookup shall display authentication details: failed password count, last logon timestamp, last workstation used with IP address.
 - **FR8**: Users shall be able to ping a computer (ICMP) and resolve its DNS from within the tool.
-- **FR9**: The application shall query Exchange on-prem attributes via LDAP (msExch*) to display mailbox name, aliases, forwarding, quotas, and delegations in read-only mode.
+- **FR9**: The application shall query Exchange on-prem attributes via LDAP (msExch\*) to display mailbox name, aliases, forwarding, quotas, and delegations in read-only mode.
 - **FR10**: The application shall query Exchange Online via Microsoft Graph API to display the same mailbox information in read-only mode.
 - **FR11**: Users shall be able to view login/logout event history for a user or computer.
 - **FR12**: The application shall provide lockout diagnostics: trace lockout source DC, IP address, and originating process.
@@ -42,7 +42,7 @@
 - **FR38**: The application shall create a snapshot of an AD object before any modification, allowing one-click rollback.
 - **FR39**: DomainAdmin users shall be able to view DC health: DNS status, AD services (NTDS, Netlogon, KDC), SYSVOL state, disk space, LDAP response time.
 - **FR40**: The application shall display AD replication status between DCs: sync state, errors, latency.
-- **FR41**: The application shall verify AD-related DNS records (_ldap._tcp, _kerberos._tcp SRV records).
+- **FR41**: The application shall verify AD-related DNS records (\_ldap.\_tcp, \_kerberos.\_tcp SRV records).
 - **FR42**: The application shall check Kerberos clock synchronization between DCs and workstations.
 - **FR43**: The application shall provide real-time remote workstation monitoring: CPU, RAM, active sessions, services, disk usage.
 - **FR44**: The application shall display a visual AD topology map: sites, DCs, replication links.
@@ -81,4 +81,3 @@
 - **NFR14**: The application shall gracefully degrade when features are unavailable (e.g., no Exchange attributes found - hide Exchange panel, no Entra ID - disable cloud features).
 
 ---
-

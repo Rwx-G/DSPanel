@@ -36,18 +36,18 @@ DSPanel is an open source cross-platform desktop application (Rust/Tauri v2) tha
 
 The UI adapts dynamically based on the running user's AD group memberships:
 
-| Level | Access |
-|-------|--------|
-| **ReadOnly** | Lookup, view, export |
-| **HelpDesk** | + Password reset, unlock, diagnostics |
-| **AccountOperator** | + Group management, presets, onboarding/offboarding |
-| **DomainAdmin** | + Infrastructure monitoring, security, administration |
+| Level               | Access                                                |
+| ------------------- | ----------------------------------------------------- |
+| **ReadOnly**        | Lookup, view, export                                  |
+| **HelpDesk**        | + Password reset, unlock, diagnostics                 |
+| **AccountOperator** | + Group management, presets, onboarding/offboarding   |
+| **DomainAdmin**     | + Infrastructure monitoring, security, administration |
 
 ### Hybrid Support
 
 - **AD on-prem** via LDAP
 - **Entra ID** via Microsoft Graph API
-- **Exchange on-prem** via LDAP attributes (msExch*)
+- **Exchange on-prem** via LDAP attributes (msExch\*)
 - **Exchange Online** via Microsoft Graph API
 
 ## Requirements

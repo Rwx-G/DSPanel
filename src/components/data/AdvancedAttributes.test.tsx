@@ -53,12 +53,8 @@ describe("AdvancedAttributes", () => {
   it("displays advanced attributes that are not in DISPLAYED_ATTRS", () => {
     render(<AdvancedAttributes rawAttributes={SAMPLE_ATTRS} />);
     expect(screen.getByTestId("advanced-attr-cn")).toBeInTheDocument();
-    expect(
-      screen.getByTestId("advanced-attr-description"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByTestId("advanced-attr-logonCount"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("advanced-attr-description")).toBeInTheDocument();
+    expect(screen.getByTestId("advanced-attr-logonCount")).toBeInTheDocument();
   });
 
   it("does not display attributes that are in DISPLAYED_ATTRS", () => {
@@ -69,9 +65,7 @@ describe("AdvancedAttributes", () => {
     expect(
       screen.queryByTestId("advanced-attr-sAMAccountName"),
     ).not.toBeInTheDocument();
-    expect(
-      screen.queryByTestId("advanced-attr-mail"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("advanced-attr-mail")).not.toBeInTheDocument();
     expect(
       screen.queryByTestId("advanced-attr-memberOf"),
     ).not.toBeInTheDocument();
@@ -107,9 +101,7 @@ describe("AdvancedAttributes", () => {
     fireEvent.click(toggleBtn);
 
     // Attributes should be hidden
-    expect(
-      screen.queryByTestId("advanced-attr-cn"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("advanced-attr-cn")).not.toBeInTheDocument();
 
     // Click to expand again
     fireEvent.click(toggleBtn);
@@ -125,14 +117,10 @@ describe("AdvancedAttributes", () => {
     fireEvent.change(searchInput, { target: { value: "logon" } });
 
     // logonCount should still be visible
-    expect(
-      screen.getByTestId("advanced-attr-logonCount"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("advanced-attr-logonCount")).toBeInTheDocument();
 
     // Other attributes should be filtered out
-    expect(
-      screen.queryByTestId("advanced-attr-cn"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("advanced-attr-cn")).not.toBeInTheDocument();
     expect(
       screen.queryByTestId("advanced-attr-description"),
     ).not.toBeInTheDocument();
@@ -145,9 +133,7 @@ describe("AdvancedAttributes", () => {
     fireEvent.change(searchInput, { target: { value: "Test user" } });
 
     // description has "Test user account" value
-    expect(
-      screen.getByTestId("advanced-attr-description"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("advanced-attr-description")).toBeInTheDocument();
 
     // Other attributes should be filtered out
     expect(
@@ -176,9 +162,7 @@ describe("AdvancedAttributes", () => {
 
     // All attributes should be visible again
     expect(screen.getByTestId("advanced-attr-cn")).toBeInTheDocument();
-    expect(
-      screen.getByTestId("advanced-attr-logonCount"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("advanced-attr-logonCount")).toBeInTheDocument();
   });
 
   it("toggles favorite status of an attribute", () => {

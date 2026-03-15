@@ -12,10 +12,10 @@ N/A - This is a greenfield project scaffolded with `cargo create-tauri-app` usin
 
 ### Change Log
 
-| Date | Version | Description | Author |
-|------|---------|-------------|--------|
-| 2026-03-10 | 0.1 | Initial architecture document | Romain G. |
-| 2026-03-13 | 0.2 | Migration to Rust/Tauri v2 + React/TypeScript | Romain G. |
+| Date       | Version | Description                                   | Author    |
+| ---------- | ------- | --------------------------------------------- | --------- |
+| 2026-03-10 | 0.1     | Initial architecture document                 | Romain G. |
+| 2026-03-13 | 0.2     | Migration to Rust/Tauri v2 + React/TypeScript | Romain G. |
 
 ---
 
@@ -133,35 +133,35 @@ graph TB
 
 ### Technology Stack Table
 
-| Category | Technology | Version | Purpose | Rationale |
-|----------|-----------|---------|---------|-----------|
-| **Backend Language** | Rust | 1.85+ (stable) | Backend logic, system operations | Memory safety, performance, strong type system, no GC |
-| **Frontend Language** | TypeScript | 5.x | Frontend UI development | Type safety, excellent React integration, developer tooling |
-| **Desktop Framework** | Tauri | 2.x | Desktop app shell, IPC bridge | Small binary size, native webview, Rust backend, cross-platform |
-| **UI Framework** | React | 18.x | Frontend component framework | Component model, hooks, large ecosystem, mature tooling |
-| **Bundler** | Vite | 6.x | Frontend build tool | Fast HMR, native ESM, optimized builds |
-| **LDAP** | ldap3 | 0.11.x | AD on-prem queries (Rust) | Pure Rust LDAP client, async, TLS support |
-| **HTTP Client** | reqwest | 0.12.x | Graph API, HIBP, GitHub API, webhooks (Rust) | Async HTTP, TLS, connection pooling, widely used |
-| **Logging** | tracing | 0.1.x | Structured logging (Rust) | Structured spans, multiple subscribers, async-aware |
-| **Logging Subscriber** | tracing-subscriber | 0.3.x | Log output formatting (Rust) | File + console output, filtering, JSON format |
-| **Logging File** | tracing-appender | 0.2.x | Rolling file logs (Rust) | Non-blocking file appender, daily rotation |
-| **Serialization** | serde + serde_json | 1.x | JSON serialization (Rust) | De facto Rust serialization, derive macros, performant |
-| **Local DB** | rusqlite | 0.32.x | Audit log + snapshots storage (Rust) | Lightweight SQLite binding, bundled SQLite |
-| **Error Handling** | thiserror + anyhow | 1.x / 1.x | Typed + ad-hoc errors (Rust) | Ergonomic error types, context chaining |
-| **Password Hash** | sha1 | 0.10.x | SHA1 for HIBP k-anonymity (Rust) | Lightweight, pure Rust |
-| **PDF Export** | printpdf or genpdf | latest | PDF report generation (Rust) | Pure Rust, no external dependencies |
-| **CSV Export** | csv | 1.x | CSV export (Rust) | Fast, RFC 4180 compliant, serde integration |
-| **State Management** | React Context + hooks | built-in | Frontend state management | Simple, built-in, sufficient for desktop app state |
-| **Styling** | Tailwind CSS | 4.x | Utility-first CSS framework | Rapid UI development, consistent design, small bundle |
-| **Rust Testing** | cargo test | built-in | Rust unit + integration tests | Built-in test framework, no external dependency |
-| **Frontend Testing** | vitest | 3.x | Frontend unit + component tests | Vite-native, fast, Jest-compatible API |
-| **Component Testing** | React Testing Library | 16.x | React component tests | User-centric testing, widely adopted |
-| **Rust Linting** | clippy | built-in | Rust static analysis | Comprehensive lints, idiomatic Rust enforcement |
-| **Rust Formatting** | rustfmt | built-in | Rust code formatting | Standard formatting, zero config |
-| **Frontend Linting** | ESLint | 9.x | TypeScript/React linting | Configurable rules, React-specific plugins |
-| **Frontend Formatting** | Prettier | 3.x | Frontend code formatting | Opinionated, consistent formatting |
-| **Package Manager (Rust)** | cargo | built-in | Rust dependency management | Built-in, crates.io ecosystem |
-| **Package Manager (JS)** | pnpm | 10.x | Frontend dependency management | Fast, disk-efficient, strict dependency resolution |
+| Category                   | Technology            | Version        | Purpose                                      | Rationale                                                       |
+| -------------------------- | --------------------- | -------------- | -------------------------------------------- | --------------------------------------------------------------- |
+| **Backend Language**       | Rust                  | 1.85+ (stable) | Backend logic, system operations             | Memory safety, performance, strong type system, no GC           |
+| **Frontend Language**      | TypeScript            | 5.x            | Frontend UI development                      | Type safety, excellent React integration, developer tooling     |
+| **Desktop Framework**      | Tauri                 | 2.x            | Desktop app shell, IPC bridge                | Small binary size, native webview, Rust backend, cross-platform |
+| **UI Framework**           | React                 | 18.x           | Frontend component framework                 | Component model, hooks, large ecosystem, mature tooling         |
+| **Bundler**                | Vite                  | 6.x            | Frontend build tool                          | Fast HMR, native ESM, optimized builds                          |
+| **LDAP**                   | ldap3                 | 0.11.x         | AD on-prem queries (Rust)                    | Pure Rust LDAP client, async, TLS support                       |
+| **HTTP Client**            | reqwest               | 0.12.x         | Graph API, HIBP, GitHub API, webhooks (Rust) | Async HTTP, TLS, connection pooling, widely used                |
+| **Logging**                | tracing               | 0.1.x          | Structured logging (Rust)                    | Structured spans, multiple subscribers, async-aware             |
+| **Logging Subscriber**     | tracing-subscriber    | 0.3.x          | Log output formatting (Rust)                 | File + console output, filtering, JSON format                   |
+| **Logging File**           | tracing-appender      | 0.2.x          | Rolling file logs (Rust)                     | Non-blocking file appender, daily rotation                      |
+| **Serialization**          | serde + serde_json    | 1.x            | JSON serialization (Rust)                    | De facto Rust serialization, derive macros, performant          |
+| **Local DB**               | rusqlite              | 0.32.x         | Audit log + snapshots storage (Rust)         | Lightweight SQLite binding, bundled SQLite                      |
+| **Error Handling**         | thiserror + anyhow    | 1.x / 1.x      | Typed + ad-hoc errors (Rust)                 | Ergonomic error types, context chaining                         |
+| **Password Hash**          | sha1                  | 0.10.x         | SHA1 for HIBP k-anonymity (Rust)             | Lightweight, pure Rust                                          |
+| **PDF Export**             | printpdf or genpdf    | latest         | PDF report generation (Rust)                 | Pure Rust, no external dependencies                             |
+| **CSV Export**             | csv                   | 1.x            | CSV export (Rust)                            | Fast, RFC 4180 compliant, serde integration                     |
+| **State Management**       | React Context + hooks | built-in       | Frontend state management                    | Simple, built-in, sufficient for desktop app state              |
+| **Styling**                | Tailwind CSS          | 4.x            | Utility-first CSS framework                  | Rapid UI development, consistent design, small bundle           |
+| **Rust Testing**           | cargo test            | built-in       | Rust unit + integration tests                | Built-in test framework, no external dependency                 |
+| **Frontend Testing**       | vitest                | 3.x            | Frontend unit + component tests              | Vite-native, fast, Jest-compatible API                          |
+| **Component Testing**      | React Testing Library | 16.x           | React component tests                        | User-centric testing, widely adopted                            |
+| **Rust Linting**           | clippy                | built-in       | Rust static analysis                         | Comprehensive lints, idiomatic Rust enforcement                 |
+| **Rust Formatting**        | rustfmt               | built-in       | Rust code formatting                         | Standard formatting, zero config                                |
+| **Frontend Linting**       | ESLint                | 9.x            | TypeScript/React linting                     | Configurable rules, React-specific plugins                      |
+| **Frontend Formatting**    | Prettier              | 3.x            | Frontend code formatting                     | Opinionated, consistent formatting                              |
+| **Package Manager (Rust)** | cargo                 | built-in       | Rust dependency management                   | Built-in, crates.io ecosystem                                   |
+| **Package Manager (JS)**   | pnpm                  | 10.x           | Frontend dependency management               | Fast, disk-efficient, strict dependency resolution              |
 
 ---
 
@@ -176,6 +176,7 @@ All backend data models are Rust structs with `serde::Serialize` and `serde::Des
 **Purpose**: Represents an Active Directory user account with all attributes needed for lookup, healthcheck, comparison, and actions.
 
 **Key Attributes:**
+
 - sam_account_name: String - Primary login identifier
 - user_principal_name: String - UPN (user@domain.com)
 - display_name: String - Full display name
@@ -199,6 +200,7 @@ All backend data models are Rust structs with `serde::Serialize` and `serde::Des
 - thumbnail_photo: Option<Vec<u8>> - Profile photo
 
 **Relationships:**
+
 - Member of multiple DirectoryGroup objects
 - Located in one OrganizationalUnit
 - Optionally has ExchangeMailbox info
@@ -208,6 +210,7 @@ All backend data models are Rust structs with `serde::Serialize` and `serde::Des
 **Purpose**: Represents an AD computer account.
 
 **Key Attributes:**
+
 - name: String - Computer name
 - dns_host_name: String - FQDN
 - distinguished_name: String - Full DN
@@ -220,6 +223,7 @@ All backend data models are Rust structs with `serde::Serialize` and `serde::Des
 - ipv4_address: Option<String> - Resolved IP
 
 **Relationships:**
+
 - Member of multiple DirectoryGroup objects
 - Located in one OrganizationalUnit
 
@@ -228,6 +232,7 @@ All backend data models are Rust structs with `serde::Serialize` and `serde::Des
 **Purpose**: Represents an AD security or distribution group.
 
 **Key Attributes:**
+
 - name: String - Group name
 - distinguished_name: String - Full DN
 - description: String - Group description
@@ -238,6 +243,7 @@ All backend data models are Rust structs with `serde::Serialize` and `serde::Des
 - member_count: i32 - Total member count
 
 **Relationships:**
+
 - Contains multiple DirectoryUser, DirectoryComputer, or nested DirectoryGroup members
 - Can be member of other DirectoryGroup objects
 
@@ -246,6 +252,7 @@ All backend data models are Rust structs with `serde::Serialize` and `serde::Des
 **Purpose**: Read-only Exchange mailbox diagnostic data (on-prem or online).
 
 **Key Attributes:**
+
 - mailbox_name: String - Display name
 - primary_smtp_address: String - Primary email
 - aliases: Vec<String> - All proxy addresses
@@ -261,6 +268,7 @@ All backend data models are Rust structs with `serde::Serialize` and `serde::Des
 **Purpose**: Declarative template for onboarding/offboarding operations.
 
 **Key Attributes:**
+
 - id: Uuid - Unique identifier
 - name: String - Preset display name
 - description: String - What this preset does
@@ -274,6 +282,7 @@ All backend data models are Rust structs with `serde::Serialize` and `serde::Des
 - modified_at: DateTime - Last modification
 
 **Relationships:**
+
 - References multiple DirectoryGroup objects
 - References one target OrganizationalUnit
 
@@ -282,6 +291,7 @@ All backend data models are Rust structs with `serde::Serialize` and `serde::Des
 **Purpose**: Internal DSPanel action log entry stored in SQLite.
 
 **Key Attributes:**
+
 - id: i64 - Auto-increment ID
 - timestamp: DateTime - When the action occurred
 - user_name: String - DSPanel operator (OS account)
@@ -296,6 +306,7 @@ All backend data models are Rust structs with `serde::Serialize` and `serde::Des
 **Purpose**: Point-in-time capture of an AD object's attributes for backup/restore.
 
 **Key Attributes:**
+
 - id: i64 - Auto-increment ID
 - timestamp: DateTime - Snapshot time
 - object_dn: String - Distinguished name
@@ -309,6 +320,7 @@ All backend data models are Rust structs with `serde::Serialize` and `serde::Des
 **Purpose**: Trigger-based automation rule definition.
 
 **Key Attributes:**
+
 - id: Uuid - Unique identifier
 - name: String - Rule name
 - is_enabled: bool - Active state
@@ -331,6 +343,7 @@ All TypeScript interfaces mirror the Rust structs and are used for type-safe IPC
 **Responsibility**: Detect current user's AD group memberships at startup and map to a PermissionLevel. Provide permission checking for both Rust commands and React UI binding.
 
 **Key Functions (Rust):**
+
 - `get_current_level() -> PermissionLevel`
 - `has_permission(required: PermissionLevel) -> bool`
 - `detect_permission_level() -> Result<PermissionLevel>`
@@ -344,6 +357,7 @@ All TypeScript interfaces mirror the Rust structs and are used for type-safe IPC
 **Responsibility**: Abstract all directory operations behind the `DirectoryProvider` trait. Two implementations: `LdapDirectoryProvider` (on-prem) and `GraphDirectoryProvider` (Entra ID).
 
 **Key Trait Methods (Rust):**
+
 - `search_users(query: &str) -> Result<Vec<DirectoryUser>>`
 - `search_computers(query: &str) -> Result<Vec<DirectoryComputer>>`
 - `get_groups() -> Result<Vec<DirectoryGroup>>`
@@ -363,9 +377,10 @@ All TypeScript interfaces mirror the Rust structs and are used for type-safe IPC
 
 ### exchange module
 
-**Responsibility**: Query Exchange mailbox information in read-only mode. Delegates to LDAP msExch* attributes (on-prem) or Graph API (online).
+**Responsibility**: Query Exchange mailbox information in read-only mode. Delegates to LDAP msExch\* attributes (on-prem) or Graph API (online).
 
 **Key Functions (Rust):**
+
 - `get_mailbox_info(user_dn: &str) -> Result<Option<ExchangeMailboxInfo>>`
 - `is_exchange_available() -> bool`
 
@@ -376,6 +391,7 @@ All TypeScript interfaces mirror the Rust structs and are used for type-safe IPC
 **Responsibility**: Load, validate, save, and execute presets from the configured network share.
 
 **Key Functions (Rust):**
+
 - `get_presets() -> Result<Vec<Preset>>`
 - `save_preset(preset: &Preset) -> Result<()>`
 - `delete_preset(preset_id: Uuid) -> Result<()>`
@@ -389,6 +405,7 @@ All TypeScript interfaces mirror the Rust structs and are used for type-safe IPC
 **Responsibility**: Log all DSPanel actions to local SQLite database. Provide query/search/export capabilities.
 
 **Key Functions (Rust):**
+
 - `log(entry: &AuditLogEntry) -> Result<()>`
 - `search(criteria: &AuditSearchCriteria) -> Result<Vec<AuditLogEntry>>`
 - `export(criteria: &AuditSearchCriteria, format: ExportFormat) -> Result<Vec<u8>>`
@@ -400,6 +417,7 @@ All TypeScript interfaces mirror the Rust structs and are used for type-safe IPC
 **Responsibility**: Capture AD object state before modifications and restore from snapshots.
 
 **Key Functions (Rust):**
+
 - `capture(object_dn: &str, operation_type: &str) -> Result<ObjectSnapshot>`
 - `get_snapshots(object_dn: &str) -> Result<Vec<ObjectSnapshot>>`
 - `restore(snapshot_id: i64) -> Result<()>`
@@ -412,6 +430,7 @@ All TypeScript interfaces mirror the Rust structs and are used for type-safe IPC
 **Responsibility**: Compute account healthcheck badges and domain-wide health status.
 
 **Key Functions (Rust):**
+
 - `compute_user_health(user: &DirectoryUser) -> AccountHealthStatus`
 - `get_dc_health() -> Result<Vec<DCHealthStatus>>`
 - `get_replication_status() -> Result<Vec<ReplicationStatus>>`
@@ -425,6 +444,7 @@ All TypeScript interfaces mirror the Rust structs and are used for type-safe IPC
 **Responsibility**: Compute domain risk score, detect AD attacks from event logs, and analyze privilege escalation paths.
 
 **Key Functions (Rust):**
+
 - `compute_risk_score() -> Result<RiskScoreReport>`
 - `get_privileged_accounts() -> Result<Vec<PrivilegedAccountInfo>>`
 - `detect_attacks() -> Result<Vec<SecurityAlert>>`
@@ -437,6 +457,7 @@ All TypeScript interfaces mirror the Rust structs and are used for type-safe IPC
 **Responsibility**: Generate scheduled and on-demand reports.
 
 **Key Functions (Rust):**
+
 - `generate_report(report_type: ReportType, parameters: &ReportParameters) -> Result<ReportResult>`
 - `schedule_report(schedule: &ScheduledReport) -> Result<()>`
 - `get_scheduled_reports() -> Result<Vec<ScheduledReport>>`
@@ -448,6 +469,7 @@ All TypeScript interfaces mirror the Rust structs and are used for type-safe IPC
 **Responsibility**: Export data to CSV and PDF formats.
 
 **Key Functions (Rust):**
+
 - `export_to_csv<T: Serialize>(data: &[T], file_path: &Path) -> Result<()>`
 - `export_to_pdf(report: &ReportResult, file_path: &Path) -> Result<()>`
 
@@ -458,6 +480,7 @@ All TypeScript interfaces mirror the Rust structs and are used for type-safe IPC
 **Responsibility**: Send webhook notifications to Teams, Slack, or email.
 
 **Key Functions (Rust):**
+
 - `send(event: &NotificationEvent) -> Result<()>`
 - `test_channel(channel: &NotificationChannel) -> Result<bool>`
 
@@ -470,6 +493,7 @@ All TypeScript interfaces mirror the Rust structs and are used for type-safe IPC
 **Implementation**: React Router + custom navigation context
 
 **Key Hooks:**
+
 - `useNavigation().navigateTo(path: string, params?: object)`
 - `useNavigation().openTab(path: string, params?: object)`
 - `useDialog().showDialog(component: ReactNode)`
@@ -520,6 +544,7 @@ graph LR
 - **Rate Limits**: None (on-prem infrastructure)
 
 **Key Operations:**
+
 - Search with LDAP filters for user/computer/group lookups
 - Modify for attribute changes, group membership modifications
 - Add for object creation (onboarding)
@@ -537,6 +562,7 @@ graph LR
 - **Rate Limits**: Per-tenant throttling (varies by endpoint)
 
 **Key Endpoints Used:**
+
 - `GET /users/{id}` - User profile and attributes
 - `GET /users/{id}/memberOf` - Group memberships
 - `GET /users/{id}/mailboxSettings` - Exchange Online mailbox settings
@@ -555,6 +581,7 @@ graph LR
 - **Rate Limits**: Generous, no API key required for password range endpoint
 
 **Key Endpoints Used:**
+
 - `GET /range/{first5HashChars}` - Get all password hashes matching the first 5 characters of the SHA1 hash
 
 **Integration Notes**: Only the first 5 characters of the SHA1 hash are sent (k-anonymity). Response is compared locally. Must work offline (skip check with warning if unreachable).
@@ -567,6 +594,7 @@ graph LR
 - **Rate Limits**: 60 requests/hour unauthenticated
 
 **Key Endpoints Used:**
+
 - `GET /repos/Rwx-G/DSPanel/releases/latest` - Get latest release version and download URL
 
 ---
@@ -1104,25 +1132,25 @@ feature branch --> PR --> main (CI: cargo test + pnpm test + clippy + eslint)
 
 #### Rust
 
-| Element | Convention | Example |
-|---------|-----------|---------|
-| Modules | snake_case | `directory_provider` |
-| Structs/Enums | PascalCase | `DirectoryUser`, `PermissionLevel` |
-| Functions | snake_case | `search_users`, `compute_risk_score` |
-| Constants | SCREAMING_SNAKE_CASE | `MAX_RETRY_COUNT` |
-| Trait names | PascalCase | `DirectoryProvider` |
-| Fields | snake_case | `sam_account_name` |
+| Element       | Convention           | Example                              |
+| ------------- | -------------------- | ------------------------------------ |
+| Modules       | snake_case           | `directory_provider`                 |
+| Structs/Enums | PascalCase           | `DirectoryUser`, `PermissionLevel`   |
+| Functions     | snake_case           | `search_users`, `compute_risk_score` |
+| Constants     | SCREAMING_SNAKE_CASE | `MAX_RETRY_COUNT`                    |
+| Trait names   | PascalCase           | `DirectoryProvider`                  |
+| Fields        | snake_case           | `sam_account_name`                   |
 
 #### TypeScript / React
 
-| Element | Convention | Example |
-|---------|-----------|---------|
-| Components | PascalCase | `UserLookupPage`, `SearchBar` |
-| Hooks | camelCase with use prefix | `usePermission`, `useDebounce` |
-| Interfaces/Types | PascalCase | `DirectoryUser`, `AuditLogEntry` |
-| Functions/variables | camelCase | `searchUsers`, `isLoading` |
-| Constants | SCREAMING_SNAKE_CASE or camelCase | `MAX_PAGE_SIZE` |
-| CSS classes | kebab-case (Tailwind utilities) | `text-sm`, `bg-primary` |
+| Element             | Convention                        | Example                          |
+| ------------------- | --------------------------------- | -------------------------------- |
+| Components          | PascalCase                        | `UserLookupPage`, `SearchBar`    |
+| Hooks               | camelCase with use prefix         | `usePermission`, `useDebounce`   |
+| Interfaces/Types    | PascalCase                        | `DirectoryUser`, `AuditLogEntry` |
+| Functions/variables | camelCase                         | `searchUsers`, `isLoading`       |
+| Constants           | SCREAMING_SNAKE_CASE or camelCase | `MAX_PAGE_SIZE`                  |
+| CSS classes         | kebab-case (Tailwind utilities)   | `text-sm`, `bg-primary`          |
 
 ### Critical Rules
 
@@ -1173,6 +1201,7 @@ feature branch --> PR --> main (CI: cargo test + pnpm test + clippy + eslint)
 - **Coverage Requirement**: 90%+ on services/, best-effort on commands/
 
 **Requirements:**
+
 - Test all public functions
 - Cover edge cases and error conditions
 - Follow arrange/act/assert pattern
@@ -1188,6 +1217,7 @@ feature branch --> PR --> main (CI: cargo test + pnpm test + clippy + eslint)
 - **Coverage Requirement**: Best-effort on pages, good coverage on hooks and utility functions
 
 **Requirements:**
+
 - Test custom hooks with `renderHook()`
 - Test components with user-centric queries (`getByRole`, `getByText`)
 - Mock Tauri `invoke()` calls in tests

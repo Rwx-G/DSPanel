@@ -110,9 +110,10 @@ A tool that every IT team member opens first thing in the morning - from the L1 
 
 ### Core Features (Must Have)
 
-*Note: the full scope (57 features, 10 modules) is documented in the brainstorming results. No prioritization has been defined at this stage - all features are retained. Phased prioritization (MVP, V2, V3, V4) will be done during PRD creation.*
+_Note: the full scope (57 features, 10 modules) is documented in the brainstorming results. No prioritization has been defined at this stage - all features are retained. Phased prioritization (MVP, V2, V3, V4) will be done during PRD creation._
 
 **Module A - Lookup & Diagnostics**
+
 - User account lookup (complete info, groups, OU, status)
 - Computer account lookup
 - Visual healthcheck badge (expired, inactive, password never changed, locked out, disabled)
@@ -125,18 +126,21 @@ A tool that every IT team member opens first thing in the morning - from the L1 
 - Advanced LDAP search (custom filter)
 
 **Module B - Comparison & Permissions Audit**
+
 - Side-by-side comparison of 2 users (visual group delta)
 - UNC path permissions audit (ACL, groups, user cross-reference)
 - NTFS Permissions Analyzer (cross-reference NTFS permissions / AD groups)
 - State-in-Time comparison
 
 **Module C - Group Management**
+
 - Group tree view (hierarchy + flat view)
 - Add/remove members (drag & drop, multi-selection)
 - Group-centric bulk operations (D=Delete, A=Add, T=Transfer)
 - Empty / circular group detection
 
 **Module D - Presets & Workflows**
+
 - Presets per role/team (JSON/YAML on configurable network share)
 - Preset management via UI (create/edit exclusively through the tool)
 - Onboarding wizard (form, preset, preview, execute, ticket output)
@@ -144,6 +148,7 @@ A tool that every IT team member opens first thing in the morning - from the L1 
 - Systematic dry-run / preview before any execution
 
 **Module E - Support Actions**
+
 - Password reset (with options: must change at next logon, etc.)
 - Account unlock
 - Enable / Disable account
@@ -152,6 +157,7 @@ A tool that every IT team member opens first thing in the morning - from the L1 
 - Password flag management (Password Never Expires, Cannot Change)
 
 **Module F - Object Administration**
+
 - Move objects between OUs (single + bulk)
 - AD Recycle Bin (restore deleted objects)
 - AD contact management
@@ -160,15 +166,17 @@ A tool that every IT team member opens first thing in the morning - from the L1 
 - Object backup/restore (snapshot before modification, rollback)
 
 **Module G - Infrastructure Monitoring & Health**
+
 - DC health (DNS, AD services, SYSVOL, disk space, LDAP response time)
 - AD replication (status, errors, latency between DCs)
-- DNS health check (SRV records: _ldap, _kerberos)
+- DNS health check (SRV records: \_ldap, \_kerberos)
 - Kerberos / clock skew (time sync between DCs/workstations)
 - Real-time remote workstation monitoring (CPU, RAM, sessions, services, disks)
 - Visual AD topology (site map, DCs, replication links)
 - Privileged accounts dashboard (Domain/Enterprise/Schema Admins + password alerts)
 
 **Module H - Reports & Export**
+
 - CSV export (groups, members, OUs, results)
 - PDF export (formatted reports)
 - Scheduled reports (inactive accounts, expired passwords, empty groups, orphaned machines)
@@ -176,6 +184,7 @@ A tool that every IT team member opens first thing in the morning - from the L1 
 - Compliance reports (GDPR / HIPAA / SOX)
 
 **Module I - Audit, Security & Traceability**
+
 - DSPanel internal audit log (who, what, when, on which object)
 - AD change history (timeline via replication metadata)
 - Risk Score / security posture (domain-wide score)
@@ -184,6 +193,7 @@ A tool that every IT team member opens first thing in the morning - from the L1 
 - Triggers / automation ("if X then Y" rules on AD changes)
 
 **Module J - Extensibility & Integration**
+
 - External script execution (PowerShell/exe with object context)
 - Webhooks / notifications (Teams, Slack, email)
 - GPO viewer (which GPOs apply where + scope report + what-if)
@@ -191,7 +201,7 @@ A tool that every IT team member opens first thing in the morning - from the L1 
 
 ### Out of Scope for MVP
 
-*No exclusions defined at this stage. Prioritization will be done in the PRD.*
+_No exclusions defined at this stage. Prioritization will be done in the PRD._
 
 ### MVP Success Criteria
 
@@ -203,7 +213,7 @@ The tool fully replaces existing internal tools for L1/L2 support and is adopted
 
 ### Phase 2+ Features
 
-*No phasing defined - all 57 features are in the global scope. Sequencing will be defined in the PRD based on technical complexity and user value.*
+_No phasing defined - all 57 features are in the global scope. Sequencing will be defined in the PRD based on technical complexity and user value._
 
 ### Long-term Vision
 
@@ -265,7 +275,7 @@ DSPanel becomes the open source reference for desktop AD administration, positio
 - Target environments have at minimum a functional on-prem AD
 - The Windows account running DSPanel has at minimum read access to the AD directory
 - JSON/YAML presets will be stored on a network share accessible to tool users
-- Exchange on-prem query is feasible via LDAP msExch* attributes without requiring a dedicated Exchange Management Shell server
+- Exchange on-prem query is feasible via LDAP msExch\* attributes without requiring a dedicated Exchange Management Shell server
 - For Exchange Online and Entra ID, an Azure AD App Registration with appropriate permissions will be configured
 - AD attack detection features will be based on event log analysis and AD metadata, not a network agent
 
@@ -278,7 +288,7 @@ DSPanel becomes the open source reference for desktop AD administration, positio
 - **Scope complexity**: 57 features is a very ambitious scope for a solo developer. Risk of feature creep or abandonment without strict prioritization in the PRD.
 - **Real environment testing**: AD features require a test domain. Some features (replication, multi-DC, Exchange) are difficult to test without dedicated infrastructure.
 - **Permissions and security**: a tool that performs password resets and group management must be flawless in terms of security. A vulnerability could compromise the entire AD domain.
-- **Exchange on-prem compatibility**: LDAP msExch* attributes cover basic info but some data (actual quotas, mailbox stats) may require Remote PowerShell Exchange.
+- **Exchange on-prem compatibility**: LDAP msExch\* attributes cover basic info but some data (actual quotas, mailbox stats) may require Remote PowerShell Exchange.
 - **Performance on large domains**: LDAP queries on 100k+ object domains with complex filters can be slow. Pagination and caching will be critical.
 - **AD attack detection**: ambitious feature requiring specific security expertise (Kerberos, Golden Ticket, DCSync). Risk of false positives/negatives.
 
@@ -305,11 +315,13 @@ DSPanel becomes the open source reference for desktop AD administration, positio
 ### A. Research Summary
 
 **Open source tools analyzed:**
+
 - BLAZAM (web-based, .NET, full AD management with delegation and automation)
 - ADTools (WPF, LDAP, cross-domain search, Exchange integration)
 - ADxRay (AD health check, HTML report)
 
 **Commercial tools analyzed:**
+
 - ManageEngine ADManager Plus / ADAudit Plus (200+ reports, risk score, compliance, hybrid management)
 - Quest Active Administrator (100+ diagnostic tests, backup/restore, GPO management)
 - Netwrix Auditor (audit, state-in-time, compliance, threat detection)

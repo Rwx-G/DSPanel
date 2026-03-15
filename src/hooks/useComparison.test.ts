@@ -192,9 +192,7 @@ describe("useComparison", () => {
       await result.current.compare();
     });
 
-    expect(result.current.error).toBe(
-      "Comparison failed: Error: LDAP error",
-    );
+    expect(result.current.error).toBe("Comparison failed: Error: LDAP error");
     expect(result.current.isComparing).toBe(false);
   });
 
@@ -420,9 +418,7 @@ describe("useComparison", () => {
       await result.current.prefill("alice", "bob");
     });
 
-    expect(result.current.error).toBe(
-      "Failed to load users: Error: LDAP down",
-    );
+    expect(result.current.error).toBe("Failed to load users: Error: LDAP down");
   });
 
   it("prefill sets error when comparison invoke fails", async () => {
@@ -438,9 +434,7 @@ describe("useComparison", () => {
       await result.current.prefill("alice", "bob");
     });
 
-    expect(result.current.error).toBe(
-      "Comparison failed: Error: compare fail",
-    );
+    expect(result.current.error).toBe("Comparison failed: Error: compare fail");
     expect(result.current.isComparing).toBe(false);
   });
 

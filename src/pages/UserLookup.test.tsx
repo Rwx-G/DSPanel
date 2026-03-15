@@ -324,8 +324,7 @@ describe("UserLookup", () => {
 
   it("shows empty state with no filter text when no users available", async () => {
     mockInvoke.mockImplementation(((cmd: string) => {
-      if (cmd === "browse_users")
-        return Promise.resolve(makeBrowseResult([]));
+      if (cmd === "browse_users") return Promise.resolve(makeBrowseResult([]));
       if (cmd === "evaluate_health_cmd") return Promise.resolve(HEALTHY_STATUS);
       return Promise.resolve(null);
     }) as typeof invoke);
@@ -573,8 +572,7 @@ describe("UserLookup", () => {
 
   it("shows empty state with filter text when search returns no users", async () => {
     mockInvoke.mockImplementation(((cmd: string) => {
-      if (cmd === "browse_users")
-        return Promise.resolve(makeBrowseResult([]));
+      if (cmd === "browse_users") return Promise.resolve(makeBrowseResult([]));
       if (cmd === "search_users") return Promise.resolve([]);
       if (cmd === "evaluate_health_cmd") return Promise.resolve(HEALTHY_STATUS);
       return Promise.resolve(null);
@@ -588,17 +586,13 @@ describe("UserLookup", () => {
   });
 
   it("displays user without department in the results list", async () => {
-    const entries = [
-      makeEntry("nodept", "No Department", { department: [] }),
-    ];
+    const entries = [makeEntry("nodept", "No Department", { department: [] })];
     mockBrowseWith(entries);
 
     render(<UserLookup />, { wrapper: TestProviders });
 
     await waitFor(() => {
-      expect(
-        screen.getByTestId("user-result-nodept"),
-      ).toBeInTheDocument();
+      expect(screen.getByTestId("user-result-nodept")).toBeInTheDocument();
     });
 
     // Should show SAM without department suffix
