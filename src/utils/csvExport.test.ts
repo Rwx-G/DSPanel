@@ -93,4 +93,81 @@ describe("downloadCsv", () => {
     const result = await downloadCsv("data.csv", "a,b");
     expect(result).toBeNull();
   });
+
+  it("should propagate error when invoke rejects", async () => {
+    mockInvoke.mockRejectedValueOnce(new Error("Write failed"));
+
+    await expect(downloadCsv("data.csv", "a,b")).rejects.toThrow(
+      "Write failed",
+    );
+  });
+});
+
+describe("exportTableToCsv", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should format columns and data into CSV and call downloadCsv", async () => {
+    mockInvoke.mockResolvedValueOnce("/path/to/file.csv");
+
+    const { exportTableToCsv } = await import("./csvExport");
+
+    const columns = [
+      { key: "name" as const, header: "Name" },
+      { key: "age" as const, header: "Age" },
+    ];
+    const data = [
+      { name: "Alice", age: "30" },
+      { name: "Bob", age: "25" },
+    ];
+
+    const result = await exportTableToCsv(columns, data, "test.csv");
+
+    expect(mockInvoke).toHaveBeenCalledWith("save_file_dialog", {
+      content: "Name,Age\nAlice,30\nBob,25",
+      defaultName: "test.csv",
+      filterName: "CSV files",
+      filterExtensions: ["csv"],
+    });
+    expect(result).toBe("/path/to/file.csv");
+  });
+
+  it("should handle empty data array", async () => {
+    mockInvoke.mockResolvedValueOnce("/path/to/file.csv");
+
+    const { exportTableToCsv } = await import("./csvExport");
+
+    const columns = [{ key: "name" as const, header: "Name" }];
+    const result = await exportTableToCsv(columns, [], "test.csv");
+
+    expect(mockInvoke).toHaveBeenCalledWith("save_file_dialog", {
+      content: "Name",
+      defaultName: "test.csv",
+      filterName: "CSV files",
+      filterExtensions: ["csv"],
+    });
+    expect(result).toBe("/path/to/file.csv");
+  });
+
+  it("should convert null/undefined values to empty string", async () => {
+    mockInvoke.mockResolvedValueOnce("/path/to/file.csv");
+
+    const { exportTableToCsv } = await import("./csvExport");
+
+    const columns = [
+      { key: "name" as const, header: "Name" },
+      { key: "value" as const, header: "Value" },
+    ];
+    const data = [{ name: "Test", value: undefined as unknown as string }];
+
+    await exportTableToCsv(columns, data, "test.csv");
+
+    expect(mockInvoke).toHaveBeenCalledWith("save_file_dialog", {
+      content: "Name,Value\nTest,",
+      defaultName: "test.csv",
+      filterName: "CSV files",
+      filterExtensions: ["csv"],
+    });
+  });
 });

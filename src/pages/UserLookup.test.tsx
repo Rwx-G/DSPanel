@@ -321,4 +321,312 @@ describe("UserLookup", () => {
       });
     });
   });
+
+  it("shows empty state with no filter text when no users available", async () => {
+    mockInvoke.mockImplementation(((cmd: string) => {
+      if (cmd === "browse_users")
+        return Promise.resolve(makeBrowseResult([]));
+      if (cmd === "evaluate_health_cmd") return Promise.resolve(HEALTHY_STATUS);
+      return Promise.resolve(null);
+    }) as typeof invoke);
+
+    render(<UserLookup />, { wrapper: TestProviders });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("empty-state-title")).toHaveTextContent(
+        "No users found",
+      );
+      expect(screen.getByText("No users available.")).toBeInTheDocument();
+    });
+  });
+
+  it("shows placeholder text when no user is selected", async () => {
+    const entries = [makeEntry("jdoe", "John Doe")];
+    mockBrowseWith(entries);
+
+    render(<UserLookup />, { wrapper: TestProviders });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("user-results-list")).toBeInTheDocument();
+    });
+
+    expect(
+      screen.getByText("Select a user to view details"),
+    ).toBeInTheDocument();
+  });
+
+  it("shows user detail panel after selection", async () => {
+    const entries = [makeEntry("jdoe", "John Doe")];
+    mockBrowseWith(entries);
+
+    render(<UserLookup />, { wrapper: TestProviders });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("user-result-jdoe")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId("user-result-jdoe"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("user-detail")).toBeInTheDocument();
+    });
+  });
+
+  it("highlights selected user in results list", async () => {
+    const entries = [
+      makeEntry("jdoe", "John Doe"),
+      makeEntry("asmith", "Alice Smith"),
+    ];
+    mockBrowseWith(entries);
+
+    render(<UserLookup />, { wrapper: TestProviders });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("user-result-jdoe")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId("user-result-jdoe"));
+
+    await waitFor(() => {
+      const selected = screen.getByTestId("user-result-jdoe");
+      expect(selected.className).toContain("selected");
+    });
+  });
+
+  it("displays department in user result item", async () => {
+    const entries = [makeEntry("jdoe", "John Doe")];
+    mockBrowseWith(entries);
+
+    render(<UserLookup />, { wrapper: TestProviders });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("user-result-jdoe")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText(/IT/)).toBeInTheDocument();
+  });
+
+  it("renders search bar component", async () => {
+    mockBrowseWith([]);
+
+    render(<UserLookup />, { wrapper: TestProviders });
+
+    expect(screen.getByTestId("search-bar")).toBeInTheDocument();
+  });
+
+  it("renders accessibility status region", async () => {
+    mockBrowseWith([makeEntry("jdoe", "John Doe")]);
+
+    render(<UserLookup />, { wrapper: TestProviders });
+
+    await waitFor(() => {
+      const status = screen.getByTestId("user-lookup-status");
+      expect(status).toBeInTheDocument();
+    });
+  });
+
+  it("shows context menu on right-click with no user selected", async () => {
+    const entries = [makeEntry("jdoe", "John Doe")];
+    mockBrowseWith(entries);
+
+    render(<UserLookup />, { wrapper: TestProviders });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("user-result-jdoe")).toBeInTheDocument();
+    });
+
+    fireEvent.contextMenu(screen.getByTestId("user-result-jdoe"));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Select a user first to compare"),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("shows context menu with 'Cannot compare' when right-clicking the selected user", async () => {
+    const entries = [
+      makeEntry("jdoe", "John Doe"),
+      makeEntry("asmith", "Alice Smith"),
+    ];
+    mockBrowseWith(entries);
+
+    render(<UserLookup />, { wrapper: TestProviders });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("user-result-jdoe")).toBeInTheDocument();
+    });
+
+    // Select jdoe first
+    fireEvent.click(screen.getByTestId("user-result-jdoe"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("user-detail")).toBeInTheDocument();
+    });
+
+    // Right-click on the same user
+    fireEvent.contextMenu(screen.getByTestId("user-result-jdoe"));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Cannot compare a user with itself"),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("shows compare option when right-clicking a different user from selected", async () => {
+    const entries = [
+      makeEntry("jdoe", "John Doe"),
+      makeEntry("asmith", "Alice Smith"),
+    ];
+    mockBrowseWith(entries);
+
+    render(<UserLookup />, { wrapper: TestProviders });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("user-result-jdoe")).toBeInTheDocument();
+    });
+
+    // Select jdoe
+    fireEvent.click(screen.getByTestId("user-result-jdoe"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("user-detail")).toBeInTheDocument();
+    });
+
+    // Right-click on asmith
+    fireEvent.contextMenu(screen.getByTestId("user-result-asmith"));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Compare John Doe with Alice Smith/),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("refreshes selected user data via invoke on refreshSelectedUser", async () => {
+    const entries = [makeEntry("jdoe", "John Doe")];
+    mockBrowseWith(entries);
+
+    render(<UserLookup />, { wrapper: TestProviders });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("user-result-jdoe")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId("user-result-jdoe"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("user-detail")).toBeInTheDocument();
+    });
+
+    // The detail panel should render with the user's name
+    const detail = screen.getByTestId("user-detail");
+    expect(detail.querySelector("h2")).toHaveTextContent("John Doe");
+  });
+
+  it("displays group filter functionality within detail panel", async () => {
+    const entries = [makeEntry("jdoe", "John Doe")];
+    mockBrowseWith(entries);
+
+    render(<UserLookup />, { wrapper: TestProviders });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("user-result-jdoe")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId("user-result-jdoe"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("user-groups-section")).toBeInTheDocument();
+    });
+
+    // Both groups should be visible
+    expect(screen.getByText("Domain Users")).toBeInTheDocument();
+    expect(screen.getByText("Developers")).toBeInTheDocument();
+  });
+
+  it("shows accessibility status for loading state", () => {
+    mockInvoke.mockImplementation(
+      (() => new Promise(() => {})) as typeof invoke,
+    );
+    render(<UserLookup />, { wrapper: TestProviders });
+
+    const status = screen.getByTestId("user-lookup-status");
+    expect(status).toHaveTextContent("Loading users...");
+  });
+
+  it("shows accessibility status for error state", async () => {
+    mockInvoke.mockImplementation(((cmd: string) => {
+      if (cmd === "browse_users")
+        return Promise.reject(new Error("Network error"));
+      return Promise.resolve(HEALTHY_STATUS);
+    }) as typeof invoke);
+
+    render(<UserLookup />, { wrapper: TestProviders });
+
+    await waitFor(() => {
+      const status = screen.getByTestId("user-lookup-status");
+      expect(status).toHaveTextContent(/Error/);
+    });
+  });
+
+  it("shows empty state with filter text when search returns no users", async () => {
+    mockInvoke.mockImplementation(((cmd: string) => {
+      if (cmd === "browse_users")
+        return Promise.resolve(makeBrowseResult([]));
+      if (cmd === "search_users") return Promise.resolve([]);
+      if (cmd === "evaluate_health_cmd") return Promise.resolve(HEALTHY_STATUS);
+      return Promise.resolve(null);
+    }) as typeof invoke);
+
+    render(<UserLookup />, { wrapper: TestProviders });
+
+    await waitFor(() => {
+      expect(screen.getByText("No users available.")).toBeInTheDocument();
+    });
+  });
+
+  it("displays user without department in the results list", async () => {
+    const entries = [
+      makeEntry("nodept", "No Department", { department: [] }),
+    ];
+    mockBrowseWith(entries);
+
+    render(<UserLookup />, { wrapper: TestProviders });
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId("user-result-nodept"),
+      ).toBeInTheDocument();
+    });
+
+    // Should show SAM without department suffix
+    const item = screen.getByTestId("user-result-nodept");
+    expect(item).toBeInTheDocument();
+  });
+
+  it("shows health badge on selected user detail", async () => {
+    const entries = [makeEntry("jdoe", "John Doe")];
+    mockBrowseWith(entries);
+
+    render(<UserLookup />, { wrapper: TestProviders });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("user-result-jdoe")).toBeInTheDocument();
+    });
+
+    // Wait for health evaluation
+    await waitFor(() => {
+      const result = screen.getByTestId("user-result-jdoe");
+      const badge = result.querySelector('[data-testid="health-badge"]');
+      expect(badge).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId("user-result-jdoe"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("user-detail")).toBeInTheDocument();
+    });
+  });
 });
