@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { parseBackendError } from "@/utils/errorMapping";
 import {
   FolderSearch,
   Download,
@@ -233,7 +234,8 @@ export function NtfsAnalyzer() {
       });
       setResult(res);
     } catch (e) {
-      setError(`${e}`);
+      const parsed = parseBackendError(e);
+      setError(parsed?.user_message ?? `${e}`);
     } finally {
       setIsAnalyzing(false);
     }

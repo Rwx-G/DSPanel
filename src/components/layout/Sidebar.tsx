@@ -3,8 +3,6 @@ import {
   Monitor,
   KeyRound,
   Settings,
-  ChevronLeft,
-  ChevronRight,
   Home,
   Sun,
   Moon,
@@ -112,7 +110,9 @@ export function Sidebar({ expanded, onToggle }: SidebarProps) {
           aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
           data-testid="sidebar-toggle"
         >
-          {expanded ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
+          <span className="text-[16px] leading-none text-[var(--color-text-secondary)]">
+            {expanded ? "\u276E" : "\u276F"}
+          </span>
         </button>
       </div>
 

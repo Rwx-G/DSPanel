@@ -527,7 +527,7 @@ pub(crate) async fn compare_users_inner(
 
 /// Reads NTFS ACL from a UNC path.
 pub(crate) fn audit_ntfs_permissions_inner(path: &str) -> Result<NtfsAuditResult, AppError> {
-    crate::services::ntfs::validate_unc_path(path).map_err(AppError::Configuration)?;
+    crate::services::ntfs::validate_unc_path(path).map_err(AppError::Validation)?;
 
     #[cfg(feature = "demo")]
     let aces = crate::services::ntfs::read_acl_demo(path);
@@ -649,7 +649,7 @@ pub(crate) fn compute_attribute_diff_inner(
 
 /// Performs a recursive NTFS permissions analysis on a UNC path.
 pub(crate) fn analyze_ntfs_inner(path: &str, depth: usize) -> Result<NtfsAnalysisResult, AppError> {
-    crate::services::ntfs::validate_unc_path(path).map_err(AppError::Configuration)?;
+    crate::services::ntfs::validate_unc_path(path).map_err(AppError::Validation)?;
 
     Ok(crate::services::ntfs_analyzer::analyze(path, depth))
 }
