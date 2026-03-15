@@ -273,7 +273,7 @@ const TabItem = memo(function TabItem({
 
       {!tab.isPinned && (
         <button
-          className="ml-0.5 flex h-4 w-4 items-center justify-center rounded-sm opacity-0 group-hover:opacity-100 hover:bg-[var(--color-surface-hover)] transition-opacity duration-150"
+          className="ml-0.5 flex h-4 w-4 items-center justify-center rounded-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors"
           onClick={(e) => {
             e.stopPropagation();
             onClose(tab.id);

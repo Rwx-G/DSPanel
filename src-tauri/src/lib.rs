@@ -122,6 +122,11 @@ pub fn run() {
             commands::remove_group_member,
             commands::detect_empty_groups,
             commands::detect_circular_groups,
+            commands::detect_single_member_groups,
+            commands::detect_stale_groups,
+            commands::detect_undescribed_groups,
+            commands::detect_deep_nesting,
+            commands::detect_duplicate_groups,
             commands::delete_group,
             commands::get_ou_tree,
         ])

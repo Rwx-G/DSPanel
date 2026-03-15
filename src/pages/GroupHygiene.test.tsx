@@ -37,30 +37,93 @@ function makeEmptyGroupEntry(name: string): DirectoryEntry {
   };
 }
 
+function makeGroupEntry(
+  name: string,
+  attrs: Record<string, string[]> = {},
+): DirectoryEntry {
+  return {
+    distinguishedName: `CN=${name},OU=Groups,DC=example,DC=com`,
+    samAccountName: name,
+    displayName: name,
+    objectClass: "group",
+    attributes: {
+      groupType: ["-2147483646"],
+      description: [`${name} group`],
+      ...attrs,
+    },
+  };
+}
+
+interface DeepNestingResult {
+  groupDn: string;
+  groupName: string;
+  depth: number;
+}
+
 function mockPermissions(level: string) {
   mockInvoke.mockImplementation(((cmd: string) => {
     if (cmd === "get_permission_level") return Promise.resolve(level);
     if (cmd === "get_user_groups") return Promise.resolve([]);
     if (cmd === "detect_empty_groups") return Promise.resolve([]);
     if (cmd === "detect_circular_groups") return Promise.resolve([]);
+    if (cmd === "detect_single_member_groups") return Promise.resolve([]);
+    if (cmd === "detect_stale_groups") return Promise.resolve([]);
+    if (cmd === "detect_undescribed_groups") return Promise.resolve([]);
+    if (cmd === "detect_deep_nesting") return Promise.resolve([]);
+    if (cmd === "detect_duplicate_groups") return Promise.resolve([]);
     if (cmd === "delete_group") return Promise.resolve(null);
     return Promise.resolve(null);
   }) as typeof invoke);
 }
 
-function mockScanResults(
-  emptyGroups: DirectoryEntry[],
-  cycles: string[][],
-  level = "DomainAdmin",
-) {
+interface ScanResultsOptions {
+  emptyGroups?: DirectoryEntry[];
+  cycles?: string[][];
+  singleMemberGroups?: DirectoryEntry[];
+  staleGroups?: DirectoryEntry[];
+  undescribedGroups?: DirectoryEntry[];
+  deeplyNested?: DeepNestingResult[];
+  duplicateGroups?: DirectoryEntry[][];
+  level?: string;
+}
+
+function mockScanResults(opts: ScanResultsOptions) {
+  const {
+    emptyGroups = [],
+    cycles = [],
+    singleMemberGroups = [],
+    staleGroups = [],
+    undescribedGroups = [],
+    deeplyNested = [],
+    duplicateGroups = [],
+    level = "DomainAdmin",
+  } = opts;
+
   mockInvoke.mockImplementation(((cmd: string) => {
     if (cmd === "get_permission_level") return Promise.resolve(level);
     if (cmd === "get_user_groups") return Promise.resolve([]);
     if (cmd === "detect_empty_groups") return Promise.resolve(emptyGroups);
     if (cmd === "detect_circular_groups") return Promise.resolve(cycles);
+    if (cmd === "detect_single_member_groups")
+      return Promise.resolve(singleMemberGroups);
+    if (cmd === "detect_stale_groups") return Promise.resolve(staleGroups);
+    if (cmd === "detect_undescribed_groups")
+      return Promise.resolve(undescribedGroups);
+    if (cmd === "detect_deep_nesting") return Promise.resolve(deeplyNested);
+    if (cmd === "detect_duplicate_groups")
+      return Promise.resolve(duplicateGroups);
     if (cmd === "delete_group") return Promise.resolve(null);
     return Promise.resolve(null);
   }) as typeof invoke);
+}
+
+// Legacy helper - wraps new interface for backward compatibility
+function mockScanResultsLegacy(
+  emptyGroups: DirectoryEntry[],
+  cycles: string[][],
+  level = "DomainAdmin",
+) {
+  mockScanResults({ emptyGroups, cycles, level });
 }
 
 describe("GroupHygiene", () => {
@@ -96,7 +159,7 @@ describe("GroupHygiene", () => {
       makeEmptyGroupEntry("Legacy-VPN"),
       makeEmptyGroupEntry("Old-Printers"),
     ];
-    mockScanResults(emptyGroups, []);
+    mockScanResultsLegacy(emptyGroups, []);
 
     render(<GroupHygiene />, { wrapper: TestProviders });
     fireEvent.click(screen.getByTestId("scan-button"));
@@ -117,7 +180,7 @@ describe("GroupHygiene", () => {
         "CN=Developers,OU=Groups,DC=example,DC=com",
       ],
     ];
-    mockScanResults([], cycles);
+    mockScanResultsLegacy([], cycles);
 
     render(<GroupHygiene />, { wrapper: TestProviders });
     fireEvent.click(screen.getByTestId("scan-button"));
@@ -133,7 +196,7 @@ describe("GroupHygiene", () => {
   });
 
   it("shows empty state when no issues found", async () => {
-    mockScanResults([], []);
+    mockScanResultsLegacy([], []);
 
     render(<GroupHygiene />, { wrapper: TestProviders });
     fireEvent.click(screen.getByTestId("scan-button"));
@@ -152,6 +215,11 @@ describe("GroupHygiene", () => {
       if (cmd === "detect_empty_groups")
         return Promise.reject(new Error("Connection lost"));
       if (cmd === "detect_circular_groups") return Promise.resolve([]);
+      if (cmd === "detect_single_member_groups") return Promise.resolve([]);
+      if (cmd === "detect_stale_groups") return Promise.resolve([]);
+      if (cmd === "detect_undescribed_groups") return Promise.resolve([]);
+      if (cmd === "detect_deep_nesting") return Promise.resolve([]);
+      if (cmd === "detect_duplicate_groups") return Promise.resolve([]);
       return Promise.resolve(null);
     }) as typeof invoke);
 
@@ -170,7 +238,7 @@ describe("GroupHygiene", () => {
       makeEmptyGroupEntry("Sales-EMEA"),
       makeEmptyGroupEntry("Dev-Frontend"),
     ];
-    mockScanResults(emptyGroups, []);
+    mockScanResultsLegacy(emptyGroups, []);
 
     render(<GroupHygiene />, { wrapper: TestProviders });
     fireEvent.click(screen.getByTestId("scan-button"));
@@ -192,7 +260,7 @@ describe("GroupHygiene", () => {
 
   it("delete selected opens preview", async () => {
     const emptyGroups = [makeEmptyGroupEntry("Sales-EMEA")];
-    mockScanResults(emptyGroups, []);
+    mockScanResultsLegacy(emptyGroups, []);
 
     render(<GroupHygiene />, { wrapper: TestProviders });
     fireEvent.click(screen.getByTestId("scan-button"));
@@ -220,7 +288,7 @@ describe("GroupHygiene", () => {
 
   it("delete executes and refreshes", async () => {
     const emptyGroups = [makeEmptyGroupEntry("Sales-EMEA")];
-    mockScanResults(emptyGroups, []);
+    mockScanResultsLegacy(emptyGroups, []);
 
     render(<GroupHygiene />, { wrapper: TestProviders });
     fireEvent.click(screen.getByTestId("scan-button"));
@@ -252,7 +320,7 @@ describe("GroupHygiene", () => {
 
   it("go to group calls navigation", async () => {
     const emptyGroups = [makeEmptyGroupEntry("Sales-EMEA")];
-    mockScanResults(emptyGroups, []);
+    mockScanResultsLegacy(emptyGroups, []);
 
     render(<GroupHygiene />, { wrapper: TestProviders });
     fireEvent.click(screen.getByTestId("scan-button"));
@@ -269,7 +337,7 @@ describe("GroupHygiene", () => {
 
   it("permission gating: delete hidden for non-DomainAdmin", async () => {
     const emptyGroups = [makeEmptyGroupEntry("Sales-EMEA")];
-    mockScanResults(emptyGroups, [], "AccountOperator");
+    mockScanResultsLegacy(emptyGroups, [], "AccountOperator");
 
     render(<GroupHygiene />, { wrapper: TestProviders });
     fireEvent.click(screen.getByTestId("scan-button"));
@@ -290,7 +358,7 @@ describe("GroupHygiene", () => {
       makeEmptyGroupEntry("Dev-Frontend"),
       makeEmptyGroupEntry("Dev-Backend"),
     ];
-    mockScanResults(emptyGroups, []);
+    mockScanResultsLegacy(emptyGroups, []);
 
     render(<GroupHygiene />, { wrapper: TestProviders });
     fireEvent.click(screen.getByTestId("scan-button"));
@@ -307,7 +375,7 @@ describe("GroupHygiene", () => {
       ["CN=A,DC=test", "CN=B,DC=test", "CN=A,DC=test"],
       ["CN=C,DC=test", "CN=D,DC=test", "CN=C,DC=test"],
     ];
-    mockScanResults([], cycles);
+    mockScanResultsLegacy([], cycles);
 
     render(<GroupHygiene />, { wrapper: TestProviders });
     fireEvent.click(screen.getByTestId("scan-button"));
@@ -321,7 +389,7 @@ describe("GroupHygiene", () => {
 
   it("delete progress shows during execution", async () => {
     const emptyGroups = [makeEmptyGroupEntry("Sales-EMEA")];
-    mockScanResults(emptyGroups, []);
+    mockScanResultsLegacy(emptyGroups, []);
 
     render(<GroupHygiene />, { wrapper: TestProviders });
     fireEvent.click(screen.getByTestId("scan-button"));
@@ -360,7 +428,7 @@ describe("GroupHygiene", () => {
         "CN=TeamA,OU=Groups,DC=example,DC=com",
       ],
     ];
-    mockScanResults([], cycles);
+    mockScanResultsLegacy([], cycles);
 
     render(<GroupHygiene />, { wrapper: TestProviders });
     fireEvent.click(screen.getByTestId("scan-button"));
@@ -382,7 +450,7 @@ describe("GroupHygiene", () => {
       makeEmptyGroupEntry("Sales-EMEA"),
       makeEmptyGroupEntry("Dev-Frontend"),
     ];
-    mockScanResults(emptyGroups, []);
+    mockScanResultsLegacy(emptyGroups, []);
 
     render(<GroupHygiene />, { wrapper: TestProviders });
     fireEvent.click(screen.getByTestId("scan-button"));
@@ -402,7 +470,7 @@ describe("GroupHygiene", () => {
 
   it("cancel in delete preview closes dialog", async () => {
     const emptyGroups = [makeEmptyGroupEntry("Sales-EMEA")];
-    mockScanResults(emptyGroups, []);
+    mockScanResultsLegacy(emptyGroups, []);
 
     render(<GroupHygiene />, { wrapper: TestProviders });
     fireEvent.click(screen.getByTestId("scan-button"));
@@ -430,5 +498,213 @@ describe("GroupHygiene", () => {
         screen.queryByTestId("delete-preview-dialog"),
       ).not.toBeInTheDocument();
     });
+  });
+
+  // --- New detection tests ---
+
+  it("displays single-member groups after scan", async () => {
+    const singleMemberGroups = [
+      makeGroupEntry("IT-Support", {
+        member: ["CN=User1,DC=example,DC=com"],
+        groupType: ["-2147483646"],
+      }),
+    ];
+    mockScanResults({ singleMemberGroups });
+
+    render(<GroupHygiene />, { wrapper: TestProviders });
+    fireEvent.click(screen.getByTestId("scan-button"));
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId("single-member-groups-section"),
+      ).toBeInTheDocument();
+    });
+
+    expect(screen.getByTestId("single-member-groups-count")).toHaveTextContent(
+      "1",
+    );
+    expect(screen.getByText("IT-Support")).toBeInTheDocument();
+  });
+
+  it("displays stale groups with last modified date", async () => {
+    const staleGroups = [
+      makeGroupEntry("Old-Team", {
+        groupType: ["-2147483646"],
+        whenChanged: ["2024-01-01T00:00:00Z"],
+      }),
+    ];
+    mockScanResults({ staleGroups });
+
+    render(<GroupHygiene />, { wrapper: TestProviders });
+    fireEvent.click(screen.getByTestId("scan-button"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("stale-groups-section")).toBeInTheDocument();
+    });
+
+    expect(screen.getByTestId("stale-groups-count")).toHaveTextContent("1");
+    expect(screen.getByText("Old-Team")).toBeInTheDocument();
+    expect(screen.getByText("> 180 days ago")).toBeInTheDocument();
+  });
+
+  it("displays undescribed groups after scan", async () => {
+    const undescribedGroups = [
+      makeGroupEntry("No-Desc-Group", { groupType: ["-2147483646"] }),
+      makeGroupEntry("Another-No-Desc", { groupType: ["-2147483646"] }),
+    ];
+    mockScanResults({ undescribedGroups });
+
+    render(<GroupHygiene />, { wrapper: TestProviders });
+    fireEvent.click(screen.getByTestId("scan-button"));
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId("undescribed-groups-section"),
+      ).toBeInTheDocument();
+    });
+
+    expect(screen.getByTestId("undescribed-groups-count")).toHaveTextContent(
+      "2",
+    );
+    expect(screen.getByText("No-Desc-Group")).toBeInTheDocument();
+    expect(screen.getByText("Another-No-Desc")).toBeInTheDocument();
+  });
+
+  it("displays deep nesting results with depth", async () => {
+    const deeplyNested: DeepNestingResult[] = [
+      {
+        groupDn: "CN=IT-Team,OU=Groups,DC=example,DC=com",
+        groupName: "IT-Team",
+        depth: 4,
+      },
+    ];
+    mockScanResults({ deeplyNested });
+
+    render(<GroupHygiene />, { wrapper: TestProviders });
+    fireEvent.click(screen.getByTestId("scan-button"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("deep-nesting-section")).toBeInTheDocument();
+    });
+
+    expect(screen.getByTestId("deep-nesting-count")).toHaveTextContent("1");
+    expect(screen.getByTestId("deep-nested-IT-Team")).toBeInTheDocument();
+    expect(screen.getByTestId("depth-IT-Team")).toHaveTextContent("Depth: 4");
+  });
+
+  it("displays duplicate groups as clusters", async () => {
+    const duplicateGroups = [
+      [
+        makeGroupEntry("IT-Support", {
+          member: ["CN=User1,DC=example,DC=com"],
+          groupType: ["-2147483646"],
+        }),
+        makeGroupEntry("IT-Helpdesk", {
+          member: ["CN=User1,DC=example,DC=com"],
+          groupType: ["-2147483646"],
+        }),
+      ],
+    ];
+    mockScanResults({ duplicateGroups });
+
+    render(<GroupHygiene />, { wrapper: TestProviders });
+    fireEvent.click(screen.getByTestId("scan-button"));
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId("duplicate-groups-section"),
+      ).toBeInTheDocument();
+    });
+
+    expect(screen.getByTestId("duplicate-groups-count")).toHaveTextContent("1");
+    expect(screen.getByTestId("duplicate-cluster-0")).toBeInTheDocument();
+    expect(
+      screen.getByTestId("duplicate-group-IT-Support"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId("duplicate-group-IT-Helpdesk"),
+    ).toBeInTheDocument();
+  });
+
+  it("single-member groups go-to navigation works", async () => {
+    const singleMemberGroups = [
+      makeGroupEntry("Solo-Group", {
+        member: ["CN=User1,DC=example,DC=com"],
+        groupType: ["-2147483646"],
+      }),
+    ];
+    mockScanResults({ singleMemberGroups });
+
+    render(<GroupHygiene />, { wrapper: TestProviders });
+    fireEvent.click(screen.getByTestId("scan-button"));
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId("single-member-groups-section"),
+      ).toBeInTheDocument();
+    });
+
+    const goToBtn = screen.getByTestId("go-to-group-Solo-Group");
+    fireEvent.click(goToBtn);
+    expect(goToBtn).toBeInTheDocument();
+  });
+
+  it("deep nesting go-to navigation works", async () => {
+    const deeplyNested: DeepNestingResult[] = [
+      {
+        groupDn: "CN=Deep-Group,OU=Groups,DC=example,DC=com",
+        groupName: "Deep-Group",
+        depth: 5,
+      },
+    ];
+    mockScanResults({ deeplyNested });
+
+    render(<GroupHygiene />, { wrapper: TestProviders });
+    fireEvent.click(screen.getByTestId("scan-button"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("deep-nesting-section")).toBeInTheDocument();
+    });
+
+    const goToBtn = screen.getByTestId("go-to-group-Deep-Group");
+    fireEvent.click(goToBtn);
+    expect(goToBtn).toBeInTheDocument();
+  });
+
+  it("all detections run in parallel via scan button", async () => {
+    mockScanResults({});
+
+    render(<GroupHygiene />, { wrapper: TestProviders });
+    fireEvent.click(screen.getByTestId("scan-button"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("no-issues")).toBeInTheDocument();
+    });
+
+    // Verify all 7 detection commands were called
+    expect(mockInvoke).toHaveBeenCalledWith("detect_empty_groups");
+    expect(mockInvoke).toHaveBeenCalledWith("detect_circular_groups");
+    expect(mockInvoke).toHaveBeenCalledWith("detect_single_member_groups");
+    expect(mockInvoke).toHaveBeenCalledWith("detect_stale_groups", {
+      daysThreshold: 180,
+    });
+    expect(mockInvoke).toHaveBeenCalledWith("detect_undescribed_groups");
+    expect(mockInvoke).toHaveBeenCalledWith("detect_deep_nesting", {
+      maxDepth: 3,
+    });
+    expect(mockInvoke).toHaveBeenCalledWith("detect_duplicate_groups");
+  });
+
+  it("placeholder containers show for all 7 detections before scan", () => {
+    mockPermissions("ReadOnly");
+    render(<GroupHygiene />, { wrapper: TestProviders });
+
+    expect(screen.getByText("Empty Groups")).toBeInTheDocument();
+    expect(screen.getByText("Single-Member Groups")).toBeInTheDocument();
+    expect(screen.getByText("Stale Groups")).toBeInTheDocument();
+    expect(screen.getByText("Groups Without Description")).toBeInTheDocument();
+    expect(screen.getByText("Circular Nesting")).toBeInTheDocument();
+    expect(screen.getByText("Excessive Nesting Depth")).toBeInTheDocument();
+    expect(screen.getByText("Duplicate Groups")).toBeInTheDocument();
   });
 });

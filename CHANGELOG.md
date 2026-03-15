@@ -10,10 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Group hygiene scan detecting empty groups and circular group nesting (4.4)
+- Single-member group detection - flags groups with exactly one member (4.4)
+- Stale group detection - flags groups not modified in over 180 days (4.4)
+- Duplicate group detection - flags groups sharing identical member sets (4.4)
+- Undescribed group detection - flags groups missing the description attribute (4.4)
+- Excessive nesting depth detection - flags groups nested deeper than 3 levels (4.4)
 - One-click navigation from hygiene findings to group browser (4.4)
 - Bulk delete of empty groups with dry-run preview and DomainAdmin gating (4.4)
 - `delete_object` trait method on DirectoryProvider for AD object deletion (4.4)
 - `detect_empty_groups`, `detect_circular_groups`, `delete_group` Tauri commands (4.4)
+- `detect_single_member_groups`, `detect_stale_groups`, `detect_undescribed_groups`, `detect_deep_nesting`, `detect_duplicate_groups` Tauri commands (4.4)
 - DFS-based circular nesting detection with three-color graph marking (4.4)
 - Hygiene tab in GroupManagement view (AccountOperator+ gated) (4.4)
 - Bulk operations panel for Delete/Add/Transfer members across groups (4.3)

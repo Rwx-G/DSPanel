@@ -854,6 +854,219 @@ pub(crate) async fn detect_circular_groups_inner(
     Ok(cycles)
 }
 
+/// Detects groups with exactly one member.
+pub(crate) async fn detect_single_member_groups_inner(
+    state: &AppState,
+) -> Result<Vec<DirectoryEntry>, AppError> {
+    let provider = state.directory_provider.clone();
+    let groups = provider
+        .browse_groups(5000)
+        .await
+        .map_err(|e| AppError::Directory(e.to_string()))?;
+
+    let single: Vec<DirectoryEntry> = groups
+        .into_iter()
+        .filter(|g| {
+            let members = g.get_attribute_values("member");
+            members.len() == 1
+        })
+        .filter(|g| {
+            let dn = &g.distinguished_name;
+            !dn.contains("CN=Builtin,") && !dn.contains("CN=Users,DC=")
+        })
+        .collect();
+
+    Ok(single)
+}
+
+/// Result for a group with deep nesting.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeepNestingResult {
+    pub group_dn: String,
+    pub group_name: String,
+    pub depth: usize,
+}
+
+/// Detects groups not modified for longer than the given threshold in days.
+pub(crate) async fn detect_stale_groups_inner(
+    state: &AppState,
+    days_threshold: u64,
+) -> Result<Vec<DirectoryEntry>, AppError> {
+    let provider = state.directory_provider.clone();
+    let groups = provider
+        .browse_groups(5000)
+        .await
+        .map_err(|e| AppError::Directory(e.to_string()))?;
+
+    let now = chrono::Utc::now();
+    let threshold = chrono::Duration::days(days_threshold as i64);
+
+    let stale: Vec<DirectoryEntry> = groups
+        .into_iter()
+        .filter(|g| {
+            let dn = &g.distinguished_name;
+            !dn.contains("CN=Builtin,") && !dn.contains("CN=Users,DC=")
+        })
+        .filter(|g| {
+            if let Some(when_changed) = g.get_attribute("whenChanged") {
+                if let Ok(parsed) = chrono::DateTime::parse_from_rfc3339(when_changed) {
+                    let age = now - parsed.with_timezone(&chrono::Utc);
+                    return age > threshold;
+                }
+                // Try AD generalized time format: yyyyMMddHHmmss.0Z
+                if let Ok(parsed) = chrono::NaiveDateTime::parse_from_str(
+                    when_changed.trim_end_matches('Z'),
+                    "%Y%m%d%H%M%S%.f",
+                ) {
+                    let utc = parsed.and_utc();
+                    let age = now - utc;
+                    return age > threshold;
+                }
+            }
+            false
+        })
+        .collect();
+
+    Ok(stale)
+}
+
+/// Detects groups missing the description attribute.
+pub(crate) async fn detect_undescribed_groups_inner(
+    state: &AppState,
+) -> Result<Vec<DirectoryEntry>, AppError> {
+    let provider = state.directory_provider.clone();
+    let groups = provider
+        .browse_groups(5000)
+        .await
+        .map_err(|e| AppError::Directory(e.to_string()))?;
+
+    let undescribed: Vec<DirectoryEntry> = groups
+        .into_iter()
+        .filter(|g| {
+            let dn = &g.distinguished_name;
+            !dn.contains("CN=Builtin,") && !dn.contains("CN=Users,DC=")
+        })
+        .filter(|g| {
+            let desc = g.get_attribute("description").unwrap_or("");
+            desc.trim().is_empty()
+        })
+        .collect();
+
+    Ok(undescribed)
+}
+
+/// Detects groups nested deeper than `max_depth` levels.
+pub(crate) async fn detect_deep_nesting_inner(
+    state: &AppState,
+    max_depth: usize,
+) -> Result<Vec<DeepNestingResult>, AppError> {
+    let provider = state.directory_provider.clone();
+    let groups = provider
+        .browse_groups(5000)
+        .await
+        .map_err(|e| AppError::Directory(e.to_string()))?;
+
+    // Build parent-to-child adjacency: group DN -> child group DNs
+    let group_dns: std::collections::HashSet<String> = groups
+        .iter()
+        .map(|g| g.distinguished_name.clone())
+        .collect();
+
+    let mut children_of: std::collections::HashMap<String, Vec<String>> =
+        std::collections::HashMap::new();
+    for group in &groups {
+        let member_groups: Vec<String> = group
+            .get_attribute_values("member")
+            .iter()
+            .filter(|m| group_dns.contains(*m))
+            .cloned()
+            .collect();
+        children_of.insert(group.distinguished_name.clone(), member_groups);
+    }
+
+    // For each group, compute maximum depth via DFS
+    fn compute_depth(
+        node: &str,
+        children_of: &std::collections::HashMap<String, Vec<String>>,
+        visited: &mut std::collections::HashSet<String>,
+    ) -> usize {
+        if visited.contains(node) {
+            return 0; // avoid cycles
+        }
+        visited.insert(node.to_string());
+        let max_child_depth = children_of
+            .get(node)
+            .map(|children| {
+                children
+                    .iter()
+                    .map(|c| compute_depth(c, children_of, visited))
+                    .max()
+                    .unwrap_or(0)
+            })
+            .unwrap_or(0);
+        visited.remove(node);
+        max_child_depth + 1
+    }
+
+    let mut results: Vec<DeepNestingResult> = Vec::new();
+    for group in &groups {
+        let mut visited = std::collections::HashSet::new();
+        let depth = compute_depth(&group.distinguished_name, &children_of, &mut visited);
+        if depth > max_depth {
+            let name = group
+                .display_name
+                .clone()
+                .or_else(|| group.sam_account_name.clone())
+                .unwrap_or_else(|| group.distinguished_name.clone());
+            results.push(DeepNestingResult {
+                group_dn: group.distinguished_name.clone(),
+                group_name: name,
+                depth,
+            });
+        }
+    }
+
+    Ok(results)
+}
+
+/// Detects groups that have exactly the same set of members.
+pub(crate) async fn detect_duplicate_groups_inner(
+    state: &AppState,
+) -> Result<Vec<Vec<DirectoryEntry>>, AppError> {
+    let provider = state.directory_provider.clone();
+    let groups = provider
+        .browse_groups(5000)
+        .await
+        .map_err(|e| AppError::Directory(e.to_string()))?;
+
+    // Build member set fingerprints
+    let mut member_map: std::collections::HashMap<Vec<String>, Vec<DirectoryEntry>> =
+        std::collections::HashMap::new();
+
+    for group in groups {
+        let dn = &group.distinguished_name;
+        if dn.contains("CN=Builtin,") || dn.contains("CN=Users,DC=") {
+            continue;
+        }
+        let members = group.get_attribute_values("member");
+        if members.is_empty() {
+            continue; // empty groups already handled separately
+        }
+        let mut sorted_members: Vec<String> = members.to_vec();
+        sorted_members.sort();
+        member_map.entry(sorted_members).or_default().push(group);
+    }
+
+    // Keep only clusters with 2+ groups
+    let duplicates: Vec<Vec<DirectoryEntry>> = member_map
+        .into_values()
+        .filter(|cluster| cluster.len() >= 2)
+        .collect();
+
+    Ok(duplicates)
+}
+
 /// Deletes a group by DN (requires DomainAdmin).
 pub(crate) async fn delete_group_inner(state: &AppState, group_dn: &str) -> Result<(), AppError> {
     if !state
@@ -1087,6 +1300,48 @@ pub async fn detect_circular_groups(
     state: State<'_, AppState>,
 ) -> Result<Vec<Vec<String>>, AppError> {
     detect_circular_groups_inner(&state).await
+}
+
+/// Detects groups with exactly one member.
+#[tauri::command]
+pub async fn detect_single_member_groups(
+    state: State<'_, AppState>,
+) -> Result<Vec<DirectoryEntry>, AppError> {
+    detect_single_member_groups_inner(&state).await
+}
+
+/// Detects groups not modified in a long time (stale).
+#[tauri::command]
+pub async fn detect_stale_groups(
+    days_threshold: u64,
+    state: State<'_, AppState>,
+) -> Result<Vec<DirectoryEntry>, AppError> {
+    detect_stale_groups_inner(&state, days_threshold).await
+}
+
+/// Detects groups missing description attribute.
+#[tauri::command]
+pub async fn detect_undescribed_groups(
+    state: State<'_, AppState>,
+) -> Result<Vec<DirectoryEntry>, AppError> {
+    detect_undescribed_groups_inner(&state).await
+}
+
+/// Detects groups with excessive nesting depth.
+#[tauri::command]
+pub async fn detect_deep_nesting(
+    max_depth: usize,
+    state: State<'_, AppState>,
+) -> Result<Vec<DeepNestingResult>, AppError> {
+    detect_deep_nesting_inner(&state, max_depth).await
+}
+
+/// Detects groups with identical member sets.
+#[tauri::command]
+pub async fn detect_duplicate_groups(
+    state: State<'_, AppState>,
+) -> Result<Vec<Vec<DirectoryEntry>>, AppError> {
+    detect_duplicate_groups_inner(&state).await
 }
 
 /// Deletes a group by DN.
@@ -3473,5 +3728,100 @@ mod tests {
         assert_eq!(entries.len(), 1);
         assert!(entries[0].success);
         assert_eq!(entries[0].action, "GroupDeleted");
+    }
+
+    #[tokio::test]
+    async fn test_detect_single_member_groups_inner() {
+        let single_group = make_group_entry_with_members(
+            "SingleGroup",
+            vec!["CN=User1,OU=Users,DC=example,DC=com"],
+        );
+        let multi_group = make_group_entry_with_members(
+            "MultiGroup",
+            vec![
+                "CN=User1,OU=Users,DC=example,DC=com",
+                "CN=User2,OU=Users,DC=example,DC=com",
+            ],
+        );
+        let empty_group = make_group_entry_with_members("EmptyGroup", vec![]);
+        let groups = vec![single_group, multi_group, empty_group];
+        let state = make_state_with_groups(groups);
+        let result = detect_single_member_groups_inner(&state).await.unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].sam_account_name, Some("SingleGroup".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_detect_stale_groups_inner() {
+        let mut stale_group = make_group_entry_with_members("StaleGroup", vec![]);
+        stale_group.attributes.insert(
+            "whenChanged".to_string(),
+            vec!["2024-01-01T00:00:00Z".to_string()],
+        );
+        let mut fresh_group = make_group_entry_with_members("FreshGroup", vec![]);
+        fresh_group.attributes.insert(
+            "whenChanged".to_string(),
+            vec!["2026-03-14T00:00:00Z".to_string()],
+        );
+        let groups = vec![stale_group, fresh_group];
+        let state = make_state_with_groups(groups);
+        let result = detect_stale_groups_inner(&state, 180).await.unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].sam_account_name, Some("StaleGroup".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_detect_undescribed_groups_inner() {
+        let with_desc = make_group_entry_with_members("WithDesc", vec![]);
+        // WithDesc already has description from the helper
+        let mut without_desc = make_group_entry_with_members("NoDesc", vec![]);
+        without_desc.attributes.remove("description");
+        let groups = vec![with_desc, without_desc];
+        let state = make_state_with_groups(groups);
+        let result = detect_undescribed_groups_inner(&state).await.unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].sam_account_name, Some("NoDesc".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_detect_duplicate_groups_inner() {
+        let group_a = make_group_entry_with_members(
+            "GroupA",
+            vec!["CN=User1,DC=example,DC=com", "CN=User2,DC=example,DC=com"],
+        );
+        let group_b = make_group_entry_with_members(
+            "GroupB",
+            vec!["CN=User2,DC=example,DC=com", "CN=User1,DC=example,DC=com"],
+        );
+        let group_c = make_group_entry_with_members("GroupC", vec!["CN=User3,DC=example,DC=com"]);
+        let groups = vec![group_a, group_b, group_c];
+        let state = make_state_with_groups(groups);
+        let result = detect_duplicate_groups_inner(&state).await.unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].len(), 2);
+        let names: Vec<&str> = result[0]
+            .iter()
+            .filter_map(|g| g.sam_account_name.as_deref())
+            .collect();
+        assert!(names.contains(&"GroupA"));
+        assert!(names.contains(&"GroupB"));
+    }
+
+    #[tokio::test]
+    async fn test_detect_deep_nesting_inner() {
+        // Create a chain: GroupA -> GroupB -> GroupC (depth 3 from A)
+        let group_a =
+            make_group_entry_with_members("GroupA", vec!["CN=GroupB,OU=Groups,DC=example,DC=com"]);
+        let group_b =
+            make_group_entry_with_members("GroupB", vec!["CN=GroupC,OU=Groups,DC=example,DC=com"]);
+        let group_c = make_group_entry_with_members("GroupC", vec![]);
+        let groups = vec![group_a, group_b, group_c];
+        let state = make_state_with_groups(groups);
+        // max_depth = 2 means we report groups with depth > 2
+        let result = detect_deep_nesting_inner(&state, 2).await.unwrap();
+        assert!(!result.is_empty(), "Should detect GroupA with depth 3");
+        assert!(result
+            .iter()
+            .any(|r| r.group_name == "GroupA" && r.depth == 3));
     }
 }

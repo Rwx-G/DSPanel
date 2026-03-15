@@ -366,12 +366,7 @@ fn sample_group_entries() -> Vec<DirectoryEntry> {
         &users,
         &["cjones", "inovak"],
     );
-    let it_support = make_subgroup(
-        "IT-Support",
-        "IT support sub-group",
-        &users,
-        &["sjackson"],
-    );
+    let it_support = make_subgroup("IT-Support", "IT support sub-group", &users, &["sjackson"]);
     let dev_frontend = make_subgroup(
         "Dev-Frontend",
         "Frontend developers sub-group",
@@ -395,6 +390,21 @@ fn sample_group_entries() -> Vec<DirectoryEntry> {
     add_group_member(&mut eng_team, &dev_frontend);
     add_group_member(&mut eng_team, &dev_backend);
 
+    // Group without description, with same members as IT-Support (duplicate pair)
+    let it_support_dup = make_group_no_description(
+        "IT-Helpdesk",
+        vec!["CN=Samuel Jackson,OU=IT,OU=Users,DC=contoso,DC=com".to_string()],
+    );
+
+    // Group without description and multiple members
+    let temp_project = make_group_no_description(
+        "Temp-Project",
+        vec![
+            "CN=John Doe,OU=IT,OU=Users,DC=contoso,DC=com".to_string(),
+            "CN=Alice Smith,OU=HR,OU=Users,DC=contoso,DC=com".to_string(),
+        ],
+    );
+
     vec![
         it_team,
         make_group("HR Team", "HR", &users),
@@ -408,6 +418,8 @@ fn sample_group_entries() -> Vec<DirectoryEntry> {
         dev_backend,
         make_group_empty("Deprecated-Printers"),
         make_group_empty("Legacy-VPN"),
+        it_support_dup,
+        temp_project,
     ]
 }
 
@@ -433,6 +445,11 @@ fn make_group(name: &str, dept: &str, all_users: &[DirectoryEntry]) -> Directory
         vec![format!("{} department security group", dept)],
     );
     attrs.insert("member".to_string(), members);
+    // Recent modification date by default
+    attrs.insert(
+        "whenChanged".to_string(),
+        vec!["2026-03-10T14:30:00Z".to_string()],
+    );
 
     DirectoryEntry {
         distinguished_name: group_dn,
@@ -464,6 +481,10 @@ fn make_subgroup(
     attrs.insert("groupType".to_string(), vec!["-2147483646".to_string()]);
     attrs.insert("description".to_string(), vec![description.to_string()]);
     attrs.insert("member".to_string(), members);
+    attrs.insert(
+        "whenChanged".to_string(),
+        vec!["2026-03-10T14:30:00Z".to_string()],
+    );
 
     DirectoryEntry {
         distinguished_name: format!("CN={},OU=Groups,DC=contoso,DC=com", name),
@@ -488,6 +509,28 @@ fn make_group_empty(name: &str) -> DirectoryEntry {
     attrs.insert(
         "description".to_string(),
         vec![format!("{} (unused)", name)],
+    );
+    // Stale date for empty groups
+    attrs.insert(
+        "whenChanged".to_string(),
+        vec!["2024-06-15T00:00:00Z".to_string()],
+    );
+    DirectoryEntry {
+        distinguished_name: format!("CN={},OU=Groups,DC=contoso,DC=com", name),
+        sam_account_name: Some(name.to_string()),
+        display_name: Some(name.to_string()),
+        object_class: Some("group".to_string()),
+        attributes: attrs,
+    }
+}
+
+fn make_group_no_description(name: &str, members: Vec<String>) -> DirectoryEntry {
+    let mut attrs = HashMap::new();
+    attrs.insert("groupType".to_string(), vec!["-2147483646".to_string()]);
+    attrs.insert("member".to_string(), members);
+    attrs.insert(
+        "whenChanged".to_string(),
+        vec!["2024-05-01T00:00:00Z".to_string()],
     );
     DirectoryEntry {
         distinguished_name: format!("CN={},OU=Groups,DC=contoso,DC=com", name),

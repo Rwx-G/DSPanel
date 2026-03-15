@@ -336,7 +336,7 @@ export function BulkOperations() {
       data-testid="bulk-operations"
     >
       <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">
-        Bulk Operations
+        Groups Bulk Operation
       </h2>
 
       {/* Operation Type Selector */}
@@ -351,10 +351,8 @@ export function BulkOperations() {
             return (
               <button
                 key={op}
-                className={`btn flex items-center gap-1.5 px-3 py-1.5 text-caption ${
-                  isActive
-                    ? "bg-[var(--color-primary)] text-white"
-                    : "btn-ghost"
+                className={`btn btn-sm flex items-center gap-1.5 ${
+                  isActive ? "btn-primary" : "btn-outline"
                 }`}
                 onClick={() => setOperationType(op)}
                 disabled={isRunning}
@@ -489,7 +487,7 @@ export function BulkOperations() {
           data-testid="bulk-action-buttons"
         >
           <button
-            className="btn btn-ghost flex items-center gap-1.5"
+            className="btn btn-outline btn-sm flex items-center gap-1.5"
             onClick={handlePreview}
             disabled={!canPreview || isRunning}
             data-testid="bulk-preview-btn"
@@ -498,7 +496,7 @@ export function BulkOperations() {
             Preview
           </button>
           <button
-            className="btn btn-primary flex items-center gap-1.5"
+            className="btn btn-primary btn-sm flex items-center gap-1.5"
             onClick={handleExecute}
             disabled={plannedChanges.length === 0 || isRunning}
             data-testid="bulk-execute-btn"
