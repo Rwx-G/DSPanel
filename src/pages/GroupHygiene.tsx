@@ -18,7 +18,142 @@ import {
   ExternalLink,
   ArrowRight,
   Info,
+  ThumbsUp,
 } from "lucide-react";
+
+/** Wrapper for hygiene result sections - shows green "all clear" when count is 0 */
+function HygieneSection({
+  title,
+  count,
+  testId,
+  countTestId,
+  severity = "warning",
+  tooltip,
+  tooltipPosition = "below",
+  actions,
+  children,
+}: {
+  title: string;
+  count: number;
+  testId: string;
+  countTestId: string;
+  severity?: "warning" | "error";
+  tooltip?: { what: string; why: string; fix: string; warn?: string };
+  tooltipPosition?: "below" | "above";
+  actions?: React.ReactNode;
+  children?: React.ReactNode;
+}) {
+  const [showTip, setShowTip] = useState(false);
+  const isClean = count === 0;
+  return (
+    <div
+      className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-3"
+      data-testid={testId}
+    >
+      <div className="flex items-center justify-between">
+        <h3 className="flex items-center gap-2 text-body font-semibold text-[var(--color-text-primary)]">
+          {title}
+          <span
+            className={`inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-caption font-medium text-white ${
+              isClean
+                ? "bg-[var(--color-success)]"
+                : severity === "error"
+                  ? "bg-[var(--color-error)]"
+                  : "bg-[var(--color-warning)]"
+            }`}
+            data-testid={countTestId}
+          >
+            {count}
+          </span>
+          {isClean && (
+            <ThumbsUp size={14} className="text-[var(--color-success)]" />
+          )}
+          {tooltip && (
+            <div className="relative">
+              <button
+                className="flex h-5 w-5 items-center justify-center rounded-full text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors"
+                onClick={() => setShowTip(!showTip)}
+                onBlur={() => setTimeout(() => setShowTip(false), 150)}
+                aria-label={`About ${title}`}
+              >
+                <Info size={13} />
+              </button>
+              {showTip && (
+                <div className={`absolute left-0 z-50 w-80 rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-3 shadow-lg ${tooltipPosition === "above" ? "bottom-full mb-1" : "top-full mt-1"}`}>
+                  <p className="text-caption text-[var(--color-text-primary)]">
+                    <strong>What:</strong> {tooltip.what}
+                  </p>
+                  <p className="mt-1 text-caption text-[var(--color-text-primary)]">
+                    <strong>Why:</strong> {tooltip.why}
+                  </p>
+                  <p className="mt-1 text-caption text-[var(--color-text-primary)]">
+                    <strong>Fix:</strong> {tooltip.fix}
+                  </p>
+                  {tooltip.warn && (
+                    <p className="mt-1.5 flex items-start gap-1 text-caption text-[var(--color-warning)]">
+                      <AlertCircle size={12} className="mt-0.5 shrink-0" />
+                      {tooltip.warn}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </h3>
+        {!isClean && actions && <div>{actions}</div>}
+      </div>
+      {isClean ? (
+        <p className="mt-2 text-caption text-[var(--color-success)]">
+          All clear - no issues detected
+        </p>
+      ) : (
+        <div className="mt-3">{children}</div>
+      )}
+    </div>
+  );
+}
+
+const HYGIENE_TOOLTIPS = {
+  empty: {
+    what: "Groups with zero members.",
+    why: "Empty groups clutter AD and may still be referenced in UNC path ACLs or GPOs, causing confusion during audits.",
+    fix: "Delete the group if unused, or add the appropriate members. Check UNC permissions before deleting.",
+    warn: "The group may still be configured on UNC paths or file share ACLs. Verify with NTFS Analyzer before deleting.",
+  },
+  singleMember: {
+    what: "Groups containing only one member.",
+    why: "A single-member group adds unnecessary indirection. The user could be assigned permissions directly.",
+    fix: "Assign the user directly to the resource, then remove the group. Or add more members if the group is meant to grow.",
+    warn: "Some applications require group-based access even for a single user. Verify before removing.",
+  },
+  stale: {
+    what: "Groups not modified in over 180 days.",
+    why: "Stale groups may reflect outdated team structures or completed projects, increasing the attack surface.",
+    fix: "Review with the group owner. Archive or delete if obsolete, update membership if still needed.",
+  },
+  undescribed: {
+    what: "Groups missing the description attribute.",
+    why: "Without a description, administrators cannot determine the group's purpose, making audits and cleanup harder.",
+    fix: "Add a meaningful description in Group Management (e.g. team name, project, access scope).",
+  },
+  circular: {
+    what: "Groups that contain each other in a nesting loop (A contains B contains A).",
+    why: "Circular nesting causes unexpected permission inheritance and can degrade LDAP query performance.",
+    fix: "Break the cycle by removing one of the nesting relationships. Decide which group should be the parent.",
+    warn: "Circular nesting can cause token bloat and authentication delays. Fix as soon as possible.",
+  },
+  deepNesting: {
+    what: "Groups nested deeper than 3 levels.",
+    why: "Deep nesting makes permissions hard to audit and can cause Kerberos token size issues (MaxTokenSize).",
+    fix: "Flatten the group structure by reducing nesting levels. Consider using direct memberships instead.",
+  },
+  duplicate: {
+    what: "Multiple groups with exactly the same set of members.",
+    why: "Duplicate groups create confusion about which group to use and increase maintenance burden.",
+    fix: "Consolidate into a single group. Update all ACLs and GPOs to reference the surviving group, then delete duplicates.",
+    warn: "Different groups may be used on different resources. Verify all references before merging.",
+  },
+};
 
 interface DeleteProgress {
   current: number;
@@ -211,7 +346,7 @@ export function GroupHygiene() {
 
   const handleGoToGroup = useCallback(
     (groupDn: string) => {
-      openTab("Group Management", "group-management", "Users", {
+      openTab("Group Management", "groups", "users-group", {
         selectedGroupDn: groupDn,
       });
     },
@@ -270,16 +405,16 @@ export function GroupHygiene() {
         key: "actions",
         header: "",
         sortable: false,
-        width: 80,
+        width: 70,
         resizable: false,
         render: (_value, row) => (
           <button
-            className="btn btn-ghost flex items-center gap-1 text-caption"
+            className="btn btn-ghost btn-sm flex items-center gap-1 whitespace-nowrap"
             onClick={() => handleGoToGroup(row.dn)}
             data-testid={`go-to-group-${row.name}`}
-            title="Go to group"
+            title="Open in Group Management"
           >
-            <ExternalLink size={14} />
+            <ExternalLink size={12} />
             Go to
           </button>
         ),
@@ -317,16 +452,16 @@ export function GroupHygiene() {
         key: "actions",
         header: "",
         sortable: false,
-        width: 80,
+        width: 70,
         resizable: false,
         render: (_value: string, row: SimpleGroupRow) => (
           <button
-            className="btn btn-ghost flex items-center gap-1 text-caption"
+            className="btn btn-ghost btn-sm flex items-center gap-1 whitespace-nowrap"
             onClick={() => handleGoToGroup(row.dn)}
             data-testid={`go-to-group-${row.name}`}
-            title="Go to group"
+            title="Open in Group Management"
           >
-            <ExternalLink size={14} />
+            <ExternalLink size={12} />
             Go to
           </button>
         ),
@@ -352,16 +487,16 @@ export function GroupHygiene() {
         key: "actions",
         header: "",
         sortable: false,
-        width: 80,
+        width: 70,
         resizable: false,
         render: (_value: string, row: StaleGroupRow) => (
           <button
-            className="btn btn-ghost flex items-center gap-1 text-caption"
+            className="btn btn-ghost btn-sm flex items-center gap-1 whitespace-nowrap"
             onClick={() => handleGoToGroup(row.dn)}
             data-testid={`go-to-group-${row.name}`}
-            title="Go to group"
+            title="Open in Group Management"
           >
-            <ExternalLink size={14} />
+            <ExternalLink size={12} />
             Go to
           </button>
         ),
@@ -406,14 +541,20 @@ export function GroupHygiene() {
                 className="absolute left-0 top-full z-50 mt-1 w-80 rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-3 shadow-lg"
                 data-testid="hygiene-info-popup"
               >
-                <p className="text-caption font-semibold text-[var(--color-text-primary)] mb-1">
+                <p className="text-caption font-semibold text-[var(--color-text-primary)] mb-1.5">
                   Group Hygiene Scanner
                 </p>
-                <p className="text-caption text-[var(--color-text-secondary)]">
-                  Scan your domain to detect empty groups, single-member groups,
-                  stale groups, groups without description, circular nesting, and
-                  excessive nesting depth. Empty groups can be cleaned up in bulk
-                  if you have DomainAdmin permissions.
+                <ul className="space-y-1 text-caption text-[var(--color-text-secondary)]">
+                  <li><strong>Empty groups</strong> - no members at all</li>
+                  <li><strong>Single-member groups</strong> - only one member, possibly redundant</li>
+                  <li><strong>Stale groups</strong> - not modified in over 180 days</li>
+                  <li><strong>No description</strong> - missing documentation</li>
+                  <li><strong>Circular nesting</strong> - Group A contains B contains A</li>
+                  <li><strong>Excessive depth</strong> - nested deeper than 3 levels</li>
+                  <li><strong>Duplicate groups</strong> - identical member sets</li>
+                </ul>
+                <p className="mt-1.5 text-caption text-[var(--color-text-disabled)]">
+                  Empty groups can be deleted in bulk (DomainAdmin required).
                 </p>
               </div>
             )}
@@ -430,101 +571,34 @@ export function GroupHygiene() {
         </button>
       </div>
 
-      {/* Placeholder containers before scan */}
+      {/* Placeholder containers before scan - same layout as populated sections but greyed out */}
       {!scanned && !scanning && !scanError && (
-        <>
-          <div className="rounded-lg border border-dashed border-[var(--color-border-default)] bg-[var(--color-surface-bg)] p-4 opacity-60">
-            <div className="mb-2 flex items-center gap-2">
-              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--color-text-disabled)] px-1.5 text-caption font-medium text-white">
-                -
-              </span>
-              <h3 className="text-body font-semibold text-[var(--color-text-secondary)]">
-                Empty Groups
+        <div className="space-y-4 opacity-50 pointer-events-none">
+          {[
+            { title: "Empty Groups", hint: "No members at all" },
+            { title: "Single-Member Groups", hint: "Only one member, possibly redundant" },
+            { title: "Stale Groups", hint: "Not modified in over 180 days" },
+            { title: "Groups Without Description", hint: "Missing documentation" },
+            { title: "Circular Nesting", hint: "Circular group nesting detected" },
+            { title: "Excessive Nesting Depth", hint: "Nested deeper than 3 levels" },
+            { title: "Duplicate Groups", hint: "Identical member sets" },
+          ].map((section) => (
+            <div
+              key={section.title}
+              className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-3"
+            >
+              <h3 className="mb-3 flex items-center gap-2 text-body font-semibold text-[var(--color-text-primary)]">
+                {section.title}
+                <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--color-text-disabled)] px-1.5 text-caption font-medium text-white">
+                  -
+                </span>
               </h3>
+              <p className="text-caption text-[var(--color-text-secondary)]">
+                Run scan to detect: {section.hint}
+              </p>
             </div>
-            <p className="text-caption text-[var(--color-text-disabled)]">
-              Run scan to detect groups with no members
-            </p>
-          </div>
-          <div className="rounded-lg border border-dashed border-[var(--color-border-default)] bg-[var(--color-surface-bg)] p-4 opacity-60">
-            <div className="mb-2 flex items-center gap-2">
-              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--color-text-disabled)] px-1.5 text-caption font-medium text-white">
-                -
-              </span>
-              <h3 className="text-body font-semibold text-[var(--color-text-secondary)]">
-                Single-Member Groups
-              </h3>
-            </div>
-            <p className="text-caption text-[var(--color-text-disabled)]">
-              Run scan to detect groups with only one member
-            </p>
-          </div>
-          <div className="rounded-lg border border-dashed border-[var(--color-border-default)] bg-[var(--color-surface-bg)] p-4 opacity-60">
-            <div className="mb-2 flex items-center gap-2">
-              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--color-text-disabled)] px-1.5 text-caption font-medium text-white">
-                -
-              </span>
-              <h3 className="text-body font-semibold text-[var(--color-text-secondary)]">
-                Stale Groups
-              </h3>
-            </div>
-            <p className="text-caption text-[var(--color-text-disabled)]">
-              Run scan to detect groups not modified in over 180 days
-            </p>
-          </div>
-          <div className="rounded-lg border border-dashed border-[var(--color-border-default)] bg-[var(--color-surface-bg)] p-4 opacity-60">
-            <div className="mb-2 flex items-center gap-2">
-              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--color-text-disabled)] px-1.5 text-caption font-medium text-white">
-                -
-              </span>
-              <h3 className="text-body font-semibold text-[var(--color-text-secondary)]">
-                Groups Without Description
-              </h3>
-            </div>
-            <p className="text-caption text-[var(--color-text-disabled)]">
-              Run scan to detect groups missing a description
-            </p>
-          </div>
-          <div className="rounded-lg border border-dashed border-[var(--color-border-default)] bg-[var(--color-surface-bg)] p-4 opacity-60">
-            <div className="mb-2 flex items-center gap-2">
-              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--color-text-disabled)] px-1.5 text-caption font-medium text-white">
-                -
-              </span>
-              <h3 className="text-body font-semibold text-[var(--color-text-secondary)]">
-                Circular Nesting
-              </h3>
-            </div>
-            <p className="text-caption text-[var(--color-text-disabled)]">
-              Run scan to detect circular group nesting
-            </p>
-          </div>
-          <div className="rounded-lg border border-dashed border-[var(--color-border-default)] bg-[var(--color-surface-bg)] p-4 opacity-60">
-            <div className="mb-2 flex items-center gap-2">
-              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--color-text-disabled)] px-1.5 text-caption font-medium text-white">
-                -
-              </span>
-              <h3 className="text-body font-semibold text-[var(--color-text-secondary)]">
-                Excessive Nesting Depth
-              </h3>
-            </div>
-            <p className="text-caption text-[var(--color-text-disabled)]">
-              Run scan to detect groups nested deeper than 3 levels
-            </p>
-          </div>
-          <div className="rounded-lg border border-dashed border-[var(--color-border-default)] bg-[var(--color-surface-bg)] p-4 opacity-60">
-            <div className="mb-2 flex items-center gap-2">
-              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--color-text-disabled)] px-1.5 text-caption font-medium text-white">
-                -
-              </span>
-              <h3 className="text-body font-semibold text-[var(--color-text-secondary)]">
-                Duplicate Groups
-              </h3>
-            </div>
-            <p className="text-caption text-[var(--color-text-disabled)]">
-              Run scan to detect groups with identical members
-            </p>
-          </div>
-        </>
+          ))}
+        </div>
       )}
 
       {scanning && (
@@ -547,298 +621,236 @@ export function GroupHygiene() {
         </div>
       )}
 
-      {scanned && !scanning && !scanError && totalIssues === 0 && (
-        <div
-          className="flex flex-col items-center justify-center py-8"
-          data-testid="no-issues"
-        >
-          <CheckCircle
-            size={48}
-            className="mb-2 text-[var(--color-success)]"
-          />
-          <p className="text-body font-medium text-[var(--color-text-primary)]">
-            No issues found
-          </p>
-          <p className="text-caption text-[var(--color-text-secondary)]">
-            All groups are healthy.
-          </p>
-        </div>
-      )}
-
-      {/* Empty Groups */}
-      {scanned && !scanning && emptyGroups.length > 0 && (
-        <div
-          className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-3"
-          data-testid="empty-groups-section"
-        >
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="flex items-center gap-2 text-body font-semibold text-[var(--color-text-primary)]">
-              Empty Groups
-              <span
-                className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--color-warning)] px-1.5 text-caption font-medium text-white"
-                data-testid="empty-groups-count"
-              >
-                {emptyGroups.length}
-              </span>
-            </h3>
-            <div className="flex items-center gap-2">
-              {canDelete && emptyGroups.length > 0 && (
-                <label className="flex items-center gap-1.5 text-caption text-[var(--color-text-secondary)]">
-                  <input
-                    type="checkbox"
-                    checked={allSelected}
-                    onChange={(e) => handleSelectAll(e.target.checked)}
-                    data-testid="select-all-empty"
-                  />
-                  Select all
-                </label>
-              )}
-              {canDelete && selectedEmpty.size > 0 && (
-                <button
-                  className="btn btn-secondary flex items-center gap-1 text-caption"
-                  onClick={() => setShowDeletePreview(true)}
-                  disabled={deleting}
-                  data-testid="delete-selected-btn"
-                >
-                  <Trash2 size={14} />
-                  Delete Selected ({selectedEmpty.size})
-                </button>
-              )}
-            </div>
-          </div>
-          <DataTable
-            columns={emptyGroupColumns}
-            data={emptyGroupRows}
-            rowKey={(row) => row.dn}
-          />
-        </div>
-      )}
-
-      {/* Single-Member Groups */}
-      {scanned && !scanning && singleMemberGroups.length > 0 && (
-        <div
-          className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-3"
-          data-testid="single-member-groups-section"
-        >
-          <h3 className="mb-3 flex items-center gap-2 text-body font-semibold text-[var(--color-text-primary)]">
-            Single-Member Groups
-            <span
-              className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--color-warning)] px-1.5 text-caption font-medium text-white"
-              data-testid="single-member-groups-count"
-            >
-              {singleMemberGroups.length}
-            </span>
-          </h3>
-          <DataTable
-            columns={simpleGroupColumns}
-            data={singleMemberGroups.map((g) => ({
-              name: g.displayName || g.samAccountName,
-              dn: g.distinguishedName,
-              scope: g.scope,
-              actions: "",
-            }))}
-            rowKey={(row) => row.dn}
-          />
-        </div>
-      )}
-
-      {/* Stale Groups */}
-      {scanned && !scanning && staleGroups.length > 0 && (
-        <div
-          className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-3"
-          data-testid="stale-groups-section"
-        >
-          <h3 className="mb-3 flex items-center gap-2 text-body font-semibold text-[var(--color-text-primary)]">
-            Stale Groups
-            <span
-              className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--color-warning)] px-1.5 text-caption font-medium text-white"
-              data-testid="stale-groups-count"
-            >
-              {staleGroups.length}
-            </span>
-          </h3>
-          <DataTable
-            columns={staleGroupColumns}
-            data={staleGroups.map((g) => ({
-              name: g.displayName || g.samAccountName,
-              dn: g.distinguishedName,
-              scope: g.scope,
-              lastModified: formatWhenChanged(g),
-              actions: "",
-            }))}
-            rowKey={(row) => row.dn}
-          />
-        </div>
-      )}
-
-      {/* Groups Without Description */}
-      {scanned && !scanning && undescribedGroups.length > 0 && (
-        <div
-          className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-3"
-          data-testid="undescribed-groups-section"
-        >
-          <h3 className="mb-3 flex items-center gap-2 text-body font-semibold text-[var(--color-text-primary)]">
-            Groups Without Description
-            <span
-              className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--color-warning)] px-1.5 text-caption font-medium text-white"
-              data-testid="undescribed-groups-count"
-            >
-              {undescribedGroups.length}
-            </span>
-          </h3>
-          <DataTable
-            columns={simpleGroupColumns}
-            data={undescribedGroups.map((g) => ({
-              name: g.displayName || g.samAccountName,
-              dn: g.distinguishedName,
-              scope: g.scope,
-              actions: "",
-            }))}
-            rowKey={(row) => row.dn}
-          />
-        </div>
-      )}
-
-      {/* Circular Nesting */}
-      {scanned && !scanning && cycles.length > 0 && (
-        <div
-          className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-3"
-          data-testid="circular-groups-section"
-        >
-          <h3 className="mb-3 flex items-center gap-2 text-body font-semibold text-[var(--color-text-primary)]">
-            Circular Nesting
-            <span
-              className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--color-error)] px-1.5 text-caption font-medium text-white"
-              data-testid="cycles-count"
-            >
-              {cycles.length}
-            </span>
-          </h3>
-          <div className="space-y-2">
-            {cycles.map((cycle, idx) => (
-              <div
-                key={idx}
-                className="flex flex-wrap items-center gap-1 rounded border border-[var(--color-border-subtle)] px-3 py-2"
-                data-testid={`cycle-${idx}`}
-              >
-                {cycle.map((dn, dnIdx) => {
-                  const cn = dn.match(/^CN=([^,]+)/i)?.[1] ?? dn;
-                  const isLast = dnIdx === cycle.length - 1;
-                  return (
-                    <span key={dnIdx} className="flex items-center gap-1">
-                      <button
-                        className="text-body font-medium text-[var(--color-primary)] hover:underline"
-                        onClick={() => handleGoToGroup(dn)}
-                        data-testid={`cycle-group-${cn}`}
-                        title={dn}
-                      >
-                        {cn}
-                      </button>
-                      {!isLast && (
-                        <ArrowRight
-                          size={14}
-                          className="text-[var(--color-text-secondary)]"
-                        />
-                      )}
-                    </span>
-                  );
-                })}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Excessive Nesting Depth */}
-      {scanned && !scanning && deeplyNested.length > 0 && (
-        <div
-          className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-3"
-          data-testid="deep-nesting-section"
-        >
-          <h3 className="mb-3 flex items-center gap-2 text-body font-semibold text-[var(--color-text-primary)]">
-            Excessive Nesting Depth
-            <span
-              className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--color-warning)] px-1.5 text-caption font-medium text-white"
-              data-testid="deep-nesting-count"
-            >
-              {deeplyNested.length}
-            </span>
-          </h3>
-          <div className="space-y-2">
-            {deeplyNested.map((item) => (
-              <div
-                key={item.groupDn}
-                className="flex items-center justify-between rounded border border-[var(--color-border-subtle)] px-3 py-2"
-                data-testid={`deep-nested-${item.groupName}`}
-              >
+      {/* --- Hygiene Sections (always visible after scan, green when clean) --- */}
+      {scanned && !scanning && !scanError && (
+        <>
+          {/* Empty Groups */}
+          <HygieneSection
+            title="Empty Groups"
+            count={emptyGroups.length}
+            testId="empty-groups-section"
+            countTestId="empty-groups-count"
+            tooltip={HYGIENE_TOOLTIPS.empty}
+            actions={
+              canDelete ? (
                 <div className="flex items-center gap-2">
-                  <span className="text-body font-medium text-[var(--color-text-primary)]">
-                    {item.groupName}
-                  </span>
-                  <span
-                    className="text-caption text-[var(--color-text-secondary)]"
-                    data-testid={`depth-${item.groupName}`}
+                  <label className="flex items-center gap-1.5 text-caption text-[var(--color-text-secondary)]">
+                    <input
+                      type="checkbox"
+                      checked={allSelected}
+                      onChange={(e) => handleSelectAll(e.target.checked)}
+                      data-testid="select-all-empty"
+                    />
+                    Select all
+                  </label>
+                  <button
+                    className="btn btn-outline btn-sm flex items-center gap-1 tabular-nums"
+                    onClick={() => setShowDeletePreview(true)}
+                    disabled={selectedEmpty.size === 0 || deleting}
+                    data-testid="delete-selected-btn"
                   >
-                    Depth: {item.depth}
-                  </span>
+                    <Trash2 size={14} />
+                    Delete Selected ({selectedEmpty.size})
+                  </button>
                 </div>
-                <button
-                  className="btn btn-ghost flex items-center gap-1 text-caption"
-                  onClick={() => handleGoToGroup(item.groupDn)}
-                  data-testid={`go-to-group-${item.groupName}`}
-                  title="Go to group"
-                >
-                  <ExternalLink size={14} />
-                  Go to
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+              ) : undefined
+            }
+          >
+            <DataTable
+              columns={emptyGroupColumns}
+              data={emptyGroupRows}
+              rowKey={(row) => row.dn}
+              onRowClick={
+                canDelete
+                  ? (row) =>
+                      handleSelectEmpty(row.dn, !selectedEmpty.has(row.dn))
+                  : undefined
+              }
+            />
+          </HygieneSection>
 
-      {/* Duplicate Groups */}
-      {scanned && !scanning && duplicateGroups.length > 0 && (
-        <div
-          className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-3"
-          data-testid="duplicate-groups-section"
-        >
-          <h3 className="mb-3 flex items-center gap-2 text-body font-semibold text-[var(--color-text-primary)]">
-            Duplicate Groups
-            <span
-              className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--color-warning)] px-1.5 text-caption font-medium text-white"
-              data-testid="duplicate-groups-count"
-            >
-              {duplicateGroups.length}
-            </span>
-          </h3>
-          <div className="space-y-2">
-            {duplicateGroups.map((cluster, idx) => (
-              <div
-                key={idx}
-                className="rounded border border-[var(--color-border-subtle)] px-3 py-2"
-                data-testid={`duplicate-cluster-${idx}`}
-              >
-                <p className="mb-1 text-caption text-[var(--color-text-secondary)]">
-                  These groups share identical members:
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {cluster.map((g) => (
-                    <button
-                      key={g.distinguishedName}
-                      className="btn btn-sm btn-outline flex items-center gap-1"
-                      onClick={() => handleGoToGroup(g.distinguishedName)}
-                      data-testid={`duplicate-group-${g.displayName || g.samAccountName}`}
-                    >
-                      {g.displayName || g.samAccountName}
-                      <ExternalLink size={12} />
-                    </button>
-                  ))}
+          {/* Single-Member Groups */}
+          <HygieneSection
+            title="Single-Member Groups"
+            count={singleMemberGroups.length}
+            testId="single-member-groups-section"
+            countTestId="single-member-groups-count"
+            tooltip={HYGIENE_TOOLTIPS.singleMember}
+          >
+            <DataTable
+              columns={simpleGroupColumns}
+              data={singleMemberGroups.map((g) => ({
+                name: g.displayName || g.samAccountName,
+                dn: g.distinguishedName,
+                scope: g.scope,
+                actions: "",
+              }))}
+              rowKey={(row) => row.dn}
+            />
+          </HygieneSection>
+
+          {/* Stale Groups */}
+          <HygieneSection
+            title="Stale Groups"
+            count={staleGroups.length}
+            testId="stale-groups-section"
+            countTestId="stale-groups-count"
+            tooltip={HYGIENE_TOOLTIPS.stale}
+          >
+            <DataTable
+              columns={staleGroupColumns}
+              data={staleGroups.map((g) => ({
+                name: g.displayName || g.samAccountName,
+                dn: g.distinguishedName,
+                scope: g.scope,
+                lastModified: formatWhenChanged(g),
+                actions: "",
+              }))}
+              rowKey={(row) => row.dn}
+            />
+          </HygieneSection>
+
+          {/* Groups Without Description */}
+          <HygieneSection
+            title="Groups Without Description"
+            count={undescribedGroups.length}
+            testId="undescribed-groups-section"
+            countTestId="undescribed-groups-count"
+            tooltip={HYGIENE_TOOLTIPS.undescribed}
+          >
+            <DataTable
+              columns={simpleGroupColumns}
+              data={undescribedGroups.map((g) => ({
+                name: g.displayName || g.samAccountName,
+                dn: g.distinguishedName,
+                scope: g.scope,
+                actions: "",
+              }))}
+              rowKey={(row) => row.dn}
+            />
+          </HygieneSection>
+
+          {/* Circular Nesting */}
+          <HygieneSection
+            title="Circular Nesting"
+            count={cycles.length}
+            testId="circular-groups-section"
+            countTestId="cycles-count"
+            severity="error"
+            tooltip={HYGIENE_TOOLTIPS.circular}
+          >
+            <div className="space-y-2">
+              {cycles.map((cycle, idx) => (
+                <div
+                  key={idx}
+                  className="flex flex-wrap items-center gap-1 rounded border border-[var(--color-border-subtle)] px-3 py-2"
+                  data-testid={`cycle-${idx}`}
+                >
+                  {cycle.map((dn, dnIdx) => {
+                    const cn = dn.match(/^CN=([^,]+)/i)?.[1] ?? dn;
+                    const isLast = dnIdx === cycle.length - 1;
+                    return (
+                      <span key={dnIdx} className="flex items-center gap-1">
+                        <button
+                          className="text-body font-medium text-[var(--color-primary)] hover:underline"
+                          onClick={() => handleGoToGroup(dn)}
+                          data-testid={`cycle-group-${cn}`}
+                          title={dn}
+                        >
+                          {cn}
+                        </button>
+                        {!isLast && (
+                          <ArrowRight
+                            size={14}
+                            className="text-[var(--color-text-secondary)]"
+                          />
+                        )}
+                      </span>
+                    );
+                  })}
                 </div>
-              </div>
-            ))}
-          </div>
-        </div>
+              ))}
+            </div>
+          </HygieneSection>
+
+          {/* Excessive Nesting Depth */}
+          <HygieneSection
+            title="Excessive Nesting Depth"
+            count={deeplyNested.length}
+            testId="deep-nesting-section"
+            countTestId="deep-nesting-count"
+            tooltip={HYGIENE_TOOLTIPS.deepNesting}
+            tooltipPosition="above"
+          >
+            <div className="space-y-2">
+              {deeplyNested.map((item) => (
+                <div
+                  key={item.groupDn}
+                  className="flex items-center justify-between rounded border border-[var(--color-border-subtle)] px-3 py-2"
+                  data-testid={`deep-nested-${item.groupName}`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-body font-medium text-[var(--color-text-primary)]">
+                      {item.groupName}
+                    </span>
+                    <span
+                      className="text-caption text-[var(--color-text-secondary)]"
+                      data-testid={`depth-${item.groupName}`}
+                    >
+                      Depth: {item.depth}
+                    </span>
+                  </div>
+                  <button
+                    className="btn btn-ghost btn-sm flex items-center gap-1 whitespace-nowrap"
+                    onClick={() => handleGoToGroup(item.groupDn)}
+                    data-testid={`go-to-group-${item.groupName}`}
+                    title="Open in Group Management"
+                  >
+                    <ExternalLink size={12} />
+                    Go to
+                  </button>
+                </div>
+              ))}
+            </div>
+          </HygieneSection>
+
+          {/* Duplicate Groups */}
+          <HygieneSection
+            title="Duplicate Groups"
+            count={duplicateGroups.length}
+            testId="duplicate-groups-section"
+            countTestId="duplicate-groups-count"
+            tooltip={HYGIENE_TOOLTIPS.duplicate}
+            tooltipPosition="above"
+          >
+            <div className="space-y-2">
+              {duplicateGroups.map((cluster, idx) => (
+                <div
+                  key={idx}
+                  className="rounded border border-[var(--color-border-subtle)] px-3 py-2"
+                  data-testid={`duplicate-cluster-${idx}`}
+                >
+                  <p className="mb-1 text-caption text-[var(--color-text-secondary)]">
+                    These groups share identical members:
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {cluster.map((g) => (
+                      <button
+                        key={g.distinguishedName}
+                        className="btn btn-sm btn-outline flex items-center gap-1"
+                        onClick={() => handleGoToGroup(g.distinguishedName)}
+                        data-testid={`duplicate-group-${g.displayName || g.samAccountName}`}
+                      >
+                        {g.displayName || g.samAccountName}
+                        <ExternalLink size={12} />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </HygieneSection>
+        </>
       )}
 
       {showDeletePreview && (

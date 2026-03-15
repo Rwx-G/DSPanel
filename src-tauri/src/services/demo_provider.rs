@@ -367,18 +367,39 @@ fn sample_group_entries() -> Vec<DirectoryEntry> {
         &["cjones", "inovak"],
     );
     let it_support = make_subgroup("IT-Support", "IT support sub-group", &users, &["sjackson"]);
-    let dev_frontend = make_subgroup(
-        "Dev-Frontend",
-        "Frontend developers sub-group",
-        &users,
-        &["fchen", "egupta"],
-    );
     let dev_backend = make_subgroup(
         "Dev-Backend",
         "Backend developers sub-group",
         &users,
         &["gkumar", "qnguyen", "uroberts"],
     );
+
+    // Deep nesting chain under Dev-Frontend: depth 4
+    // Engineering Team > Dev-Frontend > UI-Components > Design-System
+    let design_system = make_subgroup(
+        "Design-System",
+        "Design system team",
+        &users,
+        &["fchen"],
+    );
+    let mut ui_components = make_subgroup(
+        "UI-Components",
+        "UI components team",
+        &users,
+        &["fchen", "egupta"],
+    );
+    add_group_member(&mut ui_components, &design_system);
+
+    let mut dev_frontend_deep = make_subgroup(
+        "Dev-Frontend",
+        "Frontend developers sub-group",
+        &users,
+        &["fchen", "egupta"],
+    );
+    add_group_member(&mut dev_frontend_deep, &ui_components);
+
+    // Replace dev_frontend with the deep version
+    let dev_frontend = dev_frontend_deep;
 
     // Parent groups: contain users + nested sub-groups
     let mut it_team = make_group("IT Team", "IT", &users);
@@ -416,6 +437,8 @@ fn sample_group_entries() -> Vec<DirectoryEntry> {
         it_support,
         dev_frontend,
         dev_backend,
+        ui_components,
+        design_system,
         make_group_empty("Deprecated-Printers"),
         make_group_empty("Legacy-VPN"),
         it_support_dup,

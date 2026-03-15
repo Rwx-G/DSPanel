@@ -195,17 +195,19 @@ describe("GroupHygiene", () => {
     expect(screen.getByText("Finance-Analysts")).toBeInTheDocument();
   });
 
-  it("shows empty state when no issues found", async () => {
+  it("shows all sections with green badges when no issues found", async () => {
     mockScanResultsLegacy([], []);
 
     render(<GroupHygiene />, { wrapper: TestProviders });
     fireEvent.click(screen.getByTestId("scan-button"));
 
     await waitFor(() => {
-      expect(screen.getByTestId("no-issues")).toBeInTheDocument();
+      expect(screen.getByTestId("empty-groups-section")).toBeInTheDocument();
     });
 
-    expect(screen.getByText("No issues found")).toBeInTheDocument();
+    // All sections visible with 0 count and "All clear" message
+    expect(screen.getByTestId("empty-groups-count")).toHaveTextContent("0");
+    expect(screen.getAllByText("All clear - no issues detected").length).toBe(7);
   });
 
   it("scan error shows error message", async () => {
@@ -678,7 +680,7 @@ describe("GroupHygiene", () => {
     fireEvent.click(screen.getByTestId("scan-button"));
 
     await waitFor(() => {
-      expect(screen.getByTestId("no-issues")).toBeInTheDocument();
+      expect(screen.getByTestId("empty-groups-section")).toBeInTheDocument();
     });
 
     // Verify all 7 detection commands were called
