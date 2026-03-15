@@ -619,4 +619,140 @@ describe("UserComparison", () => {
     const summary = screen.getByTestId("delta-summary");
     expect(summary).toHaveTextContent("2 groups");
   });
+
+  it("add-to-group action for onlyA group calls invoke with userB DN", async () => {
+    await renderWithComparison();
+
+    const groupItems = screen.getAllByTestId(/group-item-/);
+    const onlyAItem = groupItems.find(
+      (el) => el.getAttribute("data-category") === "onlyA",
+    );
+    expect(onlyAItem).toBeDefined();
+
+    fireEvent.contextMenu(onlyAItem!);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Add.*to this group/)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText(/Add.*to this group/));
+
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith(
+        "add_user_to_group",
+        expect.objectContaining({
+          userDn: "CN=Alice Smith,OU=Users,DC=example,DC=com",
+          groupDn: "CN=Developers,DC=example,DC=com",
+        }),
+      );
+    });
+  });
+
+  it("add-to-group for onlyA group shows error notification on failure", async () => {
+    const userA = makeEntry("jdoe", "John Doe", [
+      "CN=Domain Users,DC=example,DC=com",
+      "CN=Developers,DC=example,DC=com",
+    ]);
+    const userB = makeEntry("asmith", "Alice Smith", [
+      "CN=Domain Users,DC=example,DC=com",
+      "CN=Managers,DC=example,DC=com",
+    ]);
+
+    mockInvoke.mockImplementation(async (cmd: string, args?: unknown) => {
+      if (cmd === "search_users") return [userA, userB];
+      if (cmd === "get_user") {
+        const a = args as { samAccountName: string };
+        if (a.samAccountName === "jdoe") return userA;
+        if (a.samAccountName === "asmith") return userB;
+        return null;
+      }
+      if (cmd === "compare_users") return MOCK_COMPARISON;
+      if (cmd === "add_user_to_group")
+        throw new Error("Access denied");
+      if (cmd === "analyze_ntfs")
+        return {
+          paths: [],
+          conflicts: [],
+          totalAces: 0,
+          totalPathsScanned: 0,
+          totalErrors: 0,
+        };
+      return null;
+    });
+
+    render(
+      <TestProviders>
+        <UserComparison />
+      </TestProviders>,
+    );
+
+    // Select user A
+    fireEvent.change(screen.getByTestId("user-a-input"), {
+      target: { value: "jdoe" },
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId("user-a-dropdown")).toBeInTheDocument(),
+    );
+    fireEvent.mouseDown(screen.getByTestId("user-a-result-jdoe"));
+
+    // Select user B
+    fireEvent.change(screen.getByTestId("user-b-input"), {
+      target: { value: "asmith" },
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId("user-b-dropdown")).toBeInTheDocument(),
+    );
+    fireEvent.mouseDown(screen.getByTestId("user-b-result-asmith"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("user-a-selected")).toBeInTheDocument();
+      expect(screen.getByTestId("user-b-selected")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId("compare-button"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("comparison-results")).toBeInTheDocument();
+    });
+
+    const groupItems = screen.getAllByTestId(/group-item-/);
+    const onlyAItem = groupItems.find(
+      (el) => el.getAttribute("data-category") === "onlyA",
+    );
+    expect(onlyAItem).toBeDefined();
+
+    fireEvent.contextMenu(onlyAItem!);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Add.*to this group/)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText(/Add.*to this group/));
+
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith(
+        "add_user_to_group",
+        expect.any(Object),
+      );
+    });
+  });
+
+  it("context menu on shared group only shows view members option", async () => {
+    await renderWithComparison();
+
+    const groupItems = screen.getAllByTestId(/group-item-/);
+    const sharedItem = groupItems.find(
+      (el) => el.getAttribute("data-category") === "shared",
+    );
+    expect(sharedItem).toBeDefined();
+
+    fireEvent.contextMenu(sharedItem!);
+
+    await waitFor(() => {
+      expect(screen.getByText("View group members")).toBeInTheDocument();
+    });
+
+    // Should NOT have an "Add to group" option for shared groups
+    expect(screen.queryByText(/Add.*to this group/)).not.toBeInTheDocument();
+  });
 });
