@@ -7,37 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-
-- Tauri `search_groups` command wired to GroupPicker component with `useGroupSearch` hook
-- Tauri `get_ou_tree` command wired to OUPicker component with `useOUTree` hook
-- `DirectoryProvider::get_ou_tree()` trait method with LDAP and demo implementations
-- Demo provider now returns realistic group search results (was empty)
-- Nested group resolution via LDAP_MATCHING_RULE_IN_CHAIN for transitive membership in user comparison (3.1)
-- Session-level cache for group member queries in GroupChainTree to avoid redundant LDAP calls (3.3)
-- `aria-describedby` linking error messages to form inputs in FormField (1.8)
-- Highlight matching search text in ComboBox dropdown options (1.8)
-- Keyboard accessibility on HealthBadge tooltip: Escape to close, Enter/Space to toggle (1.11)
-- DNS resolution timeout indicator after 10s in ComputerDetail (1.12)
-- CSV export via context menu in DataTable with `csvFilename` prop and `exportTableToCsv` utility (1.7)
-- `msDS-ReplValueMetaData` parser for linked-attribute replication (member, memberOf) with Active/Removed status (3.4)
-- Linked Attribute Changes section in StateInTimeView displaying value-level replication history
-- Storybook setup with Vite builder, theme switcher (light/dark), and a11y addon (1.6)
-- Stories for 15 components: TextInput, PasswordInput, FormField, ComboBox, OUPicker, GroupPicker, StatusBadge, TagChip, LoadingSpinner, EmptyState, CopyButton, HealthBadge, DataTable, PropertyGrid, TreeView, FilterBar, DialogShell
-
-### Changed
-
-- Audit service migrated from JSON file to SQLite for durability and performance under high-volume support workflows (2.x)
-- LDAP connection pooling: reuse a single multiplexed connection instead of connect/bind per operation
-- Automatic reconnect on stale LDAP connection with one retry before propagating errors
-- Replace fragile string-split XML parsing in replication metadata with `quick-xml` crate (3.4)
-
-### Fixed
-
-- Resolve NTFS ACE trustee SIDs to DOMAIN\Username via LookupAccountSidW instead of showing raw SIDs (3.2)
-- Reject path traversal (`..` segments) in UNC path validation (3.2)
-- Add search input validation: trim, max 256 chars, reject control characters (defense-in-depth)
-
 ## [0.3.0] - 2026-03-15
 
 Epic 3 - Comparison & Permissions Audit. Side-by-side user comparison, NTFS permissions
@@ -50,34 +19,58 @@ analysis with ACL cross-referencing, and AD replication metadata timeline.
 - User comparison page with dual search, filter, sort, OU/lastLogon/status in user cards (3.1)
 - Right-click context menu on groups: "View group members" and "Add user to group" (3.1)
 - Cross-tab compare: right-click in User Lookup to compare two users directly (3.1)
+- Nested group resolution via LDAP_MATCHING_RULE_IN_CHAIN for transitive membership in user comparison (3.1)
 - UNC path permissions audit with NTFS ACL reading via Windows API (3.2)
 - ACE cross-reference with user group SIDs showing access indicators (allowed/denied/no-match) (3.2)
 - Access Summary with per-user breakdown and differences explanation (3.2)
 - Color-coded ACE rows with legend (green=both, red=A only, blue=B only) (3.2)
+- Contextual tooltips on access indicators showing user name and matched trustee (3.2)
 - CSV export via native save file dialog (rfd crate) (3.2)
 - Standalone NTFS Permissions Analyzer page with recursive depth scanning (3.3)
 - Allow/deny conflict detection across parent/child paths (3.3)
 - Inherited vs explicit ACE filtering toggle (3.3)
 - Group chain tree with recursive expansion and circular reference detection (3.3)
+- Session-level cache for group member queries in GroupChainTree to avoid redundant LDAP calls (3.3)
 - Right-click "View group members" on ACE trustees (3.3)
 - State-in-time replication metadata viewer parsing msDS-ReplAttributeMetaData XML (3.4)
+- `msDS-ReplValueMetaData` parser for linked-attribute replication (member, memberOf) with Active/Removed status (3.4)
+- Linked Attribute Changes section in StateInTimeView displaying value-level replication history (3.4)
 - Attribute timeline sorted by last change time with version and originating DC (3.4)
 - Attribute diff between two timestamps showing version changes (3.4)
 - Replication History section in user and computer detail views (3.4)
+- Tauri `search_groups` command wired to GroupPicker component with `useGroupSearch` hook
+- Tauri `get_ou_tree` command wired to OUPicker component with `useOUTree` hook
+- `DirectoryProvider::get_ou_tree()` trait method with LDAP and demo implementations
+- CSV export via context menu in DataTable with `csvFilename` prop and `exportTableToCsv` utility (1.7)
+- `aria-describedby` linking error messages to form inputs in FormField (1.8)
+- Highlight matching search text in ComboBox dropdown options (1.8)
+- Keyboard accessibility on HealthBadge tooltip: Escape to close, Enter/Space to toggle (1.11)
+- DNS resolution timeout indicator after 10s in ComputerDetail (1.12)
+- Storybook setup with Vite builder, theme switcher (light/dark), and a11y addon
+- Stories for 15 components: TextInput, PasswordInput, FormField, ComboBox, OUPicker, GroupPicker, StatusBadge, TagChip, LoadingSpinner, EmptyState, CopyButton, HealthBadge, DataTable, PropertyGrid, TreeView, FilterBar, DialogShell
 - Tab state persistence across switches (components stay mounted)
 - Toast notifications with severity-colored progress bar
 - Technical backlog document (docs/backlog.md)
 - New sidebar entries: User Comparison (Directory group), NTFS Analyzer (Tools group)
 - New Tauri commands: compare_users, add_user_to_group, audit_ntfs_permissions, cross_reference_ntfs, analyze_ntfs, get_replication_metadata, compute_attribute_diff, save_file_dialog
+- 1691 tests (616 Rust + 1075 frontend), 62% Rust line coverage, 89% frontend line coverage
 
 ### Changed
 
+- Audit service migrated from JSON file to SQLite for durability and performance under high-volume support workflows
+- LDAP connection pooling: reuse a single multiplexed connection instead of connect/bind per operation
+- Automatic reconnect on stale LDAP connection with one retry before propagating errors
+- Replace fragile string-split XML parsing in replication metadata with `quick-xml` crate (3.4)
 - Context menu onClick deferred to microtask for async-safe handling
 - Demo provider: search_users and get_user_by_identity use full 26-user dataset
 - useBrowse: removed auto-select on single search result for better UX
 
 ### Fixed
 
+- Resolve NTFS ACE trustee SIDs to DOMAIN\Username via LookupAccountSidW instead of showing raw SIDs (3.2)
+- Array sort mutation in useComparison: spread before sort to prevent source mutation (3.1)
+- Reject path traversal (`..` segments) in UNC path validation (3.2)
+- Search input validation: trim, max 256 chars, reject control characters (defense-in-depth)
 - Notification notify() argument order (message, severity) was inverted causing NotificationHost crash
 - Async context menu actions no longer trigger ErrorBoundary via unhandled rejections
 

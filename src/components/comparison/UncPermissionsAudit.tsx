@@ -17,29 +17,48 @@ import { type DirectoryEntry } from "@/types/directory";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { formatCsv, downloadCsv } from "@/utils/csvExport";
 
-const ACCESS_TOOLTIPS: Record<AccessIndicator, string> = {
-  Allowed: "User has access via a matching group membership or direct ACE",
-  Denied: "User is explicitly denied access via a matching ACE",
-  NoMatch: "ACE does not match any of the user's group memberships",
-};
+function accessTooltip(
+  indicator: AccessIndicator,
+  userName: string,
+  trusteeName: string,
+): string {
+  const trustee = trusteeName.split("\\").pop() ?? trusteeName;
+  switch (indicator) {
+    case "Allowed":
+      return `${userName} has access via ${trustee}`;
+    case "Denied":
+      return `${userName} is denied via ${trustee}`;
+    case "NoMatch":
+      return `No matching group for ${userName}`;
+  }
+}
 
-function AccessIcon({ indicator }: { indicator: AccessIndicator }) {
+function AccessIcon({
+  indicator,
+  userName,
+  trusteeName,
+}: {
+  indicator: AccessIndicator;
+  userName: string;
+  trusteeName: string;
+}) {
+  const title = accessTooltip(indicator, userName, trusteeName);
   switch (indicator) {
     case "Allowed":
       return (
-        <span title={ACCESS_TOOLTIPS.Allowed} data-testid="access-allowed">
+        <span title={title} data-testid="access-allowed">
           <Shield size={14} className="text-[var(--color-success)]" />
         </span>
       );
     case "Denied":
       return (
-        <span title={ACCESS_TOOLTIPS.Denied} data-testid="access-denied">
+        <span title={title} data-testid="access-denied">
           <ShieldAlert size={14} className="text-[var(--color-error)]" />
         </span>
       );
     case "NoMatch":
       return (
-        <span title={ACCESS_TOOLTIPS.NoMatch} data-testid="access-nomatch">
+        <span title={title} data-testid="access-nomatch">
           <Minus
             size={14}
             className="text-[var(--color-text-secondary)]"
@@ -294,10 +313,18 @@ export function UncPermissionsAudit({
                       {userA && userB && ref && (
                         <>
                           <td className="px-3 py-2 text-center">
-                            <AccessIcon indicator={ref.userAAccess} />
+                            <AccessIcon
+                              indicator={ref.userAAccess}
+                              userName={userA.displayName ?? userA.samAccountName ?? "User A"}
+                              trusteeName={ace.trusteeDisplayName}
+                            />
                           </td>
                           <td className="px-3 py-2 text-center">
-                            <AccessIcon indicator={ref.userBAccess} />
+                            <AccessIcon
+                              indicator={ref.userBAccess}
+                              userName={userB.displayName ?? userB.samAccountName ?? "User B"}
+                              trusteeName={ace.trusteeDisplayName}
+                            />
                           </td>
                         </>
                       )}
