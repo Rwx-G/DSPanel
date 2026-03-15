@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { SearchBar } from "@/components/common/SearchBar";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
@@ -6,7 +6,11 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { VirtualizedList } from "@/components/data/VirtualizedList";
 import { TreeView, type TreeNode } from "@/components/data/TreeView";
 import { DataTable, type Column } from "@/components/data/DataTable";
-import { type DirectoryEntry, type DirectoryGroup } from "@/types/directory";
+import {
+  type DirectoryEntry,
+  type DirectoryGroup,
+  mapEntryToGroup,
+} from "@/types/directory";
 import { parseCnFromDn } from "@/utils/dn";
 import { useGroupBrowse } from "@/hooks/useGroupBrowse";
 import { useOUTree } from "@/hooks/useOUTree";
@@ -58,7 +62,7 @@ export function GroupManagement() {
     refresh,
   } = useGroupBrowse();
 
-  const { openTabs, activeTabId } = useNavigation();
+  const { openTabs, activeTabId, clearTabData } = useNavigation();
   const activeTab = openTabs.find((t) => t.id === activeTabId);
   const selectedGroupDn = activeTab?.data?.selectedGroupDn as
     | string
@@ -89,15 +93,48 @@ export function GroupManagement() {
 
   const treeNodes = useMemo(() => ouNodesToTreeNodes(ouNodes), [ouNodes]);
 
-  // Handle cross-module deep-linking
+  // Handle cross-module deep-linking: select group by DN
+  const deepLinkHandled = useRef<string | null>(null);
   useEffect(() => {
-    if (selectedGroupDn && groups.length > 0 && !selectedGroup) {
-      const found = groups.find((g) => g.distinguishedName === selectedGroupDn);
-      if (found) {
-        setSelectedGroup(found);
-      }
+    if (!selectedGroupDn || deepLinkHandled.current === selectedGroupDn) return;
+
+    // First try to find in already-loaded groups
+    const found = groups.find((g) => g.distinguishedName === selectedGroupDn);
+    if (found) {
+      setSelectedGroup(found);
+      deepLinkHandled.current = selectedGroupDn;
+      if (activeTabId) clearTabData(activeTabId);
+      return;
     }
-  }, [selectedGroupDn, groups, selectedGroup, setSelectedGroup]);
+
+    // Otherwise search by CN extracted from the DN
+    if (!loading) {
+      const cn = parseCnFromDn(selectedGroupDn);
+      if (!cn) return;
+
+      invoke<DirectoryEntry[]>("search_groups", { query: cn })
+        .then((entries) => {
+          const match = entries.find(
+            (e) => e.distinguishedName === selectedGroupDn,
+          );
+          if (match) {
+            setSelectedGroup(mapEntryToGroup(match));
+          }
+        })
+        .catch((err) => console.warn("Deep-link group search failed:", err))
+        .finally(() => {
+          deepLinkHandled.current = selectedGroupDn;
+          if (activeTabId) clearTabData(activeTabId);
+        });
+    }
+  }, [
+    selectedGroupDn,
+    groups,
+    loading,
+    setSelectedGroup,
+    activeTabId,
+    clearTabData,
+  ]);
 
   // Load members when a group is selected
   useEffect(() => {
