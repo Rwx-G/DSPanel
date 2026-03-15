@@ -128,6 +128,9 @@ pub fn run() {
             commands::detect_deep_nesting,
             commands::detect_duplicate_groups,
             commands::delete_group,
+            commands::create_group,
+            commands::move_object,
+            commands::update_managed_by,
             commands::get_ou_tree,
         ])
         .run(tauri::generate_context!())

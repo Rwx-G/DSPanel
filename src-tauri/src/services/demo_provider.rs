@@ -376,12 +376,7 @@ fn sample_group_entries() -> Vec<DirectoryEntry> {
 
     // Deep nesting chain under Dev-Frontend: depth 4
     // Engineering Team > Dev-Frontend > UI-Components > Design-System
-    let design_system = make_subgroup(
-        "Design-System",
-        "Design system team",
-        &users,
-        &["fchen"],
-    );
+    let design_system = make_subgroup("Design-System", "Design system team", &users, &["fchen"]);
     let mut ui_components = make_subgroup(
         "UI-Components",
         "UI components team",
@@ -1191,6 +1186,45 @@ impl DirectoryProvider for DemoDirectoryProvider {
 
     async fn get_ou_tree(&self) -> Result<Vec<OUNode>> {
         Ok(sample_ou_tree())
+    }
+
+    async fn create_group(
+        &self,
+        name: &str,
+        container_dn: &str,
+        scope: &str,
+        category: &str,
+        description: &str,
+    ) -> Result<String> {
+        let dn = format!("CN={},{}", name, container_dn);
+        tracing::info!(
+            name = %name,
+            container_dn = %container_dn,
+            scope = %scope,
+            category = %category,
+            description = %description,
+            dn = %dn,
+            "DEMO: create group simulated"
+        );
+        Ok(dn)
+    }
+
+    async fn move_object(&self, object_dn: &str, target_container_dn: &str) -> Result<()> {
+        tracing::info!(
+            object_dn = %object_dn,
+            target_container_dn = %target_container_dn,
+            "DEMO: move object simulated"
+        );
+        Ok(())
+    }
+
+    async fn update_managed_by(&self, group_dn: &str, manager_dn: &str) -> Result<()> {
+        tracing::info!(
+            group_dn = %group_dn,
+            manager_dn = %manager_dn,
+            "DEMO: update managedBy simulated"
+        );
+        Ok(())
     }
 }
 

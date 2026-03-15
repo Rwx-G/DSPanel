@@ -1067,6 +1067,128 @@ pub(crate) async fn detect_duplicate_groups_inner(
     Ok(duplicates)
 }
 
+/// Creates a new group in Active Directory. Requires AccountOperator permission.
+pub(crate) async fn create_group_inner(
+    state: &AppState,
+    name: &str,
+    container_dn: &str,
+    scope: &str,
+    category: &str,
+    description: &str,
+) -> Result<String, AppError> {
+    if !state
+        .permission_service
+        .has_permission(PermissionLevel::AccountOperator)
+    {
+        return Err(AppError::PermissionDenied(
+            "Group creation requires AccountOperator permission or higher".to_string(),
+        ));
+    }
+
+    let dn = format!("CN={},{}", name, container_dn);
+    state.snapshot_service.capture(&dn, "GroupCreate");
+
+    let provider = state.directory_provider.clone();
+    match provider
+        .create_group(name, container_dn, scope, category, description)
+        .await
+    {
+        Ok(created_dn) => {
+            state.audit_service.log_success(
+                "GroupCreated",
+                &created_dn,
+                &format!(
+                    "Group created: scope={}, category={}, container={}",
+                    scope, category, container_dn
+                ),
+            );
+            Ok(created_dn)
+        }
+        Err(e) => {
+            state.audit_service.log_failure(
+                "GroupCreateFailed",
+                &dn,
+                &format!("Failed to create group: {}", e),
+            );
+            Err(AppError::Directory(e.to_string()))
+        }
+    }
+}
+
+/// Moves an AD object to a different container. Requires DomainAdmin permission.
+pub(crate) async fn move_object_inner(
+    state: &AppState,
+    object_dn: &str,
+    target_container_dn: &str,
+) -> Result<(), AppError> {
+    if !state
+        .permission_service
+        .has_permission(PermissionLevel::DomainAdmin)
+    {
+        return Err(AppError::PermissionDenied(
+            "Moving objects requires DomainAdmin permission".to_string(),
+        ));
+    }
+
+    state.snapshot_service.capture(object_dn, "MoveObject");
+
+    let provider = state.directory_provider.clone();
+    match provider.move_object(object_dn, target_container_dn).await {
+        Ok(()) => {
+            state.audit_service.log_success(
+                "ObjectMoved",
+                object_dn,
+                &format!("Moved to {}", target_container_dn),
+            );
+            Ok(())
+        }
+        Err(e) => {
+            state.audit_service.log_failure(
+                "MoveObjectFailed",
+                object_dn,
+                &format!("Failed to move object: {}", e),
+            );
+            Err(AppError::Directory(e.to_string()))
+        }
+    }
+}
+
+/// Updates the managedBy attribute of a group. Requires AccountOperator permission.
+pub(crate) async fn update_managed_by_inner(
+    state: &AppState,
+    group_dn: &str,
+    manager_dn: &str,
+) -> Result<(), AppError> {
+    if !state
+        .permission_service
+        .has_permission(PermissionLevel::AccountOperator)
+    {
+        return Err(AppError::PermissionDenied(
+            "Updating group manager requires AccountOperator permission or higher".to_string(),
+        ));
+    }
+
+    let provider = state.directory_provider.clone();
+    match provider.update_managed_by(group_dn, manager_dn).await {
+        Ok(()) => {
+            state.audit_service.log_success(
+                "ManagedByUpdated",
+                group_dn,
+                &format!("Manager set to {}", manager_dn),
+            );
+            Ok(())
+        }
+        Err(e) => {
+            state.audit_service.log_failure(
+                "UpdateManagedByFailed",
+                group_dn,
+                &format!("Failed to update managedBy: {}", e),
+            );
+            Err(AppError::Directory(e.to_string()))
+        }
+    }
+}
+
 /// Deletes a group by DN (requires DomainAdmin).
 pub(crate) async fn delete_group_inner(state: &AppState, group_dn: &str) -> Result<(), AppError> {
     if !state
@@ -1348,6 +1470,47 @@ pub async fn detect_duplicate_groups(
 #[tauri::command]
 pub async fn delete_group(group_dn: String, state: State<'_, AppState>) -> Result<(), AppError> {
     delete_group_inner(&state, &group_dn).await
+}
+
+/// Creates a new group in Active Directory.
+#[tauri::command]
+pub async fn create_group(
+    name: String,
+    container_dn: String,
+    scope: String,
+    category: String,
+    description: String,
+    state: State<'_, AppState>,
+) -> Result<String, AppError> {
+    create_group_inner(
+        &state,
+        &name,
+        &container_dn,
+        &scope,
+        &category,
+        &description,
+    )
+    .await
+}
+
+/// Moves an AD object to a different container.
+#[tauri::command]
+pub async fn move_object(
+    object_dn: String,
+    target_container_dn: String,
+    state: State<'_, AppState>,
+) -> Result<(), AppError> {
+    move_object_inner(&state, &object_dn, &target_container_dn).await
+}
+
+/// Updates the managedBy attribute of a group.
+#[tauri::command]
+pub async fn update_managed_by(
+    group_dn: String,
+    manager_dn: String,
+    state: State<'_, AppState>,
+) -> Result<(), AppError> {
+    update_managed_by_inner(&state, &group_dn, &manager_dn).await
 }
 
 /// Returns the current Windows username from the environment.
@@ -3823,5 +3986,131 @@ mod tests {
         assert!(result
             .iter()
             .any(|r| r.group_name == "GroupA" && r.depth == 3));
+    }
+
+    // -----------------------------------------------------------------------
+    // create_group_inner tests
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_create_group_inner_requires_account_operator() {
+        let state = make_state(); // default is ReadOnly
+        let result = create_group_inner(
+            &state,
+            "TestGroup",
+            "OU=Groups,DC=example,DC=com",
+            "Global",
+            "Security",
+            "Test desc",
+        )
+        .await;
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(matches!(err, AppError::PermissionDenied(_)));
+    }
+
+    #[tokio::test]
+    async fn test_create_group_inner_audits_success() {
+        let (state, provider) =
+            make_state_with_level_and_provider(PermissionLevel::AccountOperator);
+
+        let result = create_group_inner(
+            &state,
+            "TestGroup",
+            "OU=Groups,DC=example,DC=com",
+            "Global",
+            "Security",
+            "A test group",
+        )
+        .await;
+        assert!(result.is_ok());
+        let dn = result.unwrap();
+        assert_eq!(dn, "CN=TestGroup,OU=Groups,DC=example,DC=com");
+
+        // Verify the mock recorded the call
+        let calls = provider.create_group_calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].0, "TestGroup");
+
+        // Verify audit log
+        let entries = state.audit_service.get_entries();
+        assert!(entries.iter().any(|e| e.action == "GroupCreated"));
+    }
+
+    // -----------------------------------------------------------------------
+    // move_object_inner tests
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_move_object_inner_requires_domain_admin() {
+        let state = make_state(); // default is ReadOnly
+        let result = move_object_inner(
+            &state,
+            "CN=TestGroup,OU=Old,DC=example,DC=com",
+            "OU=New,DC=example,DC=com",
+        )
+        .await;
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(matches!(err, AppError::PermissionDenied(_)));
+    }
+
+    #[tokio::test]
+    async fn test_move_object_inner_audits_success() {
+        let (state, provider) = make_state_with_level_and_provider(PermissionLevel::DomainAdmin);
+
+        let result = move_object_inner(
+            &state,
+            "CN=TestGroup,OU=Old,DC=example,DC=com",
+            "OU=New,DC=example,DC=com",
+        )
+        .await;
+        assert!(result.is_ok());
+
+        let calls = provider.move_object_calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+
+        let entries = state.audit_service.get_entries();
+        assert!(entries.iter().any(|e| e.action == "ObjectMoved"));
+    }
+
+    // -----------------------------------------------------------------------
+    // update_managed_by_inner tests
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_update_managed_by_inner_requires_account_operator() {
+        let state = make_state(); // default is ReadOnly
+        let result = update_managed_by_inner(
+            &state,
+            "CN=TestGroup,OU=Groups,DC=example,DC=com",
+            "CN=Manager,OU=Users,DC=example,DC=com",
+        )
+        .await;
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(matches!(err, AppError::PermissionDenied(_)));
+    }
+
+    #[tokio::test]
+    async fn test_update_managed_by_inner_audits_success() {
+        let (state, provider) =
+            make_state_with_level_and_provider(PermissionLevel::AccountOperator);
+
+        let result = update_managed_by_inner(
+            &state,
+            "CN=TestGroup,OU=Groups,DC=example,DC=com",
+            "CN=Manager,OU=Users,DC=example,DC=com",
+        )
+        .await;
+        assert!(result.is_ok());
+
+        let calls = provider.update_managed_by_calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].0, "CN=TestGroup,OU=Groups,DC=example,DC=com");
+        assert_eq!(calls[0].1, "CN=Manager,OU=Users,DC=example,DC=com");
+
+        let entries = state.audit_service.get_entries();
+        assert!(entries.iter().any(|e| e.action == "ManagedByUpdated"));
     }
 }

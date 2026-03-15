@@ -123,6 +123,31 @@ pub trait DirectoryProvider: Send + Sync {
 
     /// Deletes an AD object by its DN.
     async fn delete_object(&self, dn: &str) -> Result<()>;
+
+    /// Creates a new group in Active Directory.
+    ///
+    /// Parameters:
+    /// - `name`: The CN of the new group
+    /// - `container_dn`: The DN of the container (OU) where the group will be created
+    /// - `scope`: "Global", "DomainLocal", or "Universal"
+    /// - `category`: "Security" or "Distribution"
+    /// - `description`: A description for the group
+    ///
+    /// Returns the DN of the created group.
+    async fn create_group(
+        &self,
+        name: &str,
+        container_dn: &str,
+        scope: &str,
+        category: &str,
+        description: &str,
+    ) -> Result<String>;
+
+    /// Moves an AD object to a different container via LDAP moddn.
+    async fn move_object(&self, object_dn: &str, target_container_dn: &str) -> Result<()>;
+
+    /// Updates the managedBy attribute of a group.
+    async fn update_managed_by(&self, group_dn: &str, manager_dn: &str) -> Result<()>;
 }
 
 #[cfg(test)]
@@ -151,6 +176,10 @@ pub mod tests {
         pub set_password_flags_calls: Mutex<Vec<(String, bool, bool)>>,
         pub remove_group_member_calls: Mutex<Vec<(String, String)>>,
         pub delete_calls: Mutex<Vec<String>>,
+        #[allow(clippy::type_complexity)]
+        pub create_group_calls: Mutex<Vec<(String, String, String, String, String)>>,
+        pub move_object_calls: Mutex<Vec<(String, String)>>,
+        pub update_managed_by_calls: Mutex<Vec<(String, String)>>,
         cannot_change_password: Mutex<bool>,
         replication_metadata: Mutex<Option<String>>,
         ou_tree: Mutex<Vec<OUNode>>,
@@ -181,6 +210,9 @@ pub mod tests {
                 set_password_flags_calls: Mutex::new(Vec::new()),
                 remove_group_member_calls: Mutex::new(Vec::new()),
                 delete_calls: Mutex::new(Vec::new()),
+                create_group_calls: Mutex::new(Vec::new()),
+                move_object_calls: Mutex::new(Vec::new()),
+                update_managed_by_calls: Mutex::new(Vec::new()),
                 cannot_change_password: Mutex::new(false),
                 replication_metadata: Mutex::new(None),
                 ou_tree: Mutex::new(Vec::new()),
@@ -205,6 +237,9 @@ pub mod tests {
                 set_password_flags_calls: Mutex::new(Vec::new()),
                 remove_group_member_calls: Mutex::new(Vec::new()),
                 delete_calls: Mutex::new(Vec::new()),
+                create_group_calls: Mutex::new(Vec::new()),
+                move_object_calls: Mutex::new(Vec::new()),
+                update_managed_by_calls: Mutex::new(Vec::new()),
                 cannot_change_password: Mutex::new(false),
                 replication_metadata: Mutex::new(None),
                 ou_tree: Mutex::new(Vec::new()),
@@ -450,6 +485,43 @@ pub mod tests {
         async fn delete_object(&self, dn: &str) -> Result<()> {
             self.check_failure()?;
             self.delete_calls.lock().unwrap().push(dn.to_string());
+            Ok(())
+        }
+
+        async fn create_group(
+            &self,
+            name: &str,
+            container_dn: &str,
+            scope: &str,
+            category: &str,
+            description: &str,
+        ) -> Result<String> {
+            self.check_failure()?;
+            self.create_group_calls.lock().unwrap().push((
+                name.to_string(),
+                container_dn.to_string(),
+                scope.to_string(),
+                category.to_string(),
+                description.to_string(),
+            ));
+            Ok(format!("CN={},{}", name, container_dn))
+        }
+
+        async fn move_object(&self, object_dn: &str, target_container_dn: &str) -> Result<()> {
+            self.check_failure()?;
+            self.move_object_calls
+                .lock()
+                .unwrap()
+                .push((object_dn.to_string(), target_container_dn.to_string()));
+            Ok(())
+        }
+
+        async fn update_managed_by(&self, group_dn: &str, manager_dn: &str) -> Result<()> {
+            self.check_failure()?;
+            self.update_managed_by_calls
+                .lock()
+                .unwrap()
+                .push((group_dn.to_string(), manager_dn.to_string()));
             Ok(())
         }
     }

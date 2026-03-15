@@ -81,11 +81,27 @@ function setupMocks(options?: {
   const failAtStep = options?.failAtStep;
   let invokeCount = 0;
 
-  mockInvoke.mockImplementation(((cmd: string) => {
+  mockInvoke.mockImplementation(((cmd: string, args?: Record<string, unknown>) => {
     if (cmd === "get_permission_level") return Promise.resolve(permLevel);
     if (cmd === "get_user_groups") return Promise.resolve([]);
     if (cmd === "search_groups") return Promise.resolve(groupSearchResults);
     if (cmd === "get_group_members") return Promise.resolve(members);
+    if (cmd === "search_users") {
+      return Promise.resolve([
+        {
+          distinguishedName: "CN=Source User,OU=Users,DC=example,DC=com",
+          samAccountName: "srcuser",
+          displayName: "Source User",
+          objectClass: "user",
+          attributes: {
+            memberOf: [
+              "CN=GroupA,DC=example,DC=com",
+              "CN=GroupB,DC=example,DC=com",
+            ],
+          },
+        },
+      ]);
+    }
     if (cmd === "add_user_to_group") {
       invokeCount++;
       if (failAtStep !== undefined && invokeCount >= failAtStep) {
@@ -100,8 +116,27 @@ function setupMocks(options?: {
       }
       return Promise.resolve(null);
     }
+    if (cmd === "create_group")
+      return Promise.resolve(
+        `CN=${(args as Record<string, string>)?.name ?? "Test"},OU=Groups,DC=example,DC=com`,
+      );
+    if (cmd === "move_object") return Promise.resolve(null);
+    if (cmd === "update_managed_by") return Promise.resolve(null);
+    if (cmd === "save_file_dialog") return Promise.resolve("/tmp/test.csv");
     return Promise.resolve(null);
   }) as typeof invoke);
+}
+
+async function renderAndWait() {
+  await act(async () => {
+    render(<BulkOperations />, { wrapper: TestProviders });
+  });
+}
+
+async function clickCard(opId: string) {
+  await act(async () => {
+    fireEvent.click(screen.getByTestId(`op-card-${opId}`));
+  });
 }
 
 async function selectSourceGroup() {
@@ -112,7 +147,9 @@ async function selectSourceGroup() {
     expect(screen.getByTestId("group-option-Developers")).toBeInTheDocument();
   });
 
-  fireEvent.click(screen.getByTestId("group-option-Developers"));
+  await act(async () => {
+    fireEvent.click(screen.getByTestId("group-option-Developers"));
+  });
 
   await waitFor(() => {
     expect(screen.getByTestId("member-list")).toBeInTheDocument();
@@ -130,7 +167,9 @@ async function selectTargetGroup() {
     ).toBeInTheDocument();
   });
 
-  fireEvent.click(screen.getByTestId("group-option-Finance-Analysts"));
+  await act(async () => {
+    fireEvent.click(screen.getByTestId("group-option-Finance-Analysts"));
+  });
 }
 
 describe("BulkOperations", () => {
@@ -138,24 +177,72 @@ describe("BulkOperations", () => {
     mockInvoke.mockReset();
   });
 
-  it("renders with operation type selector, source/target group inputs", () => {
+  // -----------------------------------------------------------------------
+  // Operation Picker Tests
+  // -----------------------------------------------------------------------
+
+  it("renders operation picker with all operation cards", async () => {
     setupMocks();
-    render(<BulkOperations />, { wrapper: TestProviders });
+    await renderAndWait();
 
     expect(screen.getByTestId("bulk-operations")).toBeInTheDocument();
+    expect(screen.getByTestId("operation-picker")).toBeInTheDocument();
+
+    expect(screen.getByTestId("op-card-transfer")).toBeInTheDocument();
+    expect(screen.getByTestId("op-card-clone-group")).toBeInTheDocument();
+    expect(screen.getByTestId("op-card-merge-groups")).toBeInTheDocument();
+    expect(screen.getByTestId("op-card-copy-memberships")).toBeInTheDocument();
+    expect(screen.getByTestId("op-card-import-csv")).toBeInTheDocument();
+    expect(screen.getByTestId("op-card-export-csv")).toBeInTheDocument();
+    expect(screen.getByTestId("op-card-move-groups")).toBeInTheDocument();
+    expect(screen.getByTestId("op-card-create-groups")).toBeInTheDocument();
+    expect(screen.getByTestId("op-card-update-manager")).toBeInTheDocument();
+    expect(screen.getByTestId("op-card-delete")).toBeInTheDocument();
+    expect(screen.getByTestId("op-card-add")).toBeInTheDocument();
+  });
+
+  it("clicking an operation card navigates to its panel", async () => {
+    setupMocks();
+    await renderAndWait();
+
+    await clickCard("delete");
+
+    expect(screen.getByTestId("bulk-back-btn")).toBeInTheDocument();
     expect(screen.getByTestId("operation-type-selector")).toBeInTheDocument();
+    expect(screen.queryByTestId("operation-picker")).not.toBeInTheDocument();
+  });
+
+  it("back button returns to operation picker", async () => {
+    setupMocks();
+    await renderAndWait();
+
+    await clickCard("delete");
+    expect(screen.getByTestId("bulk-back-btn")).toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("bulk-back-btn"));
+    });
+    expect(screen.getByTestId("operation-picker")).toBeInTheDocument();
+  });
+
+  // -----------------------------------------------------------------------
+  // Member-based operation tests (Delete / Add / Transfer)
+  // -----------------------------------------------------------------------
+
+  it("delete mode shows source/target group selectors", async () => {
+    setupMocks();
+    await renderAndWait();
+    await clickCard("delete");
+
     expect(screen.getByTestId("source-group-section")).toBeInTheDocument();
     expect(screen.getByTestId("target-group-section")).toBeInTheDocument();
   });
 
   it("delete mode disables target group selector", async () => {
     setupMocks();
-    render(<BulkOperations />, { wrapper: TestProviders });
+    await renderAndWait();
+    await clickCard("delete");
 
-    // Delete is the default mode
-    expect(screen.getByTestId("op-type-delete")).toBeInTheDocument();
-
-    // Target group picker should be disabled
     const targetSection = screen.getByTestId("target-group-section");
     const targetPicker = targetSection.querySelector(
       '[data-testid="group-picker"]',
@@ -163,40 +250,10 @@ describe("BulkOperations", () => {
     expect(targetPicker).toHaveClass("pointer-events-none");
   });
 
-  it("add mode enables both source and target", async () => {
-    setupMocks();
-    render(<BulkOperations />, { wrapper: TestProviders });
-
-    fireEvent.click(screen.getByTestId("op-type-add"));
-
-    await waitFor(() => {
-      const targetSection = screen.getByTestId("target-group-section");
-      const targetPicker = targetSection.querySelector(
-        '[data-testid="group-picker"]',
-      );
-      expect(targetPicker).not.toHaveClass("pointer-events-none");
-    });
-  });
-
-  it("transfer mode enables both source and target", async () => {
-    setupMocks();
-    render(<BulkOperations />, { wrapper: TestProviders });
-
-    fireEvent.click(screen.getByTestId("op-type-transfer"));
-
-    await waitFor(() => {
-      const targetSection = screen.getByTestId("target-group-section");
-      const targetPicker = targetSection.querySelector(
-        '[data-testid="group-picker"]',
-      );
-      expect(targetPicker).not.toHaveClass("pointer-events-none");
-    });
-  });
-
   it("loads members when source group is selected", async () => {
     setupMocks();
-    render(<BulkOperations />, { wrapper: TestProviders });
-
+    await renderAndWait();
+    await clickCard("delete");
     await selectSourceGroup();
 
     expect(screen.getByText("John Doe")).toBeInTheDocument();
@@ -206,26 +263,29 @@ describe("BulkOperations", () => {
 
   it("member selection with checkboxes and select-all", async () => {
     setupMocks();
-    render(<BulkOperations />, { wrapper: TestProviders });
-
+    await renderAndWait();
+    await clickCard("delete");
     await selectSourceGroup();
 
-    // Select individual member
-    fireEvent.click(screen.getByTestId("bulk-member-John Doe"));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("bulk-member-John Doe"));
+    });
 
     await waitFor(() => {
       expect(screen.getByText("1 selected")).toBeInTheDocument();
     });
 
-    // Select all
-    fireEvent.click(screen.getByTestId("bulk-select-all"));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("bulk-select-all"));
+    });
 
     await waitFor(() => {
       expect(screen.getByText("3 selected")).toBeInTheDocument();
     });
 
-    // Deselect all
-    fireEvent.click(screen.getByTestId("bulk-select-all"));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("bulk-select-all"));
+    });
 
     await waitFor(() => {
       expect(screen.getByText("0 selected")).toBeInTheDocument();
@@ -234,15 +294,16 @@ describe("BulkOperations", () => {
 
   it("preview generates correct planned changes for Delete", async () => {
     setupMocks();
-    render(<BulkOperations />, { wrapper: TestProviders });
-
+    await renderAndWait();
+    await clickCard("delete");
     await selectSourceGroup();
 
-    // Select a member
-    fireEvent.click(screen.getByTestId("bulk-member-John Doe"));
-
-    // Click preview
-    fireEvent.click(screen.getByTestId("bulk-preview-btn"));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("bulk-member-John Doe"));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("bulk-preview-btn"));
+    });
 
     await waitFor(() => {
       expect(screen.getByTestId("bulk-preview-panel")).toBeInTheDocument();
@@ -250,25 +311,22 @@ describe("BulkOperations", () => {
 
     expect(screen.getByTestId("planned-change-0")).toBeInTheDocument();
     expect(screen.getByText("REMOVE")).toBeInTheDocument();
-    // Should show "from" the source group
     expect(screen.getByText("from Developers")).toBeInTheDocument();
   });
 
   it("preview generates correct planned changes for Add", async () => {
     setupMocks();
-    render(<BulkOperations />, { wrapper: TestProviders });
-
-    // Switch to Add mode
-    fireEvent.click(screen.getByTestId("op-type-add"));
-
+    await renderAndWait();
+    await clickCard("add");
     await selectSourceGroup();
     await selectTargetGroup();
 
-    // Select a member
-    fireEvent.click(screen.getByTestId("bulk-member-Alice Smith"));
-
-    // Click preview
-    fireEvent.click(screen.getByTestId("bulk-preview-btn"));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("bulk-member-Alice Smith"));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("bulk-preview-btn"));
+    });
 
     await waitFor(() => {
       expect(screen.getByTestId("bulk-preview-panel")).toBeInTheDocument();
@@ -280,25 +338,22 @@ describe("BulkOperations", () => {
 
   it("preview generates correct planned changes for Transfer (add + remove pairs)", async () => {
     setupMocks();
-    render(<BulkOperations />, { wrapper: TestProviders });
-
-    // Switch to Transfer mode
-    fireEvent.click(screen.getByTestId("op-type-transfer"));
-
+    await renderAndWait();
+    await clickCard("transfer");
     await selectSourceGroup();
     await selectTargetGroup();
 
-    // Select a member
-    fireEvent.click(screen.getByTestId("bulk-member-John Doe"));
-
-    // Click preview
-    fireEvent.click(screen.getByTestId("bulk-preview-btn"));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("bulk-member-John Doe"));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("bulk-preview-btn"));
+    });
 
     await waitFor(() => {
       expect(screen.getByTestId("bulk-preview-panel")).toBeInTheDocument();
     });
 
-    // Transfer generates add + remove pairs
     expect(screen.getByText("Planned Changes (2)")).toBeInTheDocument();
     expect(screen.getByText("ADD")).toBeInTheDocument();
     expect(screen.getByText("REMOVE")).toBeInTheDocument();
@@ -308,20 +363,21 @@ describe("BulkOperations", () => {
 
   it("execute calls correct Tauri commands for Delete", async () => {
     setupMocks();
-    render(<BulkOperations />, { wrapper: TestProviders });
-
+    await renderAndWait();
+    await clickCard("delete");
     await selectSourceGroup();
 
-    fireEvent.click(screen.getByTestId("bulk-member-John Doe"));
-
-    // Preview first to generate planned changes
-    fireEvent.click(screen.getByTestId("bulk-preview-btn"));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("bulk-member-John Doe"));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("bulk-preview-btn"));
+    });
 
     await waitFor(() => {
       expect(screen.getByTestId("bulk-preview-panel")).toBeInTheDocument();
     });
 
-    // Execute
     await act(async () => {
       fireEvent.click(screen.getByTestId("bulk-execute-btn"));
     });
@@ -336,16 +392,17 @@ describe("BulkOperations", () => {
 
   it("execute calls correct Tauri commands for Add", async () => {
     setupMocks();
-    render(<BulkOperations />, { wrapper: TestProviders });
-
-    fireEvent.click(screen.getByTestId("op-type-add"));
-
+    await renderAndWait();
+    await clickCard("add");
     await selectSourceGroup();
     await selectTargetGroup();
 
-    fireEvent.click(screen.getByTestId("bulk-member-John Doe"));
-
-    fireEvent.click(screen.getByTestId("bulk-preview-btn"));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("bulk-member-John Doe"));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("bulk-preview-btn"));
+    });
 
     await waitFor(() => {
       expect(screen.getByTestId("bulk-preview-panel")).toBeInTheDocument();
@@ -365,16 +422,17 @@ describe("BulkOperations", () => {
 
   it("execute calls correct Tauri commands for Transfer", async () => {
     setupMocks();
-    render(<BulkOperations />, { wrapper: TestProviders });
-
-    fireEvent.click(screen.getByTestId("op-type-transfer"));
-
+    await renderAndWait();
+    await clickCard("transfer");
     await selectSourceGroup();
     await selectTargetGroup();
 
-    fireEvent.click(screen.getByTestId("bulk-member-John Doe"));
-
-    fireEvent.click(screen.getByTestId("bulk-preview-btn"));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("bulk-member-John Doe"));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("bulk-preview-btn"));
+    });
 
     await waitFor(() => {
       expect(screen.getByTestId("bulk-preview-panel")).toBeInTheDocument();
@@ -384,7 +442,6 @@ describe("BulkOperations", () => {
       fireEvent.click(screen.getByTestId("bulk-execute-btn"));
     });
 
-    // Transfer calls add_user_to_group first, then remove_group_member
     await waitFor(() => {
       expect(mockInvoke).toHaveBeenCalledWith("add_user_to_group", {
         userDn: "CN=John Doe,OU=Users,OU=Corp,DC=example,DC=com",
@@ -399,15 +456,18 @@ describe("BulkOperations", () => {
 
   it("progress indicator updates during execution", async () => {
     setupMocks();
-    render(<BulkOperations />, { wrapper: TestProviders });
-
+    await renderAndWait();
+    await clickCard("delete");
     await selectSourceGroup();
 
-    // Select multiple members
-    fireEvent.click(screen.getByTestId("bulk-member-John Doe"));
-    fireEvent.click(screen.getByTestId("bulk-member-Alice Smith"));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("bulk-member-John Doe"));
+      fireEvent.click(screen.getByTestId("bulk-member-Alice Smith"));
+    });
 
-    fireEvent.click(screen.getByTestId("bulk-preview-btn"));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("bulk-preview-btn"));
+    });
 
     await waitFor(() => {
       expect(screen.getByTestId("bulk-preview-panel")).toBeInTheDocument();
@@ -421,7 +481,6 @@ describe("BulkOperations", () => {
       expect(screen.getByTestId("bulk-progress")).toBeInTheDocument();
     });
 
-    // Should eventually show completed
     await waitFor(() => {
       expect(screen.getByTestId("bulk-progress-message")).toHaveTextContent(
         "Successfully completed 2 operations.",
@@ -430,17 +489,19 @@ describe("BulkOperations", () => {
   });
 
   it("rollback reverses completed operations on failure", async () => {
-    // Fail at step 2 (second operation)
     setupMocks({ failAtStep: 2 });
-    render(<BulkOperations />, { wrapper: TestProviders });
-
+    await renderAndWait();
+    await clickCard("delete");
     await selectSourceGroup();
 
-    // Select two members
-    fireEvent.click(screen.getByTestId("bulk-member-John Doe"));
-    fireEvent.click(screen.getByTestId("bulk-member-Alice Smith"));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("bulk-member-John Doe"));
+      fireEvent.click(screen.getByTestId("bulk-member-Alice Smith"));
+    });
 
-    fireEvent.click(screen.getByTestId("bulk-preview-btn"));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("bulk-preview-btn"));
+    });
 
     await waitFor(() => {
       expect(screen.getByTestId("bulk-preview-panel")).toBeInTheDocument();
@@ -450,14 +511,12 @@ describe("BulkOperations", () => {
       fireEvent.click(screen.getByTestId("bulk-execute-btn"));
     });
 
-    // Should show failed status with rollback message
     await waitFor(() => {
       expect(screen.getByTestId("bulk-progress-message")).toHaveTextContent(
         /Failed at step.*Rolled back/,
       );
     });
 
-    // Verify rollback call was made (reversal of the first successful remove)
     await waitFor(() => {
       expect(mockInvoke).toHaveBeenCalledWith("add_user_to_group", {
         userDn: "CN=John Doe,OU=Users,OU=Corp,DC=example,DC=com",
@@ -466,14 +525,274 @@ describe("BulkOperations", () => {
     });
   });
 
-  it("permission gating hides execute for non-AccountOperator", async () => {
+  it("permission gating disables cards for insufficient permissions", async () => {
     setupMocks({ permissionLevel: "ReadOnly" });
-    render(<BulkOperations />, { wrapper: TestProviders });
+    await renderAndWait();
+
+    expect(screen.getByTestId("operation-picker")).toBeInTheDocument();
+
+    // Export CSV should still be enabled (ReadOnly permission)
+    const exportCard = screen.getByTestId("op-card-export-csv");
+    expect(exportCard).not.toBeDisabled();
+
+    // Delete should be disabled (requires AccountOperator)
+    const deleteCard = screen.getByTestId("op-card-delete");
+    expect(deleteCard).toBeDisabled();
+  });
+
+  // -----------------------------------------------------------------------
+  // Export CSV Tests
+  // -----------------------------------------------------------------------
+
+  it("export-csv operation shows group selector and export button", async () => {
+    setupMocks();
+    await renderAndWait();
+    await clickCard("export-csv");
+
+    expect(screen.getByTestId("source-group-section")).toBeInTheDocument();
+
+    const searchInput = screen.getByTestId("group-picker-search");
+    fireEvent.change(searchInput, { target: { value: "Dev" } });
 
     await waitFor(() => {
-      expect(screen.getByTestId("bulk-no-permission")).toBeInTheDocument();
+      expect(
+        screen.getByTestId("group-option-Developers"),
+      ).toBeInTheDocument();
     });
 
-    expect(screen.queryByTestId("bulk-action-buttons")).not.toBeInTheDocument();
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("group-option-Developers"));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("member-list")).toBeInTheDocument();
+    });
+
+    expect(screen.getByTestId("bulk-export-btn")).toBeInTheDocument();
+  });
+
+  it("export-csv triggers CSV download via save_file_dialog", async () => {
+    setupMocks();
+    await renderAndWait();
+    await clickCard("export-csv");
+
+    const searchInput = screen.getByTestId("group-picker-search");
+    fireEvent.change(searchInput, { target: { value: "Dev" } });
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId("group-option-Developers"),
+      ).toBeInTheDocument();
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("group-option-Developers"));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("member-list")).toBeInTheDocument();
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("bulk-export-btn"));
+    });
+
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith(
+        "save_file_dialog",
+        expect.objectContaining({
+          defaultName: "Developers_members.csv",
+        }),
+      );
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Copy Memberships Tests
+  // -----------------------------------------------------------------------
+
+  it("copy-memberships shows user search inputs", async () => {
+    setupMocks();
+    await renderAndWait();
+    await clickCard("copy-memberships");
+
+    expect(screen.getByTestId("source-user-section")).toBeInTheDocument();
+    expect(screen.getByTestId("target-user-section")).toBeInTheDocument();
+    expect(screen.getByTestId("copy-source-user-input")).toBeInTheDocument();
+    expect(screen.getByTestId("copy-target-user-input")).toBeInTheDocument();
+  });
+
+  it("copy-memberships search resolves user", async () => {
+    setupMocks();
+    await renderAndWait();
+    await clickCard("copy-memberships");
+
+    fireEvent.change(screen.getByTestId("copy-source-user-input"), {
+      target: { value: "srcuser" },
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("copy-source-user-search"));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("copy-source-user-result")).toHaveTextContent(
+        "Found: Source User",
+      );
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Clone Group Tests
+  // -----------------------------------------------------------------------
+
+  it("clone-group shows source group, name input and container input", async () => {
+    setupMocks();
+    await renderAndWait();
+    await clickCard("clone-group");
+
+    expect(screen.getByTestId("source-group-section")).toBeInTheDocument();
+    expect(screen.getByTestId("clone-name-input")).toBeInTheDocument();
+    expect(screen.getByTestId("clone-container-input")).toBeInTheDocument();
+  });
+
+  it("clone-group execute creates group and adds members", async () => {
+    setupMocks();
+    await renderAndWait();
+    await clickCard("clone-group");
+
+    // Select source group
+    const searchInput = screen.getByTestId("group-picker-search");
+    fireEvent.change(searchInput, { target: { value: "Dev" } });
+    await waitFor(() => {
+      expect(
+        screen.getByTestId("group-option-Developers"),
+      ).toBeInTheDocument();
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("group-option-Developers"));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText(/3 members/i)).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByTestId("clone-name-input"), {
+      target: { value: "Dev-Clone" },
+    });
+    fireEvent.change(screen.getByTestId("clone-container-input"), {
+      target: { value: "OU=Groups,DC=example,DC=com" },
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("bulk-execute-btn"));
+    });
+
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith("create_group", {
+        name: "Dev-Clone",
+        containerDn: "OU=Groups,DC=example,DC=com",
+        scope: "Global",
+        category: "Security",
+        description: "Clone of Developers",
+      });
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Merge Groups Tests
+  // -----------------------------------------------------------------------
+
+  it("merge-groups shows source and target group pickers", async () => {
+    setupMocks();
+    await renderAndWait();
+    await clickCard("merge-groups");
+
+    expect(screen.getByTestId("source-group-section")).toBeInTheDocument();
+    expect(screen.getByTestId("target-group-section")).toBeInTheDocument();
+  });
+
+  // -----------------------------------------------------------------------
+  // Import CSV Tests
+  // -----------------------------------------------------------------------
+
+  it("import-csv shows target group and file input", async () => {
+    setupMocks();
+    await renderAndWait();
+    await clickCard("import-csv");
+
+    expect(screen.getByTestId("target-group-section")).toBeInTheDocument();
+    expect(screen.getByTestId("csv-file-input")).toBeInTheDocument();
+  });
+
+  // -----------------------------------------------------------------------
+  // Move Groups Tests
+  // -----------------------------------------------------------------------
+
+  it("move-groups shows group picker and target OU input", async () => {
+    setupMocks({ permissionLevel: "DomainAdmin" });
+    await renderAndWait();
+    await clickCard("move-groups");
+
+    expect(screen.getByTestId("source-group-section")).toBeInTheDocument();
+    expect(screen.getByTestId("move-target-ou-input")).toBeInTheDocument();
+  });
+
+  // -----------------------------------------------------------------------
+  // Create Groups Tests
+  // -----------------------------------------------------------------------
+
+  it("create-groups shows CSV file input", async () => {
+    setupMocks();
+    await renderAndWait();
+    await clickCard("create-groups");
+
+    expect(screen.getByTestId("create-groups-csv-input")).toBeInTheDocument();
+  });
+
+  // -----------------------------------------------------------------------
+  // Update Manager Tests
+  // -----------------------------------------------------------------------
+
+  it("update-manager shows group picker and manager input", async () => {
+    setupMocks();
+    await renderAndWait();
+    await clickCard("update-manager");
+
+    expect(screen.getByTestId("source-group-section")).toBeInTheDocument();
+    expect(screen.getByTestId("manager-user-input")).toBeInTheDocument();
+  });
+
+  it("update-manager search resolves manager user", async () => {
+    setupMocks();
+    await renderAndWait();
+    await clickCard("update-manager");
+
+    fireEvent.change(screen.getByTestId("manager-user-input"), {
+      target: { value: "srcuser" },
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("manager-user-search"));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("manager-user-result")).toHaveTextContent(
+        "Found: Source User",
+      );
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Member list CSV export button
+  // -----------------------------------------------------------------------
+
+  it("member list shows inline export CSV button", async () => {
+    setupMocks();
+    await renderAndWait();
+    await clickCard("delete");
+    await selectSourceGroup();
+
+    expect(screen.getByTestId("member-export-csv-btn")).toBeInTheDocument();
   });
 });

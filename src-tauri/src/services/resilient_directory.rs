@@ -346,6 +346,61 @@ where
     async fn get_ou_tree(&self) -> Result<Vec<OUNode>> {
         resilient_call!(self, |inner| inner.get_ou_tree().await)
     }
+
+    async fn create_group(
+        &self,
+        name: &str,
+        container_dn: &str,
+        scope: &str,
+        category: &str,
+        description: &str,
+    ) -> Result<String> {
+        let name = name.to_string();
+        let container = container_dn.to_string();
+        let scope = scope.to_string();
+        let category = category.to_string();
+        let desc = description.to_string();
+        let inner_ref = self.inner.clone();
+        self.execute_with_resilience(|| {
+            let inner = inner_ref.clone();
+            let n = name.clone();
+            let c = container.clone();
+            let s = scope.clone();
+            let cat = category.clone();
+            let d = desc.clone();
+            async move { inner.create_group(&n, &c, &s, &cat, &d).await }
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!(e))
+    }
+
+    async fn move_object(&self, object_dn: &str, target_container_dn: &str) -> Result<()> {
+        let o = object_dn.to_string();
+        let t = target_container_dn.to_string();
+        let inner_ref = self.inner.clone();
+        self.execute_with_resilience(|| {
+            let inner = inner_ref.clone();
+            let o = o.clone();
+            let t = t.clone();
+            async move { inner.move_object(&o, &t).await }
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!(e))
+    }
+
+    async fn update_managed_by(&self, group_dn: &str, manager_dn: &str) -> Result<()> {
+        let g = group_dn.to_string();
+        let m = manager_dn.to_string();
+        let inner_ref = self.inner.clone();
+        self.execute_with_resilience(|| {
+            let inner = inner_ref.clone();
+            let g = g.clone();
+            let m = m.clone();
+            async move { inner.update_managed_by(&g, &m).await }
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!(e))
+    }
 }
 
 #[cfg(test)]

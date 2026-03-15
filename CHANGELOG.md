@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Bulk operations redesigned with card-based operation picker (11 operations)
+- Export group members to CSV with inline button and standalone operation
+- Copy user memberships from one user to another with preview
+- Update managedBy attribute on multiple groups at once (AccountOperator)
+- Clone group with members to a new group in a specified OU (AccountOperator)
+- Merge members from multiple groups into a surviving target group (AccountOperator)
+- Import members from CSV file into a group with resolve and preview (HelpDesk)
+- Move groups to a different OU via LDAP moddn (DomainAdmin)
+- Bulk create groups from CSV template with name, description, scope, category, OU columns (AccountOperator)
+- `create_group`, `move_object`, `update_managed_by` trait methods on DirectoryProvider
+- `create_group`, `move_object`, `update_managed_by` Tauri commands with permission checks and audit logging
+
 - Group hygiene scan detecting empty groups and circular group nesting (4.4)
 - Single-member group detection - flags groups with exactly one member (4.4)
 - Stale group detection - flags groups not modified in over 180 days (4.4)

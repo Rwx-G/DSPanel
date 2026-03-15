@@ -950,6 +950,125 @@ impl DirectoryProvider for LdapDirectoryProvider {
         })
         .await
     }
+
+    async fn create_group(
+        &self,
+        name: &str,
+        container_dn: &str,
+        scope: &str,
+        category: &str,
+        description: &str,
+    ) -> Result<String> {
+        let dn = format!("CN={},{}", name, container_dn);
+
+        // Compute groupType value from scope and category
+        let scope_bits: i32 = match scope {
+            "DomainLocal" => 0x4,
+            "Universal" => 0x8,
+            _ => 0x2, // Global
+        };
+        let category_bit: i32 = if category == "Distribution" {
+            0
+        } else {
+            -2_147_483_648_i32 // 0x80000000 - Security
+        };
+        let group_type = scope_bits | category_bit;
+
+        let dn_clone = dn.clone();
+        let name_owned = name.to_string();
+        let desc_owned = description.to_string();
+        self.with_connection(|mut ldap| {
+            let dn = dn_clone.clone();
+            let name_owned = name_owned.clone();
+            let desc_owned = desc_owned.clone();
+            async move {
+                let mut attrs = vec![
+                    (
+                        "objectClass".to_string(),
+                        HashSet::from(["group".to_string()]),
+                    ),
+                    ("sAMAccountName".to_string(), HashSet::from([name_owned])),
+                    (
+                        "groupType".to_string(),
+                        HashSet::from([group_type.to_string()]),
+                    ),
+                ];
+                if !desc_owned.is_empty() {
+                    attrs.push(("description".to_string(), HashSet::from([desc_owned])));
+                }
+
+                ldap.add(&dn, attrs)
+                    .await
+                    .context("Failed to create group")?
+                    .success()
+                    .context("Create group LDAP operation returned error")?;
+
+                tracing::info!(dn = %dn, "Group created");
+                Ok(dn)
+            }
+        })
+        .await
+    }
+
+    async fn move_object(&self, object_dn: &str, target_container_dn: &str) -> Result<()> {
+        // Extract the RDN (first component) from the object DN
+        let rdn = object_dn
+            .split(',')
+            .next()
+            .context("Invalid DN: cannot extract RDN")?
+            .to_string();
+
+        let target = target_container_dn.to_string();
+        self.with_connection(|mut ldap| {
+            let rdn = rdn.clone();
+            let target = target.clone();
+            async move {
+                ldap.modifydn(object_dn, &rdn, true, Some(&target))
+                    .await
+                    .context("Failed to move object")?
+                    .success()
+                    .context("Move object LDAP operation returned error")?;
+
+                tracing::info!(
+                    object_dn = %object_dn,
+                    target = %target,
+                    "Object moved"
+                );
+                Ok(())
+            }
+        })
+        .await
+    }
+
+    async fn update_managed_by(&self, group_dn: &str, manager_dn: &str) -> Result<()> {
+        let g = group_dn.to_string();
+        let m = manager_dn.to_string();
+        self.with_connection(|mut ldap| {
+            let g = g.clone();
+            let m = m.clone();
+            async move {
+                ldap.modify(
+                    &g,
+                    vec![Mod::Replace(
+                        "managedBy".to_string(),
+                        HashSet::from([m.clone()]),
+                    )],
+                )
+                .await
+                .context("Failed to update managedBy")?
+                .success()
+                .context("Update managedBy LDAP operation returned error")?;
+
+                tracing::info!(
+                    group_dn = %g,
+                    manager_dn = %m,
+                    "managedBy updated"
+                );
+                Ok(())
+            }
+        })
+        .await
+    }
 }
 
 /// Builds a hierarchical OU tree from a flat list of (DN, name) pairs.
