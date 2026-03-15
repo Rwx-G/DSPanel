@@ -57,6 +57,17 @@ export class ErrorBoundary extends Component<
             An unexpected error occurred. This has been logged for
             investigation.
           </p>
+          {this.state.error && (
+            <details className="w-full max-w-lg" data-testid="error-boundary-details">
+              <summary className="cursor-pointer text-caption text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]">
+                Show error details
+              </summary>
+              <pre className="mt-2 max-h-48 overflow-auto rounded-md bg-[var(--color-surface-bg)] p-3 text-caption text-[var(--color-error)] font-mono whitespace-pre-wrap break-all">
+                {this.state.error.message}
+                {this.state.error.stack && `\n\n${this.state.error.stack}`}
+              </pre>
+            </details>
+          )}
           <button
             className="btn btn-primary"
             onClick={this.handleRetry}
