@@ -4,10 +4,7 @@ Items deferred from QA reviews. None are blocking - all stories are PASS.
 
 ## Priority: Medium
 
-| Source | Item | Refs |
-|--------|------|------|
-| 1.8 | Wire OUPicker to Tauri `get_ou_tree` command | `src/components/form/OUPicker.tsx` |
-| 1.8 | Wire GroupPicker to Tauri `search_groups` command | `src/components/form/GroupPicker.tsx` |
+(No items)
 
 ## Priority: Low
 

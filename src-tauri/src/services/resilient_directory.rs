@@ -5,7 +5,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 
 use crate::error::DirectoryError;
-use crate::models::DirectoryEntry;
+use crate::models::{DirectoryEntry, OUNode};
 use crate::services::directory::DirectoryProvider;
 use crate::services::resilience::{retry_with_backoff, CircuitBreaker, RetryConfig};
 
@@ -301,6 +301,10 @@ where
         })
         .await
         .map_err(|e| anyhow::anyhow!(e))
+    }
+
+    async fn get_ou_tree(&self) -> Result<Vec<OUNode>> {
+        resilient_call!(self, |inner| inner.get_ou_tree().await)
     }
 }
 

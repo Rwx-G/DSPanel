@@ -117,6 +117,8 @@ pub fn run() {
             commands::analyze_ntfs,
             commands::audit_ntfs_permissions,
             commands::cross_reference_ntfs,
+            commands::search_groups,
+            commands::get_ou_tree,
         ])
         .run(tauri::generate_context!())
         .unwrap_or_else(|e| {

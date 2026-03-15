@@ -7,7 +7,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use std::collections::HashMap;
 
-use crate::models::DirectoryEntry;
+use crate::models::{DirectoryEntry, OUNode};
 use crate::services::directory::DirectoryProvider;
 
 pub struct DemoDirectoryProvider;
@@ -791,12 +791,17 @@ impl DirectoryProvider for DemoDirectoryProvider {
             .collect())
     }
 
-    async fn search_groups(
-        &self,
-        _filter: &str,
-        _max_results: usize,
-    ) -> Result<Vec<DirectoryEntry>> {
-        Ok(vec![])
+    async fn search_groups(&self, filter: &str, max_results: usize) -> Result<Vec<DirectoryEntry>> {
+        let lower = filter.to_lowercase();
+        Ok(sample_group_entries()
+            .into_iter()
+            .filter(|g| {
+                let name = g.display_name.as_deref().unwrap_or("").to_lowercase();
+                let sam = g.sam_account_name.as_deref().unwrap_or("").to_lowercase();
+                name.contains(&lower) || sam.contains(&lower)
+            })
+            .take(max_results)
+            .collect())
     }
 
     async fn browse_users(&self, max_results: usize) -> Result<Vec<DirectoryEntry>> {
@@ -895,4 +900,76 @@ impl DirectoryProvider for DemoDirectoryProvider {
     async fn get_replication_metadata(&self, object_dn: &str) -> Result<Option<String>> {
         Ok(Some(sample_replication_metadata_for(object_dn)))
     }
+
+    async fn get_ou_tree(&self) -> Result<Vec<OUNode>> {
+        Ok(sample_ou_tree())
+    }
+}
+
+fn sample_ou_tree() -> Vec<OUNode> {
+    vec![
+        OUNode {
+            distinguished_name: "OU=Users,DC=contoso,DC=com".to_string(),
+            name: "Users".to_string(),
+            has_children: Some(true),
+            children: Some(vec![
+                OUNode {
+                    distinguished_name: "OU=IT,OU=Users,DC=contoso,DC=com".to_string(),
+                    name: "IT".to_string(),
+                    children: None,
+                    has_children: None,
+                },
+                OUNode {
+                    distinguished_name: "OU=HR,OU=Users,DC=contoso,DC=com".to_string(),
+                    name: "HR".to_string(),
+                    children: None,
+                    has_children: None,
+                },
+                OUNode {
+                    distinguished_name: "OU=Finance,OU=Users,DC=contoso,DC=com".to_string(),
+                    name: "Finance".to_string(),
+                    children: None,
+                    has_children: None,
+                },
+                OUNode {
+                    distinguished_name: "OU=Sales,OU=Users,DC=contoso,DC=com".to_string(),
+                    name: "Sales".to_string(),
+                    children: None,
+                    has_children: None,
+                },
+            ]),
+        },
+        OUNode {
+            distinguished_name: "OU=Computers,DC=contoso,DC=com".to_string(),
+            name: "Computers".to_string(),
+            has_children: Some(true),
+            children: Some(vec![
+                OUNode {
+                    distinguished_name: "OU=Workstations,OU=Computers,DC=contoso,DC=com"
+                        .to_string(),
+                    name: "Workstations".to_string(),
+                    children: None,
+                    has_children: None,
+                },
+                OUNode {
+                    distinguished_name: "OU=Servers,OU=Computers,DC=contoso,DC=com".to_string(),
+                    name: "Servers".to_string(),
+                    children: None,
+                    has_children: None,
+                },
+            ]),
+        },
+        OUNode {
+            distinguished_name: "OU=Groups,DC=contoso,DC=com".to_string(),
+            name: "Groups".to_string(),
+            children: None,
+            has_children: None,
+        },
+        OUNode {
+            distinguished_name: "OU=Service Accounts,DC=contoso,DC=com".to_string(),
+            name: "Service Accounts".to_string(),
+            children: None,
+            has_children: None,
+        },
+    ]
 }

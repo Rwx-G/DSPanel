@@ -1,4 +1,4 @@
-use crate::models::DirectoryEntry;
+use crate::models::{DirectoryEntry, OUNode};
 use anyhow::Result;
 use async_trait::async_trait;
 
@@ -95,6 +95,12 @@ pub trait DirectoryProvider: Send + Sync {
     /// This is an operational attribute that must be explicitly requested.
     /// Returns None if the attribute is not available.
     async fn get_replication_metadata(&self, object_dn: &str) -> Result<Option<String>>;
+
+    /// Returns the OU tree starting from the base DN.
+    ///
+    /// Each node contains the OU name and DN. Children are populated
+    /// for the first level; deeper levels use `has_children` for lazy loading.
+    async fn get_ou_tree(&self) -> Result<Vec<OUNode>>;
 }
 
 #[cfg(test)]
@@ -123,6 +129,7 @@ pub mod tests {
         pub set_password_flags_calls: Mutex<Vec<(String, bool, bool)>>,
         cannot_change_password: Mutex<bool>,
         replication_metadata: Mutex<Option<String>>,
+        ou_tree: Mutex<Vec<OUNode>>,
     }
 
     impl Default for MockDirectoryProvider {
@@ -150,6 +157,7 @@ pub mod tests {
                 set_password_flags_calls: Mutex::new(Vec::new()),
                 cannot_change_password: Mutex::new(false),
                 replication_metadata: Mutex::new(None),
+                ou_tree: Mutex::new(Vec::new()),
             }
         }
 
@@ -171,6 +179,7 @@ pub mod tests {
                 set_password_flags_calls: Mutex::new(Vec::new()),
                 cannot_change_password: Mutex::new(false),
                 replication_metadata: Mutex::new(None),
+                ou_tree: Mutex::new(Vec::new()),
             }
         }
 
@@ -367,6 +376,11 @@ pub mod tests {
         async fn get_replication_metadata(&self, _object_dn: &str) -> Result<Option<String>> {
             self.check_failure()?;
             Ok(self.replication_metadata.lock().unwrap().clone())
+        }
+
+        async fn get_ou_tree(&self) -> Result<Vec<OUNode>> {
+            self.check_failure()?;
+            Ok(self.ou_tree.lock().unwrap().clone())
         }
     }
 

@@ -5,7 +5,7 @@ use anyhow::{Context, Result};
 use async_trait::async_trait;
 use ldap3::{LdapConnAsync, LdapConnSettings, Mod, Scope, SearchEntry};
 
-use crate::models::DirectoryEntry;
+use crate::models::{DirectoryEntry, OUNode};
 use crate::services::directory::DirectoryProvider;
 
 /// LDAP attributes to retrieve for user searches.
@@ -789,6 +789,91 @@ impl DirectoryProvider for LdapDirectoryProvider {
         })
         .await
     }
+
+    async fn get_ou_tree(&self) -> Result<Vec<OUNode>> {
+        if self.domain.is_none() {
+            return Ok(Vec::new());
+        }
+
+        let base = self.base_dn.lock().unwrap().clone().unwrap_or_default();
+        self.with_connection(|mut ldap| {
+            let base = base.clone();
+            async move {
+                let (rs, _) = ldap
+                    .search(
+                        &base,
+                        Scope::Subtree,
+                        "(objectClass=organizationalUnit)",
+                        vec!["distinguishedName", "name"],
+                    )
+                    .await
+                    .context("Failed to query OU tree")?
+                    .success()
+                    .context("OU tree LDAP query returned error")?;
+
+                let mut flat_ous: Vec<(String, String)> = rs
+                    .into_iter()
+                    .map(|entry| {
+                        let se = SearchEntry::construct(entry);
+                        let name = se
+                            .attrs
+                            .get("name")
+                            .and_then(|v| v.first().cloned())
+                            .unwrap_or_default();
+                        (se.dn, name)
+                    })
+                    .collect();
+
+                flat_ous.sort_by(|a, b| a.1.to_lowercase().cmp(&b.1.to_lowercase()));
+                Ok(build_ou_tree(&flat_ous, &base))
+            }
+        })
+        .await
+    }
+}
+
+/// Builds a hierarchical OU tree from a flat list of (DN, name) pairs.
+fn build_ou_tree(flat_ous: &[(String, String)], base_dn: &str) -> Vec<OUNode> {
+    fn children_of(flat_ous: &[(String, String)], target_parent: &str) -> Vec<OUNode> {
+        let mut nodes: Vec<OUNode> = flat_ous
+            .iter()
+            .filter(|(dn, _)| {
+                let dn_lower = dn.to_lowercase();
+                if dn_lower == target_parent {
+                    return false;
+                }
+                // Direct child: everything after the first comma is the parent DN
+                match dn_lower.find(',') {
+                    Some(pos) => &dn_lower[pos + 1..] == target_parent,
+                    None => false,
+                }
+            })
+            .map(|(dn, name)| {
+                let dn_lower = dn.to_lowercase();
+                let child_nodes = children_of(flat_ous, &dn_lower);
+                let has_children = if child_nodes.is_empty() {
+                    None
+                } else {
+                    Some(true)
+                };
+                OUNode {
+                    distinguished_name: dn.clone(),
+                    name: name.clone(),
+                    children: if child_nodes.is_empty() {
+                        None
+                    } else {
+                        Some(child_nodes)
+                    },
+                    has_children,
+                }
+            })
+            .collect();
+
+        nodes.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+        nodes
+    }
+
+    children_of(flat_ous, &base_dn.to_lowercase())
 }
 
 #[cfg(test)]

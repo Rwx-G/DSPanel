@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Tauri `search_groups` command wired to GroupPicker component with `useGroupSearch` hook
+- Tauri `get_ou_tree` command wired to OUPicker component with `useOUTree` hook
+- `DirectoryProvider::get_ou_tree()` trait method with LDAP and demo implementations
+- Demo provider now returns realistic group search results (was empty)
+
 ### Changed
 
 - LDAP connection pooling: reuse a single multiplexed connection instead of connect/bind per operation

@@ -3,7 +3,7 @@ use tauri::State;
 use std::time::{Duration, Instant};
 
 use crate::error::AppError;
-use crate::models::DirectoryEntry;
+use crate::models::{DirectoryEntry, OUNode};
 use crate::services::audit::AuditEntry;
 use crate::services::comparison::GroupComparisonResult;
 use crate::services::mfa::{MfaConfig, MfaSetupResult};
@@ -77,6 +77,28 @@ pub(crate) async fn search_users_inner(
     let provider = state.directory_provider.clone();
     provider
         .search_users(&sanitized, 50)
+        .await
+        .map_err(|e| AppError::Directory(e.to_string()))
+}
+
+/// Searches for groups matching the query string.
+pub(crate) async fn search_groups_inner(
+    state: &AppState,
+    query: &str,
+) -> Result<Vec<DirectoryEntry>, AppError> {
+    let sanitized = validate_search_input(query)?;
+    let provider = state.directory_provider.clone();
+    provider
+        .search_groups(&sanitized, 50)
+        .await
+        .map_err(|e| AppError::Directory(e.to_string()))
+}
+
+/// Returns the OU tree from Active Directory.
+pub(crate) async fn get_ou_tree_inner(state: &AppState) -> Result<Vec<OUNode>, AppError> {
+    let provider = state.directory_provider.clone();
+    provider
+        .get_ou_tree()
         .await
         .map_err(|e| AppError::Directory(e.to_string()))
 }
@@ -644,6 +666,21 @@ pub async fn search_users(
     state: State<'_, AppState>,
 ) -> Result<Vec<DirectoryEntry>, AppError> {
     search_users_inner(&state, &query).await
+}
+
+/// Searches for groups matching a query string.
+#[tauri::command]
+pub async fn search_groups(
+    query: String,
+    state: State<'_, AppState>,
+) -> Result<Vec<DirectoryEntry>, AppError> {
+    search_groups_inner(&state, &query).await
+}
+
+/// Returns the OU tree from Active Directory.
+#[tauri::command]
+pub async fn get_ou_tree(state: State<'_, AppState>) -> Result<Vec<OUNode>, AppError> {
+    get_ou_tree_inner(&state).await
 }
 
 /// Returns a single user by sAMAccountName with full attributes.
