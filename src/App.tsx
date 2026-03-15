@@ -16,6 +16,8 @@ import { PasswordGenerator } from "@/pages/PasswordGenerator";
 import { UserComparison } from "@/pages/UserComparison";
 import { NtfsAnalyzer } from "@/pages/NtfsAnalyzer";
 import { GroupManagement } from "@/pages/GroupManagement";
+import { BulkOperations } from "@/pages/BulkOperations";
+import { GroupHygiene } from "@/pages/GroupHygiene";
 
 const APP_VERSION = __APP_VERSION__;
 
@@ -129,6 +131,8 @@ const MODULE_COMPONENTS: Record<
   computers: ComputerLookup,
   "user-comparison": UserComparison,
   groups: GroupManagement,
+  "bulk-operations": BulkOperations,
+  "group-hygiene": GroupHygiene,
   "ntfs-analyzer": NtfsAnalyzer,
   "password-generator": PasswordGenerator,
 };

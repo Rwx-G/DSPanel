@@ -14,17 +14,8 @@ import { parseCnFromDn } from "@/utils/dn";
 import { useGroupBrowse } from "@/hooks/useGroupBrowse";
 import { useNavigation } from "@/contexts/NavigationContext";
 import { usePermissions } from "@/hooks/usePermissions";
-import { BulkOperations } from "@/pages/BulkOperations";
-import { GroupHygiene } from "@/pages/GroupHygiene";
 import { GroupDetail } from "@/pages/GroupDetail";
-import {
-  Users,
-  AlertCircle,
-  Layers,
-  ShieldAlert,
-} from "lucide-react";
-
-type ViewMode = "list" | "bulk" | "hygiene";
+import { Users, AlertCircle } from "lucide-react";
 
 export function GroupManagement() {
   const {
@@ -50,7 +41,6 @@ export function GroupManagement() {
   const { hasPermission } = usePermissions();
   const canManageMembers = hasPermission("AccountOperator");
 
-  const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [members, setMembers] = useState<DirectoryEntry[]>([]);
   const [membersLoading, setMembersLoading] = useState(false);
 
@@ -161,50 +151,16 @@ export function GroupManagement() {
     [selectedGroup, setSelectedGroup],
   );
 
-  const isListView = viewMode === "list";
-
   return (
     <div className="flex h-full flex-col" data-testid="group-management">
       <div className="border-b border-[var(--color-border-subtle)] p-3">
-        <div className="flex items-center gap-2">
-          <div className="flex-1">
-            <SearchBar
-              value={filterText}
-              onChange={handleFilterChange}
-              onSearch={handleFilterChange}
-              placeholder="Search groups by name or description..."
-              debounceMs={300}
-            />
-          </div>
-          {canManageMembers && (
-            <div className="flex items-center gap-1">
-              <button
-                className={`flex h-7 w-7 items-center justify-center rounded-md transition-colors ${
-                  viewMode === "bulk"
-                    ? "bg-[var(--color-surface-selected)] text-[var(--color-primary)]"
-                    : "text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]"
-                }`}
-                onClick={() => setViewMode(viewMode === "bulk" ? "list" : "bulk")}
-                title="Bulk operations"
-                data-testid="view-toggle-bulk"
-              >
-                <Layers size={16} />
-              </button>
-              <button
-                className={`flex h-7 w-7 items-center justify-center rounded-md transition-colors ${
-                  viewMode === "hygiene"
-                    ? "bg-[var(--color-surface-selected)] text-[var(--color-primary)]"
-                    : "text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]"
-                }`}
-                onClick={() => setViewMode(viewMode === "hygiene" ? "list" : "hygiene")}
-                title="Group hygiene"
-                data-testid="view-toggle-hygiene"
-              >
-                <ShieldAlert size={16} />
-              </button>
-            </div>
-          )}
-        </div>
+        <SearchBar
+          value={filterText}
+          onChange={handleFilterChange}
+          onSearch={handleFilterChange}
+          placeholder="Search groups by name or description..."
+          debounceMs={300}
+        />
       </div>
 
       <div
@@ -221,22 +177,7 @@ export function GroupManagement() {
       </div>
 
       <div className="flex flex-1 overflow-hidden">
-        {viewMode === "bulk" && (
-          <div
-            className="flex-1 overflow-hidden"
-            data-testid="bulk-operations-view"
-          >
-            <BulkOperations />
-          </div>
-        )}
-
-        {viewMode === "hygiene" && (
-          <div className="flex-1 overflow-hidden" data-testid="hygiene-view">
-            <GroupHygiene />
-          </div>
-        )}
-
-        {isListView && loading && (
+        {loading && (
           <div
             className="flex flex-1 items-center justify-center"
             data-testid="group-management-loading"
@@ -245,7 +186,7 @@ export function GroupManagement() {
           </div>
         )}
 
-        {isListView && !loading && error && (
+        {!loading && error && (
           <div
             className="flex flex-1 items-center justify-center"
             data-testid="group-management-error"
@@ -259,7 +200,7 @@ export function GroupManagement() {
           </div>
         )}
 
-        {isListView && !loading && !error && groups.length === 0 && (
+        {!loading && !error && groups.length === 0 && (
           <div
             className="flex flex-1 items-center justify-center"
             data-testid="group-management-empty"
@@ -276,7 +217,7 @@ export function GroupManagement() {
           </div>
         )}
 
-        {isListView && !loading && !error && groups.length > 0 && (
+        {!loading && !error && groups.length > 0 && (
           <>
             <div className="flex w-64 shrink-0 flex-col overflow-hidden border-r border-[var(--color-border-subtle)]">
               <div
