@@ -118,7 +118,10 @@ describe("GroupManagement", () => {
   });
 
   it("renders with search bar and loads groups on mount (flat view default)", async () => {
-    const entries = [makeGroupEntry("Developers"), makeGroupEntry("Finance-Analysts")];
+    const entries = [
+      makeGroupEntry("Developers"),
+      makeGroupEntry("Finance-Analysts"),
+    ];
     mockBrowseWith(entries);
 
     render(<GroupManagement />, { wrapper: TestProviders });
@@ -130,7 +133,9 @@ describe("GroupManagement", () => {
     });
 
     expect(screen.getByTestId("group-result-Developers")).toBeInTheDocument();
-    expect(screen.getByTestId("group-result-Finance-Analysts")).toBeInTheDocument();
+    expect(
+      screen.getByTestId("group-result-Finance-Analysts"),
+    ).toBeInTheDocument();
   });
 
   it("shows loading state during initial load", () => {
@@ -175,7 +180,9 @@ describe("GroupManagement", () => {
       expect(screen.getByTestId("group-management-empty")).toBeInTheDocument();
     });
 
-    expect(screen.getByText("No groups found")).toBeInTheDocument();
+    expect(
+      screen.getByTestId("empty-state-title"),
+    ).toHaveTextContent("No groups found");
   });
 
   it("displays group details when a group is selected", async () => {
@@ -196,8 +203,6 @@ describe("GroupManagement", () => {
 
     const detail = screen.getByTestId("group-detail");
     expect(detail.querySelector("h2")).toHaveTextContent("Developers");
-    expect(screen.getByTestId("group-scope")).toHaveTextContent("Global");
-    expect(screen.getByTestId("group-category")).toHaveTextContent("Security");
   });
 
   it("shows member list in detail panel", async () => {
@@ -268,7 +273,10 @@ describe("GroupManagement", () => {
   });
 
   it("search filters groups in flat view", async () => {
-    const entries = [makeGroupEntry("Developers"), makeGroupEntry("Finance-Analysts")];
+    const entries = [
+      makeGroupEntry("Developers"),
+      makeGroupEntry("Finance-Analysts"),
+    ];
     mockBrowseWith(entries);
 
     render(<GroupManagement />, { wrapper: TestProviders });
@@ -319,7 +327,7 @@ describe("GroupManagement", () => {
     expect(screen.getByText("Groups")).toBeInTheDocument();
   });
 
-  it("group detail shows correct scope and category values", async () => {
+  it("group detail shows correct scope and category values via badges", async () => {
     const entries = [makeGroupEntry("DL-Group", "DomainLocal", "Distribution")];
     mockBrowseWith(entries);
 
@@ -332,32 +340,14 @@ describe("GroupManagement", () => {
     fireEvent.click(screen.getByTestId("group-result-DL-Group"));
 
     await waitFor(() => {
-      expect(screen.getByTestId("group-scope")).toHaveTextContent(
-        "DomainLocal",
-      );
-      expect(screen.getByTestId("group-category")).toHaveTextContent(
-        "Distribution",
-      );
+      expect(screen.getByTestId("group-detail")).toBeInTheDocument();
     });
-  });
 
-  it("renders each scope/category combination correctly", async () => {
-    // Test Global Security
-    const gs = [makeGroupEntry("GS-Group", "Global", "Security")];
-    mockBrowseWith(gs);
-
-    const { unmount } = render(<GroupManagement />, { wrapper: TestProviders });
-    await waitFor(() => {
-      expect(screen.getByTestId("group-result-GS-Group")).toBeInTheDocument();
-    });
-    fireEvent.click(screen.getByTestId("group-result-GS-Group"));
-    await waitFor(() => {
-      expect(screen.getByTestId("group-scope")).toHaveTextContent("Global");
-      expect(screen.getByTestId("group-category")).toHaveTextContent(
-        "Security",
-      );
-    });
-    unmount();
+    // Scope and category are now shown in PropertyGrid and StatusBadge
+    const badges = screen.getAllByTestId("status-badge");
+    const badgeTexts = badges.map((b) => b.textContent);
+    expect(badgeTexts).toContain("DomainLocal");
+    expect(badgeTexts).toContain("Distribution");
   });
 
   it("shows placeholder when no group is selected", async () => {
@@ -373,6 +363,52 @@ describe("GroupManagement", () => {
     expect(
       screen.getByText("Select a group to view details"),
     ).toBeInTheDocument();
+  });
+
+  it("has aria-live status region", async () => {
+    const entries = [makeGroupEntry("Developers")];
+    mockBrowseWith(entries);
+
+    render(<GroupManagement />, { wrapper: TestProviders });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("group-management-status")).toBeInTheDocument();
+    });
+
+    const status = screen.getByTestId("group-management-status");
+    expect(status).toHaveAttribute("aria-live", "polite");
+  });
+
+  it("shows view mode toolbar with all buttons", async () => {
+    const entries = [makeGroupEntry("Developers")];
+    mockBrowseWith(entries, { permissionLevel: "AccountOperator" });
+
+    render(<GroupManagement />, { wrapper: TestProviders });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("view-toggle-flat")).toBeInTheDocument();
+    });
+
+    expect(screen.getByTestId("view-toggle-tree")).toBeInTheDocument();
+    expect(screen.getByTestId("view-toggle-bulk")).toBeInTheDocument();
+    expect(screen.getByTestId("view-toggle-hygiene")).toBeInTheDocument();
+  });
+
+  it("shows category badge on list items", async () => {
+    const entries = [makeGroupEntry("Developers", "Global", "Security")];
+    mockBrowseWith(entries);
+
+    render(<GroupManagement />, { wrapper: TestProviders });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("group-result-Developers")).toBeInTheDocument();
+    });
+
+    // List item should have a StatusBadge
+    const listItem = screen.getByTestId("group-result-Developers");
+    const badge = listItem.querySelector("[data-testid='status-badge']");
+    expect(badge).toBeInTheDocument();
+    expect(badge?.textContent).toBe("Security");
   });
 
   describe("Member Management (Story 4.2)", () => {
@@ -486,17 +522,14 @@ describe("GroupManagement", () => {
         expect(screen.getByText("John Doe")).toBeInTheDocument();
       });
 
-      // Select a member
       fireEvent.click(screen.getByTestId("member-checkbox-John Doe"));
 
       await waitFor(() => {
         expect(screen.getByTestId("remove-selected-btn")).toBeInTheDocument();
       });
 
-      // Click remove selected
       fireEvent.click(screen.getByTestId("remove-selected-btn"));
 
-      // Should show preview button with pending changes
       await waitFor(() => {
         expect(screen.getByTestId("preview-changes-btn")).toBeInTheDocument();
       });
@@ -513,7 +546,6 @@ describe("GroupManagement", () => {
         expect(screen.getByText("John Doe")).toBeInTheDocument();
       });
 
-      // Select and remove
       fireEvent.click(screen.getByTestId("member-checkbox-John Doe"));
 
       await waitFor(() => {
@@ -526,7 +558,6 @@ describe("GroupManagement", () => {
         expect(screen.getByTestId("preview-changes-btn")).toBeInTheDocument();
       });
 
-      // Open preview
       fireEvent.click(screen.getByTestId("preview-changes-btn"));
 
       await waitFor(() => {
@@ -545,7 +576,6 @@ describe("GroupManagement", () => {
         expect(screen.getByText("John Doe")).toBeInTheDocument();
       });
 
-      // Select and remove
       fireEvent.click(screen.getByTestId("member-checkbox-John Doe"));
 
       await waitFor(() => {
