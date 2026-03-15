@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Group member management with multi-select, add/remove with dry-run preview dialog (4.2)
+- Permission-gated member management controls (AccountOperator+ required) (4.2)
+- User search for adding members to groups with duplicate detection (4.2)
+- MemberChangePreviewDialog component with change summary and loading state (4.2)
+
 ## [0.3.0] - 2026-03-15
 
 Epic 3 - Comparison & Permissions Audit. Side-by-side user comparison, NTFS permissions

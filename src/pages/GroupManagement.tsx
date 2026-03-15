@@ -11,8 +11,22 @@ import { parseCnFromDn } from "@/utils/dn";
 import { useGroupBrowse } from "@/hooks/useGroupBrowse";
 import { useOUTree } from "@/hooks/useOUTree";
 import { useNavigation } from "@/contexts/NavigationContext";
+import { usePermissions } from "@/hooks/usePermissions";
+import {
+  MemberChangePreviewDialog,
+  type MemberChange,
+} from "@/components/dialogs/MemberChangePreviewDialog";
 import { type OUNode } from "@/components/form/OUPicker";
-import { Users, AlertCircle, FolderTree, List } from "lucide-react";
+import {
+  Users,
+  AlertCircle,
+  FolderTree,
+  List,
+  UserPlus,
+  UserMinus,
+  Eye,
+  Search,
+} from "lucide-react";
 
 type ViewMode = "flat" | "tree";
 
@@ -46,10 +60,26 @@ export function GroupManagement() {
     | string
     | undefined;
 
+  const { hasPermission } = usePermissions();
+  const canManageMembers = hasPermission("AccountOperator");
+
   const [viewMode, setViewMode] = useState<ViewMode>("flat");
   const [selectedOU, setSelectedOU] = useState<string | null>(null);
   const [members, setMembers] = useState<DirectoryEntry[]>([]);
   const [membersLoading, setMembersLoading] = useState(false);
+
+  // Member management state
+  const [selectedMembers, setSelectedMembers] = useState<Set<string>>(
+    new Set(),
+  );
+  const [pendingChanges, setPendingChanges] = useState<MemberChange[]>([]);
+  const [showPreview, setShowPreview] = useState(false);
+  const [applying, setApplying] = useState(false);
+  const [memberSearchText, setMemberSearchText] = useState("");
+  const [memberSearchResults, setMemberSearchResults] = useState<
+    DirectoryEntry[]
+  >([]);
+  const [memberSearchLoading, setMemberSearchLoading] = useState(false);
 
   const { nodes: ouNodes, loading: ouLoading, error: ouError } = useOUTree();
 
@@ -74,6 +104,11 @@ export function GroupManagement() {
 
     let cancelled = false;
     setMembersLoading(true);
+    // Reset member management state when group changes
+    setSelectedMembers(new Set());
+    setPendingChanges([]);
+    setMemberSearchText("");
+    setMemberSearchResults([]);
 
     invoke<DirectoryEntry[]>("get_group_members", {
       groupDn: selectedGroup.distinguishedName,
@@ -118,15 +153,184 @@ export function GroupManagement() {
     setSelectedOU(id);
   }, []);
 
+  // Member selection handlers
+  const handleMemberSelect = useCallback((dn: string, checked: boolean) => {
+    setSelectedMembers((prev) => {
+      const next = new Set(prev);
+      if (checked) {
+        next.add(dn);
+      } else {
+        next.delete(dn);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleSelectAll = useCallback(
+    (checked: boolean) => {
+      if (checked) {
+        setSelectedMembers(new Set(members.map((m) => m.distinguishedName)));
+      } else {
+        setSelectedMembers(new Set());
+      }
+    },
+    [members],
+  );
+
+  const allSelected =
+    members.length > 0 && selectedMembers.size === members.length;
+
+  // Remove selected members (add to pending changes)
+  const handleRemoveSelected = useCallback(() => {
+    const removals: MemberChange[] = Array.from(selectedMembers).map((dn) => {
+      const member = members.find((m) => m.distinguishedName === dn);
+      const name =
+        member?.displayName ?? member?.samAccountName ?? parseCnFromDn(dn);
+      return { memberDn: dn, memberName: name, action: "remove" as const };
+    });
+
+    setPendingChanges((prev) => {
+      // Avoid duplicates
+      const existingDns = new Set(
+        prev.filter((c) => c.action === "remove").map((c) => c.memberDn),
+      );
+      const newChanges = removals.filter((r) => !existingDns.has(r.memberDn));
+      return [...prev, ...newChanges];
+    });
+    setSelectedMembers(new Set());
+  }, [selectedMembers, members]);
+
+  // Member search for adding
+  const handleMemberSearch = useCallback((query: string) => {
+    setMemberSearchText(query);
+    if (!query.trim()) {
+      setMemberSearchResults([]);
+      return;
+    }
+
+    setMemberSearchLoading(true);
+    invoke<DirectoryEntry[]>("search_users", { query })
+      .then((results) => {
+        setMemberSearchResults(results);
+      })
+      .catch((err) => {
+        console.warn("Failed to search users:", err);
+        setMemberSearchResults([]);
+      })
+      .finally(() => {
+        setMemberSearchLoading(false);
+      });
+  }, []);
+
+  // Add user to group (pending)
+  const handleAddToGroup = useCallback(
+    (entry: DirectoryEntry) => {
+      const name =
+        entry.displayName ??
+        entry.samAccountName ??
+        parseCnFromDn(entry.distinguishedName);
+
+      // Check if already a member
+      const alreadyMember = members.some(
+        (m) => m.distinguishedName === entry.distinguishedName,
+      );
+      if (alreadyMember) return;
+
+      // Check if already in pending adds
+      const alreadyPending = pendingChanges.some(
+        (c) => c.memberDn === entry.distinguishedName && c.action === "add",
+      );
+      if (alreadyPending) return;
+
+      setPendingChanges((prev) => [
+        ...prev,
+        {
+          memberDn: entry.distinguishedName,
+          memberName: name,
+          action: "add",
+        },
+      ]);
+    },
+    [members, pendingChanges],
+  );
+
+  // Apply all pending changes
+  const handleApplyChanges = useCallback(async () => {
+    if (!selectedGroup || pendingChanges.length === 0) return;
+
+    setApplying(true);
+    try {
+      const results = await Promise.allSettled(
+        pendingChanges.map((change) => {
+          if (change.action === "add") {
+            return invoke("add_user_to_group", {
+              userDn: change.memberDn,
+              groupDn: selectedGroup.distinguishedName,
+            });
+          } else {
+            return invoke("remove_group_member", {
+              memberDn: change.memberDn,
+              groupDn: selectedGroup.distinguishedName,
+            });
+          }
+        }),
+      );
+
+      const failures = results.filter((r) => r.status === "rejected");
+      if (failures.length > 0) {
+        console.warn(`${failures.length} member changes failed`);
+      }
+
+      // Refresh member list
+      const refreshed = await invoke<DirectoryEntry[]>("get_group_members", {
+        groupDn: selectedGroup.distinguishedName,
+      });
+      setMembers(refreshed);
+      setPendingChanges([]);
+      setSelectedMembers(new Set());
+      setShowPreview(false);
+    } catch (err) {
+      console.warn("Failed to apply member changes:", err);
+    } finally {
+      setApplying(false);
+    }
+  }, [selectedGroup, pendingChanges]);
+
   const memberColumns: Column<{
     name: string;
     type: string;
     dn: string;
-  }>[] = [
-    { key: "name", header: "Name", sortable: true },
-    { key: "type", header: "Type", sortable: true },
-    { key: "dn", header: "Distinguished Name", sortable: true },
-  ];
+  }>[] = useMemo(() => {
+    const cols: Column<{ name: string; type: string; dn: string }>[] = [];
+
+    if (canManageMembers) {
+      cols.push({
+        key: "name" as const,
+        header: "",
+        sortable: false,
+        width: 40,
+        resizable: false,
+        render: (_value, row) => (
+          <input
+            type="checkbox"
+            checked={selectedMembers.has(row.dn)}
+            onChange={(e) => handleMemberSelect(row.dn, e.target.checked)}
+            onClick={(e) => e.stopPropagation()}
+            data-testid={`member-checkbox-${row.name}`}
+            aria-label={`Select ${row.name}`}
+          />
+        ),
+      });
+    }
+
+    cols.push(
+      { key: "name", header: "Name", sortable: true },
+      { key: "type", header: "Type", sortable: true },
+      { key: "dn", header: "Distinguished Name", sortable: true },
+    );
+
+    return cols;
+  }, [canManageMembers, selectedMembers, handleMemberSelect]);
 
   const memberRows = members.map((m) => ({
     name:
@@ -365,9 +569,53 @@ export function GroupManagement() {
                   </div>
 
                   <div data-testid="group-members-section">
-                    <h3 className="mb-2 text-body font-semibold text-[var(--color-text-primary)]">
-                      Members ({members.length})
-                    </h3>
+                    <div className="mb-2 flex items-center justify-between">
+                      <h3 className="text-body font-semibold text-[var(--color-text-primary)]">
+                        Members ({members.length})
+                      </h3>
+                      {canManageMembers && (
+                        <div
+                          className="flex items-center gap-2"
+                          data-testid="member-management-controls"
+                        >
+                          {selectedMembers.size > 0 && (
+                            <button
+                              className="btn btn-secondary flex items-center gap-1 text-caption"
+                              onClick={handleRemoveSelected}
+                              data-testid="remove-selected-btn"
+                            >
+                              <UserMinus size={14} />
+                              Remove Selected ({selectedMembers.size})
+                            </button>
+                          )}
+                          {pendingChanges.length > 0 && (
+                            <button
+                              className="btn btn-primary flex items-center gap-1 text-caption"
+                              onClick={() => setShowPreview(true)}
+                              data-testid="preview-changes-btn"
+                            >
+                              <Eye size={14} />
+                              Preview ({pendingChanges.length})
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {canManageMembers && members.length > 0 && (
+                      <div className="mb-2 flex items-center gap-2">
+                        <label className="flex items-center gap-1.5 text-caption text-[var(--color-text-secondary)]">
+                          <input
+                            type="checkbox"
+                            checked={allSelected}
+                            onChange={(e) => handleSelectAll(e.target.checked)}
+                            data-testid="select-all-checkbox"
+                          />
+                          Select all
+                        </label>
+                      </div>
+                    )}
+
                     {membersLoading ? (
                       <LoadingSpinner message="Loading members..." />
                     ) : members.length > 0 ? (
@@ -380,6 +628,103 @@ export function GroupManagement() {
                       <p className="text-caption text-[var(--color-text-secondary)]">
                         No members found
                       </p>
+                    )}
+
+                    {canManageMembers && (
+                      <div
+                        className="mt-4 rounded-lg border border-[var(--color-border-default)] p-3"
+                        data-testid="add-member-section"
+                      >
+                        <h4 className="mb-2 flex items-center gap-1.5 text-body font-medium text-[var(--color-text-primary)]">
+                          <UserPlus size={16} />
+                          Add Members
+                        </h4>
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1">
+                            <div
+                              className="flex items-center gap-2 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5"
+                              data-testid="member-search-bar"
+                            >
+                              <Search
+                                size={16}
+                                className="shrink-0 text-[var(--color-text-secondary)]"
+                                aria-hidden="true"
+                              />
+                              <input
+                                type="text"
+                                value={memberSearchText}
+                                onChange={(e) => {
+                                  setMemberSearchText(e.target.value);
+                                  handleMemberSearch(e.target.value);
+                                }}
+                                placeholder="Search users to add..."
+                                aria-label="Search users to add"
+                                className="flex-1 bg-transparent text-body text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-secondary)]"
+                                data-testid="member-search-input"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {memberSearchLoading && (
+                          <div className="mt-2">
+                            <LoadingSpinner message="Searching..." />
+                          </div>
+                        )}
+
+                        {memberSearchResults.length > 0 && (
+                          <div
+                            className="mt-2 max-h-40 overflow-auto rounded border border-[var(--color-border-subtle)]"
+                            data-testid="member-search-results"
+                          >
+                            {memberSearchResults.map((entry) => {
+                              const name =
+                                entry.displayName ??
+                                entry.samAccountName ??
+                                parseCnFromDn(entry.distinguishedName);
+                              const isAlreadyMember = members.some(
+                                (m) =>
+                                  m.distinguishedName ===
+                                  entry.distinguishedName,
+                              );
+                              const isPending = pendingChanges.some(
+                                (c) =>
+                                  c.memberDn === entry.distinguishedName &&
+                                  c.action === "add",
+                              );
+                              return (
+                                <div
+                                  key={entry.distinguishedName}
+                                  className="flex items-center justify-between border-b border-[var(--color-border-subtle)] px-3 py-1.5 last:border-b-0"
+                                  data-testid={`search-result-${name}`}
+                                >
+                                  <div className="min-w-0 flex-1">
+                                    <p className="truncate text-body text-[var(--color-text-primary)]">
+                                      {name}
+                                    </p>
+                                    <p className="truncate text-caption text-[var(--color-text-secondary)]">
+                                      {entry.samAccountName}
+                                    </p>
+                                  </div>
+                                  <button
+                                    className="btn btn-ghost flex items-center gap-1 text-caption"
+                                    onClick={() => handleAddToGroup(entry)}
+                                    disabled={isAlreadyMember || isPending}
+                                    data-testid={`add-member-btn-${name}`}
+                                  >
+                                    <UserPlus size={14} />
+                                    {isAlreadyMember
+                                      ? "Member"
+                                      : isPending
+                                        ? "Pending"
+                                        : "Add"}
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>
@@ -394,6 +739,17 @@ export function GroupManagement() {
           </>
         )}
       </div>
+
+      {showPreview && selectedGroup && (
+        <MemberChangePreviewDialog
+          open={showPreview}
+          changes={pendingChanges}
+          groupName={selectedGroup.displayName || selectedGroup.samAccountName}
+          onConfirm={handleApplyChanges}
+          onCancel={() => setShowPreview(false)}
+          loading={applying}
+        />
+      )}
     </div>
   );
 }
