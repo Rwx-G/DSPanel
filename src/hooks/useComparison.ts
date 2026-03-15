@@ -101,7 +101,7 @@ export function useComparison() {
       onlyB: 2,
     };
 
-    groups.sort((a, b) => {
+    groups = [...groups].sort((a, b) => {
       let cmp: number;
       if (sortField === "category") {
         cmp = categoryOrder[a.category] - categoryOrder[b.category];

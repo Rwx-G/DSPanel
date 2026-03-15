@@ -6,14 +6,20 @@ import { type DirectoryEntry } from "@/types/directory";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { formatCsv, downloadCsv } from "@/utils/csvExport";
 
+const ACCESS_TOOLTIPS: Record<AccessIndicator, string> = {
+  Allowed: "User has access via a matching group membership or direct ACE",
+  Denied: "User is explicitly denied access via a matching ACE",
+  NoMatch: "ACE does not match any of the user's group memberships",
+};
+
 function AccessIcon({ indicator }: { indicator: AccessIndicator }) {
   switch (indicator) {
     case "Allowed":
-      return <Shield size={14} className="text-[var(--color-success)]" data-testid="access-allowed" />;
+      return <Shield size={14} className="text-[var(--color-success)]" data-testid="access-allowed" title={ACCESS_TOOLTIPS.Allowed} />;
     case "Denied":
-      return <ShieldAlert size={14} className="text-[var(--color-error)]" data-testid="access-denied" />;
+      return <ShieldAlert size={14} className="text-[var(--color-error)]" data-testid="access-denied" title={ACCESS_TOOLTIPS.Denied} />;
     case "NoMatch":
-      return <Minus size={14} className="text-[var(--color-text-secondary)]" data-testid="access-nomatch" />;
+      return <Minus size={14} className="text-[var(--color-text-secondary)]" data-testid="access-nomatch" title={ACCESS_TOOLTIPS.NoMatch} />;
   }
 }
 
