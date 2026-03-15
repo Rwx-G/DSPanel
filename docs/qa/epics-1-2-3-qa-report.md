@@ -98,20 +98,20 @@ All previous CONCERNS have been addressed since the 2026-03-14 review.
 
 ## Epic 3 - Comparison and Permissions Audit
 
-**Status: PASS (93/100) - First full review**
+**Status: PASS (94/100) - Updated after fixes**
 
 | Story | Title | Gate | Score | Notes |
 |-------|-------|------|-------|-------|
-| 3.1 | Side-by-Side User Comparison | **PASS** | 95 | All key attributes shown, nested groups via MATCHING_RULE_IN_CHAIN |
-| 3.2 | UNC Permissions Audit | **PASS** | 95 | Complete with CSV export, access summary, color-coded ACEs |
+| 3.1 | Side-by-Side User Comparison | **PASS** | 97 | All key attributes shown, nested groups via MATCHING_RULE_IN_CHAIN |
+| 3.2 | UNC Permissions Audit | **PASS** | 97 | Complete with CSV export, access summary, color-coded ACEs |
 | 3.3 | NTFS Permissions Analyzer | **PASS** | 90 | GroupChainTree implemented, PDF deferred to 10.1 by design |
 | 3.4 | State-in-Time Comparison | **PASS** | 90 | Version-only diff correct per AD metadata limitations |
 
-**Epic 3 Score: 93/100**
+**Epic 3 Score: 94/100**
 
 ### Story-by-Story Analysis
 
-#### 3.1 User Comparison - PASS (90)
+#### 3.1 User Comparison - PASS (97)
 
 **Previous concerns resolved:**
 - User cards now show OU path, last logon, and account status (Disabled/Locked/Active)
@@ -218,7 +218,7 @@ All 7 acceptance criteria fully met:
 |------|---------------|---------------|------|
 | Epic 1 | 100/100 | 100/100 | **PASS** |
 | Epic 2 | 74/100 | 92/100 | **PASS** |
-| Epic 3 | N/A (first review) | 93/100 | **PASS** |
-| **Overall** | - | **95/100** | **PASS** |
+| Epic 3 | N/A (first review) | 94/100 | **PASS** |
+| **Overall** | - | **96/100** | **PASS** |
 
 **All three epics are production-ready.** All 22 stories have PASS gates. Remaining items are minor design decisions (PDF deferred to Epic 10, version-only diff is AD limitation) and incremental improvements. No security, performance, or stability blockers. Zero test failures across 1254 tests.
