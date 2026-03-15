@@ -145,9 +145,7 @@ mod tests {
     #[test]
     fn test_app_state_audit_service_works() {
         let state = make_state();
-        state
-            .audit_service
-            .log_success("Test", "dn", "test detail");
+        state.audit_service.log_success("Test", "dn", "test detail");
         assert_eq!(state.audit_service.count(), 1);
     }
 

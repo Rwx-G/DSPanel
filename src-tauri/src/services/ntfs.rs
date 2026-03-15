@@ -797,10 +797,7 @@ mod tests {
             },
         ];
 
-        let user_a_sids = vec![
-            "S-1-5-21-100".to_string(),
-            "S-1-5-21-300".to_string(),
-        ];
+        let user_a_sids = vec!["S-1-5-21-100".to_string(), "S-1-5-21-300".to_string()];
         let user_b_sids = vec!["S-1-5-21-200".to_string()];
 
         let results = cross_reference_aces(&aces, &user_a_sids, &user_b_sids);

@@ -372,7 +372,7 @@ mod tests {
         };
         svc.init_schema();
         svc.init_schema(); // second call - should be a no-op
-        // Service still works after double init
+                           // Service still works after double init
         svc.log_success("Check", "dn", "idempotent");
         assert_eq!(svc.count(), 1);
     }

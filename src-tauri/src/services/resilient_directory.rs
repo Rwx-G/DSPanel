@@ -750,12 +750,8 @@ mod tests {
     fn test_circuit_breaker_accessor() {
         let inner = Arc::new(MockDirectoryProvider::new());
         let cb = CircuitBreaker::new(CircuitBreakerConfig::default());
-        let provider = ResilientDirectoryProvider::new(
-            inner,
-            RetryConfig::default(),
-            cb.clone(),
-            noop_delay,
-        );
+        let provider =
+            ResilientDirectoryProvider::new(inner, RetryConfig::default(), cb.clone(), noop_delay);
         assert_eq!(provider.circuit_breaker().state(), CircuitState::Closed);
     }
 
@@ -933,10 +929,7 @@ mod tests {
             noop_delay,
         );
 
-        let results = provider
-            .get_nested_groups("CN=User,DC=test")
-            .await
-            .unwrap();
+        let results = provider.get_nested_groups("CN=User,DC=test").await.unwrap();
         assert!(results.is_empty());
     }
 
@@ -1039,12 +1032,8 @@ mod tests {
         cb.record_failure(); // opens the circuit
         assert_eq!(cb.state(), CircuitState::Open);
 
-        let provider = ResilientDirectoryProvider::new(
-            inner,
-            RetryConfig::default(),
-            cb,
-            noop_delay,
-        );
+        let provider =
+            ResilientDirectoryProvider::new(inner, RetryConfig::default(), cb, noop_delay);
 
         assert!(provider.test_connection().await.is_err());
         assert!(provider.search_users("test", 50).await.is_err());

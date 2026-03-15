@@ -2283,8 +2283,7 @@ mod tests {
     #[tokio::test]
     async fn test_add_user_to_group_requires_helpdesk() {
         let state = make_state(); // ReadOnly
-        let result =
-            add_user_to_group_inner(&state, "CN=User,DC=test", "CN=Group,DC=test").await;
+        let result = add_user_to_group_inner(&state, "CN=User,DC=test", "CN=Group,DC=test").await;
         assert!(result.is_err());
         match result.unwrap_err() {
             AppError::PermissionDenied(msg) => assert!(msg.contains("HelpDesk")),
@@ -2295,8 +2294,7 @@ mod tests {
     #[tokio::test]
     async fn test_add_user_to_group_succeeds_with_helpdesk() {
         let (state, _provider) = make_state_with_level_and_provider(PermissionLevel::HelpDesk);
-        let result =
-            add_user_to_group_inner(&state, "CN=User,DC=test", "CN=Group,DC=test").await;
+        let result = add_user_to_group_inner(&state, "CN=User,DC=test", "CN=Group,DC=test").await;
         assert!(result.is_ok());
         let entries = state.audit_service.get_entries();
         assert_eq!(entries.len(), 1);
@@ -2307,8 +2305,7 @@ mod tests {
     #[tokio::test]
     async fn test_add_user_to_group_failure_logs_audit() {
         let state = make_state_with_level_and_failure(PermissionLevel::HelpDesk);
-        let result =
-            add_user_to_group_inner(&state, "CN=User,DC=test", "CN=Group,DC=test").await;
+        let result = add_user_to_group_inner(&state, "CN=User,DC=test", "CN=Group,DC=test").await;
         assert!(result.is_err());
         let entries = state.audit_service.get_entries();
         assert_eq!(entries.len(), 1);
@@ -2372,8 +2369,7 @@ mod tests {
     #[tokio::test]
     async fn test_set_password_flags_failure_logs_audit() {
         let state = make_state_with_level_and_failure(PermissionLevel::AccountOperator);
-        let result =
-            set_password_flags_inner(&state, "CN=User,DC=test", true, false).await;
+        let result = set_password_flags_inner(&state, "CN=User,DC=test", true, false).await;
         assert!(result.is_err());
         let entries = state.audit_service.get_entries();
         assert_eq!(entries.len(), 1);
@@ -2483,10 +2479,7 @@ mod tests {
         assert!(result.attributes.is_empty());
         assert!(result.value_metadata.is_empty());
         assert!(result.message.is_some());
-        assert!(result
-            .message
-            .unwrap()
-            .contains("not available"));
+        assert!(result.message.unwrap().contains("not available"));
     }
 
     #[tokio::test]
@@ -2537,7 +2530,11 @@ mod tests {
         assert!(result.is_available);
         assert_eq!(result.attributes.len(), 2);
         // Parser may return in any order - check both are present
-        let names: Vec<&str> = result.attributes.iter().map(|a| a.attribute_name.as_str()).collect();
+        let names: Vec<&str> = result
+            .attributes
+            .iter()
+            .map(|a| a.attribute_name.as_str())
+            .collect();
         assert!(names.contains(&"displayName"));
         assert!(names.contains(&"title"));
     }
@@ -2548,23 +2545,23 @@ mod tests {
 
     #[test]
     fn test_compute_attribute_diff_inner_empty_metadata() {
-        let diff = compute_attribute_diff_inner(&[], "2026-01-01T00:00:00Z", "2026-12-31T23:59:59Z");
+        let diff =
+            compute_attribute_diff_inner(&[], "2026-01-01T00:00:00Z", "2026-12-31T23:59:59Z");
         assert!(diff.is_empty());
     }
 
     #[test]
     fn test_compute_attribute_diff_inner_all_outside_range() {
-        let metadata = vec![
-            crate::services::replication::AttributeMetadata {
-                attribute_name: "displayName".to_string(),
-                version: 3,
-                last_originating_change_time: "2025-01-01T00:00:00Z".to_string(),
-                last_originating_dsa_dn: String::new(),
-                local_usn: 0,
-                originating_usn: 0,
-            },
-        ];
-        let diff = compute_attribute_diff_inner(&metadata, "2026-01-01T00:00:00Z", "2026-12-31T23:59:59Z");
+        let metadata = vec![crate::services::replication::AttributeMetadata {
+            attribute_name: "displayName".to_string(),
+            version: 3,
+            last_originating_change_time: "2025-01-01T00:00:00Z".to_string(),
+            last_originating_dsa_dn: String::new(),
+            local_usn: 0,
+            originating_usn: 0,
+        }];
+        let diff =
+            compute_attribute_diff_inner(&metadata, "2026-01-01T00:00:00Z", "2026-12-31T23:59:59Z");
         assert!(diff.is_empty());
     }
 
@@ -2588,7 +2585,8 @@ mod tests {
                 originating_usn: 0,
             },
         ];
-        let diff = compute_attribute_diff_inner(&metadata, "2026-01-01T00:00:00Z", "2026-12-31T23:59:59Z");
+        let diff =
+            compute_attribute_diff_inner(&metadata, "2026-01-01T00:00:00Z", "2026-12-31T23:59:59Z");
         assert_eq!(diff.len(), 2);
         assert_eq!(diff[0].attribute_name, "sn");
         assert_eq!(diff[0].version_before, 1); // saturating_sub(1) of 2
@@ -2619,23 +2617,23 @@ mod tests {
             },
         ];
         // Both boundary timestamps should be included (>=, <=)
-        let diff = compute_attribute_diff_inner(&metadata, "2026-01-01T00:00:00Z", "2026-12-31T23:59:59Z");
+        let diff =
+            compute_attribute_diff_inner(&metadata, "2026-01-01T00:00:00Z", "2026-12-31T23:59:59Z");
         assert_eq!(diff.len(), 2);
     }
 
     #[test]
     fn test_compute_attribute_diff_inner_version_zero() {
-        let metadata = vec![
-            crate::services::replication::AttributeMetadata {
-                attribute_name: "new_attr".to_string(),
-                version: 0,
-                last_originating_change_time: "2026-06-01T00:00:00Z".to_string(),
-                last_originating_dsa_dn: String::new(),
-                local_usn: 0,
-                originating_usn: 0,
-            },
-        ];
-        let diff = compute_attribute_diff_inner(&metadata, "2026-01-01T00:00:00Z", "2026-12-31T23:59:59Z");
+        let metadata = vec![crate::services::replication::AttributeMetadata {
+            attribute_name: "new_attr".to_string(),
+            version: 0,
+            last_originating_change_time: "2026-06-01T00:00:00Z".to_string(),
+            last_originating_dsa_dn: String::new(),
+            local_usn: 0,
+            originating_usn: 0,
+        }];
+        let diff =
+            compute_attribute_diff_inner(&metadata, "2026-01-01T00:00:00Z", "2026-12-31T23:59:59Z");
         assert_eq!(diff.len(), 1);
         // version 0 saturating_sub(1) = 0
         assert_eq!(diff[0].version_before, 0);
@@ -2659,7 +2657,9 @@ mod tests {
         assert!(calls[0].2); // user_cannot_change_password = true
         let entries = state.audit_service.get_entries();
         assert!(entries[0].details.contains("password_never_expires=false"));
-        assert!(entries[0].details.contains("user_cannot_change_password=true"));
+        assert!(entries[0]
+            .details
+            .contains("user_cannot_change_password=true"));
     }
 
     #[tokio::test]
@@ -2675,7 +2675,9 @@ mod tests {
         assert!(calls[0].2);
         let entries = state.audit_service.get_entries();
         assert!(entries[0].details.contains("password_never_expires=true"));
-        assert!(entries[0].details.contains("user_cannot_change_password=true"));
+        assert!(entries[0]
+            .details
+            .contains("user_cannot_change_password=true"));
     }
 
     #[tokio::test]
@@ -2691,14 +2693,15 @@ mod tests {
         assert!(!calls[0].2);
         let entries = state.audit_service.get_entries();
         assert!(entries[0].details.contains("password_never_expires=false"));
-        assert!(entries[0].details.contains("user_cannot_change_password=false"));
+        assert!(entries[0]
+            .details
+            .contains("user_cannot_change_password=false"));
     }
 
     #[tokio::test]
     async fn test_set_password_flags_requires_readonly_denied() {
         let state = make_state_with_level(PermissionLevel::ReadOnly);
-        let result =
-            set_password_flags_inner(&state, "CN=Test,DC=test", true, true).await;
+        let result = set_password_flags_inner(&state, "CN=Test,DC=test", true, true).await;
         assert!(result.is_err());
         match result.unwrap_err() {
             AppError::PermissionDenied(msg) => assert!(msg.contains("AccountOperator")),
@@ -2708,10 +2711,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_set_password_flags_succeeds_with_domain_admin() {
-        let (state, _provider) =
-            make_state_with_level_and_provider(PermissionLevel::DomainAdmin);
-        let result =
-            set_password_flags_inner(&state, "CN=User5,DC=test", true, false).await;
+        let (state, _provider) = make_state_with_level_and_provider(PermissionLevel::DomainAdmin);
+        let result = set_password_flags_inner(&state, "CN=User5,DC=test", true, false).await;
         assert!(result.is_ok());
     }
 
@@ -2979,10 +2980,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_add_user_to_group_succeeds_with_admin() {
-        let (state, _provider) =
-            make_state_with_level_and_provider(PermissionLevel::DomainAdmin);
-        let result =
-            add_user_to_group_inner(&state, "CN=User,DC=test", "CN=Group,DC=test").await;
+        let (state, _provider) = make_state_with_level_and_provider(PermissionLevel::DomainAdmin);
+        let result = add_user_to_group_inner(&state, "CN=User,DC=test", "CN=Group,DC=test").await;
         assert!(result.is_ok());
     }
 
@@ -2990,8 +2989,7 @@ mod tests {
     async fn test_add_user_to_group_succeeds_with_account_operator() {
         let (state, _provider) =
             make_state_with_level_and_provider(PermissionLevel::AccountOperator);
-        let result =
-            add_user_to_group_inner(&state, "CN=User,DC=test", "CN=Group,DC=test").await;
+        let result = add_user_to_group_inner(&state, "CN=User,DC=test", "CN=Group,DC=test").await;
         assert!(result.is_ok());
     }
 }

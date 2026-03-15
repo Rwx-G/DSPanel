@@ -852,10 +852,7 @@ mod tests {
             vec!["Read", "Write", "Execute"]
         );
         // deny_permissions should be the full deny list
-        assert_eq!(
-            conflicts[0].deny_permissions,
-            vec!["Write", "Delete"]
-        );
+        assert_eq!(conflicts[0].deny_permissions, vec!["Write", "Delete"]);
         assert_eq!(conflicts[0].trustee_display_name, "Finance");
     }
 
@@ -931,16 +928,40 @@ mod tests {
             PathAclResult {
                 path: "\\\\server\\dir1".to_string(),
                 aces: vec![
-                    make_ace("S-1-5-21-100", "GroupA", AceAccessType::Allow, vec!["Read", "Write"], false),
-                    make_ace("S-1-5-21-200", "GroupB", AceAccessType::Allow, vec!["Execute"], false),
+                    make_ace(
+                        "S-1-5-21-100",
+                        "GroupA",
+                        AceAccessType::Allow,
+                        vec!["Read", "Write"],
+                        false,
+                    ),
+                    make_ace(
+                        "S-1-5-21-200",
+                        "GroupB",
+                        AceAccessType::Allow,
+                        vec!["Execute"],
+                        false,
+                    ),
                 ],
                 error: None,
             },
             PathAclResult {
                 path: "\\\\server\\dir2".to_string(),
                 aces: vec![
-                    make_ace("S-1-5-21-100", "GroupA", AceAccessType::Deny, vec!["Write"], false),
-                    make_ace("S-1-5-21-300", "GroupC", AceAccessType::Deny, vec!["Read"], false),
+                    make_ace(
+                        "S-1-5-21-100",
+                        "GroupA",
+                        AceAccessType::Deny,
+                        vec!["Write"],
+                        false,
+                    ),
+                    make_ace(
+                        "S-1-5-21-300",
+                        "GroupC",
+                        AceAccessType::Deny,
+                        vec!["Read"],
+                        false,
+                    ),
                 ],
                 error: None,
             },
@@ -1024,8 +1045,14 @@ mod tests {
         let conflicts = detect_conflicts(&paths);
         assert_eq!(conflicts.len(), 1);
         // Overlap on "Delete"
-        assert_eq!(conflicts[0].allow_permissions, vec!["Read", "Write", "Execute", "Delete"]);
-        assert_eq!(conflicts[0].deny_permissions, vec!["Delete", "TakeOwnership"]);
+        assert_eq!(
+            conflicts[0].allow_permissions,
+            vec!["Read", "Write", "Execute", "Delete"]
+        );
+        assert_eq!(
+            conflicts[0].deny_permissions,
+            vec!["Delete", "TakeOwnership"]
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -1076,8 +1103,20 @@ mod tests {
         let result = PathAclResult {
             path: "\\\\server\\share".to_string(),
             aces: vec![
-                make_ace("S-1-5-21-100", "Admins", AceAccessType::Allow, vec!["Read"], false),
-                make_ace("S-1-5-21-200", "Users", AceAccessType::Deny, vec!["Write"], true),
+                make_ace(
+                    "S-1-5-21-100",
+                    "Admins",
+                    AceAccessType::Allow,
+                    vec!["Read"],
+                    false,
+                ),
+                make_ace(
+                    "S-1-5-21-200",
+                    "Users",
+                    AceAccessType::Deny,
+                    vec!["Write"],
+                    true,
+                ),
             ],
             error: None,
         };
@@ -1277,7 +1316,13 @@ mod tests {
         let result = NtfsAnalysisResult {
             paths: vec![PathAclResult {
                 path: "\\\\server\\share".to_string(),
-                aces: vec![make_ace("S-1-5-21-100", "G", AceAccessType::Allow, vec!["Read"], false)],
+                aces: vec![make_ace(
+                    "S-1-5-21-100",
+                    "G",
+                    AceAccessType::Allow,
+                    vec!["Read"],
+                    false,
+                )],
                 error: None,
             }],
             conflicts: vec![],

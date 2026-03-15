@@ -760,11 +760,7 @@ mod tests {
         let result = svc.setup("testuser").unwrap();
 
         for (i, code) in result.backup_codes.iter().enumerate() {
-            assert!(
-                svc.verify(code).unwrap(),
-                "Backup code {} should verify",
-                i
-            );
+            assert!(svc.verify(code).unwrap(), "Backup code {} should verify", i);
         }
         // All 10 used up - none should work now
         // Re-setup to get new codes and verify old ones are gone
@@ -862,7 +858,8 @@ mod tests {
 
     #[test]
     fn test_mfa_setup_result_deserialization() {
-        let json = r#"{"secretBase32":"AAAA","qrUri":"otpauth://totp/test","backupCodes":["11111111"]}"#;
+        let json =
+            r#"{"secretBase32":"AAAA","qrUri":"otpauth://totp/test","backupCodes":["11111111"]}"#;
         let result: MfaSetupResult = serde_json::from_str(json).unwrap();
         assert_eq!(result.secret_base32, "AAAA");
         assert_eq!(result.backup_codes.len(), 1);
