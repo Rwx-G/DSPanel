@@ -1,4 +1,4 @@
-import { type ReactNode } from "react";
+import { type ReactNode, useId, isValidElement, cloneElement } from "react";
 
 interface FormFieldProps {
   label: string;
@@ -15,6 +15,16 @@ export function FormField({
   htmlFor,
   children,
 }: FormFieldProps) {
+  const errorId = useId();
+
+  // Inject aria-describedby on the first child element when an error is present
+  const enhancedChildren =
+    error && isValidElement(children)
+      ? cloneElement(children as React.ReactElement<Record<string, unknown>>, {
+          "aria-describedby": errorId,
+        })
+      : children;
+
   return (
     <div className="space-y-1" data-testid="form-field">
       <label
@@ -29,9 +39,10 @@ export function FormField({
           </span>
         )}
       </label>
-      {children}
+      {enhancedChildren}
       {error && (
         <p
+          id={errorId}
           className="text-caption text-[var(--color-error)]"
           role="alert"
           data-testid="form-field-error"

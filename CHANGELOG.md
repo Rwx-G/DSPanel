@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Demo provider now returns realistic group search results (was empty)
 - Nested group resolution via LDAP_MATCHING_RULE_IN_CHAIN for transitive membership in user comparison (3.1)
 - Session-level cache for group member queries in GroupChainTree to avoid redundant LDAP calls (3.3)
+- `aria-describedby` linking error messages to form inputs in FormField (1.8)
+- Highlight matching search text in ComboBox dropdown options (1.8)
+- Keyboard accessibility on HealthBadge tooltip: Escape to close, Enter/Space to toggle (1.11)
+- DNS resolution timeout indicator after 10s in ComputerDetail (1.12)
 
 ### Changed
 

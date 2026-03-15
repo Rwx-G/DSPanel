@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { ChevronDown } from "lucide-react";
 
 export interface ComboBoxOption {
@@ -15,6 +15,21 @@ interface ComboBoxProps {
   error?: boolean;
 }
 
+function HighlightedText({ text, query }: { text: string; query: string }) {
+  if (!query.trim()) return <>{text}</>;
+  const index = text.toLowerCase().indexOf(query.toLowerCase());
+  if (index === -1) return <>{text}</>;
+  return (
+    <>
+      {text.slice(0, index)}
+      <mark className="bg-[var(--color-primary-subtle)] text-[var(--color-primary)] rounded-sm">
+        {text.slice(index, index + query.length)}
+      </mark>
+      {text.slice(index + query.length)}
+    </>
+  );
+}
+
 export function ComboBox({
   options,
   value,
@@ -29,8 +44,12 @@ export function ComboBox({
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const filteredOptions = options.filter((opt) =>
-    opt.label.toLowerCase().includes(searchText.toLowerCase()),
+  const filteredOptions = useMemo(
+    () =>
+      options.filter((opt) =>
+        opt.label.toLowerCase().includes(searchText.toLowerCase()),
+      ),
+    [options, searchText],
   );
 
   const selectedOption = options.find((opt) => opt.value === value);
@@ -188,7 +207,7 @@ export function ComboBox({
                   aria-selected={opt.value === value}
                   data-testid={`combobox-option-${opt.value}`}
                 >
-                  {opt.label}
+                  <HighlightedText text={opt.label} query={searchText} />
                 </div>
               ))
             )}
