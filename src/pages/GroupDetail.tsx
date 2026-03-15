@@ -327,7 +327,7 @@ export function GroupDetail({
               data-testid="member-management-controls"
             >
               <button
-                className="btn btn-sm flex items-center gap-1"
+                className="btn btn-outline btn-sm flex items-center gap-1"
                 onClick={handleRemoveSelected}
                 disabled={selectedMembers.size === 0}
                 data-testid="remove-selected-btn"
@@ -337,7 +337,7 @@ export function GroupDetail({
                 {selectedMembers.size > 0 && ` (${selectedMembers.size})`}
               </button>
               <button
-                className="btn btn-sm flex items-center gap-1"
+                className="btn btn-primary btn-sm flex items-center gap-1"
                 onClick={() => setShowPreview(true)}
                 disabled={pendingChanges.length === 0}
                 data-testid="preview-changes-btn"
