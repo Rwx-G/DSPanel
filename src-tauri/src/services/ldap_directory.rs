@@ -138,16 +138,42 @@ impl std::fmt::Debug for LdapAuthMode {
 /// lazily on first use and reused across operations. `ldap3::Ldap` supports
 /// multiplexing, so a single connection handles concurrent requests efficiently
 /// without per-operation connect/bind overhead.
+/// TLS configuration for LDAP connections.
+#[derive(Debug, Clone, Default)]
+pub struct LdapTlsConfig {
+    /// Whether to use LDAPS (implicit TLS on port 636).
+    pub enabled: bool,
+    /// Whether to skip TLS certificate verification (lab environments only).
+    pub skip_verify: bool,
+}
+
 pub struct LdapDirectoryProvider {
     domain: Option<String>,
     server_override: Option<String>,
     auth_mode: LdapAuthMode,
+    tls_config: LdapTlsConfig,
     base_dn: Mutex<Option<String>>,
     connected: Mutex<bool>,
     /// Pooled LDAP connection. Reused across operations; recreated on failure.
     pool: tokio::sync::Mutex<Option<ldap3::Ldap>>,
     /// Authenticated user identity resolved via WhoAmI.
     authenticated_user: Mutex<Option<String>>,
+}
+
+/// Parses the server string and returns (host, use_tls).
+///
+/// Supports `ldaps://host`, `ldap://host`, or plain `host`.
+fn parse_server_url(server: &str) -> (String, bool) {
+    if let Some(rest) = server.strip_prefix("ldaps://") {
+        // Remove trailing port if present
+        let host = rest.split(':').next().unwrap_or(rest);
+        (host.to_string(), true)
+    } else if let Some(rest) = server.strip_prefix("ldap://") {
+        let host = rest.split(':').next().unwrap_or(rest);
+        (host.to_string(), false)
+    } else {
+        (server.to_string(), false)
+    }
 }
 
 impl Default for LdapDirectoryProvider {
@@ -174,6 +200,7 @@ impl LdapDirectoryProvider {
             domain,
             server_override: None,
             auth_mode: LdapAuthMode::Gssapi,
+            tls_config: LdapTlsConfig::default(),
             base_dn: Mutex::new(None),
             connected: Mutex::new(false),
             pool: tokio::sync::Mutex::new(None),
@@ -186,17 +213,30 @@ impl LdapDirectoryProvider {
     /// Uses explicit credentials instead of Kerberos. The `server` parameter
     /// specifies the LDAP host (IP or hostname), bypassing `USERDNSDOMAIN`
     /// auto-detection.
-    pub fn new_with_credentials(server: String, bind_dn: String, password: String) -> Self {
+    pub fn new_with_credentials(
+        server: String,
+        bind_dn: String,
+        password: String,
+        tls_config: LdapTlsConfig,
+    ) -> Self {
+        let (host, url_tls) = parse_server_url(&server);
+        let effective_tls = LdapTlsConfig {
+            enabled: tls_config.enabled || url_tls,
+            skip_verify: tls_config.skip_verify,
+        };
+
         tracing::warn!(
-            server = %server,
+            server = %host,
             bind_dn = %bind_dn,
+            tls = effective_tls.enabled,
             "Simple bind mode active - credentials-based authentication"
         );
 
         Self {
-            domain: Some(server.clone()),
-            server_override: Some(server),
+            domain: Some(host.clone()),
+            server_override: Some(host),
             auth_mode: LdapAuthMode::SimpleBind { bind_dn, password },
+            tls_config: effective_tls,
             base_dn: Mutex::new(None),
             connected: Mutex::new(false),
             pool: tokio::sync::Mutex::new(None),
@@ -287,13 +327,26 @@ impl LdapDirectoryProvider {
                 .clone(),
         };
 
-        tracing::debug!(host = %host, auth_mode = ?self.auth_mode, "Establishing LDAP connection");
+        let (scheme, port) = if self.tls_config.enabled {
+            ("ldaps", 636)
+        } else {
+            ("ldap", 389)
+        };
+        tracing::debug!(host = %host, auth_mode = ?self.auth_mode, tls = self.tls_config.enabled, "Establishing LDAP connection");
 
-        let settings = LdapConnSettings::new();
-        let (conn, mut ldap) =
-            LdapConnAsync::with_settings(settings, &format!("ldap://{}:389", host))
-                .await
-                .context("Failed to connect to LDAP server")?;
+        let mut settings =
+            LdapConnSettings::new().set_conn_timeout(std::time::Duration::from_secs(10));
+        if self.tls_config.skip_verify {
+            settings = settings.set_no_tls_verify(true);
+        }
+        let url = format!("{}://{}:{}", scheme, host, port);
+        let (conn, mut ldap) = LdapConnAsync::with_settings(settings, &url).await.context(
+            if self.tls_config.enabled {
+                "Failed to connect to LDAP server via LDAPS (TLS) - check certificate and port 636"
+            } else {
+                "Failed to connect to LDAP server"
+            },
+        )?;
 
         tokio::spawn(conn.drive());
 
@@ -448,6 +501,7 @@ impl LdapDirectoryProvider {
             let domain = self.domain.clone();
             let server_override = self.server_override.clone();
             let auth_mode = self.auth_mode.clone();
+            let tls_config = self.tls_config.clone();
 
             self.with_connection(|_pooled_ldap| {
                 let base = base.clone();
@@ -456,11 +510,13 @@ impl LdapDirectoryProvider {
                 let domain = domain.clone();
                 let server_override = server_override.clone();
                 let auth_mode = auth_mode.clone();
+                let tls_config = tls_config.clone();
                 async move {
                     // Use a fresh dedicated connection for paged search
                     // to avoid leaking controls into the shared pool.
                     let mut ldap =
-                        create_fresh_connection(&domain, &server_override, &auth_mode).await?;
+                        create_fresh_connection(&domain, &server_override, &auth_mode, &tls_config)
+                            .await?;
 
                     let page_size = 500_i32;
                     let mut all_entries = Vec::new();
@@ -562,14 +618,24 @@ async fn create_fresh_connection(
     domain: &Option<String>,
     server_override: &Option<String>,
     auth_mode: &LdapAuthMode,
+    tls_config: &LdapTlsConfig,
 ) -> Result<ldap3::Ldap> {
     let host = match server_override {
         Some(server) => server.clone(),
         None => domain.as_ref().context("No domain available")?.clone(),
     };
 
-    let settings = LdapConnSettings::new();
-    let (conn, mut ldap) = LdapConnAsync::with_settings(settings, &format!("ldap://{}:389", host))
+    let (scheme, port) = if tls_config.enabled {
+        ("ldaps", 636)
+    } else {
+        ("ldap", 389)
+    };
+    let mut settings = LdapConnSettings::new().set_conn_timeout(std::time::Duration::from_secs(10));
+    if tls_config.skip_verify {
+        settings = settings.set_no_tls_verify(true);
+    }
+    let url = format!("{}://{}:{}", scheme, host, port);
+    let (conn, mut ldap) = LdapConnAsync::with_settings(settings, &url)
         .await
         .context("Failed to connect to LDAP server")?;
 
@@ -1098,12 +1164,7 @@ impl DirectoryProvider for LdapDirectoryProvider {
                         let dn = dn.clone();
                         async move {
                             let (rs, _) = ldap
-                                .search(
-                                    &dn,
-                                    Scope::Base,
-                                    "(objectClass=*)",
-                                    vec!["tokenGroups"],
-                                )
+                                .search(&dn, Scope::Base, "(objectClass=*)", vec!["tokenGroups"])
                                 .await
                                 .context("Failed to query tokenGroups")?
                                 .success()
@@ -1488,13 +1549,9 @@ impl DirectoryProvider for LdapDirectoryProvider {
                         if let Ok(result) = search_result {
                             if let Some(entry) = result.0.into_iter().next() {
                                 let se = SearchEntry::construct(entry);
-                                if let Some(classes) =
-                                    se.attrs.get("allowedChildClassesEffective")
+                                if let Some(classes) = se.attrs.get("allowedChildClassesEffective")
                                 {
-                                    if classes
-                                        .iter()
-                                        .any(|c| c.eq_ignore_ascii_case("user"))
-                                    {
+                                    if classes.iter().any(|c| c.eq_ignore_ascii_case("user")) {
                                         return Ok(true);
                                     }
                                 }
@@ -1517,9 +1574,7 @@ impl DirectoryProvider for LdapDirectoryProvider {
                 async move {
                     for ou_dn in &probe_bases {
                         let search_result = ldap
-                            .with_search_options(
-                                ldap3::SearchOptions::new().sizelimit(1),
-                            )
+                            .with_search_options(ldap3::SearchOptions::new().sizelimit(1))
                             .search(
                                 ou_dn,
                                 Scope::OneLevel,
@@ -1531,12 +1586,8 @@ impl DirectoryProvider for LdapDirectoryProvider {
                         if let Ok(result) = search_result {
                             for entry in result.0 {
                                 let se = SearchEntry::construct(entry);
-                                if let Some(attrs) =
-                                    se.attrs.get("allowedAttributesEffective")
-                                {
-                                    if attrs.iter().any(|a| {
-                                        a.eq_ignore_ascii_case("lockoutTime")
-                                    }) {
+                                if let Some(attrs) = se.attrs.get("allowedAttributesEffective") {
+                                    if attrs.iter().any(|a| a.eq_ignore_ascii_case("lockoutTime")) {
                                         return Ok(true);
                                     }
                                 }
@@ -1556,9 +1607,7 @@ impl DirectoryProvider for LdapDirectoryProvider {
                 async move {
                     for ou_dn in &probe_bases {
                         let search_result = ldap
-                            .with_search_options(
-                                ldap3::SearchOptions::new().sizelimit(1),
-                            )
+                            .with_search_options(ldap3::SearchOptions::new().sizelimit(1))
                             .search(
                                 ou_dn,
                                 Scope::OneLevel,
@@ -1570,13 +1619,8 @@ impl DirectoryProvider for LdapDirectoryProvider {
                         if let Ok(result) = search_result {
                             for entry in result.0 {
                                 let se = SearchEntry::construct(entry);
-                                if let Some(attrs) =
-                                    se.attrs.get("allowedAttributesEffective")
-                                {
-                                    if attrs
-                                        .iter()
-                                        .any(|a| a.eq_ignore_ascii_case("member"))
-                                    {
+                                if let Some(attrs) = se.attrs.get("allowedAttributesEffective") {
+                                    if attrs.iter().any(|a| a.eq_ignore_ascii_case("member")) {
                                         return Ok(true);
                                     }
                                 }
@@ -1605,8 +1649,13 @@ impl DirectoryProvider for LdapDirectoryProvider {
         }
 
         // Use a dedicated connection to avoid mutating shared base_dn
-        let mut ldap =
-            create_fresh_connection(&self.domain, &self.server_override, &self.auth_mode).await?;
+        let mut ldap = create_fresh_connection(
+            &self.domain,
+            &self.server_override,
+            &self.auth_mode,
+            &self.tls_config,
+        )
+        .await?;
 
         // Discover schema naming context via rootDSE
         let (rs, _) = ldap
@@ -1892,6 +1941,7 @@ mod tests {
             "10.0.0.10".to_string(),
             "CN=Test,DC=lab,DC=local".to_string(),
             "secret".to_string(),
+            LdapTlsConfig::default(),
         );
 
         assert!(matches!(
@@ -1910,6 +1960,7 @@ mod tests {
             "10.0.0.10".to_string(),
             "CN=Test,DC=lab,DC=local".to_string(),
             "secret".to_string(),
+            LdapTlsConfig::default(),
         );
 
         assert_eq!(provider.server_override, Some("10.0.0.10".to_string()));
@@ -1922,11 +1973,74 @@ mod tests {
             "dc01.lab.local".to_string(),
             "CN=Admin,DC=lab,DC=local".to_string(),
             "pass".to_string(),
+            LdapTlsConfig::default(),
         );
 
         // domain is set to the server value so search operations work
         assert!(provider.domain.is_some());
         assert_eq!(provider.domain.as_deref(), Some("dc01.lab.local"));
+    }
+
+    #[test]
+    fn test_parse_server_url_plain() {
+        let (host, tls) = parse_server_url("172.31.72.165");
+        assert_eq!(host, "172.31.72.165");
+        assert!(!tls);
+    }
+
+    #[test]
+    fn test_parse_server_url_ldap_scheme() {
+        let (host, tls) = parse_server_url("ldap://172.31.72.165");
+        assert_eq!(host, "172.31.72.165");
+        assert!(!tls);
+    }
+
+    #[test]
+    fn test_parse_server_url_ldaps_scheme() {
+        let (host, tls) = parse_server_url("ldaps://172.31.72.165");
+        assert_eq!(host, "172.31.72.165");
+        assert!(tls);
+    }
+
+    #[test]
+    fn test_parse_server_url_ldaps_with_port() {
+        let (host, tls) = parse_server_url("ldaps://dc.example.com:636");
+        assert_eq!(host, "dc.example.com");
+        assert!(tls);
+    }
+
+    #[test]
+    fn test_parse_server_url_hostname() {
+        let (host, tls) = parse_server_url("dc01.corp.local");
+        assert_eq!(host, "dc01.corp.local");
+        assert!(!tls);
+    }
+
+    #[test]
+    fn test_tls_config_from_url_scheme() {
+        let provider = LdapDirectoryProvider::new_with_credentials(
+            "ldaps://10.0.0.10".to_string(),
+            "CN=Test,DC=lab,DC=local".to_string(),
+            "secret".to_string(),
+            LdapTlsConfig::default(),
+        );
+        assert!(provider.tls_config.enabled);
+        assert_eq!(provider.server_override, Some("10.0.0.10".to_string()));
+    }
+
+    #[test]
+    fn test_tls_config_explicit_flag() {
+        let provider = LdapDirectoryProvider::new_with_credentials(
+            "10.0.0.10".to_string(),
+            "CN=Test,DC=lab,DC=local".to_string(),
+            "secret".to_string(),
+            LdapTlsConfig {
+                enabled: true,
+                skip_verify: true,
+            },
+        );
+        assert!(provider.tls_config.enabled);
+        assert!(provider.tls_config.skip_verify);
     }
 
     #[tokio::test]

@@ -55,14 +55,27 @@ pub fn run() {
     };
     #[cfg(not(feature = "demo"))]
     let provider: Arc<dyn services::DirectoryProvider> = {
+        use services::ldap_directory::LdapTlsConfig;
+
         let server = std::env::var("DSPANEL_LDAP_SERVER").ok();
         let bind_dn = std::env::var("DSPANEL_LDAP_BIND_DN").ok();
         let bind_password = std::env::var("DSPANEL_LDAP_BIND_PASSWORD").ok();
+        let use_tls = std::env::var("DSPANEL_LDAP_USE_TLS")
+            .map(|v| v == "true" || v == "1")
+            .unwrap_or(false);
+        let skip_verify = std::env::var("DSPANEL_LDAP_TLS_SKIP_VERIFY")
+            .map(|v| v == "true" || v == "1")
+            .unwrap_or(false);
+
+        let tls_config = LdapTlsConfig {
+            enabled: use_tls,
+            skip_verify,
+        };
 
         match (server, bind_dn, bind_password) {
-            (Some(s), Some(d), Some(p)) => {
-                Arc::new(LdapDirectoryProvider::new_with_credentials(s, d, p))
-            }
+            (Some(s), Some(d), Some(p)) => Arc::new(LdapDirectoryProvider::new_with_credentials(
+                s, d, p, tls_config,
+            )),
             (None, None, None) => Arc::new(LdapDirectoryProvider::new()),
             _ => {
                 tracing::warn!(

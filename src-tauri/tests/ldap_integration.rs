@@ -33,13 +33,24 @@
 //! ```
 
 use dspanel_lib::services::directory::DirectoryProvider;
-use dspanel_lib::services::ldap_directory::LdapDirectoryProvider;
+use dspanel_lib::services::ldap_directory::{LdapDirectoryProvider, LdapTlsConfig};
 
 async fn create_connected_provider() -> Option<LdapDirectoryProvider> {
     let server = std::env::var("DSPANEL_LDAP_SERVER").ok()?;
     let bind_dn = std::env::var("DSPANEL_LDAP_BIND_DN").ok()?;
     let password = std::env::var("DSPANEL_LDAP_BIND_PASSWORD").ok()?;
-    let provider = LdapDirectoryProvider::new_with_credentials(server, bind_dn, password);
+    let use_tls = std::env::var("DSPANEL_LDAP_USE_TLS")
+        .map(|v| v == "true" || v == "1")
+        .unwrap_or(false);
+    let skip_verify = std::env::var("DSPANEL_LDAP_TLS_SKIP_VERIFY")
+        .map(|v| v == "true" || v == "1")
+        .unwrap_or(false);
+    let tls_config = LdapTlsConfig {
+        enabled: use_tls,
+        skip_verify,
+    };
+    let provider =
+        LdapDirectoryProvider::new_with_credentials(server, bind_dn, password, tls_config);
     provider
         .test_connection()
         .await
