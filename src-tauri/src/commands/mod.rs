@@ -1533,9 +1533,7 @@ pub fn get_computer_name() -> String {
 
 /// Returns all attribute names from the AD schema.
 #[tauri::command]
-pub async fn get_schema_attributes(
-    state: State<'_, AppState>,
-) -> Result<Vec<String>, AppError> {
+pub async fn get_schema_attributes(state: State<'_, AppState>) -> Result<Vec<String>, AppError> {
     let provider = state.directory_provider.clone();
     provider
         .get_schema_attributes()

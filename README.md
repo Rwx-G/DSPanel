@@ -8,7 +8,7 @@
   <img src="https://img.shields.io/badge/Rust-2021-orange.svg" alt="Rust">
   <img src="https://img.shields.io/badge/Tauri-v2-blue.svg" alt="Tauri">
   <img src="https://img.shields.io/badge/Platform-Windows%20|%20macOS%20|%20Linux-0078D6.svg" alt="Platform">
-  <img src="https://img.shields.io/badge/Status-v0.3.0-brightgreen.svg" alt="Status">
+  <img src="https://img.shields.io/badge/Status-v0.4.0-brightgreen.svg" alt="Status">
 </p>
 
 ---
@@ -89,6 +89,40 @@ pnpm tauri build
 
 ```bash
 pnpm tauri dev
+```
+
+### Integration Tests (Real AD)
+
+Integration tests run against a real Active Directory domain controller. They are
+skipped by default and gated by environment variables.
+
+**Lab setup:**
+
+1. Windows Server 2022 VM (Hyper-V, Internal switch, 2-4 GB RAM)
+2. Promote to DC, then populate with [BadBlood](https://github.com/davidprowe/BadBlood)
+3. Create three test accounts: `TestReadOnly` (standard user), `TestOperator`
+   (Account Operators), `TestAdmin` (Domain Admins + Enterprise Admins)
+
+**Running:**
+
+```bash
+# Read-only tests (15 tests)
+export DSPANEL_LDAP_SERVER=172.31.72.165
+export DSPANEL_LDAP_BIND_DN="CN=TestReadOnly,CN=Users,DC=dspanel,DC=local"
+export DSPANEL_LDAP_BIND_PASSWORD="P@ssw0rd2026!"
+cargo test --test ldap_integration -- --nocapture read_
+
+# Write tests (4 tests - requires Account Operator)
+export DSPANEL_LDAP_BIND_DN="CN=TestOperator,CN=Users,DC=dspanel,DC=local"
+cargo test --test ldap_integration -- --nocapture write_
+
+# Admin tests (2 tests - requires Domain Admin)
+export DSPANEL_LDAP_BIND_DN="CN=TestAdmin,CN=Users,DC=dspanel,DC=local"
+cargo test --test ldap_integration -- --nocapture admin_
+
+# All tests (22 tests - use admin account)
+export DSPANEL_LDAP_BIND_DN="CN=TestAdmin,CN=Users,DC=dspanel,DC=local"
+cargo test --test ldap_integration -- --nocapture
 ```
 
 ## Project Structure

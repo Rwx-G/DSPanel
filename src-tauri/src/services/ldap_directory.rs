@@ -115,10 +115,7 @@ pub enum LdapAuthMode {
     /// Kerberos authentication via GSSAPI (default, requires domain-joined machine).
     Gssapi,
     /// Simple bind with explicit credentials (for lab/test environments).
-    SimpleBind {
-        bind_dn: String,
-        password: String,
-    },
+    SimpleBind { bind_dn: String, password: String },
 }
 
 impl std::fmt::Debug for LdapAuthMode {
@@ -196,10 +193,7 @@ impl LdapDirectoryProvider {
         Self {
             domain: Some(server.clone()),
             server_override: Some(server),
-            auth_mode: LdapAuthMode::SimpleBind {
-                bind_dn,
-                password,
-            },
+            auth_mode: LdapAuthMode::SimpleBind { bind_dn, password },
             base_dn: Mutex::new(None),
             connected: Mutex::new(false),
             pool: tokio::sync::Mutex::new(None),
@@ -423,11 +417,7 @@ impl LdapDirectoryProvider {
 
                     // rc=0: success, rc=4: sizeLimitExceeded (partial results OK)
                     if rc != 0 && rc != 4 {
-                        anyhow::bail!(
-                            "LDAP search error (rc={}): {}",
-                            rc,
-                            search_result.1.text
-                        );
+                        anyhow::bail!("LDAP search error (rc={}): {}", rc, search_result.1.text);
                     }
 
                     let rs = search_result.0;
@@ -435,9 +425,7 @@ impl LdapDirectoryProvider {
                     let entries: Vec<DirectoryEntry> = rs
                         .into_iter()
                         .take(max_results)
-                        .map(|entry| {
-                            search_entry_to_directory_entry(SearchEntry::construct(entry))
-                        })
+                        .map(|entry| search_entry_to_directory_entry(SearchEntry::construct(entry)))
                         .collect();
 
                     tracing::debug!(count = entries.len(), rc, "Search: simple path complete");
@@ -462,9 +450,8 @@ impl LdapDirectoryProvider {
                 async move {
                     // Use a fresh dedicated connection for paged search
                     // to avoid leaking controls into the shared pool.
-                    let mut ldap = create_fresh_connection(
-                        &domain, &server_override, &auth_mode,
-                    ).await?;
+                    let mut ldap =
+                        create_fresh_connection(&domain, &server_override, &auth_mode).await?;
 
                     let page_size = 500_i32;
                     let mut all_entries = Vec::new();
@@ -532,17 +519,13 @@ async fn create_fresh_connection(
 ) -> Result<ldap3::Ldap> {
     let host = match server_override {
         Some(server) => server.clone(),
-        None => domain
-            .as_ref()
-            .context("No domain available")?
-            .clone(),
+        None => domain.as_ref().context("No domain available")?.clone(),
     };
 
     let settings = LdapConnSettings::new();
-    let (conn, mut ldap) =
-        LdapConnAsync::with_settings(settings, &format!("ldap://{}:389", host))
-            .await
-            .context("Failed to connect to LDAP server")?;
+    let (conn, mut ldap) = LdapConnAsync::with_settings(settings, &format!("ldap://{}:389", host))
+        .await
+        .context("Failed to connect to LDAP server")?;
 
     tokio::spawn(conn.drive());
 
@@ -1312,13 +1295,17 @@ impl DirectoryProvider for LdapDirectoryProvider {
         }
 
         // Use a dedicated connection to avoid mutating shared base_dn
-        let mut ldap = create_fresh_connection(
-            &self.domain, &self.server_override, &self.auth_mode,
-        ).await?;
+        let mut ldap =
+            create_fresh_connection(&self.domain, &self.server_override, &self.auth_mode).await?;
 
         // Discover schema naming context via rootDSE
         let (rs, _) = ldap
-            .search("", Scope::Base, "(objectClass=*)", vec!["schemaNamingContext"])
+            .search(
+                "",
+                Scope::Base,
+                "(objectClass=*)",
+                vec!["schemaNamingContext"],
+            )
             .await
             .context("Failed to query rootDSE for schema DN")?
             .success()
@@ -1329,7 +1316,9 @@ impl DirectoryProvider for LdapDirectoryProvider {
             .next()
             .and_then(|entry| {
                 let se = SearchEntry::construct(entry);
-                se.attrs.get("schemaNamingContext").and_then(|v| v.first().cloned())
+                se.attrs
+                    .get("schemaNamingContext")
+                    .and_then(|v| v.first().cloned())
             })
             .context("schemaNamingContext not found in rootDSE")?;
 
@@ -1343,7 +1332,8 @@ impl DirectoryProvider for LdapDirectoryProvider {
             let pr_control: RawControl = controls::PagedResults {
                 size: 500,
                 cookie: cookie.clone(),
-            }.into();
+            }
+            .into();
             ldap.with_controls(vec![pr_control]);
 
             let (rs, result) = ldap
@@ -1362,7 +1352,8 @@ impl DirectoryProvider for LdapDirectoryProvider {
 
             cookie = Vec::new();
             for ctrl in &result.ctrls {
-                if let controls::Control(Some(controls::ControlType::PagedResults), ref raw) = *ctrl {
+                if let controls::Control(Some(controls::ControlType::PagedResults), ref raw) = *ctrl
+                {
                     let pr: controls::PagedResults = raw.parse();
                     cookie = pr.cookie;
                 }
@@ -1593,7 +1584,10 @@ mod tests {
             "secret".to_string(),
         );
 
-        assert!(matches!(provider.auth_mode(), LdapAuthMode::SimpleBind { .. }));
+        assert!(matches!(
+            provider.auth_mode(),
+            LdapAuthMode::SimpleBind { .. }
+        ));
         if let LdapAuthMode::SimpleBind { bind_dn, password } = provider.auth_mode() {
             assert_eq!(bind_dn, "CN=Test,DC=lab,DC=local");
             assert_eq!(password, "secret");

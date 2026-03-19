@@ -1229,9 +1229,14 @@ impl DirectoryProvider for DemoDirectoryProvider {
 
     async fn get_schema_attributes(&self) -> Result<Vec<String>> {
         Ok(vec![
-            "cn".to_string(), "displayName".to_string(), "mail".to_string(),
-            "sAMAccountName".to_string(), "telephoneNumber".to_string(),
-            "givenName".to_string(), "sn".to_string(), "department".to_string(),
+            "cn".to_string(),
+            "displayName".to_string(),
+            "mail".to_string(),
+            "sAMAccountName".to_string(),
+            "telephoneNumber".to_string(),
+            "givenName".to_string(),
+            "sn".to_string(),
+            "department".to_string(),
         ])
     }
 }

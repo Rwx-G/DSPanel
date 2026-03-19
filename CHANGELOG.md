@@ -7,8 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-03-19
+
+Epic 4 - Group Management & Bulk Operations. Complete group management with
+browse, member management, bulk operations, and hygiene detection. Also includes
+LDAP simple bind authentication for testing against standalone AD labs, LDAP
+paged results for large directories, and comprehensive integration tests against
+a real AD domain controller populated with [BadBlood](https://github.com/davidprowe/BadBlood).
+
 ### Added
 
+- Simple bind (username/password) LDAP authentication mode via environment
+  variables `DSPANEL_LDAP_SERVER`, `DSPANEL_LDAP_BIND_DN`,
+  `DSPANEL_LDAP_BIND_PASSWORD` for testing against non-domain-joined AD labs (4.5)
+- LDAP paged results control loop for fetching >1000 objects from AD without
+  `sizeLimitExceeded` errors (4.5)
+- Integration test suite (22 tests) against a real AD domain controller:
+  15 read tests, 4 write tests, 2 admin tests, 1 resilience test (4.5)
+- Health filter buttons (All/Healthy/Warning/Critical) with live counts in
+  User Lookup search bar
+- `evaluate_health_batch` Tauri command for single-IPC bulk health evaluation
+  of all users (replaces per-user sequential calls)
+- `preloadAll` option on `useBrowse` hook for eager loading of all pages at mount
+- Compact HealthBadge mode (icon-only for Healthy users in list view)
+- GroupBadge component with category icon (Shield/Mail), scope abbreviation
+  (G/DL/U), distinct color coding, and custom hover tooltip
+- Category filters (Security/Distribution) with counts in Group Management
+- Status (Enabled/Disabled) and OS (Windows/Other) filters with counts in
+  Computer Lookup
+- AD schema attribute discovery via `get_schema_attributes` command for
+  Advanced Attributes "Show empty" toggle
+- "Show empty" toggle in Advanced Attributes that merges schema attributes
+  with populated user attributes
+- `extractErrorMessage` utility for consistent error display across all
+  catch blocks
+- Story 5.5 (Modify User Attributes) created for Epic 5
 - Bulk operations redesigned with card-based operation picker (11 operations)
 - Export group members to CSV with inline button and standalone operation
 - Copy user memberships from one user to another with preview
@@ -20,7 +53,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bulk create groups from CSV template with name, description, scope, category, OU columns (AccountOperator)
 - `create_group`, `move_object`, `update_managed_by` trait methods on DirectoryProvider
 - `create_group`, `move_object`, `update_managed_by` Tauri commands with permission checks and audit logging
-
 - Group hygiene scan detecting empty groups and circular group nesting (4.4)
 - Single-member group detection - flags groups with exactly one member (4.4)
 - Stale group detection - flags groups not modified in over 180 days (4.4)
@@ -43,6 +75,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Permission-gated member management controls (AccountOperator+ required) (4.2)
 - User search for adding members to groups with duplicate detection (4.2)
 - MemberChangePreviewDialog component with change summary and loading state (4.2)
+
+### Changed
+
+- All write actions (Reset Password, Unlock, Enable, Disable, Add/Remove
+  members, Delete, Save password flags) are now visible but disabled when
+  the user lacks the required permission level, with tooltip explaining the
+  requirement. Previously they were hidden entirely.
+- User Lookup preloads all users at page mount instead of paginating on scroll,
+  enabling immediate health status computation for all accounts
+- Group Management and Computer Lookup also preload all items at mount
+- LDAP connection retry logic only reconnects on connection-level errors
+  (timeout, reset, broken pipe), not on business logic errors (missing
+  attributes, permission denied)
+- `get_user_by_identity` now fetches all attributes (wildcard `*`) instead of
+  a fixed list, enabling Advanced Attributes display in user detail
+- GroupDetail badges replaced with styled category (Shield/Mail) and scope
+  (G/DL/U) badges matching the list view
+
+### Fixed
+
+- LDAP paged results controls leaking into shared connection pool, causing
+  all subsequent searches to fail after the first browse operation
+- `get_schema_attributes` race condition corrupting shared `base_dn` state,
+  causing groups and computers to search in the schema context instead of
+  the domain
+- Windows FILETIME dates (`accountExpires`, `pwdLastSet`, `lastLogon`)
+  displayed as raw tick values instead of human-readable dates
+- AD generalized time format (`whenCreated`, `whenChanged`) not parsed for
+  display
+- `sizeLimitExceeded` (rc=4) treated as fatal error instead of accepting
+  partial results
+- Raw JSON error objects displayed in toaster notifications instead of
+  user-friendly messages
+- Health badge tooltip icon alignment (not vertically centered)
+- Healthy badge tooltip missing checkmark icon
 
 ## [0.3.0] - 2026-03-15
 
