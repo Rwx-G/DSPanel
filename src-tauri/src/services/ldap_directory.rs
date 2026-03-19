@@ -401,62 +401,87 @@ impl LdapDirectoryProvider {
         let filter = filter.to_string();
         let attrs: Vec<String> = attrs.iter().map(|a| a.to_string()).collect();
 
-        self.with_connection(|mut ldap| {
-            let base = base.clone();
-            let filter = filter.clone();
-            let attrs = attrs.clone();
-            async move {
-                let page_size = std::cmp::min(max_results, 500) as i32;
-                let mut all_entries = Vec::new();
-                let mut cookie: Vec<u8> = Vec::new();
-
-                loop {
-                    let pr_control: RawControl = controls::PagedResults {
-                        size: page_size,
-                        cookie: cookie.clone(),
-                    }
-                    .into();
-                    ldap.with_controls(vec![pr_control]);
-
-                    let (rs, result) = ldap
-                        .search(&base, Scope::Subtree, &filter, attrs.clone())
+        // For small queries (<=1000), use a simple search without pagination.
+        // AD's default MaxPageSize is 1000, so no paging control is needed.
+        // For large queries, use manual paged results control loop.
+        if max_results <= 1000 {
+            self.with_connection(|mut ldap| {
+                let base = base.clone();
+                let filter = filter.clone();
+                let attrs = attrs.clone();
+                async move {
+                    let (rs, _) = ldap
+                        .search(&base, Scope::Subtree, &filter, attrs)
                         .await
-                        .context("LDAP paged search failed")?
+                        .context("LDAP search failed")?
                         .success()
-                        .context("LDAP paged search returned error")?;
+                        .context("LDAP search returned error")?;
 
-                    for entry in rs {
-                        all_entries.push(search_entry_to_directory_entry(
-                            SearchEntry::construct(entry),
-                        ));
-                    }
+                    let entries: Vec<DirectoryEntry> = rs
+                        .into_iter()
+                        .take(max_results)
+                        .map(|entry| {
+                            search_entry_to_directory_entry(SearchEntry::construct(entry))
+                        })
+                        .collect();
 
-                    if all_entries.len() >= max_results {
-                        all_entries.truncate(max_results);
-                        break;
-                    }
+                    Ok(entries)
+                }
+            })
+            .await
+        } else {
+            // Paged search: use a dedicated connection to avoid leaking
+            // controls into the shared pool.
+            let mut ldap = self.create_connection().await?;
+            let page_size = 500_i32;
+            let mut all_entries = Vec::new();
+            let mut cookie: Vec<u8> = Vec::new();
 
-                    cookie = Vec::new();
-                    for ctrl in &result.ctrls {
-                        if let controls::Control(
-                            Some(controls::ControlType::PagedResults),
-                            ref raw,
-                        ) = *ctrl
-                        {
-                            let pr: controls::PagedResults = raw.parse();
-                            cookie = pr.cookie;
-                        }
-                    }
+            loop {
+                let pr_control: RawControl = controls::PagedResults {
+                    size: page_size,
+                    cookie: cookie.clone(),
+                }
+                .into();
+                ldap.with_controls(vec![pr_control]);
 
-                    if cookie.is_empty() {
-                        break;
+                let (rs, result) = ldap
+                    .search(&base, Scope::Subtree, &filter, attrs.clone())
+                    .await
+                    .context("LDAP paged search failed")?
+                    .success()
+                    .context("LDAP paged search returned error")?;
+
+                for entry in rs {
+                    all_entries.push(search_entry_to_directory_entry(
+                        SearchEntry::construct(entry),
+                    ));
+                }
+
+                if all_entries.len() >= max_results {
+                    all_entries.truncate(max_results);
+                    break;
+                }
+
+                cookie = Vec::new();
+                for ctrl in &result.ctrls {
+                    if let controls::Control(
+                        Some(controls::ControlType::PagedResults),
+                        ref raw,
+                    ) = *ctrl
+                    {
+                        let pr: controls::PagedResults = raw.parse();
+                        cookie = pr.cookie;
                     }
                 }
 
-                Ok(all_entries)
+                if cookie.is_empty() {
+                    break;
+                }
             }
-        })
-        .await
+
+            Ok(all_entries)
+        }
     }
 }
 
