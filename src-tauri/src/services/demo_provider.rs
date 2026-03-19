@@ -1161,7 +1161,7 @@ impl DirectoryProvider for DemoDirectoryProvider {
 
     async fn get_nested_groups(&self, user_dn: &str) -> Result<Vec<String>> {
         // Demo: return direct memberOf + simulate one level of nesting
-        let users = sample_users();
+        let users = sample_browse_users();
         if let Some(user) = users.iter().find(|u| u.distinguished_name == user_dn) {
             let mut groups: Vec<String> = user.get_attribute_values("memberOf").to_vec();
             // Add parent groups from sample_group_entries memberOf

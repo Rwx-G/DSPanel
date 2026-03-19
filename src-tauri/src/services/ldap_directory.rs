@@ -3,6 +3,7 @@ use std::sync::Mutex;
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
+use ldap3::adapters::{Adapter, PagedResults};
 use ldap3::{LdapConnAsync, LdapConnSettings, Mod, Scope, SearchEntry};
 
 use crate::models::{DirectoryEntry, OUNode};
@@ -104,14 +105,46 @@ pub fn ldap_escape(input: &str) -> String {
     output
 }
 
+/// LDAP authentication mode selection.
+///
+/// Controls how the provider authenticates to the directory server at runtime.
+/// The `gssapi` Cargo feature flag controls whether the GSSAPI dependency is
+/// compiled in, but this enum selects the actual auth method used.
+#[derive(Clone)]
+pub enum LdapAuthMode {
+    /// Kerberos authentication via GSSAPI (default, requires domain-joined machine).
+    Gssapi,
+    /// Simple bind with explicit credentials (for lab/test environments).
+    SimpleBind {
+        bind_dn: String,
+        password: String,
+    },
+}
+
+impl std::fmt::Debug for LdapAuthMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Gssapi => write!(f, "Gssapi"),
+            Self::SimpleBind { bind_dn, .. } => f
+                .debug_struct("SimpleBind")
+                .field("bind_dn", bind_dn)
+                .field("password", &"[REDACTED]")
+                .finish(),
+        }
+    }
+}
+
 /// `DirectoryProvider` implementation using on-premises Active Directory via LDAP.
 ///
-/// Uses `ldap3` crate for LDAP operations with Kerberos (GSSAPI) authentication.
-/// The connection is established lazily on first use and reused across operations.
-/// `ldap3::Ldap` supports multiplexing, so a single connection handles concurrent
-/// requests efficiently without per-operation connect/bind overhead.
+/// Supports both GSSAPI (Kerberos) and simple bind authentication. The auth mode
+/// is selected at runtime based on configuration. The connection is established
+/// lazily on first use and reused across operations. `ldap3::Ldap` supports
+/// multiplexing, so a single connection handles concurrent requests efficiently
+/// without per-operation connect/bind overhead.
 pub struct LdapDirectoryProvider {
     domain: Option<String>,
+    server_override: Option<String>,
+    auth_mode: LdapAuthMode,
     base_dn: Mutex<Option<String>>,
     connected: Mutex<bool>,
     /// Pooled LDAP connection. Reused across operations; recreated on failure.
@@ -125,7 +158,7 @@ impl Default for LdapDirectoryProvider {
 }
 
 impl LdapDirectoryProvider {
-    /// Creates a new `LdapDirectoryProvider`.
+    /// Creates a new `LdapDirectoryProvider` with GSSAPI authentication.
     ///
     /// Domain is auto-detected from the `USERDNSDOMAIN` environment variable.
     /// If the variable is not set, the provider operates in disconnected mode.
@@ -140,10 +173,42 @@ impl LdapDirectoryProvider {
 
         Self {
             domain,
+            server_override: None,
+            auth_mode: LdapAuthMode::Gssapi,
             base_dn: Mutex::new(None),
             connected: Mutex::new(false),
             pool: tokio::sync::Mutex::new(None),
         }
+    }
+
+    /// Creates a new `LdapDirectoryProvider` with simple bind authentication.
+    ///
+    /// Uses explicit credentials instead of Kerberos. The `server` parameter
+    /// specifies the LDAP host (IP or hostname), bypassing `USERDNSDOMAIN`
+    /// auto-detection.
+    pub fn new_with_credentials(server: String, bind_dn: String, password: String) -> Self {
+        tracing::warn!(
+            server = %server,
+            bind_dn = %bind_dn,
+            "Simple bind mode active - credentials-based authentication"
+        );
+
+        Self {
+            domain: Some(server.clone()),
+            server_override: Some(server),
+            auth_mode: LdapAuthMode::SimpleBind {
+                bind_dn,
+                password,
+            },
+            base_dn: Mutex::new(None),
+            connected: Mutex::new(false),
+            pool: tokio::sync::Mutex::new(None),
+        }
+    }
+
+    /// Returns the configured authentication mode.
+    pub fn auth_mode(&self) -> &LdapAuthMode {
+        &self.auth_mode
     }
 
     /// Returns a pooled LDAP connection, creating one if needed.
@@ -203,30 +268,53 @@ impl LdapDirectoryProvider {
         }
     }
 
-    /// Establishes a new LDAP connection with GSSAPI authentication.
+    /// Establishes a new LDAP connection with the configured authentication mode.
     async fn create_connection(&self) -> Result<ldap3::Ldap> {
-        let domain = self
-            .domain
-            .as_ref()
-            .context("No domain available - machine is not domain-joined")?;
+        let host = match &self.server_override {
+            Some(server) => server.clone(),
+            None => self
+                .domain
+                .as_ref()
+                .context("No domain available - machine is not domain-joined")?
+                .clone(),
+        };
+
+        tracing::debug!(host = %host, auth_mode = ?self.auth_mode, "Establishing LDAP connection");
 
         let settings = LdapConnSettings::new();
         let (conn, mut ldap) =
-            LdapConnAsync::with_settings(settings, &format!("ldap://{}:389", domain))
+            LdapConnAsync::with_settings(settings, &format!("ldap://{}:389", host))
                 .await
                 .context("Failed to connect to LDAP server")?;
 
         tokio::spawn(conn.drive());
 
-        #[cfg(feature = "gssapi")]
-        ldap.sasl_gssapi_bind(domain)
-            .await
-            .context("GSSAPI (Kerberos) authentication failed")?;
+        match &self.auth_mode {
+            LdapAuthMode::SimpleBind { bind_dn, password } => {
+                let result = ldap
+                    .simple_bind(bind_dn, password)
+                    .await
+                    .context("Simple bind failed - connection error")?;
+                if result.rc != 0 {
+                    anyhow::bail!(
+                        "Simple bind authentication failed (rc={}): invalid credentials or insufficient access",
+                        result.rc
+                    );
+                }
+                tracing::info!(bind_dn = %bind_dn, "Simple bind authentication successful");
+            }
+            LdapAuthMode::Gssapi => {
+                #[cfg(feature = "gssapi")]
+                ldap.sasl_gssapi_bind(&host)
+                    .await
+                    .context("GSSAPI (Kerberos) authentication failed")?;
 
-        #[cfg(not(feature = "gssapi"))]
-        ldap.simple_bind("", "")
-            .await
-            .context("Anonymous LDAP bind failed (build without gssapi feature)")?;
+                #[cfg(not(feature = "gssapi"))]
+                ldap.simple_bind("", "")
+                    .await
+                    .context("Anonymous LDAP bind failed (build without gssapi feature)")?;
+            }
+        }
 
         // Discover base DN via rootDSE
         let (rs, _) = ldap
@@ -294,6 +382,10 @@ impl LdapDirectoryProvider {
     }
 
     /// Performs an LDAP search and maps results to `DirectoryEntry` objects.
+    ///
+    /// Uses LDAP paged results control to retrieve results in pages of 500,
+    /// avoiding AD's default MaxPageSize (1000) limit. Results are capped
+    /// at `max_results` client-side.
     async fn search(
         &self,
         filter: &str,
@@ -314,22 +406,25 @@ impl LdapDirectoryProvider {
             let filter = filter.clone();
             let attrs = attrs.clone();
             async move {
-                let (rs, _) = ldap
-                    .search(&base, Scope::Subtree, &filter, attrs)
+                let page_size = std::cmp::min(max_results, 500) as i32;
+                let adapters: Vec<Box<dyn Adapter<_, _>>> =
+                    vec![Box::new(PagedResults::new(page_size))];
+                let mut stream = ldap
+                    .streaming_search_with(adapters, &base, Scope::Subtree, &filter, attrs)
                     .await
-                    .context("LDAP search failed")?
-                    .success()
-                    .context("LDAP search returned error")?;
+                    .context("LDAP paged search failed")?;
 
-                let entries: Vec<DirectoryEntry> = rs
-                    .into_iter()
-                    .take(max_results)
-                    .map(|entry| {
-                        let se = SearchEntry::construct(entry);
-                        search_entry_to_directory_entry(se)
-                    })
-                    .collect();
+                let mut entries = Vec::new();
+                while let Some(entry) = stream.next().await.context("LDAP page fetch failed")? {
+                    entries.push(search_entry_to_directory_entry(
+                        SearchEntry::construct(entry),
+                    ));
+                    if entries.len() >= max_results {
+                        break;
+                    }
+                }
 
+                let _result = stream.finish().await;
                 Ok(entries)
             }
         })
@@ -1263,6 +1358,60 @@ mod tests {
         if let Some(val) = original {
             std::env::set_var("USERDNSDOMAIN", val);
         }
+    }
+
+    #[test]
+    fn test_new_defaults_to_gssapi_auth_mode() {
+        let original = std::env::var("USERDNSDOMAIN").ok();
+        std::env::remove_var("USERDNSDOMAIN");
+
+        let provider = LdapDirectoryProvider::new();
+        assert!(matches!(provider.auth_mode(), LdapAuthMode::Gssapi));
+        assert!(provider.server_override.is_none());
+
+        if let Some(val) = original {
+            std::env::set_var("USERDNSDOMAIN", val);
+        }
+    }
+
+    #[test]
+    fn test_new_with_credentials_sets_simple_bind_mode() {
+        let provider = LdapDirectoryProvider::new_with_credentials(
+            "10.0.0.10".to_string(),
+            "CN=Test,DC=lab,DC=local".to_string(),
+            "secret".to_string(),
+        );
+
+        assert!(matches!(provider.auth_mode(), LdapAuthMode::SimpleBind { .. }));
+        if let LdapAuthMode::SimpleBind { bind_dn, password } = provider.auth_mode() {
+            assert_eq!(bind_dn, "CN=Test,DC=lab,DC=local");
+            assert_eq!(password, "secret");
+        }
+    }
+
+    #[test]
+    fn test_new_with_credentials_sets_server_override() {
+        let provider = LdapDirectoryProvider::new_with_credentials(
+            "10.0.0.10".to_string(),
+            "CN=Test,DC=lab,DC=local".to_string(),
+            "secret".to_string(),
+        );
+
+        assert_eq!(provider.server_override, Some("10.0.0.10".to_string()));
+        assert_eq!(provider.domain_name(), Some("10.0.0.10"));
+    }
+
+    #[test]
+    fn test_new_with_credentials_domain_is_set() {
+        let provider = LdapDirectoryProvider::new_with_credentials(
+            "dc01.lab.local".to_string(),
+            "CN=Admin,DC=lab,DC=local".to_string(),
+            "pass".to_string(),
+        );
+
+        // domain is set to the server value so search operations work
+        assert!(provider.domain.is_some());
+        assert_eq!(provider.domain.as_deref(), Some("dc01.lab.local"));
     }
 
     #[tokio::test]

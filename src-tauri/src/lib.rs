@@ -54,7 +54,26 @@ pub fn run() {
         Arc::new(services::demo_provider::DemoDirectoryProvider::new())
     };
     #[cfg(not(feature = "demo"))]
-    let provider: Arc<dyn services::DirectoryProvider> = Arc::new(LdapDirectoryProvider::new());
+    let provider: Arc<dyn services::DirectoryProvider> = {
+        let server = std::env::var("DSPANEL_LDAP_SERVER").ok();
+        let bind_dn = std::env::var("DSPANEL_LDAP_BIND_DN").ok();
+        let bind_password = std::env::var("DSPANEL_LDAP_BIND_PASSWORD").ok();
+
+        match (server, bind_dn, bind_password) {
+            (Some(s), Some(d), Some(p)) => {
+                Arc::new(LdapDirectoryProvider::new_with_credentials(s, d, p))
+            }
+            (None, None, None) => Arc::new(LdapDirectoryProvider::new()),
+            _ => {
+                tracing::warn!(
+                    "Partial LDAP credentials detected - all three variables must be set: \
+                     DSPANEL_LDAP_SERVER, DSPANEL_LDAP_BIND_DN, DSPANEL_LDAP_BIND_PASSWORD. \
+                     Falling back to GSSAPI"
+                );
+                Arc::new(LdapDirectoryProvider::new())
+            }
+        }
+    };
 
     let app_state = AppState::new(provider, PermissionConfig::default());
 
