@@ -10,6 +10,7 @@ export function useGroupBrowse(): UseBrowseReturn<DirectoryGroup> {
       g.displayName.toLowerCase().includes(lower) ||
       g.samAccountName.toLowerCase().includes(lower) ||
       g.description.toLowerCase().includes(lower),
+    itemKey: (g) => g.distinguishedName,
     preloadAll: true,
   });
 }

@@ -17,6 +17,8 @@ import {
   type ContextMenuItem,
 } from "@/components/common/ContextMenu";
 import { useNavigation } from "@/contexts/NavigationContext";
+import { useNotifications } from "@/contexts/NotificationContext";
+import { extractErrorMessage } from "@/utils/errorMapping";
 import {
   UserPlus,
   UserMinus,
@@ -237,6 +239,8 @@ export function GroupDetail({
   canManageMembers,
   onMembersRefresh,
 }: GroupDetailProps) {
+  const { notify } = useNotifications();
+
   // Member management state
   const [selectedMembers, setSelectedMembers] = useState<Set<string>>(
     new Set(),
@@ -530,8 +534,22 @@ export function GroupDetail({
       );
 
       const failures = results.filter((r) => r.status === "rejected");
-      if (failures.length > 0) {
-        console.warn(`${failures.length} member changes failed`);
+      const successes = results.length - failures.length;
+
+      if (failures.length > 0 && successes > 0) {
+        const firstErr = (failures[0] as PromiseRejectedResult).reason;
+        notify(
+          `${successes} change(s) applied, ${failures.length} failed: ${extractErrorMessage(firstErr)}`,
+          "warning",
+        );
+      } else if (failures.length > 0) {
+        const firstErr = (failures[0] as PromiseRejectedResult).reason;
+        notify(extractErrorMessage(firstErr), "error");
+      } else {
+        notify(
+          `${successes} member change(s) applied successfully`,
+          "success",
+        );
       }
 
       setPendingChanges([]);
@@ -540,7 +558,7 @@ export function GroupDetail({
       closeAddDropdown();
       onMembersRefresh();
     } catch (err) {
-      console.warn("Failed to apply member changes:", err);
+      notify(extractErrorMessage(err), "error");
     } finally {
       setApplying(false);
     }

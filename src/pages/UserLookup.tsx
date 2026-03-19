@@ -37,6 +37,7 @@ export function UserLookup() {
     loadMore,
     selectedItem: selectedUser,
     setSelectedItem: setSelectedUser,
+    updateItem,
     refresh,
   } = useUserBrowse();
 
@@ -148,6 +149,7 @@ export function UserLookup() {
       if (entry) {
         const updated = mapEntryToUser(entry);
         setSelectedUser(updated);
+        updateItem(updated.samAccountName, updated);
         const health = await evaluateHealth(updated);
         setHealthMap((prev) => {
           const next = new Map(prev);
@@ -158,7 +160,7 @@ export function UserLookup() {
     } catch (e) {
       console.warn("Failed to refresh user:", e);
     }
-  }, [selectedUser, setSelectedUser]);
+  }, [selectedUser, setSelectedUser, updateItem]);
 
   const filteredGroups = selectedUser
     ? selectedUser.memberOf.filter((dn) =>

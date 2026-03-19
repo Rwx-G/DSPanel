@@ -20,6 +20,7 @@ function useComputerBrowse() {
     clientFilter: (c, lower) =>
       c.name.toLowerCase().includes(lower) ||
       c.dnsHostName.toLowerCase().includes(lower),
+    itemKey: (c) => c.distinguishedName,
     preloadAll: true,
   });
 }

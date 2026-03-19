@@ -15,6 +15,8 @@ export interface UseBrowseOptions<T> {
   searchCommand: string;
   mapEntry: (entry: DirectoryEntry) => T;
   clientFilter: (item: T, lower: string) => boolean;
+  /** Returns a unique key for an item (used by updateItem). */
+  itemKey: (item: T) => string;
   /** When true, automatically loads all pages on mount instead of waiting for scroll. */
   preloadAll?: boolean;
 }
@@ -32,6 +34,7 @@ export interface UseBrowseReturn<T> {
   loadMore: () => void;
   selectedItem: T | null;
   setSelectedItem: (item: T | null) => void;
+  updateItem: (key: string, updated: T) => void;
   refresh: () => void;
 }
 
@@ -43,6 +46,7 @@ export function useBrowse<T>({
   searchCommand,
   mapEntry,
   clientFilter,
+  itemKey,
   preloadAll = false,
 }: UseBrowseOptions<T>): UseBrowseReturn<T> {
   const [allBrowseItems, setAllBrowseItems] = useState<T[]>([]);
@@ -63,6 +67,8 @@ export function useBrowse<T>({
   mapEntryRef.current = mapEntry;
   const clientFilterRef = useRef(clientFilter);
   clientFilterRef.current = clientFilter;
+  const itemKeyRef = useRef(itemKey);
+  itemKeyRef.current = itemKey;
 
   const loadBrowsePage = useCallback(
     async (page: number, append: boolean) => {
@@ -202,6 +208,13 @@ export function useBrowse<T>({
     loadBrowsePage(browsePageLoaded + 1, true);
   }, [mode, loadingMore, hasMore, browsePageLoaded, loadBrowsePage]);
 
+  const updateItem = useCallback((key: string, updated: T) => {
+    const replacer = (items: T[]) =>
+      items.map((item) => (itemKeyRef.current(item) === key ? updated : item));
+    setAllBrowseItems(replacer);
+    setDisplayedItems(replacer);
+  }, []);
+
   const refresh = useCallback(() => {
     setAllBrowseItems([]);
     setDisplayedItems([]);
@@ -225,6 +238,7 @@ export function useBrowse<T>({
     loadMore,
     selectedItem,
     setSelectedItem,
+    updateItem,
     refresh,
   };
 }
