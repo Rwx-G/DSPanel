@@ -44,9 +44,11 @@ function saveFavorites(favs: Set<string>) {
 
 interface AdvancedAttributesProps {
   rawAttributes: Record<string, string[]>;
+  /** All attribute names from the AD schema, used to populate empty attributes. */
+  schemaAttributes?: string[];
 }
 
-export function AdvancedAttributes({ rawAttributes }: AdvancedAttributesProps) {
+export function AdvancedAttributes({ rawAttributes, schemaAttributes }: AdvancedAttributesProps) {
   const [favorites, setFavorites] = useState<Set<string>>(loadFavorites);
   const [collapsed, setCollapsed] = useState(false);
   const [searchText, setSearchText] = useState("");
@@ -64,12 +66,34 @@ export function AdvancedAttributes({ rawAttributes }: AdvancedAttributesProps) {
     });
   }, []);
 
-  // Filter out already-displayed attributes, split into favorites and rest
+  const [showEmpty, setShowEmpty] = useState(false);
+
+  // Filter out already-displayed attributes, split into favorites and rest.
+  // When showEmpty is on, merge in schema attributes that have no value.
   const allAdvanced = useMemo(() => {
-    return Object.entries(rawAttributes)
-      .filter(([key]) => !DISPLAYED_ATTRS.has(key))
-      .sort(([a], [b]) => a.localeCompare(b));
-  }, [rawAttributes]);
+    const populated = Object.entries(rawAttributes)
+      .filter(([key]) => !DISPLAYED_ATTRS.has(key));
+
+    if (!showEmpty) {
+      return populated
+        .filter(([, values]) => values.some((v) => v !== ""))
+        .sort(([a], [b]) => a.localeCompare(b));
+    }
+
+    // Merge schema attributes as empty entries
+    const result = new Map<string, string[]>();
+    if (schemaAttributes) {
+      for (const attr of schemaAttributes) {
+        if (!DISPLAYED_ATTRS.has(attr)) {
+          result.set(attr, []);
+        }
+      }
+    }
+    for (const [key, values] of populated) {
+      result.set(key, values);
+    }
+    return Array.from(result.entries()).sort(([a], [b]) => a.localeCompare(b));
+  }, [rawAttributes, showEmpty, schemaAttributes]);
 
   const { favoriteAttrs, otherAttrs } = useMemo(() => {
     const lower = searchText.toLowerCase();
@@ -180,6 +204,16 @@ export function AdvancedAttributes({ rawAttributes }: AdvancedAttributesProps) {
                 <X size={14} />
               </button>
             )}
+            <label className="flex shrink-0 items-center gap-1.5 text-caption text-[var(--color-text-secondary)] cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={showEmpty}
+                onChange={(e) => setShowEmpty(e.target.checked)}
+                className="accent-[var(--color-primary)]"
+                data-testid="show-empty-toggle"
+              />
+              Show empty
+            </label>
           </div>
 
           {filteredCount === 0 && (

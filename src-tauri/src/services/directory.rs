@@ -148,6 +148,12 @@ pub trait DirectoryProvider: Send + Sync {
 
     /// Updates the managedBy attribute of a group.
     async fn update_managed_by(&self, group_dn: &str, manager_dn: &str) -> Result<()>;
+
+    /// Returns all user-applicable attribute names from the AD schema.
+    ///
+    /// Queries the schema naming context for attributeSchema objects that
+    /// apply to the "user" class. Returns just the `lDAPDisplayName` values.
+    async fn get_schema_attributes(&self) -> Result<Vec<String>>;
 }
 
 #[cfg(test)]
@@ -523,6 +529,17 @@ pub mod tests {
                 .unwrap()
                 .push((group_dn.to_string(), manager_dn.to_string()));
             Ok(())
+        }
+
+        async fn get_schema_attributes(&self) -> Result<Vec<String>> {
+            self.check_failure()?;
+            Ok(vec![
+                "cn".to_string(),
+                "displayName".to_string(),
+                "mail".to_string(),
+                "sAMAccountName".to_string(),
+                "telephoneNumber".to_string(),
+            ])
         }
     }
 

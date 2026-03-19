@@ -109,6 +109,7 @@ pub fn run() {
             commands::search_computers,
             commands::ping_host,
             commands::resolve_dns,
+            commands::get_schema_attributes,
             commands::evaluate_health_cmd,
             commands::evaluate_health_batch,
             commands::get_current_username,

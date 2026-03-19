@@ -1226,6 +1226,14 @@ impl DirectoryProvider for DemoDirectoryProvider {
         );
         Ok(())
     }
+
+    async fn get_schema_attributes(&self) -> Result<Vec<String>> {
+        Ok(vec![
+            "cn".to_string(), "displayName".to_string(), "mail".to_string(),
+            "sAMAccountName".to_string(), "telephoneNumber".to_string(),
+            "givenName".to_string(), "sn".to_string(), "department".to_string(),
+        ])
+    }
 }
 
 fn sample_ou_tree() -> Vec<OUNode> {

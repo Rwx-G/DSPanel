@@ -41,6 +41,13 @@ export function UserLookup() {
   } = useUserBrowse();
 
   const [healthFilter, setHealthFilter] = useState<HealthFilter>("all");
+  const [schemaAttributes, setSchemaAttributes] = useState<string[]>([]);
+
+  useEffect(() => {
+    invoke<string[]>("get_schema_attributes")
+      .then(setSchemaAttributes)
+      .catch((e) => console.warn("Failed to load schema attributes:", e));
+  }, []);
 
   const { openTab, openTabs, activeTabId, clearTabData } = useNavigation();
 
@@ -252,7 +259,15 @@ export function UserLookup() {
             ? "bg-[var(--color-surface-selected)]"
             : ""
         }`}
-        onClick={() => setSelectedUser(user)}
+        onClick={() => {
+          setSelectedUser(user);
+          // Fetch full attributes for detail view
+          invoke<DirectoryEntry | null>("get_user", {
+            samAccountName: user.samAccountName,
+          }).then((entry) => {
+            if (entry) setSelectedUser(mapEntryToUser(entry));
+          }).catch(() => {});
+        }}
         onContextMenu={(e) => handleUserContextMenu(e, user)}
         data-testid={`user-result-${user.samAccountName}`}
       >
@@ -400,6 +415,7 @@ export function UserLookup() {
                   groupFilterText={groupFilterText}
                   onGroupFilterText={setGroupFilterText}
                   onRefresh={refreshSelectedUser}
+                  schemaAttributes={schemaAttributes}
                 />
               ) : (
                 <div className="flex h-full items-center justify-center">

@@ -401,6 +401,16 @@ where
         .await
         .map_err(|e| anyhow::anyhow!(e))
     }
+
+    async fn get_schema_attributes(&self) -> Result<Vec<String>> {
+        let inner_ref = self.inner.clone();
+        self.execute_with_resilience(|| {
+            let inner = inner_ref.clone();
+            async move { inner.get_schema_attributes().await }
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!(e))
+    }
 }
 
 #[cfg(test)]

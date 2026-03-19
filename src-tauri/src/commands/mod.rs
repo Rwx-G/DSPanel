@@ -1531,6 +1531,18 @@ pub fn get_computer_name() -> String {
     })
 }
 
+/// Returns all attribute names from the AD schema.
+#[tauri::command]
+pub async fn get_schema_attributes(
+    state: State<'_, AppState>,
+) -> Result<Vec<String>, AppError> {
+    let provider = state.directory_provider.clone();
+    provider
+        .get_schema_attributes()
+        .await
+        .map_err(|e| AppError::Directory(e.to_string()))
+}
+
 /// Evaluates the health status of a user account.
 ///
 /// Receives user account properties and returns a health assessment with

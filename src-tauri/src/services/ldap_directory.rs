@@ -668,7 +668,8 @@ impl DirectoryProvider for LdapDirectoryProvider {
             "(&(objectClass=user)(objectCategory=person)(sAMAccountName={}))",
             escaped
         );
-        let results = self.search(&ldap_filter, USER_ATTRS, 1).await?;
+        // Fetch all attributes for single-user detail view (advanced attributes)
+        let results = self.search(&ldap_filter, &["*"], 1).await?;
         Ok(results.into_iter().next())
     }
 
@@ -1191,6 +1192,65 @@ impl DirectoryProvider for LdapDirectoryProvider {
             }
         })
         .await
+    }
+
+    async fn get_schema_attributes(&self) -> Result<Vec<String>> {
+        if self.domain.is_none() {
+            return Ok(Vec::new());
+        }
+
+        // Discover schema naming context via rootDSE
+        let schema_dn = self
+            .with_connection(|mut ldap| async move {
+                let (rs, _) = ldap
+                    .search(
+                        "",
+                        Scope::Base,
+                        "(objectClass=*)",
+                        vec!["schemaNamingContext"],
+                    )
+                    .await
+                    .context("Failed to query rootDSE for schema DN")?
+                    .success()
+                    .context("rootDSE schema query returned error")?;
+
+                if let Some(entry) = rs.into_iter().next() {
+                    let se = SearchEntry::construct(entry);
+                    if let Some(dn) = se
+                        .attrs
+                        .get("schemaNamingContext")
+                        .and_then(|v| v.first().cloned())
+                    {
+                        return Ok(dn);
+                    }
+                }
+                anyhow::bail!("schemaNamingContext not found in rootDSE")
+            })
+            .await?;
+
+        // Query all attributeSchema objects for their lDAPDisplayName
+        let filter = "(objectClass=attributeSchema)";
+        let attrs = &["lDAPDisplayName"];
+
+        // Use the raw search with paged results on the schema DN
+        let base = self.base_dn.lock().unwrap().clone();
+        // Temporarily override base_dn for schema search
+        *self.base_dn.lock().unwrap() = Some(schema_dn);
+        let results = self.search(filter, attrs, 10000).await;
+        // Restore original base_dn
+        *self.base_dn.lock().unwrap() = base;
+
+        let entries = results?;
+        let mut names: Vec<String> = entries
+            .iter()
+            .filter_map(|e| {
+                e.attributes
+                    .get("lDAPDisplayName")
+                    .and_then(|v| v.first().cloned())
+            })
+            .collect();
+        names.sort();
+        Ok(names)
     }
 }
 

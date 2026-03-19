@@ -52,6 +52,7 @@ export interface UserDetailProps {
   groupFilterText: string;
   onGroupFilterText: (value: string) => void;
   onRefresh?: () => void;
+  schemaAttributes?: string[];
 }
 
 export function UserDetail({
@@ -62,6 +63,7 @@ export function UserDetail({
   groupFilterText: _groupFilterText,
   onGroupFilterText,
   onRefresh,
+  schemaAttributes,
 }: UserDetailProps) {
   const [groupFilters, setGroupFilters] = useState<FilterChip[]>([]);
   const [showPasswordReset, setShowPasswordReset] = useState(false);
@@ -275,7 +277,7 @@ export function UserDetail({
 
       <div className="border-t border-[var(--color-border-default)]" />
 
-      <AdvancedAttributes rawAttributes={user.rawAttributes} />
+      <AdvancedAttributes rawAttributes={user.rawAttributes} schemaAttributes={schemaAttributes} />
 
       <div className="border-t border-[var(--color-border-default)]" />
 
