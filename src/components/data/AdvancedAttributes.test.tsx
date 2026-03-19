@@ -223,11 +223,15 @@ describe("AdvancedAttributes", () => {
     expect(items[2]).toHaveAttribute("data-testid", "advanced-attr-zeta");
   });
 
-  it("shows (empty) indicator for empty value", () => {
+  it("shows (empty) indicator for empty value when showEmpty is toggled on", () => {
     const attrs: Record<string, string[]> = {
+      populatedAttr: ["has value"],
       emptyAttr: [""],
     };
     render(<AdvancedAttributes rawAttributes={attrs} />);
+
+    // By default, empty attributes are hidden. Toggle "Show empty" to reveal them.
+    fireEvent.click(screen.getByTestId("show-empty-toggle"));
 
     expect(screen.getByText("(empty)")).toBeInTheDocument();
   });

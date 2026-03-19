@@ -244,6 +244,22 @@ export function GroupHygiene() {
         duplicateEntries.map((cluster) => cluster.map(mapEntryToGroup)),
       );
       setScanned(true);
+
+      // Audit log the scan completion
+      const totalIssues =
+        emptyEntries.length +
+        detectedCycles.length +
+        singleEntries.length +
+        staleEntries.length +
+        undescribedEntries.length +
+        nestingResults.length +
+        duplicateEntries.length;
+      invoke("audit_log", {
+        action: "HygieneScanCompleted",
+        targetDn: "",
+        details: `Scan complete: ${totalIssues} issue(s) found (${emptyEntries.length} empty, ${detectedCycles.length} circular, ${singleEntries.length} single-member, ${staleEntries.length} stale, ${undescribedEntries.length} undescribed, ${nestingResults.length} deep-nested, ${duplicateEntries.length} duplicate)`,
+        success: true,
+      }).catch(() => {});
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       setScanError(message);
@@ -304,6 +320,16 @@ export function GroupHygiene() {
       });
 
       try {
+        // Re-check that the group is still empty before deleting (race condition protection)
+        const members = await invoke<DirectoryEntry[]>("get_group_members", {
+          groupDn: dn,
+          maxResults: 1,
+        });
+        if (members.length > 0) {
+          failed++;
+          console.warn("Group no longer empty, skipping deletion:", dn);
+          continue;
+        }
         await invoke("delete_group", { groupDn: dn });
         completed++;
       } catch (err) {

@@ -101,15 +101,15 @@ function makeEntry(
       title: ["Engineer"],
       userAccountControl: ["512"],
       lockoutTime: ["0"],
-      lastLogon: ["2026-03-12T08:00:00Z"],
-      pwdLastSet: ["2026-02-01T10:00:00Z"],
+      lastLogon: ["134177760000000000"],
+      pwdLastSet: ["134144136000000000"],
       memberOf: [
         "CN=Domain Users,CN=Users,DC=example,DC=com",
         "CN=Developers,OU=Groups,DC=example,DC=com",
       ],
       badPwdCount: ["0"],
-      whenCreated: ["2024-01-01T00:00:00Z"],
-      whenChanged: ["2026-03-01T00:00:00Z"],
+      whenCreated: ["20240101000000.0Z"],
+      whenChanged: ["20260301000000.0Z"],
       ...attrs,
     },
   };
@@ -141,6 +141,21 @@ function mockBrowseWith(
         return Promise.resolve(status);
       }
       return Promise.resolve(HEALTHY_STATUS);
+    }
+    if (cmd === "evaluate_health_batch") {
+      const inputs = args?.inputs as { enabled: boolean }[] | undefined;
+      if (inputs) {
+        return Promise.resolve(
+          inputs.map((input) => {
+            if (!input.enabled) return CRITICAL_STATUS;
+            for (const [, status] of Object.entries(healthOverrides)) {
+              return status;
+            }
+            return HEALTHY_STATUS;
+          }),
+        );
+      }
+      return Promise.resolve([]);
     }
     return Promise.resolve(null);
   }) as typeof invoke);

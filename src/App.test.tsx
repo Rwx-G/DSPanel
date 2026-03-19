@@ -54,6 +54,7 @@ function mockInvokeResponses(overrides: Record<string, unknown> = {}) {
     check_connection: false,
     get_permission_level: "ReadOnly",
     get_current_username: "TestUser",
+    get_authenticated_identity: "TestUser",
     get_computer_name: "TESTPC",
     get_user_groups: [],
     ...overrides,
@@ -134,7 +135,7 @@ describe("App", () => {
     render(<App />);
 
     await waitFor(() => {
-      expect(screen.getByText("TestUser")).toBeInTheDocument();
+      expect(screen.getAllByText("TestUser").length).toBeGreaterThanOrEqual(1);
     });
   });
 

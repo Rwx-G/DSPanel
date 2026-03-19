@@ -327,7 +327,7 @@ describe("UserActions", () => {
     });
   });
 
-  it("shows generic error on action failure with non-string error", async () => {
+  it("shows extracted error message on action failure with Error object", async () => {
     mockInvoke.mockRejectedValueOnce(new Error("network") as never);
 
     render(
@@ -348,13 +348,13 @@ describe("UserActions", () => {
     fireEvent.click(screen.getByTestId("dialog-confirm"));
 
     await waitFor(() => {
-      expect(screen.getByText("Unlock failed")).toBeInTheDocument();
+      expect(screen.getByText("network")).toBeInTheDocument();
     });
   });
 
-  it("shows parsed JSON error message when error is JSON", async () => {
+  it("shows parsed JSON error message when error is backend JSON", async () => {
     mockInvoke.mockRejectedValueOnce(
-      JSON.stringify({ userMessage: "Access denied by policy" }) as never,
+      JSON.stringify({ kind: "permission_denied", message: "Access denied", user_message: "Access denied by policy", retryable: false }) as never,
     );
 
     render(

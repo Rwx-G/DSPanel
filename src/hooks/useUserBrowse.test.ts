@@ -28,12 +28,12 @@ function makeEntry(
       title: ["Engineer"],
       userAccountControl: ["512"],
       lockoutTime: ["0"],
-      lastLogon: ["2026-03-12T08:00:00Z"],
-      pwdLastSet: ["2026-02-01T10:00:00Z"],
+      lastLogon: ["134177760000000000"],
+      pwdLastSet: ["134144136000000000"],
       memberOf: ["CN=Domain Users,CN=Users,DC=example,DC=com"],
       badPwdCount: ["0"],
-      whenCreated: ["2024-01-01T00:00:00Z"],
-      whenChanged: ["2026-03-01T00:00:00Z"],
+      whenCreated: ["20240101000000.0Z"],
+      whenChanged: ["20260301000000.0Z"],
       ...attrs,
     },
   };
@@ -52,12 +52,13 @@ describe("useUserBrowse", () => {
     mockInvoke.mockReset();
   });
 
-  it("loads first page on mount", async () => {
+  it("loads all pages on mount (preloadAll)", async () => {
     const entries = [
       makeEntry("jdoe", "John Doe"),
       makeEntry("asmith", "Alice Smith"),
     ];
-    mockInvoke.mockResolvedValueOnce(makeBrowseResult(entries));
+    // preloadAll loads in a while loop; first page returns hasMore=false
+    mockInvoke.mockResolvedValueOnce(makeBrowseResult(entries, false));
 
     const { result } = renderHook(() => useUserBrowse());
 
@@ -92,11 +93,14 @@ describe("useUserBrowse", () => {
     expect(result.current.items).toHaveLength(0);
   });
 
-  it("loads more pages in browse mode", async () => {
+  it("preloads multiple pages when hasMore is true", async () => {
     const page0 = [makeEntry("a", "Alice"), makeEntry("b", "Bob")];
     const page1 = [makeEntry("c", "Carol")];
 
-    mockInvoke.mockResolvedValueOnce(makeBrowseResult(page0, true));
+    // preloadAll loads pages in a while loop
+    mockInvoke
+      .mockResolvedValueOnce(makeBrowseResult(page0, true))
+      .mockResolvedValueOnce(makeBrowseResult(page1, false));
 
     const { result } = renderHook(() => useUserBrowse());
 
@@ -104,19 +108,7 @@ describe("useUserBrowse", () => {
       expect(result.current.loading).toBe(false);
     });
 
-    expect(result.current.hasMore).toBe(true);
-    expect(result.current.items).toHaveLength(2);
-
-    mockInvoke.mockResolvedValueOnce(makeBrowseResult(page1, false));
-
-    await act(async () => {
-      result.current.loadMore();
-    });
-
-    await waitFor(() => {
-      expect(result.current.loadingMore).toBe(false);
-    });
-
+    // All items should be loaded
     expect(result.current.items).toHaveLength(3);
     expect(result.current.hasMore).toBe(false);
   });
@@ -240,6 +232,7 @@ describe("useUserBrowse", () => {
 
     expect(result.current.filterText).toBe("");
     expect(result.current.mode).toBe("browse");
+    // preloadAll initial load + refresh (which uses loadBrowsePage)
     expect(mockInvoke).toHaveBeenCalledTimes(2);
   });
 });

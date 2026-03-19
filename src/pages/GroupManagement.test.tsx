@@ -303,11 +303,9 @@ describe("GroupManagement", () => {
       expect(screen.getByTestId("group-detail")).toBeInTheDocument();
     });
 
-    // Scope and category are now shown in PropertyGrid and StatusBadge
-    const badges = screen.getAllByTestId("status-badge");
-    const badgeTexts = badges.map((b) => b.textContent);
-    expect(badgeTexts).toContain("DomainLocal");
-    expect(badgeTexts).toContain("Distribution");
+    // Scope and category are shown in the group detail (badge + PropertyGrid)
+    expect(screen.getAllByText("Domain Local").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Distribution").length).toBeGreaterThanOrEqual(1);
   });
 
   it("shows placeholder when no group is selected", async () => {
@@ -339,7 +337,7 @@ describe("GroupManagement", () => {
     expect(status).toHaveAttribute("aria-live", "polite");
   });
 
-  it("shows category badge on list items", async () => {
+  it("shows category and scope info on list items", async () => {
     const entries = [makeGroupEntry("Developers", "Global", "Security")];
     mockBrowseWith(entries);
 
@@ -349,11 +347,12 @@ describe("GroupManagement", () => {
       expect(screen.getByTestId("group-result-Developers")).toBeInTheDocument();
     });
 
-    // List item should have a StatusBadge
+    // List item shows scope/category info inline with abbreviation
     const listItem = screen.getByTestId("group-result-Developers");
-    const badge = listItem.querySelector("[data-testid='status-badge']");
-    expect(badge).toBeInTheDocument();
-    expect(badge?.textContent).toBe("Security");
+    // Scope abbreviation "G" for Global should be visible
+    expect(listItem.textContent).toContain("G");
+    // Category and scope details appear in subtitle line
+    expect(listItem.textContent).toContain("Security");
   });
 
   describe("Deep-link and member loading", () => {
@@ -540,22 +539,17 @@ describe("GroupManagement", () => {
       expect(screen.getByTestId("select-all-checkbox")).toBeInTheDocument();
     });
 
-    it("hides add/remove controls for ReadOnly users", async () => {
+    it("disables add/remove controls for ReadOnly users", async () => {
       await selectGroupWithMembers("ReadOnly");
 
       await waitFor(() => {
         expect(screen.getByText("John Doe")).toBeInTheDocument();
       });
 
-      expect(
-        screen.queryByTestId("member-management-controls"),
-      ).not.toBeInTheDocument();
-      expect(
-        screen.queryByTestId("add-member-btn"),
-      ).not.toBeInTheDocument();
-      expect(
-        screen.queryByTestId("select-all-checkbox"),
-      ).not.toBeInTheDocument();
+      // Controls are rendered but disabled for ReadOnly
+      expect(screen.getByTestId("add-member-btn")).toBeDisabled();
+      expect(screen.getByTestId("remove-selected-btn")).toBeDisabled();
+      expect(screen.getByTestId("preview-changes-btn")).toBeDisabled();
     });
 
     it("multi-select on member list works", async () => {

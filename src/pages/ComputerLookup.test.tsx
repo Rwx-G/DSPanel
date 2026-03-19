@@ -256,7 +256,9 @@ describe("ComputerLookup", () => {
       expect(screen.getByTestId("computer-result-WS001")).toBeInTheDocument();
     });
 
-    expect(screen.getByText("Disabled")).toBeInTheDocument();
+    // The computer result item should show "Disabled" badge
+    const resultItem = screen.getByTestId("computer-result-WS001");
+    expect(resultItem.textContent).toContain("Disabled");
   });
 
   it("renders accessibility status region", async () => {

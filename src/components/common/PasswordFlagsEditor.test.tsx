@@ -364,7 +364,7 @@ describe("PasswordFlagsEditor", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText("Failed to update password flags"),
+        screen.getByText("fail"),
       ).toBeInTheDocument();
     });
   });

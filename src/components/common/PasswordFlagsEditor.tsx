@@ -28,6 +28,8 @@ export function PasswordFlagsEditor({
   const [adCannotChangePassword, setAdCannotChangePassword] = useState(false);
   const [saving, setSaving] = useState(false);
   const [refreshCount, setRefreshCount] = useState(0);
+  const [cannotChangePasswordUnavailable, setCannotChangePasswordUnavailable] =
+    useState(false);
 
   // Fetch the DACL-based "Cannot Change Password" flag and reset state on user change
   useEffect(() => {
@@ -47,6 +49,7 @@ export function PasswordFlagsEditor({
         if (!cancelled) {
           setAdCannotChangePassword(false);
           setUserCannotChangePassword(false);
+          setCannotChangePasswordUnavailable(true);
         }
       });
 
@@ -143,13 +146,18 @@ export function PasswordFlagsEditor({
           type="checkbox"
           checked={userCannotChangePassword}
           onChange={(e) => setUserCannotChangePassword(e.target.checked)}
-          disabled={!canEdit}
+          disabled={!canEdit || cannotChangePasswordUnavailable}
           className="rounded border-[var(--color-border-default)]"
           data-testid="user-cannot-change-password-checkbox"
         />
         <span className="text-body text-[var(--color-text-primary)]">
           User Cannot Change Password
         </span>
+        {cannotChangePasswordUnavailable && (
+          <span className="text-caption text-[var(--color-text-secondary)]">
+            (insufficient permissions to read)
+          </span>
+        )}
       </label>
 
       <button

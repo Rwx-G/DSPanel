@@ -1636,6 +1636,22 @@ pub fn get_audit_entries(state: State<'_, AppState>) -> Vec<AuditEntry> {
     get_audit_entries_inner(&state)
 }
 
+/// Logs an audit event from the frontend (for operations not backed by a write command).
+#[tauri::command]
+pub fn audit_log(
+    action: String,
+    target_dn: String,
+    details: String,
+    success: bool,
+    state: State<'_, AppState>,
+) {
+    if success {
+        state.audit_service.log_success(&action, &target_dn, &details);
+    } else {
+        state.audit_service.log_failure(&action, &target_dn, &details);
+    }
+}
+
 /// Adds a user to a group.
 #[tauri::command]
 pub async fn add_user_to_group(

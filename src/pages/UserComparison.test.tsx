@@ -22,6 +22,18 @@ vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
 }));
 
+vi.mock("@/hooks/usePermissions", () => ({
+  usePermissions: () => ({
+    level: "AccountOperator" as const,
+    groups: [],
+    loading: false,
+    hasPermission: (required: string) => {
+      const levels = ["ReadOnly", "HelpDesk", "AccountOperator", "Admin", "DomainAdmin"];
+      return levels.indexOf("AccountOperator") >= levels.indexOf(required);
+    },
+  }),
+}));
+
 import { invoke } from "@tauri-apps/api/core";
 const mockInvoke = vi.mocked(invoke);
 

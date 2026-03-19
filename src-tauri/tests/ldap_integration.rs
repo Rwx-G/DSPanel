@@ -287,7 +287,7 @@ async fn read_consecutive_searches_stable() {
         let results = provider
             .search_users("test", 10)
             .await
-            .expect(&format!("search #{} failed", i));
+            .unwrap_or_else(|_| panic!("search #{} failed", i));
         assert!(!results.is_empty(), "Search #{} returned empty", i);
     }
     println!("5 consecutive searches completed successfully");

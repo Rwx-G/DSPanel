@@ -7,126 +7,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.4.0] - 2026-03-19
+## [0.4.0] - 2026-03-20
 
-Epic 4 - Group Management & Bulk Operations. Complete group management with
-browse, member management, bulk operations, and hygiene detection. Includes
-LDAP simple bind authentication for testing against standalone AD labs, LDAP
-paged results for large directories, comprehensive integration tests against
-a real AD domain controller populated with [BadBlood](https://github.com/davidprowe/BadBlood).
-Language-independent permission detection via SID RIDs and probe-based
-effective permission discovery using AD constructed attributes.
+Epic 4 - Group Management & Bulk Operations. Complete group lifecycle with
+browse, member management, bulk operations, and hygiene detection. Validated
+against a real AD (Windows Server 2022 + [BadBlood](https://github.com/davidprowe/BadBlood)).
 
 ### Added
 
-- New `Admin` permission level between AccountOperator and DomainAdmin for
-  managing non-built-in objects (delete/move users, groups, computers)
-- Probe-based permission detection using `allowedAttributesEffective` and
-  `allowedChildClassesEffective` on all OUs (~250ms for 223 OUs). Detects
-  delegated admin rights without requiring specific group membership
-- Language-independent permission detection via well-known SID RIDs (works
-  in any AD locale: French, German, Spanish, etc.)
-- LDAP WhoAmI extended operation to resolve authenticated identity (supports
-  GSSAPI with "Run as" and simple bind)
-- "Authenticated as" display in Home page Permissions card showing the LDAP
-  identity used for operations
-- Custom DSPanel permission groups: `DSPanel-HelpDesk`, `DSPanel-AccountOps`,
-  `DSPanel-Admin`, `DSPanel-DomainAdmin` for organization-specific role mapping
-- `tokenGroups` binary attribute fetching for SID-based group detection with
-  `sid_bytes_to_string` parser
-- Simple bind (username/password) LDAP authentication mode via environment
-  variables `DSPANEL_LDAP_SERVER`, `DSPANEL_LDAP_BIND_DN`,
-  `DSPANEL_LDAP_BIND_PASSWORD` for testing against non-domain-joined AD labs (4.5)
-- LDAP paged results control loop for fetching >1000 objects from AD without
-  `sizeLimitExceeded` errors (4.5)
-- Integration test suite (22 tests) against a real AD domain controller:
-  15 read tests, 4 write tests, 2 admin tests, 1 resilience test (4.5)
-- Health filter buttons (All/Healthy/Warning/Critical) with live counts in
-  User Lookup search bar
-- `evaluate_health_batch` Tauri command for single-IPC bulk health evaluation
-  of all users (replaces per-user sequential calls)
-- `preloadAll` option on `useBrowse` hook for eager loading of all pages at mount
-- Compact HealthBadge mode (icon-only for Healthy users in list view)
-- GroupBadge component with category icon (Shield/Mail), scope abbreviation
-  (G/DL/U), distinct color coding, and custom hover tooltip
-- Category filters (Security/Distribution) with counts in Group Management
-- Status (Enabled/Disabled) and OS (Windows/Other) filters with counts in
-  Computer Lookup
-- AD schema attribute discovery via `get_schema_attributes` command for
-  Advanced Attributes "Show empty" toggle
-- "Show empty" toggle in Advanced Attributes that merges schema attributes
-  with populated user attributes
-- `extractErrorMessage` utility for consistent error display across all
-  catch blocks
-- Story 5.5 (Modify User Attributes) created for Epic 5
-- Bulk operations redesigned with card-based operation picker (11 operations)
-- Export group members to CSV with inline button and standalone operation
-- Copy user memberships from one user to another with preview
-- Update managedBy attribute on multiple groups at once (AccountOperator)
-- Clone group with members to a new group in a specified OU (AccountOperator)
-- Merge members from multiple groups into a surviving target group (AccountOperator)
-- Import members from CSV file into a group with resolve and preview (HelpDesk)
-- Move groups to a different OU via LDAP moddn (DomainAdmin)
-- Bulk create groups from CSV template with name, description, scope, category, OU columns (AccountOperator)
-- `create_group`, `move_object`, `update_managed_by` trait methods on DirectoryProvider
-- `create_group`, `move_object`, `update_managed_by` Tauri commands with permission checks and audit logging
-- Group hygiene scan detecting empty groups and circular group nesting (4.4)
-- Single-member group detection - flags groups with exactly one member (4.4)
-- Stale group detection - flags groups not modified in over 180 days (4.4)
-- Duplicate group detection - flags groups sharing identical member sets (4.4)
-- Undescribed group detection - flags groups missing the description attribute (4.4)
-- Excessive nesting depth detection - flags groups nested deeper than 3 levels (4.4)
-- One-click navigation from hygiene findings to group browser (4.4)
-- Bulk delete of empty groups with dry-run preview and DomainAdmin gating (4.4)
-- `delete_object` trait method on DirectoryProvider for AD object deletion (4.4)
-- `detect_empty_groups`, `detect_circular_groups`, `delete_group` Tauri commands (4.4)
-- `detect_single_member_groups`, `detect_stale_groups`, `detect_undescribed_groups`, `detect_deep_nesting`, `detect_duplicate_groups` Tauri commands (4.4)
-- DFS-based circular nesting detection with three-color graph marking (4.4)
-- Hygiene tab in GroupManagement view (AccountOperator+ gated) (4.4)
-- Bulk operations panel for Delete/Add/Transfer members across groups (4.3)
-- Dry-run preview of planned changes before execution (4.3)
-- Progress indicator with step-by-step status during bulk execution (4.3)
-- Rollback on failure reversing completed operations in LIFO order (4.3)
-- Bulk operations view toggle in GroupManagement (AccountOperator+ gated) (4.3)
-- Group member management with multi-select, add/remove with dry-run preview dialog (4.2)
-- Permission-gated member management controls (AccountOperator+ required) (4.2)
-- User search for adding members to groups with duplicate detection (4.2)
-- MemberChangePreviewDialog component with change summary and loading state (4.2)
+#### Group Management (4.1-4.3)
+- Group browser with flat search and OU tree, preloaded at mount
+- Group member management with add/remove, dry-run preview, and audit logging
+- Bulk operations redesigned with 4 categories (Members, Groups, Properties, Export) and 10 operations:
+  Add/Remove/Transfer members, Copy user groups, Import CSV, Create/Clone/Merge/Move groups, Set ManagedBy, Export CSV
+- Dry-run preview, progress indicator, and rollback on failure for all bulk ops
+- Cross-module deep-link from User Lookup to Group Management
+
+#### Group Hygiene (4.4)
+- 7 hygiene detections: empty, circular nesting, single-member, stale (180d), undescribed, deep nesting (>3 levels), duplicate member sets
+- Bulk delete with re-check before deletion (race condition protection)
+- One-click navigation to problematic group
+- Hygiene scan audit event logging
+
+#### LDAP & Authentication (4.5-4.6)
+- Simple bind authentication via `DSPANEL_LDAP_SERVER`, `DSPANEL_LDAP_BIND_DN`, `DSPANEL_LDAP_BIND_PASSWORD`
+- LDAPS (TLS) support on port 636 via `ldaps://` URL scheme or `DSPANEL_LDAP_USE_TLS`
+- Self-signed cert support via `DSPANEL_LDAP_TLS_SKIP_VERIFY`
+- LDAP paged results for fetching >1000 objects
+- Connection keepalive (5-minute background ping)
+- 22 integration tests against real AD over LDAPS
+
+#### Permission System
+- 5 permission levels: ReadOnly, HelpDesk, AccountOperator, Admin, DomainAdmin
+- Language-independent detection via well-known SID RIDs (works in any AD locale)
+- Probe-based detection via `allowedAttributesEffective` on all OUs for delegated permissions
+- LDAP WhoAmI for authenticated identity (supports "Run as" and simple bind)
+- Custom groups: `DSPanel-HelpDesk`, `DSPanel-AccountOps`, `DSPanel-Admin`, `DSPanel-DomainAdmin`
+
+#### UI/UX Improvements
+- Health filter buttons (Healthy/Warning/Critical) with live counts
+- GroupBadge with category icon (Shield/Mail) + scope (G/DL/U) + tooltip
+- Category/Status/OS filters for Group Management and Computer Lookup
+- Advanced Attributes "Show empty" toggle with AD schema discovery
+- Visible-but-disabled actions with permission tooltips (replaces hidden)
+- "Authenticated as" display in Home page
+- Windows FILETIME and AD generalized time date formatting
+- Consistent error display via `extractErrorMessage`
 
 ### Changed
 
-- All write actions (Reset Password, Unlock, Enable, Disable, Add/Remove
-  members, Delete, Save password flags) are now visible but disabled when
-  the user lacks the required permission level, with tooltip explaining the
-  requirement. Previously they were hidden entirely.
-- User Lookup preloads all users at page mount instead of paginating on scroll,
-  enabling immediate health status computation for all accounts
-- Group Management and Computer Lookup also preload all items at mount
-- LDAP connection retry logic only reconnects on connection-level errors
-  (timeout, reset, broken pipe), not on business logic errors (missing
-  attributes, permission denied)
-- `get_user_by_identity` now fetches all attributes (wildcard `*`) instead of
-  a fixed list, enabling Advanced Attributes display in user detail
-- GroupDetail badges replaced with styled category (Shield/Mail) and scope
-  (G/DL/U) badges matching the list view
+- Preload all users/groups/computers at mount (replaces paginated scroll)
+- Bulk health evaluation in single IPC call (replaces per-user sequential)
+- Audit log operator set from WhoAmI identity (not Windows USERNAME)
+- LDAP retry only on connection errors, not business logic errors
 
 ### Fixed
 
-- LDAP paged results controls leaking into shared connection pool, causing
-  all subsequent searches to fail after the first browse operation
-- `get_schema_attributes` race condition corrupting shared `base_dn` state,
-  causing groups and computers to search in the schema context instead of
-  the domain
-- Windows FILETIME dates (`accountExpires`, `pwdLastSet`, `lastLogon`)
-  displayed as raw tick values instead of human-readable dates
-- AD generalized time format (`whenCreated`, `whenChanged`) not parsed for
-  display
-- `sizeLimitExceeded` (rc=4) treated as fatal error instead of accepting
-  partial results
-- Raw JSON error objects displayed in toaster notifications instead of
-  user-friendly messages
-- Health badge tooltip icon alignment (not vertically centered)
-- Healthy badge tooltip missing checkmark icon
+- LDAP paged results controls leaking into shared connection pool
+- `get_schema_attributes` race condition corrupting shared `base_dn`
+- Password flags "User Cannot Change Password" not re-saveable after toggle
+- `nTSecurityDescriptor` read failure shows info message for ReadOnly users
+- `sizeLimitExceeded` (rc=4) treated as fatal instead of partial success
+- Raw JSON error objects in toaster notifications
+- Health badge tooltip icon alignment and missing Healthy checkmark
 
 ## [0.3.0] - 2026-03-15
 

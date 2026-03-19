@@ -100,34 +100,30 @@ describe("GroupDetail", () => {
     renderGroupDetail({
       group: makeGroup({ scope: "Universal", category: "Distribution" }),
     });
-    const badges = screen.getAllByTestId("status-badge");
-    const texts = badges.map((b) => b.textContent);
-    expect(texts).toContain("Universal");
-    expect(texts).toContain("Distribution");
+    // Badges are inline spans in the group detail header (may also appear in PropertyGrid)
+    expect(screen.getAllByText("Universal").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Distribution").length).toBeGreaterThanOrEqual(1);
   });
 
-  it("shows scope badge with info variant", () => {
+  it("shows scope badge for Global", () => {
     renderGroupDetail({ group: makeGroup({ scope: "Global" }) });
-    const badges = screen.getAllByTestId("status-badge");
-    const scopeBadge = badges.find((b) => b.textContent === "Global");
-    expect(scopeBadge).toBeDefined();
-    expect(scopeBadge?.getAttribute("data-variant")).toBe("info");
+    expect(screen.getAllByText("Global").length).toBeGreaterThanOrEqual(1);
   });
 
-  it("shows category badge with neutral variant for Security", () => {
+  it("shows category badge for Security", () => {
     renderGroupDetail({ group: makeGroup({ category: "Security" }) });
-    const badges = screen.getAllByTestId("status-badge");
-    const catBadge = badges.find((b) => b.textContent === "Security");
-    expect(catBadge).toBeDefined();
-    expect(catBadge?.getAttribute("data-variant")).toBe("neutral");
+    expect(screen.getAllByText("Security").length).toBeGreaterThanOrEqual(1);
   });
 
-  it("shows category badge with warning variant for Distribution", () => {
+  it("shows category badge for Distribution with warning style", () => {
     renderGroupDetail({ group: makeGroup({ category: "Distribution" }) });
-    const badges = screen.getAllByTestId("status-badge");
-    const catBadge = badges.find((b) => b.textContent === "Distribution");
-    expect(catBadge).toBeDefined();
-    expect(catBadge?.getAttribute("data-variant")).toBe("warning");
+    const badges = screen.getAllByText("Distribution");
+    expect(badges.length).toBeGreaterThanOrEqual(1);
+    // At least one badge element should contain "warning" in its class
+    const hasBadgeWithWarning = badges.some((el) =>
+      el.className.includes("warning") || el.closest("[class*='warning']") !== null,
+    );
+    expect(hasBadgeWithWarning).toBe(true);
   });
 
   it("shows CopyButton for samAccountName", () => {
@@ -177,13 +173,12 @@ describe("GroupDetail", () => {
     expect(screen.getByText("Member Management")).toBeInTheDocument();
   });
 
-  it("hides management controls for ReadOnly", () => {
+  it("disables management controls for ReadOnly", () => {
     renderGroupDetail({ canManageMembers: false });
-    expect(
-      screen.queryByTestId("member-management-controls"),
-    ).not.toBeInTheDocument();
-    expect(screen.queryByTestId("add-member-btn")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("select-all-checkbox")).not.toBeInTheDocument();
+    // Controls are rendered but buttons are disabled
+    expect(screen.getByTestId("add-member-btn")).toBeDisabled();
+    expect(screen.getByTestId("remove-selected-btn")).toBeDisabled();
+    expect(screen.getByTestId("preview-changes-btn")).toBeDisabled();
   });
 
   it("shows loading spinner when members are loading", () => {

@@ -110,6 +110,25 @@ pub fn run() {
                     tracing::info!(operator = %name, "Audit operator set to authenticated identity");
                 }
             });
+            // Start LDAP keepalive background task (ping every 5 minutes)
+            let keepalive_provider = state.directory_provider.clone();
+            tauri::async_runtime::spawn(async move {
+                let interval = std::time::Duration::from_secs(300); // 5 minutes
+                loop {
+                    tokio::time::sleep(interval).await;
+                    if keepalive_provider.is_connected() {
+                        match keepalive_provider.test_connection().await {
+                            Ok(true) => {
+                                tracing::debug!("LDAP keepalive: connection alive");
+                            }
+                            _ => {
+                                tracing::debug!("LDAP keepalive: connection lost, will reconnect on next operation");
+                            }
+                        }
+                    }
+                }
+            });
+
             tracing::info!("DSPanel setup complete");
             Ok(())
         })
@@ -141,6 +160,7 @@ pub fn run() {
             commands::get_cannot_change_password,
             commands::set_password_flags,
             commands::get_audit_entries,
+            commands::audit_log,
             commands::generate_password,
             commands::check_password_hibp,
             commands::mfa_setup,

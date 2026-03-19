@@ -72,6 +72,7 @@ function mockPermissions(level: string) {
     if (cmd === "detect_deep_nesting") return Promise.resolve([]);
     if (cmd === "detect_duplicate_groups") return Promise.resolve([]);
     if (cmd === "delete_group") return Promise.resolve(null);
+    if (cmd === "get_group_members") return Promise.resolve([]);
     return Promise.resolve(null);
   }) as typeof invoke);
 }
@@ -113,6 +114,7 @@ function mockScanResults(opts: ScanResultsOptions) {
     if (cmd === "detect_duplicate_groups")
       return Promise.resolve(duplicateGroups);
     if (cmd === "delete_group") return Promise.resolve(null);
+    if (cmd === "get_group_members") return Promise.resolve([]);
     return Promise.resolve(null);
   }) as typeof invoke);
 }
@@ -337,7 +339,7 @@ describe("GroupHygiene", () => {
     // Navigation context is tested via integration
   });
 
-  it("permission gating: delete hidden for non-DomainAdmin", async () => {
+  it("permission gating: delete disabled for non-Admin", async () => {
     const emptyGroups = [makeEmptyGroupEntry("Sales-EMEA")];
     mockScanResultsLegacy(emptyGroups, [], "AccountOperator");
 
@@ -348,10 +350,8 @@ describe("GroupHygiene", () => {
       expect(screen.getByTestId("empty-groups-section")).toBeInTheDocument();
     });
 
-    expect(
-      screen.queryByTestId("empty-group-checkbox-Sales-EMEA"),
-    ).not.toBeInTheDocument();
-    expect(screen.queryByTestId("delete-selected-btn")).not.toBeInTheDocument();
+    // Delete button is rendered but disabled for non-Admin users
+    expect(screen.getByTestId("delete-selected-btn")).toBeDisabled();
   });
 
   it("empty group count badge shows correct number", async () => {
