@@ -146,6 +146,8 @@ pub struct LdapDirectoryProvider {
     connected: Mutex<bool>,
     /// Pooled LDAP connection. Reused across operations; recreated on failure.
     pool: tokio::sync::Mutex<Option<ldap3::Ldap>>,
+    /// Authenticated user identity resolved via WhoAmI.
+    authenticated_user: Mutex<Option<String>>,
 }
 
 impl Default for LdapDirectoryProvider {
@@ -175,6 +177,7 @@ impl LdapDirectoryProvider {
             base_dn: Mutex::new(None),
             connected: Mutex::new(false),
             pool: tokio::sync::Mutex::new(None),
+            authenticated_user: Mutex::new(None),
         }
     }
 
@@ -197,12 +200,18 @@ impl LdapDirectoryProvider {
             base_dn: Mutex::new(None),
             connected: Mutex::new(false),
             pool: tokio::sync::Mutex::new(None),
+            authenticated_user: Mutex::new(None),
         }
     }
 
     /// Returns the configured authentication mode.
     pub fn auth_mode(&self) -> &LdapAuthMode {
         &self.auth_mode
+    }
+
+    /// Returns the authenticated user identity resolved via WhoAmI.
+    pub fn resolved_user(&self) -> Option<String> {
+        self.authenticated_user.lock().unwrap().clone()
     }
 
     /// Returns a pooled LDAP connection, creating one if needed.
@@ -506,6 +515,43 @@ impl LdapDirectoryProvider {
             .await
         }
     }
+}
+
+/// Converts a binary SID to its string representation (e.g., "S-1-5-21-...-512").
+///
+/// SID binary format:
+/// - Byte 0: revision (always 1)
+/// - Byte 1: sub-authority count
+/// - Bytes 2-7: identifier authority (big-endian 48-bit)
+/// - Bytes 8+: sub-authorities (4 bytes each, little-endian)
+fn sid_bytes_to_string(bytes: &[u8]) -> String {
+    if bytes.len() < 8 {
+        return String::new();
+    }
+    let revision = bytes[0];
+    let sub_authority_count = bytes[1] as usize;
+    let authority = u64::from(bytes[2]) << 40
+        | u64::from(bytes[3]) << 32
+        | u64::from(bytes[4]) << 24
+        | u64::from(bytes[5]) << 16
+        | u64::from(bytes[6]) << 8
+        | u64::from(bytes[7]);
+
+    let mut sid = format!("S-{}-{}", revision, authority);
+    for i in 0..sub_authority_count {
+        let offset = 8 + i * 4;
+        if offset + 4 > bytes.len() {
+            break;
+        }
+        let sub = u32::from_le_bytes([
+            bytes[offset],
+            bytes[offset + 1],
+            bytes[offset + 2],
+            bytes[offset + 3],
+        ]);
+        sid.push_str(&format!("-{}", sub));
+    }
+    sid
 }
 
 /// Creates a fresh LDAP connection without using the pool.
@@ -990,11 +1036,102 @@ impl DirectoryProvider for LdapDirectoryProvider {
     }
 
     async fn get_current_user_groups(&self) -> Result<Vec<String>> {
-        let username =
-            std::env::var("USERNAME").context("USERNAME environment variable not set")?;
+        // Use LDAP "Who Am I" extended operation to determine the authenticated
+        // identity. This works correctly for both GSSAPI (including runas) and
+        // simple bind. The response is "u:DOMAIN\user" or "dn:CN=...",
+        // from which we extract the sAMAccountName.
+        let username: String = self
+            .with_connection(|mut ldap| async move {
+                let (exop, _) = ldap
+                    .extended(ldap3::exop::WhoAmI)
+                    .await
+                    .context("WhoAmI extended operation failed")?
+                    .success()
+                    .context("WhoAmI returned error")?;
+
+                let authzid = exop
+                    .val
+                    .and_then(|v| String::from_utf8(v).ok())
+                    .unwrap_or_default();
+
+                // Parse authzid: "u:DOMAIN\user" or "dn:CN=User,CN=Users,..."
+                let name: String = if let Some(domain_user) = authzid.strip_prefix("u:") {
+                    // "u:DSPANEL\TestAdmin" -> "TestAdmin"
+                    domain_user
+                        .split('\\')
+                        .next_back()
+                        .unwrap_or(domain_user)
+                        .to_string()
+                } else if let Some(dn) = authzid.strip_prefix("dn:") {
+                    // "dn:CN=TestAdmin,CN=Users,..." -> "TestAdmin"
+                    dn.split(',')
+                        .next()
+                        .and_then(|rdn: &str| rdn.strip_prefix("CN="))
+                        .unwrap_or("")
+                        .to_string()
+                } else {
+                    authzid
+                };
+
+                Ok(name)
+            })
+            .await?;
+
+        if username.is_empty() {
+            tracing::warn!("Could not determine authenticated user identity");
+            return Ok(Vec::new());
+        }
+
+        tracing::info!(username = %username, "Authenticated identity resolved");
+        // Store the resolved identity for later retrieval
+        *self.authenticated_user.lock().unwrap() = Some(username.clone());
         let user = self.get_user_by_identity(&username).await?;
         match user {
-            Some(entry) => Ok(entry.get_attribute_values("memberOf").to_vec()),
+            Some(entry) => {
+                let mut results = entry.get_attribute_values("memberOf").to_vec();
+
+                // Also fetch tokenGroups (operational attribute, not returned by *)
+                // to get SID strings for language-independent permission detection.
+                let dn = entry.distinguished_name.clone();
+                let sids = self
+                    .with_connection(|mut ldap| {
+                        let dn = dn.clone();
+                        async move {
+                            let (rs, _) = ldap
+                                .search(
+                                    &dn,
+                                    Scope::Base,
+                                    "(objectClass=*)",
+                                    vec!["tokenGroups"],
+                                )
+                                .await
+                                .context("Failed to query tokenGroups")?
+                                .success()
+                                .context("tokenGroups query returned error")?;
+
+                            let mut sids = Vec::new();
+                            if let Some(entry) = rs.into_iter().next() {
+                                let se = SearchEntry::construct(entry);
+                                if let Some(token_groups) = se.bin_attrs.get("tokenGroups") {
+                                    for sid_bytes in token_groups {
+                                        sids.push(sid_bytes_to_string(sid_bytes));
+                                    }
+                                }
+                            }
+                            Ok(sids)
+                        }
+                    })
+                    .await
+                    .unwrap_or_default();
+
+                tracing::info!(
+                    sid_count = sids.len(),
+                    group_count = results.len(),
+                    "User groups and SIDs retrieved"
+                );
+                results.extend(sids);
+                Ok(results)
+            }
             None => {
                 tracing::warn!("Current user {} not found in directory", username);
                 Ok(Vec::new())
@@ -1287,6 +1424,10 @@ impl DirectoryProvider for LdapDirectoryProvider {
             }
         })
         .await
+    }
+
+    fn authenticated_user(&self) -> Option<String> {
+        self.resolved_user()
     }
 
     async fn get_schema_attributes(&self) -> Result<Vec<String>> {

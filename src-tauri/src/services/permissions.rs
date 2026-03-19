@@ -30,25 +30,58 @@ impl std::fmt::Display for PermissionLevel {
     }
 }
 
+/// Well-known RIDs (Relative IDs) for AD built-in groups.
+/// These are language-independent and work in any AD locale.
+const RID_DOMAIN_ADMINS: u32 = 512;
+const RID_ENTERPRISE_ADMINS: u32 = 519;
+const RID_ACCOUNT_OPERATORS: u32 = 548;
+const RID_ADMINISTRATORS: u32 = 544;
+
 /// Configuration for permission group-to-level mappings.
+///
+/// Includes both well-known SID RID mappings (language-independent) and
+/// custom group name mappings for organization-specific groups.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PermissionConfig {
+    /// Custom group name to permission level mappings.
     pub group_mappings: HashMap<String, PermissionLevel>,
+    /// SID suffix (RID) to permission level mappings.
+    #[serde(default = "default_rid_mappings")]
+    pub rid_mappings: HashMap<u32, PermissionLevel>,
+}
+
+fn default_rid_mappings() -> HashMap<u32, PermissionLevel> {
+    let mut m = HashMap::new();
+    m.insert(RID_DOMAIN_ADMINS, PermissionLevel::DomainAdmin);
+    m.insert(RID_ENTERPRISE_ADMINS, PermissionLevel::DomainAdmin);
+    m.insert(RID_ADMINISTRATORS, PermissionLevel::DomainAdmin);
+    m.insert(RID_ACCOUNT_OPERATORS, PermissionLevel::AccountOperator);
+    m
 }
 
 impl Default for PermissionConfig {
     fn default() -> Self {
-        let mut mappings = HashMap::new();
-        mappings.insert("DSPanel-HelpDesk".to_string(), PermissionLevel::HelpDesk);
-        mappings.insert(
+        let mut group_mappings = HashMap::new();
+        // Custom DSPanel-specific groups (organization can create these)
+        group_mappings.insert("DSPanel-HelpDesk".to_string(), PermissionLevel::HelpDesk);
+        group_mappings.insert(
             "DSPanel-AccountOps".to_string(),
             PermissionLevel::AccountOperator,
         );
-        mappings.insert("Domain Admins".to_string(), PermissionLevel::DomainAdmin);
+        group_mappings.insert(
+            "DSPanel-Admin".to_string(),
+            PermissionLevel::DomainAdmin,
+        );
         Self {
-            group_mappings: mappings,
+            group_mappings,
+            rid_mappings: default_rid_mappings(),
         }
     }
+}
+
+/// Extracts the RID (last sub-authority) from a SID string like "S-1-5-21-...-512".
+fn extract_rid(sid: &str) -> Option<u32> {
+    sid.rsplit('-').next()?.parse().ok()
 }
 
 /// Service for detecting and checking user permissions based on AD group memberships.
@@ -58,7 +91,9 @@ impl Default for PermissionConfig {
 pub struct PermissionService {
     current_level: Mutex<PermissionLevel>,
     user_groups: Mutex<Vec<String>>,
+    authenticated_user: Mutex<Option<String>>,
     group_mappings: HashMap<String, PermissionLevel>,
+    rid_mappings: HashMap<u32, PermissionLevel>,
 }
 
 impl PermissionService {
@@ -67,7 +102,9 @@ impl PermissionService {
         Self {
             current_level: Mutex::new(PermissionLevel::ReadOnly),
             user_groups: Mutex::new(Vec::new()),
+            authenticated_user: Mutex::new(None),
             group_mappings: config.group_mappings,
+            rid_mappings: config.rid_mappings,
         }
     }
 
@@ -86,32 +123,67 @@ impl PermissionService {
         self.user_groups.lock().unwrap().clone()
     }
 
+    /// Returns the authenticated user identity (resolved via WhoAmI or bind DN).
+    pub fn authenticated_user(&self) -> Option<String> {
+        self.authenticated_user.lock().unwrap().clone()
+    }
+
+    /// Sets the authenticated user identity.
+    pub fn set_authenticated_user(&self, username: String) {
+        *self.authenticated_user.lock().unwrap() = Some(username);
+    }
+
     /// Detects the user's permission level by querying AD group memberships.
     ///
     /// The service queries the `DirectoryProvider` for the current user's groups,
     /// maps them to permission levels, and selects the highest level.
     /// Defaults to `ReadOnly` when no matching groups are found.
     pub async fn detect_permissions(&self, provider: &dyn DirectoryProvider) -> Result<()> {
-        let group_dns = provider.get_current_user_groups().await?;
+        let group_strings = provider.get_current_user_groups().await?;
 
-        // Extract the CN from each group DN for matching.
-        // Group DNs are like "CN=Domain Admins,CN=Users,DC=example,DC=com"
-        let group_names: Vec<String> = group_dns.iter().filter_map(|dn| extract_cn(dn)).collect();
+        // Separate group DNs from SID strings.
+        // get_current_user_groups returns both: DNs from memberOf and
+        // SID strings (S-1-5-...) from tokenGroups.
+        let mut group_names = Vec::new();
+        let mut sids = Vec::new();
+
+        for entry in &group_strings {
+            if entry.starts_with("S-1-") {
+                sids.push(entry.clone());
+            } else if let Some(cn) = extract_cn(entry) {
+                group_names.push(cn);
+            }
+        }
 
         let mut detected_level = PermissionLevel::ReadOnly;
 
+        // 1. Match by well-known RID (language-independent)
+        for sid in &sids {
+            if let Some(rid) = extract_rid(sid) {
+                if let Some(&level) = self.rid_mappings.get(&rid) {
+                    if level > detected_level {
+                        tracing::info!(sid = %sid, rid, level = %level, "RID match");
+                        detected_level = level;
+                    }
+                }
+            }
+        }
+
+        // 2. Match by custom group name (organization-specific)
         for group_name in &group_names {
             if let Some(&level) = self.group_mappings.get(group_name) {
                 if level > detected_level {
+                    tracing::info!(group = %group_name, level = %level, "Group name match");
                     detected_level = level;
                 }
             }
         }
 
         tracing::info!(
-            "Permission level detected: {} (from {} groups)",
+            "Permission level detected: {} (from {} groups, {} SIDs)",
             detected_level,
-            group_names.len()
+            group_names.len(),
+            sids.len()
         );
 
         *self.current_level.lock().unwrap() = detected_level;
@@ -148,6 +220,7 @@ mod tests {
     fn custom_service(mappings: HashMap<String, PermissionLevel>) -> PermissionService {
         PermissionService::new(PermissionConfig {
             group_mappings: mappings,
+            rid_mappings: default_rid_mappings(),
         })
     }
 
@@ -202,7 +275,7 @@ mod tests {
     // --- PermissionConfig tests ---
 
     #[test]
-    fn test_default_config_has_three_mappings() {
+    fn test_default_config_has_three_group_mappings() {
         let config = PermissionConfig::default();
         assert_eq!(config.group_mappings.len(), 3);
         assert_eq!(
@@ -214,8 +287,21 @@ mod tests {
             Some(&PermissionLevel::AccountOperator)
         );
         assert_eq!(
-            config.group_mappings.get("Domain Admins"),
+            config.group_mappings.get("DSPanel-Admin"),
             Some(&PermissionLevel::DomainAdmin)
+        );
+    }
+
+    #[test]
+    fn test_default_config_has_rid_mappings() {
+        let config = PermissionConfig::default();
+        assert_eq!(
+            config.rid_mappings.get(&RID_DOMAIN_ADMINS),
+            Some(&PermissionLevel::DomainAdmin)
+        );
+        assert_eq!(
+            config.rid_mappings.get(&RID_ACCOUNT_OPERATORS),
+            Some(&PermissionLevel::AccountOperator)
         );
     }
 
@@ -292,9 +378,20 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_detect_domain_admin_from_group() {
+    async fn test_detect_domain_admin_from_sid() {
+        // RID 512 = Domain Admins (language-independent)
+        let mut groups = make_group_dns(&["SomeLocalizedGroup"]);
+        groups.push("S-1-5-21-1234567890-1234567890-1234567890-512".to_string());
+        let provider = MockDirectoryProvider::new().with_user_groups(groups);
+        let service = default_service();
+        service.detect_permissions(&provider).await.unwrap();
+        assert_eq!(service.current_level(), PermissionLevel::DomainAdmin);
+    }
+
+    #[tokio::test]
+    async fn test_detect_domain_admin_from_custom_group_name() {
         let provider =
-            MockDirectoryProvider::new().with_user_groups(make_group_dns(&["Domain Admins"]));
+            MockDirectoryProvider::new().with_user_groups(make_group_dns(&["DSPanel-Admin"]));
         let service = default_service();
         service.detect_permissions(&provider).await.unwrap();
         assert_eq!(service.current_level(), PermissionLevel::DomainAdmin);
@@ -302,11 +399,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_highest_level_wins() {
-        let provider = MockDirectoryProvider::new().with_user_groups(make_group_dns(&[
-            "DSPanel-HelpDesk",
-            "DSPanel-AccountOps",
-            "Domain Admins",
-        ]));
+        let mut groups = make_group_dns(&["DSPanel-HelpDesk", "DSPanel-AccountOps"]);
+        // Add Domain Admins SID
+        groups.push("S-1-5-21-1234567890-1234567890-1234567890-512".to_string());
+        let provider = MockDirectoryProvider::new().with_user_groups(groups);
         let service = default_service();
         service.detect_permissions(&provider).await.unwrap();
         assert_eq!(service.current_level(), PermissionLevel::DomainAdmin);
@@ -314,8 +410,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_inheritance_domain_admin_has_helpdesk_permission() {
-        let provider =
-            MockDirectoryProvider::new().with_user_groups(make_group_dns(&["Domain Admins"]));
+        let provider = MockDirectoryProvider::new().with_user_groups(vec![
+            "S-1-5-21-1234567890-1234567890-1234567890-512".to_string(),
+        ]);
         let service = default_service();
         service.detect_permissions(&provider).await.unwrap();
         assert!(service.has_permission(PermissionLevel::HelpDesk));

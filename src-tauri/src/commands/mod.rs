@@ -1522,6 +1522,17 @@ pub fn get_current_username() -> String {
     })
 }
 
+/// Returns the authenticated LDAP identity (resolved via WhoAmI or bind DN).
+///
+/// This may differ from `get_current_username` when using "Run as" or simple bind.
+#[tauri::command]
+pub fn get_authenticated_identity(state: State<'_, AppState>) -> String {
+    state
+        .permission_service
+        .authenticated_user()
+        .unwrap_or_else(get_current_username)
+}
+
 /// Returns the computer name from the environment.
 #[tauri::command]
 pub fn get_computer_name() -> String {

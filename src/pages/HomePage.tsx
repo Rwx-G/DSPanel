@@ -115,6 +115,10 @@ export function HomePage({ status }: HomePageProps) {
             iconColor={perm.color}
           >
             <StatusRow
+              label="Authenticated as"
+              value={status.authenticatedUser || status.username || "..."}
+            />
+            <StatusRow
               label="Level"
               value={perm.label}
               valueColor={perm.color}

@@ -411,6 +411,10 @@ where
         .await
         .map_err(|e| anyhow::anyhow!(e))
     }
+
+    fn authenticated_user(&self) -> Option<String> {
+        self.inner.authenticated_user()
+    }
 }
 
 #[cfg(test)]

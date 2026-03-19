@@ -149,6 +149,9 @@ pub trait DirectoryProvider: Send + Sync {
     /// Updates the managedBy attribute of a group.
     async fn update_managed_by(&self, group_dn: &str, manager_dn: &str) -> Result<()>;
 
+    /// Returns the authenticated user identity resolved via WhoAmI, if available.
+    fn authenticated_user(&self) -> Option<String>;
+
     /// Returns all user-applicable attribute names from the AD schema.
     ///
     /// Queries the schema naming context for attributeSchema objects that
@@ -540,6 +543,10 @@ pub mod tests {
                 "sAMAccountName".to_string(),
                 "telephoneNumber".to_string(),
             ])
+        }
+
+        fn authenticated_user(&self) -> Option<String> {
+            None
         }
     }
 

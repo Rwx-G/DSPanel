@@ -90,6 +90,10 @@ pub fn run() {
                 if let Err(e) = permission_svc.detect_permissions(&*provider).await {
                     tracing::warn!("Permission detection failed: {}", e);
                 }
+                // Store the authenticated identity resolved during permission detection
+                if let Some(name) = provider.authenticated_user() {
+                    permission_svc.set_authenticated_user(name);
+                }
             });
             tracing::info!("DSPanel setup complete");
             Ok(())
@@ -113,6 +117,7 @@ pub fn run() {
             commands::evaluate_health_cmd,
             commands::evaluate_health_batch,
             commands::get_current_username,
+            commands::get_authenticated_identity,
             commands::get_computer_name,
             commands::reset_password,
             commands::unlock_account,
