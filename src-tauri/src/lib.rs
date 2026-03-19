@@ -110,6 +110,7 @@ pub fn run() {
             commands::ping_host,
             commands::resolve_dns,
             commands::evaluate_health_cmd,
+            commands::evaluate_health_batch,
             commands::get_current_username,
             commands::get_computer_name,
             commands::reset_password,

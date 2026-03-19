@@ -19,9 +19,11 @@ const LEVEL_ICON: Record<HealthLevel, typeof Info> = {
 
 interface HealthBadgeProps {
   healthStatus: AccountHealthStatus;
+  /** When true, shows only the icon without text. */
+  compact?: boolean;
 }
 
-export function HealthBadge({ healthStatus }: HealthBadgeProps) {
+export function HealthBadge({ healthStatus, compact = false }: HealthBadgeProps) {
   const [showTooltip, setShowTooltip] = useState(false);
   const tooltipId = useId();
   const badgeRef = useRef<HTMLDivElement>(null);
@@ -80,12 +82,13 @@ export function HealthBadge({ healthStatus }: HealthBadgeProps) {
       data-level={healthStatus.level}
     >
       <span
-        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${LEVEL_STYLES[healthStatus.level]}`}
+        className={`inline-flex items-center gap-1 rounded-full ${compact ? "p-1" : "px-2 py-0.5"} text-[11px] font-medium ${LEVEL_STYLES[healthStatus.level]}`}
       >
         <Icon size={12} />
-        {flagCount === 0
-          ? "Healthy"
-          : `${flagCount} issue${flagCount > 1 ? "s" : ""}`}
+        {!compact &&
+          (flagCount === 0
+            ? "Healthy"
+            : `${flagCount} issue${flagCount > 1 ? "s" : ""}`)}
       </span>
 
       {showTooltip &&

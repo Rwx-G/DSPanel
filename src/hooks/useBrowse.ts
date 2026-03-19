@@ -15,6 +15,8 @@ export interface UseBrowseOptions<T> {
   searchCommand: string;
   mapEntry: (entry: DirectoryEntry) => T;
   clientFilter: (item: T, lower: string) => boolean;
+  /** When true, automatically loads all pages on mount instead of waiting for scroll. */
+  preloadAll?: boolean;
 }
 
 export interface UseBrowseReturn<T> {
@@ -41,6 +43,7 @@ export function useBrowse<T>({
   searchCommand,
   mapEntry,
   clientFilter,
+  preloadAll = false,
 }: UseBrowseOptions<T>): UseBrowseReturn<T> {
   const [allBrowseItems, setAllBrowseItems] = useState<T[]>([]);
   const [displayedItems, setDisplayedItems] = useState<T[]>([]);
@@ -98,13 +101,51 @@ export function useBrowse<T>({
     [browseCommand],
   );
 
-  // Load first page on mount
+  // Load first page on mount, then preload remaining pages if requested
   useEffect(() => {
     if (!mountedRef.current) {
       mountedRef.current = true;
-      loadBrowsePage(0, false);
+
+      if (preloadAll) {
+        // Load all pages sequentially
+        const loadAll = async () => {
+          setLoading(true);
+          setError(null);
+          try {
+            let page = 0;
+            let allItems: T[] = [];
+            let more = true;
+
+            while (more) {
+              const result = await invoke<BrowseResult>(browseCommand, {
+                page,
+                pageSize: PAGE_SIZE,
+              });
+              const mapped = result.entries.map((e) => mapEntryRef.current(e));
+              allItems = [...allItems, ...mapped];
+              setAllBrowseItems(allItems);
+              setDisplayedItems(allItems);
+              setTotalCount(result.totalCount);
+              more = result.hasMore;
+              page++;
+            }
+
+            setHasMore(false);
+            setBrowsePageLoaded(page - 1);
+          } catch (err) {
+            setError(
+              err instanceof Error ? err.message : "Failed to load items",
+            );
+          } finally {
+            setLoading(false);
+          }
+        };
+        loadAll();
+      } else {
+        loadBrowsePage(0, false);
+      }
     }
-  }, [loadBrowsePage]);
+  }, [loadBrowsePage, preloadAll, browseCommand]);
 
   const setFilterText = useCallback(
     async (text: string) => {

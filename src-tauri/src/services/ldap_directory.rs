@@ -3,7 +3,7 @@ use std::sync::Mutex;
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
-use ldap3::adapters::{Adapter, PagedResults};
+use ldap3::controls::{self, RawControl};
 use ldap3::{LdapConnAsync, LdapConnSettings, Mod, Scope, SearchEntry};
 
 use crate::models::{DirectoryEntry, OUNode};
@@ -407,25 +407,53 @@ impl LdapDirectoryProvider {
             let attrs = attrs.clone();
             async move {
                 let page_size = std::cmp::min(max_results, 500) as i32;
-                let adapters: Vec<Box<dyn Adapter<_, _>>> =
-                    vec![Box::new(PagedResults::new(page_size))];
-                let mut stream = ldap
-                    .streaming_search_with(adapters, &base, Scope::Subtree, &filter, attrs)
-                    .await
-                    .context("LDAP paged search failed")?;
+                let mut all_entries = Vec::new();
+                let mut cookie: Vec<u8> = Vec::new();
 
-                let mut entries = Vec::new();
-                while let Some(entry) = stream.next().await.context("LDAP page fetch failed")? {
-                    entries.push(search_entry_to_directory_entry(
-                        SearchEntry::construct(entry),
-                    ));
-                    if entries.len() >= max_results {
+                loop {
+                    let pr_control: RawControl = controls::PagedResults {
+                        size: page_size,
+                        cookie: cookie.clone(),
+                    }
+                    .into();
+                    ldap.with_controls(vec![pr_control]);
+
+                    let (rs, result) = ldap
+                        .search(&base, Scope::Subtree, &filter, attrs.clone())
+                        .await
+                        .context("LDAP paged search failed")?
+                        .success()
+                        .context("LDAP paged search returned error")?;
+
+                    for entry in rs {
+                        all_entries.push(search_entry_to_directory_entry(
+                            SearchEntry::construct(entry),
+                        ));
+                    }
+
+                    if all_entries.len() >= max_results {
+                        all_entries.truncate(max_results);
+                        break;
+                    }
+
+                    cookie = Vec::new();
+                    for ctrl in &result.ctrls {
+                        if let controls::Control(
+                            Some(controls::ControlType::PagedResults),
+                            ref raw,
+                        ) = *ctrl
+                        {
+                            let pr: controls::PagedResults = raw.parse();
+                            cookie = pr.cookie;
+                        }
+                    }
+
+                    if cookie.is_empty() {
                         break;
                     }
                 }
 
-                let _result = stream.finish().await;
-                Ok(entries)
+                Ok(all_entries)
             }
         })
         .await

@@ -35,6 +35,37 @@ export interface DirectoryUser {
 /** Default empty rawAttributes for test helpers that build DirectoryUser manually. */
 export const EMPTY_RAW_ATTRIBUTES: Record<string, string[]> = {};
 
+/**
+ * Converts a Windows FILETIME (100ns ticks since 1601-01-01) to a readable date string.
+ * Returns "Never" for special values (0, max int64) or null/empty input.
+ */
+function formatFiletime(value: string | null): string | null {
+  if (!value || value === "0") return null;
+  // 0x7FFFFFFFFFFFFFFF = "never expires" sentinel
+  if (value === "9223372036854775807") return "Never";
+  const ticks = BigInt(value);
+  // FILETIME epoch offset: ticks between 1601-01-01 and 1970-01-01
+  const epochOffset = BigInt("116444736000000000");
+  const ms = Number((ticks - epochOffset) / BigInt(10000));
+  if (ms < 0 || !isFinite(ms)) return null;
+  const d = new Date(ms);
+  return d.toISOString().replace("T", " ").substring(0, 19);
+}
+
+/**
+ * Formats AD generalized time (e.g. "20260319114721.0Z") to a readable date string.
+ */
+function formatGeneralizedTime(value: string): string {
+  if (!value) return "";
+  // Format: YYYYMMDDHHmmss.0Z
+  const match = value.match(
+    /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/,
+  );
+  if (!match) return value;
+  const [, y, mo, d, h, mi, s] = match;
+  return `${y}-${mo}-${d} ${h}:${mi}:${s}`;
+}
+
 export function mapEntryToUser(entry: DirectoryEntry): DirectoryUser {
   const attr = (name: string): string => entry.attributes[name]?.[0] ?? "";
 
@@ -55,15 +86,15 @@ export function mapEntryToUser(entry: DirectoryEntry): DirectoryUser {
     organizationalUnit: parseOuFromDn(entry.distinguishedName),
     enabled: (uac & 0x0002) === 0,
     lockedOut: attr("lockoutTime") !== "" && attr("lockoutTime") !== "0",
-    accountExpires: attr("accountExpires") || null,
-    passwordLastSet: attr("pwdLastSet") || null,
+    accountExpires: formatFiletime(attr("accountExpires") || null),
+    passwordLastSet: formatFiletime(attr("pwdLastSet") || null),
     passwordExpired: (uac & 0x800000) !== 0,
     passwordNeverExpires: (uac & 0x10000) !== 0,
-    lastLogon: attr("lastLogon") || null,
+    lastLogon: formatFiletime(attr("lastLogon") || null),
     lastLogonWorkstation: attr("lastLogonWorkstation"),
     badPasswordCount: parseInt(attr("badPwdCount") || "0", 10),
-    whenCreated: attr("whenCreated"),
-    whenChanged: attr("whenChanged"),
+    whenCreated: formatGeneralizedTime(attr("whenCreated")),
+    whenChanged: formatGeneralizedTime(attr("whenChanged")),
     memberOf: attrList("memberOf"),
     rawAttributes: entry.attributes,
   };

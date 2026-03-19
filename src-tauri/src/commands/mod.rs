@@ -137,7 +137,7 @@ pub(crate) async fn browse_users_inner(
     page_size: usize,
 ) -> Result<BrowseResult, AppError> {
     const CACHE_TTL: Duration = Duration::from_secs(60);
-    const MAX_BROWSE: usize = 500;
+    const MAX_BROWSE: usize = 5000;
 
     // Check cache validity
     let cached = {
@@ -192,7 +192,7 @@ pub(crate) async fn browse_computers_inner(
     page_size: usize,
 ) -> Result<BrowseResult, AppError> {
     const CACHE_TTL: Duration = Duration::from_secs(60);
-    const MAX_BROWSE: usize = 500;
+    const MAX_BROWSE: usize = 5000;
 
     let cached = {
         let cache = state.browse_computers_cache.lock().unwrap();
@@ -244,7 +244,7 @@ pub(crate) async fn browse_groups_inner(
     page_size: usize,
 ) -> Result<BrowseResult, AppError> {
     const CACHE_TTL: Duration = Duration::from_secs(60);
-    const MAX_BROWSE: usize = 500;
+    const MAX_BROWSE: usize = 5000;
 
     let cached = {
         let cache = state.browse_groups_cache.lock().unwrap();
@@ -1539,6 +1539,19 @@ pub fn get_computer_name() -> String {
 pub fn evaluate_health_cmd(input: HealthInput) -> AccountHealthStatus {
     let now_ms = chrono::Utc::now().timestamp_millis();
     crate::services::evaluate_health(&input, now_ms)
+}
+
+/// Evaluates health status for multiple user accounts in a single IPC call.
+///
+/// Accepts a vector of health inputs and returns a vector of results in the
+/// same order. Much faster than calling `evaluate_health_cmd` per user.
+#[tauri::command]
+pub fn evaluate_health_batch(inputs: Vec<HealthInput>) -> Vec<AccountHealthStatus> {
+    let now_ms = chrono::Utc::now().timestamp_millis();
+    inputs
+        .iter()
+        .map(|input| crate::services::evaluate_health(input, now_ms))
+        .collect()
 }
 
 /// Resets a user's password.
