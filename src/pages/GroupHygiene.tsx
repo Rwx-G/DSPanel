@@ -632,28 +632,28 @@ export function GroupHygiene() {
             countTestId="empty-groups-count"
             tooltip={HYGIENE_TOOLTIPS.empty}
             actions={
-              canDelete ? (
-                <div className="flex items-center gap-2">
-                  <label className="flex items-center gap-1.5 text-caption text-[var(--color-text-secondary)]">
-                    <input
-                      type="checkbox"
-                      checked={allSelected}
-                      onChange={(e) => handleSelectAll(e.target.checked)}
-                      data-testid="select-all-empty"
-                    />
-                    Select all
-                  </label>
-                  <button
-                    className="btn btn-outline btn-sm flex items-center gap-1 tabular-nums"
-                    onClick={() => setShowDeletePreview(true)}
-                    disabled={selectedEmpty.size === 0 || deleting}
-                    data-testid="delete-selected-btn"
-                  >
-                    <Trash2 size={14} />
-                    Delete Selected ({selectedEmpty.size})
-                  </button>
-                </div>
-              ) : undefined
+              <div className="flex items-center gap-2">
+                <label className="flex items-center gap-1.5 text-caption text-[var(--color-text-secondary)]">
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    onChange={(e) => handleSelectAll(e.target.checked)}
+                    disabled={!canDelete}
+                    data-testid="select-all-empty"
+                  />
+                  Select all
+                </label>
+                <button
+                  className="btn btn-outline btn-sm flex items-center gap-1 tabular-nums"
+                  onClick={() => setShowDeletePreview(true)}
+                  disabled={!canDelete || selectedEmpty.size === 0 || deleting}
+                  title={!canDelete ? "Requires DomainAdmin permission" : undefined}
+                  data-testid="delete-selected-btn"
+                >
+                  <Trash2 size={14} />
+                  Delete Selected ({selectedEmpty.size})
+                </button>
+              </div>
             }
           >
             <DataTable

@@ -595,10 +595,9 @@ export function GroupDetail({
               Members ({directMembers.length})
               {nestedGroups.length > 0 && ` and ${nestedGroups.length} nested group(s)`}
             </h3>
-            {canManageMembers && (
-              <div className="relative">
-                <button
-                  className="flex h-5 w-5 items-center justify-center rounded-full text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors"
+            <div className="relative">
+              <button
+                className="flex h-5 w-5 items-center justify-center rounded-full text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors"
                   onClick={() => setShowHelp(!showHelp)}
                   onBlur={() => setTimeout(() => setShowHelp(false), 150)}
                   aria-label="Member management help"
@@ -625,13 +624,11 @@ export function GroupDetail({
                   </div>
                 )}
               </div>
-            )}
           </div>
-          {canManageMembers && (
-            <div
-              className="flex items-center gap-2"
-              data-testid="member-management-controls"
-            >
+          <div
+            className="flex items-center gap-2"
+            data-testid="member-management-controls"
+          >
               <div className="relative" ref={addDropdownRef}>
                 <button
                   className={`btn btn-outline btn-sm flex items-center gap-1 ${showAddDropdown ? "bg-[var(--color-primary-subtle)] border-[var(--color-primary)]" : ""}`}
@@ -644,6 +641,8 @@ export function GroupDetail({
                       return !prev;
                     })
                   }
+                  disabled={!canManageMembers}
+                  title={!canManageMembers ? "Requires AccountOperator permission" : undefined}
                   data-testid="add-member-btn"
                 >
                   <UserPlus size={14} />
@@ -756,7 +755,8 @@ export function GroupDetail({
               <button
                 className="btn btn-outline btn-sm flex items-center gap-1"
                 onClick={handleRemoveSelected}
-                disabled={selectedMembers.size === 0}
+                disabled={!canManageMembers || selectedMembers.size === 0}
+                title={!canManageMembers ? "Requires AccountOperator permission" : undefined}
                 data-testid="remove-selected-btn"
               >
                 <UserMinus size={14} />
@@ -766,7 +766,8 @@ export function GroupDetail({
               <button
                 className="btn btn-primary btn-sm flex items-center gap-1"
                 onClick={() => setShowPreview(true)}
-                disabled={pendingChanges.length === 0}
+                disabled={!canManageMembers || pendingChanges.length === 0}
+                title={!canManageMembers ? "Requires AccountOperator permission" : undefined}
                 data-testid="preview-changes-btn"
               >
                 <Eye size={14} />
@@ -774,8 +775,7 @@ export function GroupDetail({
                 {pendingChanges.length > 0 && ` (${pendingChanges.length})`}
               </button>
             </div>
-          )}
-        </div>
+          </div>
 
         {/* Pending changes summary */}
         {canManageMembers && pendingChanges.length > 0 && (

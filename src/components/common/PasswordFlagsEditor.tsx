@@ -156,16 +156,15 @@ export function PasswordFlagsEditor({
         </span>
       </label>
 
-      <PermissionGate requiredLevel="AccountOperator">
-        <button
-          className="btn btn-sm btn-primary text-caption"
-          onClick={handleSave}
-          disabled={!isDirty || saving}
-          data-testid="save-flags-btn"
-        >
-          {saving ? "Saving..." : "Save Changes"}
-        </button>
-      </PermissionGate>
+      <button
+        className="btn btn-sm btn-primary text-caption"
+        onClick={handleSave}
+        disabled={!canEdit || !isDirty || saving}
+        title={!canEdit ? "Requires AccountOperator permission" : undefined}
+        data-testid="save-flags-btn"
+      >
+        {saving ? "Saving..." : "Save Changes"}
+      </button>
     </div>
   );
 }
