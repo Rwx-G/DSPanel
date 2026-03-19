@@ -16,6 +16,8 @@ interface GroupPickerProps {
   placeholder?: string;
   disabled?: boolean;
   debounceMs?: number;
+  /** When true, only one group can be selected (replaces instead of appending). */
+  singleSelect?: boolean;
 }
 
 export function GroupPicker({
@@ -25,6 +27,7 @@ export function GroupPicker({
   placeholder = "Search groups...",
   disabled = false,
   debounceMs = 300,
+  singleSelect = false,
 }: GroupPickerProps) {
   const [searchText, setSearchText] = useState("");
   const [results, setResults] = useState<GroupOption[]>([]);
@@ -84,7 +87,7 @@ export function GroupPicker({
 
   const handleAddGroup = useCallback(
     (group: GroupOption) => {
-      onSelectionChange([...selectedGroups, group]);
+      onSelectionChange(singleSelect ? [group] : [...selectedGroups, group]);
       setSearchText("");
       setResults([]);
       setIsOpen(false);

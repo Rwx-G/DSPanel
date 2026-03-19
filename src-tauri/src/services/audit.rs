@@ -69,9 +69,7 @@ impl AuditService {
         let conn = Connection::open_in_memory().expect("Failed to open in-memory SQLite");
         let svc = Self {
             conn: Mutex::new(conn),
-            operator: Mutex::new(
-                std::env::var("USERNAME").unwrap_or_else(|_| "Test".to_string()),
-            ),
+            operator: Mutex::new(std::env::var("USERNAME").unwrap_or_else(|_| "Test".to_string())),
         };
         svc.init_schema();
         svc

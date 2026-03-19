@@ -27,6 +27,9 @@ import {
   Shield,
   ArrowLeft,
   Merge,
+  Search,
+  X,
+  ChevronDown,
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -69,83 +72,108 @@ interface OperationCard {
   minPermission: string;
 }
 
-const OPERATION_CARDS: OperationCard[] = [
+interface OperationCategory {
+  label: string;
+  cards: OperationCard[];
+}
+
+const OPERATION_CATEGORIES: OperationCategory[] = [
   {
-    id: "transfer",
-    label: "Transfer Members",
-    icon: ArrowRightLeft,
-    description: "Move members from one group to another",
-    minPermission: "AccountOperator",
+    label: "Members",
+    cards: [
+      {
+        id: "add",
+        label: "Add Members",
+        icon: UserPlus,
+        description: "Add members to a target group",
+        minPermission: "HelpDesk",
+      },
+      {
+        id: "delete",
+        label: "Remove Members",
+        icon: Trash2,
+        description: "Remove members from a group",
+        minPermission: "AccountOperator",
+      },
+      {
+        id: "transfer",
+        label: "Transfer Members",
+        icon: ArrowRightLeft,
+        description: "Move members from one group to another",
+        minPermission: "AccountOperator",
+      },
+      {
+        id: "copy-memberships",
+        label: "Copy User Groups",
+        icon: Users,
+        description: "Copy group memberships from one user to another",
+        minPermission: "HelpDesk",
+      },
+      {
+        id: "import-csv",
+        label: "Import CSV",
+        icon: Upload,
+        description: "Add members to a group from a CSV file",
+        minPermission: "HelpDesk",
+      },
+    ],
   },
   {
-    id: "clone-group",
-    label: "Clone Group",
-    icon: Copy,
-    description: "Create a copy of a group with its members",
-    minPermission: "AccountOperator",
+    label: "Groups",
+    cards: [
+      {
+        id: "create-groups",
+        label: "Create Groups",
+        icon: FilePlus2,
+        description: "Bulk create groups from CSV template",
+        minPermission: "AccountOperator",
+      },
+      {
+        id: "clone-group",
+        label: "Clone Group",
+        icon: Copy,
+        description: "Create a copy of a group with its members",
+        minPermission: "AccountOperator",
+      },
+      {
+        id: "merge-groups",
+        label: "Merge Groups",
+        icon: Merge,
+        description: "Combine members from multiple groups into one",
+        minPermission: "AccountOperator",
+      },
+      {
+        id: "move-groups",
+        label: "Move Groups",
+        icon: FolderInput,
+        description: "Move groups to a different OU",
+        minPermission: "Admin",
+      },
+    ],
   },
   {
-    id: "merge-groups",
-    label: "Merge Groups",
-    icon: Merge,
-    description: "Combine members from multiple groups into one",
-    minPermission: "AccountOperator",
+    label: "Properties",
+    cards: [
+      {
+        id: "update-manager",
+        label: "Set ManagedBy",
+        icon: Shield,
+        description: "Set the managedBy attribute on groups",
+        minPermission: "AccountOperator",
+      },
+    ],
   },
   {
-    id: "copy-memberships",
-    label: "Copy User Groups",
-    icon: Users,
-    description: "Copy group memberships from one user to another",
-    minPermission: "HelpDesk",
-  },
-  {
-    id: "import-csv",
-    label: "Import CSV",
-    icon: Upload,
-    description: "Add members to a group from a CSV file",
-    minPermission: "HelpDesk",
-  },
-  {
-    id: "export-csv",
-    label: "Export CSV",
-    icon: Download,
-    description: "Export group members to a CSV file",
-    minPermission: "ReadOnly",
-  },
-  {
-    id: "move-groups",
-    label: "Move Groups",
-    icon: FolderInput,
-    description: "Move groups to a different OU",
-    minPermission: "Admin",
-  },
-  {
-    id: "create-groups",
-    label: "Create Groups",
-    icon: FilePlus2,
-    description: "Bulk create groups from CSV template",
-    minPermission: "AccountOperator",
-  },
-  {
-    id: "update-manager",
-    label: "Update Manager",
-    icon: Shield,
-    description: "Set the managedBy attribute on groups",
-    minPermission: "AccountOperator",
-  },
-  {
-    id: "delete",
-    label: "Delete Members",
-    icon: Trash2,
-    description: "Remove members from a group",
-    minPermission: "AccountOperator",
-  },
-  {
-    id: "add",
-    label: "Add Members",
-    icon: UserPlus,
-    description: "Add members to a target group",
-    minPermission: "HelpDesk",
+    label: "Export",
+    cards: [
+      {
+        id: "export-csv",
+        label: "Export CSV",
+        icon: Download,
+        description: "Export group members to a CSV file",
+        minPermission: "ReadOnly",
+      },
+    ],
   },
 ];
 
@@ -190,6 +218,199 @@ function parseCsvRows(text: string): string[][] {
 // Main Component
 // ---------------------------------------------------------------------------
 
+interface OUNode {
+  distinguishedName: string;
+  name: string;
+  children?: OUNode[] | null;
+}
+
+function OUPicker({
+  value,
+  onChange,
+  disabled = false,
+  testId = "ou-picker",
+}: {
+  value: string;
+  onChange: (dn: string) => void;
+  disabled?: boolean;
+  testId?: string;
+}) {
+  const [ous, setOus] = useState<OUNode[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    invoke<OUNode[]>("get_ou_tree")
+      .then((tree) => {
+        if (!cancelled) setOus(tree);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const flattenOUs = (nodes: OUNode[], depth: number = 0): { dn: string; label: string; depth: number }[] => {
+    const result: { dn: string; label: string; depth: number }[] = [];
+    for (const node of nodes) {
+      result.push({ dn: node.distinguishedName, label: node.name, depth });
+      if (node.children) {
+        result.push(...flattenOUs(node.children, depth + 1));
+      }
+    }
+    return result;
+  };
+
+  const flatOUs = flattenOUs(ous);
+  const selectedLabel = flatOUs.find((ou) => ou.dn === value)?.label;
+
+  return (
+    <div className="relative" data-testid={testId}>
+      <button
+        className="flex w-full items-center justify-between rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5 text-left text-body"
+        onClick={() => setIsOpen(!isOpen)}
+        disabled={disabled || loading}
+        type="button"
+      >
+        <span className={value ? "text-[var(--color-text-primary)]" : "text-[var(--color-text-secondary)]"}>
+          {loading ? "Loading OUs..." : selectedLabel || value || "Select an OU..."}
+        </span>
+        <ChevronDown size={14} className="shrink-0 text-[var(--color-text-secondary)]" />
+      </button>
+      {isOpen && flatOUs.length > 0 && (
+        <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-48 overflow-auto rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-elevated)] shadow-lg">
+          {flatOUs.map((ou) => (
+            <button
+              key={ou.dn}
+              className={`flex w-full items-center px-3 py-1.5 text-left text-body hover:bg-[var(--color-surface-hover)] ${
+                ou.dn === value ? "bg-[var(--color-surface-selected)]" : ""
+              }`}
+              style={{ paddingLeft: `${12 + ou.depth * 16}px` }}
+              onClick={() => {
+                onChange(ou.dn);
+                setIsOpen(false);
+              }}
+            >
+              {ou.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function UserSearchPicker({
+  selected,
+  onSelect,
+  disabled = false,
+  placeholder = "Search user...",
+  testId = "user-search-picker",
+}: {
+  selected: DirectoryEntry | null;
+  onSelect: (user: DirectoryEntry | null) => void;
+  disabled?: boolean;
+  placeholder?: string;
+  testId?: string;
+}) {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<DirectoryEntry[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (query.length < 3) {
+      setResults([]);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    const timer = setTimeout(async () => {
+      try {
+        const entries = await invoke<DirectoryEntry[]>("search_users", {
+          query,
+        });
+        if (!cancelled) setResults(entries);
+      } catch {
+        if (!cancelled) setResults([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [query]);
+
+  if (selected) {
+    return (
+      <div
+        className="flex items-center justify-between rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5"
+        data-testid={`${testId}-selected`}
+      >
+        <span className="text-body text-[var(--color-text-primary)]">
+          {selected.displayName || selected.samAccountName || "?"}
+          <span className="ml-2 text-caption text-[var(--color-text-secondary)]">
+            ({selected.samAccountName})
+          </span>
+        </span>
+        <button
+          className="text-[var(--color-text-secondary)] hover:text-[var(--color-error)]"
+          onClick={() => onSelect(null)}
+          disabled={disabled}
+        >
+          <X size={14} />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative" data-testid={testId}>
+      <div className="flex items-center gap-2 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2 py-1">
+        <Search size={14} className="shrink-0 text-[var(--color-text-secondary)]" />
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={placeholder}
+          className="flex-1 bg-transparent text-body text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-secondary)]"
+          disabled={disabled}
+          data-testid={`${testId}-input`}
+        />
+        {loading && <LoadingSpinner />}
+      </div>
+      {results.length > 0 && (
+        <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-48 overflow-auto rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-elevated)] shadow-lg">
+          {results.map((entry) => (
+            <button
+              key={entry.distinguishedName}
+              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-body hover:bg-[var(--color-surface-hover)]"
+              onClick={() => {
+                onSelect(entry);
+                setQuery("");
+                setResults([]);
+              }}
+            >
+              <span className="text-[var(--color-text-primary)]">
+                {entry.displayName || entry.samAccountName || "?"}
+              </span>
+              <span className="text-caption text-[var(--color-text-secondary)]">
+                {entry.samAccountName}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function BulkOperations() {
   const { hasPermission } = usePermissions();
   const searchGroups = useGroupSearch();
@@ -204,6 +425,13 @@ export function BulkOperations() {
   const [selectedMembers, setSelectedMembers] = useState<Set<string>>(
     new Set(),
   );
+  // Add Members mode: user search to find members to add
+  const [addMemberSearch, setAddMemberSearch] = useState("");
+  const [addMemberResults, setAddMemberResults] = useState<DirectoryEntry[]>(
+    [],
+  );
+  const [addMemberLoading, setAddMemberLoading] = useState(false);
+  const [stagedMembers, setStagedMembers] = useState<DirectoryEntry[]>([]);
   const [plannedChanges, setPlannedChanges] = useState<PlannedChange[]>([]);
   const [showPreview, setShowPreview] = useState(false);
   const [progress, setProgress] = useState<BulkProgress>({
@@ -254,6 +482,9 @@ export function BulkOperations() {
     setPlannedChanges([]);
     setShowPreview(false);
     setProgress({ current: 0, total: 0, status: "idle", message: "" });
+    setAddMemberSearch("");
+    setAddMemberResults([]);
+    setStagedMembers([]);
     setSourceUserQuery("");
     setTargetUserQuery("");
     setSourceUser(null);
@@ -306,6 +537,38 @@ export function BulkOperations() {
       cancelled = true;
     };
   }, [sourceGroups]);
+
+  // Search users for Add Members mode
+  useEffect(() => {
+    if (selectedOp !== "add" || addMemberSearch.length < 3) {
+      setAddMemberResults([]);
+      return;
+    }
+    let cancelled = false;
+    setAddMemberLoading(true);
+    const timer = setTimeout(async () => {
+      try {
+        const results = await invoke<DirectoryEntry[]>("search_users", {
+          query: addMemberSearch,
+        });
+        if (!cancelled) {
+          // Filter out already staged members
+          const stagedDNs = new Set(stagedMembers.map((m) => m.distinguishedName));
+          setAddMemberResults(
+            results.filter((r) => !stagedDNs.has(r.distinguishedName)),
+          );
+        }
+      } catch {
+        if (!cancelled) setAddMemberResults([]);
+      } finally {
+        if (!cancelled) setAddMemberLoading(false);
+      }
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [addMemberSearch, selectedOp, stagedMembers]);
 
   const handleMemberSelect = useCallback((dn: string, checked: boolean) => {
     setSelectedMembers((prev) => {
@@ -363,10 +626,10 @@ export function BulkOperations() {
       }
     } else if (selectedOp === "add") {
       for (const target of targetGroups) {
-        for (const dn of selectedDns) {
+        for (const entry of stagedMembers) {
           changes.push({
-            memberDn: dn,
-            memberName: getMemberName(dn),
+            memberDn: entry.distinguishedName,
+            memberName: entry.displayName || entry.samAccountName || "?",
             groupDn: target.distinguishedName,
             groupName: target.name,
             action: "add",
@@ -398,7 +661,7 @@ export function BulkOperations() {
 
     setPlannedChanges(changes);
     setShowPreview(true);
-  }, [selectedOp, sourceGroups, targetGroups, selectedMembers, getMemberName]);
+  }, [selectedOp, sourceGroups, targetGroups, selectedMembers, stagedMembers, getMemberName]);
 
   // ---------------------------------------------------------------------------
   // Execute handler (for add/remove based operations)
@@ -550,8 +813,17 @@ export function BulkOperations() {
 
   const handleCopyPreview = useCallback(async () => {
     if (!sourceUser || !targetUser) return;
-    const sourceUserGroups = sourceUser.attributes?.memberOf ?? [];
-    const targetUserGroups = targetUser.attributes?.memberOf ?? [];
+    // Re-fetch full user details to get complete memberOf
+    const [fullSource, fullTarget] = await Promise.all([
+      invoke<DirectoryEntry | null>("get_user", {
+        samAccountName: sourceUser.samAccountName,
+      }),
+      invoke<DirectoryEntry | null>("get_user", {
+        samAccountName: targetUser.samAccountName,
+      }),
+    ]);
+    const sourceUserGroups = fullSource?.attributes?.memberOf ?? [];
+    const targetUserGroups = fullTarget?.attributes?.memberOf ?? [];
     const targetSet = new Set(targetUserGroups);
     const newGroups = sourceUserGroups.filter((g) => !targetSet.has(g));
     setCopyPreviewGroups(newGroups);
@@ -1016,18 +1288,21 @@ export function BulkOperations() {
 
   const canPreview = useMemo(() => {
     if (!selectedOp) return false;
-    if (
-      selectedOp === "delete" ||
-      selectedOp === "add" ||
-      selectedOp === "transfer"
-    ) {
-      if (selectedMembers.size === 0) return false;
-      if (sourceGroups.length === 0) return false;
-      if (selectedOp !== "delete" && targetGroups.length === 0) return false;
-      return true;
+    if (selectedOp === "add") {
+      return stagedMembers.length > 0 && targetGroups.length > 0;
+    }
+    if (selectedOp === "delete") {
+      return selectedMembers.size > 0 && sourceGroups.length > 0;
+    }
+    if (selectedOp === "transfer") {
+      return (
+        selectedMembers.size > 0 &&
+        sourceGroups.length > 0 &&
+        targetGroups.length > 0
+      );
     }
     return false;
-  }, [selectedMembers, sourceGroups, targetGroups, selectedOp]);
+  }, [selectedMembers, sourceGroups, targetGroups, selectedOp, stagedMembers]);
 
   const isRunning =
     progress.status === "running" || progress.status === "rolling-back";
@@ -1051,40 +1326,47 @@ export function BulkOperations() {
           Groups Bulk Operations
         </h2>
 
-        <div
-          className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4"
-          data-testid="operation-picker"
-        >
-          {OPERATION_CARDS.map((card) => {
-            const Icon = card.icon;
-            const permitted = hasPermission(card.minPermission);
-            return (
-              <button
-                key={card.id}
-                onClick={() => setSelectedOp(card.id)}
-                disabled={!permitted}
-                className={`flex flex-col items-start gap-2 rounded-lg border p-3 text-left transition-colors ${
-                  permitted
-                    ? "border-[var(--color-border-default)] bg-[var(--color-surface-card)] hover:border-[var(--color-primary)] hover:bg-[var(--color-surface-hover)] cursor-pointer"
-                    : "border-[var(--color-border-subtle)] bg-[var(--color-surface-default)] opacity-50 cursor-not-allowed"
-                }`}
-                data-testid={`op-card-${card.id}`}
-              >
-                <div className="flex items-center gap-2">
-                  <Icon
-                    size={18}
-                    className="text-[var(--color-primary)]"
-                  />
-                  <span className="text-body font-medium text-[var(--color-text-primary)]">
-                    {card.label}
-                  </span>
-                </div>
-                <p className="text-caption text-[var(--color-text-secondary)]">
-                  {card.description}
-                </p>
-              </button>
-            );
-          })}
+        <div className="space-y-4" data-testid="operation-picker">
+          {OPERATION_CATEGORIES.map((category) => (
+            <div key={category.label}>
+              <h3 className="mb-2 text-caption font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">
+                {category.label}
+              </h3>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                {category.cards.map((card) => {
+                  const Icon = card.icon;
+                  const permitted = hasPermission(card.minPermission);
+                  return (
+                    <button
+                      key={card.id}
+                      onClick={() => setSelectedOp(card.id)}
+                      disabled={!permitted}
+                      title={!permitted ? `Requires ${card.minPermission} permission` : undefined}
+                      className={`flex flex-col items-start gap-2 rounded-lg border p-3 text-left transition-colors ${
+                        permitted
+                          ? "border-[var(--color-border-default)] bg-[var(--color-surface-card)] hover:border-[var(--color-primary)] hover:bg-[var(--color-surface-hover)] cursor-pointer"
+                          : "border-[var(--color-border-subtle)] bg-[var(--color-surface-default)] opacity-50 cursor-not-allowed"
+                      }`}
+                      data-testid={`op-card-${card.id}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Icon
+                          size={18}
+                          className="text-[var(--color-primary)]"
+                        />
+                        <span className="text-body font-medium text-[var(--color-text-primary)]">
+                          {card.label}
+                        </span>
+                      </div>
+                      <p className="text-caption text-[var(--color-text-secondary)]">
+                        {card.description}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     );
@@ -1117,7 +1399,7 @@ export function BulkOperations() {
           Back
         </button>
         <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">
-          {OPERATION_CARDS.find((c) => c.id === selectedOp)?.label ??
+          {OPERATION_CATEGORIES.flatMap((cat) => cat.cards).find((c) => c.id === selectedOp)?.label ??
             "Bulk Operation"}
         </h2>
       </div>
@@ -1127,85 +1409,144 @@ export function BulkOperations() {
       {/* ----------------------------------------------------------------- */}
       {isMemberOp && (
         <>
-          {/* Operation Type Selector */}
-          <div data-testid="operation-type-selector">
-            <label className="mb-2 block text-caption font-medium text-[var(--color-text-secondary)]">
-              Operation Type
-            </label>
-            <div className="flex gap-1">
-              {(["delete", "add", "transfer"] as BulkOperationType[]).map(
-                (op) => {
-                  const icons: Record<string, typeof Trash2> = {
-                    delete: Trash2,
-                    add: UserPlus,
-                    transfer: ArrowRightLeft,
-                  };
-                  const labels: Record<string, string> = {
-                    delete: "Delete",
-                    add: "Add",
-                    transfer: "Transfer",
-                  };
-                  const Icon = icons[op];
-                  const isActive = selectedOp === op;
-                  return (
+          {/* Group Selectors - adapted per operation */}
+          <div
+            className={selectedOp === "transfer" ? "grid grid-cols-2 gap-4" : ""}
+            data-testid="group-selectors"
+          >
+            {/* Source Group: shown for delete and transfer */}
+            {(selectedOp === "delete" || selectedOp === "transfer") && (
+              <div data-testid="source-group-section">
+                <label className="mb-2 block text-caption font-medium text-[var(--color-text-secondary)]">
+                  {selectedOp === "transfer" ? "Source Group" : "Group"}
+                </label>
+                <GroupPicker
+                  selectedGroups={sourceGroups}
+                  onSelectionChange={setSourceGroups}
+                  onSearch={searchGroups}
+                  placeholder="Search group..."
+                  disabled={isRunning}
+                  singleSelect
+                />
+              </div>
+            )}
+
+            {/* Target Group: shown for add and transfer */}
+            {(selectedOp === "add" || selectedOp === "transfer") && (
+              <div data-testid="target-group-section">
+                <label className="mb-2 block text-caption font-medium text-[var(--color-text-secondary)]">
+                  {selectedOp === "transfer" ? "Target Group" : "Group"}
+                </label>
+                <GroupPicker
+                  selectedGroups={targetGroups}
+                  onSelectionChange={setTargetGroups}
+                  onSearch={searchGroups}
+                  placeholder="Search group..."
+                  disabled={isRunning}
+                  singleSelect
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Member Selection - different UI for add vs remove/transfer */}
+          {selectedOp === "add" ? (
+            <div data-testid="add-member-search-section">
+              <label className="mb-2 block text-caption font-medium text-[var(--color-text-secondary)]">
+                Search Members to Add
+              </label>
+              <div className="relative">
+                <div className="flex items-center gap-2 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2 py-1">
+                  <Search size={14} className="shrink-0 text-[var(--color-text-secondary)]" />
+                  <input
+                    type="text"
+                    value={addMemberSearch}
+                    onChange={(e) => setAddMemberSearch(e.target.value)}
+                    placeholder="Search users by name or username (min 3 chars)..."
+                    className="flex-1 bg-transparent text-body text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-secondary)]"
+                    disabled={targetGroups.length === 0 || isRunning}
+                  />
+                  {addMemberLoading && <LoadingSpinner />}
+                </div>
+                {addMemberResults.length > 0 && (
+                  <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-48 overflow-auto rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-elevated)] shadow-lg">
+                    {addMemberResults.map((entry) => (
+                      <button
+                        key={entry.distinguishedName}
+                        className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-body hover:bg-[var(--color-surface-hover)]"
+                        onClick={() => {
+                          setStagedMembers((prev) => [...prev, entry]);
+                          setAddMemberResults((prev) =>
+                            prev.filter((r) => r.distinguishedName !== entry.distinguishedName),
+                          );
+                        }}
+                      >
+                        <UserPlus size={14} className="shrink-0 text-[var(--color-success)]" />
+                        <span className="text-[var(--color-text-primary)]">
+                          {entry.displayName || entry.samAccountName || "?"}
+                        </span>
+                        <span className="text-caption text-[var(--color-text-secondary)]">
+                          {entry.samAccountName}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {targetGroups.length === 0 && (
+                <p className="mt-2 text-caption text-[var(--color-text-secondary)]">
+                  Select a target group first
+                </p>
+              )}
+              {stagedMembers.length > 0 && (
+                <div className="mt-3">
+                  <div className="mb-1 flex items-center justify-between">
+                    <span className="text-caption font-medium text-[var(--color-text-secondary)]">
+                      Staged ({stagedMembers.length})
+                    </span>
                     <button
-                      key={op}
-                      className={`btn btn-sm flex items-center gap-1.5 ${
-                        isActive ? "btn-primary" : "btn-outline"
-                      }`}
-                      onClick={() => setSelectedOp(op)}
-                      disabled={isRunning}
-                      data-testid={`op-type-${op}`}
+                      className="text-caption text-[var(--color-text-secondary)] underline hover:no-underline"
+                      onClick={() => setStagedMembers([])}
                     >
-                      <Icon size={14} />
-                      {labels[op]}
+                      Clear all
                     </button>
-                  );
-                },
+                  </div>
+                  <div className="space-y-1 rounded-md border border-[var(--color-border-default)] p-2">
+                    {stagedMembers.map((entry) => (
+                      <div
+                        key={entry.distinguishedName}
+                        className="flex items-center justify-between rounded px-2 py-1 text-body hover:bg-[var(--color-surface-hover)]"
+                      >
+                        <span>{entry.displayName || entry.samAccountName || "?"}</span>
+                        <button
+                          className="text-[var(--color-text-secondary)] hover:text-[var(--color-error)]"
+                          onClick={() =>
+                            setStagedMembers((prev) =>
+                              prev.filter((m) => m.distinguishedName !== entry.distinguishedName),
+                            )
+                          }
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
-          </div>
-
-          {/* Group Selectors */}
-          <div className="grid grid-cols-2 gap-4">
-            <div data-testid="source-group-section">
-              <label className="mb-2 block text-caption font-medium text-[var(--color-text-secondary)]">
-                Source Group
-              </label>
-              <GroupPicker
-                selectedGroups={sourceGroups}
-                onSelectionChange={setSourceGroups}
-                onSearch={searchGroups}
-                placeholder="Search source group..."
-                disabled={isRunning}
-              />
-            </div>
-            <div data-testid="target-group-section">
-              <label className="mb-2 block text-caption font-medium text-[var(--color-text-secondary)]">
-                Target Group
-              </label>
-              <GroupPicker
-                selectedGroups={targetGroups}
-                onSelectionChange={setTargetGroups}
-                onSearch={searchGroups}
-                placeholder="Search target group..."
-                disabled={selectedOp === "delete" || isRunning}
-              />
-            </div>
-          </div>
-
-          {/* Member Selection */}
-          <MemberList
-            members={members}
-            membersLoading={membersLoading}
-            sourceGroupsEmpty={sourceGroups.length === 0}
-            selectedMembers={selectedMembers}
-            allSelected={allSelected}
-            isRunning={isRunning}
-            onMemberSelect={handleMemberSelect}
-            onSelectAll={handleSelectAll}
-            onExportCsv={handleExportCsv}
-          />
+          ) : (
+            <MemberList
+              members={members}
+              membersLoading={membersLoading}
+              sourceGroupsEmpty={sourceGroups.length === 0}
+              selectedMembers={selectedMembers}
+              allSelected={allSelected}
+              isRunning={isRunning}
+              onMemberSelect={handleMemberSelect}
+              onSelectAll={handleSelectAll}
+              onExportCsv={handleExportCsv}
+            />
+          )}
 
           {/* Action Buttons */}
           {canExecute && (
@@ -1301,65 +1642,25 @@ export function BulkOperations() {
               <label className="mb-2 block text-caption font-medium text-[var(--color-text-secondary)]">
                 Source User (copy from)
               </label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={sourceUserQuery}
-                  onChange={(e) => setSourceUserQuery(e.target.value)}
-                  placeholder="SAM account name..."
-                  className="flex-1 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5 text-body text-[var(--color-text-primary)]"
-                  style={{ outline: "none", boxShadow: "none" }}
-                  disabled={isRunning}
-                  data-testid="copy-source-user-input"
-                />
-                <button
-                  className="btn btn-sm btn-outline"
-                  onClick={() =>
-                    handleSearchUser(sourceUserQuery, setSourceUser)
-                  }
-                  disabled={isRunning || !sourceUserQuery.trim()}
-                  data-testid="copy-source-user-search"
-                >
-                  Search
-                </button>
-              </div>
-              {sourceUser && (
-                <p className="mt-1 text-caption text-[var(--color-text-secondary)]" data-testid="copy-source-user-result">
-                  Found: {sourceUser.displayName ?? sourceUser.samAccountName}
-                </p>
-              )}
+              <UserSearchPicker
+                selected={sourceUser}
+                onSelect={setSourceUser}
+                disabled={isRunning}
+                placeholder="Search user by name..."
+                testId="copy-source-user"
+              />
             </div>
             <div data-testid="target-user-section">
               <label className="mb-2 block text-caption font-medium text-[var(--color-text-secondary)]">
                 Target User (copy to)
               </label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={targetUserQuery}
-                  onChange={(e) => setTargetUserQuery(e.target.value)}
-                  placeholder="SAM account name..."
-                  className="flex-1 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5 text-body text-[var(--color-text-primary)]"
-                  style={{ outline: "none", boxShadow: "none" }}
-                  disabled={isRunning}
-                  data-testid="copy-target-user-input"
-                />
-                <button
-                  className="btn btn-sm btn-outline"
-                  onClick={() =>
-                    handleSearchUser(targetUserQuery, setTargetUser)
-                  }
-                  disabled={isRunning || !targetUserQuery.trim()}
-                  data-testid="copy-target-user-search"
-                >
-                  Search
-                </button>
-              </div>
-              {targetUser && (
-                <p className="mt-1 text-caption text-[var(--color-text-secondary)]" data-testid="copy-target-user-result">
-                  Found: {targetUser.displayName ?? targetUser.samAccountName}
-                </p>
-              )}
+              <UserSearchPicker
+                selected={targetUser}
+                onSelect={setTargetUser}
+                disabled={isRunning}
+                placeholder="Search user by name..."
+                testId="copy-target-user"
+              />
             </div>
           </div>
 
@@ -1433,6 +1734,7 @@ export function BulkOperations() {
               onSearch={searchGroups}
               placeholder="Search source group..."
               disabled={isRunning}
+              singleSelect
             />
           </div>
 
@@ -1460,17 +1762,13 @@ export function BulkOperations() {
             </div>
             <div>
               <label className="mb-2 block text-caption font-medium text-[var(--color-text-secondary)]">
-                Target OU (DN)
+                Target OU
               </label>
-              <input
-                type="text"
+              <OUPicker
                 value={cloneContainerDn}
-                onChange={(e) => setCloneContainerDn(e.target.value)}
-                placeholder="e.g. OU=Groups,DC=example,DC=com"
-                className="w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5 text-body text-[var(--color-text-primary)]"
-                style={{ outline: "none", boxShadow: "none" }}
+                onChange={setCloneContainerDn}
                 disabled={isRunning}
-                data-testid="clone-container-input"
+                testId="clone-container-picker"
               />
             </div>
           </div>
@@ -1499,6 +1797,9 @@ export function BulkOperations() {
       {/* ----------------------------------------------------------------- */}
       {selectedOp === "merge-groups" && (
         <>
+          <div className="rounded-md border border-[var(--color-info)]/30 bg-[var(--color-info)]/5 px-3 py-2 text-caption text-[var(--color-text-secondary)]">
+            <strong className="text-[var(--color-info)]">How it works:</strong> All members from the source groups will be added to the target group. Source groups are not deleted - only their members are copied. Duplicates are skipped automatically.
+          </div>
           <div className="grid grid-cols-2 gap-4">
             <div data-testid="source-group-section">
               <label className="mb-2 block text-caption font-medium text-[var(--color-text-secondary)]">
@@ -1522,6 +1823,7 @@ export function BulkOperations() {
                 onSearch={searchGroups}
                 placeholder="Search target group..."
                 disabled={isRunning}
+                singleSelect
               />
             </div>
           </div>
@@ -1655,17 +1957,13 @@ export function BulkOperations() {
 
           <div>
             <label className="mb-2 block text-caption font-medium text-[var(--color-text-secondary)]">
-              Target OU (DN)
+              Target OU
             </label>
-            <input
-              type="text"
+            <OUPicker
               value={moveTargetOu}
-              onChange={(e) => setMoveTargetOu(e.target.value)}
-              placeholder="e.g. OU=Groups,DC=example,DC=com"
-              className="w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5 text-body text-[var(--color-text-primary)]"
-              style={{ outline: "none", boxShadow: "none" }}
+              onChange={setMoveTargetOu}
               disabled={isRunning}
-              data-testid="move-target-ou-input"
+              testId="move-target-ou-picker"
             />
           </div>
 
@@ -1779,34 +2077,13 @@ export function BulkOperations() {
             <label className="mb-2 block text-caption font-medium text-[var(--color-text-secondary)]">
               New Manager
             </label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={managerQuery}
-                onChange={(e) => setManagerQuery(e.target.value)}
-                placeholder="SAM account name..."
-                className="flex-1 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5 text-body text-[var(--color-text-primary)]"
-                style={{ outline: "none", boxShadow: "none" }}
-                disabled={isRunning}
-                data-testid="manager-user-input"
-              />
-              <button
-                className="btn btn-sm btn-outline"
-                onClick={() =>
-                  handleSearchUser(managerQuery, setSelectedManager)
-                }
-                disabled={isRunning || !managerQuery.trim()}
-                data-testid="manager-user-search"
-              >
-                Search
-              </button>
-            </div>
-            {selectedManager && (
-              <p className="mt-1 text-caption text-[var(--color-text-secondary)]" data-testid="manager-user-result">
-                Found:{" "}
-                {selectedManager.displayName ?? selectedManager.samAccountName}
-              </p>
-            )}
+            <UserSearchPicker
+              selected={selectedManager}
+              onSelect={setSelectedManager}
+              disabled={isRunning}
+              placeholder="Search manager by name..."
+              testId="manager-user"
+            />
           </div>
 
           <div className="flex items-center gap-2" data-testid="bulk-action-buttons">
@@ -1844,7 +2121,7 @@ export function BulkOperations() {
                 data-testid={`planned-change-${index}`}
               >
                 <span
-                  className={`mt-0.5 shrink-0 text-caption font-medium ${
+                  className={`mt-0.5 w-16 shrink-0 text-caption font-medium ${
                     change.action === "add"
                       ? "text-[var(--color-success)]"
                       : "text-[var(--color-error)]"
