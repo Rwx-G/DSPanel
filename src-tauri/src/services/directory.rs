@@ -152,6 +152,16 @@ pub trait DirectoryProvider: Send + Sync {
     /// Returns the authenticated user identity resolved via WhoAmI, if available.
     fn authenticated_user(&self) -> Option<String>;
 
+    /// Probes the effective permissions of the current user by checking
+    /// `allowedAttributesEffective` and `allowedChildClassesEffective`
+    /// on representative objects.
+    ///
+    /// Returns a tuple of (can_write_user_attrs, can_write_group_members, can_create_objects):
+    /// - can_write_user_attrs: `lockoutTime` writable on a user (HelpDesk)
+    /// - can_write_group_members: `member` writable on a group (AccountOperator)
+    /// - can_create_objects: `user` creatable in an OU (Admin)
+    async fn probe_effective_permissions(&self) -> Result<(bool, bool, bool)>;
+
     /// Returns all user-applicable attribute names from the AD schema.
     ///
     /// Queries the schema naming context for attributeSchema objects that
@@ -547,6 +557,11 @@ pub mod tests {
 
         fn authenticated_user(&self) -> Option<String> {
             None
+        }
+
+        async fn probe_effective_permissions(&self) -> Result<(bool, bool, bool)> {
+            self.check_failure()?;
+            Ok((false, false, false))
         }
     }
 

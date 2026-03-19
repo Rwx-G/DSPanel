@@ -34,14 +34,35 @@ DSPanel is an open source cross-platform desktop application (Rust/Tauri v2) tha
 
 ### Adaptive Permissions
 
-The UI adapts dynamically based on the running user's AD group memberships:
+The UI adapts dynamically based on the running user's AD permissions. Detection
+uses three strategies (highest wins):
+
+1. **SID-based** - automatic detection of well-known AD groups (Domain Admins,
+   Account Operators, etc.) via RID matching - works in any AD locale
+2. **Probe-based** - tests effective permissions via `allowedAttributesEffective`
+   and `allowedChildClassesEffective` on representative objects - detects
+   delegated permissions without requiring specific group membership
+3. **Custom groups** - optional AD groups for explicit role assignment
 
 | Level               | Access                                                |
 | ------------------- | ----------------------------------------------------- |
 | **ReadOnly**        | Lookup, view, export                                  |
 | **HelpDesk**        | + Password reset, unlock, diagnostics                 |
 | **AccountOperator** | + Group management, presets, onboarding/offboarding   |
-| **DomainAdmin**     | + Infrastructure monitoring, security, administration |
+| **Admin**           | + Delete/move objects, create users                   |
+| **DomainAdmin**     | + Built-in/sensitive objects, infrastructure           |
+
+#### Custom Permission Groups
+
+Organizations can create these AD security groups for explicit DSPanel role
+assignment (optional - probe-based detection works without them):
+
+| AD Group                | DSPanel Level   |
+| ----------------------- | --------------- |
+| `DSPanel-HelpDesk`      | HelpDesk        |
+| `DSPanel-AccountOps`    | AccountOperator |
+| `DSPanel-Admin`         | Admin           |
+| `DSPanel-DomainAdmin`   | DomainAdmin     |
 
 ### Hybrid Support
 

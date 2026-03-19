@@ -16,7 +16,8 @@ pub enum PermissionLevel {
     ReadOnly = 0,
     HelpDesk = 1,
     AccountOperator = 2,
-    DomainAdmin = 3,
+    Admin = 3,
+    DomainAdmin = 4,
 }
 
 impl std::fmt::Display for PermissionLevel {
@@ -25,6 +26,7 @@ impl std::fmt::Display for PermissionLevel {
             PermissionLevel::ReadOnly => write!(f, "ReadOnly"),
             PermissionLevel::HelpDesk => write!(f, "HelpDesk"),
             PermissionLevel::AccountOperator => write!(f, "AccountOperator"),
+            PermissionLevel::Admin => write!(f, "Admin"),
             PermissionLevel::DomainAdmin => write!(f, "DomainAdmin"),
         }
     }
@@ -68,8 +70,9 @@ impl Default for PermissionConfig {
             "DSPanel-AccountOps".to_string(),
             PermissionLevel::AccountOperator,
         );
+        group_mappings.insert("DSPanel-Admin".to_string(), PermissionLevel::Admin);
         group_mappings.insert(
-            "DSPanel-Admin".to_string(),
+            "DSPanel-DomainAdmin".to_string(),
             PermissionLevel::DomainAdmin,
         );
         Self {
@@ -179,8 +182,31 @@ impl PermissionService {
             }
         }
 
+        // 3. If still below DomainAdmin, probe effective permissions
+        if detected_level < PermissionLevel::DomainAdmin {
+            match provider.probe_effective_permissions().await {
+                Ok((can_write_user, can_write_group, can_create)) => {
+                    if can_create && detected_level < PermissionLevel::Admin {
+                        tracing::info!("Probe: can create objects in OU -> Admin");
+                        detected_level = PermissionLevel::Admin;
+                    }
+                    if can_write_group && detected_level < PermissionLevel::AccountOperator {
+                        tracing::info!("Probe: can write group members -> AccountOperator");
+                        detected_level = PermissionLevel::AccountOperator;
+                    }
+                    if can_write_user && detected_level < PermissionLevel::HelpDesk {
+                        tracing::info!("Probe: can write user attributes -> HelpDesk");
+                        detected_level = PermissionLevel::HelpDesk;
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!("Permission probe failed: {}", e);
+                }
+            }
+        }
+
         tracing::info!(
-            "Permission level detected: {} (from {} groups, {} SIDs)",
+            "Permission level detected: {} (from {} groups, {} SIDs, with probe)",
             detected_level,
             group_names.len(),
             sids.len()
@@ -275,9 +301,9 @@ mod tests {
     // --- PermissionConfig tests ---
 
     #[test]
-    fn test_default_config_has_three_group_mappings() {
+    fn test_default_config_has_group_mappings() {
         let config = PermissionConfig::default();
-        assert_eq!(config.group_mappings.len(), 3);
+        assert_eq!(config.group_mappings.len(), 4);
         assert_eq!(
             config.group_mappings.get("DSPanel-HelpDesk"),
             Some(&PermissionLevel::HelpDesk)
@@ -288,6 +314,10 @@ mod tests {
         );
         assert_eq!(
             config.group_mappings.get("DSPanel-Admin"),
+            Some(&PermissionLevel::Admin)
+        );
+        assert_eq!(
+            config.group_mappings.get("DSPanel-DomainAdmin"),
             Some(&PermissionLevel::DomainAdmin)
         );
     }
@@ -310,7 +340,7 @@ mod tests {
         let config = PermissionConfig::default();
         let json = serde_json::to_string(&config).unwrap();
         let deserialized: PermissionConfig = serde_json::from_str(&json).unwrap();
-        assert_eq!(deserialized.group_mappings.len(), 3);
+        assert_eq!(deserialized.group_mappings.len(), 4);
     }
 
     // --- PermissionService tests ---
@@ -389,9 +419,18 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_detect_domain_admin_from_custom_group_name() {
+    async fn test_detect_admin_from_custom_group_name() {
         let provider =
             MockDirectoryProvider::new().with_user_groups(make_group_dns(&["DSPanel-Admin"]));
+        let service = default_service();
+        service.detect_permissions(&provider).await.unwrap();
+        assert_eq!(service.current_level(), PermissionLevel::Admin);
+    }
+
+    #[tokio::test]
+    async fn test_detect_domain_admin_from_custom_group_name() {
+        let provider =
+            MockDirectoryProvider::new().with_user_groups(make_group_dns(&["DSPanel-DomainAdmin"]));
         let service = default_service();
         service.detect_permissions(&provider).await.unwrap();
         assert_eq!(service.current_level(), PermissionLevel::DomainAdmin);

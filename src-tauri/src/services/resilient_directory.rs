@@ -415,6 +415,16 @@ where
     fn authenticated_user(&self) -> Option<String> {
         self.inner.authenticated_user()
     }
+
+    async fn probe_effective_permissions(&self) -> Result<(bool, bool, bool)> {
+        let inner_ref = self.inner.clone();
+        self.execute_with_resilience(|| {
+            let inner = inner_ref.clone();
+            async move { inner.probe_effective_permissions().await }
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!(e))
+    }
 }
 
 #[cfg(test)]

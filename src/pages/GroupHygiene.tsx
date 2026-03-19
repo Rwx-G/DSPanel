@@ -197,7 +197,7 @@ export function GroupHygiene() {
 
   const [showInfo, setShowInfo] = useState(false);
   const { hasPermission } = usePermissions();
-  const canDelete = hasPermission("DomainAdmin");
+  const canDelete = hasPermission("Admin");
   const { openTab } = useNavigation();
 
   const totalIssues =
@@ -647,7 +647,7 @@ export function GroupHygiene() {
                   className="btn btn-outline btn-sm flex items-center gap-1 tabular-nums"
                   onClick={() => setShowDeletePreview(true)}
                   disabled={!canDelete || selectedEmpty.size === 0 || deleting}
-                  title={!canDelete ? "Requires DomainAdmin permission" : undefined}
+                  title={!canDelete ? "Requires Admin permission" : undefined}
                   data-testid="delete-selected-btn"
                 >
                   <Trash2 size={14} />

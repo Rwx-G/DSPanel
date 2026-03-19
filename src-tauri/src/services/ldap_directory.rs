@@ -1430,6 +1430,175 @@ impl DirectoryProvider for LdapDirectoryProvider {
         self.resolved_user()
     }
 
+    async fn probe_effective_permissions(&self) -> Result<(bool, bool, bool)> {
+        if self.domain.is_none() {
+            return Ok((false, false, false));
+        }
+
+        let base_dn = self.base_dn().unwrap_or_default();
+
+        // Phase 1: Get all OUs with allowedChildClassesEffective in a single query.
+        // This covers probe 3 (can_create) and gives us the OU list for probes 1 & 2.
+        let ous: Vec<String> = self
+            .with_connection(|mut ldap| {
+                let base_dn = base_dn.clone();
+                async move {
+                    let search_result = ldap
+                        .search(
+                            &base_dn,
+                            Scope::Subtree,
+                            "(objectClass=organizationalUnit)",
+                            vec!["distinguishedName"],
+                        )
+                        .await
+                        .context("Probe: OU enumeration failed")?;
+
+                    let dns: Vec<String> = search_result
+                        .0
+                        .into_iter()
+                        .map(|e| SearchEntry::construct(e).dn)
+                        .collect();
+                    Ok(dns)
+                }
+            })
+            .await
+            .unwrap_or_default();
+
+        tracing::info!(ou_count = ous.len(), "Probe: enumerated OUs");
+
+        // Also check containers (CN=Users, CN=Builtin, etc.)
+        let mut probe_bases: Vec<String> = ous;
+        probe_bases.push(base_dn.clone());
+
+        // Probe 3: Check allowedChildClassesEffective on all OUs
+        let can_create = self
+            .with_connection(|mut ldap| {
+                let probe_bases = probe_bases.clone();
+                async move {
+                    for ou_dn in &probe_bases {
+                        let search_result = ldap
+                            .search(
+                                ou_dn,
+                                Scope::Base,
+                                "(objectClass=*)",
+                                vec!["allowedChildClassesEffective"],
+                            )
+                            .await;
+
+                        if let Ok(result) = search_result {
+                            if let Some(entry) = result.0.into_iter().next() {
+                                let se = SearchEntry::construct(entry);
+                                if let Some(classes) =
+                                    se.attrs.get("allowedChildClassesEffective")
+                                {
+                                    if classes
+                                        .iter()
+                                        .any(|c| c.eq_ignore_ascii_case("user"))
+                                    {
+                                        return Ok(true);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Ok(false)
+                }
+            })
+            .await
+            .unwrap_or(false);
+
+        // Phase 2: For each OU, sample ONE user and ONE group to check
+        // allowedAttributesEffective. Early return as soon as we find a match.
+
+        // Probe 1: Check lockoutTime writable on any user (HelpDesk)
+        let can_write_user = self
+            .with_connection(|mut ldap| {
+                let probe_bases = probe_bases.clone();
+                async move {
+                    for ou_dn in &probe_bases {
+                        let search_result = ldap
+                            .with_search_options(
+                                ldap3::SearchOptions::new().sizelimit(1),
+                            )
+                            .search(
+                                ou_dn,
+                                Scope::OneLevel,
+                                "(&(objectClass=user)(objectCategory=person))",
+                                vec!["allowedAttributesEffective"],
+                            )
+                            .await;
+
+                        if let Ok(result) = search_result {
+                            for entry in result.0 {
+                                let se = SearchEntry::construct(entry);
+                                if let Some(attrs) =
+                                    se.attrs.get("allowedAttributesEffective")
+                                {
+                                    if attrs.iter().any(|a| {
+                                        a.eq_ignore_ascii_case("lockoutTime")
+                                    }) {
+                                        return Ok(true);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Ok(false)
+                }
+            })
+            .await
+            .unwrap_or(false);
+
+        // Probe 2: Check member writable on any group (AccountOperator)
+        let can_write_group = self
+            .with_connection(|mut ldap| {
+                let probe_bases = probe_bases.clone();
+                async move {
+                    for ou_dn in &probe_bases {
+                        let search_result = ldap
+                            .with_search_options(
+                                ldap3::SearchOptions::new().sizelimit(1),
+                            )
+                            .search(
+                                ou_dn,
+                                Scope::OneLevel,
+                                "(objectClass=group)",
+                                vec!["allowedAttributesEffective"],
+                            )
+                            .await;
+
+                        if let Ok(result) = search_result {
+                            for entry in result.0 {
+                                let se = SearchEntry::construct(entry);
+                                if let Some(attrs) =
+                                    se.attrs.get("allowedAttributesEffective")
+                                {
+                                    if attrs
+                                        .iter()
+                                        .any(|a| a.eq_ignore_ascii_case("member"))
+                                    {
+                                        return Ok(true);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Ok(false)
+                }
+            })
+            .await
+            .unwrap_or(false);
+
+        tracing::info!(
+            can_write_user,
+            can_write_group,
+            can_create,
+            "Permission probe results"
+        );
+
+        Ok((can_write_user, can_write_group, can_create))
+    }
+
     async fn get_schema_attributes(&self) -> Result<Vec<String>> {
         if self.domain.is_none() {
             return Ok(Vec::new());

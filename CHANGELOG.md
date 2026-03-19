@@ -10,13 +10,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.4.0] - 2026-03-19
 
 Epic 4 - Group Management & Bulk Operations. Complete group management with
-browse, member management, bulk operations, and hygiene detection. Also includes
+browse, member management, bulk operations, and hygiene detection. Includes
 LDAP simple bind authentication for testing against standalone AD labs, LDAP
-paged results for large directories, and comprehensive integration tests against
+paged results for large directories, comprehensive integration tests against
 a real AD domain controller populated with [BadBlood](https://github.com/davidprowe/BadBlood).
+Language-independent permission detection via SID RIDs and probe-based
+effective permission discovery using AD constructed attributes.
 
 ### Added
 
+- New `Admin` permission level between AccountOperator and DomainAdmin for
+  managing non-built-in objects (delete/move users, groups, computers)
+- Probe-based permission detection using `allowedAttributesEffective` and
+  `allowedChildClassesEffective` on all OUs (~250ms for 223 OUs). Detects
+  delegated admin rights without requiring specific group membership
+- Language-independent permission detection via well-known SID RIDs (works
+  in any AD locale: French, German, Spanish, etc.)
+- LDAP WhoAmI extended operation to resolve authenticated identity (supports
+  GSSAPI with "Run as" and simple bind)
+- "Authenticated as" display in Home page Permissions card showing the LDAP
+  identity used for operations
+- Custom DSPanel permission groups: `DSPanel-HelpDesk`, `DSPanel-AccountOps`,
+  `DSPanel-Admin`, `DSPanel-DomainAdmin` for organization-specific role mapping
+- `tokenGroups` binary attribute fetching for SID-based group detection with
+  `sid_bytes_to_string` parser
 - Simple bind (username/password) LDAP authentication mode via environment
   variables `DSPANEL_LDAP_SERVER`, `DSPANEL_LDAP_BIND_DN`,
   `DSPANEL_LDAP_BIND_PASSWORD` for testing against non-domain-joined AD labs (4.5)

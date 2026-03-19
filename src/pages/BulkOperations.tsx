@@ -117,7 +117,7 @@ const OPERATION_CARDS: OperationCard[] = [
     label: "Move Groups",
     icon: FolderInput,
     description: "Move groups to a different OU",
-    minPermission: "DomainAdmin",
+    minPermission: "Admin",
   },
   {
     id: "create-groups",

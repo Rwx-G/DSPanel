@@ -30,6 +30,10 @@ const PERM_LABELS: Record<string, { label: string; color: string }> = {
     label: "Account Operator",
     color: "var(--color-perm-accountops)",
   },
+  Admin: {
+    label: "Admin",
+    color: "var(--color-perm-domainadmin)",
+  },
   DomainAdmin: {
     label: "Domain Admin",
     color: "var(--color-perm-domainadmin)",
