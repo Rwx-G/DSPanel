@@ -102,9 +102,8 @@ describe("useMfaGate", () => {
     // Start checkMfa - it will call showCustomDialog which opens a dialog.
     // The dialog promise never resolves in this test, but we can verify
     // both invoke calls were made before the dialog opened.
-    let promise: Promise<boolean>;
     await act(async () => {
-      promise = result.current.checkMfa("PasswordReset");
+      void result.current.checkMfa("PasswordReset");
       // Allow the async invoke calls to settle
       await new Promise((r) => setTimeout(r, 0));
     });

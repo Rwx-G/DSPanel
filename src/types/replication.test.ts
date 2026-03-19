@@ -33,6 +33,7 @@ describe("replication types", () => {
           originatingUsn: 0,
         },
       ],
+      valueMetadata: [],
       isAvailable: true,
       message: null,
     };
@@ -44,6 +45,7 @@ describe("replication types", () => {
     const result: ReplicationMetadataResult = {
       objectDn: "CN=Test,DC=example,DC=com",
       attributes: [],
+      valueMetadata: [],
       isAvailable: false,
       message: "Metadata not available",
     };

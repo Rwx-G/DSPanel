@@ -200,15 +200,6 @@ export function GroupHygiene() {
   const canDelete = hasPermission("Admin");
   const { openTab } = useNavigation();
 
-  const totalIssues =
-    emptyGroups.length +
-    cycles.length +
-    singleMemberGroups.length +
-    staleGroups.length +
-    undescribedGroups.length +
-    deeplyNested.length +
-    duplicateGroups.length;
-
   const handleScan = useCallback(async () => {
     setScanning(true);
     setScanError(null);

@@ -680,7 +680,7 @@ describe("UserLookup", () => {
 
       mockInvoke.mockImplementation(((
         cmd: string,
-        args?: Record<string, unknown>,
+        _args?: Record<string, unknown>,
       ) => {
         if (cmd === "browse_users")
           return Promise.resolve(makeBrowseResult(browseEntries));

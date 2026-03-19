@@ -271,8 +271,6 @@ describe("ComputerLookup", () => {
   });
 
   it("shows Unknown OS when operatingSystem is empty", async () => {
-    const entries = [makeComputerEntry("WS001", { operatingSystem: [""] })];
-
     // Override mapEntryToComputer behavior - OS comes from attributes
     mockInvoke.mockImplementation(((cmd: string) => {
       if (cmd === "browse_computers") {

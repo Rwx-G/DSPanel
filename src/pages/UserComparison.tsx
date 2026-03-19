@@ -141,7 +141,7 @@ function UserSearchField({
             }}
             data-testid={`${testId}-input`}
           />
-          {isSearching && <LoadingSpinner size="sm" />}
+          {isSearching && <LoadingSpinner size={16} />}
         </div>
         {showDropdown && results.length > 0 && (
           <div
@@ -423,7 +423,7 @@ export function UserComparison() {
           data-testid="compare-button"
         >
           {isComparing ? (
-            <LoadingSpinner size="sm" />
+            <LoadingSpinner size={16} />
           ) : (
             <GitCompareArrows size={16} />
           )}

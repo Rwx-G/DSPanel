@@ -4,6 +4,7 @@ import { GroupPicker, type GroupOption } from "@/components/form/GroupPicker";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { useGroupSearch } from "@/hooks/useGroupSearch";
 import { usePermissions } from "@/hooks/usePermissions";
+import { type PermissionLevel } from "@/types/permissions";
 import { parseCnFromDn } from "@/utils/dn";
 import { formatCsv, downloadCsv } from "@/utils/csvExport";
 import { extractErrorMessage } from "@/utils/errorMapping";
@@ -69,7 +70,7 @@ interface OperationCard {
   label: string;
   icon: typeof Trash2;
   description: string;
-  minPermission: string;
+  minPermission: PermissionLevel;
 }
 
 interface OperationCategory {
@@ -442,8 +443,8 @@ export function BulkOperations() {
   });
 
   // Copy memberships state
-  const [sourceUserQuery, setSourceUserQuery] = useState("");
-  const [targetUserQuery, setTargetUserQuery] = useState("");
+  const [, setSourceUserQuery] = useState("");
+  const [, setTargetUserQuery] = useState("");
   const [sourceUser, setSourceUser] = useState<DirectoryEntry | null>(null);
   const [targetUser, setTargetUser] = useState<DirectoryEntry | null>(null);
   const [copyPreviewGroups, setCopyPreviewGroups] = useState<string[]>([]);
@@ -465,7 +466,7 @@ export function BulkOperations() {
   );
 
   // Update manager state
-  const [managerQuery, setManagerQuery] = useState("");
+  const [, setManagerQuery] = useState("");
   const [selectedManager, setSelectedManager] = useState<DirectoryEntry | null>(
     null,
   );
@@ -793,23 +794,6 @@ export function BulkOperations() {
   // ---------------------------------------------------------------------------
   // Copy Memberships handlers
   // ---------------------------------------------------------------------------
-
-  const handleSearchUser = useCallback(
-    async (query: string, setter: (u: DirectoryEntry | null) => void) => {
-      if (!query.trim()) return;
-      try {
-        const results = await invoke<DirectoryEntry[]>("search_users", {
-          query,
-        });
-        if (results.length > 0) {
-          setter(results[0]);
-        }
-      } catch (err) {
-        console.warn("User search failed:", err);
-      }
-    },
-    [],
-  );
 
   const handleCopyPreview = useCallback(async () => {
     if (!sourceUser || !targetUser) return;

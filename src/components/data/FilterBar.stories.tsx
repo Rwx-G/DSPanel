@@ -26,8 +26,8 @@ export const Default: Story = {
 export const WithActiveFilters: Story = {
   render: () => {
     const [filters, setFilters] = useState<FilterChip[]>([
-      { id: "1", label: "Department: IT", field: "department", value: "IT" },
-      { id: "2", label: "Status: Active", field: "status", value: "Active" },
+      { id: "1", label: "Department: IT", value: "IT" },
+      { id: "2", label: "Status: Active", value: "Active" },
     ]);
     return (
       <FilterBar

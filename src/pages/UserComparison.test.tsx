@@ -392,7 +392,7 @@ describe("UserComparison", () => {
 
   it("shows selected user details with title and department", async () => {
     const userA = makeEntry("jdoe", "John Doe");
-    mockInvoke.mockImplementation(async (cmd: string, args?: unknown) => {
+    mockInvoke.mockImplementation(async (cmd: string, _args?: unknown) => {
       if (cmd === "search_users") return [userA];
       if (cmd === "get_user") return userA;
       return null;

@@ -3,7 +3,7 @@ import { renderHook, act } from "@testing-library/react";
 import { useTabDrag } from "./useTabDrag";
 
 function makePointerEvent(
-  type: string,
+  _type: string,
   overrides: Partial<React.PointerEvent> = {},
 ): React.PointerEvent {
   return {
@@ -35,8 +35,8 @@ function makeContainerEl(tabCount: number, tabWidth = 100) {
 }
 
 describe("useTabDrag", () => {
-  let moveTab: ReturnType<typeof vi.fn>;
-  let activateTab: ReturnType<typeof vi.fn>;
+  let moveTab: (fromIndex: number, toIndex: number) => void;
+  let activateTab: (tabId: string) => void;
 
   beforeEach(() => {
     moveTab = vi.fn();

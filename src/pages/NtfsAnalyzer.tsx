@@ -352,7 +352,7 @@ export function NtfsAnalyzer() {
             data-testid="analyze-button"
           >
             {isAnalyzing ? (
-              <LoadingSpinner size="sm" />
+              <LoadingSpinner size={16} />
             ) : (
               <FolderSearch size={14} />
             )}

@@ -182,7 +182,7 @@ export function UncPermissionsAudit({
           data-testid="audit-button"
         >
           {isAuditing ? (
-            <LoadingSpinner size="sm" />
+            <LoadingSpinner size={16} />
           ) : (
             <FolderSearch size={14} />
           )}

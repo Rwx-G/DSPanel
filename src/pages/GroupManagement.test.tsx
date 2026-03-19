@@ -396,7 +396,7 @@ describe("GroupManagement", () => {
         },
       };
 
-      mockInvoke.mockImplementation(((cmd: string, args?: Record<string, unknown>) => {
+      mockInvoke.mockImplementation(((cmd: string, _args?: Record<string, unknown>) => {
         if (cmd === "browse_groups") return Promise.resolve(makeBrowseResult(browseEntries));
         if (cmd === "search_groups") return Promise.resolve([searchEntry]);
         if (cmd === "get_group_members") return Promise.resolve([]);

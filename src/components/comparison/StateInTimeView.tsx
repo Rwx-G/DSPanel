@@ -98,7 +98,7 @@ export function StateInTimeView({
           disabled={isLoading}
           data-testid="load-metadata-button"
         >
-          {isLoading ? <LoadingSpinner size="sm" /> : <History size={14} />}
+          {isLoading ? <LoadingSpinner size={16} /> : <History size={14} />}
           Load Replication History
         </button>
       )}
