@@ -102,9 +102,10 @@ export function HealthBadge({ healthStatus, compact = false }: HealthBadgeProps)
             data-testid="health-tooltip"
           >
             {flagCount === 0 ? (
-              <p className="text-caption text-[var(--color-text-secondary)]">
+              <div className="flex items-center gap-1.5 text-caption text-[var(--color-text-secondary)]">
+                <CheckCircle size={12} className="shrink-0 text-[var(--color-success)]" />
                 No issues detected
-              </p>
+              </div>
             ) : (
               <ul className="space-y-1">
                 {healthStatus.activeFlags.map((flag) => {
@@ -112,12 +113,12 @@ export function HealthBadge({ healthStatus, compact = false }: HealthBadgeProps)
                   return (
                     <li
                       key={flag.name}
-                      className="flex items-start gap-1.5"
+                      className="flex items-center gap-1.5"
                       data-testid={`health-flag-${flag.name}`}
                     >
                       <FlagIcon
                         size={12}
-                        className={`mt-0.5 shrink-0 ${LEVEL_STYLES[flag.severity].split(" ")[1]}`}
+                        className={`mr-1 shrink-0 ${LEVEL_STYLES[flag.severity].split(" ")[1]}`}
                       />
                       <div>
                         <span className="text-caption font-medium text-[var(--color-text-primary)]">

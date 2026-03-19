@@ -237,10 +237,12 @@ impl LdapDirectoryProvider {
         tracing::info!("LDAP connection pool invalidated - will reconnect on next operation");
     }
 
-    /// Executes an LDAP operation with automatic reconnect on stale connection.
+    /// Executes an LDAP operation with automatic reconnect on connection failure.
     ///
-    /// On connection-level failure, invalidates the pool and retries once with
-    /// a fresh connection before propagating the error.
+    /// On connection-level failure (timeout, reset, broken pipe, LDAP protocol
+    /// errors), invalidates the pool and retries once with a fresh connection.
+    /// Business logic errors (missing attributes, permission denied) are
+    /// propagated without retry to avoid unnecessary reconnections.
     async fn with_connection<T, Op, Fut>(&self, operation: Op) -> Result<T>
     where
         Op: Fn(ldap3::Ldap) -> Fut,
@@ -255,7 +257,10 @@ impl LdapDirectoryProvider {
                     || msg.contains("timeout")
                     || msg.contains("broken pipe")
                     || msg.contains("reset")
-                    || msg.contains("closed");
+                    || msg.contains("closed")
+                    || msg.contains("ldap search error")
+                    || msg.contains("ldap search failed")
+                    || msg.contains("ldap paged search");
                 if is_connection_error {
                     tracing::warn!("LDAP connection error, reconnecting: {}", err);
                     self.invalidate_connection().await;
@@ -401,21 +406,31 @@ impl LdapDirectoryProvider {
         let filter = filter.to_string();
         let attrs: Vec<String> = attrs.iter().map(|a| a.to_string()).collect();
 
-        // For small queries (<=1000), use a simple search without pagination.
-        // AD's default MaxPageSize is 1000, so no paging control is needed.
-        // For large queries, use manual paged results control loop.
         if max_results <= 1000 {
+            // Simple search without pagination (within AD's default MaxPageSize).
+            tracing::info!(filter = %filter, max_results, base = %base, "Search: simple path");
             self.with_connection(|mut ldap| {
                 let base = base.clone();
                 let filter = filter.clone();
                 let attrs = attrs.clone();
                 async move {
-                    let (rs, _) = ldap
+                    let search_result = ldap
                         .search(&base, Scope::Subtree, &filter, attrs)
                         .await
-                        .context("LDAP search failed")?
-                        .success()
-                        .context("LDAP search returned error")?;
+                        .context("LDAP search failed")?;
+
+                    let rc = search_result.1.rc;
+
+                    // rc=0: success, rc=4: sizeLimitExceeded (partial results OK)
+                    if rc != 0 && rc != 4 {
+                        anyhow::bail!(
+                            "LDAP search error (rc={}): {}",
+                            rc,
+                            search_result.1.text
+                        );
+                    }
+
+                    let rs = search_result.0;
 
                     let entries: Vec<DirectoryEntry> = rs
                         .into_iter()
@@ -425,64 +440,136 @@ impl LdapDirectoryProvider {
                         })
                         .collect();
 
+                    tracing::debug!(count = entries.len(), rc, "Search: simple path complete");
                     Ok(entries)
                 }
             })
             .await
         } else {
-            // Paged search: use a dedicated connection to avoid leaking
-            // controls into the shared pool.
-            let mut ldap = self.create_connection().await?;
-            let page_size = 500_i32;
-            let mut all_entries = Vec::new();
-            let mut cookie: Vec<u8> = Vec::new();
+            // Paged search: create a dedicated connection inside the retry
+            // loop so stale connections are handled automatically.
+            let domain = self.domain.clone();
+            let server_override = self.server_override.clone();
+            let auth_mode = self.auth_mode.clone();
 
-            loop {
-                let pr_control: RawControl = controls::PagedResults {
-                    size: page_size,
-                    cookie: cookie.clone(),
-                }
-                .into();
-                ldap.with_controls(vec![pr_control]);
+            self.with_connection(|_pooled_ldap| {
+                let base = base.clone();
+                let filter = filter.clone();
+                let attrs = attrs.clone();
+                let domain = domain.clone();
+                let server_override = server_override.clone();
+                let auth_mode = auth_mode.clone();
+                async move {
+                    // Use a fresh dedicated connection for paged search
+                    // to avoid leaking controls into the shared pool.
+                    let mut ldap = create_fresh_connection(
+                        &domain, &server_override, &auth_mode,
+                    ).await?;
 
-                let (rs, result) = ldap
-                    .search(&base, Scope::Subtree, &filter, attrs.clone())
-                    .await
-                    .context("LDAP paged search failed")?
-                    .success()
-                    .context("LDAP paged search returned error")?;
+                    let page_size = 500_i32;
+                    let mut all_entries = Vec::new();
+                    let mut cookie: Vec<u8> = Vec::new();
 
-                for entry in rs {
-                    all_entries.push(search_entry_to_directory_entry(
-                        SearchEntry::construct(entry),
-                    ));
-                }
+                    loop {
+                        let pr_control: RawControl = controls::PagedResults {
+                            size: page_size,
+                            cookie: cookie.clone(),
+                        }
+                        .into();
+                        ldap.with_controls(vec![pr_control]);
 
-                if all_entries.len() >= max_results {
-                    all_entries.truncate(max_results);
-                    break;
-                }
+                        let (rs, result) = ldap
+                            .search(&base, Scope::Subtree, &filter, attrs.clone())
+                            .await
+                            .context("LDAP paged search failed")?
+                            .success()
+                            .context("LDAP paged search returned error")?;
 
-                cookie = Vec::new();
-                for ctrl in &result.ctrls {
-                    if let controls::Control(
-                        Some(controls::ControlType::PagedResults),
-                        ref raw,
-                    ) = *ctrl
-                    {
-                        let pr: controls::PagedResults = raw.parse();
-                        cookie = pr.cookie;
+                        for entry in rs {
+                            all_entries.push(search_entry_to_directory_entry(
+                                SearchEntry::construct(entry),
+                            ));
+                        }
+
+                        if all_entries.len() >= max_results {
+                            all_entries.truncate(max_results);
+                            break;
+                        }
+
+                        cookie = Vec::new();
+                        for ctrl in &result.ctrls {
+                            if let controls::Control(
+                                Some(controls::ControlType::PagedResults),
+                                ref raw,
+                            ) = *ctrl
+                            {
+                                let pr: controls::PagedResults = raw.parse();
+                                cookie = pr.cookie;
+                            }
+                        }
+
+                        if cookie.is_empty() {
+                            break;
+                        }
                     }
-                }
 
-                if cookie.is_empty() {
-                    break;
+                    Ok(all_entries)
                 }
-            }
-
-            Ok(all_entries)
+            })
+            .await
         }
     }
+}
+
+/// Creates a fresh LDAP connection without using the pool.
+///
+/// Used for paged searches that need dedicated connections to avoid
+/// leaking pagination controls into the shared pool.
+async fn create_fresh_connection(
+    domain: &Option<String>,
+    server_override: &Option<String>,
+    auth_mode: &LdapAuthMode,
+) -> Result<ldap3::Ldap> {
+    let host = match server_override {
+        Some(server) => server.clone(),
+        None => domain
+            .as_ref()
+            .context("No domain available")?
+            .clone(),
+    };
+
+    let settings = LdapConnSettings::new();
+    let (conn, mut ldap) =
+        LdapConnAsync::with_settings(settings, &format!("ldap://{}:389", host))
+            .await
+            .context("Failed to connect to LDAP server")?;
+
+    tokio::spawn(conn.drive());
+
+    match auth_mode {
+        LdapAuthMode::SimpleBind { bind_dn, password } => {
+            let result = ldap
+                .simple_bind(bind_dn, password)
+                .await
+                .context("Simple bind failed")?;
+            if result.rc != 0 {
+                anyhow::bail!("Simple bind authentication failed (rc={})", result.rc);
+            }
+        }
+        LdapAuthMode::Gssapi => {
+            #[cfg(feature = "gssapi")]
+            ldap.sasl_gssapi_bind(&host)
+                .await
+                .context("GSSAPI authentication failed")?;
+
+            #[cfg(not(feature = "gssapi"))]
+            ldap.simple_bind("", "")
+                .await
+                .context("Anonymous bind failed")?;
+        }
+    }
+
+    Ok(ldap)
 }
 
 /// Modifies the DACL to set or clear the "User Cannot Change Password" deny ACEs.
@@ -1224,56 +1311,67 @@ impl DirectoryProvider for LdapDirectoryProvider {
             return Ok(Vec::new());
         }
 
+        // Use a dedicated connection to avoid mutating shared base_dn
+        let mut ldap = create_fresh_connection(
+            &self.domain, &self.server_override, &self.auth_mode,
+        ).await?;
+
         // Discover schema naming context via rootDSE
-        let schema_dn = self
-            .with_connection(|mut ldap| async move {
-                let (rs, _) = ldap
-                    .search(
-                        "",
-                        Scope::Base,
-                        "(objectClass=*)",
-                        vec!["schemaNamingContext"],
-                    )
-                    .await
-                    .context("Failed to query rootDSE for schema DN")?
-                    .success()
-                    .context("rootDSE schema query returned error")?;
+        let (rs, _) = ldap
+            .search("", Scope::Base, "(objectClass=*)", vec!["schemaNamingContext"])
+            .await
+            .context("Failed to query rootDSE for schema DN")?
+            .success()
+            .context("rootDSE schema query returned error")?;
 
-                if let Some(entry) = rs.into_iter().next() {
-                    let se = SearchEntry::construct(entry);
-                    if let Some(dn) = se
-                        .attrs
-                        .get("schemaNamingContext")
-                        .and_then(|v| v.first().cloned())
-                    {
-                        return Ok(dn);
-                    }
-                }
-                anyhow::bail!("schemaNamingContext not found in rootDSE")
+        let schema_dn = rs
+            .into_iter()
+            .next()
+            .and_then(|entry| {
+                let se = SearchEntry::construct(entry);
+                se.attrs.get("schemaNamingContext").and_then(|v| v.first().cloned())
             })
-            .await?;
+            .context("schemaNamingContext not found in rootDSE")?;
 
-        // Query all attributeSchema objects for their lDAPDisplayName
+        // Query all attributeSchema objects with paged results
+        let mut names = Vec::new();
+        let mut cookie: Vec<u8> = Vec::new();
         let filter = "(objectClass=attributeSchema)";
-        let attrs = &["lDAPDisplayName"];
+        let attrs = vec!["lDAPDisplayName".to_string()];
 
-        // Use the raw search with paged results on the schema DN
-        let base = self.base_dn.lock().unwrap().clone();
-        // Temporarily override base_dn for schema search
-        *self.base_dn.lock().unwrap() = Some(schema_dn);
-        let results = self.search(filter, attrs, 10000).await;
-        // Restore original base_dn
-        *self.base_dn.lock().unwrap() = base;
+        loop {
+            let pr_control: RawControl = controls::PagedResults {
+                size: 500,
+                cookie: cookie.clone(),
+            }.into();
+            ldap.with_controls(vec![pr_control]);
 
-        let entries = results?;
-        let mut names: Vec<String> = entries
-            .iter()
-            .filter_map(|e| {
-                e.attributes
-                    .get("lDAPDisplayName")
-                    .and_then(|v| v.first().cloned())
-            })
-            .collect();
+            let (rs, result) = ldap
+                .search(&schema_dn, Scope::Subtree, filter, attrs.clone())
+                .await
+                .context("Schema search failed")?
+                .success()
+                .context("Schema search returned error")?;
+
+            for entry in rs {
+                let se = SearchEntry::construct(entry);
+                if let Some(name) = se.attrs.get("lDAPDisplayName").and_then(|v| v.first()) {
+                    names.push(name.clone());
+                }
+            }
+
+            cookie = Vec::new();
+            for ctrl in &result.ctrls {
+                if let controls::Control(Some(controls::ControlType::PagedResults), ref raw) = *ctrl {
+                    let pr: controls::PagedResults = raw.parse();
+                    cookie = pr.cookie;
+                }
+            }
+            if cookie.is_empty() {
+                break;
+            }
+        }
+
         names.sort();
         Ok(names)
     }

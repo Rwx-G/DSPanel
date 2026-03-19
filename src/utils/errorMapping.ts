@@ -76,6 +76,26 @@ export function mapErrorToNotification(
   };
 }
 
+/**
+ * Extracts a human-readable error message from any error type.
+ *
+ * Handles Tauri JSON errors, plain Error objects, and raw strings.
+ * Use this for inline error messages (e.g. progress steps).
+ */
+export function extractErrorMessage(error: unknown): string {
+  const backendError = parseBackendError(error);
+  if (backendError) {
+    return backendError.user_message || backendError.message;
+  }
+  if (typeof error === "object" && error !== null && "message" in error) {
+    return (error as { message: string }).message;
+  }
+  if (typeof error === "string") {
+    return error;
+  }
+  return "An unexpected error occurred";
+}
+
 /** Maps backend error kind to notification severity. */
 function getSeverityForKind(kind: string): NotificationSeverity {
   switch (kind) {

@@ -6,6 +6,7 @@ import { useGroupSearch } from "@/hooks/useGroupSearch";
 import { usePermissions } from "@/hooks/usePermissions";
 import { parseCnFromDn } from "@/utils/dn";
 import { formatCsv, downloadCsv } from "@/utils/csvExport";
+import { extractErrorMessage } from "@/utils/errorMapping";
 import { type DirectoryEntry } from "@/types/directory";
 import {
   Trash2,
@@ -580,7 +581,7 @@ export function BulkOperations() {
           current: i,
           total,
           status: "failed",
-          message: `Failed at step ${i + 1}: ${err}`,
+          message: `Failed at step ${i + 1}: ${extractErrorMessage(err)}`,
         });
         return;
       }
@@ -651,7 +652,7 @@ export function BulkOperations() {
         current: 0,
         total: 1,
         status: "failed",
-        message: `Failed to create group: ${err}`,
+        message: `Failed to create group: ${extractErrorMessage(err)}`,
       });
     }
   }, [sourceGroups, cloneNewName, cloneContainerDn, members]);
@@ -722,7 +723,7 @@ export function BulkOperations() {
         current: 0,
         total: 1,
         status: "failed",
-        message: `Merge failed: ${err}`,
+        message: `Merge failed: ${extractErrorMessage(err)}`,
       });
     }
   }, [sourceGroups, targetGroups]);
@@ -812,7 +813,7 @@ export function BulkOperations() {
           current: i,
           total,
           status: "failed",
-          message: `Failed at step ${i + 1}: ${err}`,
+          message: `Failed at step ${i + 1}: ${extractErrorMessage(err)}`,
         });
         return;
       }
@@ -858,7 +859,7 @@ export function BulkOperations() {
           current: i,
           total,
           status: "failed",
-          message: `Failed to move ${sourceGroups[i].name}: ${err}`,
+          message: `Failed to move ${sourceGroups[i].name}: ${extractErrorMessage(err)}`,
         });
         return;
       }
@@ -949,7 +950,7 @@ export function BulkOperations() {
           current: i,
           total,
           status: "failed",
-          message: `Failed to create "${name}": ${err}`,
+          message: `Failed to create "${name}": ${extractErrorMessage(err)}`,
         });
         return;
       }
@@ -995,7 +996,7 @@ export function BulkOperations() {
           current: i,
           total,
           status: "failed",
-          message: `Failed to update ${sourceGroups[i].name}: ${err}`,
+          message: `Failed to update ${sourceGroups[i].name}: ${extractErrorMessage(err)}`,
         });
         return;
       }

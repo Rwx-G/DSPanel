@@ -1,9 +1,9 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo, useId } from "react";
+import { createPortal } from "react-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { SearchBar } from "@/components/common/SearchBar";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { EmptyState } from "@/components/common/EmptyState";
-import { StatusBadge } from "@/components/common/StatusBadge";
 import { VirtualizedList } from "@/components/data/VirtualizedList";
 import {
   type DirectoryEntry,
@@ -15,7 +15,101 @@ import { useGroupBrowse } from "@/hooks/useGroupBrowse";
 import { useNavigation } from "@/contexts/NavigationContext";
 import { usePermissions } from "@/hooks/usePermissions";
 import { GroupDetail } from "@/pages/GroupDetail";
-import { Users, AlertCircle } from "lucide-react";
+import { Users, AlertCircle, Shield, Mail } from "lucide-react";
+
+const SCOPE_LABELS: Record<string, string> = {
+  Global: "Global",
+  DomainLocal: "Domain Local",
+  Universal: "Universal",
+  Unknown: "Unknown",
+};
+
+const CATEGORY_COLORS: Record<string, string> = {
+  Security: "bg-[var(--color-info)]/10 text-[var(--color-info)]",
+  Distribution: "bg-[var(--color-warning)]/10 text-[var(--color-warning)]",
+};
+
+const SCOPE_COLORS: Record<string, string> = {
+  Global: "bg-[var(--color-success)]/10 text-[var(--color-success)]",
+  DomainLocal: "bg-[var(--color-surface-hover)] text-[var(--color-text-primary)]",
+  Universal: "bg-[var(--color-primary-subtle)] text-[var(--color-primary)]",
+  Unknown: "bg-[var(--color-surface-hover)] text-[var(--color-text-secondary)]",
+};
+
+function GroupBadge({ group }: { group: DirectoryGroup }) {
+  const [showTooltip, setShowTooltip] = useState(false);
+  const tooltipId = useId();
+  const badgeRef = useRef<HTMLDivElement>(null);
+  const [tooltipPos, setTooltipPos] = useState<{ top: number; left: number } | null>(null);
+
+  useEffect(() => {
+    if (!showTooltip || !badgeRef.current) {
+      setTooltipPos(null);
+      return;
+    }
+    const rect = badgeRef.current.getBoundingClientRect();
+    const tooltipWidth = 200;
+    let left = rect.left + rect.width / 2 - tooltipWidth / 2;
+    let top = rect.bottom + 4;
+    if (left < 4) left = 4;
+    if (left + tooltipWidth > window.innerWidth - 4) left = window.innerWidth - tooltipWidth - 4;
+    if (top + 80 > window.innerHeight) top = rect.top - 4;
+    setTooltipPos({ top, left });
+  }, [showTooltip]);
+
+  const isSecurity = group.category === "Security";
+  const CategoryIcon = isSecurity ? Shield : Mail;
+  const scopeAbbr =
+    group.scope === "DomainLocal" ? "DL" : group.scope === "Universal" ? "U" : "G";
+
+  return (
+    <>
+      <div
+        ref={badgeRef}
+        onMouseEnter={() => setShowTooltip(true)}
+        onMouseLeave={() => setShowTooltip(false)}
+        className="inline-flex shrink-0 items-center gap-1"
+        aria-describedby={showTooltip ? tooltipId : undefined}
+      >
+        <span className={`inline-flex items-center rounded-full p-1 ${CATEGORY_COLORS[group.category] || ""}`}>
+          <CategoryIcon size={10} />
+        </span>
+        <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none ${SCOPE_COLORS[group.scope] || SCOPE_COLORS.Unknown}`}>
+          {scopeAbbr}
+        </span>
+      </div>
+      {showTooltip &&
+        tooltipPos &&
+        createPortal(
+          <div
+            id={tooltipId}
+            role="tooltip"
+            className="fixed z-50 w-[200px] rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-2 shadow-lg"
+            style={{ top: tooltipPos.top, left: tooltipPos.left }}
+          >
+            <ul className="space-y-1">
+              <li className="flex items-center gap-1.5">
+                <CategoryIcon size={12} className={`mr-1 shrink-0 ${isSecurity ? "text-[var(--color-info)]" : "text-[var(--color-warning)]"}`} />
+                <span className="text-caption font-medium text-[var(--color-text-primary)]">{group.category}</span>
+              </li>
+              <li className="flex items-center gap-1.5">
+                <Users size={12} className="mr-1 shrink-0 text-[var(--color-text-secondary)]" />
+                <div>
+                  <span className="text-caption font-medium text-[var(--color-text-primary)]">{SCOPE_LABELS[group.scope] || group.scope}</span>
+                  <p className="text-[10px] text-[var(--color-text-secondary)]">Scope</p>
+                </div>
+              </li>
+              <li className="flex items-center gap-1.5">
+                <Users size={12} className="mr-1 shrink-0 text-[var(--color-text-secondary)]" />
+                <span className="text-caption font-medium text-[var(--color-text-primary)]">{group.memberCount} member{group.memberCount !== 1 ? "s" : ""}</span>
+              </li>
+            </ul>
+          </div>,
+          document.body,
+        )}
+    </>
+  );
+}
 
 export function GroupManagement() {
   const {
@@ -43,6 +137,21 @@ export function GroupManagement() {
 
   const [members, setMembers] = useState<DirectoryEntry[]>([]);
   const [membersLoading, setMembersLoading] = useState(false);
+  const [categoryFilter, setCategoryFilter] = useState<"all" | "Security" | "Distribution">("all");
+
+  const filteredGroups = useMemo(() => {
+    if (categoryFilter === "all") return groups;
+    return groups.filter((g) => g.category === categoryFilter);
+  }, [groups, categoryFilter]);
+
+  const categoryCounts = useMemo(() => {
+    let security = 0, distribution = 0;
+    for (const g of groups) {
+      if (g.category === "Security") security++;
+      else distribution++;
+    }
+    return { security, distribution };
+  }, [groups]);
 
   // Handle cross-module deep-linking: select group by DN
   const deepLinkHandled = useRef<string | null>(null);
@@ -142,10 +251,7 @@ export function GroupManagement() {
             {group.scope} {group.category} - {group.memberCount} member(s)
           </p>
         </div>
-        <StatusBadge
-          text={group.category}
-          variant={group.category === "Security" ? "neutral" : "warning"}
-        />
+        <GroupBadge group={group} />
       </button>
     ),
     [selectedGroup, setSelectedGroup],
@@ -153,14 +259,40 @@ export function GroupManagement() {
 
   return (
     <div className="flex h-full flex-col" data-testid="group-management">
-      <div className="border-b border-[var(--color-border-subtle)] p-3">
-        <SearchBar
-          value={filterText}
-          onChange={handleFilterChange}
-          onSearch={handleFilterChange}
-          placeholder="Search groups by name or description..."
-          debounceMs={300}
-        />
+      <div className="flex items-center gap-2 border-b border-[var(--color-border-subtle)] px-3 py-2">
+        <div className="flex-1">
+          <SearchBar
+            value={filterText}
+            onChange={handleFilterChange}
+            onSearch={handleFilterChange}
+            placeholder="Search groups by name or description..."
+            debounceMs={300}
+          />
+        </div>
+        <div className="flex items-center gap-1">
+          {(
+            [
+              { key: "all", label: "All" },
+              { key: "Security", label: "Security" },
+              { key: "Distribution", label: "Distribution" },
+            ] as const
+          ).map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => setCategoryFilter(key)}
+              className={`btn btn-sm ${
+                categoryFilter === key ? "btn-outline" : "btn-ghost"
+              }`}
+            >
+              {label}
+              {key !== "all" && (
+                <span className="ml-1 opacity-70">
+                  ({key === "Security" ? categoryCounts.security : categoryCounts.distribution})
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div
@@ -170,9 +302,9 @@ export function GroupManagement() {
       >
         {loading && "Loading groups..."}
         {!loading &&
-          groups.length > 0 &&
-          `${groups.length} group${groups.length > 1 ? "s" : ""} found`}
-        {!loading && groups.length === 0 && !error && "No groups found"}
+          filteredGroups.length > 0 &&
+          `${filteredGroups.length} group${filteredGroups.length > 1 ? "s" : ""} found`}
+        {!loading && filteredGroups.length === 0 && !error && "No groups found"}
         {error && `Error: ${error}`}
       </div>
 
@@ -200,7 +332,7 @@ export function GroupManagement() {
           </div>
         )}
 
-        {!loading && !error && groups.length === 0 && (
+        {!loading && !error && filteredGroups.length === 0 && (
           <div
             className="flex flex-1 items-center justify-center"
             data-testid="group-management-empty"
@@ -209,15 +341,17 @@ export function GroupManagement() {
               icon={<Users size={48} />}
               title="No groups found"
               description={
-                filterText
-                  ? `No groups match "${filterText}".`
-                  : "No groups available."
+                categoryFilter !== "all"
+                  ? `No ${categoryFilter} groups found.`
+                  : filterText
+                    ? `No groups match "${filterText}".`
+                    : "No groups available."
               }
             />
           </div>
         )}
 
-        {!loading && !error && groups.length > 0 && (
+        {!loading && !error && filteredGroups.length > 0 && (
           <>
             <div className="flex w-64 shrink-0 flex-col overflow-hidden border-r border-[var(--color-border-subtle)]">
               <div
@@ -225,7 +359,7 @@ export function GroupManagement() {
                 data-testid="group-results-list"
               >
                 <VirtualizedList
-                  items={groups}
+                  items={filteredGroups}
                   renderItem={renderGroupItem}
                   estimateSize={52}
                   itemKey={(group) => group.distinguishedName}

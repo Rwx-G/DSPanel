@@ -1,6 +1,5 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { StatusBadge } from "@/components/common/StatusBadge";
 import { CopyButton } from "@/components/common/CopyButton";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import {
@@ -28,6 +27,8 @@ import {
   ChevronRight,
   Users,
   User,
+  Shield,
+  Mail,
   FolderOpen,
   X,
 } from "lucide-react";
@@ -552,11 +553,23 @@ export function GroupDetail({
           {group.displayName || group.samAccountName}
         </h2>
         <div className="flex items-center gap-2">
-          <StatusBadge text={group.scope} variant="info" />
-          <StatusBadge
-            text={group.category}
-            variant={group.category === "Security" ? "neutral" : "warning"}
-          />
+          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${
+            group.category === "Security"
+              ? "bg-[var(--color-info)]/10 text-[var(--color-info)]"
+              : "bg-[var(--color-warning)]/10 text-[var(--color-warning)]"
+          }`}>
+            {group.category === "Security" ? <Shield size={12} /> : <Mail size={12} />}
+            {group.category}
+          </span>
+          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${
+            group.scope === "Global"
+              ? "bg-[var(--color-success)]/10 text-[var(--color-success)]"
+              : group.scope === "Universal"
+                ? "bg-[var(--color-primary-subtle)] text-[var(--color-primary)]"
+                : "bg-[var(--color-surface-hover)] text-[var(--color-text-primary)]"
+          }`}>
+            {group.scope === "DomainLocal" ? "Domain Local" : group.scope}
+          </span>
         </div>
       </div>
 

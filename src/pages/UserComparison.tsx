@@ -22,6 +22,8 @@ import {
 import { GroupMembersDialog } from "@/components/dialogs/GroupMembersDialog";
 import { UncPermissionsAudit } from "@/components/comparison/UncPermissionsAudit";
 import { useNotifications } from "@/contexts/NotificationContext";
+import { usePermissions } from "@/hooks/usePermissions";
+import { extractErrorMessage } from "@/utils/errorMapping";
 
 function parseDnOu(dn: string): string {
   const ou = formatOuPath(dn);
@@ -277,6 +279,8 @@ export function UserComparison() {
   } = useComparison();
 
   const { notify } = useNotifications();
+  const { hasPermission } = usePermissions();
+  const canModifyGroups = hasPermission("HelpDesk");
   const { openTabs, activeTabId, clearTabData } = useNavigation();
 
   // React to prefill data passed via tab navigation
@@ -321,6 +325,7 @@ export function UserComparison() {
         items.push({
           label: `Add ${userA.displayName ?? userA.samAccountName} to this group`,
           icon: <UserPlus size={14} />,
+          disabled: !canModifyGroups,
           onClick: async () => {
             try {
               await invoke("add_user_to_group", {
@@ -333,7 +338,7 @@ export function UserComparison() {
               );
               compare();
             } catch (err) {
-              notify(`Failed to add to group: ${err}`, "error");
+              notify(extractErrorMessage(err), "error");
             }
           },
         });
@@ -343,6 +348,7 @@ export function UserComparison() {
         items.push({
           label: `Add ${userB.displayName ?? userB.samAccountName} to this group`,
           icon: <UserPlus size={14} />,
+          disabled: !canModifyGroups,
           onClick: async () => {
             try {
               await invoke("add_user_to_group", {
@@ -355,7 +361,7 @@ export function UserComparison() {
               );
               compare();
             } catch (err) {
-              notify(`Failed to add to group: ${err}`, "error");
+              notify(extractErrorMessage(err), "error");
             }
           },
         });
@@ -364,7 +370,7 @@ export function UserComparison() {
       setContextMenuItems(items);
       setContextMenuPos({ x: e.clientX, y: e.clientY });
     },
-    [userA, userB, compare, notify],
+    [userA, userB, compare, notify, canModifyGroups],
   );
 
   const userAName = userA?.displayName ?? userA?.samAccountName ?? "User A";
