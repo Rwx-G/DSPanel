@@ -104,8 +104,10 @@ pub fn run() {
                     tracing::warn!("Permission detection failed: {}", e);
                 }
                 // Store the authenticated identity resolved during permission detection
-                if let Some(name) = provider.authenticated_user() {
-                    permission_svc.set_authenticated_user(name);
+                if let Some(ref name) = provider.authenticated_user() {
+                    permission_svc.set_authenticated_user(name.clone());
+                    state.audit_service.set_operator(name.clone());
+                    tracing::info!(operator = %name, "Audit operator set to authenticated identity");
                 }
             });
             tracing::info!("DSPanel setup complete");

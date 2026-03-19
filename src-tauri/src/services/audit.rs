@@ -23,7 +23,7 @@ pub struct AuditEntry {
 /// Entries are stored in a SQLite database for durability and query performance.
 pub struct AuditService {
     conn: Mutex<Connection>,
-    operator: String,
+    operator: Mutex<String>,
 }
 
 impl Default for AuditService {
@@ -51,10 +51,16 @@ impl AuditService {
 
         let svc = Self {
             conn: Mutex::new(conn),
-            operator,
+            operator: Mutex::new(operator),
         };
         svc.init_schema();
         svc
+    }
+
+    /// Updates the operator identity (called after WhoAmI resolves the
+    /// authenticated user, which may differ from the Windows USERNAME).
+    pub fn set_operator(&self, operator: String) {
+        *self.operator.lock().unwrap() = operator;
     }
 
     /// Creates an AuditService with an in-memory database (for testing).
@@ -63,7 +69,9 @@ impl AuditService {
         let conn = Connection::open_in_memory().expect("Failed to open in-memory SQLite");
         let svc = Self {
             conn: Mutex::new(conn),
-            operator: std::env::var("USERNAME").unwrap_or_else(|_| "Test".to_string()),
+            operator: Mutex::new(
+                std::env::var("USERNAME").unwrap_or_else(|_| "Test".to_string()),
+            ),
         };
         svc.init_schema();
         svc
@@ -120,7 +128,7 @@ impl AuditService {
     pub fn log_success(&self, action: &str, target_dn: &str, details: &str) {
         let entry = AuditEntry {
             timestamp: chrono::Utc::now().to_rfc3339(),
-            operator: self.operator.clone(),
+            operator: self.operator.lock().unwrap().clone(),
             action: action.to_string(),
             target_dn: target_dn.to_string(),
             details: details.to_string(),
@@ -140,7 +148,7 @@ impl AuditService {
     pub fn log_failure(&self, action: &str, target_dn: &str, error: &str) {
         let entry = AuditEntry {
             timestamp: chrono::Utc::now().to_rfc3339(),
-            operator: self.operator.clone(),
+            operator: self.operator.lock().unwrap().clone(),
             action: action.to_string(),
             target_dn: target_dn.to_string(),
             details: error.to_string(),
@@ -286,7 +294,7 @@ mod tests {
             let conn = Connection::open(&path).unwrap();
             let svc = AuditService {
                 conn: Mutex::new(conn),
-                operator: "test".to_string(),
+                operator: Mutex::new("test".to_string()),
             };
             svc.init_schema();
             svc.log_success("TestAction", "CN=Test", "test details");
@@ -298,7 +306,7 @@ mod tests {
             let conn = Connection::open(&path).unwrap();
             let svc = AuditService {
                 conn: Mutex::new(conn),
-                operator: "test".to_string(),
+                operator: Mutex::new("test".to_string()),
             };
             svc.init_schema();
             assert_eq!(svc.count(), 1);
@@ -368,7 +376,7 @@ mod tests {
         let conn = Connection::open_in_memory().expect("open in-memory");
         let svc = AuditService {
             conn: Mutex::new(conn),
-            operator: "test".to_string(),
+            operator: Mutex::new("test".to_string()),
         };
         svc.init_schema();
         svc.init_schema(); // second call - should be a no-op

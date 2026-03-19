@@ -1,10 +1,10 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { PermissionGate } from "@/components/common/PermissionGate";
 import { useDialog } from "@/contexts/DialogContext";
 import { useNotifications } from "@/contexts/NotificationContext";
 import { usePermissions } from "@/hooks/usePermissions";
 import { type DirectoryUser } from "@/types/directory";
+import { extractErrorMessage } from "@/utils/errorMapping";
 import { type DryRunChange } from "@/components/dialogs/DryRunPreviewDialog";
 
 interface PasswordFlagsEditorProps {
@@ -27,6 +27,7 @@ export function PasswordFlagsEditor({
     useState(false);
   const [adCannotChangePassword, setAdCannotChangePassword] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [refreshCount, setRefreshCount] = useState(0);
 
   // Fetch the DACL-based "Cannot Change Password" flag and reset state on user change
   useEffect(() => {
@@ -52,7 +53,7 @@ export function PasswordFlagsEditor({
     return () => {
       cancelled = true;
     };
-  }, [user.distinguishedName, user.passwordNeverExpires]);
+  }, [user.distinguishedName, user.passwordNeverExpires, refreshCount]);
 
   const isDirty = useMemo(
     () =>
@@ -100,15 +101,10 @@ export function PasswordFlagsEditor({
         userCannotChangePassword,
       });
       notify("Password flags updated successfully", "success");
+      setRefreshCount((c) => c + 1);
       onRefresh();
     } catch (e) {
-      const msg = typeof e === "string" ? e : "Failed to update password flags";
-      try {
-        const parsed = JSON.parse(msg);
-        notify(parsed.userMessage || parsed.message || msg, "error");
-      } catch {
-        notify(msg, "error");
-      }
+      notify(extractErrorMessage(e), "error");
     } finally {
       setSaving(false);
     }
