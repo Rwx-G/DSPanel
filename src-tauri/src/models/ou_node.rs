@@ -12,6 +12,7 @@ pub struct OUNode {
     pub has_children: Option<bool>,
 }
 
+#[allow(clippy::unwrap_used)]
 #[cfg(test)]
 mod tests {
     use super::*;

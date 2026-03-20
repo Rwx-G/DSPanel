@@ -181,8 +181,8 @@ fn parse_date_to_ms(date_str: &str) -> Result<i64, ()> {
     Err(())
 }
 
-#[cfg(test)]
 #[allow(clippy::unwrap_used)]
+#[cfg(test)]
 mod tests {
     use super::*;
 

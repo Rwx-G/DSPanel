@@ -44,6 +44,7 @@ pub fn format_bytes(bytes: u64) -> String {
     }
 }
 
+#[allow(clippy::unwrap_used)]
 #[cfg(test)]
 mod tests {
     use super::*;

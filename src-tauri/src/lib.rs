@@ -1,6 +1,6 @@
 // Enforced: unwrap() is forbidden in production code.
 // Use expect("context") for Mutex locks, or proper error handling for Result/Option.
-// Tests are exempt via #[cfg(test)] allow attributes.
+// Tests are exempt via #[allow(clippy::unwrap_used)] attributes.
 #![deny(clippy::unwrap_used)]
 
 pub mod commands;
@@ -279,6 +279,7 @@ pub fn run() {
         });
 }
 
+#[allow(clippy::unwrap_used)]
 #[cfg(test)]
 mod tests {
     use super::*;

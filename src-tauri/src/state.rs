@@ -76,7 +76,8 @@ impl AppState {
     }
 
     /// Creates an AppState with in-memory services (no file I/O) for testing.
-    #[cfg(test)]
+    #[allow(clippy::unwrap_used)]
+#[cfg(test)]
     pub fn new_for_test(
         provider: Arc<dyn DirectoryProvider>,
         permission_config: PermissionConfig,
@@ -103,6 +104,7 @@ impl AppState {
     }
 }
 
+#[allow(clippy::unwrap_used)]
 #[cfg(test)]
 mod tests {
     use super::*;

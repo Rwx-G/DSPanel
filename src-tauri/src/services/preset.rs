@@ -514,8 +514,8 @@ fn sanitize_filename(name: &str) -> String {
     sanitized.trim_matches('_').to_string()
 }
 
-#[cfg(test)]
 #[allow(clippy::unwrap_used)]
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::models::PresetType;

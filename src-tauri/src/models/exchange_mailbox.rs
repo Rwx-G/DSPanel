@@ -109,6 +109,7 @@ pub fn extract_exchange_info(
     })
 }
 
+#[allow(clippy::unwrap_used)]
 #[cfg(test)]
 mod tests {
     use super::*;

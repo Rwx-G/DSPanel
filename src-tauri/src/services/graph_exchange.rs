@@ -64,7 +64,8 @@ impl GraphExchangeService {
     }
 
     /// Creates a service with custom base URLs (for testing with mock servers).
-    #[cfg(test)]
+    #[allow(clippy::unwrap_used)]
+#[cfg(test)]
     fn new_with_base_urls(graph_base_url: &str, auth_base_url: &str) -> Self {
         Self {
             config: RwLock::new(GraphConfig::default()),
@@ -416,8 +417,8 @@ struct GraphEmailAddress {
     address: Option<String>,
 }
 
-#[cfg(test)]
 #[allow(clippy::unwrap_used)]
+#[cfg(test)]
 mod tests {
     use super::*;
 

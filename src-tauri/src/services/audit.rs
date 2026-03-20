@@ -64,7 +64,8 @@ impl AuditService {
     }
 
     /// Creates an AuditService with an in-memory database (for testing).
-    #[cfg(test)]
+    #[allow(clippy::unwrap_used)]
+#[cfg(test)]
     pub fn new_in_memory() -> Self {
         let conn = Connection::open_in_memory().expect("Failed to open in-memory SQLite");
         let svc = Self {
@@ -197,8 +198,8 @@ impl AuditService {
     }
 }
 
-#[cfg(test)]
 #[allow(clippy::unwrap_used)]
+#[cfg(test)]
 mod tests {
     use super::*;
 

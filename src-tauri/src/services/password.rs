@@ -207,8 +207,8 @@ pub async fn generate_safe_password(
     unreachable!()
 }
 
-#[cfg(test)]
 #[allow(clippy::unwrap_used)]
+#[cfg(test)]
 mod tests {
     use super::*;
 

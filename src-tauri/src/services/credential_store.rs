@@ -119,8 +119,8 @@ impl CredentialStore for InMemoryCredentialStore {
     }
 }
 
-#[cfg(test)]
 #[allow(clippy::unwrap_used)]
+#[cfg(test)]
 mod tests {
     use super::*;
 

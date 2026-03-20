@@ -235,6 +235,7 @@ pub fn analyze(base_path: &str, max_depth: usize) -> NtfsAnalysisResult {
     }
 }
 
+#[allow(clippy::unwrap_used)]
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -237,8 +237,8 @@ fn extract_cn(dn: &str) -> Option<String> {
         .map(|cn| cn.to_string())
 }
 
-#[cfg(test)]
 #[allow(clippy::unwrap_used)]
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::services::directory::tests::MockDirectoryProvider;

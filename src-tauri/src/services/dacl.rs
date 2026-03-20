@@ -290,6 +290,7 @@ pub fn set_cannot_change_password(sd_bytes: &[u8], deny: bool) -> Result<Vec<u8>
     Ok(result)
 }
 
+#[allow(clippy::unwrap_used)]
 #[cfg(test)]
 mod tests {
     use super::*;

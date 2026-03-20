@@ -2304,8 +2304,8 @@ pub fn is_graph_configured(state: State<'_, AppState>) -> bool {
     state.graph_exchange.is_configured()
 }
 
-#[cfg(test)]
 #[allow(clippy::unwrap_used)]
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::services::directory::tests::MockDirectoryProvider;

@@ -89,7 +89,8 @@ impl MfaService {
     }
 
     /// Creates an MfaService without file persistence (for testing).
-    #[cfg(test)]
+    #[allow(clippy::unwrap_used)]
+#[cfg(test)]
     pub fn new_in_memory() -> Self {
         Self {
             secret: Mutex::new(None),
@@ -328,8 +329,8 @@ fn generate_totp(secret: &[u8], time_step: u64) -> Result<String> {
     Ok(format!("{:06}", otp))
 }
 
-#[cfg(test)]
 #[allow(clippy::unwrap_used)]
+#[cfg(test)]
 mod tests {
     use super::*;
 

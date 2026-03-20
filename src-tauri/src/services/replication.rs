@@ -272,6 +272,7 @@ pub fn get_timeline_timestamps(metadata: &[AttributeMetadata]) -> Vec<String> {
     timestamps
 }
 
+#[allow(clippy::unwrap_used)]
 #[cfg(test)]
 mod tests {
     use super::*;
