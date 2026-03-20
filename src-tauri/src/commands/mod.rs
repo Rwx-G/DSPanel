@@ -1875,7 +1875,10 @@ pub async fn resolve_dns(hostname: String) -> Result<Vec<String>, AppError> {
 
 /// Returns the configured preset storage path.
 pub(crate) fn get_preset_path_inner(state: &AppState) -> Option<String> {
-    state.preset_service.get_path().map(|p| p.to_string_lossy().to_string())
+    state
+        .preset_service
+        .get_path()
+        .map(|p| p.to_string_lossy().to_string())
 }
 
 /// Validates and sets the preset storage path, loads presets and starts watching.
@@ -2101,7 +2104,15 @@ pub async fn create_user(
     attributes: std::collections::HashMap<String, Vec<String>>,
     state: State<'_, AppState>,
 ) -> Result<String, AppError> {
-    create_user_inner(&state, &cn, &container_dn, &sam_account_name, &password, &attributes).await
+    create_user_inner(
+        &state,
+        &cn,
+        &container_dn,
+        &sam_account_name,
+        &password,
+        &attributes,
+    )
+    .await
 }
 
 /// Modifies an attribute on an AD object. Requires AccountOperator+.
@@ -4587,11 +4598,12 @@ mod tests {
     async fn test_create_user_checks_login_uniqueness() {
         let user = make_user_entry("jsmith", "John Smith");
         let provider = Arc::new(
-            crate::services::directory::tests::MockDirectoryProvider::new()
-                .with_users(vec![user]),
+            crate::services::directory::tests::MockDirectoryProvider::new().with_users(vec![user]),
         );
         let state = AppState::new_for_test(provider, PermissionConfig::default());
-        state.permission_service.set_level(PermissionLevel::AccountOperator);
+        state
+            .permission_service
+            .set_level(PermissionLevel::AccountOperator);
 
         let result = create_user_inner(
             &state,
@@ -4670,8 +4682,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_modify_attribute_captures_snapshot() {
-        let (state, _) =
-            make_state_with_level_and_provider(PermissionLevel::AccountOperator);
+        let (state, _) = make_state_with_level_and_provider(PermissionLevel::AccountOperator);
 
         modify_attribute_inner(
             &state,

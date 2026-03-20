@@ -1238,12 +1238,7 @@ impl DirectoryProvider for DemoDirectoryProvider {
         Ok(format!("CN={},{}", cn, container_dn))
     }
 
-    async fn modify_attribute(
-        &self,
-        _dn: &str,
-        _attr: &str,
-        _values: &[String],
-    ) -> Result<()> {
+    async fn modify_attribute(&self, _dn: &str, _attr: &str, _values: &[String]) -> Result<()> {
         Ok(())
     }
 

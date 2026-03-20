@@ -105,7 +105,10 @@ mod tests {
         };
         let json = serde_json::to_string(&settings).unwrap();
         let loaded: AppSettings = serde_json::from_str(&json).unwrap();
-        assert_eq!(loaded.disabled_ou.as_deref(), Some("OU=Disabled,DC=example,DC=com"));
+        assert_eq!(
+            loaded.disabled_ou.as_deref(),
+            Some("OU=Disabled,DC=example,DC=com")
+        );
     }
 
     #[test]
@@ -121,7 +124,10 @@ mod tests {
         assert!(svc.disabled_ou().is_none());
 
         svc.set_disabled_ou(Some("OU=Disabled,DC=test,DC=com".to_string()));
-        assert_eq!(svc.disabled_ou().as_deref(), Some("OU=Disabled,DC=test,DC=com"));
+        assert_eq!(
+            svc.disabled_ou().as_deref(),
+            Some("OU=Disabled,DC=test,DC=com")
+        );
     }
 
     #[test]

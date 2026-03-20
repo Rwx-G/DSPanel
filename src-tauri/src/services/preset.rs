@@ -1,8 +1,8 @@
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, RwLock};
 
-use notify_debouncer_mini::{new_debouncer, DebouncedEventKind, Debouncer};
 use notify::RecursiveMode;
+use notify_debouncer_mini::{new_debouncer, DebouncedEventKind, Debouncer};
 
 use crate::models::Preset;
 

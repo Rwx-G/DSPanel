@@ -70,7 +70,10 @@ mod tests {
         assert_eq!(deserialized.name, "New Developer");
         assert_eq!(deserialized.preset_type, PresetType::Onboarding);
         assert_eq!(deserialized.groups.len(), 1);
-        assert_eq!(deserialized.attributes.get("department").unwrap(), "Engineering");
+        assert_eq!(
+            deserialized.attributes.get("department").unwrap(),
+            "Engineering"
+        );
     }
 
     #[test]
