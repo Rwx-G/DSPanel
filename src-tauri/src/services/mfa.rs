@@ -90,7 +90,7 @@ impl MfaService {
 
     /// Creates an MfaService without file persistence (for testing).
     #[allow(clippy::unwrap_used)]
-#[cfg(test)]
+    #[cfg(test)]
     pub fn new_in_memory() -> Self {
         Self {
             secret: Mutex::new(None),

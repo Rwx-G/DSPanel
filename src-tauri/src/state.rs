@@ -77,7 +77,7 @@ impl AppState {
 
     /// Creates an AppState with in-memory services (no file I/O) for testing.
     #[allow(clippy::unwrap_used)]
-#[cfg(test)]
+    #[cfg(test)]
     pub fn new_for_test(
         provider: Arc<dyn DirectoryProvider>,
         permission_config: PermissionConfig,
