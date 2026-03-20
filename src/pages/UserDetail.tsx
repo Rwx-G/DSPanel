@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { CopyButton } from "@/components/common/CopyButton";
 import { HealthBadge } from "@/components/common/HealthBadge";
@@ -21,8 +21,11 @@ import { GroupMembersDialog } from "@/components/dialogs/GroupMembersDialog";
 import { type DirectoryUser } from "@/types/directory";
 import type { AccountHealthStatus, HealthLevel } from "@/types/health";
 import { parseCnFromDn } from "@/utils/dn";
-import { Users, FolderOpen } from "lucide-react";
+import { Users, FolderOpen, Save, ArrowUp, AlertTriangle } from "lucide-react";
 import { useNavigation } from "@/contexts/NavigationContext";
+import { usePermissions } from "@/hooks/usePermissions";
+import { useModifyAttribute } from "@/hooks/useModifyAttribute";
+import { useDialog } from "@/contexts/DialogContext";
 import { StateInTimeView } from "@/components/comparison/StateInTimeView";
 
 /** Maps health flag names to the PropertyGrid label they correspond to. */
@@ -80,8 +83,139 @@ export function UserDetail({
     name: string;
   } | null>(null);
   const { openTab } = useNavigation();
+  const { hasPermission } = usePermissions();
+  const canEdit = hasPermission("AccountOperator");
+  const { pendingChanges, saving, stageChange, clearChanges, submitChanges } =
+    useModifyAttribute();
+  const { showConfirmation, showCustomDialog } = useDialog();
 
   const handleRefresh = onRefresh ?? (() => {});
+
+  const handleSaveChanges = useCallback(async () => {
+    if (pendingChanges.length === 0) return;
+    const hasAdvanced = pendingChanges.some((c) => c.advanced);
+
+    let confirmed: boolean;
+
+    if (hasAdvanced) {
+      confirmed =
+        (await showCustomDialog<boolean>((resolve) => (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--color-surface-overlay)]">
+            <div
+              className="mx-4 w-full max-w-md rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] shadow-lg"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center gap-2 border-b border-[var(--color-border-subtle)] px-4 py-3">
+                <AlertTriangle
+                  size={20}
+                  className="text-[var(--color-warning)]"
+                />
+                <h2 className="text-body font-semibold text-[var(--color-text-primary)]">
+                  Confirm Attribute Changes
+                </h2>
+              </div>
+              <div className="px-4 py-3 space-y-3">
+                <p className="text-body text-[var(--color-text-primary)]">
+                  Apply {pendingChanges.length} change(s) to{" "}
+                  {user.displayName || user.samAccountName}?
+                </p>
+                <div className="flex items-start gap-2 rounded-md border border-[var(--color-warning)] bg-[var(--color-warning-bg)] px-3 py-2">
+                  <AlertTriangle
+                    size={16}
+                    className="mt-0.5 shrink-0 text-[var(--color-warning)]"
+                  />
+                  <p className="text-caption text-[var(--color-warning)]">
+                    You are modifying advanced attributes. Incorrect values may
+                    break authentication, group resolution, or mail delivery.
+                  </p>
+                </div>
+                <details>
+                  <summary className="cursor-pointer text-caption text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]">
+                    Details
+                  </summary>
+                  <pre className="mt-1 max-h-32 overflow-auto rounded bg-[var(--color-surface-bg)] p-2 text-caption text-[var(--color-text-secondary)]">
+                    {pendingChanges
+                      .map(
+                        (c) =>
+                          `${c.advanced ? "[ADV] " : ""}${c.attributeName}: "${c.oldValue}" -> "${c.newValue}"`,
+                      )
+                      .join("\n")}
+                  </pre>
+                </details>
+              </div>
+              <div className="flex justify-end gap-2 border-t border-[var(--color-border-subtle)] px-4 py-3">
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => resolve(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => resolve(true)}
+                >
+                  Apply Changes
+                </button>
+              </div>
+            </div>
+          </div>
+        ))) ?? false;
+    } else {
+      const detail = pendingChanges
+        .map(
+          (c) =>
+            `${c.attributeName}: "${c.oldValue}" -> "${c.newValue}"`,
+        )
+        .join("\n");
+      confirmed = await showConfirmation(
+        "Confirm Attribute Changes",
+        `Apply ${pendingChanges.length} change(s) to ${user.displayName || user.samAccountName}?`,
+        detail,
+      );
+    }
+
+    if (!confirmed) return;
+    const success = await submitChanges(user.distinguishedName);
+    if (success) {
+      handleRefresh();
+    }
+  }, [
+    pendingChanges,
+    showConfirmation,
+    showCustomDialog,
+    submitChanges,
+    user,
+    handleRefresh,
+  ]);
+
+  const handleEdit = useCallback(
+    (attributeName: string, oldValue: string, newValue: string) => {
+      stageChange(attributeName, oldValue, newValue, false);
+    },
+    [stageChange],
+  );
+
+  const handleAdvancedEdit = useCallback(
+    (attributeName: string, oldValue: string, newValue: string) => {
+      stageChange(attributeName, oldValue, newValue, true);
+    },
+    [stageChange],
+  );
+
+  // Track whether the action bar is visible in the viewport
+  const actionBarRef = useRef<HTMLDivElement>(null);
+  const [actionBarVisible, setActionBarVisible] = useState(true);
+
+  useEffect(() => {
+    const el = actionBarRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setActionBarVisible(entry.isIntersecting),
+      { threshold: 0.1 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   // Build a map of property label -> worst severity from health flags
   const severityByLabel = useMemo(() => {
@@ -107,14 +241,14 @@ export function UserDetail({
     {
       category: "Identity",
       items: [
-        { label: "Display Name", value: user.displayName },
+        { label: "Display Name", value: user.displayName, editable: canEdit, attributeName: "displayName" },
         { label: "SAM Account Name", value: user.samAccountName },
         { label: "User Principal Name", value: user.userPrincipalName },
-        { label: "First Name", value: user.givenName },
-        { label: "Last Name", value: user.surname },
-        { label: "Email", value: user.email },
-        { label: "Department", value: user.department },
-        { label: "Title", value: user.title },
+        { label: "First Name", value: user.givenName, editable: canEdit, attributeName: "givenName" },
+        { label: "Last Name", value: user.surname, editable: canEdit, attributeName: "sn" },
+        { label: "Email", value: user.email, editable: canEdit, attributeName: "mail" },
+        { label: "Department", value: user.department, editable: canEdit, attributeName: "department" },
+        { label: "Title", value: user.title, editable: canEdit, attributeName: "title" },
       ],
     },
     {
@@ -241,15 +375,63 @@ export function UserDetail({
         <CopyButton text={user.samAccountName} />
       </div>
 
-      <UserActions
-        user={user}
-        onRefresh={handleRefresh}
-        onResetPassword={() => setShowPasswordReset(true)}
-      />
+      {/* Actions row: user actions + pending changes inline */}
+      <div
+        ref={actionBarRef}
+        className="flex flex-wrap items-center gap-2"
+        data-testid="action-bar"
+      >
+        <UserActions
+          user={user}
+          onRefresh={handleRefresh}
+          onResetPassword={() => setShowPasswordReset(true)}
+        />
+
+        {pendingChanges.length > 0 && (
+          <>
+            <div className="mx-1 h-6 w-px bg-[var(--color-border-default)]" />
+            <div
+              className="flex items-center gap-2 rounded-lg border border-[var(--color-primary)] bg-[var(--color-primary-subtle)] px-3 py-1"
+              data-testid="pending-changes-bar"
+            >
+              <span className="text-caption text-[var(--color-text-primary)]">
+                {pendingChanges.length} change(s)
+                {pendingChanges.map((c) => (
+                  <span
+                    key={c.attributeName}
+                    className="ml-1.5 inline-block rounded bg-[var(--color-surface-card)] px-1.5 py-0.5 text-[10px] font-mono"
+                  >
+                    {c.attributeName}
+                  </span>
+                ))}
+              </span>
+              <button
+                onClick={clearChanges}
+                className="btn btn-sm btn-ghost"
+                data-testid="discard-changes-btn"
+              >
+                Discard
+              </button>
+              <button
+                onClick={handleSaveChanges}
+                disabled={saving}
+                className="btn btn-sm btn-primary"
+                data-testid="save-changes-btn"
+              >
+                <Save size={12} />
+                {saving ? "Saving..." : "Save"}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
 
       <div className="border-t border-[var(--color-border-default)]" />
 
-      <PropertyGrid groups={propertyGroups} />
+      <PropertyGrid
+        groups={propertyGroups}
+        onEdit={canEdit ? handleEdit : undefined}
+      />
 
       <div className="border-t border-[var(--color-border-default)]" />
 
@@ -277,7 +459,7 @@ export function UserDetail({
 
       <div className="border-t border-[var(--color-border-default)]" />
 
-      <AdvancedAttributes rawAttributes={user.rawAttributes} schemaAttributes={schemaAttributes} />
+      <AdvancedAttributes rawAttributes={user.rawAttributes} schemaAttributes={schemaAttributes} onEdit={canEdit ? handleAdvancedEdit : undefined} />
 
       <div className="border-t border-[var(--color-border-default)]" />
 
@@ -309,6 +491,37 @@ export function UserDetail({
           groupName={groupMembersDialog.name}
           onClose={() => setGroupMembersDialog(null)}
         />
+      )}
+
+      {/* Floating indicator when action bar is scrolled out of view */}
+      {pendingChanges.length > 0 && !actionBarVisible && (
+        <div
+          className="fixed bottom-10 right-4 z-40 flex items-center gap-2 rounded-lg border border-[var(--color-primary)] bg-[var(--color-surface-elevated)] px-4 py-2 shadow-xl"
+          data-testid="floating-changes-indicator"
+        >
+          <span className="text-caption font-medium text-[var(--color-text-primary)]">
+            {pendingChanges.length} unsaved change(s)
+          </span>
+          <button
+            onClick={handleSaveChanges}
+            disabled={saving}
+            className="btn btn-sm btn-primary"
+            data-testid="floating-save-btn"
+          >
+            <Save size={12} />
+            {saving ? "Saving..." : "Save"}
+          </button>
+          <button
+            onClick={() =>
+              actionBarRef.current?.scrollIntoView({ behavior: "smooth" })
+            }
+            className="btn btn-sm btn-ghost"
+            title="Scroll to action bar"
+            data-testid="floating-scroll-btn"
+          >
+            <ArrowUp size={12} />
+          </button>
+        </div>
       )}
     </div>
   );

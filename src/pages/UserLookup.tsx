@@ -21,7 +21,7 @@ import {
   type ContextMenuItem,
 } from "@/components/common/ContextMenu";
 import { UserDetail } from "@/pages/UserDetail";
-import { UserX, AlertCircle, User, GitCompareArrows } from "lucide-react";
+import { UserX, UserMinus, AlertCircle, User, GitCompareArrows } from "lucide-react";
 
 type HealthFilter = "all" | "healthy" | "warning" | "critical";
 
@@ -182,6 +182,18 @@ export function UserLookup() {
     (e: React.MouseEvent, user: DirectoryUser) => {
       e.preventDefault();
 
+      const targetName = user.displayName || user.samAccountName;
+
+      const offboardItem: ContextMenuItem = {
+        label: `Start Offboarding for ${targetName}`,
+        icon: <UserMinus size={14} />,
+        onClick: () => {
+          openTab("Offboarding", "offboarding", "user", {
+            offboardSam: user.samAccountName,
+          });
+        },
+      };
+
       if (!selectedUser) {
         setContextMenuItems([
           {
@@ -190,6 +202,7 @@ export function UserLookup() {
             onClick: () => {},
             disabled: true,
           },
+          offboardItem,
         ]);
         setContextMenuPos({ x: e.clientX, y: e.clientY });
         return;
@@ -203,6 +216,7 @@ export function UserLookup() {
             onClick: () => {},
             disabled: true,
           },
+          offboardItem,
         ]);
         setContextMenuPos({ x: e.clientX, y: e.clientY });
         return;
@@ -210,7 +224,6 @@ export function UserLookup() {
 
       const selectedName =
         selectedUser.displayName || selectedUser.samAccountName;
-      const targetName = user.displayName || user.samAccountName;
 
       setContextMenuItems([
         {
@@ -223,6 +236,7 @@ export function UserLookup() {
             });
           },
         },
+        offboardItem,
       ]);
       setContextMenuPos({ x: e.clientX, y: e.clientY });
     },

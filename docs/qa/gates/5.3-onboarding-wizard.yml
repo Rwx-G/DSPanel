@@ -1,0 +1,37 @@
+schema: 1
+story: "5.3"
+story_title: "Onboarding Wizard"
+gate: PASS
+status_reason: "All 10 ACs covered. UPN from base DN, rollback on partial failure, centered layout. 12 tests."
+reviewer: "Quinn (Test Architect)"
+updated: "2026-03-20T16:15:00Z"
+
+waiver: { active: false }
+top_issues: []
+quality_score: 98
+expires: "2026-04-03T00:00:00Z"
+
+evidence:
+  tests_reviewed: 12
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    ac_gaps: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "PermissionGate + backend permission check, login uniqueness validation"
+  performance:
+    status: PASS
+    notes: "Sequential group addition, progress feedback"
+  reliability:
+    status: PASS
+    notes: "Rollback on partial failure, UPN derived from base DN not server IP"
+  maintainability:
+    status: PASS
+    notes: "Reuses existing components, centered layout matching PasswordGenerator"
+
+recommendations:
+  immediate: []
+  future: []

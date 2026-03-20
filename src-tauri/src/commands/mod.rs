@@ -3,7 +3,8 @@ use tauri::State;
 use std::time::{Duration, Instant};
 
 use crate::error::AppError;
-use crate::models::{DirectoryEntry, OUNode};
+use crate::models::{DirectoryEntry, OUNode, Preset};
+use crate::services::app_settings::AppSettings;
 use crate::services::audit::AuditEntry;
 use crate::services::comparison::GroupComparisonResult;
 use crate::services::mfa::{MfaConfig, MfaSetupResult};
@@ -1835,6 +1836,13 @@ pub async fn save_file_dialog(
     }
 }
 
+/// Opens a native folder picker dialog and returns the selected path, or None if cancelled.
+#[tauri::command]
+pub async fn pick_folder_dialog() -> Result<Option<String>, AppError> {
+    let handle = rfd::AsyncFileDialog::new().pick_folder().await;
+    Ok(handle.map(|f| f.path().to_string_lossy().to_string()))
+}
+
 /// Resolves a hostname to IP addresses with a 5-second timeout.
 #[tauri::command]
 pub async fn resolve_dns(hostname: String) -> Result<Vec<String>, AppError> {
@@ -1859,6 +1867,279 @@ pub async fn resolve_dns(hostname: String) -> Result<Vec<String>, AppError> {
         Ok(Err(e)) => Err(AppError::Network(format!("DNS resolution failed: {}", e))),
         Err(_) => Err(AppError::Network("DNS resolution timed out".to_string())),
     }
+}
+
+// ---------------------------------------------------------------------------
+// Preset management - inner functions
+// ---------------------------------------------------------------------------
+
+/// Returns the configured preset storage path.
+pub(crate) fn get_preset_path_inner(state: &AppState) -> Option<String> {
+    state
+        .preset_service
+        .get_path()
+        .map(|p| p.to_string_lossy().to_string())
+}
+
+/// Validates and sets the preset storage path, loads presets and starts watching.
+pub(crate) fn set_preset_path_inner(state: &AppState, path: &str) -> Result<(), AppError> {
+    state
+        .preset_service
+        .configure_path(path)
+        .map_err(AppError::Configuration)
+}
+
+/// Tests whether a path is a valid, accessible directory.
+pub(crate) fn test_preset_path_inner(path: &str) -> Result<bool, AppError> {
+    match crate::services::PresetService::validate_path(path) {
+        Ok(()) => Ok(true),
+        Err(_) => Ok(false),
+    }
+}
+
+/// Returns all loaded presets.
+pub(crate) fn list_presets_inner(state: &AppState) -> Vec<Preset> {
+    state.preset_service.load_all()
+}
+
+/// Saves a preset to disk. Requires AccountOperator permission.
+pub(crate) fn save_preset_inner(state: &AppState, preset: &Preset) -> Result<(), AppError> {
+    if !state
+        .permission_service
+        .has_permission(PermissionLevel::AccountOperator)
+    {
+        return Err(AppError::PermissionDenied(
+            "Managing presets requires AccountOperator permission or higher".to_string(),
+        ));
+    }
+
+    state
+        .preset_service
+        .save(preset)
+        .map_err(AppError::Configuration)?;
+
+    state.audit_service.log_success(
+        "PresetSaved",
+        &preset.name,
+        &format!("Preset '{}' saved", preset.name),
+    );
+
+    Ok(())
+}
+
+/// Deletes a preset by name. Requires AccountOperator permission.
+pub(crate) fn delete_preset_inner(state: &AppState, name: &str) -> Result<(), AppError> {
+    if !state
+        .permission_service
+        .has_permission(PermissionLevel::AccountOperator)
+    {
+        return Err(AppError::PermissionDenied(
+            "Managing presets requires AccountOperator permission or higher".to_string(),
+        ));
+    }
+
+    state
+        .preset_service
+        .delete(name)
+        .map_err(AppError::Configuration)?;
+
+    state
+        .audit_service
+        .log_success("PresetDeleted", name, &format!("Preset '{}' deleted", name));
+
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Preset management - Tauri commands
+// ---------------------------------------------------------------------------
+
+/// Returns the configured preset storage path.
+#[tauri::command]
+pub fn get_preset_path(state: State<'_, AppState>) -> Option<String> {
+    get_preset_path_inner(&state)
+}
+
+/// Validates and sets the preset storage path.
+#[tauri::command]
+pub fn set_preset_path(path: String, state: State<'_, AppState>) -> Result<(), AppError> {
+    set_preset_path_inner(&state, &path)
+}
+
+/// Tests whether a path is a valid, accessible directory for presets.
+#[tauri::command]
+pub fn test_preset_path(path: String) -> Result<bool, AppError> {
+    test_preset_path_inner(&path)
+}
+
+/// Returns all available presets.
+#[tauri::command]
+pub fn list_presets(state: State<'_, AppState>) -> Vec<Preset> {
+    list_presets_inner(&state)
+}
+
+/// Saves a preset to disk. Requires AccountOperator+.
+#[tauri::command]
+pub fn save_preset(preset: Preset, state: State<'_, AppState>) -> Result<(), AppError> {
+    save_preset_inner(&state, &preset)
+}
+
+/// Deletes a preset by name. Requires AccountOperator+.
+#[tauri::command]
+pub fn delete_preset(name: String, state: State<'_, AppState>) -> Result<(), AppError> {
+    delete_preset_inner(&state, &name)
+}
+
+// ---------------------------------------------------------------------------
+// Onboarding / Offboarding / Modify attribute - inner functions
+// ---------------------------------------------------------------------------
+
+/// Creates a new user account with preset attributes. Requires AccountOperator+.
+pub(crate) async fn create_user_inner(
+    state: &AppState,
+    cn: &str,
+    container_dn: &str,
+    sam_account_name: &str,
+    password: &str,
+    attributes: &std::collections::HashMap<String, Vec<String>>,
+) -> Result<String, AppError> {
+    if !state
+        .permission_service
+        .has_permission(PermissionLevel::AccountOperator)
+    {
+        return Err(AppError::PermissionDenied(
+            "Creating users requires AccountOperator permission or higher".to_string(),
+        ));
+    }
+
+    let provider = state.directory_provider.clone();
+
+    // Check login uniqueness
+    let existing = provider
+        .get_user_by_identity(sam_account_name)
+        .await
+        .map_err(|e| AppError::Directory(e.to_string()))?;
+    if existing.is_some() {
+        return Err(AppError::Validation(format!(
+            "Login '{}' already exists",
+            sam_account_name
+        )));
+    }
+
+    state.snapshot_service.capture(container_dn, "CreateUser");
+
+    match provider
+        .create_user(cn, container_dn, sam_account_name, password, attributes)
+        .await
+    {
+        Ok(dn) => {
+            state.audit_service.log_success(
+                "UserCreated",
+                &dn,
+                &format!("User '{}' created in {}", sam_account_name, container_dn),
+            );
+            Ok(dn)
+        }
+        Err(e) => {
+            state.audit_service.log_failure(
+                "CreateUserFailed",
+                container_dn,
+                &format!("Failed to create user '{}': {}", sam_account_name, e),
+            );
+            Err(AppError::Directory(e.to_string()))
+        }
+    }
+}
+
+/// Modifies an attribute on an AD object. Requires AccountOperator+.
+pub(crate) async fn modify_attribute_inner(
+    state: &AppState,
+    dn: &str,
+    attribute_name: &str,
+    values: &[String],
+) -> Result<(), AppError> {
+    if !state
+        .permission_service
+        .has_permission(PermissionLevel::AccountOperator)
+    {
+        return Err(AppError::PermissionDenied(
+            "Modifying attributes requires AccountOperator permission or higher".to_string(),
+        ));
+    }
+
+    state.snapshot_service.capture(dn, "ModifyAttribute");
+
+    let provider = state.directory_provider.clone();
+    match provider.modify_attribute(dn, attribute_name, values).await {
+        Ok(()) => {
+            state.audit_service.log_success(
+                "AttributeModified",
+                dn,
+                &format!("Attribute '{}' modified", attribute_name),
+            );
+            Ok(())
+        }
+        Err(e) => {
+            state.audit_service.log_failure(
+                "ModifyAttributeFailed",
+                dn,
+                &format!("Failed to modify '{}': {}", attribute_name, e),
+            );
+            Err(AppError::Directory(e.to_string()))
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Onboarding / Offboarding / Modify attribute - Tauri commands
+// ---------------------------------------------------------------------------
+
+/// Creates a new user account. Requires AccountOperator+.
+#[tauri::command]
+pub async fn create_user(
+    cn: String,
+    container_dn: String,
+    sam_account_name: String,
+    password: String,
+    attributes: std::collections::HashMap<String, Vec<String>>,
+    state: State<'_, AppState>,
+) -> Result<String, AppError> {
+    create_user_inner(
+        &state,
+        &cn,
+        &container_dn,
+        &sam_account_name,
+        &password,
+        &attributes,
+    )
+    .await
+}
+
+/// Modifies an attribute on an AD object. Requires AccountOperator+.
+#[tauri::command]
+pub async fn modify_attribute(
+    dn: String,
+    attribute_name: String,
+    values: Vec<String>,
+    state: State<'_, AppState>,
+) -> Result<(), AppError> {
+    modify_attribute_inner(&state, &dn, &attribute_name, &values).await
+}
+
+// ---------------------------------------------------------------------------
+// App settings - Tauri commands
+// ---------------------------------------------------------------------------
+
+/// Returns the current application settings.
+#[tauri::command]
+pub fn get_app_settings(state: State<'_, AppState>) -> AppSettings {
+    state.app_settings.get()
+}
+
+/// Updates application settings and persists to disk.
+#[tauri::command]
+pub fn set_app_settings(settings: AppSettings, state: State<'_, AppState>) {
+    state.app_settings.update(settings);
 }
 
 #[cfg(test)]
@@ -4167,5 +4448,251 @@ mod tests {
 
         let entries = state.audit_service.get_entries();
         assert!(entries.iter().any(|e| e.action == "ManagedByUpdated"));
+    }
+
+    // -----------------------------------------------------------------------
+    // Preset command tests
+    // -----------------------------------------------------------------------
+
+    fn make_state_with_preset_dir(level: PermissionLevel) -> (AppState, tempfile::TempDir) {
+        let dir = tempfile::tempdir().unwrap();
+        let (state, _) = make_state_with_level_and_provider(level);
+        state
+            .preset_service
+            .configure_path(dir.path().to_str().unwrap())
+            .unwrap();
+        (state, dir)
+    }
+
+    fn make_test_preset() -> Preset {
+        use crate::models::PresetType;
+        Preset {
+            name: "Test Preset".to_string(),
+            description: "For testing".to_string(),
+            preset_type: PresetType::Onboarding,
+            target_ou: "OU=Test,DC=example,DC=com".to_string(),
+            groups: vec!["CN=Group1,DC=example,DC=com".to_string()],
+            attributes: std::collections::HashMap::new(),
+        }
+    }
+
+    #[test]
+    fn test_get_preset_path_inner_none_by_default() {
+        let state = make_state();
+        assert!(get_preset_path_inner(&state).is_none());
+    }
+
+    #[test]
+    fn test_set_and_get_preset_path() {
+        let dir = tempfile::tempdir().unwrap();
+        let state = make_state();
+        set_preset_path_inner(&state, dir.path().to_str().unwrap()).unwrap();
+        let path = get_preset_path_inner(&state);
+        assert!(path.is_some());
+    }
+
+    #[test]
+    fn test_set_preset_path_invalid() {
+        let state = make_state();
+        let result = set_preset_path_inner(&state, "/nonexistent/12345");
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), AppError::Configuration(_)));
+    }
+
+    #[test]
+    fn test_test_preset_path_valid() {
+        let dir = tempfile::tempdir().unwrap();
+        let result = test_preset_path_inner(dir.path().to_str().unwrap()).unwrap();
+        assert!(result);
+    }
+
+    #[test]
+    fn test_test_preset_path_invalid() {
+        let result = test_preset_path_inner("/nonexistent/12345").unwrap();
+        assert!(!result);
+    }
+
+    #[test]
+    fn test_list_presets_empty() {
+        let state = make_state();
+        assert!(list_presets_inner(&state).is_empty());
+    }
+
+    #[test]
+    fn test_save_preset_requires_account_operator() {
+        let (state, _dir) = make_state_with_preset_dir(PermissionLevel::HelpDesk);
+        let result = save_preset_inner(&state, &make_test_preset());
+        assert!(matches!(result.unwrap_err(), AppError::PermissionDenied(_)));
+    }
+
+    #[test]
+    fn test_save_preset_success() {
+        let (state, _dir) = make_state_with_preset_dir(PermissionLevel::AccountOperator);
+        save_preset_inner(&state, &make_test_preset()).unwrap();
+        let presets = list_presets_inner(&state);
+        assert_eq!(presets.len(), 1);
+        assert_eq!(presets[0].name, "Test Preset");
+    }
+
+    #[test]
+    fn test_save_preset_audits() {
+        let (state, _dir) = make_state_with_preset_dir(PermissionLevel::AccountOperator);
+        save_preset_inner(&state, &make_test_preset()).unwrap();
+        let entries = state.audit_service.get_entries();
+        assert!(entries.iter().any(|e| e.action == "PresetSaved"));
+    }
+
+    #[test]
+    fn test_delete_preset_requires_account_operator() {
+        let (state, _dir) = make_state_with_preset_dir(PermissionLevel::HelpDesk);
+        let result = delete_preset_inner(&state, "Test");
+        assert!(matches!(result.unwrap_err(), AppError::PermissionDenied(_)));
+    }
+
+    #[test]
+    fn test_delete_preset_success() {
+        let (state, _dir) = make_state_with_preset_dir(PermissionLevel::AccountOperator);
+        save_preset_inner(&state, &make_test_preset()).unwrap();
+        assert_eq!(list_presets_inner(&state).len(), 1);
+
+        delete_preset_inner(&state, "Test Preset").unwrap();
+        assert!(list_presets_inner(&state).is_empty());
+    }
+
+    #[test]
+    fn test_delete_preset_audits() {
+        let (state, _dir) = make_state_with_preset_dir(PermissionLevel::AccountOperator);
+        save_preset_inner(&state, &make_test_preset()).unwrap();
+        delete_preset_inner(&state, "Test Preset").unwrap();
+        let entries = state.audit_service.get_entries();
+        assert!(entries.iter().any(|e| e.action == "PresetDeleted"));
+    }
+
+    #[test]
+    fn test_delete_preset_nonexistent() {
+        let (state, _dir) = make_state_with_preset_dir(PermissionLevel::AccountOperator);
+        let result = delete_preset_inner(&state, "Nonexistent");
+        assert!(result.is_err());
+    }
+
+    // -----------------------------------------------------------------------
+    // create_user_inner tests
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_create_user_requires_account_operator() {
+        let state = make_state();
+        let result = create_user_inner(
+            &state,
+            "John Smith",
+            "OU=Users,DC=example,DC=com",
+            "jsmith",
+            "P@ssw0rd",
+            &std::collections::HashMap::new(),
+        )
+        .await;
+        assert!(matches!(result.unwrap_err(), AppError::PermissionDenied(_)));
+    }
+
+    #[tokio::test]
+    async fn test_create_user_checks_login_uniqueness() {
+        let user = make_user_entry("jsmith", "John Smith");
+        let provider = Arc::new(
+            crate::services::directory::tests::MockDirectoryProvider::new().with_users(vec![user]),
+        );
+        let state = AppState::new_for_test(provider, PermissionConfig::default());
+        state
+            .permission_service
+            .set_level(PermissionLevel::AccountOperator);
+
+        let result = create_user_inner(
+            &state,
+            "John Smith",
+            "OU=Users,DC=example,DC=com",
+            "jsmith",
+            "P@ssw0rd",
+            &std::collections::HashMap::new(),
+        )
+        .await;
+        assert!(matches!(result.unwrap_err(), AppError::Validation(_)));
+    }
+
+    #[tokio::test]
+    async fn test_create_user_success() {
+        let (state, provider) =
+            make_state_with_level_and_provider(PermissionLevel::AccountOperator);
+
+        let result = create_user_inner(
+            &state,
+            "Jane Doe",
+            "OU=Users,DC=example,DC=com",
+            "jdoe",
+            "P@ssw0rd",
+            &std::collections::HashMap::new(),
+        )
+        .await;
+        assert!(result.is_ok());
+
+        let calls = provider.create_user_calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].2, "jdoe");
+
+        let entries = state.audit_service.get_entries();
+        assert!(entries.iter().any(|e| e.action == "UserCreated"));
+    }
+
+    // -----------------------------------------------------------------------
+    // modify_attribute_inner tests
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_modify_attribute_requires_account_operator() {
+        let state = make_state();
+        let result = modify_attribute_inner(
+            &state,
+            "CN=User,DC=example,DC=com",
+            "department",
+            &["Engineering".to_string()],
+        )
+        .await;
+        assert!(matches!(result.unwrap_err(), AppError::PermissionDenied(_)));
+    }
+
+    #[tokio::test]
+    async fn test_modify_attribute_success() {
+        let (state, provider) =
+            make_state_with_level_and_provider(PermissionLevel::AccountOperator);
+
+        let result = modify_attribute_inner(
+            &state,
+            "CN=User,DC=example,DC=com",
+            "department",
+            &["Engineering".to_string()],
+        )
+        .await;
+        assert!(result.is_ok());
+
+        let calls = provider.modify_attribute_calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].1, "department");
+
+        let entries = state.audit_service.get_entries();
+        assert!(entries.iter().any(|e| e.action == "AttributeModified"));
+    }
+
+    #[tokio::test]
+    async fn test_modify_attribute_captures_snapshot() {
+        let (state, _) = make_state_with_level_and_provider(PermissionLevel::AccountOperator);
+
+        modify_attribute_inner(
+            &state,
+            "CN=User,DC=example,DC=com",
+            "department",
+            &["Engineering".to_string()],
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(state.snapshot_service.count(), 1);
     }
 }

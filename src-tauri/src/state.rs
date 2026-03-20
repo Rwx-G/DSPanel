@@ -3,8 +3,8 @@ use std::time::Instant;
 
 use crate::models::DirectoryEntry;
 use crate::services::{
-    AuditService, DirectoryProvider, MfaService, PermissionConfig, PermissionService,
-    SnapshotService,
+    AppSettingsService, AuditService, DirectoryProvider, MfaService, PermissionConfig,
+    PermissionService, PresetService, SnapshotService,
 };
 
 /// Global application state managed by Tauri.
@@ -28,6 +28,10 @@ pub struct AppState {
     pub http_client: reqwest::Client,
     /// Snapshot service for capturing object state before modifications.
     pub snapshot_service: SnapshotService,
+    /// Preset service for managing onboarding/offboarding preset files.
+    pub preset_service: PresetService,
+    /// Application settings service (disabled OU, etc.).
+    pub app_settings: AppSettingsService,
     /// Cache for browse_users: (fetch_time, sorted_entries). TTL: 60 seconds.
     pub browse_cache: Mutex<Option<(Instant, Vec<DirectoryEntry>)>>,
     /// Cache for browse_computers: (fetch_time, sorted_entries). TTL: 60 seconds.
@@ -53,6 +57,8 @@ impl AppState {
             mfa_service: MfaService::new(),
             http_client,
             snapshot_service: SnapshotService::new(),
+            preset_service: PresetService::new(),
+            app_settings: AppSettingsService::new(),
             browse_cache: Mutex::new(None),
             browse_computers_cache: Mutex::new(None),
             browse_groups_cache: Mutex::new(None),
@@ -74,6 +80,8 @@ impl AppState {
             mfa_service: MfaService::new_in_memory(),
             http_client: reqwest::Client::new(),
             snapshot_service: SnapshotService::new(),
+            preset_service: PresetService::new(),
+            app_settings: AppSettingsService::new(),
             browse_cache: Mutex::new(None),
             browse_computers_cache: Mutex::new(None),
             browse_groups_cache: Mutex::new(None),

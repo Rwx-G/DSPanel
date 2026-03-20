@@ -249,6 +249,29 @@ impl LdapDirectoryProvider {
         &self.auth_mode
     }
 
+    /// Derives the DNS domain name from the base DN.
+    ///
+    /// E.g. "DC=dspanel,DC=local" -> "dspanel.local"
+    fn dns_domain_from_base_dn(&self) -> Option<String> {
+        let base = self.base_dn.lock().unwrap().clone()?;
+        let parts: Vec<&str> = base
+            .split(',')
+            .filter_map(|p| {
+                let trimmed = p.trim();
+                if trimmed.to_uppercase().starts_with("DC=") {
+                    Some(&trimmed[3..])
+                } else {
+                    None
+                }
+            })
+            .collect();
+        if parts.is_empty() {
+            None
+        } else {
+            Some(parts.join("."))
+        }
+    }
+
     /// Returns the authenticated user identity resolved via WhoAmI.
     pub fn resolved_user(&self) -> Option<String> {
         self.authenticated_user.lock().unwrap().clone()
@@ -1481,6 +1504,109 @@ impl DirectoryProvider for LdapDirectoryProvider {
                     manager_dn = %m,
                     "managedBy updated"
                 );
+                Ok(())
+            }
+        })
+        .await
+    }
+
+    async fn create_user(
+        &self,
+        cn: &str,
+        container_dn: &str,
+        sam_account_name: &str,
+        password: &str,
+        attributes: &std::collections::HashMap<String, Vec<String>>,
+    ) -> Result<String> {
+        let dn = format!("CN={},{}", cn, container_dn);
+        let upn = format!(
+            "{}@{}",
+            sam_account_name,
+            self.dns_domain_from_base_dn()
+                .as_deref()
+                .unwrap_or_else(|| self.domain_name().unwrap_or(""))
+        );
+
+        let dn_clone = dn.clone();
+        let cn_owned = cn.to_string();
+        let sam_owned = sam_account_name.to_string();
+        let upn_owned = upn;
+        let password_owned = password.to_string();
+
+        // Build custom attribute sets outside the closure
+        let attr_sets: Vec<(String, HashSet<String>)> = attributes
+            .iter()
+            .map(|(k, v)| (k.clone(), v.iter().cloned().collect()))
+            .collect();
+
+        self.with_connection(|mut ldap| {
+            let dn = dn_clone.clone();
+            let cn_owned = cn_owned.clone();
+            let sam_owned = sam_owned.clone();
+            let upn_owned = upn_owned.clone();
+            let attr_sets = attr_sets.clone();
+            async move {
+                let mut attrs: Vec<(String, HashSet<String>)> = vec![
+                    (
+                        "objectClass".to_string(),
+                        HashSet::from([
+                            "top".to_string(),
+                            "person".to_string(),
+                            "organizationalPerson".to_string(),
+                            "user".to_string(),
+                        ]),
+                    ),
+                    ("cn".to_string(), HashSet::from([cn_owned])),
+                    ("sAMAccountName".to_string(), HashSet::from([sam_owned])),
+                    ("userPrincipalName".to_string(), HashSet::from([upn_owned])),
+                ];
+
+                for (key, values) in attr_sets {
+                    attrs.push((key, values));
+                }
+
+                ldap.add(&dn, attrs)
+                    .await
+                    .context("Failed to create user")?
+                    .success()
+                    .context("Create user LDAP operation returned error")?;
+
+                tracing::info!(dn = %dn, "User created");
+                Ok(dn)
+            }
+        })
+        .await?;
+
+        // Set password
+        self.reset_password(&dn, &password_owned, false).await?;
+
+        // Enable account
+        self.enable_account(&dn).await?;
+
+        Ok(dn)
+    }
+
+    async fn modify_attribute(
+        &self,
+        dn: &str,
+        attribute_name: &str,
+        values: &[String],
+    ) -> Result<()> {
+        let dn_owned = dn.to_string();
+        let attr_owned = attribute_name.to_string();
+        let values_owned: HashSet<String> = values.iter().cloned().collect();
+        self.with_connection(|mut ldap| {
+            let dn = dn_owned.clone();
+            let attr = attr_owned.clone();
+            let vals = values_owned.clone();
+            async move {
+                ldap.modify(&dn, vec![Mod::Replace(attr, vals)])
+                    .await
+                    .context("Failed to modify attribute")?
+                    .success()
+                    .context("Modify attribute LDAP operation returned error")?;
+
+                tracing::info!(dn = %dn, "Attribute modified");
                 Ok(())
             }
         })

@@ -18,6 +18,6 @@ export interface SidebarModule {
   id: string;
   label: string;
   icon: string;
-  group: "Directory" | "Tools" | "Settings";
+  group: "Directory" | "Tools" | "Settings" | "Workflows";
   requiredLevel: PermissionLevel;
 }

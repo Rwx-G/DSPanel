@@ -87,6 +87,27 @@ const MODULES: SidebarModule[] = [
     group: "Tools",
     requiredLevel: "ReadOnly",
   },
+  {
+    id: "presets",
+    label: "Preset Management",
+    icon: "settings",
+    group: "Workflows",
+    requiredLevel: "AccountOperator",
+  },
+  {
+    id: "onboarding",
+    label: "Onboarding",
+    icon: "user",
+    group: "Workflows",
+    requiredLevel: "AccountOperator",
+  },
+  {
+    id: "offboarding",
+    label: "Offboarding",
+    icon: "user",
+    group: "Workflows",
+    requiredLevel: "AccountOperator",
+  },
 ];
 
 interface SidebarProps {

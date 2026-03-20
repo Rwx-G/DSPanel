@@ -45,8 +45,19 @@ function DeepLinkWrapper({
 }
 
 vi.mock("@tauri-apps/api/core", () => ({
-  invoke: vi.fn(),
+  invoke: vi.fn(() => Promise.resolve(null)),
 }));
+
+// IntersectionObserver is not available in jsdom (needed by UserDetail)
+class MockIntersectionObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+if (!globalThis.IntersectionObserver) {
+  globalThis.IntersectionObserver =
+    MockIntersectionObserver as unknown as typeof IntersectionObserver;
+}
 
 // Mock react-virtual to avoid needing real scroll container measurements
 vi.mock("@tanstack/react-virtual", () => ({

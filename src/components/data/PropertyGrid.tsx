@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { useState, useCallback } from "react";
+import { ChevronDown, ChevronRight, Pencil, Check, X } from "lucide-react";
 import { AlertTriangle, AlertCircle, CheckCircle } from "lucide-react";
 import { CopyButton } from "@/components/common/CopyButton";
 
@@ -23,6 +23,10 @@ export interface PropertyItem {
   label: string;
   value: string;
   severity?: PropertySeverity;
+  /** Whether this field can be edited inline (requires onEdit). */
+  editable?: boolean;
+  /** The LDAP attribute name used when calling onEdit. */
+  attributeName?: string;
 }
 
 export interface PropertyGroup {
@@ -32,9 +36,93 @@ export interface PropertyGroup {
 
 interface PropertyGridProps {
   groups: PropertyGroup[];
+  /** Called when an editable field is changed. Receives (attributeName, oldValue, newValue). */
+  onEdit?: (attributeName: string, oldValue: string, newValue: string) => void;
 }
 
-export function PropertyGrid({ groups }: PropertyGridProps) {
+function EditableCell({
+  item,
+  onEdit,
+}: {
+  item: PropertyItem;
+  onEdit: (attributeName: string, oldValue: string, newValue: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(item.value);
+
+  const handleConfirm = useCallback(() => {
+    if (draft !== item.value && item.attributeName) {
+      onEdit(item.attributeName, item.value, draft);
+    }
+    setEditing(false);
+  }, [draft, item, onEdit]);
+
+  const handleCancel = useCallback(() => {
+    setDraft(item.value);
+    setEditing(false);
+  }, [item.value]);
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === "Enter") handleConfirm();
+      if (e.key === "Escape") handleCancel();
+    },
+    [handleConfirm, handleCancel],
+  );
+
+  if (editing) {
+    return (
+      <div className="flex flex-1 items-center gap-1">
+        <input
+          type="text"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={handleKeyDown}
+          autoFocus
+          className="flex-1 rounded border border-[var(--color-primary)] bg-[var(--color-input-bg)] px-2 py-0.5 text-body text-[var(--color-text-primary)] outline-none"
+          data-testid={`edit-input-${item.attributeName}`}
+        />
+        <button
+          onClick={handleConfirm}
+          className="rounded p-0.5 text-[var(--color-success)] hover:bg-[var(--color-success-subtle)]"
+          aria-label="Confirm edit"
+          data-testid={`edit-confirm-${item.attributeName}`}
+        >
+          <Check size={14} />
+        </button>
+        <button
+          onClick={handleCancel}
+          className="rounded p-0.5 text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]"
+          aria-label="Cancel edit"
+          data-testid={`edit-cancel-${item.attributeName}`}
+        >
+          <X size={14} />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <span className="flex-1 text-body break-all text-[var(--color-text-primary)]">
+        {item.value}
+      </span>
+      <button
+        onClick={() => {
+          setDraft(item.value);
+          setEditing(true);
+        }}
+        className="shrink-0 rounded p-0.5 text-[var(--color-text-disabled)] opacity-0 group-hover:opacity-100 hover:text-[var(--color-primary)] transition-all"
+        aria-label={`Edit ${item.label}`}
+        data-testid={`edit-btn-${item.attributeName}`}
+      >
+        <Pencil size={12} />
+      </button>
+    </>
+  );
+}
+
+export function PropertyGrid({ groups, onEdit }: PropertyGridProps) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
   const toggleGroup = (category: string) => {
@@ -95,6 +183,9 @@ export function PropertyGrid({ groups }: PropertyGridProps) {
                         : item.severity === "Success"
                           ? CheckCircle
                           : null;
+
+                  const isEditable = item.editable && item.attributeName && onEdit;
+
                   return (
                     <div
                       key={item.label}
@@ -109,24 +200,30 @@ export function PropertyGrid({ groups }: PropertyGridProps) {
                       <span className="min-w-[140px] shrink-0 text-caption text-[var(--color-text-secondary)]">
                         {item.label}
                       </span>
-                      <span
-                        className={`flex-1 text-body break-all ${
-                          item.severity
-                            ? SEVERITY_VALUE_STYLE[item.severity]
-                            : "text-[var(--color-text-primary)]"
-                        }`}
-                      >
-                        {SeverityIcon && (
-                          <SeverityIcon
-                            size={12}
-                            className="inline mr-1 -mt-0.5"
-                          />
-                        )}
-                        {item.value}
-                      </span>
-                      <span className="opacity-0 group-hover:opacity-100 transition-opacity">
-                        <CopyButton text={item.value} />
-                      </span>
+                      {isEditable ? (
+                        <EditableCell item={item} onEdit={onEdit} />
+                      ) : (
+                        <>
+                          <span
+                            className={`flex-1 text-body break-all ${
+                              item.severity
+                                ? SEVERITY_VALUE_STYLE[item.severity]
+                                : "text-[var(--color-text-primary)]"
+                            }`}
+                          >
+                            {SeverityIcon && (
+                              <SeverityIcon
+                                size={12}
+                                className="inline mr-1 -mt-0.5"
+                              />
+                            )}
+                            {item.value}
+                          </span>
+                          <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                            <CopyButton text={item.value} />
+                          </span>
+                        </>
+                      )}
                     </div>
                   );
                 })}

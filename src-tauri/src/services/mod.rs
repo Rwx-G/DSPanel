@@ -1,3 +1,4 @@
+pub mod app_settings;
 pub mod audit;
 pub mod comparison;
 pub mod dacl;
@@ -12,17 +13,20 @@ pub mod ntfs;
 pub mod ntfs_analyzer;
 pub mod password;
 pub mod permissions;
+pub mod preset;
 pub mod replication;
 pub mod resilience;
 pub mod resilient_directory;
 pub mod snapshot;
 
+pub use app_settings::AppSettingsService;
 pub use audit::AuditService;
 pub use directory::DirectoryProvider;
 pub use health::{evaluate_health, AccountHealthStatus, HealthInput, HealthLevel};
 pub use ldap_directory::LdapDirectoryProvider;
 pub use mfa::MfaService;
 pub use permissions::{PermissionConfig, PermissionLevel, PermissionService};
+pub use preset::PresetService;
 pub use resilience::{CircuitBreaker, CircuitBreakerConfig, RetryConfig, TimeoutConfig};
 pub use resilient_directory::ResilientDirectoryProvider;
 pub use snapshot::SnapshotService;
