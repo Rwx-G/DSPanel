@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-03-20
+
+Epic 5 - Presets, Onboarding and Offboarding Workflows. Role-based presets,
+guided onboarding/offboarding wizards, and inline attribute editing. Validated
+against a real AD (Windows Server 2022 + BadBlood).
+
 ### Added
 
 #### Preset Storage & Configuration (5.1)
