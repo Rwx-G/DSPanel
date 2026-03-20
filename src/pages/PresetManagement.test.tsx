@@ -73,6 +73,19 @@ function setupDefaultMocks(level = "AccountOperator") {
   }) as typeof invoke);
 }
 
+/** Waits for the PresetEditor to finish loading (spinner gone, preset list or empty state visible). */
+async function waitForEditorReady() {
+  await waitFor(
+    () => {
+      // Editor is ready when the loading spinner is gone
+      expect(screen.queryByText("Loading presets...")).toBeNull();
+      // And the preset management testid is present
+      expect(screen.getByTestId("preset-management")).toBeDefined();
+    },
+    { timeout: 5000 },
+  );
+}
+
 describe("PresetManagement", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -118,13 +131,11 @@ describe("PresetManagement", () => {
       </Wrapper>,
     );
 
-    await waitFor(
-      () => {
-        expect(screen.getByText("Dev Onboarding")).toBeDefined();
-      },
-      { timeout: 3000 },
-    );
+    await waitForEditorReady();
 
+    await waitFor(() => {
+      expect(screen.getByText("Dev Onboarding")).toBeDefined();
+    });
     expect(screen.getByText("User Offboarding")).toBeDefined();
   });
 
@@ -154,6 +165,7 @@ describe("PresetManagement", () => {
       </Wrapper>,
     );
 
+    await waitForEditorReady();
     await waitFor(() => {
       expect(screen.getByTestId("preset-item-0")).toBeDefined();
     });
@@ -175,9 +187,7 @@ describe("PresetManagement", () => {
       </Wrapper>,
     );
 
-    await waitFor(() => {
-      expect(screen.getByTestId("preset-new-btn")).toBeDefined();
-    });
+    await waitForEditorReady();
 
     fireEvent.click(screen.getByTestId("preset-new-btn"));
 
@@ -196,9 +206,7 @@ describe("PresetManagement", () => {
       </Wrapper>,
     );
 
-    await waitFor(() => {
-      expect(screen.getByTestId("preset-new-btn")).toBeDefined();
-    });
+    await waitForEditorReady();
 
     fireEvent.click(screen.getByTestId("preset-new-btn"));
     fireEvent.click(screen.getByTestId("preset-save-btn"));
@@ -308,9 +316,7 @@ describe("PresetManagement", () => {
       </Wrapper>,
     );
 
-    await waitFor(() => {
-      expect(screen.getByTestId("preset-new-btn")).toBeDefined();
-    });
+    await waitForEditorReady();
 
     fireEvent.click(screen.getByTestId("preset-new-btn"));
 
@@ -336,9 +342,7 @@ describe("PresetManagement", () => {
       </Wrapper>,
     );
 
-    await waitFor(() => {
-      expect(screen.getByTestId("preset-new-btn")).toBeDefined();
-    });
+    await waitForEditorReady();
 
     fireEvent.click(screen.getByTestId("preset-new-btn"));
 
@@ -357,9 +361,7 @@ describe("PresetManagement", () => {
       </Wrapper>,
     );
 
-    await waitFor(() => {
-      expect(screen.getByTestId("preset-new-btn")).toBeDefined();
-    });
+    await waitForEditorReady();
 
     fireEvent.click(screen.getByTestId("preset-new-btn"));
 
