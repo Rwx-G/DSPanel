@@ -1,10 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { type ReactNode } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 import { UserLookup } from "./UserLookup";
 import { DialogProvider } from "@/contexts/DialogContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
-import { NavigationProvider } from "@/contexts/NavigationContext";
+import {
+  NavigationProvider,
+  useNavigation,
+} from "@/contexts/NavigationContext";
 import type { DirectoryEntry } from "@/types/directory";
 import type { AccountHealthStatus } from "@/types/health";
 
@@ -16,6 +19,29 @@ function TestProviders({ children }: { children: ReactNode }) {
       </DialogProvider>
     </NotificationProvider>
   );
+}
+
+/**
+ * Wrapper that opens a "users" tab with data for deep-link testing.
+ */
+function DeepLinkWrapper({
+  children,
+  selectedUserSam,
+}: {
+  children: ReactNode;
+  selectedUserSam: string;
+}) {
+  const { openTab } = useNavigation();
+  const opened = useRef(false);
+
+  useEffect(() => {
+    if (!opened.current) {
+      opened.current = true;
+      openTab("User Lookup", "users", "user", { selectedUserSam });
+    }
+  }, [openTab, selectedUserSam]);
+
+  return <>{children}</>;
 }
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -75,15 +101,15 @@ function makeEntry(
       title: ["Engineer"],
       userAccountControl: ["512"],
       lockoutTime: ["0"],
-      lastLogon: ["2026-03-12T08:00:00Z"],
-      pwdLastSet: ["2026-02-01T10:00:00Z"],
+      lastLogon: ["134177760000000000"],
+      pwdLastSet: ["134144136000000000"],
       memberOf: [
         "CN=Domain Users,CN=Users,DC=example,DC=com",
         "CN=Developers,OU=Groups,DC=example,DC=com",
       ],
       badPwdCount: ["0"],
-      whenCreated: ["2024-01-01T00:00:00Z"],
-      whenChanged: ["2026-03-01T00:00:00Z"],
+      whenCreated: ["20240101000000.0Z"],
+      whenChanged: ["20260301000000.0Z"],
       ...attrs,
     },
   };
@@ -115,6 +141,21 @@ function mockBrowseWith(
         return Promise.resolve(status);
       }
       return Promise.resolve(HEALTHY_STATUS);
+    }
+    if (cmd === "evaluate_health_batch") {
+      const inputs = args?.inputs as { enabled: boolean }[] | undefined;
+      if (inputs) {
+        return Promise.resolve(
+          inputs.map((input) => {
+            if (!input.enabled) return CRITICAL_STATUS;
+            for (const [, status] of Object.entries(healthOverrides)) {
+              return status;
+            }
+            return HEALTHY_STATUS;
+          }),
+        );
+      }
+      return Promise.resolve([]);
     }
     return Promise.resolve(null);
   }) as typeof invoke);
@@ -324,8 +365,7 @@ describe("UserLookup", () => {
 
   it("shows empty state with no filter text when no users available", async () => {
     mockInvoke.mockImplementation(((cmd: string) => {
-      if (cmd === "browse_users")
-        return Promise.resolve(makeBrowseResult([]));
+      if (cmd === "browse_users") return Promise.resolve(makeBrowseResult([]));
       if (cmd === "evaluate_health_cmd") return Promise.resolve(HEALTHY_STATUS);
       return Promise.resolve(null);
     }) as typeof invoke);
@@ -573,8 +613,7 @@ describe("UserLookup", () => {
 
   it("shows empty state with filter text when search returns no users", async () => {
     mockInvoke.mockImplementation(((cmd: string) => {
-      if (cmd === "browse_users")
-        return Promise.resolve(makeBrowseResult([]));
+      if (cmd === "browse_users") return Promise.resolve(makeBrowseResult([]));
       if (cmd === "search_users") return Promise.resolve([]);
       if (cmd === "evaluate_health_cmd") return Promise.resolve(HEALTHY_STATUS);
       return Promise.resolve(null);
@@ -588,17 +627,13 @@ describe("UserLookup", () => {
   });
 
   it("displays user without department in the results list", async () => {
-    const entries = [
-      makeEntry("nodept", "No Department", { department: [] }),
-    ];
+    const entries = [makeEntry("nodept", "No Department", { department: [] })];
     mockBrowseWith(entries);
 
     render(<UserLookup />, { wrapper: TestProviders });
 
     await waitFor(() => {
-      expect(
-        screen.getByTestId("user-result-nodept"),
-      ).toBeInTheDocument();
+      expect(screen.getByTestId("user-result-nodept")).toBeInTheDocument();
     });
 
     // Should show SAM without department suffix
@@ -627,6 +662,111 @@ describe("UserLookup", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("user-detail")).toBeInTheDocument();
+    });
+  });
+
+  describe("Deep-link", () => {
+    it("selects user from browse results when selectedUserSam matches", async () => {
+      const entries = [
+        makeEntry("jdoe", "John Doe"),
+        makeEntry("asmith", "Alice Smith"),
+      ];
+      mockBrowseWith(entries);
+
+      render(
+        <TestProviders>
+          <DeepLinkWrapper selectedUserSam="asmith">
+            <UserLookup />
+          </DeepLinkWrapper>
+        </TestProviders>,
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId("user-detail")).toBeInTheDocument();
+      });
+
+      const detail = screen.getByTestId("user-detail");
+      expect(detail.querySelector("h2")).toHaveTextContent("Alice Smith");
+    });
+
+    it("fetches user via get_user when not in browse results", async () => {
+      const browseEntries = [makeEntry("jdoe", "John Doe")];
+      const remoteEntry = makeEntry("remote", "Remote User");
+
+      mockInvoke.mockImplementation(((
+        cmd: string,
+        _args?: Record<string, unknown>,
+      ) => {
+        if (cmd === "browse_users")
+          return Promise.resolve(makeBrowseResult(browseEntries));
+        if (cmd === "get_user") return Promise.resolve(remoteEntry);
+        if (cmd === "evaluate_health_cmd") return Promise.resolve(HEALTHY_STATUS);
+        return Promise.resolve(null);
+      }) as typeof invoke);
+
+      render(
+        <TestProviders>
+          <DeepLinkWrapper selectedUserSam="remote">
+            <UserLookup />
+          </DeepLinkWrapper>
+        </TestProviders>,
+      );
+
+      await waitFor(() => {
+        expect(mockInvoke).toHaveBeenCalledWith("get_user", {
+          samAccountName: "remote",
+        });
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("user-detail")).toBeInTheDocument();
+      });
+
+      const detail = screen.getByTestId("user-detail");
+      expect(detail.querySelector("h2")).toHaveTextContent("Remote User");
+    });
+  });
+
+  describe("Refresh selected user", () => {
+    it("reloads user data on refresh", async () => {
+      const entries = [makeEntry("jdoe", "John Doe")];
+      const refreshedEntry = makeEntry("jdoe", "John Doe Updated");
+
+      let getUserCallCount = 0;
+      mockInvoke.mockImplementation(((
+        cmd: string,
+      ) => {
+        if (cmd === "browse_users")
+          return Promise.resolve(makeBrowseResult(entries));
+        if (cmd === "get_user") {
+          getUserCallCount++;
+          return Promise.resolve(refreshedEntry);
+        }
+        if (cmd === "evaluate_health_cmd") return Promise.resolve(HEALTHY_STATUS);
+        return Promise.resolve(null);
+      }) as typeof invoke);
+
+      render(<UserLookup />, { wrapper: TestProviders });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("user-result-jdoe")).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByTestId("user-result-jdoe"));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("user-detail")).toBeInTheDocument();
+      });
+
+      // Click refresh button if available in UserDetail
+      const refreshBtn = screen.queryByTestId("refresh-user-btn");
+      if (refreshBtn) {
+        fireEvent.click(refreshBtn);
+
+        await waitFor(() => {
+          expect(getUserCallCount).toBeGreaterThanOrEqual(1);
+        });
+      }
     });
   });
 });

@@ -137,7 +137,7 @@ pub(crate) async fn browse_users_inner(
     page_size: usize,
 ) -> Result<BrowseResult, AppError> {
     const CACHE_TTL: Duration = Duration::from_secs(60);
-    const MAX_BROWSE: usize = 500;
+    const MAX_BROWSE: usize = 5000;
 
     // Check cache validity
     let cached = {
@@ -192,7 +192,7 @@ pub(crate) async fn browse_computers_inner(
     page_size: usize,
 ) -> Result<BrowseResult, AppError> {
     const CACHE_TTL: Duration = Duration::from_secs(60);
-    const MAX_BROWSE: usize = 500;
+    const MAX_BROWSE: usize = 5000;
 
     let cached = {
         let cache = state.browse_computers_cache.lock().unwrap();
@@ -235,6 +235,98 @@ pub(crate) async fn browse_computers_inner(
         total_count,
         has_more,
     })
+}
+
+/// Browse groups with server-side caching and pagination.
+pub(crate) async fn browse_groups_inner(
+    state: &AppState,
+    page: usize,
+    page_size: usize,
+) -> Result<BrowseResult, AppError> {
+    const CACHE_TTL: Duration = Duration::from_secs(60);
+    const MAX_BROWSE: usize = 5000;
+
+    let cached = {
+        let cache = state.browse_groups_cache.lock().unwrap();
+        cache
+            .as_ref()
+            .filter(|(ts, _)| ts.elapsed() < CACHE_TTL)
+            .map(|(_, entries)| entries.clone())
+    };
+
+    let entries = match cached {
+        Some(entries) => entries,
+        None => {
+            let provider = state.directory_provider.clone();
+            let mut fresh = provider
+                .browse_groups(MAX_BROWSE)
+                .await
+                .map_err(|e| AppError::Directory(e.to_string()))?;
+
+            fresh.sort_by(|a, b| {
+                let da = a.display_name.as_deref().unwrap_or("").to_lowercase();
+                let db = b.display_name.as_deref().unwrap_or("").to_lowercase();
+                da.cmp(&db)
+            });
+
+            let mut cache = state.browse_groups_cache.lock().unwrap();
+            *cache = Some((Instant::now(), fresh.clone()));
+
+            fresh
+        }
+    };
+
+    let total_count = entries.len();
+    let start = page * page_size;
+    let page_entries: Vec<DirectoryEntry> =
+        entries.into_iter().skip(start).take(page_size).collect();
+    let has_more = start + page_entries.len() < total_count;
+
+    Ok(BrowseResult {
+        entries: page_entries,
+        total_count,
+        has_more,
+    })
+}
+
+/// Removes a member from a group.
+pub(crate) async fn remove_group_member_inner(
+    state: &AppState,
+    group_dn: &str,
+    member_dn: &str,
+) -> Result<(), AppError> {
+    if !state
+        .permission_service
+        .has_permission(PermissionLevel::AccountOperator)
+    {
+        return Err(AppError::PermissionDenied(
+            "Removing group members requires AccountOperator permission or higher".to_string(),
+        ));
+    }
+
+    state
+        .snapshot_service
+        .capture(group_dn, "RemoveGroupMember");
+
+    let provider = state.directory_provider.clone();
+    match provider.remove_group_member(group_dn, member_dn).await {
+        Ok(()) => {
+            state.audit_service.log_success(
+                "GroupMemberRemoved",
+                group_dn,
+                &format!("Removed member {} from group", member_dn),
+            );
+            Ok(())
+        }
+        Err(e) => {
+            state.audit_service.log_failure(
+                "RemoveGroupMemberFailed",
+                group_dn,
+                &format!("Failed to remove member {} from group: {}", member_dn, e),
+            );
+            Err(AppError::Directory(e.to_string()))
+        }
+    }
 }
 
 /// Returns members of a group by its DN.
@@ -654,6 +746,478 @@ pub(crate) fn analyze_ntfs_inner(path: &str, depth: usize) -> Result<NtfsAnalysi
     Ok(crate::services::ntfs_analyzer::analyze(path, depth))
 }
 
+/// Detects empty groups (groups with no members).
+pub(crate) async fn detect_empty_groups_inner(
+    state: &AppState,
+) -> Result<Vec<DirectoryEntry>, AppError> {
+    let provider = state.directory_provider.clone();
+    let groups = provider
+        .browse_groups(5000)
+        .await
+        .map_err(|e| AppError::Directory(e.to_string()))?;
+
+    // Filter groups with no "member" attribute or empty member list
+    let empty: Vec<DirectoryEntry> = groups
+        .into_iter()
+        .filter(|g| {
+            let members = g.get_attribute_values("member");
+            members.is_empty()
+        })
+        .filter(|g| {
+            // Exclude built-in groups (those in CN=Builtin or CN=Users containers)
+            let dn = &g.distinguished_name;
+            !dn.contains("CN=Builtin,") && !dn.contains("CN=Users,DC=")
+        })
+        .collect();
+
+    Ok(empty)
+}
+
+/// Detects circular group nesting using DFS cycle detection.
+pub(crate) async fn detect_circular_groups_inner(
+    state: &AppState,
+) -> Result<Vec<Vec<String>>, AppError> {
+    let provider = state.directory_provider.clone();
+    let groups = provider
+        .browse_groups(5000)
+        .await
+        .map_err(|e| AppError::Directory(e.to_string()))?;
+
+    // Build adjacency list: group DN -> member group DNs
+    let mut graph: std::collections::HashMap<String, Vec<String>> =
+        std::collections::HashMap::new();
+    for group in &groups {
+        let members = group.get_attribute_values("member");
+        let member_groups: Vec<String> = members
+            .iter()
+            .filter(|m| groups.iter().any(|g| g.distinguished_name == **m))
+            .cloned()
+            .collect();
+        graph.insert(group.distinguished_name.clone(), member_groups);
+    }
+
+    // DFS cycle detection with three-color marking
+    let mut cycles = Vec::new();
+    let mut white: std::collections::HashSet<String> = graph.keys().cloned().collect();
+    let mut gray: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut black: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut path: Vec<String> = Vec::new();
+
+    fn dfs(
+        node: &str,
+        graph: &std::collections::HashMap<String, Vec<String>>,
+        white: &mut std::collections::HashSet<String>,
+        gray: &mut std::collections::HashSet<String>,
+        black: &mut std::collections::HashSet<String>,
+        path: &mut Vec<String>,
+        cycles: &mut Vec<Vec<String>>,
+    ) {
+        white.remove(node);
+        gray.insert(node.to_string());
+        path.push(node.to_string());
+
+        if let Some(neighbors) = graph.get(node) {
+            for neighbor in neighbors {
+                if gray.contains(neighbor.as_str()) {
+                    // Found cycle - extract the cycle from path
+                    if let Some(cycle_start) = path.iter().position(|p| p == neighbor) {
+                        let mut cycle: Vec<String> = path[cycle_start..].to_vec();
+                        cycle.push(neighbor.clone()); // close the cycle
+                        cycles.push(cycle);
+                    }
+                } else if white.contains(neighbor.as_str()) {
+                    dfs(neighbor, graph, white, gray, black, path, cycles);
+                }
+            }
+        }
+
+        path.pop();
+        gray.remove(node);
+        black.insert(node.to_string());
+    }
+
+    let start_nodes: Vec<String> = white.iter().cloned().collect();
+    for node in start_nodes {
+        if white.contains(&node) {
+            dfs(
+                &node,
+                &graph,
+                &mut white,
+                &mut gray,
+                &mut black,
+                &mut path,
+                &mut cycles,
+            );
+        }
+    }
+
+    Ok(cycles)
+}
+
+/// Detects groups with exactly one member.
+pub(crate) async fn detect_single_member_groups_inner(
+    state: &AppState,
+) -> Result<Vec<DirectoryEntry>, AppError> {
+    let provider = state.directory_provider.clone();
+    let groups = provider
+        .browse_groups(5000)
+        .await
+        .map_err(|e| AppError::Directory(e.to_string()))?;
+
+    let single: Vec<DirectoryEntry> = groups
+        .into_iter()
+        .filter(|g| {
+            let members = g.get_attribute_values("member");
+            members.len() == 1
+        })
+        .filter(|g| {
+            let dn = &g.distinguished_name;
+            !dn.contains("CN=Builtin,") && !dn.contains("CN=Users,DC=")
+        })
+        .collect();
+
+    Ok(single)
+}
+
+/// Result for a group with deep nesting.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeepNestingResult {
+    pub group_dn: String,
+    pub group_name: String,
+    pub depth: usize,
+}
+
+/// Detects groups not modified for longer than the given threshold in days.
+pub(crate) async fn detect_stale_groups_inner(
+    state: &AppState,
+    days_threshold: u64,
+) -> Result<Vec<DirectoryEntry>, AppError> {
+    let provider = state.directory_provider.clone();
+    let groups = provider
+        .browse_groups(5000)
+        .await
+        .map_err(|e| AppError::Directory(e.to_string()))?;
+
+    let now = chrono::Utc::now();
+    let threshold = chrono::Duration::days(days_threshold as i64);
+
+    let stale: Vec<DirectoryEntry> = groups
+        .into_iter()
+        .filter(|g| {
+            let dn = &g.distinguished_name;
+            !dn.contains("CN=Builtin,") && !dn.contains("CN=Users,DC=")
+        })
+        .filter(|g| {
+            if let Some(when_changed) = g.get_attribute("whenChanged") {
+                if let Ok(parsed) = chrono::DateTime::parse_from_rfc3339(when_changed) {
+                    let age = now - parsed.with_timezone(&chrono::Utc);
+                    return age > threshold;
+                }
+                // Try AD generalized time format: yyyyMMddHHmmss.0Z
+                if let Ok(parsed) = chrono::NaiveDateTime::parse_from_str(
+                    when_changed.trim_end_matches('Z'),
+                    "%Y%m%d%H%M%S%.f",
+                ) {
+                    let utc = parsed.and_utc();
+                    let age = now - utc;
+                    return age > threshold;
+                }
+            }
+            false
+        })
+        .collect();
+
+    Ok(stale)
+}
+
+/// Detects groups missing the description attribute.
+pub(crate) async fn detect_undescribed_groups_inner(
+    state: &AppState,
+) -> Result<Vec<DirectoryEntry>, AppError> {
+    let provider = state.directory_provider.clone();
+    let groups = provider
+        .browse_groups(5000)
+        .await
+        .map_err(|e| AppError::Directory(e.to_string()))?;
+
+    let undescribed: Vec<DirectoryEntry> = groups
+        .into_iter()
+        .filter(|g| {
+            let dn = &g.distinguished_name;
+            !dn.contains("CN=Builtin,") && !dn.contains("CN=Users,DC=")
+        })
+        .filter(|g| {
+            let desc = g.get_attribute("description").unwrap_or("");
+            desc.trim().is_empty()
+        })
+        .collect();
+
+    Ok(undescribed)
+}
+
+/// Detects groups nested deeper than `max_depth` levels.
+pub(crate) async fn detect_deep_nesting_inner(
+    state: &AppState,
+    max_depth: usize,
+) -> Result<Vec<DeepNestingResult>, AppError> {
+    let provider = state.directory_provider.clone();
+    let groups = provider
+        .browse_groups(5000)
+        .await
+        .map_err(|e| AppError::Directory(e.to_string()))?;
+
+    // Build parent-to-child adjacency: group DN -> child group DNs
+    let group_dns: std::collections::HashSet<String> = groups
+        .iter()
+        .map(|g| g.distinguished_name.clone())
+        .collect();
+
+    let mut children_of: std::collections::HashMap<String, Vec<String>> =
+        std::collections::HashMap::new();
+    for group in &groups {
+        let member_groups: Vec<String> = group
+            .get_attribute_values("member")
+            .iter()
+            .filter(|m| group_dns.contains(*m))
+            .cloned()
+            .collect();
+        children_of.insert(group.distinguished_name.clone(), member_groups);
+    }
+
+    // For each group, compute maximum depth via DFS
+    fn compute_depth(
+        node: &str,
+        children_of: &std::collections::HashMap<String, Vec<String>>,
+        visited: &mut std::collections::HashSet<String>,
+    ) -> usize {
+        if visited.contains(node) {
+            return 0; // avoid cycles
+        }
+        visited.insert(node.to_string());
+        let max_child_depth = children_of
+            .get(node)
+            .map(|children| {
+                children
+                    .iter()
+                    .map(|c| compute_depth(c, children_of, visited))
+                    .max()
+                    .unwrap_or(0)
+            })
+            .unwrap_or(0);
+        visited.remove(node);
+        max_child_depth + 1
+    }
+
+    let mut results: Vec<DeepNestingResult> = Vec::new();
+    for group in &groups {
+        let mut visited = std::collections::HashSet::new();
+        let depth = compute_depth(&group.distinguished_name, &children_of, &mut visited);
+        if depth > max_depth {
+            let name = group
+                .display_name
+                .clone()
+                .or_else(|| group.sam_account_name.clone())
+                .unwrap_or_else(|| group.distinguished_name.clone());
+            results.push(DeepNestingResult {
+                group_dn: group.distinguished_name.clone(),
+                group_name: name,
+                depth,
+            });
+        }
+    }
+
+    Ok(results)
+}
+
+/// Detects groups that have exactly the same set of members.
+pub(crate) async fn detect_duplicate_groups_inner(
+    state: &AppState,
+) -> Result<Vec<Vec<DirectoryEntry>>, AppError> {
+    let provider = state.directory_provider.clone();
+    let groups = provider
+        .browse_groups(5000)
+        .await
+        .map_err(|e| AppError::Directory(e.to_string()))?;
+
+    // Build member set fingerprints
+    let mut member_map: std::collections::HashMap<Vec<String>, Vec<DirectoryEntry>> =
+        std::collections::HashMap::new();
+
+    for group in groups {
+        let dn = &group.distinguished_name;
+        if dn.contains("CN=Builtin,") || dn.contains("CN=Users,DC=") {
+            continue;
+        }
+        let members = group.get_attribute_values("member");
+        if members.is_empty() {
+            continue; // empty groups already handled separately
+        }
+        let mut sorted_members: Vec<String> = members.to_vec();
+        sorted_members.sort();
+        member_map.entry(sorted_members).or_default().push(group);
+    }
+
+    // Keep only clusters with 2+ groups
+    let duplicates: Vec<Vec<DirectoryEntry>> = member_map
+        .into_values()
+        .filter(|cluster| cluster.len() >= 2)
+        .collect();
+
+    Ok(duplicates)
+}
+
+/// Creates a new group in Active Directory. Requires AccountOperator permission.
+pub(crate) async fn create_group_inner(
+    state: &AppState,
+    name: &str,
+    container_dn: &str,
+    scope: &str,
+    category: &str,
+    description: &str,
+) -> Result<String, AppError> {
+    if !state
+        .permission_service
+        .has_permission(PermissionLevel::AccountOperator)
+    {
+        return Err(AppError::PermissionDenied(
+            "Group creation requires AccountOperator permission or higher".to_string(),
+        ));
+    }
+
+    let dn = format!("CN={},{}", name, container_dn);
+    state.snapshot_service.capture(&dn, "GroupCreate");
+
+    let provider = state.directory_provider.clone();
+    match provider
+        .create_group(name, container_dn, scope, category, description)
+        .await
+    {
+        Ok(created_dn) => {
+            state.audit_service.log_success(
+                "GroupCreated",
+                &created_dn,
+                &format!(
+                    "Group created: scope={}, category={}, container={}",
+                    scope, category, container_dn
+                ),
+            );
+            Ok(created_dn)
+        }
+        Err(e) => {
+            state.audit_service.log_failure(
+                "GroupCreateFailed",
+                &dn,
+                &format!("Failed to create group: {}", e),
+            );
+            Err(AppError::Directory(e.to_string()))
+        }
+    }
+}
+
+/// Moves an AD object to a different container. Requires DomainAdmin permission.
+pub(crate) async fn move_object_inner(
+    state: &AppState,
+    object_dn: &str,
+    target_container_dn: &str,
+) -> Result<(), AppError> {
+    if !state
+        .permission_service
+        .has_permission(PermissionLevel::DomainAdmin)
+    {
+        return Err(AppError::PermissionDenied(
+            "Moving objects requires DomainAdmin permission".to_string(),
+        ));
+    }
+
+    state.snapshot_service.capture(object_dn, "MoveObject");
+
+    let provider = state.directory_provider.clone();
+    match provider.move_object(object_dn, target_container_dn).await {
+        Ok(()) => {
+            state.audit_service.log_success(
+                "ObjectMoved",
+                object_dn,
+                &format!("Moved to {}", target_container_dn),
+            );
+            Ok(())
+        }
+        Err(e) => {
+            state.audit_service.log_failure(
+                "MoveObjectFailed",
+                object_dn,
+                &format!("Failed to move object: {}", e),
+            );
+            Err(AppError::Directory(e.to_string()))
+        }
+    }
+}
+
+/// Updates the managedBy attribute of a group. Requires AccountOperator permission.
+pub(crate) async fn update_managed_by_inner(
+    state: &AppState,
+    group_dn: &str,
+    manager_dn: &str,
+) -> Result<(), AppError> {
+    if !state
+        .permission_service
+        .has_permission(PermissionLevel::AccountOperator)
+    {
+        return Err(AppError::PermissionDenied(
+            "Updating group manager requires AccountOperator permission or higher".to_string(),
+        ));
+    }
+
+    let provider = state.directory_provider.clone();
+    match provider.update_managed_by(group_dn, manager_dn).await {
+        Ok(()) => {
+            state.audit_service.log_success(
+                "ManagedByUpdated",
+                group_dn,
+                &format!("Manager set to {}", manager_dn),
+            );
+            Ok(())
+        }
+        Err(e) => {
+            state.audit_service.log_failure(
+                "UpdateManagedByFailed",
+                group_dn,
+                &format!("Failed to update managedBy: {}", e),
+            );
+            Err(AppError::Directory(e.to_string()))
+        }
+    }
+}
+
+/// Deletes a group by DN (requires DomainAdmin).
+pub(crate) async fn delete_group_inner(state: &AppState, group_dn: &str) -> Result<(), AppError> {
+    if !state
+        .permission_service
+        .has_permission(PermissionLevel::DomainAdmin)
+    {
+        return Err(AppError::PermissionDenied(
+            "Group deletion requires DomainAdmin permission".to_string(),
+        ));
+    }
+
+    state.snapshot_service.capture(group_dn, "GroupDelete");
+    let provider = state.directory_provider.clone();
+    match provider.delete_object(group_dn).await {
+        Ok(()) => {
+            state
+                .audit_service
+                .log_success("GroupDeleted", group_dn, "Group deleted");
+            Ok(())
+        }
+        Err(e) => {
+            state
+                .audit_service
+                .log_failure("GroupDeleteFailed", group_dn, &e.to_string());
+            Err(AppError::Directory(e.to_string()))
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Tauri commands - thin wrappers
 // ---------------------------------------------------------------------------
@@ -815,6 +1379,26 @@ pub async fn browse_computers(
     browse_computers_inner(&state, page, page_size).await
 }
 
+/// Browses all groups with pagination (cached server-side for 60s).
+#[tauri::command]
+pub async fn browse_groups(
+    page: usize,
+    page_size: usize,
+    state: State<'_, AppState>,
+) -> Result<BrowseResult, AppError> {
+    browse_groups_inner(&state, page, page_size).await
+}
+
+/// Removes a member from a group.
+#[tauri::command]
+pub async fn remove_group_member(
+    group_dn: String,
+    member_dn: String,
+    state: State<'_, AppState>,
+) -> Result<(), AppError> {
+    remove_group_member_inner(&state, &group_dn, &member_dn).await
+}
+
 /// Returns the members of a group identified by its DN.
 #[tauri::command]
 pub async fn get_group_members(
@@ -822,6 +1406,111 @@ pub async fn get_group_members(
     state: State<'_, AppState>,
 ) -> Result<Vec<DirectoryEntry>, AppError> {
     get_group_members_inner(&state, &group_dn).await
+}
+
+/// Detects empty groups (groups with no members).
+#[tauri::command]
+pub async fn detect_empty_groups(
+    state: State<'_, AppState>,
+) -> Result<Vec<DirectoryEntry>, AppError> {
+    detect_empty_groups_inner(&state).await
+}
+
+/// Detects circular group nesting.
+#[tauri::command]
+pub async fn detect_circular_groups(
+    state: State<'_, AppState>,
+) -> Result<Vec<Vec<String>>, AppError> {
+    detect_circular_groups_inner(&state).await
+}
+
+/// Detects groups with exactly one member.
+#[tauri::command]
+pub async fn detect_single_member_groups(
+    state: State<'_, AppState>,
+) -> Result<Vec<DirectoryEntry>, AppError> {
+    detect_single_member_groups_inner(&state).await
+}
+
+/// Detects groups not modified in a long time (stale).
+#[tauri::command]
+pub async fn detect_stale_groups(
+    days_threshold: u64,
+    state: State<'_, AppState>,
+) -> Result<Vec<DirectoryEntry>, AppError> {
+    detect_stale_groups_inner(&state, days_threshold).await
+}
+
+/// Detects groups missing description attribute.
+#[tauri::command]
+pub async fn detect_undescribed_groups(
+    state: State<'_, AppState>,
+) -> Result<Vec<DirectoryEntry>, AppError> {
+    detect_undescribed_groups_inner(&state).await
+}
+
+/// Detects groups with excessive nesting depth.
+#[tauri::command]
+pub async fn detect_deep_nesting(
+    max_depth: usize,
+    state: State<'_, AppState>,
+) -> Result<Vec<DeepNestingResult>, AppError> {
+    detect_deep_nesting_inner(&state, max_depth).await
+}
+
+/// Detects groups with identical member sets.
+#[tauri::command]
+pub async fn detect_duplicate_groups(
+    state: State<'_, AppState>,
+) -> Result<Vec<Vec<DirectoryEntry>>, AppError> {
+    detect_duplicate_groups_inner(&state).await
+}
+
+/// Deletes a group by DN.
+#[tauri::command]
+pub async fn delete_group(group_dn: String, state: State<'_, AppState>) -> Result<(), AppError> {
+    delete_group_inner(&state, &group_dn).await
+}
+
+/// Creates a new group in Active Directory.
+#[tauri::command]
+pub async fn create_group(
+    name: String,
+    container_dn: String,
+    scope: String,
+    category: String,
+    description: String,
+    state: State<'_, AppState>,
+) -> Result<String, AppError> {
+    create_group_inner(
+        &state,
+        &name,
+        &container_dn,
+        &scope,
+        &category,
+        &description,
+    )
+    .await
+}
+
+/// Moves an AD object to a different container.
+#[tauri::command]
+pub async fn move_object(
+    object_dn: String,
+    target_container_dn: String,
+    state: State<'_, AppState>,
+) -> Result<(), AppError> {
+    move_object_inner(&state, &object_dn, &target_container_dn).await
+}
+
+/// Updates the managedBy attribute of a group.
+#[tauri::command]
+pub async fn update_managed_by(
+    group_dn: String,
+    manager_dn: String,
+    state: State<'_, AppState>,
+) -> Result<(), AppError> {
+    update_managed_by_inner(&state, &group_dn, &manager_dn).await
 }
 
 /// Returns the current Windows username from the environment.
@@ -833,6 +1522,17 @@ pub fn get_current_username() -> String {
     })
 }
 
+/// Returns the authenticated LDAP identity (resolved via WhoAmI or bind DN).
+///
+/// This may differ from `get_current_username` when using "Run as" or simple bind.
+#[tauri::command]
+pub fn get_authenticated_identity(state: State<'_, AppState>) -> String {
+    state
+        .permission_service
+        .authenticated_user()
+        .unwrap_or_else(get_current_username)
+}
+
 /// Returns the computer name from the environment.
 #[tauri::command]
 pub fn get_computer_name() -> String {
@@ -840,6 +1540,16 @@ pub fn get_computer_name() -> String {
         tracing::warn!("COMPUTERNAME environment variable not set: {}", e);
         "Unknown".to_string()
     })
+}
+
+/// Returns all attribute names from the AD schema.
+#[tauri::command]
+pub async fn get_schema_attributes(state: State<'_, AppState>) -> Result<Vec<String>, AppError> {
+    let provider = state.directory_provider.clone();
+    provider
+        .get_schema_attributes()
+        .await
+        .map_err(|e| AppError::Directory(e.to_string()))
 }
 
 /// Evaluates the health status of a user account.
@@ -850,6 +1560,19 @@ pub fn get_computer_name() -> String {
 pub fn evaluate_health_cmd(input: HealthInput) -> AccountHealthStatus {
     let now_ms = chrono::Utc::now().timestamp_millis();
     crate::services::evaluate_health(&input, now_ms)
+}
+
+/// Evaluates health status for multiple user accounts in a single IPC call.
+///
+/// Accepts a vector of health inputs and returns a vector of results in the
+/// same order. Much faster than calling `evaluate_health_cmd` per user.
+#[tauri::command]
+pub fn evaluate_health_batch(inputs: Vec<HealthInput>) -> Vec<AccountHealthStatus> {
+    let now_ms = chrono::Utc::now().timestamp_millis();
+    inputs
+        .iter()
+        .map(|input| crate::services::evaluate_health(input, now_ms))
+        .collect()
 }
 
 /// Resets a user's password.
@@ -911,6 +1634,26 @@ pub async fn set_password_flags(
 #[tauri::command]
 pub fn get_audit_entries(state: State<'_, AppState>) -> Vec<AuditEntry> {
     get_audit_entries_inner(&state)
+}
+
+/// Logs an audit event from the frontend (for operations not backed by a write command).
+#[tauri::command]
+pub fn audit_log(
+    action: String,
+    target_dn: String,
+    details: String,
+    success: bool,
+    state: State<'_, AppState>,
+) {
+    if success {
+        state
+            .audit_service
+            .log_success(&action, &target_dn, &details);
+    } else {
+        state
+            .audit_service
+            .log_failure(&action, &target_dn, &details);
+    }
 }
 
 /// Adds a user to a group.
@@ -1391,6 +2134,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore] // requires ICMP privileges, fails in Docker/CI containers
     async fn test_ping_host_localhost_is_reachable() {
         let result = ping_host("127.0.0.1".to_string()).await.unwrap();
         assert!(
@@ -1852,6 +2596,103 @@ mod tests {
         let state = make_state_with_failure();
         let result = browse_users_inner(&state, 0, 10).await;
         assert!(result.is_err());
+    }
+
+    // -----------------------------------------------------------------------
+    // Browse groups tests
+    // -----------------------------------------------------------------------
+
+    fn make_group_entry(name: &str) -> DirectoryEntry {
+        let mut attrs = HashMap::new();
+        attrs.insert("groupType".to_string(), vec!["-2147483646".to_string()]);
+        attrs.insert("description".to_string(), vec![format!("{} group", name)]);
+        DirectoryEntry {
+            distinguished_name: format!("CN={},OU=Groups,DC=example,DC=com", name),
+            sam_account_name: Some(name.to_string()),
+            display_name: Some(name.to_string()),
+            object_class: Some("group".to_string()),
+            attributes: attrs,
+        }
+    }
+
+    fn make_state_with_groups(groups: Vec<DirectoryEntry>) -> AppState {
+        let provider = Arc::new(MockDirectoryProvider::new().with_groups(groups));
+        AppState::new_for_test(provider, PermissionConfig::default())
+    }
+
+    #[tokio::test]
+    async fn test_browse_groups_inner_returns_paginated_results() {
+        let groups = vec![
+            make_group_entry("Alpha Group"),
+            make_group_entry("Beta Group"),
+            make_group_entry("Gamma Group"),
+        ];
+        let state = make_state_with_groups(groups);
+        let result = browse_groups_inner(&state, 0, 2).await.unwrap();
+        assert_eq!(result.entries.len(), 2);
+        assert_eq!(result.total_count, 3);
+        assert!(result.has_more);
+    }
+
+    #[tokio::test]
+    async fn test_browse_groups_inner_uses_cache() {
+        let groups = vec![make_group_entry("TestGroup")];
+        let state = make_state_with_groups(groups);
+
+        let r1 = browse_groups_inner(&state, 0, 10).await.unwrap();
+        assert_eq!(r1.total_count, 1);
+
+        let cache = state.browse_groups_cache.lock().unwrap();
+        assert!(cache.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_browse_groups_inner_sorts_by_display_name() {
+        let groups = vec![
+            make_group_entry("Zeta"),
+            make_group_entry("Alpha"),
+            make_group_entry("Mid"),
+        ];
+        let state = make_state_with_groups(groups);
+        let result = browse_groups_inner(&state, 0, 10).await.unwrap();
+        assert_eq!(result.entries[0].display_name, Some("Alpha".to_string()));
+        assert_eq!(result.entries[1].display_name, Some("Mid".to_string()));
+        assert_eq!(result.entries[2].display_name, Some("Zeta".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_remove_group_member_inner_requires_account_operator() {
+        let state = make_state(); // ReadOnly
+        let result = remove_group_member_inner(
+            &state,
+            "CN=Group,DC=example,DC=com",
+            "CN=User,DC=example,DC=com",
+        )
+        .await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            AppError::PermissionDenied(msg) => assert!(msg.contains("AccountOperator")),
+            other => panic!("Expected PermissionDenied, got: {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_remove_group_member_inner_audits_success() {
+        let (state, provider) =
+            make_state_with_level_and_provider(PermissionLevel::AccountOperator);
+        remove_group_member_inner(
+            &state,
+            "CN=Group,DC=example,DC=com",
+            "CN=User,DC=example,DC=com",
+        )
+        .await
+        .unwrap();
+        let calls = provider.remove_group_member_calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+        let entries = state.audit_service.get_entries();
+        assert_eq!(entries.len(), 1);
+        assert!(entries[0].success);
+        assert_eq!(entries[0].action, "GroupMemberRemoved");
     }
 
     // -----------------------------------------------------------------------
@@ -2991,5 +3832,340 @@ mod tests {
             make_state_with_level_and_provider(PermissionLevel::AccountOperator);
         let result = add_user_to_group_inner(&state, "CN=User,DC=test", "CN=Group,DC=test").await;
         assert!(result.is_ok());
+    }
+
+    // -----------------------------------------------------------------------
+    // Story 4.4 - Group hygiene command tests
+    // -----------------------------------------------------------------------
+
+    fn make_group_entry_with_members(name: &str, members: Vec<&str>) -> DirectoryEntry {
+        let mut attrs = HashMap::new();
+        attrs.insert("groupType".to_string(), vec!["-2147483646".to_string()]);
+        attrs.insert("description".to_string(), vec![format!("{} group", name)]);
+        if !members.is_empty() {
+            attrs.insert(
+                "member".to_string(),
+                members.iter().map(|m| m.to_string()).collect(),
+            );
+        }
+        DirectoryEntry {
+            distinguished_name: format!("CN={},OU=Groups,DC=example,DC=com", name),
+            sam_account_name: Some(name.to_string()),
+            display_name: Some(name.to_string()),
+            object_class: Some("group".to_string()),
+            attributes: attrs,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_detect_empty_groups_inner_filters_empty() {
+        let groups = vec![
+            make_group_entry_with_members("EmptyGroup", vec![]),
+            make_group_entry_with_members(
+                "PopulatedGroup",
+                vec!["CN=User1,OU=Users,DC=example,DC=com"],
+            ),
+            make_group_entry_with_members("AnotherEmpty", vec![]),
+        ];
+        let state = make_state_with_groups(groups);
+        let result = detect_empty_groups_inner(&state).await.unwrap();
+        assert_eq!(result.len(), 2);
+        let names: Vec<&str> = result
+            .iter()
+            .filter_map(|g| g.sam_account_name.as_deref())
+            .collect();
+        assert!(names.contains(&"EmptyGroup"));
+        assert!(names.contains(&"AnotherEmpty"));
+    }
+
+    #[tokio::test]
+    async fn test_detect_empty_groups_inner_excludes_builtin() {
+        let mut builtin_group = make_group_entry_with_members("Guests", vec![]);
+        builtin_group.distinguished_name = "CN=Guests,CN=Builtin,DC=example,DC=com".to_string();
+        let mut users_group = make_group_entry_with_members("Domain Users", vec![]);
+        users_group.distinguished_name = "CN=Domain Users,CN=Users,DC=example,DC=com".to_string();
+        let normal_empty = make_group_entry_with_members("CustomEmpty", vec![]);
+        let groups = vec![builtin_group, users_group, normal_empty];
+        let state = make_state_with_groups(groups);
+        let result = detect_empty_groups_inner(&state).await.unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].sam_account_name, Some("CustomEmpty".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_detect_circular_groups_inner_detects_simple_cycle() {
+        // GroupA has member GroupB, GroupB has member GroupA
+        let group_a =
+            make_group_entry_with_members("GroupA", vec!["CN=GroupB,OU=Groups,DC=example,DC=com"]);
+        let group_b =
+            make_group_entry_with_members("GroupB", vec!["CN=GroupA,OU=Groups,DC=example,DC=com"]);
+        let groups = vec![group_a, group_b];
+        let state = make_state_with_groups(groups);
+        let result = detect_circular_groups_inner(&state).await.unwrap();
+        assert!(!result.is_empty(), "Should detect at least one cycle");
+        // Verify cycle contains both groups
+        let cycle = &result[0];
+        assert!(cycle.iter().any(|dn| dn.contains("GroupA")));
+        assert!(cycle.iter().any(|dn| dn.contains("GroupB")));
+    }
+
+    #[tokio::test]
+    async fn test_detect_circular_groups_inner_no_cycle() {
+        let group_a =
+            make_group_entry_with_members("GroupA", vec!["CN=GroupB,OU=Groups,DC=example,DC=com"]);
+        let group_b = make_group_entry_with_members("GroupB", vec![]);
+        let groups = vec![group_a, group_b];
+        let state = make_state_with_groups(groups);
+        let result = detect_circular_groups_inner(&state).await.unwrap();
+        assert!(result.is_empty(), "Should not detect any cycles");
+    }
+
+    #[tokio::test]
+    async fn test_delete_group_inner_requires_domain_admin() {
+        let state = make_state_with_level(PermissionLevel::AccountOperator);
+        let result = delete_group_inner(&state, "CN=TestGroup,DC=example,DC=com").await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            AppError::PermissionDenied(msg) => {
+                assert!(msg.contains("DomainAdmin"));
+            }
+            other => panic!("Expected PermissionDenied, got: {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_delete_group_inner_audits_success() {
+        let (state, provider) = make_state_with_level_and_provider(PermissionLevel::DomainAdmin);
+        delete_group_inner(&state, "CN=OldGroup,DC=example,DC=com")
+            .await
+            .unwrap();
+        let calls = provider.delete_calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0], "CN=OldGroup,DC=example,DC=com");
+        let entries = state.audit_service.get_entries();
+        assert_eq!(entries.len(), 1);
+        assert!(entries[0].success);
+        assert_eq!(entries[0].action, "GroupDeleted");
+    }
+
+    #[tokio::test]
+    async fn test_detect_single_member_groups_inner() {
+        let single_group = make_group_entry_with_members(
+            "SingleGroup",
+            vec!["CN=User1,OU=Users,DC=example,DC=com"],
+        );
+        let multi_group = make_group_entry_with_members(
+            "MultiGroup",
+            vec![
+                "CN=User1,OU=Users,DC=example,DC=com",
+                "CN=User2,OU=Users,DC=example,DC=com",
+            ],
+        );
+        let empty_group = make_group_entry_with_members("EmptyGroup", vec![]);
+        let groups = vec![single_group, multi_group, empty_group];
+        let state = make_state_with_groups(groups);
+        let result = detect_single_member_groups_inner(&state).await.unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].sam_account_name, Some("SingleGroup".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_detect_stale_groups_inner() {
+        let mut stale_group = make_group_entry_with_members("StaleGroup", vec![]);
+        stale_group.attributes.insert(
+            "whenChanged".to_string(),
+            vec!["2024-01-01T00:00:00Z".to_string()],
+        );
+        let mut fresh_group = make_group_entry_with_members("FreshGroup", vec![]);
+        fresh_group.attributes.insert(
+            "whenChanged".to_string(),
+            vec!["2026-03-14T00:00:00Z".to_string()],
+        );
+        let groups = vec![stale_group, fresh_group];
+        let state = make_state_with_groups(groups);
+        let result = detect_stale_groups_inner(&state, 180).await.unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].sam_account_name, Some("StaleGroup".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_detect_undescribed_groups_inner() {
+        let with_desc = make_group_entry_with_members("WithDesc", vec![]);
+        // WithDesc already has description from the helper
+        let mut without_desc = make_group_entry_with_members("NoDesc", vec![]);
+        without_desc.attributes.remove("description");
+        let groups = vec![with_desc, without_desc];
+        let state = make_state_with_groups(groups);
+        let result = detect_undescribed_groups_inner(&state).await.unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].sam_account_name, Some("NoDesc".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_detect_duplicate_groups_inner() {
+        let group_a = make_group_entry_with_members(
+            "GroupA",
+            vec!["CN=User1,DC=example,DC=com", "CN=User2,DC=example,DC=com"],
+        );
+        let group_b = make_group_entry_with_members(
+            "GroupB",
+            vec!["CN=User2,DC=example,DC=com", "CN=User1,DC=example,DC=com"],
+        );
+        let group_c = make_group_entry_with_members("GroupC", vec!["CN=User3,DC=example,DC=com"]);
+        let groups = vec![group_a, group_b, group_c];
+        let state = make_state_with_groups(groups);
+        let result = detect_duplicate_groups_inner(&state).await.unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].len(), 2);
+        let names: Vec<&str> = result[0]
+            .iter()
+            .filter_map(|g| g.sam_account_name.as_deref())
+            .collect();
+        assert!(names.contains(&"GroupA"));
+        assert!(names.contains(&"GroupB"));
+    }
+
+    #[tokio::test]
+    async fn test_detect_deep_nesting_inner() {
+        // Create a chain: GroupA -> GroupB -> GroupC (depth 3 from A)
+        let group_a =
+            make_group_entry_with_members("GroupA", vec!["CN=GroupB,OU=Groups,DC=example,DC=com"]);
+        let group_b =
+            make_group_entry_with_members("GroupB", vec!["CN=GroupC,OU=Groups,DC=example,DC=com"]);
+        let group_c = make_group_entry_with_members("GroupC", vec![]);
+        let groups = vec![group_a, group_b, group_c];
+        let state = make_state_with_groups(groups);
+        // max_depth = 2 means we report groups with depth > 2
+        let result = detect_deep_nesting_inner(&state, 2).await.unwrap();
+        assert!(!result.is_empty(), "Should detect GroupA with depth 3");
+        assert!(result
+            .iter()
+            .any(|r| r.group_name == "GroupA" && r.depth == 3));
+    }
+
+    // -----------------------------------------------------------------------
+    // create_group_inner tests
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_create_group_inner_requires_account_operator() {
+        let state = make_state(); // default is ReadOnly
+        let result = create_group_inner(
+            &state,
+            "TestGroup",
+            "OU=Groups,DC=example,DC=com",
+            "Global",
+            "Security",
+            "Test desc",
+        )
+        .await;
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(matches!(err, AppError::PermissionDenied(_)));
+    }
+
+    #[tokio::test]
+    async fn test_create_group_inner_audits_success() {
+        let (state, provider) =
+            make_state_with_level_and_provider(PermissionLevel::AccountOperator);
+
+        let result = create_group_inner(
+            &state,
+            "TestGroup",
+            "OU=Groups,DC=example,DC=com",
+            "Global",
+            "Security",
+            "A test group",
+        )
+        .await;
+        assert!(result.is_ok());
+        let dn = result.unwrap();
+        assert_eq!(dn, "CN=TestGroup,OU=Groups,DC=example,DC=com");
+
+        // Verify the mock recorded the call
+        let calls = provider.create_group_calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].0, "TestGroup");
+
+        // Verify audit log
+        let entries = state.audit_service.get_entries();
+        assert!(entries.iter().any(|e| e.action == "GroupCreated"));
+    }
+
+    // -----------------------------------------------------------------------
+    // move_object_inner tests
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_move_object_inner_requires_domain_admin() {
+        let state = make_state(); // default is ReadOnly
+        let result = move_object_inner(
+            &state,
+            "CN=TestGroup,OU=Old,DC=example,DC=com",
+            "OU=New,DC=example,DC=com",
+        )
+        .await;
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(matches!(err, AppError::PermissionDenied(_)));
+    }
+
+    #[tokio::test]
+    async fn test_move_object_inner_audits_success() {
+        let (state, provider) = make_state_with_level_and_provider(PermissionLevel::DomainAdmin);
+
+        let result = move_object_inner(
+            &state,
+            "CN=TestGroup,OU=Old,DC=example,DC=com",
+            "OU=New,DC=example,DC=com",
+        )
+        .await;
+        assert!(result.is_ok());
+
+        let calls = provider.move_object_calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+
+        let entries = state.audit_service.get_entries();
+        assert!(entries.iter().any(|e| e.action == "ObjectMoved"));
+    }
+
+    // -----------------------------------------------------------------------
+    // update_managed_by_inner tests
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_update_managed_by_inner_requires_account_operator() {
+        let state = make_state(); // default is ReadOnly
+        let result = update_managed_by_inner(
+            &state,
+            "CN=TestGroup,OU=Groups,DC=example,DC=com",
+            "CN=Manager,OU=Users,DC=example,DC=com",
+        )
+        .await;
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(matches!(err, AppError::PermissionDenied(_)));
+    }
+
+    #[tokio::test]
+    async fn test_update_managed_by_inner_audits_success() {
+        let (state, provider) =
+            make_state_with_level_and_provider(PermissionLevel::AccountOperator);
+
+        let result = update_managed_by_inner(
+            &state,
+            "CN=TestGroup,OU=Groups,DC=example,DC=com",
+            "CN=Manager,OU=Users,DC=example,DC=com",
+        )
+        .await;
+        assert!(result.is_ok());
+
+        let calls = provider.update_managed_by_calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].0, "CN=TestGroup,OU=Groups,DC=example,DC=com");
+        assert_eq!(calls[0].1, "CN=Manager,OU=Users,DC=example,DC=com");
+
+        let entries = state.audit_service.get_entries();
+        assert!(entries.iter().any(|e| e.action == "ManagedByUpdated"));
     }
 }

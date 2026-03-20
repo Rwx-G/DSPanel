@@ -22,6 +22,8 @@ import {
 import { GroupMembersDialog } from "@/components/dialogs/GroupMembersDialog";
 import { UncPermissionsAudit } from "@/components/comparison/UncPermissionsAudit";
 import { useNotifications } from "@/contexts/NotificationContext";
+import { usePermissions } from "@/hooks/usePermissions";
+import { extractErrorMessage } from "@/utils/errorMapping";
 
 function parseDnOu(dn: string): string {
   const ou = formatOuPath(dn);
@@ -111,14 +113,15 @@ function UserSearchField({
         {label}
       </label>
       <div className="relative">
-        <div className="relative">
+        <div className="flex items-center gap-2 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5">
           <Search
-            size={14}
-            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--color-text-secondary)]"
+            size={16}
+            className="shrink-0 text-[var(--color-text-secondary)]"
+            aria-hidden="true"
           />
           <input
             type="text"
-            className="w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-bg)] py-1.5 pl-8 pr-3 text-body text-[var(--color-text-primary)] placeholder-[var(--color-text-secondary)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+            className="flex-1 bg-transparent text-body text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-secondary)]"
             placeholder="Search by name or SAM..."
             value={query}
             onChange={(e) => {
@@ -138,11 +141,7 @@ function UserSearchField({
             }}
             data-testid={`${testId}-input`}
           />
-          {isSearching && (
-            <div className="absolute right-2.5 top-1/2 -translate-y-1/2">
-              <LoadingSpinner size="sm" />
-            </div>
-          )}
+          {isSearching && <LoadingSpinner size={16} />}
         </div>
         {showDropdown && results.length > 0 && (
           <div
@@ -280,6 +279,8 @@ export function UserComparison() {
   } = useComparison();
 
   const { notify } = useNotifications();
+  const { hasPermission } = usePermissions();
+  const canModifyGroups = hasPermission("HelpDesk");
   const { openTabs, activeTabId, clearTabData } = useNavigation();
 
   // React to prefill data passed via tab navigation
@@ -324,6 +325,7 @@ export function UserComparison() {
         items.push({
           label: `Add ${userA.displayName ?? userA.samAccountName} to this group`,
           icon: <UserPlus size={14} />,
+          disabled: !canModifyGroups,
           onClick: async () => {
             try {
               await invoke("add_user_to_group", {
@@ -336,7 +338,7 @@ export function UserComparison() {
               );
               compare();
             } catch (err) {
-              notify(`Failed to add to group: ${err}`, "error");
+              notify(extractErrorMessage(err), "error");
             }
           },
         });
@@ -346,6 +348,7 @@ export function UserComparison() {
         items.push({
           label: `Add ${userB.displayName ?? userB.samAccountName} to this group`,
           icon: <UserPlus size={14} />,
+          disabled: !canModifyGroups,
           onClick: async () => {
             try {
               await invoke("add_user_to_group", {
@@ -358,7 +361,7 @@ export function UserComparison() {
               );
               compare();
             } catch (err) {
-              notify(`Failed to add to group: ${err}`, "error");
+              notify(extractErrorMessage(err), "error");
             }
           },
         });
@@ -367,7 +370,7 @@ export function UserComparison() {
       setContextMenuItems(items);
       setContextMenuPos({ x: e.clientX, y: e.clientY });
     },
-    [userA, userB, compare, notify],
+    [userA, userB, compare, notify, canModifyGroups],
   );
 
   const userAName = userA?.displayName ?? userA?.samAccountName ?? "User A";
@@ -420,7 +423,7 @@ export function UserComparison() {
           data-testid="compare-button"
         >
           {isComparing ? (
-            <LoadingSpinner size="sm" />
+            <LoadingSpinner size={16} />
           ) : (
             <GitCompareArrows size={16} />
           )}
@@ -474,14 +477,15 @@ export function UserComparison() {
 
           {/* Filter & sort */}
           <div className="flex items-center gap-3">
-            <div className="relative flex-1">
+            <div className="flex flex-1 items-center gap-2 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5">
               <Search
-                size={14}
-                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--color-text-secondary)]"
+                size={16}
+                className="shrink-0 text-[var(--color-text-secondary)]"
+                aria-hidden="true"
               />
               <input
                 type="text"
-                className="w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-bg)] py-1.5 pl-8 pr-3 text-body text-[var(--color-text-primary)] placeholder-[var(--color-text-secondary)] focus:border-[var(--color-primary)] focus:outline-none"
+                className="flex-1 bg-transparent text-body text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-secondary)]"
                 placeholder="Filter groups..."
                 value={filter}
                 onChange={(e) => setFilter(e.target.value)}

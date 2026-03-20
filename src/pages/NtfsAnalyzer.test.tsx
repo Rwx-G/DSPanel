@@ -1,7 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { type ReactNode } from "react";
 import { NtfsAnalyzer } from "./NtfsAnalyzer";
+import { NavigationProvider } from "@/contexts/NavigationContext";
+import { NotificationProvider } from "@/contexts/NotificationContext";
+import { DialogProvider } from "@/contexts/DialogContext";
 import type { NtfsAnalysisResult } from "@/types/ntfs-analyzer";
+
+function TestProviders({ children }: { children: ReactNode }) {
+  return (
+    <NotificationProvider>
+      <DialogProvider>
+        <NavigationProvider>{children}</NavigationProvider>
+      </DialogProvider>
+    </NotificationProvider>
+  );
+}
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
@@ -71,7 +85,7 @@ describe("NtfsAnalyzer", () => {
   });
 
   it("renders the page with input controls", () => {
-    render(<NtfsAnalyzer />);
+    render(<NtfsAnalyzer />, { wrapper: TestProviders });
     expect(screen.getByTestId("ntfs-analyzer-page")).toBeInTheDocument();
     expect(screen.getByTestId("analyzer-path-input")).toBeInTheDocument();
     expect(screen.getByTestId("depth-selector")).toBeInTheDocument();
@@ -79,14 +93,14 @@ describe("NtfsAnalyzer", () => {
   });
 
   it("analyze button is disabled with empty path", () => {
-    render(<NtfsAnalyzer />);
+    render(<NtfsAnalyzer />, { wrapper: TestProviders });
     expect(screen.getByTestId("analyze-button")).toBeDisabled();
   });
 
   it("analyzes and displays results", async () => {
     mockInvoke.mockResolvedValueOnce(MOCK_RESULT);
 
-    render(<NtfsAnalyzer />);
+    render(<NtfsAnalyzer />, { wrapper: TestProviders });
 
     fireEvent.change(screen.getByTestId("analyzer-path-input"), {
       target: { value: "\\\\server\\share" },
@@ -105,7 +119,7 @@ describe("NtfsAnalyzer", () => {
   it("displays conflicts when detected", async () => {
     mockInvoke.mockResolvedValueOnce(MOCK_RESULT);
 
-    render(<NtfsAnalyzer />);
+    render(<NtfsAnalyzer />, { wrapper: TestProviders });
 
     fireEvent.change(screen.getByTestId("analyzer-path-input"), {
       target: { value: "\\\\server\\share" },
@@ -121,7 +135,7 @@ describe("NtfsAnalyzer", () => {
   it("displays error on failure", async () => {
     mockInvoke.mockRejectedValueOnce("Path not found");
 
-    render(<NtfsAnalyzer />);
+    render(<NtfsAnalyzer />, { wrapper: TestProviders });
 
     fireEvent.change(screen.getByTestId("analyzer-path-input"), {
       target: { value: "\\\\server\\share" },
@@ -134,7 +148,7 @@ describe("NtfsAnalyzer", () => {
   });
 
   it("allows changing depth", () => {
-    render(<NtfsAnalyzer />);
+    render(<NtfsAnalyzer />, { wrapper: TestProviders });
 
     const depthSelect = screen.getByTestId("depth-selector");
     fireEvent.change(depthSelect, { target: { value: "3" } });
@@ -144,7 +158,7 @@ describe("NtfsAnalyzer", () => {
   it("shows export CSV button after analysis", async () => {
     mockInvoke.mockResolvedValueOnce(MOCK_RESULT);
 
-    render(<NtfsAnalyzer />);
+    render(<NtfsAnalyzer />, { wrapper: TestProviders });
 
     fireEvent.change(screen.getByTestId("analyzer-path-input"), {
       target: { value: "\\\\server\\share" },
@@ -159,7 +173,7 @@ describe("NtfsAnalyzer", () => {
   it("shows explicit-only toggle", async () => {
     mockInvoke.mockResolvedValueOnce(MOCK_RESULT);
 
-    render(<NtfsAnalyzer />);
+    render(<NtfsAnalyzer />, { wrapper: TestProviders });
 
     fireEvent.change(screen.getByTestId("analyzer-path-input"), {
       target: { value: "\\\\server\\share" },
@@ -175,7 +189,7 @@ describe("NtfsAnalyzer", () => {
     const noConflicts = { ...MOCK_RESULT, conflicts: [] };
     mockInvoke.mockResolvedValueOnce(noConflicts);
 
-    render(<NtfsAnalyzer />);
+    render(<NtfsAnalyzer />, { wrapper: TestProviders });
 
     fireEvent.change(screen.getByTestId("analyzer-path-input"), {
       target: { value: "\\\\server\\share" },
@@ -191,7 +205,7 @@ describe("NtfsAnalyzer", () => {
   it("filters ACEs to explicit-only when toggle is checked", async () => {
     mockInvoke.mockResolvedValueOnce(MOCK_RESULT);
 
-    render(<NtfsAnalyzer />);
+    render(<NtfsAnalyzer />, { wrapper: TestProviders });
 
     fireEvent.change(screen.getByTestId("analyzer-path-input"), {
       target: { value: "\\\\server\\share" },
@@ -224,11 +238,12 @@ describe("NtfsAnalyzer", () => {
   it("calls exportCsv when CSV button is clicked", async () => {
     mockInvoke.mockImplementation(((cmd: string) => {
       if (cmd === "analyze_ntfs") return Promise.resolve(MOCK_RESULT);
-      if (cmd === "save_file_dialog") return Promise.resolve("/path/to/file.csv");
+      if (cmd === "save_file_dialog")
+        return Promise.resolve("/path/to/file.csv");
       return Promise.resolve(null);
     }) as typeof invoke);
 
-    render(<NtfsAnalyzer />);
+    render(<NtfsAnalyzer />, { wrapper: TestProviders });
 
     fireEvent.change(screen.getByTestId("analyzer-path-input"), {
       target: { value: "\\\\server\\share" },
@@ -254,7 +269,7 @@ describe("NtfsAnalyzer", () => {
   it("sends correct depth when depth selector is changed before analysis", async () => {
     mockInvoke.mockResolvedValueOnce(MOCK_RESULT);
 
-    render(<NtfsAnalyzer />);
+    render(<NtfsAnalyzer />, { wrapper: TestProviders });
 
     fireEvent.change(screen.getByTestId("depth-selector"), {
       target: { value: "5" },
@@ -275,7 +290,7 @@ describe("NtfsAnalyzer", () => {
   it("displays summary with path and ACE counts", async () => {
     mockInvoke.mockResolvedValueOnce(MOCK_RESULT);
 
-    render(<NtfsAnalyzer />);
+    render(<NtfsAnalyzer />, { wrapper: TestProviders });
 
     fireEvent.change(screen.getByTestId("analyzer-path-input"), {
       target: { value: "\\\\server\\share" },
@@ -291,7 +306,7 @@ describe("NtfsAnalyzer", () => {
   it("shows conflict details with trustee and paths", async () => {
     mockInvoke.mockResolvedValueOnce(MOCK_RESULT);
 
-    render(<NtfsAnalyzer />);
+    render(<NtfsAnalyzer />, { wrapper: TestProviders });
 
     fireEvent.change(screen.getByTestId("analyzer-path-input"), {
       target: { value: "\\\\server\\share" },
@@ -309,7 +324,7 @@ describe("NtfsAnalyzer", () => {
   it("triggers analysis on Enter key press", async () => {
     mockInvoke.mockResolvedValueOnce(MOCK_RESULT);
 
-    render(<NtfsAnalyzer />);
+    render(<NtfsAnalyzer />, { wrapper: TestProviders });
 
     const input = screen.getByTestId("analyzer-path-input");
     fireEvent.change(input, { target: { value: "\\\\server\\share" } });
@@ -326,7 +341,7 @@ describe("NtfsAnalyzer", () => {
   it("shows path sections that can be collapsed", async () => {
     mockInvoke.mockResolvedValueOnce(MOCK_RESULT);
 
-    render(<NtfsAnalyzer />);
+    render(<NtfsAnalyzer />, { wrapper: TestProviders });
 
     fireEvent.change(screen.getByTestId("analyzer-path-input"), {
       target: { value: "\\\\server\\share" },
@@ -346,7 +361,7 @@ describe("NtfsAnalyzer", () => {
   it("displays Deny ACE with proper styling and icon", async () => {
     mockInvoke.mockResolvedValueOnce(MOCK_RESULT);
 
-    render(<NtfsAnalyzer />);
+    render(<NtfsAnalyzer />, { wrapper: TestProviders });
 
     fireEvent.change(screen.getByTestId("analyzer-path-input"), {
       target: { value: "\\\\server\\share" },
@@ -364,7 +379,7 @@ describe("NtfsAnalyzer", () => {
   it("shows inherited and explicit sources in ACE rows", async () => {
     mockInvoke.mockResolvedValueOnce(MOCK_RESULT);
 
-    render(<NtfsAnalyzer />);
+    render(<NtfsAnalyzer />, { wrapper: TestProviders });
 
     fireEvent.change(screen.getByTestId("analyzer-path-input"), {
       target: { value: "\\\\server\\share" },
@@ -380,7 +395,7 @@ describe("NtfsAnalyzer", () => {
   });
 
   it("does not analyze with empty path after trim", () => {
-    render(<NtfsAnalyzer />);
+    render(<NtfsAnalyzer />, { wrapper: TestProviders });
 
     fireEvent.change(screen.getByTestId("analyzer-path-input"), {
       target: { value: "   " },
@@ -392,7 +407,7 @@ describe("NtfsAnalyzer", () => {
   it("collapses and expands a path section", async () => {
     mockInvoke.mockResolvedValueOnce(MOCK_RESULT);
 
-    render(<NtfsAnalyzer />);
+    render(<NtfsAnalyzer />, { wrapper: TestProviders });
 
     fireEvent.change(screen.getByTestId("analyzer-path-input"), {
       target: { value: "\\\\server\\share" },
@@ -450,7 +465,7 @@ describe("NtfsAnalyzer", () => {
 
     mockInvoke.mockResolvedValueOnce(resultWithError);
 
-    render(<NtfsAnalyzer />);
+    render(<NtfsAnalyzer />, { wrapper: TestProviders });
 
     fireEvent.change(screen.getByTestId("analyzer-path-input"), {
       target: { value: "\\\\server\\protected" },
@@ -479,7 +494,7 @@ describe("NtfsAnalyzer", () => {
 
     mockInvoke.mockResolvedValueOnce(emptyAcesResult);
 
-    render(<NtfsAnalyzer />);
+    render(<NtfsAnalyzer />, { wrapper: TestProviders });
 
     fireEvent.change(screen.getByTestId("analyzer-path-input"), {
       target: { value: "\\\\server\\empty" },
@@ -494,7 +509,7 @@ describe("NtfsAnalyzer", () => {
   it("expands trustee to show group chain tree", async () => {
     mockInvoke.mockResolvedValueOnce(MOCK_RESULT);
 
-    render(<NtfsAnalyzer />);
+    render(<NtfsAnalyzer />, { wrapper: TestProviders });
 
     fireEvent.change(screen.getByTestId("analyzer-path-input"), {
       target: { value: "\\\\server\\share" },
@@ -509,7 +524,9 @@ describe("NtfsAnalyzer", () => {
 
     // Find and click the trustee expand button within the path section
     const pathSection = screen.getByTestId("path-section-\\\\server\\share");
-    const expandBtns = pathSection.querySelectorAll('[data-testid^="trustee-expand-"]');
+    const expandBtns = pathSection.querySelectorAll(
+      '[data-testid^="trustee-expand-"]',
+    );
     expect(expandBtns.length).toBeGreaterThan(0);
 
     fireEvent.click(expandBtns[0]);
@@ -527,7 +544,7 @@ describe("NtfsAnalyzer", () => {
     };
     mockInvoke.mockResolvedValueOnce(resultWithErrors);
 
-    render(<NtfsAnalyzer />);
+    render(<NtfsAnalyzer />, { wrapper: TestProviders });
 
     fireEvent.change(screen.getByTestId("analyzer-path-input"), {
       target: { value: "\\\\server\\share" },
@@ -542,7 +559,7 @@ describe("NtfsAnalyzer", () => {
   it("shows conflict count in summary", async () => {
     mockInvoke.mockResolvedValueOnce(MOCK_RESULT);
 
-    render(<NtfsAnalyzer />);
+    render(<NtfsAnalyzer />, { wrapper: TestProviders });
 
     fireEvent.change(screen.getByTestId("analyzer-path-input"), {
       target: { value: "\\\\server\\share" },
@@ -557,7 +574,7 @@ describe("NtfsAnalyzer", () => {
   it("displays trustee context menu on right-click", async () => {
     mockInvoke.mockResolvedValueOnce(MOCK_RESULT);
 
-    render(<NtfsAnalyzer />);
+    render(<NtfsAnalyzer />, { wrapper: TestProviders });
 
     fireEvent.change(screen.getByTestId("analyzer-path-input"), {
       target: { value: "\\\\server\\share" },
@@ -581,10 +598,35 @@ describe("NtfsAnalyzer", () => {
     });
   });
 
+  it("shows Open in Group Management in trustee context menu", async () => {
+    mockInvoke.mockResolvedValueOnce(MOCK_RESULT);
+
+    render(<NtfsAnalyzer />, { wrapper: TestProviders });
+
+    fireEvent.change(screen.getByTestId("analyzer-path-input"), {
+      target: { value: "\\\\server\\share" },
+    });
+    fireEvent.click(screen.getByTestId("analyze-button"));
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId("ace-row-\\\\server\\share-0"),
+      ).toBeInTheDocument();
+    });
+
+    const aceRow = screen.getByTestId("ace-row-\\\\server\\share-0");
+    const trusteeTd = aceRow.querySelector("td");
+    fireEvent.contextMenu(trusteeTd!);
+
+    await waitFor(() => {
+      expect(screen.getByText("Open in Group Management")).toBeInTheDocument();
+    });
+  });
+
   it("displays ACE count per path section", async () => {
     mockInvoke.mockResolvedValueOnce(MOCK_RESULT);
 
-    render(<NtfsAnalyzer />);
+    render(<NtfsAnalyzer />, { wrapper: TestProviders });
 
     fireEvent.change(screen.getByTestId("analyzer-path-input"), {
       target: { value: "\\\\server\\share" },
@@ -600,7 +642,7 @@ describe("NtfsAnalyzer", () => {
   it("displays permissions text in ACE rows", async () => {
     mockInvoke.mockResolvedValueOnce(MOCK_RESULT);
 
-    render(<NtfsAnalyzer />);
+    render(<NtfsAnalyzer />, { wrapper: TestProviders });
 
     fireEvent.change(screen.getByTestId("analyzer-path-input"), {
       target: { value: "\\\\server\\share" },
@@ -617,7 +659,7 @@ describe("NtfsAnalyzer", () => {
   it("shows conflict deny permissions", async () => {
     mockInvoke.mockResolvedValueOnce(MOCK_RESULT);
 
-    render(<NtfsAnalyzer />);
+    render(<NtfsAnalyzer />, { wrapper: TestProviders });
 
     fireEvent.change(screen.getByTestId("analyzer-path-input"), {
       target: { value: "\\\\server\\share" },
@@ -642,7 +684,7 @@ describe("NtfsAnalyzer", () => {
       return Promise.resolve(null);
     }) as typeof invoke);
 
-    render(<NtfsAnalyzer />);
+    render(<NtfsAnalyzer />, { wrapper: TestProviders });
 
     fireEvent.change(screen.getByTestId("analyzer-path-input"), {
       target: { value: "\\\\server\\share" },

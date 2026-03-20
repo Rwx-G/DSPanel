@@ -20,21 +20,21 @@ Epic 1 is **complete at 100%** with zero remaining debt or backlog. All **13 sto
 
 ## Gate Summary
 
-| Story | Title | Gate | Quality Score |
-|-------|-------|------|---------------|
-| 1.1 | Project Skeleton and Bootstrap | **PASS** | 100 |
-| 1.2 | DirectoryProvider and AD Connection | **PASS** | 100 |
-| 1.3 | Permission Level Detection | **PASS** | 100 |
-| 1.4 | Theme System, Design Tokens | **PASS** | 100 |
-| 1.5 | App Shell, Navigation and Tab System | **PASS** | 100 |
-| 1.6 | Common Reusable Controls | **PASS** | 100 |
-| 1.7 | Data Display Components | **PASS** | 100 |
-| 1.8 | Form Controls, Validation | **PASS** | 100 |
-| 1.9 | Dialogs, Notifications, Feedback | **PASS** | 100 |
-| 1.10 | User Account Lookup | **PASS** | 100 |
-| 1.11 | Healthcheck Badge | **PASS** | 100 |
-| 1.12 | Computer Account Lookup | **PASS** | 100 |
-| 1.13 | Error Handling Foundation | **PASS** | 100 |
+| Story | Title                                | Gate     | Quality Score |
+| ----- | ------------------------------------ | -------- | ------------- |
+| 1.1   | Project Skeleton and Bootstrap       | **PASS** | 100           |
+| 1.2   | DirectoryProvider and AD Connection  | **PASS** | 100           |
+| 1.3   | Permission Level Detection           | **PASS** | 100           |
+| 1.4   | Theme System, Design Tokens          | **PASS** | 100           |
+| 1.5   | App Shell, Navigation and Tab System | **PASS** | 100           |
+| 1.6   | Common Reusable Controls             | **PASS** | 100           |
+| 1.7   | Data Display Components              | **PASS** | 100           |
+| 1.8   | Form Controls, Validation            | **PASS** | 100           |
+| 1.9   | Dialogs, Notifications, Feedback     | **PASS** | 100           |
+| 1.10  | User Account Lookup                  | **PASS** | 100           |
+| 1.11  | Healthcheck Badge                    | **PASS** | 100           |
+| 1.12  | Computer Account Lookup              | **PASS** | 100           |
+| 1.13  | Error Handling Foundation            | **PASS** | 100           |
 
 **Overall Epic Score: 100/100**
 
@@ -203,6 +203,7 @@ Excellent foundation. AppError and DirectoryError enums with LDAP code mapping. 
 ## Cross-Cutting Observations
 
 ### Strengths
+
 1. **Consistent architecture** - Clean separation between Rust backend (trait-based) and React frontend (hooks + context)
 2. **Strong test coverage** - 585 frontend tests + 172 Rust tests = 757 total across all modules
 3. **Error handling** - Comprehensive error pipeline from LDAP to user-facing notifications
@@ -214,23 +215,24 @@ Excellent foundation. AppError and DirectoryError enums with LDAP code mapping. 
 
 All 13 deferred items have been resolved:
 
-| Item | Story | Resolution Date |
-|------|-------|-----------------|
-| Window state persistence | 1.5 | 2026-03-13 |
-| Tab Close All context menu | 1.5 | 2026-03-13 |
-| Tab overflow scroll | 1.5 | 2026-03-13 |
-| VirtualizedList | 1.7 | 2026-03-13 |
-| DataTable column resize | 1.7 | 2026-03-13 |
-| DiffViewer scroll sync | 1.7 | 2026-03-13 |
-| OUPicker | 1.8 | 2026-03-13 |
-| GroupPicker | 1.8 | 2026-03-13 |
-| DateTimePicker | 1.8 | 2026-03-13 |
-| showCustomDialog | 1.9 | 2026-03-13 |
-| Healthcheck as Rust service | 1.11 | 2026-03-13 |
-| HealthBadge keyboard accessibility | 1.11 | 2026-03-13 |
-| Tab integration for ComputerLookup | 1.12 | 2026-03-13 |
+| Item                               | Story | Resolution Date |
+| ---------------------------------- | ----- | --------------- |
+| Window state persistence           | 1.5   | 2026-03-13      |
+| Tab Close All context menu         | 1.5   | 2026-03-13      |
+| Tab overflow scroll                | 1.5   | 2026-03-13      |
+| VirtualizedList                    | 1.7   | 2026-03-13      |
+| DataTable column resize            | 1.7   | 2026-03-13      |
+| DiffViewer scroll sync             | 1.7   | 2026-03-13      |
+| OUPicker                           | 1.8   | 2026-03-13      |
+| GroupPicker                        | 1.8   | 2026-03-13      |
+| DateTimePicker                     | 1.8   | 2026-03-13      |
+| showCustomDialog                   | 1.9   | 2026-03-13      |
+| Healthcheck as Rust service        | 1.11  | 2026-03-13      |
+| HealthBadge keyboard accessibility | 1.11  | 2026-03-13      |
+| Tab integration for ComputerLookup | 1.12  | 2026-03-13      |
 
 ### Notes for Future Epics
+
 1. **Storybook/Visual tests** - Consider setting up before v1.0 as a project-level initiative (not Epic 1 debt)
 2. **E2E tests** - Plan integration testing infrastructure when multi-page workflows are implemented (Epic 2+)
 3. **OUPicker/GroupPicker backend wiring** - Will be connected when respective Tauri commands are implemented in future epics

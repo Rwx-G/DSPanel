@@ -8,7 +8,7 @@
   <img src="https://img.shields.io/badge/Rust-2021-orange.svg" alt="Rust">
   <img src="https://img.shields.io/badge/Tauri-v2-blue.svg" alt="Tauri">
   <img src="https://img.shields.io/badge/Platform-Windows%20|%20macOS%20|%20Linux-0078D6.svg" alt="Platform">
-  <img src="https://img.shields.io/badge/Status-v0.3.0-brightgreen.svg" alt="Status">
+  <img src="https://img.shields.io/badge/Status-v0.4.0-brightgreen.svg" alt="Status">
 </p>
 
 ---
@@ -34,20 +34,41 @@ DSPanel is an open source cross-platform desktop application (Rust/Tauri v2) tha
 
 ### Adaptive Permissions
 
-The UI adapts dynamically based on the running user's AD group memberships:
+The UI adapts dynamically based on the running user's AD permissions. Detection
+uses three strategies (highest wins):
 
-| Level | Access |
-|-------|--------|
-| **ReadOnly** | Lookup, view, export |
-| **HelpDesk** | + Password reset, unlock, diagnostics |
-| **AccountOperator** | + Group management, presets, onboarding/offboarding |
-| **DomainAdmin** | + Infrastructure monitoring, security, administration |
+1. **SID-based** - automatic detection of well-known AD groups (Domain Admins,
+   Account Operators, etc.) via RID matching - works in any AD locale
+2. **Probe-based** - tests effective permissions via `allowedAttributesEffective`
+   and `allowedChildClassesEffective` on representative objects - detects
+   delegated permissions without requiring specific group membership
+3. **Custom groups** - optional AD groups for explicit role assignment
+
+| Level               | Access                                                |
+| ------------------- | ----------------------------------------------------- |
+| **ReadOnly**        | Lookup, view, export                                  |
+| **HelpDesk**        | + Password reset, unlock, diagnostics                 |
+| **AccountOperator** | + Group management, presets, onboarding/offboarding   |
+| **Admin**           | + Delete/move objects, create users                   |
+| **DomainAdmin**     | + Built-in/sensitive objects, infrastructure           |
+
+#### Custom Permission Groups
+
+Organizations can create these AD security groups for explicit DSPanel role
+assignment (optional - probe-based detection works without them):
+
+| AD Group                | DSPanel Level   |
+| ----------------------- | --------------- |
+| `DSPanel-HelpDesk`      | HelpDesk        |
+| `DSPanel-AccountOps`    | AccountOperator |
+| `DSPanel-Admin`         | Admin           |
+| `DSPanel-DomainAdmin`   | DomainAdmin     |
 
 ### Hybrid Support
 
 - **AD on-prem** via LDAP
 - **Entra ID** via Microsoft Graph API
-- **Exchange on-prem** via LDAP attributes (msExch*)
+- **Exchange on-prem** via LDAP attributes (msExch\*)
 - **Exchange Online** via Microsoft Graph API
 
 ## Requirements
@@ -89,6 +110,40 @@ pnpm tauri build
 
 ```bash
 pnpm tauri dev
+```
+
+### Integration Tests (Real AD)
+
+Integration tests run against a real Active Directory domain controller. They are
+skipped by default and gated by environment variables.
+
+**Lab setup:**
+
+1. Windows Server 2022 VM (Hyper-V, Internal switch, 2-4 GB RAM)
+2. Promote to DC, then populate with [BadBlood](https://github.com/davidprowe/BadBlood)
+3. Create three test accounts: `TestReadOnly` (standard user), `TestOperator`
+   (Account Operators), `TestAdmin` (Domain Admins + Enterprise Admins)
+
+**Running:**
+
+```bash
+# Read-only tests (15 tests)
+export DSPANEL_LDAP_SERVER=172.31.72.165
+export DSPANEL_LDAP_BIND_DN="CN=TestReadOnly,CN=Users,DC=dspanel,DC=local"
+export DSPANEL_LDAP_BIND_PASSWORD="P@ssw0rd2026!"
+cargo test --test ldap_integration -- --nocapture read_
+
+# Write tests (4 tests - requires Account Operator)
+export DSPANEL_LDAP_BIND_DN="CN=TestOperator,CN=Users,DC=dspanel,DC=local"
+cargo test --test ldap_integration -- --nocapture write_
+
+# Admin tests (2 tests - requires Domain Admin)
+export DSPANEL_LDAP_BIND_DN="CN=TestAdmin,CN=Users,DC=dspanel,DC=local"
+cargo test --test ldap_integration -- --nocapture admin_
+
+# All tests (22 tests - use admin account)
+export DSPANEL_LDAP_BIND_DN="CN=TestAdmin,CN=Users,DC=dspanel,DC=local"
+cargo test --test ldap_integration -- --nocapture
 ```
 
 ## Project Structure

@@ -9,6 +9,7 @@ I want to reset a user's password from the lookup view,
 so that I can resolve "can't log in" tickets quickly.
 
 #### Acceptance Criteria
+
 1. "Reset Password" button is visible only to HelpDesk+ permission level
 2. Password reset dialog offers: manual entry, auto-generate, and "must change at next logon" checkbox
 3. Password is validated against complexity requirements before submission
@@ -24,6 +25,7 @@ I want to generate secure passwords and check them against compromised databases
 so that reset passwords are strong and not previously breached.
 
 #### Acceptance Criteria
+
 1. Password generator is accessible from the reset dialog and as a standalone tool
 2. Generator produces passwords matching configurable criteria (length, complexity, character sets)
 3. Generated passwords are checked against HaveIBeenPwned API using k-anonymity (only first 5 chars of SHA1 sent)
@@ -38,6 +40,7 @@ I want to unlock, enable, or disable a user account from the lookup view,
 so that I can resolve lockout and access tickets.
 
 #### Acceptance Criteria
+
 1. "Unlock" button appears only when account is locked out (HelpDesk+ permission)
 2. "Enable/Disable" toggle appears for HelpDesk+ permission level
 3. Each action shows a confirmation dialog before execution
@@ -52,6 +55,7 @@ I want to manage password policy flags on a user account,
 so that I can configure special accounts (service accounts, etc.).
 
 #### Acceptance Criteria
+
 1. "Password Never Expires" and "User Cannot Change Password" checkboxes in user detail view
 2. Visible only to AccountOperator+ permission level
 3. Changes show a confirmation dialog with dry-run preview
@@ -65,6 +69,7 @@ I want sensitive actions (password reset, account deletion) to require MFA verif
 so that compromised DSPanel sessions cannot perform critical operations.
 
 #### Acceptance Criteria
+
 1. MFA gate is configurable (can be enabled/disabled per action type in settings)
 2. MFA challenge is provider-agnostic: supports TOTP (authenticator app) as built-in method
 3. MFA dialog appears before the action executes and blocks until verified
@@ -73,4 +78,3 @@ so that compromised DSPanel sessions cannot perform critical operations.
 6. Unit tests cover MFA flow (with mocked verification)
 
 ---
-

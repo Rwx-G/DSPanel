@@ -1,0 +1,52 @@
+schema: 1
+story: "4.4"
+story_title: "Empty and Circular Group Detection"
+gate: PASS
+status_reason: "All 7 acceptance criteria met (1 diverged: standalone page instead of tab). DFS cycle detection, bulk delete with DomainAdmin gating, audit logging with snapshot. 13 frontend + 4 backend tests pass."
+reviewer: "Quinn (Test Architect)"
+updated: "2026-03-15T18:50:00Z"
+
+waiver: { active: false }
+
+top_issues: []
+
+quality_score: 100
+
+expires: "2026-03-29T00:00:00Z"
+
+evidence:
+  tests_reviewed: 17
+  risks_identified: 0
+  trace:
+    ac_covered: [2, 3, 4, 5, 6, 7]
+    ac_gaps: []
+    ac_diverged: [1]
+    divergence_notes: "AC #1 'Hygiene tab in Group Management page' replaced by standalone page accessible from sidebar. Better UX for simultaneous use."
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Delete gated to DomainAdmin (stricter than AC #5 AccountOperator requirement). Snapshot capture before deletion. Full audit trail."
+  performance:
+    status: PASS
+    notes: "On-demand scan (not automatic). Parallel detection via Promise.all. browse_groups(5000) limit."
+  reliability:
+    status: PASS
+    notes: "Built-in group exclusion. Re-scan after bulk delete. Error handling with scan error display."
+  maintainability:
+    status: PASS
+    notes: "Clean separation: frontend detection display + backend DFS algorithm. Standalone page pattern consistent with other modules."
+
+risk_summary:
+  totals: { critical: 0, high: 0, medium: 0, low: 0 }
+  recommendations:
+    must_fix: []
+    monitor: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: "Consider adding HygieneScanCompleted audit event"
+      refs: ["src/pages/GroupHygiene.tsx"]
+    - action: "Consider re-checking group is still empty before deletion (race condition)"
+      refs: ["src-tauri/src/commands/mod.rs"]

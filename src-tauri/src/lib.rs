@@ -54,7 +54,39 @@ pub fn run() {
         Arc::new(services::demo_provider::DemoDirectoryProvider::new())
     };
     #[cfg(not(feature = "demo"))]
-    let provider: Arc<dyn services::DirectoryProvider> = Arc::new(LdapDirectoryProvider::new());
+    let provider: Arc<dyn services::DirectoryProvider> = {
+        use services::ldap_directory::LdapTlsConfig;
+
+        let server = std::env::var("DSPANEL_LDAP_SERVER").ok();
+        let bind_dn = std::env::var("DSPANEL_LDAP_BIND_DN").ok();
+        let bind_password = std::env::var("DSPANEL_LDAP_BIND_PASSWORD").ok();
+        let use_tls = std::env::var("DSPANEL_LDAP_USE_TLS")
+            .map(|v| v == "true" || v == "1")
+            .unwrap_or(false);
+        let skip_verify = std::env::var("DSPANEL_LDAP_TLS_SKIP_VERIFY")
+            .map(|v| v == "true" || v == "1")
+            .unwrap_or(false);
+
+        let tls_config = LdapTlsConfig {
+            enabled: use_tls,
+            skip_verify,
+        };
+
+        match (server, bind_dn, bind_password) {
+            (Some(s), Some(d), Some(p)) => Arc::new(LdapDirectoryProvider::new_with_credentials(
+                s, d, p, tls_config,
+            )),
+            (None, None, None) => Arc::new(LdapDirectoryProvider::new()),
+            _ => {
+                tracing::warn!(
+                    "Partial LDAP credentials detected - all three variables must be set: \
+                     DSPANEL_LDAP_SERVER, DSPANEL_LDAP_BIND_DN, DSPANEL_LDAP_BIND_PASSWORD. \
+                     Falling back to GSSAPI"
+                );
+                Arc::new(LdapDirectoryProvider::new())
+            }
+        }
+    };
 
     let app_state = AppState::new(provider, PermissionConfig::default());
 
@@ -71,7 +103,32 @@ pub fn run() {
                 if let Err(e) = permission_svc.detect_permissions(&*provider).await {
                     tracing::warn!("Permission detection failed: {}", e);
                 }
+                // Store the authenticated identity resolved during permission detection
+                if let Some(ref name) = provider.authenticated_user() {
+                    permission_svc.set_authenticated_user(name.clone());
+                    state.audit_service.set_operator(name.clone());
+                    tracing::info!(operator = %name, "Audit operator set to authenticated identity");
+                }
             });
+            // Start LDAP keepalive background task (ping every 5 minutes)
+            let keepalive_provider = state.directory_provider.clone();
+            tauri::async_runtime::spawn(async move {
+                let interval = std::time::Duration::from_secs(300); // 5 minutes
+                loop {
+                    tokio::time::sleep(interval).await;
+                    if keepalive_provider.is_connected() {
+                        match keepalive_provider.test_connection().await {
+                            Ok(true) => {
+                                tracing::debug!("LDAP keepalive: connection alive");
+                            }
+                            _ => {
+                                tracing::debug!("LDAP keepalive: connection lost, will reconnect on next operation");
+                            }
+                        }
+                    }
+                }
+            });
+
             tracing::info!("DSPanel setup complete");
             Ok(())
         })
@@ -90,8 +147,11 @@ pub fn run() {
             commands::search_computers,
             commands::ping_host,
             commands::resolve_dns,
+            commands::get_schema_attributes,
             commands::evaluate_health_cmd,
+            commands::evaluate_health_batch,
             commands::get_current_username,
+            commands::get_authenticated_identity,
             commands::get_computer_name,
             commands::reset_password,
             commands::unlock_account,
@@ -100,6 +160,7 @@ pub fn run() {
             commands::get_cannot_change_password,
             commands::set_password_flags,
             commands::get_audit_entries,
+            commands::audit_log,
             commands::generate_password,
             commands::check_password_hibp,
             commands::mfa_setup,
@@ -118,6 +179,19 @@ pub fn run() {
             commands::audit_ntfs_permissions,
             commands::cross_reference_ntfs,
             commands::search_groups,
+            commands::browse_groups,
+            commands::remove_group_member,
+            commands::detect_empty_groups,
+            commands::detect_circular_groups,
+            commands::detect_single_member_groups,
+            commands::detect_stale_groups,
+            commands::detect_undescribed_groups,
+            commands::detect_deep_nesting,
+            commands::detect_duplicate_groups,
+            commands::delete_group,
+            commands::create_group,
+            commands::move_object,
+            commands::update_managed_by,
             commands::get_ou_tree,
         ])
         .run(tauri::generate_context!())

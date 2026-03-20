@@ -18,8 +18,12 @@ describe("permissionIndex", () => {
     expect(permissionIndex("AccountOperator")).toBe(2);
   });
 
-  it("should return 3 for DomainAdmin", () => {
-    expect(permissionIndex("DomainAdmin")).toBe(3);
+  it("should return 3 for Admin", () => {
+    expect(permissionIndex("Admin")).toBe(3);
+  });
+
+  it("should return 4 for DomainAdmin", () => {
+    expect(permissionIndex("DomainAdmin")).toBe(4);
   });
 });
 
@@ -51,11 +55,12 @@ describe("hasPermissionLevel", () => {
 });
 
 describe("PERMISSION_LEVELS", () => {
-  it("should contain all four levels in order", () => {
+  it("should contain all five levels in order", () => {
     expect(PERMISSION_LEVELS).toEqual([
       "ReadOnly",
       "HelpDesk",
       "AccountOperator",
+      "Admin",
       "DomainAdmin",
     ]);
   });

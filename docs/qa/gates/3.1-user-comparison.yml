@@ -20,10 +20,26 @@ evidence:
     ac_gaps: []
 
 nfr_validation:
-  security: { status: PASS, notes: "add_user_to_group gated by HelpDesk permission with audit logging" }
-  performance: { status: PASS, notes: "O(n) set operations, efficient for typical AD group counts" }
-  reliability: { status: PASS, notes: "Error handling on all invoke calls, resolve_user fallback" }
-  maintainability: { status: PASS, notes: "Clean separation - comparison.rs service, useComparison hook, UserComparison page" }
+  security:
+    {
+      status: PASS,
+      notes: "add_user_to_group gated by HelpDesk permission with audit logging",
+    }
+  performance:
+    {
+      status: PASS,
+      notes: "O(n) set operations, efficient for typical AD group counts",
+    }
+  reliability:
+    {
+      status: PASS,
+      notes: "Error handling on all invoke calls, resolve_user fallback",
+    }
+  maintainability:
+    {
+      status: PASS,
+      notes: "Clean separation - comparison.rs service, useComparison hook, UserComparison page",
+    }
 
 recommendations:
   future:

@@ -2,6 +2,9 @@ import { describe, it, expect } from "vitest";
 import {
   mapEntryToUser,
   mapEntryToComputer,
+  mapEntryToGroup,
+  parseGroupScope,
+  parseGroupCategory,
   type DirectoryEntry,
 } from "./directory";
 
@@ -218,5 +221,99 @@ describe("mapEntryToComputer", () => {
       makeComputerEntry({ displayName: null }),
     );
     expect(computer.name).toBe("WS001");
+  });
+});
+
+function makeGroupEntry(
+  overrides: Partial<DirectoryEntry> = {},
+): DirectoryEntry {
+  return {
+    distinguishedName: "CN=Developers,OU=Groups,DC=example,DC=com",
+    samAccountName: "Developers",
+    displayName: "Developers",
+    objectClass: "group",
+    attributes: {
+      groupType: ["-2147483646"],
+      description: ["Development team group"],
+      member: [
+        "CN=John Doe,OU=Users,OU=Corp,DC=example,DC=com",
+        "CN=Alice Smith,OU=Users,OU=Corp,DC=example,DC=com",
+      ],
+    },
+    ...overrides,
+  };
+}
+
+describe("parseGroupScope", () => {
+  it("returns Global for bit 0x2", () => {
+    expect(parseGroupScope(0x2)).toBe("Global");
+    expect(parseGroupScope(-2147483646)).toBe("Global");
+  });
+
+  it("returns DomainLocal for bit 0x4", () => {
+    expect(parseGroupScope(0x4)).toBe("DomainLocal");
+    expect(parseGroupScope(-2147483644)).toBe("DomainLocal");
+  });
+
+  it("returns Universal for bit 0x8", () => {
+    expect(parseGroupScope(0x8)).toBe("Universal");
+    expect(parseGroupScope(-2147483640)).toBe("Universal");
+  });
+
+  it("returns Unknown for no matching bit", () => {
+    expect(parseGroupScope(0)).toBe("Unknown");
+    expect(parseGroupScope(0x10)).toBe("Unknown");
+  });
+});
+
+describe("parseGroupCategory", () => {
+  it("returns Security when bit 0x80000000 is set", () => {
+    expect(parseGroupCategory(-2147483646)).toBe("Security");
+    expect(parseGroupCategory(-2147483644)).toBe("Security");
+  });
+
+  it("returns Distribution when bit 0x80000000 is not set", () => {
+    expect(parseGroupCategory(0x2)).toBe("Distribution");
+    expect(parseGroupCategory(0x8)).toBe("Distribution");
+    expect(parseGroupCategory(0)).toBe("Distribution");
+  });
+});
+
+describe("mapEntryToGroup", () => {
+  it("maps all fields correctly", () => {
+    const group = mapEntryToGroup(makeGroupEntry());
+    expect(group.distinguishedName).toBe(
+      "CN=Developers,OU=Groups,DC=example,DC=com",
+    );
+    expect(group.samAccountName).toBe("Developers");
+    expect(group.displayName).toBe("Developers");
+    expect(group.description).toBe("Development team group");
+    expect(group.scope).toBe("Global");
+    expect(group.category).toBe("Security");
+    expect(group.memberCount).toBe(2);
+    expect(group.organizationalUnit).toBe("Groups");
+  });
+
+  it("handles missing attributes gracefully", () => {
+    const group = mapEntryToGroup(makeGroupEntry({ attributes: {} }));
+    expect(group.description).toBe("");
+    expect(group.scope).toBe("Unknown");
+    expect(group.category).toBe("Distribution");
+    expect(group.memberCount).toBe(0);
+  });
+
+  it("uses CN from DN when displayName is null", () => {
+    const group = mapEntryToGroup(
+      makeGroupEntry({
+        displayName: null,
+        attributes: { groupType: ["-2147483646"] },
+      }),
+    );
+    expect(group.displayName).toBe("Developers");
+  });
+
+  it("handles null samAccountName", () => {
+    const group = mapEntryToGroup(makeGroupEntry({ samAccountName: null }));
+    expect(group.samAccountName).toBe("");
   });
 });

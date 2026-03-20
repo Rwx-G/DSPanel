@@ -9,6 +9,7 @@ I want to search and review all actions performed in DSPanel,
 so that I can verify compliance and investigate incidents.
 
 #### Acceptance Criteria
+
 1. Audit log view with searchable/filterable table: timestamp, user, action type, target object, details, result (success/failure)
 2. Log stored locally (SQLite database)
 3. Filters: date range, user, action type, target object
@@ -23,6 +24,7 @@ I want to see a timeline of changes made to any AD object,
 so that I can investigate "what changed and when" for troubleshooting.
 
 #### Acceptance Criteria
+
 1. "History" tab on any AD object detail view
 2. Timeline shows attribute changes with timestamps, before/after values
 3. Data sourced from AD replication metadata (msDS-ReplAttributeMetaData)
@@ -36,6 +38,7 @@ I want to define automation rules (if X then Y) on AD changes,
 so that routine operations happen automatically.
 
 #### Acceptance Criteria
+
 1. Rule editor UI: trigger condition + action(s)
 2. Trigger types: object created in OU, object moved to OU, group membership changed, attribute changed
 3. Action types: apply preset, add/remove from group, send notification, execute script
@@ -51,6 +54,7 @@ I want to execute external scripts (PowerShell/exe) with the selected AD object'
 so that I can extend DSPanel with custom actions.
 
 #### Acceptance Criteria
+
 1. "Run Script" context menu on any AD object
 2. Script library configurable in settings (path to folder with approved scripts)
 3. Object attributes passed to script as parameters (SAMAccountName, DN, email, etc.)
@@ -66,6 +70,7 @@ I want to receive notifications (Teams, Slack, email) on configurable events,
 so that I am alerted to important AD changes without watching DSPanel.
 
 #### Acceptance Criteria
+
 1. Notification configuration UI: event type + channel + recipients
 2. Supported channels: webhook URL (Teams/Slack), SMTP email
 3. Configurable events: account lockout, privileged group change, security alert, automation rule triggered
@@ -80,6 +85,7 @@ I want to see which GPOs apply to a user, computer, or OU,
 so that I can troubleshoot Group Policy issues.
 
 #### Acceptance Criteria
+
 1. GPO panel accessible from user/computer/OU detail views
 2. Lists all GPOs applying to the selected scope (linked + inherited)
 3. Shows GPO name, link order, enforcement status, WMI filter
@@ -89,4 +95,3 @@ so that I can troubleshoot Group Policy issues.
 7. DomainAdmin permission required
 
 ---
-

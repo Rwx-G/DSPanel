@@ -190,6 +190,7 @@ DSPanel/
 **Rust tests**: Unit tests are colocated in the same file as the source code using `#[cfg(test)] mod tests {}`. Integration tests live in `src-tauri/tests/`.
 
 **Frontend tests**: Test files are colocated with components using the `*.test.tsx` / `*.test.ts` convention:
+
 - `src/components/common/SearchBar.tsx` -> `src/components/common/SearchBar.test.tsx`
 - `src/hooks/usePermission.ts` -> `src/hooks/usePermission.test.ts`
 - `src/lib/formatters.ts` -> `src/lib/formatters.test.ts`

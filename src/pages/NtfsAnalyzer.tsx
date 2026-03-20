@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { parseBackendError } from "@/utils/errorMapping";
 import {
   FolderSearch,
+  FolderOpen,
   Download,
   AlertTriangle,
   ShieldX,
@@ -15,6 +16,7 @@ import {
   type PathAclResult,
 } from "@/types/ntfs-analyzer";
 import { type AceEntry } from "@/types/ntfs";
+import { useNavigation } from "@/contexts/NavigationContext";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import {
   ContextMenu,
@@ -195,6 +197,7 @@ export function NtfsAnalyzer() {
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showExplicitOnly, setShowExplicitOnly] = useState(false);
+  const { openTab } = useNavigation();
 
   const handleTrusteeContextMenu = useCallback(
     (e: React.MouseEvent, ace: AceEntry) => {
@@ -214,6 +217,15 @@ export function NtfsAnalyzer() {
           label: `View members of ${name}`,
           icon: <Users size={14} />,
           onClick: () => setGroupMembersDialog({ dn: groupDn, name }),
+        },
+        {
+          label: "Open in Group Management",
+          icon: <FolderOpen size={14} />,
+          onClick: () => {
+            openTab("Group Management", "groups", "users-group", {
+              selectedGroupDn: groupDn,
+            });
+          },
         },
       ]);
       setContextMenuPos({ x: e.clientX, y: e.clientY });
@@ -294,19 +306,26 @@ export function NtfsAnalyzer() {
             <label className="mb-1 block text-caption font-medium text-[var(--color-text-secondary)]">
               UNC Path
             </label>
-            <input
-              type="text"
-              className="w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-bg)] px-3 py-1.5 text-body text-[var(--color-text-primary)] placeholder-[var(--color-text-secondary)] focus:border-[var(--color-primary)] focus:outline-none"
-              placeholder="\\server\share\folder"
-              value={uncPath}
-              onChange={(e) => setUncPath(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && uncPath.trim() && !isAnalyzing) {
-                  analyze();
-                }
-              }}
-              data-testid="analyzer-path-input"
-            />
+            <div className="flex items-center gap-2 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5">
+              <FolderSearch
+                size={16}
+                className="shrink-0 text-[var(--color-text-secondary)]"
+                aria-hidden="true"
+              />
+              <input
+                type="text"
+                className="flex-1 bg-transparent text-body text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-secondary)]"
+                placeholder="\\server\share\folder"
+                value={uncPath}
+                onChange={(e) => setUncPath(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && uncPath.trim() && !isAnalyzing) {
+                    analyze();
+                  }
+                }}
+                data-testid="analyzer-path-input"
+              />
+            </div>
           </div>
           <div>
             <label className="mb-1 block text-caption font-medium text-[var(--color-text-secondary)]">
@@ -333,7 +352,7 @@ export function NtfsAnalyzer() {
             data-testid="analyze-button"
           >
             {isAnalyzing ? (
-              <LoadingSpinner size="sm" />
+              <LoadingSpinner size={16} />
             ) : (
               <FolderSearch size={14} />
             )}

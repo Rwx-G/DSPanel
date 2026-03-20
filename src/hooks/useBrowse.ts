@@ -15,6 +15,10 @@ export interface UseBrowseOptions<T> {
   searchCommand: string;
   mapEntry: (entry: DirectoryEntry) => T;
   clientFilter: (item: T, lower: string) => boolean;
+  /** Returns a unique key for an item (used by updateItem). */
+  itemKey: (item: T) => string;
+  /** When true, automatically loads all pages on mount instead of waiting for scroll. */
+  preloadAll?: boolean;
 }
 
 export interface UseBrowseReturn<T> {
@@ -30,6 +34,7 @@ export interface UseBrowseReturn<T> {
   loadMore: () => void;
   selectedItem: T | null;
   setSelectedItem: (item: T | null) => void;
+  updateItem: (key: string, updated: T) => void;
   refresh: () => void;
 }
 
@@ -41,6 +46,8 @@ export function useBrowse<T>({
   searchCommand,
   mapEntry,
   clientFilter,
+  itemKey,
+  preloadAll = false,
 }: UseBrowseOptions<T>): UseBrowseReturn<T> {
   const [allBrowseItems, setAllBrowseItems] = useState<T[]>([]);
   const [displayedItems, setDisplayedItems] = useState<T[]>([]);
@@ -60,6 +67,8 @@ export function useBrowse<T>({
   mapEntryRef.current = mapEntry;
   const clientFilterRef = useRef(clientFilter);
   clientFilterRef.current = clientFilter;
+  const itemKeyRef = useRef(itemKey);
+  itemKeyRef.current = itemKey;
 
   const loadBrowsePage = useCallback(
     async (page: number, append: boolean) => {
@@ -98,13 +107,51 @@ export function useBrowse<T>({
     [browseCommand],
   );
 
-  // Load first page on mount
+  // Load first page on mount, then preload remaining pages if requested
   useEffect(() => {
     if (!mountedRef.current) {
       mountedRef.current = true;
-      loadBrowsePage(0, false);
+
+      if (preloadAll) {
+        // Load all pages sequentially
+        const loadAll = async () => {
+          setLoading(true);
+          setError(null);
+          try {
+            let page = 0;
+            let allItems: T[] = [];
+            let more = true;
+
+            while (more) {
+              const result = await invoke<BrowseResult>(browseCommand, {
+                page,
+                pageSize: PAGE_SIZE,
+              });
+              const mapped = result.entries.map((e) => mapEntryRef.current(e));
+              allItems = [...allItems, ...mapped];
+              setAllBrowseItems(allItems);
+              setDisplayedItems(allItems);
+              setTotalCount(result.totalCount);
+              more = result.hasMore;
+              page++;
+            }
+
+            setHasMore(false);
+            setBrowsePageLoaded(page - 1);
+          } catch (err) {
+            setError(
+              err instanceof Error ? err.message : "Failed to load items",
+            );
+          } finally {
+            setLoading(false);
+          }
+        };
+        loadAll();
+      } else {
+        loadBrowsePage(0, false);
+      }
     }
-  }, [loadBrowsePage]);
+  }, [loadBrowsePage, preloadAll, browseCommand]);
 
   const setFilterText = useCallback(
     async (text: string) => {
@@ -161,6 +208,13 @@ export function useBrowse<T>({
     loadBrowsePage(browsePageLoaded + 1, true);
   }, [mode, loadingMore, hasMore, browsePageLoaded, loadBrowsePage]);
 
+  const updateItem = useCallback((key: string, updated: T) => {
+    const replacer = (items: T[]) =>
+      items.map((item) => (itemKeyRef.current(item) === key ? updated : item));
+    setAllBrowseItems(replacer);
+    setDisplayedItems(replacer);
+  }, []);
+
   const refresh = useCallback(() => {
     setAllBrowseItems([]);
     setDisplayedItems([]);
@@ -184,6 +238,7 @@ export function useBrowse<T>({
     loadMore,
     selectedItem,
     setSelectedItem,
+    updateItem,
     refresh,
   };
 }

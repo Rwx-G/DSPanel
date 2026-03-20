@@ -21,9 +21,18 @@ evidence:
 
 nfr_validation:
   security: { status: PASS, notes: "UNC path validation, no secrets exposed" }
-  performance: { status: CONCERNS, notes: "Recursive scanning capped at depth 5, but large trees could be slow" }
-  reliability: { status: PASS, notes: "Per-directory error handling, graceful degradation" }
-  maintainability: { status: PASS, notes: "Clean service/component/type separation" }
+  performance:
+    {
+      status: CONCERNS,
+      notes: "Recursive scanning capped at depth 5, but large trees could be slow",
+    }
+  reliability:
+    {
+      status: PASS,
+      notes: "Per-directory error handling, graceful degradation",
+    }
+  maintainability:
+    { status: PASS, notes: "Clean service/component/type separation" }
 
 recommendations:
   future:

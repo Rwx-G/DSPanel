@@ -10,13 +10,13 @@ Epic 2 implements password management operations across 5 stories. Core function
 
 ## Gate Results
 
-| Story | Title | Gate | Score | Key Issue |
-|-------|-------|------|-------|-----------|
-| 2.1 | Password Reset | CONCERNS | 70 | MFA not wired into reset flow; audit in-memory only |
-| 2.2 | Password Generator | PASS | 90 | Minor: OsRng vs thread_rng |
-| 2.3 | Unlock / Enable / Disable | PASS | 90 | Clean implementation |
-| 2.4 | Password Flags | CONCERNS | 70 | Missing "User Cannot Change Password" checkbox |
-| 2.5 | MFA Gate | CONCERNS | 50 | Secret not persisted; gate not wired to actions; no setup wizard |
+| Story | Title                     | Gate     | Score | Key Issue                                                        |
+| ----- | ------------------------- | -------- | ----- | ---------------------------------------------------------------- |
+| 2.1   | Password Reset            | CONCERNS | 70    | MFA not wired into reset flow; audit in-memory only              |
+| 2.2   | Password Generator        | PASS     | 90    | Minor: OsRng vs thread_rng                                       |
+| 2.3   | Unlock / Enable / Disable | PASS     | 90    | Clean implementation                                             |
+| 2.4   | Password Flags            | CONCERNS | 70    | Missing "User Cannot Change Password" checkbox                   |
+| 2.5   | MFA Gate                  | CONCERNS | 50    | Secret not persisted; gate not wired to actions; no setup wizard |
 
 **Overall Epic Score: 74/100**
 
@@ -30,21 +30,21 @@ Epic 2 implements password management operations across 5 stories. Core function
 
 ### Security Assessment
 
-| Area | Status | Notes |
-|------|--------|-------|
-| Permission enforcement | PASS | Dual enforcement (UI PermissionGate + backend command check) |
-| Password handling | PASS | Never logged, unicodePwd correctly encoded |
-| HIBP k-anonymity | PASS | Only 5-char SHA1 prefix transmitted |
-| MFA secret storage | FAIL | In-memory only, needs encrypted persistence |
-| Snapshot before modify | CONCERNS | Not implemented for write operations per coding standards |
+| Area                   | Status   | Notes                                                        |
+| ---------------------- | -------- | ------------------------------------------------------------ |
+| Permission enforcement | PASS     | Dual enforcement (UI PermissionGate + backend command check) |
+| Password handling      | PASS     | Never logged, unicodePwd correctly encoded                   |
+| HIBP k-anonymity       | PASS     | Only 5-char SHA1 prefix transmitted                          |
+| MFA secret storage     | FAIL     | In-memory only, needs encrypted persistence                  |
+| Snapshot before modify | CONCERNS | Not implemented for write operations per coding standards    |
 
 ### Test Coverage
 
-| Layer | Before | After | Delta |
-|-------|--------|-------|-------|
-| Rust unit tests | 223 | 270 | +47 |
-| Frontend tests | 646 | 701 | +55 |
-| **Total** | **869** | **971** | **+102** |
+| Layer           | Before  | After   | Delta    |
+| --------------- | ------- | ------- | -------- |
+| Rust unit tests | 223     | 270     | +47      |
+| Frontend tests  | 646     | 701     | +55      |
+| **Total**       | **869** | **971** | **+102** |
 
 Test quality is good - covers permission gating, audit logging, error paths, and UI state management. No flaky tests observed.
 
@@ -65,6 +65,7 @@ Test quality is good - covers permission gating, audit logging, error paths, and
 ## Files Reviewed
 
 ### Backend (Rust)
+
 - `src-tauri/src/services/directory.rs` - DirectoryProvider trait extension
 - `src-tauri/src/services/ldap_directory.rs` - LDAP write implementations
 - `src-tauri/src/services/resilient_directory.rs` - Resilient wrappers
@@ -76,6 +77,7 @@ Test quality is good - covers permission gating, audit logging, error paths, and
 - `src-tauri/src/lib.rs` - Command registration
 
 ### Frontend (React/TypeScript)
+
 - `src/components/dialogs/PasswordResetDialog.tsx` (NEW)
 - `src/components/dialogs/MfaDialog.tsx` (NEW)
 - `src/components/common/UserActions.tsx` (NEW)
@@ -85,5 +87,6 @@ Test quality is good - covers permission gating, audit logging, error paths, and
 - `src/App.tsx` - Router + DialogProvider
 
 ### Tests
+
 - 5 new test files (frontend)
 - Rust tests inline in service/command modules

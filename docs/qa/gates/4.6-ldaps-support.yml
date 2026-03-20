@@ -1,0 +1,51 @@
+schema: 1
+story: "4.6"
+story_title: "LDAPS (TLS) Support"
+gate: PASS
+status_reason: "All 9 acceptance criteria met. LDAPS via ldap3/tls-native, URL scheme parsing, env var configuration, TLS in both pooled and dedicated connections, skip verify for labs. 7 new unit tests, integration test scaffold ready. NFR6 compliance."
+reviewer: "Quinn (Test Architect)"
+updated: "2026-03-19T21:30:00Z"
+
+waiver: { active: false }
+
+top_issues: []
+
+quality_score: 100
+
+expires: "2026-04-02T00:00:00Z"
+
+evidence:
+  tests_reviewed: 7
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9]
+    ac_gaps: []
+    ac_diverged: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "TLS via native-tls, system cert store, skip_verify only when explicit. NFR6 compliance achieved."
+  performance:
+    status: PASS
+    notes: "10s connection timeout. TLS handshake ~50ms negligible for desktop."
+  reliability:
+    status: PASS
+    notes: "Both connection paths (pooled + dedicated) use consistent TLS settings."
+  maintainability:
+    status: PASS
+    notes: "LdapTlsConfig struct clean, parse_server_url well-tested."
+
+risk_summary:
+  totals: { critical: 0, high: 0, medium: 0, low: 0 }
+  recommendations:
+    must_fix: []
+    monitor: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: "Install AD CS on test DC to validate password reset over LDAPS"
+      refs: ["src-tauri/tests/ldap_integration.rs"]
+    - action: "Consider DSPANEL_LDAP_CA_CERT for custom CA cert file loading"
+      refs: ["src-tauri/src/services/ldap_directory.rs"]

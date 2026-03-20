@@ -9,6 +9,7 @@ I want to move AD objects (users, computers, groups) between OUs,
 so that I can reorganize AD structure as needed.
 
 #### Acceptance Criteria
+
 1. "Move to OU" action available from context menu on any AD object
 2. OU picker shows the OU tree for target selection
 3. Supports single and bulk move (multi-selection)
@@ -23,6 +24,7 @@ I want to browse and restore deleted AD objects from the Recycle Bin,
 so that I can recover accidental deletions.
 
 #### Acceptance Criteria
+
 1. Recycle Bin view lists all deleted objects with name, type, deletion date, and original OU
 2. Search/filter within deleted objects
 3. Restore selected object(s) to original location or a specified OU
@@ -37,6 +39,7 @@ I want to view and manage AD contact and printer objects,
 so that DSPanel covers all common AD object types.
 
 #### Acceptance Criteria
+
 1. Contacts appear in search results with a distinct icon
 2. Contact detail view shows: name, email, phone, company, description
 3. CRUD operations on contacts (create, edit, delete) for AccountOperator+
@@ -51,6 +54,7 @@ I want to view and update user thumbnail photos in AD,
 so that directory photos stay current.
 
 #### Acceptance Criteria
+
 1. User detail view displays current thumbnail photo (or placeholder if none)
 2. "Change Photo" button allows uploading a new image (JPG/PNG)
 3. Image is resized to AD-appropriate dimensions (96x96 max) before upload
@@ -65,6 +69,7 @@ I want DSPanel to snapshot an AD object before any modification,
 so that I can rollback changes if something goes wrong.
 
 #### Acceptance Criteria
+
 1. Before any write operation, the object's current state is captured (all attributes)
 2. Snapshots stored locally with timestamp, object DN, and operation type
 3. "History" tab on object detail shows previous snapshots
@@ -74,4 +79,3 @@ so that I can rollback changes if something goes wrong.
 7. DomainAdmin permission for restore operations
 
 ---
-

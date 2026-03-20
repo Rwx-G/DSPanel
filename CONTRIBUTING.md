@@ -33,9 +33,9 @@ Thank you for your interest in contributing to DSPanel! This document provides g
 - Node.js 20+
 - pnpm (`npm install -g pnpm`)
 - Platform-specific Tauri dependencies:
-  - **Linux**: `sudo apt install libwebkit2gtk-4.1-dev build-essential curl wget file libssl-dev libayatana-appindicator3-dev librsvg2-dev`
-  - **macOS**: Xcode Command Line Tools (`xcode-select --install`)
-  - **Windows**: Microsoft Visual Studio C++ Build Tools, WebView2
+    - **Linux**: `sudo apt install libwebkit2gtk-4.1-dev build-essential curl wget file libssl-dev libayatana-appindicator3-dev librsvg2-dev`
+    - **macOS**: Xcode Command Line Tools (`xcode-select --install`)
+    - **Windows**: Microsoft Visual Studio C++ Build Tools, WebView2
 
 ### Build and Test
 
@@ -101,6 +101,7 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 **Types**: `feat`, `fix`, `docs`, `refactor`, `test`, `ci`, `chore`
 
 **Examples**:
+
 - `feat(lookup): add user account search with healthcheck badge`
 - `fix(groups): handle circular group nesting detection`
 - `docs(architecture): update source tree after refactor`

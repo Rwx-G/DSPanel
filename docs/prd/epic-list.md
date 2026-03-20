@@ -10,7 +10,7 @@
 
 - **Epic 5: Presets, Onboarding and Offboarding Workflows** (4 stories) - Implement declarative presets (JSON on network share), the preset editor UI, onboarding wizard, and offboarding workflow with dry-run preview.
 
-- **Epic 6: Exchange Diagnostics** (2 stories) - Add Exchange on-prem (LDAP msExch*) and Exchange Online (Graph) read-only mailbox diagnostics to the user lookup view.
+- **Epic 6: Exchange Diagnostics** (2 stories) - Add Exchange on-prem (LDAP msExch\*) and Exchange Online (Graph) read-only mailbox diagnostics to the user lookup view.
 
 - **Epic 7: Administration and Object Management** (5 stories) - Deliver OU object movement, AD Recycle Bin access, contact/printer management, thumbnail photos, and object backup/restore.
 
@@ -28,20 +28,20 @@
 
 ## Summary
 
-| Epic | Stories | Scope |
-|------|---------|-------|
-| Epic 1 | 12 | Foundation + Base UI + Core Lookup |
-| Epic 2 | 5 | Support Actions |
-| Epic 3 | 4 | Comparison + Permissions Audit |
-| Epic 4 | 4 | Group Management + Bulk Ops |
-| Epic 5 | 4 | Presets + Onboarding/Offboarding |
-| Epic 6 | 2 | Exchange Diagnostics |
-| Epic 7 | 5 | Administration + Object Management |
-| Epic 8 | 5 | Infrastructure Health |
-| Epic 9 | 4 | Security + Risk Scoring |
-| Epic 10 | 4 | Reports + Export + Compliance |
-| Epic 11 | 6 | Audit + Automation + Extensibility |
-| Epic 12 | 5 | RBAC + Settings + Polish |
-| **Total** | **60** | |
+| Epic      | Stories | Scope                              |
+| --------- | ------- | ---------------------------------- |
+| Epic 1    | 12      | Foundation + Base UI + Core Lookup |
+| Epic 2    | 5       | Support Actions                    |
+| Epic 3    | 4       | Comparison + Permissions Audit     |
+| Epic 4    | 4       | Group Management + Bulk Ops        |
+| Epic 5    | 4       | Presets + Onboarding/Offboarding   |
+| Epic 6    | 2       | Exchange Diagnostics               |
+| Epic 7    | 5       | Administration + Object Management |
+| Epic 8    | 5       | Infrastructure Health              |
+| Epic 9    | 4       | Security + Risk Scoring            |
+| Epic 10   | 4       | Reports + Export + Compliance      |
+| Epic 11   | 6       | Audit + Automation + Extensibility |
+| Epic 12   | 5       | RBAC + Settings + Polish           |
+| **Total** | **60**  |                                    |
 
 ---

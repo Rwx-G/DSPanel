@@ -1,10 +1,10 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { PermissionGate } from "@/components/common/PermissionGate";
 import { useDialog } from "@/contexts/DialogContext";
 import { useNotifications } from "@/contexts/NotificationContext";
 import { usePermissions } from "@/hooks/usePermissions";
 import { type DirectoryUser } from "@/types/directory";
+import { extractErrorMessage } from "@/utils/errorMapping";
 import { type DryRunChange } from "@/components/dialogs/DryRunPreviewDialog";
 
 interface PasswordFlagsEditorProps {
@@ -27,6 +27,9 @@ export function PasswordFlagsEditor({
     useState(false);
   const [adCannotChangePassword, setAdCannotChangePassword] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [refreshCount, setRefreshCount] = useState(0);
+  const [cannotChangePasswordUnavailable, setCannotChangePasswordUnavailable] =
+    useState(false);
 
   // Fetch the DACL-based "Cannot Change Password" flag and reset state on user change
   useEffect(() => {
@@ -46,13 +49,14 @@ export function PasswordFlagsEditor({
         if (!cancelled) {
           setAdCannotChangePassword(false);
           setUserCannotChangePassword(false);
+          setCannotChangePasswordUnavailable(true);
         }
       });
 
     return () => {
       cancelled = true;
     };
-  }, [user.distinguishedName, user.passwordNeverExpires]);
+  }, [user.distinguishedName, user.passwordNeverExpires, refreshCount]);
 
   const isDirty = useMemo(
     () =>
@@ -100,15 +104,10 @@ export function PasswordFlagsEditor({
         userCannotChangePassword,
       });
       notify("Password flags updated successfully", "success");
+      setRefreshCount((c) => c + 1);
       onRefresh();
     } catch (e) {
-      const msg = typeof e === "string" ? e : "Failed to update password flags";
-      try {
-        const parsed = JSON.parse(msg);
-        notify(parsed.userMessage || parsed.message || msg, "error");
-      } catch {
-        notify(msg, "error");
-      }
+      notify(extractErrorMessage(e), "error");
     } finally {
       setSaving(false);
     }
@@ -147,25 +146,29 @@ export function PasswordFlagsEditor({
           type="checkbox"
           checked={userCannotChangePassword}
           onChange={(e) => setUserCannotChangePassword(e.target.checked)}
-          disabled={!canEdit}
+          disabled={!canEdit || cannotChangePasswordUnavailable}
           className="rounded border-[var(--color-border-default)]"
           data-testid="user-cannot-change-password-checkbox"
         />
         <span className="text-body text-[var(--color-text-primary)]">
           User Cannot Change Password
         </span>
+        {cannotChangePasswordUnavailable && (
+          <span className="text-caption text-[var(--color-text-secondary)]">
+            (insufficient permissions to read)
+          </span>
+        )}
       </label>
 
-      <PermissionGate requiredLevel="AccountOperator">
-        <button
-          className="btn btn-sm btn-primary text-caption"
-          onClick={handleSave}
-          disabled={!isDirty || saving}
-          data-testid="save-flags-btn"
-        >
-          {saving ? "Saving..." : "Save Changes"}
-        </button>
-      </PermissionGate>
+      <button
+        className="btn btn-sm btn-primary text-caption"
+        onClick={handleSave}
+        disabled={!canEdit || !isDirty || saving}
+        title={!canEdit ? "Requires AccountOperator permission" : undefined}
+        data-testid="save-flags-btn"
+      >
+        {saving ? "Saving..." : "Save Changes"}
+      </button>
     </div>
   );
 }

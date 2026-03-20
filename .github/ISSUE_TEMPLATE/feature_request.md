@@ -3,7 +3,7 @@ name: Feature Request
 about: Suggest a new feature for DSPanel
 title: "[FEATURE] "
 labels: enhancement
-assignees: ''
+assignees: ""
 ---
 
 ## Problem

@@ -10,4 +10,4 @@ type Story = StoryObj<typeof LoadingSpinner>;
 
 export const Default: Story = {};
 export const WithMessage: Story = { args: { message: "Loading users..." } };
-export const Small: Story = { args: { size: "sm" } };
+export const Small: Story = { args: { size: 16 } };

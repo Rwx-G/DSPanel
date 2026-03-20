@@ -15,6 +15,9 @@ import { HomePage } from "@/pages/HomePage";
 import { PasswordGenerator } from "@/pages/PasswordGenerator";
 import { UserComparison } from "@/pages/UserComparison";
 import { NtfsAnalyzer } from "@/pages/NtfsAnalyzer";
+import { GroupManagement } from "@/pages/GroupManagement";
+import { BulkOperations } from "@/pages/BulkOperations";
+import { GroupHygiene } from "@/pages/GroupHygiene";
 
 const APP_VERSION = __APP_VERSION__;
 
@@ -35,6 +38,7 @@ export interface AppStatus {
   isConnected: boolean;
   domainName: string | null;
   permissionLevel: string;
+  authenticatedUser: string;
   username: string;
   computerName: string;
   userGroups: string[];
@@ -46,6 +50,7 @@ export function App() {
     isConnected: false,
     domainName: null,
     permissionLevel: "ReadOnly",
+    authenticatedUser: "",
     username: "",
     computerName: "",
     userGroups: [],
@@ -80,6 +85,12 @@ export function App() {
     invoke<string>("get_current_username")
       .then((name) => {
         setStatus((s) => ({ ...s, username: name }));
+      })
+      .catch((e) => console.warn("Failed to get username:", e));
+
+    invoke<string>("get_authenticated_identity")
+      .then((name) => {
+        setStatus((s) => ({ ...s, authenticatedUser: name }));
       })
       .catch((e) => console.warn("Failed to get username:", e));
 
@@ -127,6 +138,9 @@ const MODULE_COMPONENTS: Record<
   users: UserLookup,
   computers: ComputerLookup,
   "user-comparison": UserComparison,
+  groups: GroupManagement,
+  "bulk-operations": BulkOperations,
+  "group-hygiene": GroupHygiene,
   "ntfs-analyzer": NtfsAnalyzer,
   "password-generator": PasswordGenerator,
 };

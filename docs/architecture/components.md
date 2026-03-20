@@ -5,6 +5,7 @@
 **Responsibility**: Detect current user's AD group memberships at startup and map to a PermissionLevel. Provide permission checking for both Rust commands and React UI binding.
 
 **Key Functions (Rust):**
+
 - `get_current_level() -> PermissionLevel`
 - `has_permission(required: PermissionLevel) -> bool`
 - `detect_permission_level() -> Result<PermissionLevel>`
@@ -18,6 +19,7 @@
 **Responsibility**: Abstract all directory operations behind the `DirectoryProvider` trait. Two implementations: `LdapDirectoryProvider` (on-prem) and `GraphDirectoryProvider` (Entra ID).
 
 **Key Trait Methods (Rust):**
+
 - `search_users(query: &str) -> Result<Vec<DirectoryUser>>`
 - `search_computers(query: &str) -> Result<Vec<DirectoryComputer>>`
 - `get_groups() -> Result<Vec<DirectoryGroup>>`
@@ -37,9 +39,10 @@
 
 ### exchange module
 
-**Responsibility**: Query Exchange mailbox information in read-only mode. Delegates to LDAP msExch* attributes (on-prem) or Graph API (online).
+**Responsibility**: Query Exchange mailbox information in read-only mode. Delegates to LDAP msExch\* attributes (on-prem) or Graph API (online).
 
 **Key Functions (Rust):**
+
 - `get_mailbox_info(user_dn: &str) -> Result<Option<ExchangeMailboxInfo>>`
 - `is_exchange_available() -> bool`
 
@@ -50,6 +53,7 @@
 **Responsibility**: Load, validate, save, and execute presets from the configured network share.
 
 **Key Functions (Rust):**
+
 - `get_presets() -> Result<Vec<Preset>>`
 - `save_preset(preset: &Preset) -> Result<()>`
 - `delete_preset(preset_id: Uuid) -> Result<()>`
@@ -63,6 +67,7 @@
 **Responsibility**: Log all DSPanel actions to local SQLite database. Provide query/search/export capabilities.
 
 **Key Functions (Rust):**
+
 - `log(entry: &AuditLogEntry) -> Result<()>`
 - `search(criteria: &AuditSearchCriteria) -> Result<Vec<AuditLogEntry>>`
 - `export(criteria: &AuditSearchCriteria, format: ExportFormat) -> Result<Vec<u8>>`
@@ -74,6 +79,7 @@
 **Responsibility**: Capture AD object state before modifications and restore from snapshots.
 
 **Key Functions (Rust):**
+
 - `capture(object_dn: &str, operation_type: &str) -> Result<ObjectSnapshot>`
 - `get_snapshots(object_dn: &str) -> Result<Vec<ObjectSnapshot>>`
 - `restore(snapshot_id: i64) -> Result<()>`
@@ -86,6 +92,7 @@
 **Responsibility**: Compute account healthcheck badges and domain-wide health status.
 
 **Key Functions (Rust):**
+
 - `compute_user_health(user: &DirectoryUser) -> AccountHealthStatus`
 - `get_dc_health() -> Result<Vec<DCHealthStatus>>`
 - `get_replication_status() -> Result<Vec<ReplicationStatus>>`
@@ -99,6 +106,7 @@
 **Responsibility**: Compute domain risk score, detect AD attacks from event logs, and analyze privilege escalation paths.
 
 **Key Functions (Rust):**
+
 - `compute_risk_score() -> Result<RiskScoreReport>`
 - `get_privileged_accounts() -> Result<Vec<PrivilegedAccountInfo>>`
 - `detect_attacks() -> Result<Vec<SecurityAlert>>`
@@ -111,6 +119,7 @@
 **Responsibility**: Generate scheduled and on-demand reports.
 
 **Key Functions (Rust):**
+
 - `generate_report(report_type: ReportType, parameters: &ReportParameters) -> Result<ReportResult>`
 - `schedule_report(schedule: &ScheduledReport) -> Result<()>`
 - `get_scheduled_reports() -> Result<Vec<ScheduledReport>>`
@@ -122,6 +131,7 @@
 **Responsibility**: Export data to CSV and PDF formats.
 
 **Key Functions (Rust):**
+
 - `export_to_csv<T: Serialize>(data: &[T], file_path: &Path) -> Result<()>`
 - `export_to_pdf(report: &ReportResult, file_path: &Path) -> Result<()>`
 
@@ -132,6 +142,7 @@
 **Responsibility**: Send webhook notifications to Teams, Slack, or email.
 
 **Key Functions (Rust):**
+
 - `send(event: &NotificationEvent) -> Result<()>`
 - `test_channel(channel: &NotificationChannel) -> Result<bool>`
 
@@ -144,6 +155,7 @@
 **Implementation**: React Router + custom navigation context
 
 **Key Hooks:**
+
 - `useNavigation().navigateTo(path: string, params?: object)`
 - `useNavigation().openTab(path: string, params?: object)`
 - `useDialog().showDialog(component: ReactNode)`

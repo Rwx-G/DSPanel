@@ -60,10 +60,7 @@ function AccessIcon({
     case "NoMatch":
       return (
         <span title={title} data-testid="access-nomatch">
-          <Minus
-            size={14}
-            className="text-[var(--color-text-secondary)]"
-          />
+          <Minus size={14} className="text-[var(--color-text-secondary)]" />
         </span>
       );
   }
@@ -156,19 +153,26 @@ export function UncPermissionsAudit({
           <label className="mb-1 block text-caption font-medium text-[var(--color-text-secondary)]">
             UNC Path
           </label>
-          <input
-            type="text"
-            className="w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-bg)] px-3 py-1.5 text-body text-[var(--color-text-primary)] placeholder-[var(--color-text-secondary)] focus:border-[var(--color-primary)] focus:outline-none"
-            placeholder="\\server\share\folder"
-            value={uncPath}
-            onChange={(e) => setUncPath(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && uncPath.trim() && !isAuditing) {
-                audit();
+          <div className="flex items-center gap-2 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5">
+            <FolderSearch
+              size={16}
+              className="shrink-0 text-[var(--color-text-secondary)]"
+              aria-hidden="true"
+            />
+            <input
+              type="text"
+              className="flex-1 bg-transparent text-body text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-secondary)]"
+              placeholder="\\server\share\folder"
+              value={uncPath}
+              onChange={(e) => setUncPath(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && uncPath.trim() && !isAuditing) {
+                  audit();
               }
             }}
             data-testid="unc-path-input"
-          />
+            />
+          </div>
         </div>
         <button
           className="btn btn-primary btn-sm flex items-center gap-1.5"
@@ -178,7 +182,7 @@ export function UncPermissionsAudit({
           data-testid="audit-button"
         >
           {isAuditing ? (
-            <LoadingSpinner size="sm" />
+            <LoadingSpinner size={16} />
           ) : (
             <FolderSearch size={14} />
           )}
@@ -317,14 +321,22 @@ export function UncPermissionsAudit({
                           <td className="px-3 py-2 text-center">
                             <AccessIcon
                               indicator={ref.userAAccess}
-                              userName={userA.displayName ?? userA.samAccountName ?? "User A"}
+                              userName={
+                                userA.displayName ??
+                                userA.samAccountName ??
+                                "User A"
+                              }
                               trusteeName={ace.trusteeDisplayName}
                             />
                           </td>
                           <td className="px-3 py-2 text-center">
                             <AccessIcon
                               indicator={ref.userBAccess}
-                              userName={userB.displayName ?? userB.samAccountName ?? "User B"}
+                              userName={
+                                userB.displayName ??
+                                userB.samAccountName ??
+                                "User B"
+                              }
                               trusteeName={ace.trusteeDisplayName}
                             />
                           </td>

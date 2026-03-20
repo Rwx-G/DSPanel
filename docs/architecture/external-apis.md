@@ -8,6 +8,7 @@
 - **Rate Limits**: None (on-prem infrastructure)
 
 **Key Operations:**
+
 - Search with LDAP filters for user/computer/group lookups
 - Modify for attribute changes, group membership modifications
 - Add for object creation (onboarding)
@@ -26,6 +27,7 @@
 - **Rate Limits**: Per-tenant throttling (varies by endpoint)
 
 **Key Endpoints Used:**
+
 - `GET /users/{id}` - User profile and attributes
 - `GET /users/{id}/memberOf` - Group memberships
 - `GET /users/{id}/mailboxSettings` - Exchange Online mailbox settings
@@ -45,6 +47,7 @@
 - **Rate Limits**: Generous, no API key required for password range endpoint
 
 **Key Endpoints Used:**
+
 - `GET /range/{first5HashChars}` - Get all password hashes matching the first 5 characters of the SHA1 hash
 
 **Integration Notes**: Only the first 5 characters of the SHA1 hash are sent (k-anonymity). Response is compared locally. Must work offline (skip check with warning if unreachable).
@@ -58,6 +61,7 @@
 - **Rate Limits**: 60 requests/hour unauthenticated
 
 **Key Endpoints Used:**
+
 - `GET /repos/Rwx-G/DSPanel/releases/latest` - Get latest release version and download URL
 
 ---

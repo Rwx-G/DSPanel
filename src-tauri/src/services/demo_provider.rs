@@ -356,21 +356,199 @@ fn sample_browse_users() -> Vec<DirectoryEntry> {
 }
 
 fn sample_group_entries() -> Vec<DirectoryEntry> {
+    // Groups match user memberOf attributes: "CN={dept} Team,OU=Groups,DC=contoso,DC=com"
+    let users = sample_browse_users();
+
+    // Sub-groups with specific user subsets
+    let it_admins = make_subgroup(
+        "IT-Admins",
+        "IT administrator sub-group",
+        &users,
+        &["cjones", "inovak"],
+    );
+    let it_support = make_subgroup("IT-Support", "IT support sub-group", &users, &["sjackson"]);
+    let dev_backend = make_subgroup(
+        "Dev-Backend",
+        "Backend developers sub-group",
+        &users,
+        &["gkumar", "qnguyen", "uroberts"],
+    );
+
+    // Deep nesting chain under Dev-Frontend: depth 4
+    // Engineering Team > Dev-Frontend > UI-Components > Design-System
+    let design_system = make_subgroup("Design-System", "Design system team", &users, &["fchen"]);
+    let mut ui_components = make_subgroup(
+        "UI-Components",
+        "UI components team",
+        &users,
+        &["fchen", "egupta"],
+    );
+    add_group_member(&mut ui_components, &design_system);
+
+    let mut dev_frontend_deep = make_subgroup(
+        "Dev-Frontend",
+        "Frontend developers sub-group",
+        &users,
+        &["fchen", "egupta"],
+    );
+    add_group_member(&mut dev_frontend_deep, &ui_components);
+
+    // Replace dev_frontend with the deep version
+    let dev_frontend = dev_frontend_deep;
+
+    // Parent groups: contain users + nested sub-groups
+    let mut it_team = make_group("IT Team", "IT", &users);
+    // Add sub-groups as members of IT Team
+    add_group_member(&mut it_team, &it_admins);
+    add_group_member(&mut it_team, &it_support);
+
+    let mut eng_team = make_group("Engineering Team", "Engineering", &users);
+    add_group_member(&mut eng_team, &dev_frontend);
+    add_group_member(&mut eng_team, &dev_backend);
+
+    // Group without description, with same members as IT-Support (duplicate pair)
+    let it_support_dup = make_group_no_description(
+        "IT-Helpdesk",
+        vec!["CN=Samuel Jackson,OU=IT,OU=Users,DC=contoso,DC=com".to_string()],
+    );
+
+    // Group without description and multiple members
+    let temp_project = make_group_no_description(
+        "Temp-Project",
+        vec![
+            "CN=John Doe,OU=IT,OU=Users,DC=contoso,DC=com".to_string(),
+            "CN=Alice Smith,OU=HR,OU=Users,DC=contoso,DC=com".to_string(),
+        ],
+    );
+
     vec![
-        make_group("IT-Admins", "IT Team", "IT"),
-        make_group("IT-Support", "IT Team", "IT"),
-        make_group("Dev-Frontend", "Engineering Team", "Engineering"),
-        make_group("Dev-Backend", "Engineering Team", "Engineering"),
-        make_group("Finance-Analysts", "Finance Team", "Finance"),
-        make_group("Sales-EMEA", "Sales Team", "Sales"),
+        it_team,
+        make_group("HR Team", "HR", &users),
+        make_group("Finance Team", "Finance", &users),
+        eng_team,
+        make_group("Sales Team", "Sales", &users),
+        make_group("Marketing Team", "Marketing", &users),
+        it_admins,
+        it_support,
+        dev_frontend,
+        dev_backend,
+        ui_components,
+        design_system,
+        make_group_empty("Deprecated-Printers"),
+        make_group_empty("Legacy-VPN"),
+        it_support_dup,
+        temp_project,
     ]
 }
 
-fn make_group(name: &str, parent_group: &str, _dept: &str) -> DirectoryEntry {
+fn make_group(name: &str, dept: &str, all_users: &[DirectoryEntry]) -> DirectoryEntry {
+    let group_dn = format!("CN={},OU=Groups,DC=contoso,DC=com", name);
+
+    // Collect members: users whose memberOf contains this group's DN
+    let members: Vec<String> = all_users
+        .iter()
+        .filter(|u| {
+            u.get_attribute_values("memberOf")
+                .iter()
+                .any(|m| m.eq_ignore_ascii_case(&group_dn))
+        })
+        .map(|u| u.distinguished_name.clone())
+        .collect();
+
     let mut attrs = HashMap::new();
+    // Global Security group by default: 0x80000002 = -2147483646
+    attrs.insert("groupType".to_string(), vec!["-2147483646".to_string()]);
     attrs.insert(
-        "memberOf".to_string(),
-        vec![format!("CN={},OU=Groups,DC=contoso,DC=com", parent_group)],
+        "description".to_string(),
+        vec![format!("{} department security group", dept)],
+    );
+    attrs.insert("member".to_string(), members);
+    // Recent modification date by default
+    attrs.insert(
+        "whenChanged".to_string(),
+        vec!["2026-03-10T14:30:00Z".to_string()],
+    );
+
+    DirectoryEntry {
+        distinguished_name: group_dn,
+        sam_account_name: Some(name.replace(' ', "-")),
+        display_name: Some(name.to_string()),
+        object_class: Some("group".to_string()),
+        attributes: attrs,
+    }
+}
+
+fn make_subgroup(
+    name: &str,
+    description: &str,
+    all_users: &[DirectoryEntry],
+    sam_filter: &[&str],
+) -> DirectoryEntry {
+    let members: Vec<String> = all_users
+        .iter()
+        .filter(|u| {
+            u.sam_account_name
+                .as_deref()
+                .map(|s| sam_filter.contains(&s))
+                .unwrap_or(false)
+        })
+        .map(|u| u.distinguished_name.clone())
+        .collect();
+
+    let mut attrs = HashMap::new();
+    attrs.insert("groupType".to_string(), vec!["-2147483646".to_string()]);
+    attrs.insert("description".to_string(), vec![description.to_string()]);
+    attrs.insert("member".to_string(), members);
+    attrs.insert(
+        "whenChanged".to_string(),
+        vec!["2026-03-10T14:30:00Z".to_string()],
+    );
+
+    DirectoryEntry {
+        distinguished_name: format!("CN={},OU=Groups,DC=contoso,DC=com", name),
+        sam_account_name: Some(name.to_string()),
+        display_name: Some(name.to_string()),
+        object_class: Some("group".to_string()),
+        attributes: attrs,
+    }
+}
+
+fn add_group_member(parent: &mut DirectoryEntry, child: &DirectoryEntry) {
+    let members = parent
+        .attributes
+        .entry("member".to_string())
+        .or_insert_with(Vec::new);
+    members.push(child.distinguished_name.clone());
+}
+
+fn make_group_empty(name: &str) -> DirectoryEntry {
+    let mut attrs = HashMap::new();
+    attrs.insert("groupType".to_string(), vec!["-2147483646".to_string()]);
+    attrs.insert(
+        "description".to_string(),
+        vec![format!("{} (unused)", name)],
+    );
+    // Stale date for empty groups
+    attrs.insert(
+        "whenChanged".to_string(),
+        vec!["2024-06-15T00:00:00Z".to_string()],
+    );
+    DirectoryEntry {
+        distinguished_name: format!("CN={},OU=Groups,DC=contoso,DC=com", name),
+        sam_account_name: Some(name.to_string()),
+        display_name: Some(name.to_string()),
+        object_class: Some("group".to_string()),
+        attributes: attrs,
+    }
+}
+
+fn make_group_no_description(name: &str, members: Vec<String>) -> DirectoryEntry {
+    let mut attrs = HashMap::new();
+    attrs.insert("groupType".to_string(), vec!["-2147483646".to_string()]);
+    attrs.insert("member".to_string(), members);
+    attrs.insert(
+        "whenChanged".to_string(),
+        vec!["2024-05-01T00:00:00Z".to_string()],
     );
     DirectoryEntry {
         distinguished_name: format!("CN={},OU=Groups,DC=contoso,DC=com", name),
@@ -830,6 +1008,30 @@ impl DirectoryProvider for DemoDirectoryProvider {
         Ok(sample_computers().into_iter().take(max_results).collect())
     }
 
+    async fn browse_groups(&self, max_results: usize) -> Result<Vec<DirectoryEntry>> {
+        Ok(sample_group_entries()
+            .into_iter()
+            .take(max_results)
+            .collect())
+    }
+
+    async fn remove_group_member(&self, group_dn: &str, member_dn: &str) -> Result<()> {
+        tracing::info!(
+            group_dn = %group_dn,
+            member_dn = %member_dn,
+            "DEMO: remove group member simulated"
+        );
+        Ok(())
+    }
+
+    async fn delete_object(&self, dn: &str) -> Result<()> {
+        tracing::info!(
+            dn = %dn,
+            "DEMO: delete object simulated"
+        );
+        Ok(())
+    }
+
     async fn get_user_by_identity(&self, sam_account_name: &str) -> Result<Option<DirectoryEntry>> {
         Ok(sample_browse_users()
             .into_iter()
@@ -841,16 +1043,28 @@ impl DirectoryProvider for DemoDirectoryProvider {
         group_dn: &str,
         max_results: usize,
     ) -> Result<Vec<DirectoryEntry>> {
-        // Search users, computers, and sub-groups for members of this group
-        let mut members: Vec<DirectoryEntry> = sample_browse_users()
+        // Find the group and read its "member" attribute to get member DNs
+        let groups = sample_group_entries();
+        let member_dns: Vec<String> = groups
+            .iter()
+            .find(|g| g.distinguished_name.eq_ignore_ascii_case(group_dn))
+            .map(|g| g.get_attribute_values("member").to_vec())
+            .unwrap_or_default();
+
+        // Resolve member DNs to full entries (users, computers, or sub-groups)
+        let all_entries: Vec<DirectoryEntry> = sample_browse_users()
             .into_iter()
             .chain(sample_computers())
-            .chain(sample_group_entries())
-            .filter(|entry| {
-                entry
-                    .get_attribute_values("memberOf")
+            .chain(groups)
+            .collect();
+
+        let mut members: Vec<DirectoryEntry> = member_dns
+            .iter()
+            .filter_map(|dn| {
+                all_entries
                     .iter()
-                    .any(|m| m == group_dn)
+                    .find(|e| e.distinguished_name.eq_ignore_ascii_case(dn))
+                    .cloned()
             })
             .take(max_results)
             .collect();
@@ -947,7 +1161,7 @@ impl DirectoryProvider for DemoDirectoryProvider {
 
     async fn get_nested_groups(&self, user_dn: &str) -> Result<Vec<String>> {
         // Demo: return direct memberOf + simulate one level of nesting
-        let users = sample_users();
+        let users = sample_browse_users();
         if let Some(user) = users.iter().find(|u| u.distinguished_name == user_dn) {
             let mut groups: Vec<String> = user.get_attribute_values("memberOf").to_vec();
             // Add parent groups from sample_group_entries memberOf
@@ -972,6 +1186,58 @@ impl DirectoryProvider for DemoDirectoryProvider {
 
     async fn get_ou_tree(&self) -> Result<Vec<OUNode>> {
         Ok(sample_ou_tree())
+    }
+
+    async fn create_group(
+        &self,
+        name: &str,
+        container_dn: &str,
+        scope: &str,
+        category: &str,
+        description: &str,
+    ) -> Result<String> {
+        let dn = format!("CN={},{}", name, container_dn);
+        tracing::info!(
+            name = %name,
+            container_dn = %container_dn,
+            scope = %scope,
+            category = %category,
+            description = %description,
+            dn = %dn,
+            "DEMO: create group simulated"
+        );
+        Ok(dn)
+    }
+
+    async fn move_object(&self, object_dn: &str, target_container_dn: &str) -> Result<()> {
+        tracing::info!(
+            object_dn = %object_dn,
+            target_container_dn = %target_container_dn,
+            "DEMO: move object simulated"
+        );
+        Ok(())
+    }
+
+    async fn update_managed_by(&self, group_dn: &str, manager_dn: &str) -> Result<()> {
+        tracing::info!(
+            group_dn = %group_dn,
+            manager_dn = %manager_dn,
+            "DEMO: update managedBy simulated"
+        );
+        Ok(())
+    }
+
+    async fn get_schema_attributes(&self) -> Result<Vec<String>> {
+        Ok(vec![
+            "cn".to_string(),
+            "displayName".to_string(),
+            "mail".to_string(),
+            "sAMAccountName".to_string(),
+            "telephoneNumber".to_string(),
+            "givenName".to_string(),
+            "sn".to_string(),
+            "department".to_string(),
+        ])
     }
 }
 

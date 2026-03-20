@@ -24,7 +24,7 @@ export function useOUTree(): UseOUTreeReturn {
       setNodes(tree);
     } catch (err) {
       setError(true);
-      handleError(err);
+      handleError(err, "loading OU tree");
     } finally {
       setLoading(false);
     }

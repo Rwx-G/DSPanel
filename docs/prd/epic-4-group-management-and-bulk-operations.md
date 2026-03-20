@@ -9,6 +9,7 @@ I want to browse AD groups in a tree view by OU or in a flat searchable list,
 so that I can quickly find and manage groups.
 
 #### Acceptance Criteria
+
 1. Tree view displays OU hierarchy with groups as leaf nodes
 2. Flat view shows all groups in a searchable/sortable/filterable list
 3. Toggle between tree and flat view
@@ -31,6 +32,7 @@ I want to add and remove members from groups using drag-and-drop,
 so that I can manage group memberships efficiently.
 
 #### Acceptance Criteria
+
 1. Drag users/computers/groups from search results or other groups into a target group
 2. Multi-selection supported for batch add
 3. Remove members via selection + delete or context menu
@@ -46,6 +48,7 @@ I want to perform group-centric bulk operations (Delete members, Add members, Tr
 so that I can handle batch changes like team moves efficiently.
 
 #### Acceptance Criteria
+
 1. Bulk operation panel: select source group(s), target group(s), and operation type (D/A/T)
 2. Member selection within source group with multi-select and select-all
 3. Transfer (T) = Add to target + Delete from source (atomic operation)
@@ -61,6 +64,7 @@ I want to identify empty groups and circular group nesting,
 so that I can clean up AD group hygiene issues.
 
 #### Acceptance Criteria
+
 1. "Hygiene" tab in group management shows detected issues
 2. Empty groups listed with name, OU, and creation date
 3. Circular nesting detected and displayed as a warning with the nesting chain
@@ -68,4 +72,3 @@ so that I can clean up AD group hygiene issues.
 5. Bulk delete option for empty groups (with dry-run)
 
 ---
-

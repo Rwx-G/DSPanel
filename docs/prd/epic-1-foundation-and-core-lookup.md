@@ -9,6 +9,7 @@ I want a working Tauri v2 application with Rust backend, React frontend, logging
 so that all future features plug into a consistent architecture.
 
 #### Acceptance Criteria
+
 1. Project builds and runs with Tauri v2 (Rust) + React/TypeScript (Vite) + Vitest test setup
 2. Tauri command infrastructure is established for frontend-backend IPC
 3. React project is configured with TypeScript strict mode and component conventions
@@ -25,6 +26,7 @@ I want a DirectoryProvider trait with an LDAP implementation that auto-detects t
 so that all AD queries go through a consistent abstraction.
 
 #### Acceptance Criteria
+
 1. DirectoryProvider trait is defined with methods for user search, computer search, and group queries
 2. LdapDirectoryProvider implements DirectoryProvider using the ldap3 crate
 3. At startup, the provider auto-detects the current domain via environment (USERDNSDOMAIN / rootDSE)
@@ -40,6 +42,7 @@ I want DSPanel to detect my AD group memberships at startup and determine my per
 so that I only see actions I am authorized to perform.
 
 #### Acceptance Criteria
+
 1. PermissionService detects current user's AD group memberships at startup
 2. Groups are mapped to permission levels: ReadOnly (default), HelpDesk, AccountOperator, DomainAdmin
 3. Group names used for detection are configurable (not hardcoded)
@@ -55,6 +58,7 @@ I want a comprehensive theme system with design tokens, dark/light modes, and or
 so that the entire application has a consistent, professional visual identity from day one.
 
 #### Acceptance Criteria
+
 1. Color palette defined as CSS custom properties (design tokens): primary, secondary, accent, semantic colors (success/warning/error/info), surface colors (background, card, elevated), text colors (primary, secondary, disabled)
 2. Dark and light theme stylesheets with all token values, switchable at runtime without restart via data-theme attribute
 3. Typography scale defined: heading 1-4, body, caption, monospace - with consistent font family, sizes, and weights
@@ -72,6 +76,7 @@ I want a polished application shell with sidebar navigation, tabbed content area
 so that all features have a consistent navigation and layout framework.
 
 #### Acceptance Criteria
+
 1. Main window with three-zone layout: collapsible left sidebar (navigation), center content area, bottom status bar
 2. Sidebar displays module icons and labels grouped by category (Lookup, Management, Security, Infrastructure, Settings), with active state highlighting
 3. Sidebar is collapsible to icon-only mode (toggle button or keyboard shortcut)
@@ -92,6 +97,7 @@ I want a library of common reusable React components,
 so that all views use consistent, tested UI components.
 
 #### Acceptance Criteria
+
 1. SearchBar control: text input with search icon, clear button, placeholder text, debounced search event (300ms), keyboard shortcut support (Ctrl+F)
 2. PermissionGate control: wrapper that shows/hides/disables content based on required PermissionLevel (binds to PermissionService)
 3. StatusBadge control: colored pill/chip with icon and text, variants for account status (Active, Disabled, Locked, Expired), severity (Critical, Warning, Info, Success)
@@ -112,6 +118,7 @@ I want standardized data display components for tables, lists, and detail views,
 so that all data-heavy views look and behave consistently.
 
 #### Acceptance Criteria
+
 1. StyledDataGrid: custom-styled DataGrid with alternating row colors, hover highlight, selection styling, sortable column headers with sort direction indicator, column resize, and frozen columns support
 2. FilterBar component: horizontal bar with filter chips, text filter, and clear-all button - emits a filter predicate callback for list filtering
 3. Pagination control: page size selector (25/50/100), page navigation (first/prev/next/last), item count display ("Showing 1-25 of 342")
@@ -129,6 +136,7 @@ I want standardized form controls with a validation framework,
 so that all input forms follow consistent patterns and provide clear user feedback.
 
 #### Acceptance Criteria
+
 1. FormField control: label + input + validation message container, supports required indicator (asterisk)
 2. Styled TextBox with validation states: normal, focused, error (red border + message), disabled
 3. Styled PasswordBox with show/hide toggle
@@ -148,6 +156,7 @@ I want a dialog service, toast notification system, and progress feedback framew
 so that user interactions and background operations provide clear, consistent feedback.
 
 #### Acceptance Criteria
+
 1. DialogService with methods: ShowConfirmation(title, message, details), ShowWarning, ShowError, ShowDryRunPreview(changes), showCustomDialog(component)
 2. Confirmation dialog: title, message, optional detail expander, Cancel/Confirm buttons with configurable labels
 3. DryRunPreview dialog: scrollable list of pending changes with icons (add/modify/delete), cancel/execute buttons
@@ -164,6 +173,7 @@ I want to search for a user account and see their complete information,
 so that I can quickly diagnose account issues when handling tickets.
 
 #### Acceptance Criteria
+
 1. Search bar accepts SAMAccountName, UPN, display name, or partial match
 2. Search results appear in a list with name, department, and status
 3. Selecting a result opens a detail view with: display name, first/last name, email, department, title, OU (as breadcrumb), DN, account status (enabled/disabled), locked status
@@ -179,6 +189,7 @@ I want to see a visual healthcheck badge on each account,
 so that I can instantly identify problematic accounts without reading every field.
 
 #### Acceptance Criteria
+
 1. Healthcheck badge appears next to the user's name in lookup results and detail view
 2. Badge aggregates multiple status flags: Disabled, Locked Out, Expired, Password Expired, Password Never Expires, Inactive 30 days, Inactive 90 days, Never Logged On, Password Never Changed
 3. Each flag has a distinct color/icon (red for critical, orange for warning, green for healthy)
@@ -193,6 +204,7 @@ I want to search for a computer account and see its details,
 so that I can diagnose workstation issues.
 
 #### Acceptance Criteria
+
 1. Computer search works by name (exact and partial match)
 2. Detail view shows: computer name, DNS hostname, OS, OS version, last logon, OU, enabled status
 3. Group memberships are listed
@@ -207,6 +219,7 @@ I want a unified error handling and network resilience layer,
 so that all AD write operations (starting in Epic 2) fail gracefully with clear user feedback, automatic retry, and structured audit logging.
 
 #### Acceptance Criteria
+
 1. Typed error hierarchy exists: `DsPanelError`, `DirectoryError`, `NetworkError`, `PermissionDeniedError`
 2. All `DirectoryProvider` trait LDAP operations wrap raw errors into typed `DirectoryError` with user-friendly messages
 3. Transient LDAP/network failures are retried with exponential backoff (1s, 2s, 4s, max 3 attempts)

@@ -22,13 +22,13 @@
 # Simplified CI workflow
 # Triggers: push to main, pull requests
 steps:
-  - cargo fmt --check          # Rust formatting
-  - cargo clippy -- -D warnings # Rust linting
-  - cargo test                  # Rust unit tests
-  - pnpm install                # Frontend dependencies
-  - pnpm lint                   # ESLint
-  - pnpm test                   # vitest
-  - cargo tauri build           # (release only) Full app build
+    - cargo fmt --check # Rust formatting
+    - cargo clippy -- -D warnings # Rust linting
+    - cargo test # Rust unit tests
+    - pnpm install # Frontend dependencies
+    - pnpm lint # ESLint
+    - pnpm test # vitest
+    - cargo tauri build # (release only) Full app build
 ```
 
 ### Environments

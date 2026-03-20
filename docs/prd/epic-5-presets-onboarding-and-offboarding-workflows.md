@@ -9,6 +9,7 @@ I want to configure a network share path for storing presets and have DSPanel re
 so that presets are centralized and shared across the team.
 
 #### Acceptance Criteria
+
 1. Settings view allows configuring the preset storage path (UNC or local path)
 2. Application validates path accessibility at startup and shows warning if unreachable
 3. Presets are stored as individual JSON files (one per preset)
@@ -22,6 +23,7 @@ I want to create and edit presets through the DSPanel UI,
 so that I do not need to manually edit JSON files.
 
 #### Acceptance Criteria
+
 1. Preset list view shows all available presets with name, type (onboarding/offboarding), and target role/team
 2. Preset editor form: name, description, type, target OU, list of AD groups (searchable picker), additional attributes
 3. Group picker allows browsing/searching AD groups and adding them to the preset
@@ -36,6 +38,7 @@ I want a guided wizard for creating a new user with a preset,
 so that onboarding is consistent, fast, and error-free.
 
 #### Acceptance Criteria
+
 1. Wizard steps: user details form, preset selection, preview diff, confirm and execute
 2. User details: first name, last name, login convention (auto-generated), password (generated), target OU (from preset or override)
 3. Preset selection shows which groups and settings will be applied
@@ -51,6 +54,7 @@ I want a guided offboarding workflow,
 so that departing users are consistently and securely deprovisioned.
 
 #### Acceptance Criteria
+
 1. Workflow triggered from user lookup view context menu
 2. Steps: confirm user, preview current state, select offboarding actions, preview changes, execute
 3. Available actions (each toggleable): disable account, remove from all groups, set mail forwarding, move to "Disabled Users" OU, reset password to random
@@ -59,4 +63,3 @@ so that departing users are consistently and securely deprovisioned.
 6. Full audit logging
 
 ---
-

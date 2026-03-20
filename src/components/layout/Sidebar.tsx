@@ -1,5 +1,6 @@
 import {
   User,
+  Users,
   Monitor,
   KeyRound,
   Settings,
@@ -8,6 +9,8 @@ import {
   Moon,
   GitCompareArrows,
   FolderSearch,
+  Layers,
+  ShieldAlert,
   type LucideIcon,
 } from "lucide-react";
 import { useNavigation } from "@/contexts/NavigationContext";
@@ -21,7 +24,10 @@ const ICON_MAP: Record<string, LucideIcon> = {
   key: KeyRound,
   settings: Settings,
   compare: GitCompareArrows,
+  "users-group": Users,
   "folder-search": FolderSearch,
+  layers: Layers,
+  "shield-alert": ShieldAlert,
 };
 
 const MODULES: SidebarModule[] = [
@@ -38,6 +44,27 @@ const MODULES: SidebarModule[] = [
     icon: "compare",
     group: "Directory",
     requiredLevel: "ReadOnly",
+  },
+  {
+    id: "groups",
+    label: "Group Management",
+    icon: "users-group",
+    group: "Directory",
+    requiredLevel: "ReadOnly",
+  },
+  {
+    id: "group-hygiene",
+    label: "Group Hygiene",
+    icon: "shield-alert",
+    group: "Directory",
+    requiredLevel: "AccountOperator",
+  },
+  {
+    id: "bulk-operations",
+    label: "Groups Bulk Operation",
+    icon: "layers",
+    group: "Directory",
+    requiredLevel: "AccountOperator",
   },
   {
     id: "computers",

@@ -30,6 +30,10 @@ const PERM_LABELS: Record<string, { label: string; color: string }> = {
     label: "Account Operator",
     color: "var(--color-perm-accountops)",
   },
+  Admin: {
+    label: "Admin",
+    color: "var(--color-perm-domainadmin)",
+  },
   DomainAdmin: {
     label: "Domain Admin",
     color: "var(--color-perm-domainadmin)",
@@ -114,6 +118,10 @@ export function HomePage({ status }: HomePageProps) {
             title="Permissions"
             iconColor={perm.color}
           >
+            <StatusRow
+              label="Authenticated as"
+              value={status.authenticatedUser || status.username || "..."}
+            />
             <StatusRow
               label="Level"
               value={perm.label}

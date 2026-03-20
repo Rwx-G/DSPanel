@@ -1,4 +1,4 @@
-import { type ReactNode, useState, useCallback, useRef } from "react";
+import { type ReactNode, useState, useCallback, useRef, useMemo } from "react";
 import { ArrowUp, ArrowDown, ArrowUpDown, Download } from "lucide-react";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { EmptyState } from "@/components/common/EmptyState";
@@ -68,14 +68,44 @@ export function DataTable<T>({
     minWidth: number;
   } | null>(null);
 
+  // Internal sort state when no external onSort is provided
+  const [internalSort, setInternalSort] = useState<SortState<T> | undefined>(
+    undefined,
+  );
+
+  const activeSortState = sortState ?? internalSort;
+
   const handleSort = (col: Column<T>) => {
-    if (!col.sortable || !onSort) return;
+    if (!col.sortable) return;
     const newDirection: SortDirection =
-      sortState?.key === col.key && sortState.direction === "asc"
+      activeSortState?.key === col.key && activeSortState.direction === "asc"
         ? "desc"
         : "asc";
-    onSort(col.key, newDirection);
+    if (onSort) {
+      onSort(col.key, newDirection);
+    } else {
+      setInternalSort({ key: col.key, direction: newDirection });
+    }
   };
+
+  // Sort data internally when no external onSort is provided
+  const sortedData = useMemo(() => {
+    if (onSort || !activeSortState) return data;
+    const { key, direction } = activeSortState;
+    return [...data].sort((a, b) => {
+      const aRaw = a[key];
+      const bRaw = b[key];
+      const aVal =
+        aRaw == null ? "" : typeof aRaw === "string" ? aRaw : String(aRaw);
+      const bVal =
+        bRaw == null ? "" : typeof bRaw === "string" ? bRaw : String(bRaw);
+      const cmp = aVal.localeCompare(bVal, undefined, {
+        numeric: true,
+        sensitivity: "base",
+      });
+      return direction === "asc" ? cmp : -cmp;
+    });
+  }, [data, activeSortState, onSort]);
 
   const handleResizeStart = useCallback(
     (e: React.MouseEvent, col: Column<T>) => {
@@ -125,7 +155,7 @@ export function DataTable<T>({
           label: "Export to CSV",
           icon: <Download size={14} />,
           onClick: async () => {
-            await exportTableToCsv(columns, data, csvFilename);
+            await exportTableToCsv(columns, sortedData, csvFilename);
           },
         },
       ]
@@ -142,7 +172,7 @@ export function DataTable<T>({
     );
   }
 
-  if (data.length === 0) {
+  if (sortedData.length === 0) {
     return (
       <div data-testid="data-table-empty">
         <EmptyState title={emptyMessage} />
@@ -191,8 +221,8 @@ export function DataTable<T>({
                       : undefined
                   }
                   aria-sort={
-                    sortState?.key === col.key
-                      ? sortState.direction === "asc"
+                    activeSortState?.key === col.key
+                      ? activeSortState.direction === "asc"
                         ? "ascending"
                         : "descending"
                       : undefined
@@ -206,8 +236,8 @@ export function DataTable<T>({
                         className="inline-flex"
                         data-testid={`sort-icon-${col.key}`}
                       >
-                        {sortState?.key === col.key ? (
-                          sortState.direction === "asc" ? (
+                        {activeSortState?.key === col.key ? (
+                          activeSortState.direction === "asc" ? (
                             <ArrowUp size={14} />
                           ) : (
                             <ArrowDown size={14} />
@@ -234,7 +264,7 @@ export function DataTable<T>({
           </tr>
         </thead>
         <tbody>
-          {data.map((row) => (
+          {sortedData.map((row) => (
             <tr
               key={rowKey(row)}
               className={`border-b border-[var(--color-border-subtle)] even:bg-[var(--color-surface-bg)] hover:bg-[var(--color-surface-hover)] transition-colors ${

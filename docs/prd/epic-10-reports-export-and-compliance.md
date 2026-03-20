@@ -9,6 +9,7 @@ I want to export any search results, group memberships, or reports to CSV or PDF
 so that I can share data with colleagues and document findings.
 
 #### Acceptance Criteria
+
 1. Export button available in all list/table views (search results, group members, comparison, reports)
 2. CSV export with proper encoding (UTF-8 BOM) and delimiter options
 3. PDF export with headers, timestamps, and page numbers
@@ -22,6 +23,7 @@ I want to schedule recurring reports (inactive accounts, expired passwords, empt
 so that I receive regular hygiene reports without manual effort.
 
 #### Acceptance Criteria
+
 1. Report scheduler UI: select report type, frequency (daily/weekly/monthly), output format, destination (local folder or email)
 2. Available report types: inactive accounts (configurable threshold), expired passwords, password never expires, empty groups, orphaned computer accounts, privileged account summary
 3. Reports run in background (Windows Task Scheduler integration or in-app scheduler)
@@ -35,6 +37,7 @@ I want to automate cleanup of stale accounts based on configurable criteria,
 so that AD stays clean without manual intervention.
 
 #### Acceptance Criteria
+
 1. Cleanup rules: inactive for X days, never logged on + created more than Y days ago, disabled for more than Z days
 2. Actions: disable, move to cleanup OU, delete (escalating severity)
 3. Mandatory dry-run preview showing all affected objects before execution
@@ -49,6 +52,7 @@ I want predefined compliance report templates (GDPR, HIPAA, SOX),
 so that I can generate audit-ready reports for compliance reviews.
 
 #### Acceptance Criteria
+
 1. Template library with predefined compliance report types
 2. Each template specifies which data points to collect and how to present them
 3. Generated reports include: executive summary, findings, evidence tables, recommendations
@@ -57,4 +61,3 @@ so that I can generate audit-ready reports for compliance reviews.
 6. Templates are extensible (admin can create custom templates)
 
 ---
-

@@ -114,6 +114,59 @@ pub trait DirectoryProvider: Send + Sync {
     /// Each node contains the OU name and DN. Children are populated
     /// for the first level; deeper levels use `has_children` for lazy loading.
     async fn get_ou_tree(&self) -> Result<Vec<OUNode>>;
+
+    /// Fetches all groups (up to `max_results`) for browsing.
+    async fn browse_groups(&self, max_results: usize) -> Result<Vec<DirectoryEntry>>;
+
+    /// Removes a member from a group.
+    async fn remove_group_member(&self, group_dn: &str, member_dn: &str) -> Result<()>;
+
+    /// Deletes an AD object by its DN.
+    async fn delete_object(&self, dn: &str) -> Result<()>;
+
+    /// Creates a new group in Active Directory.
+    ///
+    /// Parameters:
+    /// - `name`: The CN of the new group
+    /// - `container_dn`: The DN of the container (OU) where the group will be created
+    /// - `scope`: "Global", "DomainLocal", or "Universal"
+    /// - `category`: "Security" or "Distribution"
+    /// - `description`: A description for the group
+    ///
+    /// Returns the DN of the created group.
+    async fn create_group(
+        &self,
+        name: &str,
+        container_dn: &str,
+        scope: &str,
+        category: &str,
+        description: &str,
+    ) -> Result<String>;
+
+    /// Moves an AD object to a different container via LDAP moddn.
+    async fn move_object(&self, object_dn: &str, target_container_dn: &str) -> Result<()>;
+
+    /// Updates the managedBy attribute of a group.
+    async fn update_managed_by(&self, group_dn: &str, manager_dn: &str) -> Result<()>;
+
+    /// Returns the authenticated user identity resolved via WhoAmI, if available.
+    fn authenticated_user(&self) -> Option<String>;
+
+    /// Probes the effective permissions of the current user by checking
+    /// `allowedAttributesEffective` and `allowedChildClassesEffective`
+    /// on representative objects.
+    ///
+    /// Returns a tuple of (can_write_user_attrs, can_write_group_members, can_create_objects):
+    /// - can_write_user_attrs: `lockoutTime` writable on a user (HelpDesk)
+    /// - can_write_group_members: `member` writable on a group (AccountOperator)
+    /// - can_create_objects: `user` creatable in an OU (Admin)
+    async fn probe_effective_permissions(&self) -> Result<(bool, bool, bool)>;
+
+    /// Returns all user-applicable attribute names from the AD schema.
+    ///
+    /// Queries the schema naming context for attributeSchema objects that
+    /// apply to the "user" class. Returns just the `lDAPDisplayName` values.
+    async fn get_schema_attributes(&self) -> Result<Vec<String>>;
 }
 
 #[cfg(test)]
@@ -140,6 +193,12 @@ pub mod tests {
         pub enable_calls: Mutex<Vec<String>>,
         pub disable_calls: Mutex<Vec<String>>,
         pub set_password_flags_calls: Mutex<Vec<(String, bool, bool)>>,
+        pub remove_group_member_calls: Mutex<Vec<(String, String)>>,
+        pub delete_calls: Mutex<Vec<String>>,
+        #[allow(clippy::type_complexity)]
+        pub create_group_calls: Mutex<Vec<(String, String, String, String, String)>>,
+        pub move_object_calls: Mutex<Vec<(String, String)>>,
+        pub update_managed_by_calls: Mutex<Vec<(String, String)>>,
         cannot_change_password: Mutex<bool>,
         replication_metadata: Mutex<Option<String>>,
         ou_tree: Mutex<Vec<OUNode>>,
@@ -168,6 +227,11 @@ pub mod tests {
                 enable_calls: Mutex::new(Vec::new()),
                 disable_calls: Mutex::new(Vec::new()),
                 set_password_flags_calls: Mutex::new(Vec::new()),
+                remove_group_member_calls: Mutex::new(Vec::new()),
+                delete_calls: Mutex::new(Vec::new()),
+                create_group_calls: Mutex::new(Vec::new()),
+                move_object_calls: Mutex::new(Vec::new()),
+                update_managed_by_calls: Mutex::new(Vec::new()),
                 cannot_change_password: Mutex::new(false),
                 replication_metadata: Mutex::new(None),
                 ou_tree: Mutex::new(Vec::new()),
@@ -190,6 +254,11 @@ pub mod tests {
                 enable_calls: Mutex::new(Vec::new()),
                 disable_calls: Mutex::new(Vec::new()),
                 set_password_flags_calls: Mutex::new(Vec::new()),
+                remove_group_member_calls: Mutex::new(Vec::new()),
+                delete_calls: Mutex::new(Vec::new()),
+                create_group_calls: Mutex::new(Vec::new()),
+                move_object_calls: Mutex::new(Vec::new()),
+                update_managed_by_calls: Mutex::new(Vec::new()),
                 cannot_change_password: Mutex::new(false),
                 replication_metadata: Mutex::new(None),
                 ou_tree: Mutex::new(Vec::new()),
@@ -223,6 +292,11 @@ pub mod tests {
 
         pub fn with_replication_metadata(self, xml: String) -> Self {
             *self.replication_metadata.lock().unwrap() = Some(xml);
+            self
+        }
+
+        pub fn with_ou_tree(self, tree: Vec<OUNode>) -> Self {
+            *self.ou_tree.lock().unwrap() = tree;
             self
         }
 
@@ -410,6 +484,84 @@ pub mod tests {
         async fn get_ou_tree(&self) -> Result<Vec<OUNode>> {
             self.check_failure()?;
             Ok(self.ou_tree.lock().unwrap().clone())
+        }
+
+        async fn browse_groups(&self, max_results: usize) -> Result<Vec<DirectoryEntry>> {
+            self.check_failure()?;
+            let groups = self.groups.lock().unwrap();
+            Ok(groups.iter().take(max_results).cloned().collect())
+        }
+
+        async fn remove_group_member(&self, group_dn: &str, member_dn: &str) -> Result<()> {
+            self.check_failure()?;
+            self.remove_group_member_calls
+                .lock()
+                .unwrap()
+                .push((group_dn.to_string(), member_dn.to_string()));
+            Ok(())
+        }
+
+        async fn delete_object(&self, dn: &str) -> Result<()> {
+            self.check_failure()?;
+            self.delete_calls.lock().unwrap().push(dn.to_string());
+            Ok(())
+        }
+
+        async fn create_group(
+            &self,
+            name: &str,
+            container_dn: &str,
+            scope: &str,
+            category: &str,
+            description: &str,
+        ) -> Result<String> {
+            self.check_failure()?;
+            self.create_group_calls.lock().unwrap().push((
+                name.to_string(),
+                container_dn.to_string(),
+                scope.to_string(),
+                category.to_string(),
+                description.to_string(),
+            ));
+            Ok(format!("CN={},{}", name, container_dn))
+        }
+
+        async fn move_object(&self, object_dn: &str, target_container_dn: &str) -> Result<()> {
+            self.check_failure()?;
+            self.move_object_calls
+                .lock()
+                .unwrap()
+                .push((object_dn.to_string(), target_container_dn.to_string()));
+            Ok(())
+        }
+
+        async fn update_managed_by(&self, group_dn: &str, manager_dn: &str) -> Result<()> {
+            self.check_failure()?;
+            self.update_managed_by_calls
+                .lock()
+                .unwrap()
+                .push((group_dn.to_string(), manager_dn.to_string()));
+            Ok(())
+        }
+
+        async fn get_schema_attributes(&self) -> Result<Vec<String>> {
+            self.check_failure()?;
+            Ok(vec![
+                "cn".to_string(),
+                "displayName".to_string(),
+                "mail".to_string(),
+                "sAMAccountName".to_string(),
+                "telephoneNumber".to_string(),
+            ])
+        }
+
+        fn authenticated_user(&self) -> Option<String> {
+            None
+        }
+
+        async fn probe_effective_permissions(&self) -> Result<(bool, bool, bool)> {
+            self.check_failure()?;
+            Ok((false, false, false))
         }
     }
 
@@ -622,5 +774,60 @@ pub mod tests {
         let provider = MockDirectoryProvider::new().with_failure();
         let result = provider.get_current_user_groups().await;
         assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_browse_groups_returns_configured_groups() {
+        let groups = vec![
+            make_group_entry("Domain Admins"),
+            make_group_entry("IT Support"),
+        ];
+        let provider = MockDirectoryProvider::new().with_groups(groups);
+        let results = provider.browse_groups(500).await.unwrap();
+        assert_eq!(results.len(), 2);
+        assert_eq!(
+            results[0].sam_account_name,
+            Some("Domain Admins".to_string())
+        );
+    }
+
+    #[tokio::test]
+    async fn test_browse_groups_respects_max_results() {
+        let groups = vec![
+            make_group_entry("Group1"),
+            make_group_entry("Group2"),
+            make_group_entry("Group3"),
+        ];
+        let provider = MockDirectoryProvider::new().with_groups(groups);
+        let results = provider.browse_groups(2).await.unwrap();
+        assert_eq!(results.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_remove_group_member_success() {
+        let provider = MockDirectoryProvider::new();
+        provider
+            .remove_group_member(
+                "CN=TestGroup,DC=example,DC=com",
+                "CN=User,DC=example,DC=com",
+            )
+            .await
+            .unwrap();
+        let calls = provider.remove_group_member_calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].0, "CN=TestGroup,DC=example,DC=com");
+        assert_eq!(calls[0].1, "CN=User,DC=example,DC=com");
+    }
+
+    #[tokio::test]
+    async fn test_delete_object_records_call() {
+        let provider = MockDirectoryProvider::new();
+        provider
+            .delete_object("CN=OldGroup,OU=Groups,DC=example,DC=com")
+            .await
+            .unwrap();
+        let calls = provider.delete_calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0], "CN=OldGroup,OU=Groups,DC=example,DC=com");
     }
 }

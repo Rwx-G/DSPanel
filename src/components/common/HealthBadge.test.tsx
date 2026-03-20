@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { HealthBadge } from "./HealthBadge";
 import type { AccountHealthStatus } from "@/types/health";
@@ -220,5 +220,143 @@ describe("HealthBadge", () => {
       "aria-label",
       "Health: Critical, 1 issue",
     );
+  });
+
+  it("hides tooltip when Escape is pressed", () => {
+    render(
+      <HealthBadge
+        healthStatus={makeStatus({
+          level: "Warning",
+          activeFlags: [
+            { name: "TestEsc", severity: "Warning", description: "desc" },
+          ],
+        })}
+      />,
+    );
+
+    const badge = screen.getByTestId("health-badge");
+    fireEvent.mouseEnter(badge);
+    expect(screen.getByTestId("health-tooltip")).toBeInTheDocument();
+
+    fireEvent.keyDown(badge, { key: "Escape" });
+    expect(screen.queryByTestId("health-tooltip")).not.toBeInTheDocument();
+  });
+
+  it("toggles tooltip when Enter key is pressed", () => {
+    render(
+      <HealthBadge
+        healthStatus={makeStatus({
+          level: "Info",
+          activeFlags: [
+            { name: "TestEnter", severity: "Info", description: "desc" },
+          ],
+        })}
+      />,
+    );
+
+    const badge = screen.getByTestId("health-badge");
+
+    // Open with Enter
+    fireEvent.keyDown(badge, { key: "Enter" });
+    expect(screen.getByTestId("health-tooltip")).toBeInTheDocument();
+
+    // Close with Enter
+    fireEvent.keyDown(badge, { key: "Enter" });
+    expect(screen.queryByTestId("health-tooltip")).not.toBeInTheDocument();
+  });
+
+  it("toggles tooltip when Space key is pressed", () => {
+    render(
+      <HealthBadge
+        healthStatus={makeStatus({
+          level: "Warning",
+          activeFlags: [
+            { name: "TestSpace", severity: "Warning", description: "desc" },
+          ],
+        })}
+      />,
+    );
+
+    const badge = screen.getByTestId("health-badge");
+
+    // Open with Space
+    fireEvent.keyDown(badge, { key: " " });
+    expect(screen.getByTestId("health-tooltip")).toBeInTheDocument();
+
+    // Close with Space
+    fireEvent.keyDown(badge, { key: " " });
+    expect(screen.queryByTestId("health-tooltip")).not.toBeInTheDocument();
+  });
+
+  it("repositions tooltip when it would overflow right edge of viewport", () => {
+    // Mock getBoundingClientRect to simulate badge near right edge
+    const mockRect = {
+      left: window.innerWidth - 20,
+      right: window.innerWidth - 10,
+      width: 10,
+      top: 50,
+      bottom: 60,
+      height: 10,
+      x: window.innerWidth - 20,
+      y: 50,
+      toJSON: () => ({}),
+    };
+
+    render(
+      <HealthBadge
+        healthStatus={makeStatus({
+          level: "Warning",
+          activeFlags: [
+            {
+              name: "RightEdge",
+              severity: "Warning",
+              description: "test overflow right",
+            },
+          ],
+        })}
+      />,
+    );
+
+    const badge = screen.getByTestId("health-badge");
+    vi.spyOn(badge, "getBoundingClientRect").mockReturnValue(mockRect);
+
+    fireEvent.mouseEnter(badge);
+    expect(screen.getByTestId("health-tooltip")).toBeInTheDocument();
+  });
+
+  it("repositions tooltip above badge when it would overflow bottom of viewport", () => {
+    // Mock getBoundingClientRect to simulate badge near bottom edge
+    const mockRect = {
+      left: 100,
+      right: 110,
+      width: 10,
+      top: window.innerHeight - 10,
+      bottom: window.innerHeight,
+      height: 10,
+      x: 100,
+      y: window.innerHeight - 10,
+      toJSON: () => ({}),
+    };
+
+    render(
+      <HealthBadge
+        healthStatus={makeStatus({
+          level: "Critical",
+          activeFlags: [
+            {
+              name: "BottomEdge",
+              severity: "Critical",
+              description: "test overflow bottom",
+            },
+          ],
+        })}
+      />,
+    );
+
+    const badge = screen.getByTestId("health-badge");
+    vi.spyOn(badge, "getBoundingClientRect").mockReturnValue(mockRect);
+
+    fireEvent.mouseEnter(badge);
+    expect(screen.getByTestId("health-tooltip")).toBeInTheDocument();
   });
 });

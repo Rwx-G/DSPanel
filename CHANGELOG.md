@@ -7,6 +7,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-03-20
+
+Epic 4 - Group Management & Bulk Operations. Complete group lifecycle with
+browse, member management, bulk operations, and hygiene detection. Validated
+against a real AD (Windows Server 2022 + [BadBlood](https://github.com/davidprowe/BadBlood)).
+
+### Added
+
+#### Group Management (4.1-4.3)
+- Group browser with flat search and OU tree, preloaded at mount
+- Group member management with add/remove, dry-run preview, and audit logging
+- Bulk operations redesigned with 4 categories (Members, Groups, Properties, Export) and 10 operations:
+  Add/Remove/Transfer members, Copy user groups, Import CSV, Create/Clone/Merge/Move groups, Set ManagedBy, Export CSV
+- Dry-run preview, progress indicator, and rollback on failure for all bulk ops
+- Cross-module deep-link from User Lookup to Group Management
+
+#### Group Hygiene (4.4)
+- 7 hygiene detections: empty, circular nesting, single-member, stale (180d), undescribed, deep nesting (>3 levels), duplicate member sets
+- Bulk delete with re-check before deletion (race condition protection)
+- One-click navigation to problematic group
+- Hygiene scan audit event logging
+
+#### LDAP & Authentication (4.5-4.6)
+- Simple bind authentication via `DSPANEL_LDAP_SERVER`, `DSPANEL_LDAP_BIND_DN`, `DSPANEL_LDAP_BIND_PASSWORD`
+- LDAPS (TLS) support on port 636 via `ldaps://` URL scheme or `DSPANEL_LDAP_USE_TLS`
+- Self-signed cert support via `DSPANEL_LDAP_TLS_SKIP_VERIFY`
+- LDAP paged results for fetching >1000 objects
+- Connection keepalive (5-minute background ping)
+- 22 integration tests against real AD over LDAPS
+
+#### Permission System
+- 5 permission levels: ReadOnly, HelpDesk, AccountOperator, Admin, DomainAdmin
+- Language-independent detection via well-known SID RIDs (works in any AD locale)
+- Probe-based detection via `allowedAttributesEffective` on all OUs for delegated permissions
+- LDAP WhoAmI for authenticated identity (supports "Run as" and simple bind)
+- Custom groups: `DSPanel-HelpDesk`, `DSPanel-AccountOps`, `DSPanel-Admin`, `DSPanel-DomainAdmin`
+
+#### UI/UX Improvements
+- Health filter buttons (Healthy/Warning/Critical) with live counts
+- GroupBadge with category icon (Shield/Mail) + scope (G/DL/U) + tooltip
+- Category/Status/OS filters for Group Management and Computer Lookup
+- Advanced Attributes "Show empty" toggle with AD schema discovery
+- Visible-but-disabled actions with permission tooltips (replaces hidden)
+- "Authenticated as" display in Home page
+- Windows FILETIME and AD generalized time date formatting
+- Consistent error display via `extractErrorMessage`
+
+### Changed
+
+- Preload all users/groups/computers at mount (replaces paginated scroll)
+- Bulk health evaluation in single IPC call (replaces per-user sequential)
+- Audit log operator set from WhoAmI identity (not Windows USERNAME)
+- LDAP retry only on connection errors, not business logic errors
+
+### Fixed
+
+- LDAP paged results controls leaking into shared connection pool
+- `get_schema_attributes` race condition corrupting shared `base_dn`
+- Password flags "User Cannot Change Password" not re-saveable after toggle
+- `nTSecurityDescriptor` read failure shows info message for ReadOnly users
+- `sizeLimitExceeded` (rc=4) treated as fatal instead of partial success
+- Raw JSON error objects in toaster notifications
+- Health badge tooltip icon alignment and missing Healthy checkmark
+
 ## [0.3.0] - 2026-03-15
 
 Epic 3 - Comparison & Permissions Audit. Side-by-side user comparison, NTFS permissions

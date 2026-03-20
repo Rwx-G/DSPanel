@@ -97,7 +97,7 @@ function GroupChainNode({
             className="shrink-0 text-[var(--color-warning)]"
           />
         ) : loading ? (
-          <LoadingSpinner size="sm" />
+          <LoadingSpinner size={16} />
         ) : expanded ? (
           <ChevronDown
             size={12}

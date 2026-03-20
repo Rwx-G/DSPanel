@@ -45,3 +45,22 @@ export async function evaluateHealth(
     input: toHealthInput(user),
   });
 }
+
+/**
+ * Evaluates health status for multiple users in a single IPC call.
+ *
+ * Returns a Map from samAccountName to health status.
+ */
+export async function evaluateHealthBatch(
+  users: DirectoryUser[],
+): Promise<Map<string, AccountHealthStatus>> {
+  const inputs = users.map(toHealthInput);
+  const results = await invoke<AccountHealthStatus[]>("evaluate_health_batch", {
+    inputs,
+  });
+  const map = new Map<string, AccountHealthStatus>();
+  users.forEach((user, i) => {
+    map.set(user.samAccountName, results[i]);
+  });
+  return map;
+}

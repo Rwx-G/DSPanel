@@ -1,0 +1,54 @@
+schema: 1
+story: "4.5"
+story_title: "Simple Bind Authentication for LDAP"
+gate: PASS
+status_reason: "All 9 acceptance criteria met. Runtime auth mode switching, env var configuration, security-safe logging (custom Debug redacts password). 4 new unit tests + 3 integration test scaffolds. Security fix applied during review."
+reviewer: "Quinn (Test Architect)"
+updated: "2026-03-19T12:00:00Z"
+
+waiver: { active: false }
+
+top_issues: []
+
+quality_score: 100
+
+expires: "2026-04-02T00:00:00Z"
+
+evidence:
+  tests_reviewed: 7
+  risks_identified: 1
+  risks_resolved: 1
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9]
+    ac_gaps: []
+    ac_diverged: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Custom Debug impl redacts password. No credential logging at any level. Cleartext simple bind over port 389 documented as lab-only."
+  performance:
+    status: PASS
+    notes: "Auth mode selection is one-time at connection creation. No performance impact on existing GSSAPI path."
+  reliability:
+    status: PASS
+    notes: "Partial env var detection with graceful GSSAPI fallback. Simple bind result code validation (rc != 0)."
+  maintainability:
+    status: PASS
+    notes: "Clean enum-based auth mode. Integration test scaffold ready for lab testing."
+
+risk_summary:
+  totals: { critical: 0, high: 0, medium: 0, low: 0 }
+  risks_found_and_fixed:
+    - risk: "derive(Debug) on LdapAuthMode would leak password in debug logs"
+      severity: high
+      resolution: "Replaced with custom Debug impl that redacts password field"
+  recommendations:
+    must_fix: []
+    monitor: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: "Add LDAPS (port 636) support for secure simple bind in production"
+      refs: ["src-tauri/src/services/ldap_directory.rs"]

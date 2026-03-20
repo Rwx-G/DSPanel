@@ -191,6 +191,29 @@ where
         resilient_call!(self, |inner| inner.browse_computers(max_results).await)
     }
 
+    async fn browse_groups(&self, max_results: usize) -> Result<Vec<DirectoryEntry>> {
+        resilient_call!(self, |inner| inner.browse_groups(max_results).await)
+    }
+
+    async fn delete_object(&self, dn: &str) -> Result<()> {
+        let dn_owned = dn.to_string();
+        resilient_call!(self, dn_owned, |inner, d| inner.delete_object(&d).await)
+    }
+
+    async fn remove_group_member(&self, group_dn: &str, member_dn: &str) -> Result<()> {
+        let g = group_dn.to_string();
+        let m = member_dn.to_string();
+        let inner_ref = self.inner.clone();
+        self.execute_with_resilience(|| {
+            let inner = inner_ref.clone();
+            let g = g.clone();
+            let m = m.clone();
+            async move { inner.remove_group_member(&g, &m).await }
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!(e))
+    }
+
     async fn get_user_by_identity(&self, sam_account_name: &str) -> Result<Option<DirectoryEntry>> {
         let sam = sam_account_name.to_string();
         resilient_call!(self, sam, |inner, s| inner.get_user_by_identity(&s).await)
@@ -322,6 +345,85 @@ where
 
     async fn get_ou_tree(&self) -> Result<Vec<OUNode>> {
         resilient_call!(self, |inner| inner.get_ou_tree().await)
+    }
+
+    async fn create_group(
+        &self,
+        name: &str,
+        container_dn: &str,
+        scope: &str,
+        category: &str,
+        description: &str,
+    ) -> Result<String> {
+        let name = name.to_string();
+        let container = container_dn.to_string();
+        let scope = scope.to_string();
+        let category = category.to_string();
+        let desc = description.to_string();
+        let inner_ref = self.inner.clone();
+        self.execute_with_resilience(|| {
+            let inner = inner_ref.clone();
+            let n = name.clone();
+            let c = container.clone();
+            let s = scope.clone();
+            let cat = category.clone();
+            let d = desc.clone();
+            async move { inner.create_group(&n, &c, &s, &cat, &d).await }
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!(e))
+    }
+
+    async fn move_object(&self, object_dn: &str, target_container_dn: &str) -> Result<()> {
+        let o = object_dn.to_string();
+        let t = target_container_dn.to_string();
+        let inner_ref = self.inner.clone();
+        self.execute_with_resilience(|| {
+            let inner = inner_ref.clone();
+            let o = o.clone();
+            let t = t.clone();
+            async move { inner.move_object(&o, &t).await }
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!(e))
+    }
+
+    async fn update_managed_by(&self, group_dn: &str, manager_dn: &str) -> Result<()> {
+        let g = group_dn.to_string();
+        let m = manager_dn.to_string();
+        let inner_ref = self.inner.clone();
+        self.execute_with_resilience(|| {
+            let inner = inner_ref.clone();
+            let g = g.clone();
+            let m = m.clone();
+            async move { inner.update_managed_by(&g, &m).await }
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!(e))
+    }
+
+    async fn get_schema_attributes(&self) -> Result<Vec<String>> {
+        let inner_ref = self.inner.clone();
+        self.execute_with_resilience(|| {
+            let inner = inner_ref.clone();
+            async move { inner.get_schema_attributes().await }
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!(e))
+    }
+
+    fn authenticated_user(&self) -> Option<String> {
+        self.inner.authenticated_user()
+    }
+
+    async fn probe_effective_permissions(&self) -> Result<(bool, bool, bool)> {
+        let inner_ref = self.inner.clone();
+        self.execute_with_resilience(|| {
+            let inner = inner_ref.clone();
+            async move { inner.probe_effective_permissions().await }
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!(e))
     }
 }
 

@@ -199,9 +199,7 @@ describe("ComputerLookup", () => {
       expect(screen.getByTestId("empty-state-title")).toHaveTextContent(
         "No computers found",
       );
-      expect(
-        screen.getByText("No computers available."),
-      ).toBeInTheDocument();
+      expect(screen.getByText("No computers available.")).toBeInTheDocument();
     });
   });
 
@@ -258,7 +256,9 @@ describe("ComputerLookup", () => {
       expect(screen.getByTestId("computer-result-WS001")).toBeInTheDocument();
     });
 
-    expect(screen.getByText("Disabled")).toBeInTheDocument();
+    // The computer result item should show "Disabled" badge
+    const resultItem = screen.getByTestId("computer-result-WS001");
+    expect(resultItem.textContent).toContain("Disabled");
   });
 
   it("renders accessibility status region", async () => {
@@ -273,10 +273,6 @@ describe("ComputerLookup", () => {
   });
 
   it("shows Unknown OS when operatingSystem is empty", async () => {
-    const entries = [
-      makeComputerEntry("WS001", { operatingSystem: [""] }),
-    ];
-
     // Override mapEntryToComputer behavior - OS comes from attributes
     mockInvoke.mockImplementation(((cmd: string) => {
       if (cmd === "browse_computers") {
@@ -379,9 +375,7 @@ describe("ComputerLookup", () => {
     render(<ComputerLookup />);
 
     await waitFor(() => {
-      expect(
-        screen.getByText("No computers available."),
-      ).toBeInTheDocument();
+      expect(screen.getByText("No computers available.")).toBeInTheDocument();
     });
   });
 

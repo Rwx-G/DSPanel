@@ -2,12 +2,14 @@ export type PermissionLevel =
   | "ReadOnly"
   | "HelpDesk"
   | "AccountOperator"
+  | "Admin"
   | "DomainAdmin";
 
 export const PERMISSION_LEVELS: PermissionLevel[] = [
   "ReadOnly",
   "HelpDesk",
   "AccountOperator",
+  "Admin",
   "DomainAdmin",
 ];
 

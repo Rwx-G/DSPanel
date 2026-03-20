@@ -10,5 +10,7 @@ export function useUserBrowse(): UseBrowseReturn<DirectoryUser> {
       u.displayName.toLowerCase().includes(lower) ||
       u.samAccountName.toLowerCase().includes(lower) ||
       u.email.toLowerCase().includes(lower),
+    itemKey: (u) => u.samAccountName,
+    preloadAll: true,
   });
 }

@@ -20,10 +20,22 @@ evidence:
     ac_gaps: []
 
 nfr_validation:
-  security: { status: PASS, notes: "UNC path validation, unsafe Win32 API properly scoped" }
+  security:
+    {
+      status: PASS,
+      notes: "UNC path validation, unsafe Win32 API properly scoped",
+    }
   performance: { status: PASS, notes: "Single Win32 API call per path" }
-  reliability: { status: PASS, notes: "Error handling for access denied, path not found, malformed UNC" }
-  maintainability: { status: PASS, notes: "Clean cfg(windows)/cfg(demo) separation, AccessSummary component" }
+  reliability:
+    {
+      status: PASS,
+      notes: "Error handling for access denied, path not found, malformed UNC",
+    }
+  maintainability:
+    {
+      status: PASS,
+      notes: "Clean cfg(windows)/cfg(demo) separation, AccessSummary component",
+    }
 
 recommendations:
   future:

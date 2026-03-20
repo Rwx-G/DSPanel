@@ -1,9 +1,10 @@
 import { useState, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { PermissionGate } from "@/components/common/PermissionGate";
+import { usePermissions } from "@/hooks/usePermissions";
 import { useDialog } from "@/contexts/DialogContext";
 import { useNotifications } from "@/contexts/NotificationContext";
 import { useMfaGate } from "@/hooks/useMfaGate";
+import { extractErrorMessage } from "@/utils/errorMapping";
 import { type DirectoryUser } from "@/types/directory";
 import { Unlock, Power, PowerOff, KeyRound } from "lucide-react";
 
@@ -21,6 +22,8 @@ export function UserActions({
   const { showConfirmation } = useDialog();
   const { notify } = useNotifications();
   const { checkMfa } = useMfaGate();
+  const { hasPermission } = usePermissions();
+  const canAct = hasPermission("HelpDesk");
   const [loading, setLoading] = useState<string | null>(null);
 
   const handleAction = useCallback(
@@ -47,13 +50,7 @@ export function UserActions({
         notify(`${action} successful for ${user.displayName}`, "success");
         onRefresh();
       } catch (e) {
-        const msg = typeof e === "string" ? e : `${action} failed`;
-        try {
-          const parsed = JSON.parse(msg);
-          notify(parsed.userMessage || parsed.message || msg, "error");
-        } catch {
-          notify(msg, "error");
-        }
+        notify(extractErrorMessage(e), "error");
       } finally {
         setLoading(null);
       }
@@ -93,51 +90,54 @@ export function UserActions({
   );
 
   return (
-    <PermissionGate requiredLevel="HelpDesk">
-      <div className="flex items-center gap-2" data-testid="user-actions">
+    <div className="flex items-center gap-2" data-testid="user-actions">
+      <button
+        className="btn btn-sm btn-primary flex items-center gap-1"
+        onClick={onResetPassword}
+        disabled={!canAct}
+        title={!canAct ? "Requires HelpDesk permission" : undefined}
+        data-testid="reset-password-btn"
+      >
+        <KeyRound size={12} />
+        Reset Password
+      </button>
+
+      {user.lockedOut && (
         <button
-          className="btn btn-sm btn-primary flex items-center gap-1"
-          onClick={onResetPassword}
-          data-testid="reset-password-btn"
+          className="btn btn-sm btn-secondary flex items-center gap-1"
+          onClick={handleUnlock}
+          disabled={!canAct || loading === "Unlock"}
+          title={!canAct ? "Requires HelpDesk permission" : undefined}
+          data-testid="unlock-btn"
         >
-          <KeyRound size={12} />
-          Reset Password
+          <Unlock size={12} />
+          Unlock
         </button>
+      )}
 
-        {user.lockedOut && (
-          <button
-            className="btn btn-sm btn-secondary flex items-center gap-1"
-            onClick={handleUnlock}
-            disabled={loading === "Unlock"}
-            data-testid="unlock-btn"
-          >
-            <Unlock size={12} />
-            Unlock
-          </button>
-        )}
-
-        {user.enabled ? (
-          <button
-            className="btn btn-sm btn-secondary flex items-center gap-1 text-[var(--color-error)]"
-            onClick={handleDisable}
-            disabled={loading === "Disable"}
-            data-testid="disable-btn"
-          >
-            <PowerOff size={12} />
-            Disable
-          </button>
-        ) : (
-          <button
-            className="btn btn-sm btn-secondary flex items-center gap-1 text-[var(--color-success)]"
-            onClick={handleEnable}
-            disabled={loading === "Enable"}
-            data-testid="enable-btn"
-          >
-            <Power size={12} />
-            Enable
-          </button>
-        )}
-      </div>
-    </PermissionGate>
+      {user.enabled ? (
+        <button
+          className="btn btn-sm btn-secondary flex items-center gap-1 text-[var(--color-error)]"
+          onClick={handleDisable}
+          disabled={!canAct || loading === "Disable"}
+          title={!canAct ? "Requires HelpDesk permission" : undefined}
+          data-testid="disable-btn"
+        >
+          <PowerOff size={12} />
+          Disable
+        </button>
+      ) : (
+        <button
+          className="btn btn-sm btn-secondary flex items-center gap-1 text-[var(--color-success)]"
+          onClick={handleEnable}
+          disabled={!canAct || loading === "Enable"}
+          title={!canAct ? "Requires HelpDesk permission" : undefined}
+          data-testid="enable-btn"
+        >
+          <Power size={12} />
+          Enable
+        </button>
+      )}
+    </div>
   );
 }

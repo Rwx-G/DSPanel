@@ -127,9 +127,7 @@ describe("ComputerDetail", () => {
   });
 
   it("disables ping button when no DNS hostname", () => {
-    render(
-      <ComputerDetail computer={makeComputer({ dnsHostName: "" })} />,
-    );
+    render(<ComputerDetail computer={makeComputer({ dnsHostName: "" })} />);
     expect(screen.getByTestId("ping-button")).toBeDisabled();
   });
 
@@ -214,23 +212,17 @@ describe("ComputerDetail", () => {
   });
 
   it("shows Never for null lastLogon", () => {
-    render(
-      <ComputerDetail computer={makeComputer({ lastLogon: null })} />,
-    );
+    render(<ComputerDetail computer={makeComputer({ lastLogon: null })} />);
     expect(screen.getByText("Never")).toBeInTheDocument();
   });
 
   it("renders empty group section when computer has no groups", () => {
-    render(
-      <ComputerDetail computer={makeComputer({ memberOf: [] })} />,
-    );
+    render(<ComputerDetail computer={makeComputer({ memberOf: [] })} />);
     expect(screen.getByText("Group Memberships (0)")).toBeInTheDocument();
   });
 
   it("does not resolve DNS when hostname is empty", () => {
-    render(
-      <ComputerDetail computer={makeComputer({ dnsHostName: "" })} />,
-    );
+    render(<ComputerDetail computer={makeComputer({ dnsHostName: "" })} />);
     expect(mockInvoke).not.toHaveBeenCalledWith(
       "resolve_dns",
       expect.anything(),

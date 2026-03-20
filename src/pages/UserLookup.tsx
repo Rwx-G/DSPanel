@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { SearchBar } from "@/components/common/SearchBar";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
@@ -12,7 +12,7 @@ import {
   mapEntryToUser,
 } from "@/types/directory";
 import type { AccountHealthStatus } from "@/types/health";
-import { evaluateHealth } from "@/services/healthcheck";
+import { evaluateHealth, evaluateHealthBatch } from "@/services/healthcheck";
 import { parseCnFromDn } from "@/utils/dn";
 import { useUserBrowse } from "@/hooks/useUserBrowse";
 import { useNavigation } from "@/contexts/NavigationContext";
@@ -22,6 +22,8 @@ import {
 } from "@/components/common/ContextMenu";
 import { UserDetail } from "@/pages/UserDetail";
 import { UserX, AlertCircle, User, GitCompareArrows } from "lucide-react";
+
+type HealthFilter = "all" | "healthy" | "warning" | "critical";
 
 export function UserLookup() {
   const {
@@ -35,10 +37,65 @@ export function UserLookup() {
     loadMore,
     selectedItem: selectedUser,
     setSelectedItem: setSelectedUser,
+    updateItem,
     refresh,
   } = useUserBrowse();
 
-  const { openTab } = useNavigation();
+  const [healthFilter, setHealthFilter] = useState<HealthFilter>("all");
+  const [schemaAttributes, setSchemaAttributes] = useState<string[]>([]);
+
+  useEffect(() => {
+    invoke<string[]>("get_schema_attributes")
+      .then(setSchemaAttributes)
+      .catch((e) => console.warn("Failed to load schema attributes:", e));
+  }, []);
+
+  const { openTab, openTabs, activeTabId, clearTabData } = useNavigation();
+
+  // Deep-link: select a user by SAM account name from another module
+  const deepLinkHandled = useRef<string | null>(null);
+  const activeTab = openTabs.find((t) => t.id === activeTabId);
+  const selectedUserSam = activeTab?.data?.selectedUserSam as
+    | string
+    | undefined;
+
+  useEffect(() => {
+    if (!selectedUserSam || deepLinkHandled.current === selectedUserSam) return;
+
+    // Try to find in loaded users first
+    const found = users.find((u) => u.samAccountName === selectedUserSam);
+    if (found) {
+      setSelectedUser(found);
+      deepLinkHandled.current = selectedUserSam;
+      if (activeTabId) clearTabData(activeTabId);
+      return;
+    }
+
+    // Otherwise fetch via get_user command
+    if (!loading) {
+      invoke<DirectoryEntry | null>("get_user", {
+        samAccountName: selectedUserSam,
+      })
+        .then((entry) => {
+          if (entry) {
+            setSelectedUser(mapEntryToUser(entry));
+          }
+        })
+        .catch((err) => console.warn("Deep-link user lookup failed:", err))
+        .finally(() => {
+          deepLinkHandled.current = selectedUserSam;
+          if (activeTabId) clearTabData(activeTabId);
+        });
+    }
+  }, [
+    selectedUserSam,
+    users,
+    loading,
+    setSelectedUser,
+    activeTabId,
+    clearTabData,
+  ]);
+
   const [contextMenuPos, setContextMenuPos] = useState<{
     x: number;
     y: number;
@@ -56,27 +113,13 @@ export function UserLookup() {
     let cancelled = false;
 
     const computeHealth = async () => {
-      const CONCURRENCY = 3;
-      const map = new Map<string, AccountHealthStatus>();
-
-      for (let i = 0; i < users.length; i += CONCURRENCY) {
-        if (cancelled) return;
-        const batch = users.slice(i, i + CONCURRENCY);
-        const entries = await Promise.allSettled(
-          batch.map(async (user) => {
-            const status = await evaluateHealth(user);
-            return [user.samAccountName, status] as const;
-          }),
-        );
-        for (const entry of entries) {
-          if (entry.status === "fulfilled") {
-            const [key, value] = entry.value;
-            map.set(key, value);
-          }
-        }
+      try {
+        const map = await evaluateHealthBatch(users);
         if (!cancelled) {
-          setHealthMap(new Map(map));
+          setHealthMap(map);
         }
+      } catch (e) {
+        console.warn("Health batch evaluation failed:", e);
       }
     };
 
@@ -106,6 +149,7 @@ export function UserLookup() {
       if (entry) {
         const updated = mapEntryToUser(entry);
         setSelectedUser(updated);
+        updateItem(updated.samAccountName, updated);
         const health = await evaluateHealth(updated);
         setHealthMap((prev) => {
           const next = new Map(prev);
@@ -116,7 +160,7 @@ export function UserLookup() {
     } catch (e) {
       console.warn("Failed to refresh user:", e);
     }
-  }, [selectedUser, setSelectedUser]);
+  }, [selectedUser, setSelectedUser, updateItem]);
 
   const filteredGroups = selectedUser
     ? selectedUser.memberOf.filter((dn) =>
@@ -185,6 +229,30 @@ export function UserLookup() {
     [selectedUser, openTab],
   );
 
+  const filteredUsers = useMemo(() => {
+    if (healthFilter === "all") return users;
+    return users.filter((u) => {
+      const health = healthMap.get(u.samAccountName);
+      if (!health) return false;
+      if (healthFilter === "healthy") return health.level === "Healthy";
+      if (healthFilter === "warning") return health.level === "Warning";
+      if (healthFilter === "critical") return health.level === "Critical";
+      return true;
+    });
+  }, [users, healthMap, healthFilter]);
+
+  const healthCounts = useMemo(() => {
+    let healthy = 0,
+      warning = 0,
+      critical = 0;
+    for (const [, status] of healthMap) {
+      if (status.level === "Healthy") healthy++;
+      else if (status.level === "Warning") warning++;
+      else if (status.level === "Critical") critical++;
+    }
+    return { healthy, warning, critical };
+  }, [healthMap]);
+
   const renderUserItem = useCallback(
     (user: DirectoryUser) => (
       <button
@@ -193,7 +261,15 @@ export function UserLookup() {
             ? "bg-[var(--color-surface-selected)]"
             : ""
         }`}
-        onClick={() => setSelectedUser(user)}
+        onClick={() => {
+          setSelectedUser(user);
+          // Fetch full attributes for detail view
+          invoke<DirectoryEntry | null>("get_user", {
+            samAccountName: user.samAccountName,
+          }).then((entry) => {
+            if (entry) setSelectedUser(mapEntryToUser(entry));
+          }).catch(() => {});
+        }}
         onContextMenu={(e) => handleUserContextMenu(e, user)}
         data-testid={`user-result-${user.samAccountName}`}
       >
@@ -211,7 +287,10 @@ export function UserLookup() {
           </p>
         </div>
         {healthMap.get(user.samAccountName) && (
-          <HealthBadge healthStatus={healthMap.get(user.samAccountName)!} />
+          <HealthBadge
+            healthStatus={healthMap.get(user.samAccountName)!}
+            compact={healthMap.get(user.samAccountName)!.level === "Healthy"}
+          />
         )}
       </button>
     ),
@@ -220,14 +299,39 @@ export function UserLookup() {
 
   return (
     <div className="flex h-full flex-col" data-testid="user-lookup">
-      <div className="border-b border-[var(--color-border-subtle)] p-3">
-        <SearchBar
-          value={filterText}
-          onChange={handleFilterChange}
-          onSearch={handleFilterChange}
-          placeholder="Search by name, username, or email..."
-          debounceMs={300}
-        />
+      <div className="flex items-center gap-2 border-b border-[var(--color-border-subtle)] px-3 py-2">
+        <div className="flex-1">
+          <SearchBar
+            value={filterText}
+            onChange={handleFilterChange}
+            onSearch={handleFilterChange}
+            placeholder="Search by name, username, or email..."
+            debounceMs={300}
+          />
+        </div>
+        <div className="flex items-center gap-1">
+          {(
+            [
+              { key: "all", label: "All" },
+              { key: "healthy", label: "Healthy" },
+              { key: "warning", label: "Warning" },
+              { key: "critical", label: "Critical" },
+            ] as const
+          ).map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => setHealthFilter(key)}
+              className={`btn btn-sm ${
+                healthFilter === key ? "btn-outline" : "btn-ghost"
+              }`}
+            >
+              {label}
+              {key !== "all" && healthCounts[key] > 0 && (
+                <span className="ml-1 opacity-70">({healthCounts[key]})</span>
+              )}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div
@@ -237,9 +341,9 @@ export function UserLookup() {
       >
         {loading && "Loading users..."}
         {!loading &&
-          users.length > 0 &&
-          `${users.length} user${users.length > 1 ? "s" : ""} found`}
-        {!loading && users.length === 0 && !error && "No users found"}
+          filteredUsers.length > 0 &&
+          `${filteredUsers.length} user${filteredUsers.length > 1 ? "s" : ""} found`}
+        {!loading && filteredUsers.length === 0 && !error && "No users found"}
         {error && `Error: ${error}`}
       </div>
 
@@ -267,28 +371,30 @@ export function UserLookup() {
           </div>
         )}
 
-        {!loading && !error && users.length === 0 && (
+        {!loading && !error && filteredUsers.length === 0 && (
           <div className="flex flex-1 items-center justify-center">
             <EmptyState
               icon={<UserX size={48} />}
               title="No users found"
               description={
-                filterText
-                  ? `No users match "${filterText}".`
-                  : "No users available."
+                healthFilter !== "all"
+                  ? `No users with "${healthFilter}" health status.`
+                  : filterText
+                    ? `No users match "${filterText}".`
+                    : "No users available."
               }
             />
           </div>
         )}
 
-        {!loading && !error && users.length > 0 && (
+        {!loading && !error && filteredUsers.length > 0 && (
           <>
             <div
               className="w-64 shrink-0 border-r border-[var(--color-border-subtle)]"
               data-testid="user-results-list"
             >
               <VirtualizedList
-                items={users}
+                items={filteredUsers}
                 renderItem={renderUserItem}
                 estimateSize={52}
                 itemKey={(user) => user.samAccountName}
@@ -311,6 +417,7 @@ export function UserLookup() {
                   groupFilterText={groupFilterText}
                   onGroupFilterText={setGroupFilterText}
                   onRefresh={refreshSelectedUser}
+                  schemaAttributes={schemaAttributes}
                 />
               ) : (
                 <div className="flex h-full items-center justify-center">

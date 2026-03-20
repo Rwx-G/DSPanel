@@ -44,11 +44,11 @@ export function FilterBar({
 
   return (
     <div
-      className="flex flex-wrap items-center gap-2 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5"
+      className="mb-2 flex items-center gap-2 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2 py-1"
       data-testid="filter-bar"
     >
       <Filter
-        size={16}
+        size={14}
         className="shrink-0 text-[var(--color-text-secondary)]"
       />
 
@@ -83,11 +83,11 @@ export function FilterBar({
       {(filters.length > 0 || textValue) && (
         <button
           onClick={clearAll}
-          className="text-caption text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
+          className="rounded-sm p-0.5 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
           aria-label="Clear all filters"
           data-testid="filter-clear-all"
         >
-          Clear all
+          <X size={14} />
         </button>
       )}
     </div>

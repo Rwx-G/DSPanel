@@ -21,7 +21,8 @@ import { GroupMembersDialog } from "@/components/dialogs/GroupMembersDialog";
 import { type DirectoryUser } from "@/types/directory";
 import type { AccountHealthStatus, HealthLevel } from "@/types/health";
 import { parseCnFromDn } from "@/utils/dn";
-import { Users } from "lucide-react";
+import { Users, FolderOpen } from "lucide-react";
+import { useNavigation } from "@/contexts/NavigationContext";
 import { StateInTimeView } from "@/components/comparison/StateInTimeView";
 
 /** Maps health flag names to the PropertyGrid label they correspond to. */
@@ -51,6 +52,7 @@ export interface UserDetailProps {
   groupFilterText: string;
   onGroupFilterText: (value: string) => void;
   onRefresh?: () => void;
+  schemaAttributes?: string[];
 }
 
 export function UserDetail({
@@ -61,6 +63,7 @@ export function UserDetail({
   groupFilterText: _groupFilterText,
   onGroupFilterText,
   onRefresh,
+  schemaAttributes,
 }: UserDetailProps) {
   const [groupFilters, setGroupFilters] = useState<FilterChip[]>([]);
   const [showPasswordReset, setShowPasswordReset] = useState(false);
@@ -76,6 +79,7 @@ export function UserDetail({
     dn: string;
     name: string;
   } | null>(null);
+  const { openTab } = useNavigation();
 
   const handleRefresh = onRefresh ?? (() => {});
 
@@ -204,6 +208,15 @@ export function UserDetail({
             });
           },
         },
+        {
+          label: "Open in Group Management",
+          icon: <FolderOpen size={14} />,
+          onClick: () => {
+            openTab("Group Management", "groups", "users-group", {
+              selectedGroupDn: contextMenuRow.dn,
+            });
+          },
+        },
       ]
     : [];
 
@@ -264,7 +277,7 @@ export function UserDetail({
 
       <div className="border-t border-[var(--color-border-default)]" />
 
-      <AdvancedAttributes rawAttributes={user.rawAttributes} />
+      <AdvancedAttributes rawAttributes={user.rawAttributes} schemaAttributes={schemaAttributes} />
 
       <div className="border-t border-[var(--color-border-default)]" />
 
