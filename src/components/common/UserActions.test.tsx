@@ -11,14 +11,16 @@ vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
 }));
 
+let mockPermissionLevel = "HelpDesk";
+
 vi.mock("@/hooks/usePermissions", () => ({
   usePermissions: () => ({
-    level: "HelpDesk" as const,
+    level: mockPermissionLevel as string,
     groups: [],
     loading: false,
     hasPermission: (required: string) => {
       const levels = ["ReadOnly", "HelpDesk", "AccountOperator", "DomainAdmin"];
-      return levels.indexOf("HelpDesk") >= levels.indexOf(required);
+      return levels.indexOf(mockPermissionLevel) >= levels.indexOf(required);
     },
   }),
 }));
@@ -72,6 +74,7 @@ describe("UserActions", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPermissionLevel = "HelpDesk";
   });
 
   it("renders reset password button", () => {
@@ -350,6 +353,48 @@ describe("UserActions", () => {
     await waitFor(() => {
       expect(screen.getByText("network")).toBeInTheDocument();
     });
+  });
+
+  it("disables all action buttons when user lacks HelpDesk permission", () => {
+    mockPermissionLevel = "ReadOnly";
+
+    render(
+      <UserActions
+        user={makeUser({ lockedOut: true, enabled: true })}
+        onRefresh={onRefresh}
+        onResetPassword={onResetPassword}
+      />,
+      { wrapper: TestProviders },
+    );
+
+    expect(screen.getByTestId("reset-password-btn")).toBeDisabled();
+    expect(screen.getByTestId("unlock-btn")).toBeDisabled();
+    expect(screen.getByTestId("disable-btn")).toBeDisabled();
+  });
+
+  it("disables action buttons and shows permission title for ReadOnly user", () => {
+    mockPermissionLevel = "ReadOnly";
+
+    render(
+      <UserActions
+        user={makeUser({ lockedOut: true, enabled: false })}
+        onRefresh={onRefresh}
+        onResetPassword={onResetPassword}
+      />,
+      { wrapper: TestProviders },
+    );
+
+    const resetBtn = screen.getByTestId("reset-password-btn");
+    const unlockBtn = screen.getByTestId("unlock-btn");
+    const enableBtn = screen.getByTestId("enable-btn");
+
+    expect(resetBtn).toBeDisabled();
+    expect(unlockBtn).toBeDisabled();
+    expect(enableBtn).toBeDisabled();
+
+    expect(resetBtn).toHaveAttribute("title", "Requires HelpDesk permission");
+    expect(unlockBtn).toHaveAttribute("title", "Requires HelpDesk permission");
+    expect(enableBtn).toHaveAttribute("title", "Requires HelpDesk permission");
   });
 
   it("shows parsed JSON error message when error is backend JSON", async () => {

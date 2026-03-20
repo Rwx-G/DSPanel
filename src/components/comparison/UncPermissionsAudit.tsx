@@ -1,9 +1,12 @@
 import { useState, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { parseBackendError } from "@/utils/errorMapping";
+import { usePlatform } from "@/hooks/usePlatform";
+import { EmptyState } from "@/components/common/EmptyState";
 import {
   FolderSearch,
   Download,
+  Monitor,
   Shield,
   ShieldAlert,
   ShieldX,
@@ -75,6 +78,7 @@ export function UncPermissionsAudit({
   userA,
   userB,
 }: UncPermissionsAuditProps) {
+  const platform = usePlatform();
   const [uncPath, setUncPath] = useState("");
   const [isAuditing, setIsAuditing] = useState(false);
   const [auditResult, setAuditResult] = useState<NtfsAuditResult | null>(null);
@@ -144,6 +148,18 @@ export function UncPermissionsAudit({
     const csv = formatCsv(headers, rows);
     await downloadCsv(`ntfs-audit-${Date.now()}.csv`, csv);
   }, [auditResult, crossRef]);
+
+  if (platform && platform !== "windows") {
+    return (
+      <div data-testid="unc-permissions-audit">
+        <EmptyState
+          icon={<Monitor size={40} />}
+          title="Not available on this platform"
+          description="UNC path permissions audit requires Windows. NTFS ACL APIs are not available on macOS or Linux."
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-3" data-testid="unc-permissions-audit">

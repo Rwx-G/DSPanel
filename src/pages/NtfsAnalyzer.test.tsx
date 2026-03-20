@@ -25,6 +25,11 @@ vi.mock("@/components/comparison/GroupChainTree", () => ({
   GroupChainTree: () => null,
 }));
 
+const mockUsePlatform = vi.fn(() => "windows");
+vi.mock("@/hooks/usePlatform", () => ({
+  usePlatform: () => mockUsePlatform(),
+}));
+
 import { invoke } from "@tauri-apps/api/core";
 const mockInvoke = vi.mocked(invoke);
 
@@ -82,6 +87,27 @@ const MOCK_RESULT: NtfsAnalysisResult = {
 describe("NtfsAnalyzer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUsePlatform.mockReturnValue("windows");
+  });
+
+  it("shows platform unavailable message on non-Windows", () => {
+    mockUsePlatform.mockReturnValue("macos");
+    render(<NtfsAnalyzer />, { wrapper: TestProviders });
+    expect(screen.getByTestId("ntfs-analyzer-page")).toBeInTheDocument();
+    expect(
+      screen.getByText("Not available on this platform"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByTestId("analyzer-path-input"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows platform unavailable message on Linux", () => {
+    mockUsePlatform.mockReturnValue("linux");
+    render(<NtfsAnalyzer />, { wrapper: TestProviders });
+    expect(
+      screen.getByText("Not available on this platform"),
+    ).toBeInTheDocument();
   });
 
   it("renders the page with input controls", () => {

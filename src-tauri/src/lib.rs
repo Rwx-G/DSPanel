@@ -1,3 +1,8 @@
+// Enforced: unwrap() is forbidden in production code.
+// Use expect("context") for Mutex locks, or proper error handling for Result/Option.
+// Tests are exempt via #[cfg(test)] allow attributes.
+#![deny(clippy::unwrap_used)]
+
 pub mod commands;
 pub mod error;
 pub mod logging;
@@ -63,13 +68,19 @@ pub fn run() {
         let use_tls = std::env::var("DSPANEL_LDAP_USE_TLS")
             .map(|v| v == "true" || v == "1")
             .unwrap_or(false);
+        let starttls = std::env::var("DSPANEL_LDAP_STARTTLS")
+            .map(|v| v == "true" || v == "1")
+            .unwrap_or(false);
         let skip_verify = std::env::var("DSPANEL_LDAP_TLS_SKIP_VERIFY")
             .map(|v| v == "true" || v == "1")
             .unwrap_or(false);
+        let ca_cert_file = std::env::var("DSPANEL_LDAP_CA_CERT").ok();
 
         let tls_config = LdapTlsConfig {
             enabled: use_tls,
+            starttls,
             skip_verify,
+            ca_cert_file,
         };
 
         match (server, bind_dn, bind_password) {
@@ -133,6 +144,50 @@ pub fn run() {
             state.app_settings.load();
             state.preset_service.load_persisted();
 
+            // Migrate: move client secret from JSON to credential store (one-time)
+            {
+                let settings = state.app_settings.get();
+                if let Some(ref secret) = settings.graph_client_secret {
+                    if !secret.is_empty() {
+                        match state.credential_store.store("graph_client_secret", secret) {
+                            Ok(()) => {
+                                // Clear secret from JSON file
+                                let mut clean = settings.clone();
+                                clean.graph_client_secret = None;
+                                state.app_settings.update(clean);
+                                tracing::info!(
+                                    "Migrated graph_client_secret from JSON to OS credential store"
+                                );
+                            }
+                            Err(e) => {
+                                tracing::warn!(
+                                    "Failed to migrate client secret to credential store: {}",
+                                    e
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Sync Graph config from persisted settings + credential store
+            {
+                let settings = state.app_settings.get();
+                let client_secret = state
+                    .credential_store
+                    .retrieve("graph_client_secret")
+                    .unwrap_or(None);
+                let graph_config = services::graph_exchange::GraphConfig {
+                    tenant_id: settings.graph_tenant_id.unwrap_or_default(),
+                    client_id: settings.graph_client_id.unwrap_or_default(),
+                    client_secret,
+                };
+                if graph_config.is_configured() {
+                    state.graph_exchange.set_config(graph_config);
+                    tracing::info!("Graph integration configured from persisted settings");
+                }
+            }
+
             tracing::info!("DSPanel setup complete");
             Ok(())
         })
@@ -154,6 +209,7 @@ pub fn run() {
             commands::get_schema_attributes,
             commands::evaluate_health_cmd,
             commands::evaluate_health_batch,
+            commands::get_platform,
             commands::get_current_username,
             commands::get_authenticated_identity,
             commands::get_computer_name,
@@ -203,11 +259,18 @@ pub fn run() {
             commands::list_presets,
             commands::save_preset,
             commands::delete_preset,
+            commands::accept_preset_checksum,
             commands::pick_folder_dialog,
             commands::create_user,
             commands::modify_attribute,
             commands::get_app_settings,
             commands::set_app_settings,
+            commands::store_credential,
+            commands::get_credential,
+            commands::delete_credential,
+            commands::test_graph_connection,
+            commands::get_exchange_online_info,
+            commands::is_graph_configured,
         ])
         .run(tauri::generate_context!())
         .unwrap_or_else(|e| {

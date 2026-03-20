@@ -60,7 +60,7 @@ impl AuditService {
     /// Updates the operator identity (called after WhoAmI resolves the
     /// authenticated user, which may differ from the Windows USERNAME).
     pub fn set_operator(&self, operator: String) {
-        *self.operator.lock().unwrap() = operator;
+        *self.operator.lock().expect("lock poisoned") = operator;
     }
 
     /// Creates an AuditService with an in-memory database (for testing).
@@ -87,7 +87,7 @@ impl AuditService {
     }
 
     fn init_schema(&self) {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().expect("lock poisoned");
         conn.execute_batch(
             "CREATE TABLE IF NOT EXISTS audit_entries (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -105,7 +105,7 @@ impl AuditService {
     }
 
     fn insert_entry(&self, entry: &AuditEntry) {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().expect("lock poisoned");
         if let Err(e) = conn.execute(
             "INSERT INTO audit_entries (timestamp, operator, action, target_dn, details, success)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
@@ -126,7 +126,7 @@ impl AuditService {
     pub fn log_success(&self, action: &str, target_dn: &str, details: &str) {
         let entry = AuditEntry {
             timestamp: chrono::Utc::now().to_rfc3339(),
-            operator: self.operator.lock().unwrap().clone(),
+            operator: self.operator.lock().expect("lock poisoned").clone(),
             action: action.to_string(),
             target_dn: target_dn.to_string(),
             details: details.to_string(),
@@ -146,7 +146,7 @@ impl AuditService {
     pub fn log_failure(&self, action: &str, target_dn: &str, error: &str) {
         let entry = AuditEntry {
             timestamp: chrono::Utc::now().to_rfc3339(),
-            operator: self.operator.lock().unwrap().clone(),
+            operator: self.operator.lock().expect("lock poisoned").clone(),
             action: action.to_string(),
             target_dn: target_dn.to_string(),
             details: error.to_string(),
@@ -164,7 +164,7 @@ impl AuditService {
 
     /// Returns all audit entries (most recent first).
     pub fn get_entries(&self) -> Vec<AuditEntry> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().expect("lock poisoned");
         let mut stmt = conn
             .prepare(
                 "SELECT timestamp, operator, action, target_dn, details, success
@@ -189,7 +189,7 @@ impl AuditService {
 
     /// Returns the total number of audit entries.
     pub fn count(&self) -> usize {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().expect("lock poisoned");
         conn.query_row("SELECT COUNT(*) FROM audit_entries", [], |row| {
             row.get::<_, usize>(0)
         })
@@ -198,6 +198,7 @@ impl AuditService {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
 

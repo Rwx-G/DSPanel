@@ -27,6 +27,11 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { useModifyAttribute } from "@/hooks/useModifyAttribute";
 import { useDialog } from "@/contexts/DialogContext";
 import { StateInTimeView } from "@/components/comparison/StateInTimeView";
+import { ExchangePanel } from "@/components/data/ExchangePanel";
+import { ExchangeOnlinePanel } from "@/components/data/ExchangeOnlinePanel";
+import { extractExchangeInfo } from "@/types/exchange";
+import { type ExchangeOnlineInfo } from "@/types/exchange-online";
+import { invoke } from "@tauri-apps/api/core";
 
 /** Maps health flag names to the PropertyGrid label they correspond to. */
 const FLAG_TO_LABEL: Record<string, string> = {
@@ -235,6 +240,24 @@ export function UserDetail({
     return map;
   }, [healthStatus]);
 
+  const exchangeInfo = useMemo(
+    () => extractExchangeInfo(user.rawAttributes),
+    [user.rawAttributes],
+  );
+
+  // Fetch Exchange Online info via Graph API (if configured)
+  const [exchangeOnlineInfo, setExchangeOnlineInfo] =
+    useState<ExchangeOnlineInfo | null>(null);
+
+  useEffect(() => {
+    if (!user.userPrincipalName) return;
+    invoke<ExchangeOnlineInfo | null>("get_exchange_online_info", {
+      userPrincipalName: user.userPrincipalName,
+    })
+      .then(setExchangeOnlineInfo)
+      .catch(() => setExchangeOnlineInfo(null));
+  }, [user.userPrincipalName]);
+
   const s = (label: string) => severityByLabel.get(label);
 
   const propertyGroups: PropertyGroup[] = [
@@ -436,6 +459,20 @@ export function UserDetail({
       <div className="border-t border-[var(--color-border-default)]" />
 
       <PasswordFlagsEditor user={user} onRefresh={handleRefresh} />
+
+      {exchangeInfo && (
+        <>
+          <div className="border-t border-[var(--color-border-default)]" />
+          <ExchangePanel exchangeInfo={exchangeInfo} />
+        </>
+      )}
+
+      {exchangeOnlineInfo && (
+        <>
+          <div className="border-t border-[var(--color-border-default)]" />
+          <ExchangeOnlinePanel exchangeOnlineInfo={exchangeOnlineInfo} />
+        </>
+      )}
 
       <div className="border-t border-[var(--color-border-default)]" />
 

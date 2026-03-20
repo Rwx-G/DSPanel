@@ -172,12 +172,17 @@ fn parse_date_to_ms(date_str: &str) -> Result<i64, ()> {
     }
     // Try date-only
     if let Ok(d) = chrono::NaiveDate::parse_from_str(date_str, "%Y-%m-%d") {
-        return Ok(d.and_hms_opt(0, 0, 0).unwrap().and_utc().timestamp_millis());
+        return Ok(d
+            .and_hms_opt(0, 0, 0)
+            .expect("midnight is always valid")
+            .and_utc()
+            .timestamp_millis());
     }
     Err(())
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
 

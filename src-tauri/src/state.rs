@@ -2,6 +2,8 @@ use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use crate::models::DirectoryEntry;
+use crate::services::credential_store::CredentialStore;
+use crate::services::graph_exchange::GraphExchangeService;
 use crate::services::{
     AppSettingsService, AuditService, DirectoryProvider, MfaService, PermissionConfig,
     PermissionService, PresetService, SnapshotService,
@@ -30,8 +32,12 @@ pub struct AppState {
     pub snapshot_service: SnapshotService,
     /// Preset service for managing onboarding/offboarding preset files.
     pub preset_service: PresetService,
-    /// Application settings service (disabled OU, etc.).
+    /// Application settings service (disabled OU, Graph config, etc.).
     pub app_settings: AppSettingsService,
+    /// Graph Exchange service for Exchange Online diagnostics.
+    pub graph_exchange: GraphExchangeService,
+    /// Credential store for secure OS-native secret storage.
+    pub credential_store: Box<dyn CredentialStore>,
     /// Cache for browse_users: (fetch_time, sorted_entries). TTL: 60 seconds.
     pub browse_cache: Mutex<Option<(Instant, Vec<DirectoryEntry>)>>,
     /// Cache for browse_computers: (fetch_time, sorted_entries). TTL: 60 seconds.
@@ -59,6 +65,10 @@ impl AppState {
             snapshot_service: SnapshotService::new(),
             preset_service: PresetService::new(),
             app_settings: AppSettingsService::new(),
+            graph_exchange: GraphExchangeService::new(),
+            credential_store: Box::new(
+                crate::services::credential_store::KeyringCredentialStore::new(),
+            ),
             browse_cache: Mutex::new(None),
             browse_computers_cache: Mutex::new(None),
             browse_groups_cache: Mutex::new(None),
@@ -82,6 +92,10 @@ impl AppState {
             snapshot_service: SnapshotService::new(),
             preset_service: PresetService::new(),
             app_settings: AppSettingsService::new(),
+            graph_exchange: GraphExchangeService::new(),
+            credential_store: Box::new(
+                crate::services::credential_store::InMemoryCredentialStore::new(),
+            ),
             browse_cache: Mutex::new(None),
             browse_computers_cache: Mutex::new(None),
             browse_groups_cache: Mutex::new(None),

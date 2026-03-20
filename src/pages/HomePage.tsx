@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { type AppStatus } from "@/App";
+import { usePlatform } from "@/hooks/usePlatform";
 import { MfaSetupDialog } from "@/components/dialogs/MfaSetupDialog";
 import {
   Shield,
@@ -40,7 +41,19 @@ const PERM_LABELS: Record<string, { label: string; color: string }> = {
   },
 };
 
+const PLATFORM_LABELS: Record<string, string> = {
+  windows: "Windows",
+  macos: "macOS",
+  linux: "Linux",
+};
+
+function formatPlatform(platform: string): string {
+  if (!platform) return "...";
+  return PLATFORM_LABELS[platform] ?? platform;
+}
+
 export function HomePage({ status }: HomePageProps) {
+  const platform = usePlatform();
   const perm = PERM_LABELS[status.permissionLevel] ?? PERM_LABELS.ReadOnly;
   const [mfaConfigured, setMfaConfigured] = useState(false);
   const [showMfaSetup, setShowMfaSetup] = useState(false);
@@ -145,7 +158,7 @@ export function HomePage({ status }: HomePageProps) {
             iconColor="var(--color-info)"
           >
             <StatusRow label="Version" value={`v${status.appVersion}`} />
-            <StatusRow label="Platform" value="Windows (Tauri v2)" />
+            <StatusRow label="Platform" value={`${formatPlatform(platform)} (Tauri v2)`} />
           </DashboardCard>
         </div>
 

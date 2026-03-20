@@ -173,4 +173,97 @@ describe("useModifyAttribute", () => {
       values: [],
     });
   });
+
+  it("stores advanced flag in pendingChanges when advanced=true", () => {
+    const { result } = renderHook(() => useModifyAttribute(), { wrapper });
+
+    act(() => {
+      result.current.stageChange("userAccountControl", "512", "514", true);
+    });
+
+    expect(result.current.pendingChanges).toHaveLength(1);
+    expect(result.current.pendingChanges[0]).toEqual({
+      attributeName: "userAccountControl",
+      oldValue: "512",
+      newValue: "514",
+      advanced: true,
+    });
+  });
+
+  it("returns false on partial failure and keeps pending changes", async () => {
+    mockInvoke
+      .mockResolvedValueOnce(undefined as never)
+      .mockRejectedValueOnce(new Error("Permission denied") as never);
+
+    const { result } = renderHook(() => useModifyAttribute(), { wrapper });
+
+    act(() => {
+      result.current.stageChange("department", "IT", "Engineering");
+      result.current.stageChange("title", "Dev", "Senior Dev");
+    });
+
+    let success = true;
+    await act(async () => {
+      success = await result.current.submitChanges(
+        "CN=User,DC=example,DC=com",
+      );
+    });
+
+    expect(success).toBe(false);
+    // First invoke succeeded, second failed
+    expect(mockInvoke).toHaveBeenCalledTimes(2);
+    // Pending changes are preserved on partial failure
+    expect(result.current.pendingChanges).toHaveLength(2);
+  });
+
+  it("keeps only the latest value when same attribute is staged rapidly", () => {
+    const { result } = renderHook(() => useModifyAttribute(), { wrapper });
+
+    act(() => {
+      result.current.stageChange("department", "IT", "Engineering");
+      result.current.stageChange("department", "IT", "Sales");
+      result.current.stageChange("department", "IT", "Marketing");
+    });
+
+    expect(result.current.pendingChanges).toHaveLength(1);
+    expect(result.current.pendingChanges[0].newValue).toBe("Marketing");
+  });
+
+  it("clearChanges removes all pending changes", () => {
+    const { result } = renderHook(() => useModifyAttribute(), { wrapper });
+
+    act(() => {
+      result.current.stageChange("department", "IT", "Engineering");
+      result.current.stageChange("title", "Dev", "Senior Dev");
+      result.current.stageChange("description", "", "A description");
+    });
+
+    expect(result.current.pendingChanges).toHaveLength(3);
+
+    act(() => {
+      result.current.clearChanges();
+    });
+
+    expect(result.current.pendingChanges).toHaveLength(0);
+  });
+
+  it("sends empty array to invoke when newValue is empty string", async () => {
+    mockInvoke.mockResolvedValue(undefined as never);
+
+    const { result } = renderHook(() => useModifyAttribute(), { wrapper });
+
+    act(() => {
+      result.current.stageChange("description", "old value", "");
+    });
+
+    await act(async () => {
+      await result.current.submitChanges("CN=User,DC=example,DC=com");
+    });
+
+    expect(mockInvoke).toHaveBeenCalledWith("modify_attribute", {
+      dn: "CN=User,DC=example,DC=com",
+      attributeName: "description",
+      values: [],
+    });
+  });
 });

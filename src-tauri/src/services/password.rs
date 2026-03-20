@@ -111,7 +111,7 @@ pub fn generate_password(options: &PasswordOptions) -> Result<String> {
         password.swap(i, j);
     }
 
-    Ok(String::from_utf8(password).unwrap())
+    Ok(String::from_utf8(password).expect("password contains only ASCII characters"))
 }
 
 /// Checks a password against the HIBP Pwned Passwords API using k-anonymity.
@@ -208,6 +208,7 @@ pub async fn generate_safe_password(
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
 

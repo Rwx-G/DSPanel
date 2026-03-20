@@ -7,6 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-03-20
+
+Epic 6 - Exchange Diagnostics. Read-only Exchange mailbox diagnostics for both
+on-premises (via LDAP msExch* attributes) and Exchange Online (via Microsoft
+Graph API). LDAP TLS improvements (StartTLS, custom CA). Preset integrity
+checksums for security.
+
+### Added
+
+#### Exchange On-Prem Attributes (6.1)
+- Exchange mailbox panel in user detail view, auto-detected from msExch* LDAP attributes
+- Displays mailbox GUID, recipient type, primary SMTP, email aliases, forwarding target, delegates
+- Panel hidden when user has no Exchange attributes (graceful degradation)
+- proxyAddresses parsing (SMTP:/smtp: convention) and msExchRecipientTypeDetails mapping
+- Rust model (`ExchangeMailboxInfo`) with 16 unit tests, TypeScript extraction with 10 tests
+- Collapsible `ExchangePanel` component with 7 component tests
+
+#### LDAP TLS Improvements
+- StartTLS on port 389 as alternative to LDAPS (port 636) via `DSPANEL_LDAP_STARTTLS=true`
+- Custom CA certificate loading via `DSPANEL_LDAP_CA_CERT=/path/to/ca.pem` (PEM or DER)
+- LDAPS takes precedence over StartTLS if both are set
+- CA cert works with both LDAPS and StartTLS modes
+- New dependency: `native-tls` (direct) for custom TLS connector building
+
+#### Exchange Online Diagnostics (6.2)
+- Microsoft Graph API integration for Exchange Online mailbox diagnostics
+- OAuth2 client credentials flow with token caching and auto-expiry
+- Settings UI (`GraphSettings` component) for Azure AD tenant ID, client ID, and client secret
+- "Test Connection" button to validate Graph API connectivity
+- Exchange Online panel with mailbox quota usage bar (color-coded: green/yellow/red)
+- Displays primary SMTP, aliases, forwarding, auto-reply status, delegates
+- Panel hidden when Graph is not configured or user has no Exchange Online mailbox
+- `AppSettings` extended with Graph config fields (backwards-compatible)
+- Graph config synced from persisted settings at startup
+- Real mailbox quota via `Reports.Read.All` (getMailboxUsageDetail CSV), fallback to 50 GB default
+- Rust `GraphExchangeService` with 29 unit tests (10 sync + 19 async/mockito), TypeScript types with 10 tests
+- `ExchangeOnlinePanel` component with 8 tests, `GraphSettings` component with 7 tests
+- New dependencies: reqwest `json` feature for Graph API response parsing, `csv` crate for report parsing
+
+### Security
+
+- SHA-256 integrity checksums for preset JSON files stored in local app data
+- Warning displayed when a preset file is modified outside DSPanel (checksum mismatch)
+- User must explicitly accept externally modified presets before use
+- Checksum registry persisted in `preset-checksums.json` (LOCALAPPDATA/DSPanel)
+- New dependency: `sha2` crate for SHA-256 hashing
+
 ## [0.5.0] - 2026-03-20
 
 Epic 5 - Presets, Onboarding and Offboarding Workflows. Role-based presets,

@@ -23,7 +23,7 @@ use crate::state::AppState;
 
 /// Returns the application title from state.
 pub(crate) fn get_app_title_inner(state: &AppState) -> String {
-    state.title.lock().unwrap().clone()
+    state.title.lock().expect("lock poisoned").clone()
 }
 
 /// Returns the current user's permission level.
@@ -142,7 +142,7 @@ pub(crate) async fn browse_users_inner(
 
     // Check cache validity
     let cached = {
-        let cache = state.browse_cache.lock().unwrap();
+        let cache = state.browse_cache.lock().expect("lock poisoned");
         cache
             .as_ref()
             .filter(|(ts, _)| ts.elapsed() < CACHE_TTL)
@@ -166,7 +166,7 @@ pub(crate) async fn browse_users_inner(
             });
 
             // Update cache
-            let mut cache = state.browse_cache.lock().unwrap();
+            let mut cache = state.browse_cache.lock().expect("lock poisoned");
             *cache = Some((Instant::now(), fresh.clone()));
 
             fresh
@@ -196,7 +196,7 @@ pub(crate) async fn browse_computers_inner(
     const MAX_BROWSE: usize = 5000;
 
     let cached = {
-        let cache = state.browse_computers_cache.lock().unwrap();
+        let cache = state.browse_computers_cache.lock().expect("lock poisoned");
         cache
             .as_ref()
             .filter(|(ts, _)| ts.elapsed() < CACHE_TTL)
@@ -218,7 +218,7 @@ pub(crate) async fn browse_computers_inner(
                 da.cmp(&db)
             });
 
-            let mut cache = state.browse_computers_cache.lock().unwrap();
+            let mut cache = state.browse_computers_cache.lock().expect("lock poisoned");
             *cache = Some((Instant::now(), fresh.clone()));
 
             fresh
@@ -248,7 +248,7 @@ pub(crate) async fn browse_groups_inner(
     const MAX_BROWSE: usize = 5000;
 
     let cached = {
-        let cache = state.browse_groups_cache.lock().unwrap();
+        let cache = state.browse_groups_cache.lock().expect("lock poisoned");
         cache
             .as_ref()
             .filter(|(ts, _)| ts.elapsed() < CACHE_TTL)
@@ -270,7 +270,7 @@ pub(crate) async fn browse_groups_inner(
                 da.cmp(&db)
             });
 
-            let mut cache = state.browse_groups_cache.lock().unwrap();
+            let mut cache = state.browse_groups_cache.lock().expect("lock poisoned");
             *cache = Some((Instant::now(), fresh.clone()));
 
             fresh
@@ -1534,6 +1534,27 @@ pub fn get_authenticated_identity(state: State<'_, AppState>) -> String {
         .unwrap_or_else(get_current_username)
 }
 
+/// Returns the platform the application is running on.
+///
+/// Returns one of: "windows", "macos", "linux", or "unknown".
+pub(crate) fn get_platform_inner() -> String {
+    if cfg!(target_os = "windows") {
+        "windows".to_string()
+    } else if cfg!(target_os = "macos") {
+        "macos".to_string()
+    } else if cfg!(target_os = "linux") {
+        "linux".to_string()
+    } else {
+        "unknown".to_string()
+    }
+}
+
+/// Returns the platform the application is running on.
+#[tauri::command]
+pub fn get_platform() -> String {
+    get_platform_inner()
+}
+
 /// Returns the computer name from the environment.
 #[tauri::command]
 pub fn get_computer_name() -> String {
@@ -1927,6 +1948,25 @@ pub(crate) fn save_preset_inner(state: &AppState, preset: &Preset) -> Result<(),
     Ok(())
 }
 
+/// Accepts a preset whose checksum has changed (user acknowledges external modification).
+pub(crate) fn accept_preset_checksum_inner(state: &AppState, name: &str) -> Result<(), AppError> {
+    state
+        .preset_service
+        .accept_checksum(name)
+        .map_err(AppError::Configuration)?;
+
+    state.audit_service.log_success(
+        "PresetChecksumAccepted",
+        name,
+        &format!(
+            "Preset '{}' checksum accepted after external modification",
+            name
+        ),
+    );
+
+    Ok(())
+}
+
 /// Deletes a preset by name. Requires AccountOperator permission.
 pub(crate) fn delete_preset_inner(state: &AppState, name: &str) -> Result<(), AppError> {
     if !state
@@ -1988,6 +2028,12 @@ pub fn save_preset(preset: Preset, state: State<'_, AppState>) -> Result<(), App
 #[tauri::command]
 pub fn delete_preset(name: String, state: State<'_, AppState>) -> Result<(), AppError> {
     delete_preset_inner(&state, &name)
+}
+
+/// Accepts a preset whose checksum has changed (user acknowledges external modification).
+#[tauri::command]
+pub fn accept_preset_checksum(name: String, state: State<'_, AppState>) -> Result<(), AppError> {
+    accept_preset_checksum_inner(&state, &name)
 }
 
 // ---------------------------------------------------------------------------
@@ -2137,12 +2183,129 @@ pub fn get_app_settings(state: State<'_, AppState>) -> AppSettings {
 }
 
 /// Updates application settings and persists to disk.
+///
+/// If Graph settings changed, also updates the GraphExchangeService config.
+/// The client secret is read from the credential store, not from settings JSON.
 #[tauri::command]
 pub fn set_app_settings(settings: AppSettings, state: State<'_, AppState>) {
+    // Read client secret from credential store (not from settings JSON)
+    let client_secret = state
+        .credential_store
+        .retrieve("graph_client_secret")
+        .unwrap_or(None);
+    let graph_config = crate::services::graph_exchange::GraphConfig {
+        tenant_id: settings.graph_tenant_id.clone().unwrap_or_default(),
+        client_id: settings.graph_client_id.clone().unwrap_or_default(),
+        client_secret,
+    };
+    state.graph_exchange.set_config(graph_config);
     state.app_settings.update(settings);
 }
 
+// ---------------------------------------------------------------------------
+// Credential store - Tauri commands
+// ---------------------------------------------------------------------------
+
+/// Stores a credential in the OS-native secure storage.
+pub(crate) fn store_credential_inner(
+    state: &AppState,
+    key: &str,
+    value: &str,
+) -> Result<(), AppError> {
+    state
+        .credential_store
+        .store(key, value)
+        .map_err(|e| AppError::Internal(e.to_string()))
+}
+
+/// Retrieves a credential from the OS-native secure storage.
+pub(crate) fn get_credential_inner(
+    state: &AppState,
+    key: &str,
+) -> Result<Option<String>, AppError> {
+    state
+        .credential_store
+        .retrieve(key)
+        .map_err(|e| AppError::Internal(e.to_string()))
+}
+
+/// Deletes a credential from the OS-native secure storage.
+pub(crate) fn delete_credential_inner(state: &AppState, key: &str) -> Result<(), AppError> {
+    state
+        .credential_store
+        .delete(key)
+        .map_err(|e| AppError::Internal(e.to_string()))
+}
+
+/// Stores a credential in the OS-native secure storage.
+#[tauri::command]
+pub fn store_credential(
+    key: String,
+    value: String,
+    state: State<'_, AppState>,
+) -> Result<(), AppError> {
+    store_credential_inner(&state, &key, &value)
+}
+
+/// Retrieves a credential from the OS-native secure storage.
+/// Returns null if the credential does not exist.
+#[tauri::command]
+pub fn get_credential(key: String, state: State<'_, AppState>) -> Result<Option<String>, AppError> {
+    get_credential_inner(&state, &key)
+}
+
+/// Deletes a credential from the OS-native secure storage.
+#[tauri::command]
+pub fn delete_credential(key: String, state: State<'_, AppState>) -> Result<(), AppError> {
+    delete_credential_inner(&state, &key)
+}
+
+// ---------------------------------------------------------------------------
+// Graph Exchange - Tauri commands
+// ---------------------------------------------------------------------------
+
+use crate::models::ExchangeOnlineInfo;
+
+/// Tests the Microsoft Graph API connection with the current settings.
+#[tauri::command]
+pub async fn test_graph_connection(state: State<'_, AppState>) -> Result<bool, AppError> {
+    if !state.graph_exchange.is_configured() {
+        return Err(AppError::Validation(
+            "Graph integration is not configured. Set tenant ID and client ID in settings."
+                .to_string(),
+        ));
+    }
+    state
+        .graph_exchange
+        .test_connection(&state.http_client)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))
+}
+
+/// Fetches Exchange Online information for a user by UPN.
+#[tauri::command]
+pub async fn get_exchange_online_info(
+    user_principal_name: String,
+    state: State<'_, AppState>,
+) -> Result<Option<ExchangeOnlineInfo>, AppError> {
+    if !state.graph_exchange.is_configured() {
+        return Ok(None);
+    }
+    state
+        .graph_exchange
+        .get_exchange_online_info(&state.http_client, &user_principal_name)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))
+}
+
+/// Returns whether Graph integration is configured.
+#[tauri::command]
+pub fn is_graph_configured(state: State<'_, AppState>) -> bool {
+    state.graph_exchange.is_configured()
+}
+
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
     use crate::services::directory::tests::MockDirectoryProvider;
@@ -2492,6 +2655,25 @@ mod tests {
         let result = get_current_username();
         // In test environment, USERNAME should be set
         assert!(!result.is_empty());
+    }
+
+    #[test]
+    fn test_get_platform_returns_known_value() {
+        let result = get_platform_inner();
+        assert!(
+            ["windows", "macos", "linux", "unknown"].contains(&result.as_str()),
+            "Unexpected platform: {}",
+            result,
+        );
+    }
+
+    #[test]
+    fn test_get_platform_returns_windows_on_windows() {
+        let result = get_platform_inner();
+        // This test runs on Windows in CI
+        if cfg!(target_os = "windows") {
+            assert_eq!(result, "windows");
+        }
     }
 
     #[test]
@@ -4473,6 +4655,7 @@ mod tests {
             target_ou: "OU=Test,DC=example,DC=com".to_string(),
             groups: vec!["CN=Group1,DC=example,DC=com".to_string()],
             attributes: std::collections::HashMap::new(),
+            integrity_warning: false,
         }
     }
 
@@ -4694,5 +4877,47 @@ mod tests {
         .unwrap();
 
         assert_eq!(state.snapshot_service.count(), 1);
+    }
+
+    // -----------------------------------------------------------------------
+    // credential store tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_store_and_get_credential() {
+        let state = make_state();
+        store_credential_inner(&state, "graph_client_secret", "test-secret").unwrap();
+        let retrieved = get_credential_inner(&state, "graph_client_secret").unwrap();
+        assert_eq!(retrieved, Some("test-secret".to_string()));
+    }
+
+    #[test]
+    fn test_get_credential_missing_returns_none() {
+        let state = make_state();
+        let retrieved = get_credential_inner(&state, "graph_client_secret").unwrap();
+        assert_eq!(retrieved, None);
+    }
+
+    #[test]
+    fn test_delete_credential() {
+        let state = make_state();
+        store_credential_inner(&state, "graph_client_secret", "test-secret").unwrap();
+        delete_credential_inner(&state, "graph_client_secret").unwrap();
+        let retrieved = get_credential_inner(&state, "graph_client_secret").unwrap();
+        assert_eq!(retrieved, None);
+    }
+
+    #[test]
+    fn test_store_credential_rejects_invalid_key() {
+        let state = make_state();
+        let result = store_credential_inner(&state, "bad_key", "value");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_get_credential_rejects_invalid_key() {
+        let state = make_state();
+        let result = get_credential_inner(&state, "bad_key");
+        assert!(result.is_err());
     }
 }

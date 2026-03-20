@@ -412,9 +412,21 @@ function OnboardingContent() {
                     }`}
                     data-testid={`preset-card-${preset.name}`}
                   >
-                    <div className="text-body font-semibold text-[var(--color-text-primary)]">
+                    <div className="flex items-center gap-2 text-body font-semibold text-[var(--color-text-primary)]">
                       {preset.name}
+                      {preset.integrityWarning && (
+                        <AlertTriangle
+                          size={14}
+                          className="shrink-0 text-[var(--color-warning)]"
+                          aria-label="Preset modified externally"
+                        />
+                      )}
                     </div>
+                    {preset.integrityWarning && (
+                      <div className="mt-1 text-caption text-[var(--color-warning)]">
+                        Modified outside DSPanel - review before use
+                      </div>
+                    )}
                     <div className="mt-1 text-caption text-[var(--color-text-secondary)]">
                       {preset.description}
                     </div>

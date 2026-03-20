@@ -45,9 +45,15 @@ async fn create_connected_provider() -> Option<LdapDirectoryProvider> {
     let skip_verify = std::env::var("DSPANEL_LDAP_TLS_SKIP_VERIFY")
         .map(|v| v == "true" || v == "1")
         .unwrap_or(false);
+    let starttls = std::env::var("DSPANEL_LDAP_STARTTLS")
+        .map(|v| v == "true" || v == "1")
+        .unwrap_or(false);
+    let ca_cert_file = std::env::var("DSPANEL_LDAP_CA_CERT").ok();
     let tls_config = LdapTlsConfig {
         enabled: use_tls,
+        starttls,
         skip_verify,
+        ca_cert_file,
     };
     let provider =
         LdapDirectoryProvider::new_with_credentials(server, bind_dn, password, tls_config);

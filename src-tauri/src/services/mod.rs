@@ -1,11 +1,13 @@
 pub mod app_settings;
 pub mod audit;
 pub mod comparison;
+pub mod credential_store;
 pub mod dacl;
 #[cfg(feature = "demo")]
 pub mod demo_provider;
 pub mod directory;
 pub mod dpapi;
+pub mod graph_exchange;
 pub mod health;
 pub mod ldap_directory;
 pub mod mfa;

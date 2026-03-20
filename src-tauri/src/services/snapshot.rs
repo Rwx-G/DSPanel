@@ -46,16 +46,17 @@ impl SnapshotService {
             operation = %operation,
             "Snapshot captured before modify"
         );
-        self.snapshots.lock().unwrap().push(snapshot);
+        self.snapshots.lock().expect("lock poisoned").push(snapshot);
     }
 
     /// Returns the number of captured snapshots.
     pub fn count(&self) -> usize {
-        self.snapshots.lock().unwrap().len()
+        self.snapshots.lock().expect("lock poisoned").len()
     }
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
 

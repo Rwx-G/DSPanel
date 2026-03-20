@@ -113,7 +113,7 @@ impl PermissionService {
 
     /// Returns the current detected permission level.
     pub fn current_level(&self) -> PermissionLevel {
-        *self.current_level.lock().unwrap()
+        *self.current_level.lock().expect("lock poisoned")
     }
 
     /// Returns true if the user meets or exceeds the required permission level.
@@ -123,17 +123,20 @@ impl PermissionService {
 
     /// Returns the user's detected AD group memberships.
     pub fn user_groups(&self) -> Vec<String> {
-        self.user_groups.lock().unwrap().clone()
+        self.user_groups.lock().expect("lock poisoned").clone()
     }
 
     /// Returns the authenticated user identity (resolved via WhoAmI or bind DN).
     pub fn authenticated_user(&self) -> Option<String> {
-        self.authenticated_user.lock().unwrap().clone()
+        self.authenticated_user
+            .lock()
+            .expect("lock poisoned")
+            .clone()
     }
 
     /// Sets the authenticated user identity.
     pub fn set_authenticated_user(&self, username: String) {
-        *self.authenticated_user.lock().unwrap() = Some(username);
+        *self.authenticated_user.lock().expect("lock poisoned") = Some(username);
     }
 
     /// Detects the user's permission level by querying AD group memberships.
@@ -212,15 +215,15 @@ impl PermissionService {
             sids.len()
         );
 
-        *self.current_level.lock().unwrap() = detected_level;
-        *self.user_groups.lock().unwrap() = group_names;
+        *self.current_level.lock().expect("lock poisoned") = detected_level;
+        *self.user_groups.lock().expect("lock poisoned") = group_names;
 
         Ok(())
     }
 
     /// Manually sets the permission level (useful for testing or offline mode).
     pub fn set_level(&self, level: PermissionLevel) {
-        *self.current_level.lock().unwrap() = level;
+        *self.current_level.lock().expect("lock poisoned") = level;
     }
 }
 
@@ -235,6 +238,7 @@ fn extract_cn(dn: &str) -> Option<String> {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
     use crate::services::directory::tests::MockDirectoryProvider;

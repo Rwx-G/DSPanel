@@ -15,4 +15,6 @@ export interface Preset {
   groups: string[];
   /** Additional LDAP attributes to set (e.g., department, title). */
   attributes: Record<string, string>;
+  /** True if the preset file was modified outside DSPanel (checksum mismatch). */
+  integrityWarning?: boolean;
 }
