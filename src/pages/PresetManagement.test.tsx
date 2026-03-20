@@ -120,12 +120,11 @@ describe("PresetManagement", () => {
 
     await waitFor(
       () => {
-        expect(screen.getByTestId("preset-management")).toBeDefined();
+        expect(screen.getByText("Dev Onboarding")).toBeDefined();
       },
       { timeout: 3000 },
     );
 
-    expect(screen.getByText("Dev Onboarding")).toBeDefined();
     expect(screen.getByText("User Offboarding")).toBeDefined();
   });
 
