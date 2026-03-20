@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
-import { Star, ChevronDown, ChevronRight, Filter, X } from "lucide-react";
+import { Star, ChevronDown, ChevronRight, Filter, X, Pencil, Check } from "lucide-react";
 import { CopyButton } from "@/components/common/CopyButton";
 
 const STORAGE_KEY = "dspanel-favorite-attributes";
@@ -46,9 +46,92 @@ interface AdvancedAttributesProps {
   rawAttributes: Record<string, string[]>;
   /** All attribute names from the AD schema, used to populate empty attributes. */
   schemaAttributes?: string[];
+  /** Called when an attribute value is edited. Receives (attributeName, oldValue, newValue). */
+  onEdit?: (attributeName: string, oldValue: string, newValue: string) => void;
 }
 
-export function AdvancedAttributes({ rawAttributes, schemaAttributes }: AdvancedAttributesProps) {
+function EditableValue({
+  attrKey,
+  displayValue,
+  onEdit,
+}: {
+  attrKey: string;
+  displayValue: string;
+  onEdit: (attributeName: string, oldValue: string, newValue: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(displayValue);
+
+  const handleConfirm = useCallback(() => {
+    if (draft !== displayValue) {
+      onEdit(attrKey, displayValue, draft);
+    }
+    setEditing(false);
+  }, [draft, displayValue, attrKey, onEdit]);
+
+  const handleCancel = useCallback(() => {
+    setDraft(displayValue);
+    setEditing(false);
+  }, [displayValue]);
+
+  if (editing) {
+    return (
+      <div className="flex flex-1 items-center gap-1">
+        <input
+          type="text"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") handleConfirm();
+            if (e.key === "Escape") handleCancel();
+          }}
+          autoFocus
+          className="flex-1 rounded border border-[var(--color-primary)] bg-[var(--color-input-bg)] px-2 py-0.5 text-body font-mono text-[var(--color-text-primary)] outline-none"
+          data-testid={`adv-edit-input-${attrKey}`}
+        />
+        <button
+          onClick={handleConfirm}
+          className="rounded p-0.5 text-[var(--color-success)] hover:bg-[var(--color-success-subtle)]"
+          aria-label="Confirm edit"
+          data-testid={`adv-edit-confirm-${attrKey}`}
+        >
+          <Check size={14} />
+        </button>
+        <button
+          onClick={handleCancel}
+          className="rounded p-0.5 text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]"
+          aria-label="Cancel edit"
+          data-testid={`adv-edit-cancel-${attrKey}`}
+        >
+          <X size={14} />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <span className="flex-1 text-body text-[var(--color-text-primary)] break-all font-mono">
+        {displayValue || (
+          <span className="text-[var(--color-text-disabled)]">(empty)</span>
+        )}
+      </span>
+      <button
+        onClick={() => {
+          setDraft(displayValue);
+          setEditing(true);
+        }}
+        className="shrink-0 rounded p-0.5 text-[var(--color-text-disabled)] opacity-0 group-hover:opacity-100 hover:text-[var(--color-primary)] transition-all"
+        aria-label={`Edit ${attrKey}`}
+        data-testid={`adv-edit-btn-${attrKey}`}
+      >
+        <Pencil size={12} />
+      </button>
+    </>
+  );
+}
+
+export function AdvancedAttributes({ rawAttributes, schemaAttributes, onEdit }: AdvancedAttributesProps) {
   const [favorites, setFavorites] = useState<Set<string>>(loadFavorites);
   const [collapsed, setCollapsed] = useState(false);
   const [searchText, setSearchText] = useState("");
@@ -149,11 +232,15 @@ export function AdvancedAttributes({ rawAttributes, schemaAttributes }: Advanced
         <span className="min-w-[180px] shrink-0 text-caption text-[var(--color-text-secondary)] font-mono">
           {key}
         </span>
-        <span className="flex-1 text-body text-[var(--color-text-primary)] break-all font-mono">
-          {displayValue || (
-            <span className="text-[var(--color-text-disabled)]">(empty)</span>
-          )}
-        </span>
+        {onEdit ? (
+          <EditableValue attrKey={key} displayValue={displayValue} onEdit={onEdit} />
+        ) : (
+          <span className="flex-1 text-body text-[var(--color-text-primary)] break-all font-mono">
+            {displayValue || (
+              <span className="text-[var(--color-text-disabled)]">(empty)</span>
+            )}
+          </span>
+        )}
         <span className="opacity-0 group-hover:opacity-100 transition-opacity">
           <CopyButton text={displayValue} />
         </span>

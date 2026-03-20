@@ -10,11 +10,16 @@ interface UseOUTreeReturn {
   reload: () => void;
 }
 
-export function useOUTree(): UseOUTreeReturn {
+/**
+ * @param options.silent - When true, errors are captured but not shown as toaster notifications.
+ *   The OUPicker component already displays an inline error state.
+ */
+export function useOUTree(options?: { silent?: boolean }): UseOUTreeReturn {
   const [nodes, setNodes] = useState<OUNode[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
   const { handleError } = useErrorHandler();
+  const silent = options?.silent ?? false;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -24,11 +29,13 @@ export function useOUTree(): UseOUTreeReturn {
       setNodes(tree);
     } catch (err) {
       setError(true);
-      handleError(err, "loading OU tree");
+      if (!silent) {
+        handleError(err, "loading OU tree");
+      }
     } finally {
       setLoading(false);
     }
-  }, [handleError]);
+  }, [handleError, silent]);
 
   useEffect(() => {
     load();

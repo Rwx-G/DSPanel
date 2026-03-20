@@ -129,6 +129,10 @@ pub fn run() {
                 }
             });
 
+            // Restore persisted settings
+            state.app_settings.load();
+            state.preset_service.load_persisted();
+
             tracing::info!("DSPanel setup complete");
             Ok(())
         })
@@ -193,6 +197,17 @@ pub fn run() {
             commands::move_object,
             commands::update_managed_by,
             commands::get_ou_tree,
+            commands::get_preset_path,
+            commands::set_preset_path,
+            commands::test_preset_path,
+            commands::list_presets,
+            commands::save_preset,
+            commands::delete_preset,
+            commands::pick_folder_dialog,
+            commands::create_user,
+            commands::modify_attribute,
+            commands::get_app_settings,
+            commands::set_app_settings,
         ])
         .run(tauri::generate_context!())
         .unwrap_or_else(|e| {

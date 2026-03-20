@@ -7,6 +7,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+#### Preset Storage & Configuration (5.1)
+- PresetService with JSON file storage on configurable network share path
+- Debounced file watcher (notify crate) for auto-reload on external changes
+- Preset model with validation (name, targetOU, groups/attributes)
+- Settings UI for preset path configuration with Browse (native folder picker), Test, and Save buttons
+- Preset path persisted to `app-settings.json` and auto-restored at startup
+- Cross-platform data directory: `%LOCALAPPDATA%/DSPanel` (Windows), `~/Library/Application Support/DSPanel` (macOS), `$XDG_DATA_HOME/DSPanel` (Linux)
+- Tauri commands: get/set/test preset path, list/save/delete presets, pick_folder_dialog
+
+#### Preset Editor UI (5.2)
+- Preset management page with list/editor split view
+- Full CRUD: create, edit, delete presets with confirmation dialog
+- Reuses GroupPicker for AD group selection and OUPicker for target OU
+- Custom attributes editor (key/value pairs)
+- Name uniqueness validation, permission gating (AccountOperator+)
+- Inline storage path configuration shown when path is not yet set
+
+#### Onboarding Wizard (5.3)
+- 4-step wizard: User Details, Preset Selection, Preview, Execute
+- Auto-generated login from first/last name (configurable pattern)
+- UPN derived from AD base DN (e.g. `user@dspanel.local`), not server IP
+- Secure password auto-generation with regenerate button
+- Preview diff showing all planned changes before execution
+- Rollback on partial failure: offers to delete partially created user if group additions fail
+- Copyable output summary (login, password, OU, groups)
+- Full audit logging of onboarding operations
+
+#### Offboarding Workflow (5.4)
+- 4-step workflow: Search User, Select Actions, Preview, Execute
+- Toggleable actions: disable account, remove groups, set random password, move to Disabled OU
+- OUPicker for Disabled OU selection (replaces text input), pre-filled from app settings
+- "Start Offboarding" context menu entry in User Lookup results (auto-searches user)
+- Dry-run preview before execution with detailed action list in confirmation dialog
+- Per-action progress and error tracking
+- Copyable output summary for ticket documentation
+
+#### Modify User Attributes (5.5)
+- Inline edit (pencil icon on hover) for Identity fields: Display Name, First Name, Last Name, Email, Department, Title
+- Inline edit for Advanced Attributes (any LDAP attribute)
+- Pending changes bar next to user action buttons (Reset Password, Disable)
+- Floating indicator with Save button when action bar is scrolled out of view
+- Confirmation dialog with old->new value diff; warning box for advanced attribute changes
+- Backend `modify_attribute` Tauri command with LDAP Mod::Replace
+- `create_user` Tauri command for onboarding (LDAP add + password + enable)
+- Snapshot capture before every modification
+- Audit logging on every attribute modification
+
+#### Infrastructure
+- `AppSettingsService` for persisted app-wide settings (`app-settings.json`)
+- `disabledOu` setting for offboarding default OU (configurable in future Settings page)
+
 ## [0.4.0] - 2026-03-20
 
 Epic 4 - Group Management & Bulk Operations. Complete group lifecycle with

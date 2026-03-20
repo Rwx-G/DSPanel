@@ -412,6 +412,54 @@ where
         .map_err(|e| anyhow::anyhow!(e))
     }
 
+    async fn create_user(
+        &self,
+        cn: &str,
+        container_dn: &str,
+        sam_account_name: &str,
+        password: &str,
+        attributes: &std::collections::HashMap<String, Vec<String>>,
+    ) -> Result<String> {
+        let cn = cn.to_string();
+        let container = container_dn.to_string();
+        let sam = sam_account_name.to_string();
+        let pwd = password.to_string();
+        let attrs = attributes.clone();
+        let inner_ref = self.inner.clone();
+        self.execute_with_resilience(|| {
+            let inner = inner_ref.clone();
+            let cn = cn.clone();
+            let container = container.clone();
+            let sam = sam.clone();
+            let pwd = pwd.clone();
+            let attrs = attrs.clone();
+            async move { inner.create_user(&cn, &container, &sam, &pwd, &attrs).await }
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!(e))
+    }
+
+    async fn modify_attribute(
+        &self,
+        dn: &str,
+        attribute_name: &str,
+        values: &[String],
+    ) -> Result<()> {
+        let dn = dn.to_string();
+        let attr = attribute_name.to_string();
+        let vals = values.to_vec();
+        let inner_ref = self.inner.clone();
+        self.execute_with_resilience(|| {
+            let inner = inner_ref.clone();
+            let d = dn.clone();
+            let a = attr.clone();
+            let v = vals.clone();
+            async move { inner.modify_attribute(&d, &a, &v).await }
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!(e))
+    }
+
     fn authenticated_user(&self) -> Option<String> {
         self.inner.authenticated_user()
     }

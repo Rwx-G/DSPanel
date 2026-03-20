@@ -149,6 +149,33 @@ pub trait DirectoryProvider: Send + Sync {
     /// Updates the managedBy attribute of a group.
     async fn update_managed_by(&self, group_dn: &str, manager_dn: &str) -> Result<()>;
 
+    /// Creates a new user account in Active Directory.
+    ///
+    /// Parameters:
+    /// - `cn`: Common name for the user
+    /// - `container_dn`: DN of the OU where the user will be created
+    /// - `sam_account_name`: The sAMAccountName login
+    /// - `password`: Initial password to set
+    /// - `attributes`: Additional LDAP attributes to set
+    ///
+    /// Returns the DN of the created user.
+    async fn create_user(
+        &self,
+        cn: &str,
+        container_dn: &str,
+        sam_account_name: &str,
+        password: &str,
+        attributes: &std::collections::HashMap<String, Vec<String>>,
+    ) -> Result<String>;
+
+    /// Modifies an attribute on an AD object.
+    async fn modify_attribute(
+        &self,
+        dn: &str,
+        attribute_name: &str,
+        values: &[String],
+    ) -> Result<()>;
+
     /// Returns the authenticated user identity resolved via WhoAmI, if available.
     fn authenticated_user(&self) -> Option<String>;
 
@@ -199,6 +226,8 @@ pub mod tests {
         pub create_group_calls: Mutex<Vec<(String, String, String, String, String)>>,
         pub move_object_calls: Mutex<Vec<(String, String)>>,
         pub update_managed_by_calls: Mutex<Vec<(String, String)>>,
+        pub create_user_calls: Mutex<Vec<(String, String, String)>>,
+        pub modify_attribute_calls: Mutex<Vec<(String, String, Vec<String>)>>,
         cannot_change_password: Mutex<bool>,
         replication_metadata: Mutex<Option<String>>,
         ou_tree: Mutex<Vec<OUNode>>,
@@ -232,6 +261,8 @@ pub mod tests {
                 create_group_calls: Mutex::new(Vec::new()),
                 move_object_calls: Mutex::new(Vec::new()),
                 update_managed_by_calls: Mutex::new(Vec::new()),
+                create_user_calls: Mutex::new(Vec::new()),
+                modify_attribute_calls: Mutex::new(Vec::new()),
                 cannot_change_password: Mutex::new(false),
                 replication_metadata: Mutex::new(None),
                 ou_tree: Mutex::new(Vec::new()),
@@ -259,6 +290,8 @@ pub mod tests {
                 create_group_calls: Mutex::new(Vec::new()),
                 move_object_calls: Mutex::new(Vec::new()),
                 update_managed_by_calls: Mutex::new(Vec::new()),
+                create_user_calls: Mutex::new(Vec::new()),
+                modify_attribute_calls: Mutex::new(Vec::new()),
                 cannot_change_password: Mutex::new(false),
                 replication_metadata: Mutex::new(None),
                 ou_tree: Mutex::new(Vec::new()),
@@ -553,6 +586,42 @@ pub mod tests {
                 "sAMAccountName".to_string(),
                 "telephoneNumber".to_string(),
             ])
+        }
+
+        async fn create_user(
+            &self,
+            cn: &str,
+            container_dn: &str,
+            sam_account_name: &str,
+            _password: &str,
+            _attributes: &std::collections::HashMap<String, Vec<String>>,
+        ) -> Result<String> {
+            if *self.should_fail.lock().unwrap() {
+                anyhow::bail!("Mock create_user failure");
+            }
+            self.create_user_calls.lock().unwrap().push((
+                cn.to_string(),
+                container_dn.to_string(),
+                sam_account_name.to_string(),
+            ));
+            Ok(format!("CN={},{}", cn, container_dn))
+        }
+
+        async fn modify_attribute(
+            &self,
+            dn: &str,
+            attribute_name: &str,
+            values: &[String],
+        ) -> Result<()> {
+            if *self.should_fail.lock().unwrap() {
+                anyhow::bail!("Mock modify_attribute failure");
+            }
+            self.modify_attribute_calls.lock().unwrap().push((
+                dn.to_string(),
+                attribute_name.to_string(),
+                values.to_vec(),
+            ));
+            Ok(())
         }
 
         fn authenticated_user(&self) -> Option<String> {

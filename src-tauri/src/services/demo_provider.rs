@@ -1227,6 +1227,26 @@ impl DirectoryProvider for DemoDirectoryProvider {
         Ok(())
     }
 
+    async fn create_user(
+        &self,
+        cn: &str,
+        container_dn: &str,
+        _sam: &str,
+        _pw: &str,
+        _attrs: &std::collections::HashMap<String, Vec<String>>,
+    ) -> Result<String> {
+        Ok(format!("CN={},{}", cn, container_dn))
+    }
+
+    async fn modify_attribute(
+        &self,
+        _dn: &str,
+        _attr: &str,
+        _values: &[String],
+    ) -> Result<()> {
+        Ok(())
+    }
+
     async fn get_schema_attributes(&self) -> Result<Vec<String>> {
         Ok(vec![
             "cn".to_string(),

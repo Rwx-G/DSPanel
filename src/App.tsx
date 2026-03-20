@@ -18,6 +18,9 @@ import { NtfsAnalyzer } from "@/pages/NtfsAnalyzer";
 import { GroupManagement } from "@/pages/GroupManagement";
 import { BulkOperations } from "@/pages/BulkOperations";
 import { GroupHygiene } from "@/pages/GroupHygiene";
+import { PresetManagement } from "@/pages/PresetManagement";
+import { OnboardingWizard } from "@/pages/OnboardingWizard";
+import { Offboarding } from "@/pages/Offboarding";
 
 const APP_VERSION = __APP_VERSION__;
 
@@ -143,6 +146,9 @@ const MODULE_COMPONENTS: Record<
   "group-hygiene": GroupHygiene,
   "ntfs-analyzer": NtfsAnalyzer,
   "password-generator": PasswordGenerator,
+  presets: PresetManagement,
+  onboarding: OnboardingWizard,
+  offboarding: Offboarding,
 };
 
 function ModuleRouter({ status }: { status: AppStatus }) {

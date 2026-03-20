@@ -19,8 +19,22 @@ function TestProviders({ children }: { children: ReactNode }) {
 }
 
 vi.mock("@tauri-apps/api/core", () => ({
-  invoke: vi.fn(),
+  invoke: vi.fn(() => Promise.resolve(null)),
 }));
+
+// IntersectionObserver is not available in jsdom
+class MockIntersectionObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+
+beforeEach(() => {
+  if (!globalThis.IntersectionObserver) {
+    globalThis.IntersectionObserver =
+      MockIntersectionObserver as unknown as typeof IntersectionObserver;
+  }
+});
 
 // Mock sub-components that invoke Tauri commands internally
 vi.mock("@/components/common/UserActions", () => ({
