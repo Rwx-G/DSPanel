@@ -25,6 +25,7 @@ import { RecycleBin } from "@/pages/RecycleBin";
 import { ContactLookup } from "@/pages/ContactLookup";
 import { PrinterLookup } from "@/pages/PrinterLookup";
 import { InfrastructureHealth } from "@/pages/InfrastructureHealth";
+import { ReplicationStatus } from "@/pages/ReplicationStatus";
 
 const APP_VERSION = __APP_VERSION__;
 
@@ -165,6 +166,7 @@ const MODULE_COMPONENTS: Record<
   contacts: ContactLookup,
   printers: PrinterLookup,
   "infrastructure-health": InfrastructureHealth,
+  "replication-status": ReplicationStatus,
 };
 
 function ModuleRouter({ status }: { status: AppStatus }) {
