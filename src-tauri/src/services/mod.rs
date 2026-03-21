@@ -19,6 +19,7 @@ pub mod password;
 pub mod permissions;
 pub mod preset;
 pub mod replication;
+pub mod replication_status;
 pub mod resilience;
 pub mod resilient_directory;
 pub mod snapshot;

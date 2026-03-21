@@ -8,6 +8,7 @@ pub mod object_snapshot;
 pub mod ou_node;
 pub mod preset;
 pub mod printer;
+pub mod replication_status;
 
 pub use contact::ContactInfo;
 pub use deleted_object::DeletedObject;

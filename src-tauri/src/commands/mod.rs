@@ -4,6 +4,7 @@ use std::time::{Duration, Instant};
 
 use crate::error::AppError;
 use crate::models::dc_health::DcHealthResult;
+use crate::models::replication_status::ReplicationPartnership;
 use crate::models::{DeletedObject, DirectoryEntry, OUNode, ObjectSnapshot, Preset, SnapshotDiff};
 use crate::services::app_settings::AppSettings;
 use crate::services::audit::AuditEntry;
@@ -3418,6 +3419,73 @@ pub(crate) async fn get_dc_health_inner(state: &AppState) -> Result<Vec<DcHealth
 #[tauri::command]
 pub async fn get_dc_health(state: State<'_, AppState>) -> Result<Vec<DcHealthResult>, AppError> {
     get_dc_health_inner(&state).await
+}
+
+// ---------------------------------------------------------------------------
+// Replication Status - Inner functions
+// ---------------------------------------------------------------------------
+
+/// Returns all replication partnerships. Requires DomainAdmin.
+pub(crate) async fn get_replication_status_inner(
+    state: &AppState,
+) -> Result<Vec<ReplicationPartnership>, AppError> {
+    if !state
+        .permission_service
+        .has_permission(PermissionLevel::DomainAdmin)
+    {
+        return Err(AppError::PermissionDenied(
+            "Replication status requires DomainAdmin permission".to_string(),
+        ));
+    }
+
+    let provider = state.directory_provider.clone();
+    crate::services::replication_status::get_replication_partnerships(provider)
+        .await
+        .map_err(|e| AppError::Directory(e.to_string()))
+}
+
+/// Forces replication between two DCs. Requires DomainAdmin.
+pub(crate) async fn force_replication_inner(
+    state: &AppState,
+    source_dc: &str,
+    target_dc: &str,
+    naming_context: &str,
+) -> Result<String, AppError> {
+    if !state
+        .permission_service
+        .has_permission(PermissionLevel::DomainAdmin)
+    {
+        return Err(AppError::PermissionDenied(
+            "Force replication requires DomainAdmin permission".to_string(),
+        ));
+    }
+
+    crate::services::replication_status::force_replication(source_dc, target_dc, naming_context)
+        .await
+        .map_err(|e| AppError::Directory(e.to_string()))
+}
+
+// ---------------------------------------------------------------------------
+// Replication Status - Tauri commands
+// ---------------------------------------------------------------------------
+
+/// Returns all replication partnerships.
+#[tauri::command]
+pub async fn get_replication_status(
+    state: State<'_, AppState>,
+) -> Result<Vec<ReplicationPartnership>, AppError> {
+    get_replication_status_inner(&state).await
+}
+
+/// Forces replication between source and target DC.
+#[tauri::command]
+pub async fn force_replication_cmd(
+    source_dc: String,
+    target_dc: String,
+    naming_context: String,
+    state: State<'_, AppState>,
+) -> Result<String, AppError> {
+    force_replication_inner(&state, &source_dc, &target_dc, &naming_context).await
 }
 
 #[allow(clippy::unwrap_used)]

@@ -297,6 +297,8 @@ pub fn run() {
             commands::set_thumbnail_photo,
             commands::remove_thumbnail_photo,
             commands::get_dc_health,
+            commands::get_replication_status,
+            commands::force_replication_cmd,
         ])
         .run(tauri::generate_context!())
         .unwrap_or_else(|e| {
