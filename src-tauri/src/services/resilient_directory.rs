@@ -473,6 +473,44 @@ where
         .await
         .map_err(|e| anyhow::anyhow!(e))
     }
+
+    async fn is_recycle_bin_enabled(&self) -> Result<bool> {
+        let inner_ref = self.inner.clone();
+        self.execute_with_resilience(|| {
+            let inner = inner_ref.clone();
+            async move { inner.is_recycle_bin_enabled().await }
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!(e))
+    }
+
+    async fn get_deleted_objects(&self) -> Result<Vec<crate::models::DeletedObject>> {
+        let inner_ref = self.inner.clone();
+        self.execute_with_resilience(|| {
+            let inner = inner_ref.clone();
+            async move { inner.get_deleted_objects().await }
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!(e))
+    }
+
+    async fn restore_deleted_object(
+        &self,
+        deleted_dn: &str,
+        target_ou_dn: &str,
+    ) -> Result<()> {
+        let d = deleted_dn.to_string();
+        let t = target_ou_dn.to_string();
+        let inner_ref = self.inner.clone();
+        self.execute_with_resilience(|| {
+            let inner = inner_ref.clone();
+            let d = d.clone();
+            let t = t.clone();
+            async move { inner.restore_deleted_object(&d, &t).await }
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!(e))
+    }
 }
 
 #[allow(clippy::unwrap_used)]

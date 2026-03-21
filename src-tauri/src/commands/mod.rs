@@ -3,7 +3,7 @@ use tauri::State;
 use std::time::{Duration, Instant};
 
 use crate::error::AppError;
-use crate::models::{DirectoryEntry, OUNode, Preset};
+use crate::models::{DeletedObject, DirectoryEntry, OUNode, Preset};
 use crate::services::app_settings::AppSettings;
 use crate::services::audit::AuditEntry;
 use crate::services::comparison::GroupComparisonResult;
@@ -1216,6 +1216,89 @@ pub(crate) async fn bulk_move_objects_inner(
     Ok(results)
 }
 
+// ---------------------------------------------------------------------------
+// Recycle Bin commands
+// ---------------------------------------------------------------------------
+
+/// Checks whether the AD Recycle Bin feature is enabled. Requires DomainAdmin.
+pub(crate) async fn is_recycle_bin_enabled_inner(
+    state: &AppState,
+) -> Result<bool, AppError> {
+    if !state
+        .permission_service
+        .has_permission(PermissionLevel::DomainAdmin)
+    {
+        return Err(AppError::PermissionDenied(
+            "Recycle Bin access requires DomainAdmin permission".to_string(),
+        ));
+    }
+
+    let provider = state.directory_provider.clone();
+    provider
+        .is_recycle_bin_enabled()
+        .await
+        .map_err(|e| AppError::Directory(e.to_string()))
+}
+
+/// Lists deleted objects from the AD Recycle Bin. Requires DomainAdmin.
+pub(crate) async fn get_deleted_objects_inner(
+    state: &AppState,
+) -> Result<Vec<DeletedObject>, AppError> {
+    if !state
+        .permission_service
+        .has_permission(PermissionLevel::DomainAdmin)
+    {
+        return Err(AppError::PermissionDenied(
+            "Recycle Bin access requires DomainAdmin permission".to_string(),
+        ));
+    }
+
+    let provider = state.directory_provider.clone();
+    provider
+        .get_deleted_objects()
+        .await
+        .map_err(|e| AppError::Directory(e.to_string()))
+}
+
+/// Restores a deleted object from the Recycle Bin. Requires DomainAdmin.
+pub(crate) async fn restore_deleted_object_inner(
+    state: &AppState,
+    deleted_dn: &str,
+    target_ou_dn: &str,
+) -> Result<(), AppError> {
+    if !state
+        .permission_service
+        .has_permission(PermissionLevel::DomainAdmin)
+    {
+        return Err(AppError::PermissionDenied(
+            "Restoring objects requires DomainAdmin permission".to_string(),
+        ));
+    }
+
+    let provider = state.directory_provider.clone();
+    match provider
+        .restore_deleted_object(deleted_dn, target_ou_dn)
+        .await
+    {
+        Ok(()) => {
+            state.audit_service.log_success(
+                "ObjectRestored",
+                deleted_dn,
+                &format!("Restored to {}", target_ou_dn),
+            );
+            Ok(())
+        }
+        Err(e) => {
+            state.audit_service.log_failure(
+                "RestoreObjectFailed",
+                deleted_dn,
+                &format!("Failed to restore: {}", e),
+            );
+            Err(AppError::Directory(e.to_string()))
+        }
+    }
+}
+
 /// Updates the managedBy attribute of a group. Requires AccountOperator permission.
 pub(crate) async fn update_managed_by_inner(
     state: &AppState,
@@ -1574,6 +1657,32 @@ pub async fn bulk_move_objects(
     state: State<'_, AppState>,
 ) -> Result<Vec<BulkMoveResult>, AppError> {
     bulk_move_objects_inner(&state, &object_dns, &target_container_dn).await
+}
+
+/// Checks whether the AD Recycle Bin feature is enabled.
+#[tauri::command]
+pub async fn is_recycle_bin_enabled(
+    state: State<'_, AppState>,
+) -> Result<bool, AppError> {
+    is_recycle_bin_enabled_inner(&state).await
+}
+
+/// Lists deleted objects from the AD Recycle Bin.
+#[tauri::command]
+pub async fn get_deleted_objects(
+    state: State<'_, AppState>,
+) -> Result<Vec<DeletedObject>, AppError> {
+    get_deleted_objects_inner(&state).await
+}
+
+/// Restores a deleted object from the Recycle Bin.
+#[tauri::command]
+pub async fn restore_deleted_object(
+    deleted_dn: String,
+    target_ou_dn: String,
+    state: State<'_, AppState>,
+) -> Result<(), AppError> {
+    restore_deleted_object_inner(&state, &deleted_dn, &target_ou_dn).await
 }
 
 /// Updates the managedBy attribute of a group.
@@ -4774,6 +4883,108 @@ mod tests {
                 .count(),
             2
         );
+    }
+
+    // -----------------------------------------------------------------------
+    // recycle bin tests
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_is_recycle_bin_enabled_requires_domain_admin() {
+        let state = make_state();
+        let result = is_recycle_bin_enabled_inner(&state).await;
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), AppError::PermissionDenied(_)));
+    }
+
+    #[tokio::test]
+    async fn test_is_recycle_bin_enabled_returns_true() {
+        let (state, _) = make_state_with_level_and_provider(PermissionLevel::DomainAdmin);
+        let result = is_recycle_bin_enabled_inner(&state).await.unwrap();
+        assert!(result);
+    }
+
+    #[tokio::test]
+    async fn test_get_deleted_objects_requires_domain_admin() {
+        let state = make_state();
+        let result = get_deleted_objects_inner(&state).await;
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), AppError::PermissionDenied(_)));
+    }
+
+    #[tokio::test]
+    async fn test_get_deleted_objects_returns_list() {
+        use crate::models::DeletedObject;
+
+        let provider = Arc::new(
+            MockDirectoryProvider::new().with_deleted_objects(vec![DeletedObject {
+                distinguished_name: "CN=Test\\0ADEL:abc,CN=Deleted Objects,DC=example,DC=com"
+                    .to_string(),
+                name: "Test".to_string(),
+                object_type: "user".to_string(),
+                deletion_date: "2026-03-20".to_string(),
+                original_ou: "OU=Users,DC=example,DC=com".to_string(),
+            }]),
+        );
+        let state = AppState::new_for_test(provider, PermissionConfig::default());
+        state
+            .permission_service
+            .set_level(PermissionLevel::DomainAdmin);
+
+        let result = get_deleted_objects_inner(&state).await.unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].name, "Test");
+    }
+
+    #[tokio::test]
+    async fn test_restore_deleted_object_requires_domain_admin() {
+        let state = make_state();
+        let result = restore_deleted_object_inner(
+            &state,
+            "CN=Test,CN=Deleted Objects,DC=example,DC=com",
+            "OU=Users,DC=example,DC=com",
+        )
+        .await;
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), AppError::PermissionDenied(_)));
+    }
+
+    #[tokio::test]
+    async fn test_restore_deleted_object_success_and_audit() {
+        let (state, provider) =
+            make_state_with_level_and_provider(PermissionLevel::DomainAdmin);
+
+        let result = restore_deleted_object_inner(
+            &state,
+            "CN=Test,CN=Deleted Objects,DC=example,DC=com",
+            "OU=Users,DC=example,DC=com",
+        )
+        .await;
+        assert!(result.is_ok());
+
+        let calls = provider.restore_calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].0, "CN=Test,CN=Deleted Objects,DC=example,DC=com");
+        assert_eq!(calls[0].1, "OU=Users,DC=example,DC=com");
+
+        let entries = state.audit_service.get_entries();
+        assert!(entries.iter().any(|e| e.action == "ObjectRestored"));
+    }
+
+    #[tokio::test]
+    async fn test_restore_deleted_object_failure_audits() {
+        let state = make_state_with_level_and_failure(PermissionLevel::DomainAdmin);
+
+        let result = restore_deleted_object_inner(
+            &state,
+            "CN=Test,CN=Deleted Objects,DC=example,DC=com",
+            "OU=Users,DC=example,DC=com",
+        )
+        .await;
+        assert!(result.is_err());
+
+        let entries = state.audit_service.get_entries();
+        assert!(entries.iter().any(|e| e.action == "RestoreObjectFailed"));
     }
 
     // -----------------------------------------------------------------------

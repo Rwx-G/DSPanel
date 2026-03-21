@@ -1254,6 +1254,29 @@ impl DirectoryProvider for DemoDirectoryProvider {
             "department".to_string(),
         ])
     }
+
+    async fn is_recycle_bin_enabled(&self) -> Result<bool> {
+        Ok(true)
+    }
+
+    async fn get_deleted_objects(&self) -> Result<Vec<crate::models::DeletedObject>> {
+        Ok(vec![crate::models::DeletedObject {
+            distinguished_name:
+                "CN=Old User\\0ADEL:abc123,CN=Deleted Objects,DC=demo,DC=local".to_string(),
+            name: "Old User".to_string(),
+            object_type: "user".to_string(),
+            deletion_date: "2026-03-15T10:30:00Z".to_string(),
+            original_ou: "OU=Users,DC=demo,DC=local".to_string(),
+        }])
+    }
+
+    async fn restore_deleted_object(
+        &self,
+        _deleted_dn: &str,
+        _target_ou_dn: &str,
+    ) -> Result<()> {
+        Ok(())
+    }
 }
 
 fn sample_ou_tree() -> Vec<OUNode> {

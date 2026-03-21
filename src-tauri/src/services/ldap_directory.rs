@@ -1924,6 +1924,183 @@ impl DirectoryProvider for LdapDirectoryProvider {
         names.sort();
         Ok(names)
     }
+
+    async fn is_recycle_bin_enabled(&self) -> Result<bool> {
+        let base_dn = self
+            .base_dn()
+            .ok_or_else(|| anyhow::anyhow!("Not connected - no base DN"))?;
+
+        let config_dn = format!("CN=Partitions,CN=Configuration,{}", base_dn);
+
+        self.with_connection(|mut ldap| {
+            let config_dn = config_dn.clone();
+            async move {
+                let (rs, _) = ldap
+                    .search(
+                        &config_dn,
+                        ldap3::Scope::Base,
+                        "(objectClass=*)",
+                        vec!["msDS-EnabledFeature"],
+                    )
+                    .await
+                    .context("Failed to query Recycle Bin feature status")?
+                    .success()
+                    .context("Recycle Bin feature query returned error")?;
+
+                let recycle_bin_guid = "766ddcd8-acd0-445e-f3b9-a7f9b6744f2a";
+                for entry in rs {
+                    let se = ldap3::SearchEntry::construct(entry);
+                    if let Some(features) = se.attrs.get("msDS-EnabledFeature") {
+                        for feature in features {
+                            if feature.to_lowercase().contains(recycle_bin_guid) {
+                                return Ok(true);
+                            }
+                        }
+                    }
+                }
+                Ok(false)
+            }
+        })
+        .await
+    }
+
+    async fn get_deleted_objects(&self) -> Result<Vec<crate::models::DeletedObject>> {
+        let base_dn = self
+            .base_dn()
+            .ok_or_else(|| anyhow::anyhow!("Not connected - no base DN"))?;
+
+        let deleted_container = format!("CN=Deleted Objects,{}", base_dn);
+
+        self.with_connection(|mut ldap| {
+            let deleted_container = deleted_container.clone();
+            async move {
+                let show_deleted = ldap3::controls::RawControl {
+                    ctype: "1.2.840.113556.1.4.417".to_string(),
+                    crit: true,
+                    val: None,
+                };
+                ldap.with_controls(vec![show_deleted]);
+
+                let (rs, _) = ldap
+                    .search(
+                        &deleted_container,
+                        ldap3::Scope::OneLevel,
+                        "(isDeleted=TRUE)",
+                        vec![
+                            "cn",
+                            "objectClass",
+                            "lastKnownParent",
+                            "whenChanged",
+                            "distinguishedName",
+                        ],
+                    )
+                    .await
+                    .context("Failed to search deleted objects")?
+                    .success()
+                    .context("Deleted objects search returned error")?;
+
+                let mut objects = Vec::new();
+                for entry in rs {
+                    let se = ldap3::SearchEntry::construct(entry);
+                    let cn = se
+                        .attrs
+                        .get("cn")
+                        .and_then(|v| v.first())
+                        .cloned()
+                        .unwrap_or_default();
+                    let name = cn.split('\0').next().unwrap_or(&cn).to_string();
+                    let object_type = se
+                        .attrs
+                        .get("objectClass")
+                        .map(|classes| {
+                            if classes.iter().any(|c| c == "user") {
+                                "user"
+                            } else if classes.iter().any(|c| c == "computer") {
+                                "computer"
+                            } else if classes.iter().any(|c| c == "group") {
+                                "group"
+                            } else {
+                                "other"
+                            }
+                        })
+                        .unwrap_or("other")
+                        .to_string();
+                    let deletion_date = se
+                        .attrs
+                        .get("whenChanged")
+                        .and_then(|v| v.first())
+                        .cloned()
+                        .unwrap_or_default();
+                    let original_ou = se
+                        .attrs
+                        .get("lastKnownParent")
+                        .and_then(|v| v.first())
+                        .cloned()
+                        .unwrap_or_default();
+
+                    objects.push(crate::models::DeletedObject {
+                        distinguished_name: se.dn,
+                        name,
+                        object_type,
+                        deletion_date,
+                        original_ou,
+                    });
+                }
+
+                Ok(objects)
+            }
+        })
+        .await
+    }
+
+    async fn restore_deleted_object(
+        &self,
+        deleted_dn: &str,
+        target_ou_dn: &str,
+    ) -> Result<()> {
+        let cn_part = deleted_dn
+            .split(',')
+            .next()
+            .unwrap_or(deleted_dn);
+        let cn = cn_part
+            .strip_prefix("CN=")
+            .or_else(|| cn_part.strip_prefix("cn="))
+            .unwrap_or(cn_part);
+        let clean_cn = cn.split('\0').next().unwrap_or(cn);
+        let new_rdn = format!("CN={}", clean_cn);
+        let target = target_ou_dn.to_string();
+
+        self.with_connection(|mut ldap| {
+            let new_rdn = new_rdn.clone();
+            let target = target.clone();
+            async move {
+                let mods = vec![ldap3::Mod::Delete(
+                    "isDeleted",
+                    std::collections::HashSet::new(),
+                )];
+
+                ldap.modify(deleted_dn, mods)
+                    .await
+                    .context("Failed to remove isDeleted attribute")?
+                    .success()
+                    .context("Remove isDeleted returned error")?;
+
+                ldap.modifydn(deleted_dn, &new_rdn, true, Some(&target))
+                    .await
+                    .context("Failed to move restored object")?
+                    .success()
+                    .context("Move restored object returned error")?;
+
+                tracing::info!(
+                    deleted_dn = %deleted_dn,
+                    target_ou = %target,
+                    "Deleted object restored"
+                );
+                Ok(())
+            }
+        })
+        .await
+    }
 }
 
 /// Builds a hierarchical OU tree from a flat list of (DN, name) pairs.

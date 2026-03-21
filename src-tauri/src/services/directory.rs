@@ -1,4 +1,4 @@
-use crate::models::{DirectoryEntry, OUNode};
+use crate::models::{DeletedObject, DirectoryEntry, OUNode};
 use anyhow::Result;
 use async_trait::async_trait;
 
@@ -194,6 +194,29 @@ pub trait DirectoryProvider: Send + Sync {
     /// Queries the schema naming context for attributeSchema objects that
     /// apply to the "user" class. Returns just the `lDAPDisplayName` values.
     async fn get_schema_attributes(&self) -> Result<Vec<String>>;
+
+    /// Checks whether the AD Recycle Bin optional feature is enabled.
+    ///
+    /// Looks for the Recycle Bin feature GUID in `msDS-EnabledFeature`
+    /// on `CN=Partitions,CN=Configuration,<forest DN>`.
+    async fn is_recycle_bin_enabled(&self) -> Result<bool>;
+
+    /// Lists deleted objects from the AD Recycle Bin.
+    ///
+    /// Searches `CN=Deleted Objects,<domain DN>` with `isDeleted=TRUE`
+    /// and the `ShowDeletedControl` (OID 1.2.840.113556.1.4.417).
+    async fn get_deleted_objects(&self) -> Result<Vec<DeletedObject>>;
+
+    /// Restores a deleted object from the Recycle Bin.
+    ///
+    /// Removes the `isDeleted` attribute and moves the object to the
+    /// specified target OU. If `target_ou_dn` is empty, restores to
+    /// the original OU stored in `lastKnownParent`.
+    async fn restore_deleted_object(
+        &self,
+        deleted_dn: &str,
+        target_ou_dn: &str,
+    ) -> Result<()>;
 }
 
 #[allow(clippy::unwrap_used)]
@@ -232,6 +255,9 @@ pub mod tests {
         cannot_change_password: Mutex<bool>,
         replication_metadata: Mutex<Option<String>>,
         ou_tree: Mutex<Vec<OUNode>>,
+        recycle_bin_enabled: Mutex<bool>,
+        deleted_objects: Mutex<Vec<DeletedObject>>,
+        pub restore_calls: Mutex<Vec<(String, String)>>,
     }
 
     impl Default for MockDirectoryProvider {
@@ -267,6 +293,9 @@ pub mod tests {
                 cannot_change_password: Mutex::new(false),
                 replication_metadata: Mutex::new(None),
                 ou_tree: Mutex::new(Vec::new()),
+                recycle_bin_enabled: Mutex::new(true),
+                deleted_objects: Mutex::new(Vec::new()),
+                restore_calls: Mutex::new(Vec::new()),
             }
         }
 
@@ -296,6 +325,9 @@ pub mod tests {
                 cannot_change_password: Mutex::new(false),
                 replication_metadata: Mutex::new(None),
                 ou_tree: Mutex::new(Vec::new()),
+                recycle_bin_enabled: Mutex::new(false),
+                deleted_objects: Mutex::new(Vec::new()),
+                restore_calls: Mutex::new(Vec::new()),
             }
         }
 
@@ -331,6 +363,16 @@ pub mod tests {
 
         pub fn with_ou_tree(self, tree: Vec<OUNode>) -> Self {
             *self.ou_tree.lock().unwrap() = tree;
+            self
+        }
+
+        pub fn with_deleted_objects(self, objects: Vec<DeletedObject>) -> Self {
+            *self.deleted_objects.lock().unwrap() = objects;
+            self
+        }
+
+        pub fn with_recycle_bin_disabled(self) -> Self {
+            *self.recycle_bin_enabled.lock().unwrap() = false;
             self
         }
 
@@ -632,6 +674,29 @@ pub mod tests {
         async fn probe_effective_permissions(&self) -> Result<(bool, bool, bool)> {
             self.check_failure()?;
             Ok((false, false, false))
+        }
+
+        async fn is_recycle_bin_enabled(&self) -> Result<bool> {
+            self.check_failure()?;
+            Ok(*self.recycle_bin_enabled.lock().unwrap())
+        }
+
+        async fn get_deleted_objects(&self) -> Result<Vec<DeletedObject>> {
+            self.check_failure()?;
+            Ok(self.deleted_objects.lock().unwrap().clone())
+        }
+
+        async fn restore_deleted_object(
+            &self,
+            deleted_dn: &str,
+            target_ou_dn: &str,
+        ) -> Result<()> {
+            self.check_failure()?;
+            self.restore_calls
+                .lock()
+                .unwrap()
+                .push((deleted_dn.to_string(), target_ou_dn.to_string()));
+            Ok(())
         }
     }
 
