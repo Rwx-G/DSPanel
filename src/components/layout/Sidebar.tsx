@@ -12,6 +12,8 @@ import {
   Layers,
   ShieldAlert,
   Trash2,
+  Contact,
+  Printer,
   type LucideIcon,
 } from "lucide-react";
 import { useNavigation } from "@/contexts/NavigationContext";
@@ -30,6 +32,8 @@ const ICON_MAP: Record<string, LucideIcon> = {
   layers: Layers,
   "shield-alert": ShieldAlert,
   "recycle-bin": Trash2,
+  contact: Contact,
+  printer: Printer,
 };
 
 const MODULES: SidebarModule[] = [
@@ -72,6 +76,20 @@ const MODULES: SidebarModule[] = [
     id: "computers",
     label: "Computer Lookup",
     icon: "computer",
+    group: "Directory",
+    requiredLevel: "ReadOnly",
+  },
+  {
+    id: "contacts",
+    label: "Contacts",
+    icon: "contact",
+    group: "Directory",
+    requiredLevel: "ReadOnly",
+  },
+  {
+    id: "printers",
+    label: "Printers",
+    icon: "printer",
     group: "Directory",
     requiredLevel: "ReadOnly",
   },

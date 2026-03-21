@@ -22,6 +22,8 @@ import { PresetManagement } from "@/pages/PresetManagement";
 import { OnboardingWizard } from "@/pages/OnboardingWizard";
 import { Offboarding } from "@/pages/Offboarding";
 import { RecycleBin } from "@/pages/RecycleBin";
+import { ContactLookup } from "@/pages/ContactLookup";
+import { PrinterLookup } from "@/pages/PrinterLookup";
 
 const APP_VERSION = __APP_VERSION__;
 
@@ -159,6 +161,8 @@ const MODULE_COMPONENTS: Record<
   onboarding: OnboardingWizard,
   offboarding: Offboarding,
   "recycle-bin": RecycleBin,
+  contacts: ContactLookup,
+  printers: PrinterLookup,
 };
 
 function ModuleRouter({ status }: { status: AppStatus }) {
