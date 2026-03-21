@@ -21,6 +21,7 @@ import { GroupHygiene } from "@/pages/GroupHygiene";
 import { PresetManagement } from "@/pages/PresetManagement";
 import { OnboardingWizard } from "@/pages/OnboardingWizard";
 import { Offboarding } from "@/pages/Offboarding";
+import { RecycleBin } from "@/pages/RecycleBin";
 
 const APP_VERSION = __APP_VERSION__;
 
@@ -157,6 +158,7 @@ const MODULE_COMPONENTS: Record<
   presets: PresetManagement,
   onboarding: OnboardingWizard,
   offboarding: Offboarding,
+  "recycle-bin": RecycleBin,
 };
 
 function ModuleRouter({ status }: { status: AppStatus }) {

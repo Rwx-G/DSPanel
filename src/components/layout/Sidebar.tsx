@@ -11,6 +11,7 @@ import {
   FolderSearch,
   Layers,
   ShieldAlert,
+  Trash2,
   type LucideIcon,
 } from "lucide-react";
 import { useNavigation } from "@/contexts/NavigationContext";
@@ -28,6 +29,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   "folder-search": FolderSearch,
   layers: Layers,
   "shield-alert": ShieldAlert,
+  "recycle-bin": Trash2,
 };
 
 const MODULES: SidebarModule[] = [
@@ -72,6 +74,13 @@ const MODULES: SidebarModule[] = [
     icon: "computer",
     group: "Directory",
     requiredLevel: "ReadOnly",
+  },
+  {
+    id: "recycle-bin",
+    label: "Recycle Bin",
+    icon: "recycle-bin",
+    group: "Directory",
+    requiredLevel: "DomainAdmin",
   },
   {
     id: "ntfs-analyzer",
