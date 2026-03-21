@@ -283,6 +283,9 @@ pub fn run() {
             commands::create_printer,
             commands::update_printer,
             commands::delete_printer,
+            commands::get_thumbnail_photo,
+            commands::set_thumbnail_photo,
+            commands::remove_thumbnail_photo,
         ])
         .run(tauri::generate_context!())
         .unwrap_or_else(|e| {

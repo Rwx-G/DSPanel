@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- User thumbnail photo management in user detail view (get, set, remove thumbnailPhoto AD attribute)
+- Frontend image resizing via HTML Canvas (center-crop to 96x96 JPEG) - no new Rust dependencies
+- Upload and remove photo buttons for AccountOperator+ users
+- Audit trail entries for photo set/remove operations with snapshot capture
+
 ## [0.6.0] - 2026-03-20
 
 Epic 6 - Exchange Diagnostics. Read-only Exchange mailbox diagnostics for both

@@ -1385,6 +1385,27 @@ impl DirectoryProvider for DemoDirectoryProvider {
     async fn delete_printer(&self, _dn: &str) -> Result<()> {
         Ok(())
     }
+
+    async fn get_thumbnail_photo(&self, _user_dn: &str) -> Result<Option<String>> {
+        // Return a small 1x1 white JPEG placeholder for demo mode
+        Ok(Some(
+            "/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkS\
+             Ew8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJ\
+             CQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIy\
+             MjIyMjIyMjIyMjIyMjL/wAARCAABAAEDASIAAhEBAxEB/8QAFAABAAAAAAAAAAAAAAAAAAAACf\
+             /EABQQAQAAAAAAAAAAAAAAAAAAAAD/xAAUAQEAAAAAAAAAAAAAAAAAAAAA/8QAFBEBAAAAAAAAAA\
+             AAAAAAAAAAP/aAAwDAQACEQMRAD8AKwA="
+                .to_string(),
+        ))
+    }
+
+    async fn set_thumbnail_photo(&self, _user_dn: &str, _photo_base64: &str) -> Result<()> {
+        Ok(())
+    }
+
+    async fn remove_thumbnail_photo(&self, _user_dn: &str) -> Result<()> {
+        Ok(())
+    }
 }
 
 fn sample_ou_tree() -> Vec<OUNode> {

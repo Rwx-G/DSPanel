@@ -615,6 +615,30 @@ where
         let dn = dn.to_string();
         resilient_call!(self, dn, |inner, d| inner.delete_printer(&d).await)
     }
+
+    async fn get_thumbnail_photo(&self, user_dn: &str) -> Result<Option<String>> {
+        let dn = user_dn.to_string();
+        resilient_call!(self, dn, |inner, d| inner.get_thumbnail_photo(&d).await)
+    }
+
+    async fn set_thumbnail_photo(&self, user_dn: &str, photo_base64: &str) -> Result<()> {
+        let dn = user_dn.to_string();
+        let photo = photo_base64.to_string();
+        let inner_ref = self.inner.clone();
+        self.execute_with_resilience(|| {
+            let inner = inner_ref.clone();
+            let d = dn.clone();
+            let p = photo.clone();
+            async move { inner.set_thumbnail_photo(&d, &p).await }
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!(e))
+    }
+
+    async fn remove_thumbnail_photo(&self, user_dn: &str) -> Result<()> {
+        let dn = user_dn.to_string();
+        resilient_call!(self, dn, |inner, d| inner.remove_thumbnail_photo(&d).await)
+    }
 }
 
 #[allow(clippy::unwrap_used)]

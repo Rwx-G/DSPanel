@@ -2341,6 +2341,91 @@ impl DirectoryProvider for LdapDirectoryProvider {
     async fn delete_printer(&self, dn: &str) -> Result<()> {
         self.delete_object(dn).await
     }
+
+    async fn get_thumbnail_photo(&self, user_dn: &str) -> Result<Option<String>> {
+        use base64::Engine;
+
+        let dn_owned = user_dn.to_string();
+        self.with_connection(|mut ldap| {
+            let dn = dn_owned.clone();
+            async move {
+                let (entries, _) = ldap
+                    .search(
+                        &dn,
+                        Scope::Base,
+                        "(objectClass=*)",
+                        vec!["thumbnailPhoto"],
+                    )
+                    .await
+                    .context("Failed to search for thumbnailPhoto")?
+                    .success()
+                    .context("thumbnailPhoto search returned error")?;
+
+                if let Some(entry) = entries.into_iter().next() {
+                    let se = SearchEntry::construct(entry);
+                    if let Some(bin_values) = se.bin_attrs.get("thumbnailPhoto") {
+                        if let Some(bytes) = bin_values.first() {
+                            let encoded =
+                                base64::engine::general_purpose::STANDARD.encode(bytes);
+                            return Ok(Some(encoded));
+                        }
+                    }
+                }
+                Ok(None)
+            }
+        })
+        .await
+    }
+
+    async fn set_thumbnail_photo(&self, user_dn: &str, photo_base64: &str) -> Result<()> {
+        use base64::Engine;
+
+        let photo_bytes = base64::engine::general_purpose::STANDARD
+            .decode(photo_base64)
+            .context("Invalid base64 in photo data")?;
+        let dn_owned = user_dn.to_string();
+        self.with_connection(|mut ldap| {
+            let dn = dn_owned.clone();
+            let bytes = photo_bytes.clone();
+            async move {
+                let mods: Vec<Mod<Vec<u8>>> = vec![Mod::Replace(
+                    b"thumbnailPhoto".to_vec(),
+                    HashSet::from([bytes]),
+                )];
+                ldap.modify(&dn, mods)
+                    .await
+                    .context("Failed to set thumbnailPhoto")?
+                    .success()
+                    .context("Set thumbnailPhoto LDAP operation returned error")?;
+
+                tracing::info!(dn = %dn, "thumbnailPhoto set");
+                Ok(())
+            }
+        })
+        .await
+    }
+
+    async fn remove_thumbnail_photo(&self, user_dn: &str) -> Result<()> {
+        let dn_owned = user_dn.to_string();
+        self.with_connection(|mut ldap| {
+            let dn = dn_owned.clone();
+            async move {
+                let mods: Vec<Mod<Vec<u8>>> = vec![Mod::Delete(
+                    b"thumbnailPhoto".to_vec(),
+                    HashSet::new(),
+                )];
+                ldap.modify(&dn, mods)
+                    .await
+                    .context("Failed to remove thumbnailPhoto")?
+                    .success()
+                    .context("Remove thumbnailPhoto LDAP operation returned error")?;
+
+                tracing::info!(dn = %dn, "thumbnailPhoto removed");
+                Ok(())
+            }
+        })
+        .await
+    }
 }
 
 /// Builds a hierarchical OU tree from a flat list of (DN, name) pairs.

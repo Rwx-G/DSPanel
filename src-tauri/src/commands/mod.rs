@@ -2809,6 +2809,128 @@ pub async fn delete_printer(
     delete_printer_inner(&state, &dn).await
 }
 
+// ---------------------------------------------------------------------------
+// Thumbnail Photo
+// ---------------------------------------------------------------------------
+
+/// Gets the thumbnailPhoto attribute as base64-encoded bytes. ReadOnly access.
+pub(crate) async fn get_thumbnail_photo_inner(
+    state: &AppState,
+    user_dn: &str,
+) -> Result<Option<String>, AppError> {
+    let provider = state.directory_provider.clone();
+    provider
+        .get_thumbnail_photo(user_dn)
+        .await
+        .map_err(|e| AppError::Directory(e.to_string()))
+}
+
+/// Sets the thumbnailPhoto attribute from base64-encoded JPEG bytes.
+/// Requires AccountOperator+.
+pub(crate) async fn set_thumbnail_photo_inner(
+    state: &AppState,
+    user_dn: &str,
+    photo_base64: &str,
+) -> Result<(), AppError> {
+    if !state
+        .permission_service
+        .has_permission(PermissionLevel::AccountOperator)
+    {
+        return Err(AppError::PermissionDenied(
+            "Setting thumbnail photo requires AccountOperator permission or higher".to_string(),
+        ));
+    }
+
+    state.snapshot_service.capture(user_dn, "SetThumbnailPhoto");
+
+    let provider = state.directory_provider.clone();
+    match provider.set_thumbnail_photo(user_dn, photo_base64).await {
+        Ok(()) => {
+            state.audit_service.log_success(
+                "ThumbnailPhotoSet",
+                user_dn,
+                "Thumbnail photo set",
+            );
+            Ok(())
+        }
+        Err(e) => {
+            state.audit_service.log_failure(
+                "ThumbnailPhotoSetFailed",
+                user_dn,
+                &format!("Failed to set thumbnail photo: {}", e),
+            );
+            Err(AppError::Directory(e.to_string()))
+        }
+    }
+}
+
+/// Removes the thumbnailPhoto attribute. Requires AccountOperator+.
+pub(crate) async fn remove_thumbnail_photo_inner(
+    state: &AppState,
+    user_dn: &str,
+) -> Result<(), AppError> {
+    if !state
+        .permission_service
+        .has_permission(PermissionLevel::AccountOperator)
+    {
+        return Err(AppError::PermissionDenied(
+            "Removing thumbnail photo requires AccountOperator permission or higher".to_string(),
+        ));
+    }
+
+    state
+        .snapshot_service
+        .capture(user_dn, "RemoveThumbnailPhoto");
+
+    let provider = state.directory_provider.clone();
+    match provider.remove_thumbnail_photo(user_dn).await {
+        Ok(()) => {
+            state.audit_service.log_success(
+                "ThumbnailPhotoRemoved",
+                user_dn,
+                "Thumbnail photo removed",
+            );
+            Ok(())
+        }
+        Err(e) => {
+            state.audit_service.log_failure(
+                "ThumbnailPhotoRemoveFailed",
+                user_dn,
+                &format!("Failed to remove thumbnail photo: {}", e),
+            );
+            Err(AppError::Directory(e.to_string()))
+        }
+    }
+}
+
+/// Gets the thumbnail photo for a user. ReadOnly access.
+#[tauri::command]
+pub async fn get_thumbnail_photo(
+    user_dn: String,
+    state: State<'_, AppState>,
+) -> Result<Option<String>, AppError> {
+    get_thumbnail_photo_inner(&state, &user_dn).await
+}
+
+/// Sets the thumbnail photo for a user. Requires AccountOperator+.
+#[tauri::command]
+pub async fn set_thumbnail_photo(
+    user_dn: String,
+    photo_base64: String,
+    state: State<'_, AppState>,
+) -> Result<(), AppError> {
+    set_thumbnail_photo_inner(&state, &user_dn, &photo_base64).await
+}
+
+/// Removes the thumbnail photo for a user. Requires AccountOperator+.
+#[tauri::command]
+pub async fn remove_thumbnail_photo(
+    user_dn: String,
+    state: State<'_, AppState>,
+) -> Result<(), AppError> {
+    remove_thumbnail_photo_inner(&state, &user_dn).await
+}
+
 #[allow(clippy::unwrap_used)]
 #[cfg(test)]
 mod tests {
@@ -5765,5 +5887,149 @@ mod tests {
         let results = search_printers_inner(&state, "HP").await.unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].name, "HP-Floor3");
+    }
+
+    // -----------------------------------------------------------------------
+    // Thumbnail Photo tests
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_get_thumbnail_photo_returns_none() {
+        let state = make_state();
+        let result = get_thumbnail_photo_inner(
+            &state,
+            "CN=John,OU=Users,DC=example,DC=com",
+        )
+        .await;
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn test_get_thumbnail_photo_returns_photo() {
+        let provider = Arc::new(
+            MockDirectoryProvider::new().with_thumbnail_photo(
+                "CN=John,OU=Users,DC=example,DC=com",
+                "dGVzdA==",
+            ),
+        );
+        let state = AppState::new_for_test(provider, PermissionConfig::default());
+        let result = get_thumbnail_photo_inner(
+            &state,
+            "CN=John,OU=Users,DC=example,DC=com",
+        )
+        .await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), Some("dGVzdA==".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_set_thumbnail_photo_requires_account_operator() {
+        let state = make_state(); // ReadOnly
+        let result = set_thumbnail_photo_inner(
+            &state,
+            "CN=John,OU=Users,DC=example,DC=com",
+            "dGVzdA==",
+        )
+        .await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            AppError::PermissionDenied(msg) => {
+                assert!(msg.contains("AccountOperator"));
+            }
+            other => panic!("Expected PermissionDenied, got: {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_set_thumbnail_photo_success_and_audit() {
+        let (state, provider) =
+            make_state_with_level_and_provider(PermissionLevel::AccountOperator);
+        let result = set_thumbnail_photo_inner(
+            &state,
+            "CN=John,OU=Users,DC=example,DC=com",
+            "dGVzdA==",
+        )
+        .await;
+        assert!(result.is_ok());
+
+        let calls = provider.set_photo_calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].0, "CN=John,OU=Users,DC=example,DC=com");
+        assert_eq!(calls[0].1, "dGVzdA==");
+
+        let entries = state.audit_service.get_entries();
+        assert!(entries.iter().any(|e| e.action == "ThumbnailPhotoSet"));
+    }
+
+    #[tokio::test]
+    async fn test_remove_thumbnail_photo_requires_account_operator() {
+        let state = make_state(); // ReadOnly
+        let result = remove_thumbnail_photo_inner(
+            &state,
+            "CN=John,OU=Users,DC=example,DC=com",
+        )
+        .await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            AppError::PermissionDenied(msg) => {
+                assert!(msg.contains("AccountOperator"));
+            }
+            other => panic!("Expected PermissionDenied, got: {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_remove_thumbnail_photo_success_and_audit() {
+        let (state, provider) =
+            make_state_with_level_and_provider(PermissionLevel::AccountOperator);
+        let result = remove_thumbnail_photo_inner(
+            &state,
+            "CN=John,OU=Users,DC=example,DC=com",
+        )
+        .await;
+        assert!(result.is_ok());
+
+        let calls = provider.remove_photo_calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0], "CN=John,OU=Users,DC=example,DC=com");
+
+        let entries = state.audit_service.get_entries();
+        assert!(entries
+            .iter()
+            .any(|e| e.action == "ThumbnailPhotoRemoved"));
+    }
+
+    #[tokio::test]
+    async fn test_set_thumbnail_photo_failure_audits() {
+        let state = make_state_with_level_and_failure(PermissionLevel::AccountOperator);
+        let result = set_thumbnail_photo_inner(
+            &state,
+            "CN=John,OU=Users,DC=example,DC=com",
+            "dGVzdA==",
+        )
+        .await;
+        assert!(result.is_err());
+
+        let entries = state.audit_service.get_entries();
+        assert!(entries
+            .iter()
+            .any(|e| e.action == "ThumbnailPhotoSetFailed"));
+    }
+
+    #[tokio::test]
+    async fn test_remove_thumbnail_photo_failure_audits() {
+        let state = make_state_with_level_and_failure(PermissionLevel::AccountOperator);
+        let result = remove_thumbnail_photo_inner(
+            &state,
+            "CN=John,OU=Users,DC=example,DC=com",
+        )
+        .await;
+        assert!(result.is_err());
+
+        let entries = state.audit_service.get_entries();
+        assert!(entries
+            .iter()
+            .any(|e| e.action == "ThumbnailPhotoRemoveFailed"));
     }
 }

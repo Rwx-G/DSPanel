@@ -29,6 +29,7 @@ import { useDialog } from "@/contexts/DialogContext";
 import { StateInTimeView } from "@/components/comparison/StateInTimeView";
 import { ExchangePanel } from "@/components/data/ExchangePanel";
 import { ExchangeOnlinePanel } from "@/components/data/ExchangeOnlinePanel";
+import { UserPhoto } from "@/components/common/UserPhoto";
 import { extractExchangeInfo } from "@/types/exchange";
 import { type ExchangeOnlineInfo } from "@/types/exchange-online";
 import { invoke } from "@tauri-apps/api/core";
@@ -379,23 +380,32 @@ export function UserDetail({
 
   return (
     <div className="space-y-4" data-testid="user-detail">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">
-          {user.displayName || user.samAccountName}
-        </h2>
-        <div className="flex items-center gap-2">
-          {healthStatus && <HealthBadge healthStatus={healthStatus} />}
-          <StatusBadge
-            text={user.enabled ? "Enabled" : "Disabled"}
-            variant={user.enabled ? "success" : "error"}
-          />
-          {user.lockedOut && <StatusBadge text="Locked" variant="warning" />}
-        </div>
-      </div>
+      <div className="flex items-start gap-4">
+        <UserPhoto
+          userDn={user.distinguishedName}
+          displayName={user.displayName || user.samAccountName}
+          canEdit={canEdit}
+        />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">
+              {user.displayName || user.samAccountName}
+            </h2>
+            <div className="flex items-center gap-2">
+              {healthStatus && <HealthBadge healthStatus={healthStatus} />}
+              <StatusBadge
+                text={user.enabled ? "Enabled" : "Disabled"}
+                variant={user.enabled ? "success" : "error"}
+              />
+              {user.lockedOut && <StatusBadge text="Locked" variant="warning" />}
+            </div>
+          </div>
 
-      <div className="flex items-center gap-1 text-caption text-[var(--color-text-secondary)]">
-        <span>{user.samAccountName}</span>
-        <CopyButton text={user.samAccountName} />
+          <div className="flex items-center gap-1 text-caption text-[var(--color-text-secondary)]">
+            <span>{user.samAccountName}</span>
+            <CopyButton text={user.samAccountName} />
+          </div>
+        </div>
       </div>
 
       {/* Actions row: user actions + pending changes inline */}

@@ -262,6 +262,15 @@ pub trait DirectoryProvider: Send + Sync {
 
     /// Deletes a printer by its DN.
     async fn delete_printer(&self, dn: &str) -> Result<()>;
+
+    /// Gets the thumbnailPhoto attribute as base64-encoded bytes.
+    async fn get_thumbnail_photo(&self, user_dn: &str) -> Result<Option<String>>;
+
+    /// Sets the thumbnailPhoto attribute from base64-encoded JPEG bytes.
+    async fn set_thumbnail_photo(&self, user_dn: &str, photo_base64: &str) -> Result<()>;
+
+    /// Removes the thumbnailPhoto attribute.
+    async fn remove_thumbnail_photo(&self, user_dn: &str) -> Result<()>;
 }
 
 #[allow(clippy::unwrap_used)]
@@ -311,6 +320,9 @@ pub mod tests {
         pub create_printer_calls: Mutex<Vec<(String, HashMap<String, String>)>>,
         pub update_printer_calls: Mutex<Vec<(String, HashMap<String, String>)>>,
         pub delete_printer_calls: Mutex<Vec<String>>,
+        thumbnail_photos: Mutex<HashMap<String, String>>,
+        pub set_photo_calls: Mutex<Vec<(String, String)>>,
+        pub remove_photo_calls: Mutex<Vec<String>>,
     }
 
     impl Default for MockDirectoryProvider {
@@ -357,6 +369,9 @@ pub mod tests {
                 create_printer_calls: Mutex::new(Vec::new()),
                 update_printer_calls: Mutex::new(Vec::new()),
                 delete_printer_calls: Mutex::new(Vec::new()),
+                thumbnail_photos: Mutex::new(HashMap::new()),
+                set_photo_calls: Mutex::new(Vec::new()),
+                remove_photo_calls: Mutex::new(Vec::new()),
             }
         }
 
@@ -397,6 +412,9 @@ pub mod tests {
                 create_printer_calls: Mutex::new(Vec::new()),
                 update_printer_calls: Mutex::new(Vec::new()),
                 delete_printer_calls: Mutex::new(Vec::new()),
+                thumbnail_photos: Mutex::new(HashMap::new()),
+                set_photo_calls: Mutex::new(Vec::new()),
+                remove_photo_calls: Mutex::new(Vec::new()),
             }
         }
 
@@ -452,6 +470,14 @@ pub mod tests {
 
         pub fn with_printers(self, printers: Vec<PrinterInfo>) -> Self {
             *self.printers.lock().unwrap() = printers;
+            self
+        }
+
+        pub fn with_thumbnail_photo(self, dn: &str, photo_base64: &str) -> Self {
+            self.thumbnail_photos
+                .lock()
+                .unwrap()
+                .insert(dn.to_string(), photo_base64.to_string());
             self
         }
 
@@ -865,6 +891,39 @@ pub mod tests {
                 .lock()
                 .unwrap()
                 .push(dn.to_string());
+            Ok(())
+        }
+
+        async fn get_thumbnail_photo(&self, user_dn: &str) -> Result<Option<String>> {
+            self.check_failure()?;
+            Ok(self
+                .thumbnail_photos
+                .lock()
+                .unwrap()
+                .get(user_dn)
+                .cloned())
+        }
+
+        async fn set_thumbnail_photo(&self, user_dn: &str, photo_base64: &str) -> Result<()> {
+            self.check_failure()?;
+            self.set_photo_calls
+                .lock()
+                .unwrap()
+                .push((user_dn.to_string(), photo_base64.to_string()));
+            self.thumbnail_photos
+                .lock()
+                .unwrap()
+                .insert(user_dn.to_string(), photo_base64.to_string());
+            Ok(())
+        }
+
+        async fn remove_thumbnail_photo(&self, user_dn: &str) -> Result<()> {
+            self.check_failure()?;
+            self.remove_photo_calls
+                .lock()
+                .unwrap()
+                .push(user_dn.to_string());
+            self.thumbnail_photos.lock().unwrap().remove(user_dn);
             Ok(())
         }
     }
