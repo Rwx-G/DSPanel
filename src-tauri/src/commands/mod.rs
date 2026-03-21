@@ -1116,7 +1116,7 @@ pub(crate) async fn create_group_inner(
     }
 }
 
-/// Moves an AD object to a different container. Requires DomainAdmin permission.
+/// Moves an AD object to a different container. Requires AccountOperator permission.
 pub(crate) async fn move_object_inner(
     state: &AppState,
     object_dn: &str,
@@ -1124,10 +1124,10 @@ pub(crate) async fn move_object_inner(
 ) -> Result<(), AppError> {
     if !state
         .permission_service
-        .has_permission(PermissionLevel::DomainAdmin)
+        .has_permission(PermissionLevel::AccountOperator)
     {
         return Err(AppError::PermissionDenied(
-            "Moving objects requires DomainAdmin permission".to_string(),
+            "Moving objects requires AccountOperator permission or higher".to_string(),
         ));
     }
 
@@ -1152,6 +1152,68 @@ pub(crate) async fn move_object_inner(
             Err(AppError::Directory(e.to_string()))
         }
     }
+}
+
+/// Result of a single object move in a bulk operation.
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BulkMoveResult {
+    pub object_dn: String,
+    pub success: bool,
+    pub error: Option<String>,
+}
+
+/// Moves multiple AD objects to a target container sequentially.
+/// Continues on individual failures and returns results for all objects.
+pub(crate) async fn bulk_move_objects_inner(
+    state: &AppState,
+    object_dns: &[String],
+    target_container_dn: &str,
+) -> Result<Vec<BulkMoveResult>, AppError> {
+    if !state
+        .permission_service
+        .has_permission(PermissionLevel::AccountOperator)
+    {
+        return Err(AppError::PermissionDenied(
+            "Moving objects requires AccountOperator permission or higher".to_string(),
+        ));
+    }
+
+    let mut results = Vec::with_capacity(object_dns.len());
+
+    for dn in object_dns {
+        state.snapshot_service.capture(dn, "MoveObject");
+
+        let provider = state.directory_provider.clone();
+        match provider.move_object(dn, target_container_dn).await {
+            Ok(()) => {
+                state.audit_service.log_success(
+                    "ObjectMoved",
+                    dn,
+                    &format!("Moved to {}", target_container_dn),
+                );
+                results.push(BulkMoveResult {
+                    object_dn: dn.clone(),
+                    success: true,
+                    error: None,
+                });
+            }
+            Err(e) => {
+                state.audit_service.log_failure(
+                    "MoveObjectFailed",
+                    dn,
+                    &format!("Failed to move object: {}", e),
+                );
+                results.push(BulkMoveResult {
+                    object_dn: dn.clone(),
+                    success: false,
+                    error: Some(e.to_string()),
+                });
+            }
+        }
+    }
+
+    Ok(results)
 }
 
 /// Updates the managedBy attribute of a group. Requires AccountOperator permission.
@@ -1502,6 +1564,16 @@ pub async fn move_object(
     state: State<'_, AppState>,
 ) -> Result<(), AppError> {
     move_object_inner(&state, &object_dn, &target_container_dn).await
+}
+
+/// Moves multiple AD objects to a target container. Continues on individual failures.
+#[tauri::command]
+pub async fn bulk_move_objects(
+    object_dns: Vec<String>,
+    target_container_dn: String,
+    state: State<'_, AppState>,
+) -> Result<Vec<BulkMoveResult>, AppError> {
+    bulk_move_objects_inner(&state, &object_dns, &target_container_dn).await
 }
 
 /// Updates the managedBy attribute of a group.
@@ -4560,7 +4632,7 @@ mod tests {
     // -----------------------------------------------------------------------
 
     #[tokio::test]
-    async fn test_move_object_inner_requires_domain_admin() {
+    async fn test_move_object_inner_requires_account_operator() {
         let state = make_state(); // default is ReadOnly
         let result = move_object_inner(
             &state,
@@ -4574,8 +4646,28 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_move_object_inner_allowed_for_account_operator() {
+        let (state, provider) =
+            make_state_with_level_and_provider(PermissionLevel::AccountOperator);
+
+        let result = move_object_inner(
+            &state,
+            "CN=TestUser,OU=Old,DC=example,DC=com",
+            "OU=New,DC=example,DC=com",
+        )
+        .await;
+        assert!(result.is_ok());
+
+        let calls = provider.move_object_calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].0, "CN=TestUser,OU=Old,DC=example,DC=com");
+        assert_eq!(calls[0].1, "OU=New,DC=example,DC=com");
+    }
+
+    #[tokio::test]
     async fn test_move_object_inner_audits_success() {
-        let (state, provider) = make_state_with_level_and_provider(PermissionLevel::DomainAdmin);
+        let (state, provider) =
+            make_state_with_level_and_provider(PermissionLevel::DomainAdmin);
 
         let result = move_object_inner(
             &state,
@@ -4590,6 +4682,98 @@ mod tests {
 
         let entries = state.audit_service.get_entries();
         assert!(entries.iter().any(|e| e.action == "ObjectMoved"));
+    }
+
+    #[tokio::test]
+    async fn test_move_object_inner_audits_failure() {
+        let state = make_state_with_level_and_failure(PermissionLevel::AccountOperator);
+
+        let result = move_object_inner(
+            &state,
+            "CN=TestUser,OU=Old,DC=example,DC=com",
+            "OU=New,DC=example,DC=com",
+        )
+        .await;
+        assert!(result.is_err());
+
+        let entries = state.audit_service.get_entries();
+        assert!(entries.iter().any(|e| e.action == "MoveObjectFailed"));
+    }
+
+    // -----------------------------------------------------------------------
+    // bulk_move_objects_inner tests
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_bulk_move_objects_inner_requires_account_operator() {
+        let state = make_state();
+        let result = bulk_move_objects_inner(
+            &state,
+            &["CN=U1,OU=Old,DC=example,DC=com".to_string()],
+            "OU=New,DC=example,DC=com",
+        )
+        .await;
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), AppError::PermissionDenied(_)));
+    }
+
+    #[tokio::test]
+    async fn test_bulk_move_objects_inner_moves_all() {
+        let (state, provider) =
+            make_state_with_level_and_provider(PermissionLevel::AccountOperator);
+
+        let dns = vec![
+            "CN=U1,OU=Old,DC=example,DC=com".to_string(),
+            "CN=U2,OU=Old,DC=example,DC=com".to_string(),
+        ];
+
+        let results = bulk_move_objects_inner(&state, &dns, "OU=New,DC=example,DC=com")
+            .await
+            .unwrap();
+
+        assert_eq!(results.len(), 2);
+        assert!(results[0].success);
+        assert!(results[1].success);
+        assert!(results[0].error.is_none());
+
+        let calls = provider.move_object_calls.lock().unwrap();
+        assert_eq!(calls.len(), 2);
+
+        let entries = state.audit_service.get_entries();
+        assert_eq!(
+            entries.iter().filter(|e| e.action == "ObjectMoved").count(),
+            2
+        );
+    }
+
+    #[tokio::test]
+    async fn test_bulk_move_objects_inner_continues_on_failure() {
+        let state = make_state_with_level_and_failure(PermissionLevel::AccountOperator);
+
+        let dns = vec![
+            "CN=U1,OU=Old,DC=example,DC=com".to_string(),
+            "CN=U2,OU=Old,DC=example,DC=com".to_string(),
+        ];
+
+        let results = bulk_move_objects_inner(&state, &dns, "OU=New,DC=example,DC=com")
+            .await
+            .unwrap();
+
+        // Both should fail but the operation continues
+        assert_eq!(results.len(), 2);
+        assert!(!results[0].success);
+        assert!(!results[1].success);
+        assert!(results[0].error.is_some());
+        assert!(results[1].error.is_some());
+
+        let entries = state.audit_service.get_entries();
+        assert_eq!(
+            entries
+                .iter()
+                .filter(|e| e.action == "MoveObjectFailed")
+                .count(),
+            2
+        );
     }
 
     // -----------------------------------------------------------------------

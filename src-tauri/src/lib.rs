@@ -251,6 +251,7 @@ pub fn run() {
             commands::delete_group,
             commands::create_group,
             commands::move_object,
+            commands::bulk_move_objects,
             commands::update_managed_by,
             commands::get_ou_tree,
             commands::get_preset_path,
