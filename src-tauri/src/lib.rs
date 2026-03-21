@@ -299,6 +299,7 @@ pub fn run() {
             commands::get_dc_health,
             commands::get_replication_status,
             commands::force_replication_cmd,
+            commands::get_dns_kerberos_validation,
         ])
         .run(tauri::generate_context!())
         .unwrap_or_else(|e| {

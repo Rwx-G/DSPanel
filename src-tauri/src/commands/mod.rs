@@ -4,6 +4,7 @@ use std::time::{Duration, Instant};
 
 use crate::error::AppError;
 use crate::models::dc_health::DcHealthResult;
+use crate::models::dns_validation::DnsKerberosReport;
 use crate::models::replication_status::ReplicationPartnership;
 use crate::models::{DeletedObject, DirectoryEntry, OUNode, ObjectSnapshot, Preset, SnapshotDiff};
 use crate::services::app_settings::AppSettings;
@@ -3486,6 +3487,44 @@ pub async fn force_replication_cmd(
     state: State<'_, AppState>,
 ) -> Result<String, AppError> {
     force_replication_inner(&state, &source_dc, &target_dc, &naming_context).await
+}
+
+// ---------------------------------------------------------------------------
+// DNS & Kerberos Validation - Inner functions
+// ---------------------------------------------------------------------------
+
+/// Returns a full DNS and Kerberos validation report.
+/// Requires DomainAdmin permission.
+pub(crate) async fn get_dns_kerberos_validation_inner(
+    state: &AppState,
+    threshold_seconds: u32,
+) -> Result<DnsKerberosReport, AppError> {
+    if !state
+        .permission_service
+        .has_permission(PermissionLevel::DomainAdmin)
+    {
+        return Err(AppError::PermissionDenied(
+            "DNS/Kerberos validation requires DomainAdmin permission".to_string(),
+        ));
+    }
+
+    let provider = state.directory_provider.clone();
+    crate::services::dns_validation::run_full_validation(provider, threshold_seconds)
+        .await
+        .map_err(|e| AppError::Directory(e.to_string()))
+}
+
+// ---------------------------------------------------------------------------
+// DNS & Kerberos Validation - Tauri commands
+// ---------------------------------------------------------------------------
+
+/// Returns DNS SRV record validation and clock skew analysis for the domain.
+#[tauri::command]
+pub async fn get_dns_kerberos_validation(
+    threshold_seconds: u32,
+    state: State<'_, AppState>,
+) -> Result<DnsKerberosReport, AppError> {
+    get_dns_kerberos_validation_inner(&state, threshold_seconds).await
 }
 
 #[allow(clippy::unwrap_used)]
