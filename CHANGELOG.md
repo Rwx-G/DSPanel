@@ -7,6 +7,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-03-21
+
+Epic 8 - Infrastructure Health and Monitoring. Centralized view of AD
+infrastructure health for DomainAdmin users: DC status, replication
+monitoring, DNS/Kerberos validation, remote workstation metrics, and
+visual topology mapping.
+
+### Added
+
+#### Domain Controller Health Checks (8.1)
+- Infrastructure Health page with DC status cards showing DNS, LDAP, services, disk, SYSVOL checks
+- Color-coded health status: green (healthy), yellow (warning), red (critical)
+- DC discovery from AD Sites and Services configuration partition
+- Auto-refresh with configurable interval (30s/60s/120s/Off)
+- Expandable detail panel with individual check results and raw values
+- GC badge for Global Catalog servers
+- DomainAdmin permission gating
+
+#### AD Replication Status (8.2)
+- Replication Status page with partnership table sorted by status (failed first)
+- Failed replications highlighted with red background and error count
+- Latency display with color coding (green < 15min, yellow < 1hr, red > 1hr)
+- Force Replication button with confirmation dialog (via repadmin)
+- Auto-refresh with configurable interval (60s/120s/300s/Off)
+
+#### DNS and Kerberos Validation (8.3)
+- DNS & Kerberos validation page with on-demand checks
+- DNS SRV record validation: _ldap._tcp, _kerberos._tcp, _gc._tcp, _kpasswd._tcp
+- Expected vs actual host comparison with missing/extra host detection
+- Kerberos clock skew detection between DCs via RootDSE currentTime
+- Configurable skew threshold (1/2/5/10 minutes)
+- CSV export of validation results
+
+#### Remote Workstation Monitoring (8.4)
+- WorkstationMonitoringPanel component for computer detail views
+- CPU and RAM usage with progress bars and color-coded thresholds
+- Disk space bars per volume with used/total display
+- Running services list with state indicators
+- Active sessions list with usernames
+- 5-second auto-refresh with pause/resume toggle
+- Graceful degradation when workstation unreachable or WMI access denied
+
+#### AD Topology Visualization (8.5)
+- AD Topology page with canvas-based graph rendering
+- Sites displayed as containers with DCs as labeled nodes
+- Replication links as color-coded arrows (green/yellow/red)
+- Site links as dashed lines with cost and replication interval labels
+- GC and PDC badges on DC nodes
+- Interactive zoom (mouse wheel + buttons) and pan (click-drag)
+- Fit-to-view button and PNG export
+
+### Changed
+- Added Infrastructure group to sidebar navigation
+- Added search_configuration method to DirectoryProvider trait for Configuration partition queries
+
 ## [0.7.0] - 2026-03-21
 
 Epic 7 - Administration and Object Management. Administrative tools for
