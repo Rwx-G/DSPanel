@@ -10,6 +10,7 @@ pub mod ou_node;
 pub mod preset;
 pub mod printer;
 pub mod replication_status;
+pub mod system_metrics;
 
 pub use contact::ContactInfo;
 pub use deleted_object::DeletedObject;

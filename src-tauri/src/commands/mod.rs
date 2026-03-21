@@ -6,6 +6,7 @@ use crate::error::AppError;
 use crate::models::dc_health::DcHealthResult;
 use crate::models::dns_validation::DnsKerberosReport;
 use crate::models::replication_status::ReplicationPartnership;
+use crate::models::system_metrics::SystemMetrics;
 use crate::models::{DeletedObject, DirectoryEntry, OUNode, ObjectSnapshot, Preset, SnapshotDiff};
 use crate::services::app_settings::AppSettings;
 use crate::services::audit::AuditEntry;
@@ -3525,6 +3526,43 @@ pub async fn get_dns_kerberos_validation(
     state: State<'_, AppState>,
 ) -> Result<DnsKerberosReport, AppError> {
     get_dns_kerberos_validation_inner(&state, threshold_seconds).await
+}
+
+// ---------------------------------------------------------------------------
+// Workstation Monitoring - Inner functions
+// ---------------------------------------------------------------------------
+
+/// Returns system metrics from a remote workstation via PowerShell remoting.
+/// Requires HelpDesk permission (accessible from computer lookup).
+pub(crate) async fn get_workstation_metrics_inner(
+    state: &AppState,
+    hostname: &str,
+) -> Result<SystemMetrics, AppError> {
+    if !state
+        .permission_service
+        .has_permission(PermissionLevel::HelpDesk)
+    {
+        return Err(AppError::PermissionDenied(
+            "Workstation monitoring requires HelpDesk permission or higher".to_string(),
+        ));
+    }
+
+    crate::services::workstation_monitor::get_system_metrics(hostname)
+        .await
+        .map_err(|e| AppError::Internal(e.to_string()))
+}
+
+// ---------------------------------------------------------------------------
+// Workstation Monitoring - Tauri commands
+// ---------------------------------------------------------------------------
+
+/// Returns system metrics (CPU, RAM, disk, services, sessions) from a remote workstation.
+#[tauri::command]
+pub async fn get_workstation_metrics(
+    hostname: String,
+    state: State<'_, AppState>,
+) -> Result<SystemMetrics, AppError> {
+    get_workstation_metrics_inner(&state, &hostname).await
 }
 
 #[allow(clippy::unwrap_used)]

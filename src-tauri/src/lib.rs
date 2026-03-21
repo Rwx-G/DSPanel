@@ -300,6 +300,7 @@ pub fn run() {
             commands::get_replication_status,
             commands::force_replication_cmd,
             commands::get_dns_kerberos_validation,
+            commands::get_workstation_metrics,
         ])
         .run(tauri::generate_context!())
         .unwrap_or_else(|e| {
