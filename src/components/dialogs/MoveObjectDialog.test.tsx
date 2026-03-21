@@ -1,8 +1,12 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, beforeAll } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { type ReactNode } from "react";
 import { MoveObjectDialog, type MoveTarget } from "./MoveObjectDialog";
 import { NotificationProvider } from "@/contexts/NotificationContext";
+
+beforeAll(() => {
+  Element.prototype.scrollIntoView = vi.fn();
+});
 
 const mockInvoke = vi.fn();
 vi.mock("@tauri-apps/api/core", () => ({
@@ -89,9 +93,10 @@ describe("MoveObjectDialog", () => {
     expect(screen.getByTestId("ou-picker")).toBeInTheDocument();
   });
 
-  it("disables Next button when no OU is selected", () => {
+  it("enables Next button when current OU is pre-selected", () => {
     renderDialog();
-    expect(screen.getByTestId("move-next")).toBeDisabled();
+    // The dialog pre-selects the current parent OU from the target's DN
+    expect(screen.getByTestId("move-next")).not.toBeDisabled();
   });
 
   it("enables Next button when an OU is selected", () => {

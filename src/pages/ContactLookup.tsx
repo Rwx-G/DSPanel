@@ -19,30 +19,56 @@ import {
 import { usePermissions } from "@/hooks/usePermissions";
 import { useErrorHandler } from "@/hooks/useErrorHandler";
 import { useNotifications } from "@/contexts/NotificationContext";
-import type { ContactInfo } from "@/types/contact";
+import { useDialog } from "@/contexts/DialogContext";
+import { useBrowse } from "@/hooks/useBrowse";
+import { useModifyAttribute } from "@/hooks/useModifyAttribute";
+import { type ContactInfo, mapEntryToContact } from "@/types/contact";
 import {
   Contact,
   AlertCircle,
   UserX,
   Trash2,
-  Pencil,
   FolderInput,
 } from "lucide-react";
 
+function useContactBrowse() {
+  return useBrowse<ContactInfo>({
+    browseCommand: "browse_contacts",
+    searchCommand: "search_contacts",
+    mapEntry: mapEntryToContact,
+    clientFilter: (c, lower) =>
+      c.displayName.toLowerCase().includes(lower) ||
+      c.email.toLowerCase().includes(lower) ||
+      c.company.toLowerCase().includes(lower) ||
+      c.firstName.toLowerCase().includes(lower) ||
+      c.lastName.toLowerCase().includes(lower),
+    itemKey: (c) => c.dn,
+    preloadAll: true,
+  });
+}
+
 export function ContactLookup() {
-  const [query, setQuery] = useState("");
-  const [contacts, setContacts] = useState<ContactInfo[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedContact, setSelectedContact] = useState<ContactInfo | null>(
-    null,
-  );
-  const [editMode, setEditMode] = useState(false);
+  const {
+    items: contacts,
+    loading,
+    loadingMore,
+    error,
+    hasMore,
+    filterText,
+    setFilterText,
+    loadMore,
+    selectedItem: selectedContact,
+    setSelectedItem: setSelectedContact,
+    refresh,
+  } = useContactBrowse();
 
   const { hasPermission } = usePermissions();
   const canEdit = hasPermission("AccountOperator");
   const { handleError } = useErrorHandler();
   const { notify } = useNotifications();
+  const { showConfirmation } = useDialog();
+  const { pendingChanges, saving, stageChange, clearChanges, submitChanges } =
+    useModifyAttribute();
 
   const [contextMenuPos, setContextMenuPos] = useState<{
     x: number;
@@ -53,46 +79,18 @@ export function ContactLookup() {
   );
   const [moveTargets, setMoveTargets] = useState<MoveTarget[] | null>(null);
 
-  const searchContacts = useCallback(
-    async (searchQuery: string) => {
-      setQuery(searchQuery);
-      if (searchQuery.length < 2) {
-        setContacts([]);
-        setError(null);
-        return;
-      }
-      setLoading(true);
-      setError(null);
-      try {
-        const results = await invoke<ContactInfo[]>("search_contacts", {
-          query: searchQuery,
-        });
-        setContacts(results);
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        setError(msg);
-        setContacts([]);
-        handleError(err, "searching contacts");
-      } finally {
-        setLoading(false);
-      }
-    },
-    [handleError],
-  );
-
   const handleDelete = useCallback(
     async (contact: ContactInfo) => {
-      if (
-        !window.confirm(
-          `Are you sure you want to delete contact "${contact.displayName || contact.dn}"?`,
-        )
-      ) {
-        return;
-      }
+      const confirmed = await showConfirmation(
+        "Delete Contact",
+        `Are you sure you want to delete "${contact.displayName || contact.dn}"?`,
+        "This action cannot be undone.",
+      );
+      if (!confirmed) return;
       try {
         await invoke("delete_contact", { dn: contact.dn });
         notify("Contact deleted successfully", "success");
-        setContacts((prev) => prev.filter((c) => c.dn !== contact.dn));
+        refresh();
         if (selectedContact?.dn === contact.dn) {
           setSelectedContact(null);
         }
@@ -100,29 +98,30 @@ export function ContactLookup() {
         handleError(err, "deleting contact");
       }
     },
-    [selectedContact, handleError, notify],
+    [selectedContact, setSelectedContact, handleError, notify, refresh, showConfirmation],
   );
 
   const handleEdit = useCallback(
-    async (attributeName: string, _oldValue: string, newValue: string) => {
-      if (!selectedContact) return;
-      try {
-        await invoke("update_contact", {
-          dn: selectedContact.dn,
-          attrs: { [attributeName]: newValue },
-        });
-        const updated = { ...selectedContact, [attributeName]: newValue };
-        setSelectedContact(updated);
-        setContacts((prev) =>
-          prev.map((c) => (c.dn === updated.dn ? updated : c)),
-        );
-        notify("Contact updated successfully", "success");
-      } catch (err) {
-        handleError(err, "updating contact");
-      }
+    (attributeName: string, oldValue: string, newValue: string) => {
+      stageChange(attributeName, oldValue, newValue);
     },
-    [selectedContact, handleError, notify],
+    [stageChange],
   );
+
+  const handleSaveChanges = useCallback(async () => {
+    if (!selectedContact) return;
+    const confirmed = await showConfirmation(
+      "Save Changes",
+      `Apply ${pendingChanges.length} change(s) to "${selectedContact.displayName || selectedContact.dn}"?`,
+      pendingChanges.map((c) => `${c.attributeName}: ${c.newValue}`).join("\n"),
+    );
+    if (!confirmed) return;
+    const success = await submitChanges(selectedContact.dn);
+    if (success) {
+      notify("Contact updated successfully", "success");
+      refresh();
+    }
+  }, [selectedContact, pendingChanges, showConfirmation, submitChanges, notify, refresh]);
 
   const handleContextMenu = useCallback(
     (e: React.MouseEvent, contact: ContactInfo) => {
@@ -152,81 +151,36 @@ export function ContactLookup() {
 
   const buildPropertyGroups = useCallback(
     (contact: ContactInfo): PropertyGroup[] => {
-      const isEditable = editMode && canEdit;
+      const isEditable = canEdit;
       return [
         {
           category: "Identity",
           items: [
-            {
-              label: "Display Name",
-              value: contact.displayName,
-              editable: isEditable,
-              attributeName: "displayName",
-            },
-            {
-              label: "First Name",
-              value: contact.firstName,
-              editable: isEditable,
-              attributeName: "firstName",
-            },
-            {
-              label: "Last Name",
-              value: contact.lastName,
-              editable: isEditable,
-              attributeName: "lastName",
-            },
+            { label: "Display Name", value: contact.displayName, editable: isEditable, attributeName: "displayName" },
+            { label: "First Name", value: contact.firstName, editable: isEditable, attributeName: "givenName" },
+            { label: "Last Name", value: contact.lastName, editable: isEditable, attributeName: "sn" },
             { label: "Distinguished Name", value: contact.dn },
           ],
         },
         {
           category: "Contact Info",
           items: [
-            {
-              label: "Email",
-              value: contact.email,
-              editable: isEditable,
-              attributeName: "email",
-            },
-            {
-              label: "Phone",
-              value: contact.phone,
-              editable: isEditable,
-              attributeName: "phone",
-            },
-            {
-              label: "Mobile",
-              value: contact.mobile,
-              editable: isEditable,
-              attributeName: "mobile",
-            },
+            { label: "Email", value: contact.email, editable: isEditable, attributeName: "mail" },
+            { label: "Phone", value: contact.phone, editable: isEditable, attributeName: "telephoneNumber" },
+            { label: "Mobile", value: contact.mobile, editable: isEditable, attributeName: "mobile" },
           ],
         },
         {
           category: "Organization",
           items: [
-            {
-              label: "Company",
-              value: contact.company,
-              editable: isEditable,
-              attributeName: "company",
-            },
-            {
-              label: "Department",
-              value: contact.department,
-              editable: isEditable,
-              attributeName: "department",
-            },
-            {
-              label: "Description",
-              value: contact.description,
-              editable: isEditable,
-              attributeName: "description",
-            },
+            { label: "Company", value: contact.company, editable: isEditable, attributeName: "company" },
+            { label: "Department", value: contact.department, editable: isEditable, attributeName: "department" },
+            { label: "Description", value: contact.description, editable: isEditable, attributeName: "description" },
           ],
         },
       ];
     },
-    [editMode, canEdit],
+    [canEdit],
   );
 
   const renderContactItem = useCallback(
@@ -237,10 +191,7 @@ export function ContactLookup() {
             ? "bg-[var(--color-surface-selected)]"
             : ""
         }`}
-        onClick={() => {
-          setSelectedContact(contact);
-          setEditMode(false);
-        }}
+        onClick={() => setSelectedContact(contact)}
         onContextMenu={(e) => handleContextMenu(e, contact)}
         data-testid={`contact-result-${contact.dn}`}
       >
@@ -258,7 +209,7 @@ export function ContactLookup() {
         </div>
       </button>
     ),
-    [selectedContact, handleContextMenu],
+    [selectedContact, setSelectedContact, handleContextMenu],
   );
 
   return (
@@ -266,9 +217,9 @@ export function ContactLookup() {
       <div className="flex items-center gap-2 border-b border-[var(--color-border-subtle)] px-3 py-2">
         <div className="flex-1">
           <SearchBar
-            value={query}
-            onChange={searchContacts}
-            onSearch={searchContacts}
+            value={filterText}
+            onChange={setFilterText}
+            onSearch={setFilterText}
             placeholder="Search contacts by name, email, or company..."
             debounceMs={300}
           />
@@ -280,15 +231,11 @@ export function ContactLookup() {
         aria-live="polite"
         data-testid="contact-lookup-status"
       >
-        {loading && "Searching contacts..."}
+        {loading && "Loading contacts..."}
         {!loading &&
           contacts.length > 0 &&
           `${contacts.length} contact${contacts.length > 1 ? "s" : ""} found`}
-        {!loading &&
-          contacts.length === 0 &&
-          !error &&
-          query.length >= 2 &&
-          "No contacts found"}
+        {!loading && contacts.length === 0 && !error && "No contacts found"}
         {error && `Error: ${error}`}
       </div>
 
@@ -298,7 +245,7 @@ export function ContactLookup() {
             className="flex flex-1 items-center justify-center"
             data-testid="contact-lookup-loading"
           >
-            <LoadingSpinner message="Searching contacts..." />
+            <LoadingSpinner message="Loading contacts..." />
           </div>
         )}
 
@@ -309,32 +256,23 @@ export function ContactLookup() {
           >
             <EmptyState
               icon={<AlertCircle size={48} />}
-              title="Failed to search contacts"
+              title="Failed to load contacts"
               description={error}
-              action={{
-                label: "Retry",
-                onClick: () => searchContacts(query),
-              }}
+              action={{ label: "Retry", onClick: refresh }}
             />
           </div>
         )}
 
-        {!loading && !error && query.length < 2 && (
-          <div className="flex flex-1 items-center justify-center">
-            <EmptyState
-              icon={<Contact size={48} />}
-              title="Search for contacts"
-              description="Enter at least 2 characters to search."
-            />
-          </div>
-        )}
-
-        {!loading && !error && query.length >= 2 && contacts.length === 0 && (
+        {!loading && !error && contacts.length === 0 && (
           <div className="flex flex-1 items-center justify-center">
             <EmptyState
               icon={<UserX size={48} />}
               title="No contacts found"
-              description={`No contacts match "${query}".`}
+              description={
+                filterText
+                  ? `No contacts match "${filterText}".`
+                  : "No contacts available."
+              }
             />
           </div>
         )}
@@ -350,6 +288,8 @@ export function ContactLookup() {
                 renderItem={renderContactItem}
                 estimateSize={52}
                 itemKey={(contact) => contact.dn}
+                loadingMore={loadingMore}
+                onEndReached={hasMore ? loadMore : undefined}
                 className="h-full"
               />
             </div>
@@ -360,35 +300,67 @@ export function ContactLookup() {
             >
               {selectedContact ? (
                 <div data-testid="contact-detail">
-                  <div className="mb-4 flex items-center justify-between">
+                  <div className="mb-4">
                     <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">
                       {selectedContact.displayName ||
                         `${selectedContact.firstName} ${selectedContact.lastName}`.trim()}
                     </h2>
+                  </div>
+
+                  <div className="mb-4 flex flex-wrap items-center gap-2">
                     {canEdit && (
-                      <div className="flex items-center gap-2">
-                        <button
-                          className={`btn btn-sm ${editMode ? "btn-outline" : "btn-ghost"}`}
-                          onClick={() => setEditMode(!editMode)}
-                          data-testid="contact-edit-btn"
+                      <button
+                        className="btn btn-sm flex items-center gap-1"
+                        style={{ color: "var(--color-error)", borderColor: "var(--color-error)" }}
+                        onClick={() => handleDelete(selectedContact)}
+                        data-testid="contact-delete-btn"
+                      >
+                        <Trash2 size={14} />
+                        Delete
+                      </button>
+                    )}
+
+                    {pendingChanges.length > 0 && (
+                      <>
+                        <div className="mx-1 h-6 w-px bg-[var(--color-border-default)]" />
+                        <div
+                          className="flex items-center gap-2 rounded-lg border border-[var(--color-primary)] bg-[var(--color-primary-subtle)] px-3 py-1"
+                          data-testid="pending-changes-bar"
                         >
-                          <Pencil size={14} />
-                          {editMode ? "Done" : "Edit"}
-                        </button>
-                        <button
-                          className="btn btn-sm btn-ghost text-[var(--color-error)]"
-                          onClick={() => handleDelete(selectedContact)}
-                          data-testid="contact-delete-btn"
-                        >
-                          <Trash2 size={14} />
-                          Delete
-                        </button>
-                      </div>
+                          <span className="text-caption text-[var(--color-text-primary)]">
+                            {pendingChanges.length} change(s)
+                            {pendingChanges.map((c) => (
+                              <span
+                                key={c.attributeName}
+                                className="ml-1.5 inline-block rounded bg-[var(--color-surface-card)] px-1.5 py-0.5 text-[10px] font-mono"
+                              >
+                                {c.attributeName}
+                              </span>
+                            ))}
+                          </span>
+                          <button
+                            onClick={clearChanges}
+                            className="btn btn-sm btn-ghost"
+                            data-testid="discard-changes-btn"
+                          >
+                            Discard
+                          </button>
+                          <button
+                            onClick={handleSaveChanges}
+                            disabled={saving}
+                            className="btn btn-sm btn-primary"
+                            data-testid="save-changes-btn"
+                          >
+                            {saving ? "Saving..." : "Save"}
+                          </button>
+                        </div>
+                      </>
                     )}
                   </div>
+
                   <PropertyGrid
                     groups={buildPropertyGroups(selectedContact)}
-                    onEdit={editMode && canEdit ? handleEdit : undefined}
+                    onEdit={canEdit ? handleEdit : undefined}
                   />
                 </div>
               ) : (
@@ -413,7 +385,7 @@ export function ContactLookup() {
         <MoveObjectDialog
           targets={moveTargets}
           onClose={() => setMoveTargets(null)}
-          onMoved={() => searchContacts(query)}
+          onMoved={refresh}
         />
       )}
     </div>

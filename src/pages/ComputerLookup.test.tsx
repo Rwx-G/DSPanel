@@ -7,6 +7,33 @@ vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
 }));
 
+vi.mock("@/hooks/usePermissions", () => ({
+  usePermissions: () => ({
+    level: "ReadOnly",
+    groups: [],
+    loading: false,
+    hasPermission: () => false,
+  }),
+}));
+
+vi.mock("@/contexts/DialogContext", () => ({
+  useDialog: () => ({
+    showConfirmation: vi.fn(),
+  }),
+}));
+
+vi.mock("@/contexts/NotificationContext", () => ({
+  useNotifications: () => ({
+    notify: vi.fn(),
+  }),
+}));
+
+vi.mock("@/hooks/useErrorHandler", () => ({
+  useErrorHandler: () => ({
+    handleError: vi.fn(),
+  }),
+}));
+
 // Mock react-virtual to avoid needing real scroll container measurements
 vi.mock("@tanstack/react-virtual", () => ({
   useVirtualizer: vi.fn(({ count, estimateSize, getItemKey }) => {

@@ -457,6 +457,10 @@ export function UserLookup() {
                   groupFilterText={groupFilterText}
                   onGroupFilterText={setGroupFilterText}
                   onRefresh={refreshSelectedUser}
+                  onDeleted={() => {
+                    setSelectedUser(null);
+                    refresh();
+                  }}
                   schemaAttributes={schemaAttributes}
                 />
               ) : (

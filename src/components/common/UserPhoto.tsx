@@ -118,10 +118,10 @@ export function UserPhoto({
 
   return (
     <div
-      className="flex items-center gap-3"
+      className="flex items-center gap-2 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-surface-card)] p-2"
       data-testid="user-photo"
     >
-      <div className="relative">
+      <div className="relative shrink-0">
         {loading ? (
           <div
             className="flex items-center justify-center rounded-full bg-[var(--color-surface-elevated)]"
@@ -156,7 +156,7 @@ export function UserPhoto({
       {canEdit && !loading && (
         <div className="flex flex-col gap-1">
           <button
-            className="btn btn-sm"
+            className="btn btn-sm flex items-center gap-1"
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
             data-testid="upload-photo-btn"
@@ -166,11 +166,11 @@ export function UserPhoto({
             ) : (
               <Upload size={12} />
             )}
-            {photoBase64 ? "Change Photo" : "Upload Photo"}
+            {photoBase64 ? "Change" : "Upload"}
           </button>
           {photoBase64 && (
             <button
-              className="btn btn-sm"
+              className="btn btn-sm flex items-center gap-1"
               onClick={handleRemove}
               disabled={uploading}
               data-testid="remove-photo-btn"

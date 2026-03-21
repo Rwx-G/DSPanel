@@ -291,7 +291,13 @@ export function ComputerLookup() {
               data-testid="computer-detail-panel"
             >
               {selectedComputer ? (
-                <ComputerDetail computer={selectedComputer} />
+                <ComputerDetail
+                  computer={selectedComputer}
+                  onDeleted={() => {
+                    setSelectedComputer(null);
+                    refresh();
+                  }}
+                />
               ) : (
                 <div className="flex h-full items-center justify-center">
                   <p className="text-body text-[var(--color-text-secondary)]">

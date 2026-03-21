@@ -196,6 +196,12 @@ pub trait DirectoryProvider: Send + Sync {
     /// apply to the "user" class. Returns just the `lDAPDisplayName` values.
     async fn get_schema_attributes(&self) -> Result<Vec<String>>;
 
+    /// Fetches all contact objects (up to `max_results`) for browsing.
+    async fn browse_contacts(&self, max_results: usize) -> Result<Vec<DirectoryEntry>>;
+
+    /// Fetches all printer objects (up to `max_results`) for browsing.
+    async fn browse_printers(&self, max_results: usize) -> Result<Vec<DirectoryEntry>>;
+
     /// Checks whether the AD Recycle Bin optional feature is enabled.
     ///
     /// Looks for the Recycle Bin feature GUID in `msDS-EnabledFeature`
@@ -722,6 +728,16 @@ pub mod tests {
                 "sAMAccountName".to_string(),
                 "telephoneNumber".to_string(),
             ])
+        }
+
+        async fn browse_contacts(&self, _max_results: usize) -> Result<Vec<DirectoryEntry>> {
+            self.check_failure()?;
+            Ok(Vec::new())
+        }
+
+        async fn browse_printers(&self, _max_results: usize) -> Result<Vec<DirectoryEntry>> {
+            self.check_failure()?;
+            Ok(Vec::new())
         }
 
         async fn create_user(

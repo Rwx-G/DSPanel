@@ -1870,6 +1870,68 @@ impl DirectoryProvider for LdapDirectoryProvider {
         Ok((can_write_user, can_write_group, can_create))
     }
 
+    async fn browse_contacts(&self, max_results: usize) -> Result<Vec<DirectoryEntry>> {
+        let base_dn = self
+            .base_dn()
+            .ok_or_else(|| anyhow::anyhow!("Not connected"))?;
+        let max = max_results;
+        self.with_connection(|mut ldap| {
+            let base = base_dn.clone();
+            async move {
+                let (rs, _) = ldap
+                    .search(
+                        &base,
+                        ldap3::Scope::Subtree,
+                        "(objectClass=contact)",
+                        vec!["cn", "displayName", "mail", "company", "department", "givenName", "sn", "telephoneNumber", "mobile", "description"],
+                    )
+                    .await
+                    .context("Failed to browse contacts")?
+                    .success()
+                    .context("Browse contacts returned error")?;
+
+                let entries: Vec<DirectoryEntry> = rs
+                    .into_iter()
+                    .take(max)
+                    .map(|e| search_entry_to_directory_entry(ldap3::SearchEntry::construct(e)))
+                    .collect();
+                Ok(entries)
+            }
+        })
+        .await
+    }
+
+    async fn browse_printers(&self, max_results: usize) -> Result<Vec<DirectoryEntry>> {
+        let base_dn = self
+            .base_dn()
+            .ok_or_else(|| anyhow::anyhow!("Not connected"))?;
+        let max = max_results;
+        self.with_connection(|mut ldap| {
+            let base = base_dn.clone();
+            async move {
+                let (rs, _) = ldap
+                    .search(
+                        &base,
+                        ldap3::Scope::Subtree,
+                        "(objectClass=printQueue)",
+                        vec!["cn", "printerName", "location", "serverName", "uNCName", "driverName", "description"],
+                    )
+                    .await
+                    .context("Failed to browse printers")?
+                    .success()
+                    .context("Browse printers returned error")?;
+
+                let entries: Vec<DirectoryEntry> = rs
+                    .into_iter()
+                    .take(max)
+                    .map(|e| search_entry_to_directory_entry(ldap3::SearchEntry::construct(e)))
+                    .collect();
+                Ok(entries)
+            }
+        })
+        .await
+    }
+
     async fn get_schema_attributes(&self) -> Result<Vec<String>> {
         if self.domain.is_none() {
             return Ok(Vec::new());
@@ -1975,12 +2037,21 @@ impl DirectoryProvider for LdapDirectoryProvider {
                     .success()
                     .context("Recycle Bin feature query returned error")?;
 
-                let recycle_bin_guid = "766ddcd8-acd0-445e-f3b9-a7f9b6744f2a";
                 for entry in rs {
                     let se = ldap3::SearchEntry::construct(entry);
-                    if let Some(features) = se.attrs.get("msDS-EnabledFeature") {
+                    // Case-insensitive attr lookup: some ADs return lowercase attr names
+                    let features = se
+                        .attrs
+                        .iter()
+                        .find(|(k, _)| k.eq_ignore_ascii_case("msDS-EnabledFeature"))
+                        .map(|(_, v)| v);
+                    if let Some(features) = features {
                         for feature in features {
-                            if feature.to_lowercase().contains(recycle_bin_guid) {
+                            let lower = feature.to_lowercase();
+                            // Match by DN name or by feature GUID
+                            if lower.contains("recycle bin feature")
+                                || lower.contains("766ddcd8-acd0-445e-f3b9-a7f9b6744f2a")
+                            {
                                 return Ok(true);
                             }
                         }
@@ -2036,17 +2107,37 @@ impl DirectoryProvider for LdapDirectoryProvider {
                         .and_then(|v| v.first())
                         .cloned()
                         .unwrap_or_default();
-                    let name = cn.split('\0').next().unwrap_or(&cn).to_string();
+                    // Strip DEL:<guid> suffix - AD uses \0A (newline) or \0 as separator
+                    let name = if let Some(pos) = cn.find("\nDEL:") {
+                        cn[..pos].to_string()
+                    } else if let Some(pos) = cn.find('\0') {
+                        cn[..pos].to_string()
+                    } else if let Some(pos) = cn.find(" DEL:") {
+                        cn[..pos].to_string()
+                    } else if let Some(pos) = cn.find("\rDEL:") {
+                        cn[..pos].to_string()
+                    } else {
+                        // Fallback: strip anything after " DEL:" or any DEL:<guid> pattern
+                        let re_stripped = cn
+                            .find("DEL:")
+                            .map(|pos| cn[..pos].trim_end().to_string())
+                            .unwrap_or_else(|| cn.clone());
+                        re_stripped
+                    };
                     let object_type = se
                         .attrs
                         .get("objectClass")
                         .map(|classes| {
-                            if classes.iter().any(|c| c == "user") {
-                                "user"
-                            } else if classes.iter().any(|c| c == "computer") {
+                            if classes.iter().any(|c| c == "computer") {
                                 "computer"
+                            } else if classes.iter().any(|c| c == "user") {
+                                "user"
                             } else if classes.iter().any(|c| c == "group") {
                                 "group"
+                            } else if classes.iter().any(|c| c == "contact") {
+                                "contact"
+                            } else if classes.iter().any(|c| c == "printQueue") {
+                                "printQueue"
                             } else {
                                 "other"
                             }
@@ -2082,35 +2173,51 @@ impl DirectoryProvider for LdapDirectoryProvider {
     }
 
     async fn restore_deleted_object(&self, deleted_dn: &str, target_ou_dn: &str) -> Result<()> {
+        // Extract clean CN by stripping the \0ADEL:<guid> suffix
         let cn_part = deleted_dn.split(',').next().unwrap_or(deleted_dn);
         let cn = cn_part
             .strip_prefix("CN=")
             .or_else(|| cn_part.strip_prefix("cn="))
             .unwrap_or(cn_part);
-        let clean_cn = cn.split('\0').next().unwrap_or(cn);
-        let new_rdn = format!("CN={}", clean_cn);
+        // Handle both \0ADEL: (binary null) and \0ADEL: (literal backslash-0)
+        let clean_cn = if let Some(pos) = cn.find('\0') {
+            &cn[..pos]
+        } else if let Some(pos) = cn.find("\\0ADEL:") {
+            &cn[..pos]
+        } else if let Some(pos) = cn.find("\\0a") {
+            &cn[..pos]
+        } else {
+            cn
+        };
+        let new_dn = format!("CN={},{}", clean_cn, target_ou_dn);
         let target = target_ou_dn.to_string();
 
         self.with_connection(|mut ldap| {
-            let new_rdn = new_rdn.clone();
+            let new_dn = new_dn.clone();
             let target = target.clone();
             async move {
-                let mods = vec![ldap3::Mod::Delete(
-                    "isDeleted",
-                    std::collections::HashSet::new(),
-                )];
+                // ShowDeletedControl is required to access deleted objects
+                let show_deleted = ldap3::controls::RawControl {
+                    ctype: "1.2.840.113556.1.4.417".to_string(),
+                    crit: true,
+                    val: None,
+                };
+                ldap.with_controls(vec![show_deleted]);
+
+                // AD restore: single modify that removes isDeleted and sets new DN
+                let mods = vec![
+                    ldap3::Mod::Delete("isDeleted", std::collections::HashSet::new()),
+                    ldap3::Mod::Replace(
+                        "distinguishedName",
+                        std::collections::HashSet::from([new_dn.as_str()]),
+                    ),
+                ];
 
                 ldap.modify(deleted_dn, mods)
                     .await
-                    .context("Failed to remove isDeleted attribute")?
+                    .context("Failed to restore deleted object")?
                     .success()
-                    .context("Remove isDeleted returned error")?;
-
-                ldap.modifydn(deleted_dn, &new_rdn, true, Some(&target))
-                    .await
-                    .context("Failed to move restored object")?
-                    .success()
-                    .context("Move restored object returned error")?;
+                    .context("Restore deleted object returned error")?;
 
                 tracing::info!(
                     deleted_dn = %deleted_dn,

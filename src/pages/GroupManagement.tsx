@@ -425,6 +425,10 @@ export function GroupManagement() {
                   membersLoading={membersLoading}
                   canManageMembers={canManageMembers}
                   onMembersRefresh={loadMembers}
+                  onDeleted={() => {
+                    setSelectedGroup(null);
+                    refresh();
+                  }}
                 />
               ) : (
                 <div className="flex h-full items-center justify-center">

@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { type ReactNode } from "react";
 import { ContactLookup } from "./ContactLookup";
 import { NotificationProvider } from "@/contexts/NotificationContext";
-import type { ContactInfo } from "@/types/contact";
+import type { DirectoryEntry } from "@/types/directory";
 
 const mockInvoke = vi.fn();
 vi.mock("@tauri-apps/api/core", () => ({
@@ -31,6 +31,22 @@ vi.mock("@/hooks/useErrorHandler", () => ({
   }),
 }));
 
+vi.mock("@/contexts/DialogContext", () => ({
+  useDialog: () => ({
+    showConfirmation: vi.fn(),
+  }),
+}));
+
+vi.mock("@/hooks/useModifyAttribute", () => ({
+  useModifyAttribute: () => ({
+    pendingChanges: [],
+    saving: false,
+    stageChange: vi.fn(),
+    clearChanges: vi.fn(),
+    submitChanges: vi.fn(),
+  }),
+}));
+
 const mockHasPermission = vi.fn().mockReturnValue(false);
 vi.mock("@/hooks/usePermissions", () => ({
   usePermissions: () => ({
@@ -45,19 +61,36 @@ function Wrapper({ children }: { children: ReactNode }) {
   return <NotificationProvider>{children}</NotificationProvider>;
 }
 
-function makeContact(overrides: Partial<ContactInfo> = {}): ContactInfo {
+function makeContactEntry(
+  displayName: string,
+  overrides: Partial<DirectoryEntry> = {},
+): DirectoryEntry {
+  const dn = `CN=${displayName},OU=Contacts,DC=example,DC=com`;
   return {
-    dn: "CN=John Doe,OU=Contacts,DC=example,DC=com",
-    displayName: "John Doe",
-    firstName: "John",
-    lastName: "Doe",
-    email: "john.doe@example.com",
-    phone: "+1234567890",
-    mobile: "+0987654321",
-    company: "Acme Corp",
-    department: "Engineering",
-    description: "Test contact",
+    distinguishedName: dn,
+    samAccountName: displayName.toLowerCase().replace(/\s/g, "."),
+    displayName,
+    objectClass: "contact",
+    attributes: {
+      displayName: [displayName],
+      givenName: [displayName.split(" ")[0] || ""],
+      sn: [displayName.split(" ")[1] || ""],
+      mail: [`${displayName.toLowerCase().replace(/\s/g, ".")}@example.com`],
+      telephoneNumber: ["+1234567890"],
+      mobile: ["+0987654321"],
+      company: ["Acme Corp"],
+      department: ["Engineering"],
+      description: ["Test contact"],
+    },
     ...overrides,
+  };
+}
+
+function makeBrowseResult(entries: DirectoryEntry[], hasMore = false) {
+  return {
+    entries,
+    totalCount: entries.length + (hasMore ? 50 : 0),
+    hasMore,
   };
 }
 
@@ -67,13 +100,22 @@ describe("ContactLookup", () => {
     mockHasPermission.mockReturnValue(false);
   });
 
-  it("renders with search bar in initial state", () => {
+  it("renders with search bar in initial state", async () => {
+    mockInvoke.mockImplementation((cmd: string) => {
+      if (cmd === "browse_contacts")
+        return Promise.resolve(makeBrowseResult([]));
+      return Promise.resolve(null);
+    });
+
     render(<ContactLookup />, { wrapper: Wrapper });
     expect(screen.getByTestId("contact-lookup")).toBeInTheDocument();
     expect(screen.getByTestId("search-bar")).toBeInTheDocument();
-    expect(
-      screen.getByText("Search for contacts"),
-    ).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("No contacts available."),
+      ).toBeInTheDocument();
+    });
   });
 
   it("shows loading state during search", async () => {
@@ -83,39 +125,24 @@ describe("ContactLookup", () => {
 
     render(<ContactLookup />, { wrapper: Wrapper });
 
-    const input = screen.getByPlaceholderText(
-      "Search contacts by name, email, or company...",
-    );
-    fireEvent.change(input, { target: { value: "john" } });
-
     await waitFor(() => {
       expect(screen.getByTestId("contact-lookup-loading")).toBeInTheDocument();
     });
   });
 
   it("displays search results", async () => {
-    const contacts = [
-      makeContact(),
-      makeContact({
-        dn: "CN=Jane Smith,OU=Contacts,DC=example,DC=com",
-        displayName: "Jane Smith",
-        firstName: "Jane",
-        lastName: "Smith",
-        email: "jane.smith@example.com",
-      }),
+    const entries = [
+      makeContactEntry("John Doe"),
+      makeContactEntry("Jane Smith"),
     ];
 
     mockInvoke.mockImplementation((cmd: string) => {
-      if (cmd === "search_contacts") return Promise.resolve(contacts);
+      if (cmd === "browse_contacts")
+        return Promise.resolve(makeBrowseResult(entries));
       return Promise.resolve(null);
     });
 
     render(<ContactLookup />, { wrapper: Wrapper });
-
-    const input = screen.getByPlaceholderText(
-      "Search contacts by name, email, or company...",
-    );
-    fireEvent.change(input, { target: { value: "john" } });
 
     await waitFor(() => {
       expect(screen.getByTestId("contact-results-list")).toBeInTheDocument();
@@ -127,16 +154,12 @@ describe("ContactLookup", () => {
 
   it("shows empty state when no contacts found", async () => {
     mockInvoke.mockImplementation((cmd: string) => {
-      if (cmd === "search_contacts") return Promise.resolve([]);
+      if (cmd === "browse_contacts")
+        return Promise.resolve(makeBrowseResult([]));
       return Promise.resolve(null);
     });
 
     render(<ContactLookup />, { wrapper: Wrapper });
-
-    const input = screen.getByPlaceholderText(
-      "Search contacts by name, email, or company...",
-    );
-    fireEvent.change(input, { target: { value: "xyz" } });
 
     await waitFor(() => {
       expect(screen.getByTestId("empty-state-title")).toHaveTextContent(
@@ -147,39 +170,30 @@ describe("ContactLookup", () => {
 
   it("shows error state on search failure", async () => {
     mockInvoke.mockImplementation((cmd: string) => {
-      if (cmd === "search_contacts")
+      if (cmd === "browse_contacts")
         return Promise.reject(new Error("LDAP error"));
       return Promise.resolve(null);
     });
 
     render(<ContactLookup />, { wrapper: Wrapper });
 
-    const input = screen.getByPlaceholderText(
-      "Search contacts by name, email, or company...",
-    );
-    fireEvent.change(input, { target: { value: "john" } });
-
     await waitFor(() => {
       expect(screen.getByTestId("contact-lookup-error")).toBeInTheDocument();
     });
 
-    expect(screen.getByText("Failed to search contacts")).toBeInTheDocument();
+    expect(screen.getByText("Failed to load contacts")).toBeInTheDocument();
   });
 
   it("shows contact detail when a contact is selected", async () => {
-    const contacts = [makeContact()];
+    const entries = [makeContactEntry("John Doe")];
 
     mockInvoke.mockImplementation((cmd: string) => {
-      if (cmd === "search_contacts") return Promise.resolve(contacts);
+      if (cmd === "browse_contacts")
+        return Promise.resolve(makeBrowseResult(entries));
       return Promise.resolve(null);
     });
 
     render(<ContactLookup />, { wrapper: Wrapper });
-
-    const input = screen.getByPlaceholderText(
-      "Search contacts by name, email, or company...",
-    );
-    fireEvent.change(input, { target: { value: "john" } });
 
     await waitFor(() => {
       expect(screen.getByTestId("contact-results-list")).toBeInTheDocument();
@@ -201,19 +215,15 @@ describe("ContactLookup", () => {
 
   it("shows edit and delete buttons for AccountOperator", async () => {
     mockHasPermission.mockReturnValue(true);
-    const contacts = [makeContact()];
+    const entries = [makeContactEntry("John Doe")];
 
     mockInvoke.mockImplementation((cmd: string) => {
-      if (cmd === "search_contacts") return Promise.resolve(contacts);
+      if (cmd === "browse_contacts")
+        return Promise.resolve(makeBrowseResult(entries));
       return Promise.resolve(null);
     });
 
     render(<ContactLookup />, { wrapper: Wrapper });
-
-    const input = screen.getByPlaceholderText(
-      "Search contacts by name, email, or company...",
-    );
-    fireEvent.change(input, { target: { value: "john" } });
 
     await waitFor(() => {
       expect(screen.getByTestId("contact-results-list")).toBeInTheDocument();
@@ -225,26 +235,21 @@ describe("ContactLookup", () => {
     fireEvent.click(contactItem);
 
     await waitFor(() => {
-      expect(screen.getByTestId("contact-edit-btn")).toBeInTheDocument();
       expect(screen.getByTestId("contact-delete-btn")).toBeInTheDocument();
     });
   });
 
   it("does not show edit/delete buttons for ReadOnly users", async () => {
     mockHasPermission.mockReturnValue(false);
-    const contacts = [makeContact()];
+    const entries = [makeContactEntry("John Doe")];
 
     mockInvoke.mockImplementation((cmd: string) => {
-      if (cmd === "search_contacts") return Promise.resolve(contacts);
+      if (cmd === "browse_contacts")
+        return Promise.resolve(makeBrowseResult(entries));
       return Promise.resolve(null);
     });
 
     render(<ContactLookup />, { wrapper: Wrapper });
-
-    const input = screen.getByPlaceholderText(
-      "Search contacts by name, email, or company...",
-    );
-    fireEvent.change(input, { target: { value: "john" } });
 
     await waitFor(() => {
       expect(screen.getByTestId("contact-results-list")).toBeInTheDocument();
@@ -259,24 +264,19 @@ describe("ContactLookup", () => {
       expect(screen.getByTestId("contact-detail")).toBeInTheDocument();
     });
 
-    expect(screen.queryByTestId("contact-edit-btn")).not.toBeInTheDocument();
     expect(screen.queryByTestId("contact-delete-btn")).not.toBeInTheDocument();
   });
 
   it("shows placeholder when no contact is selected", async () => {
-    const contacts = [makeContact()];
+    const entries = [makeContactEntry("John Doe")];
 
     mockInvoke.mockImplementation((cmd: string) => {
-      if (cmd === "search_contacts") return Promise.resolve(contacts);
+      if (cmd === "browse_contacts")
+        return Promise.resolve(makeBrowseResult(entries));
       return Promise.resolve(null);
     });
 
     render(<ContactLookup />, { wrapper: Wrapper });
-
-    const input = screen.getByPlaceholderText(
-      "Search contacts by name, email, or company...",
-    );
-    fireEvent.change(input, { target: { value: "john" } });
 
     await waitFor(() => {
       expect(screen.getByTestId("contact-results-list")).toBeInTheDocument();
@@ -289,17 +289,12 @@ describe("ContactLookup", () => {
 
   it("shows retry button on error", async () => {
     mockInvoke.mockImplementation((cmd: string) => {
-      if (cmd === "search_contacts")
+      if (cmd === "browse_contacts")
         return Promise.reject(new Error("LDAP error"));
       return Promise.resolve(null);
     });
 
     render(<ContactLookup />, { wrapper: Wrapper });
-
-    const input = screen.getByPlaceholderText(
-      "Search contacts by name, email, or company...",
-    );
-    fireEvent.change(input, { target: { value: "john" } });
 
     await waitFor(() => {
       expect(screen.getByText("Retry")).toBeInTheDocument();
@@ -307,25 +302,18 @@ describe("ContactLookup", () => {
   });
 
   it("shows accessibility status for search results", async () => {
-    const contacts = [
-      makeContact(),
-      makeContact({
-        dn: "CN=Jane,OU=Contacts,DC=example,DC=com",
-        displayName: "Jane",
-      }),
+    const entries = [
+      makeContactEntry("John Doe"),
+      makeContactEntry("Jane Smith"),
     ];
 
     mockInvoke.mockImplementation((cmd: string) => {
-      if (cmd === "search_contacts") return Promise.resolve(contacts);
+      if (cmd === "browse_contacts")
+        return Promise.resolve(makeBrowseResult(entries));
       return Promise.resolve(null);
     });
 
     render(<ContactLookup />, { wrapper: Wrapper });
-
-    const input = screen.getByPlaceholderText(
-      "Search contacts by name, email, or company...",
-    );
-    fireEvent.change(input, { target: { value: "john" } });
 
     await waitFor(() => {
       const status = screen.getByTestId("contact-lookup-status");

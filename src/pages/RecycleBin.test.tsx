@@ -1,8 +1,12 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, beforeAll } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { type ReactNode } from "react";
 import { RecycleBin } from "./RecycleBin";
 import { NotificationProvider } from "@/contexts/NotificationContext";
+
+beforeAll(() => {
+  Element.prototype.scrollIntoView = vi.fn();
+});
 
 const mockInvoke = vi.fn();
 vi.mock("@tauri-apps/api/core", () => ({

@@ -16,6 +16,8 @@ import {
   User,
   Monitor,
   Users,
+  Contact,
+  Printer,
   FileQuestion,
 } from "lucide-react";
 
@@ -27,12 +29,32 @@ interface DeletedObject {
   originalOu: string;
 }
 
-type ObjectTypeFilter = "all" | "user" | "computer" | "group";
+type ObjectTypeFilter = "all" | "user" | "computer" | "group" | "contact" | "printQueue";
+
+const TYPE_LABELS: Record<string, string> = {
+  user: "User",
+  computer: "Computer",
+  group: "Group",
+  contact: "Contact",
+  printQueue: "Printer",
+  other: "Other",
+};
+
+const TYPE_BADGE_VARIANT: Record<string, "info" | "success" | "warning" | "error" | "neutral"> = {
+  user: "info",
+  computer: "success",
+  group: "warning",
+  contact: "neutral",
+  printQueue: "error",
+  other: "neutral",
+};
 
 const TYPE_ICONS: Record<string, typeof User> = {
   user: User,
   computer: Monitor,
   group: Users,
+  contact: Contact,
+  printQueue: Printer,
   other: FileQuestion,
 };
 
@@ -88,7 +110,7 @@ export function RecycleBin() {
   }, [objects, typeFilter, filterText]);
 
   const typeCounts = useMemo(() => {
-    const counts = { user: 0, computer: 0, group: 0, other: 0 };
+    const counts = { user: 0, computer: 0, group: 0, contact: 0, printQueue: 0, other: 0 };
     for (const o of objects) {
       const key = o.objectType as keyof typeof counts;
       if (key in counts) counts[key]++;
@@ -180,6 +202,8 @@ export function RecycleBin() {
               { key: "user", label: "Users" },
               { key: "computer", label: "Computers" },
               { key: "group", label: "Groups" },
+              { key: "contact", label: "Contacts" },
+              { key: "printQueue", label: "Printers" },
             ] as const
           ).map(({ key, label }) => (
             <button
@@ -256,8 +280,8 @@ export function RecycleBin() {
                     </td>
                     <td className="px-3 py-2">
                       <StatusBadge
-                        text={obj.objectType}
-                        variant="info"
+                        text={TYPE_LABELS[obj.objectType] || obj.objectType}
+                        variant={TYPE_BADGE_VARIANT[obj.objectType] || "neutral"}
                       />
                     </td>
                     <td className="px-3 py-2 text-[var(--color-text-secondary)]">
@@ -271,7 +295,7 @@ export function RecycleBin() {
                     </td>
                     <td className="px-3 py-2">
                       <button
-                        className="btn btn-sm btn-primary"
+                        className="btn btn-sm btn-primary py-0.5"
                         onClick={() => {
                           setRestoreTarget(obj);
                           setRestoreOU(obj.originalOu);

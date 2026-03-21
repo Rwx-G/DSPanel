@@ -4,8 +4,8 @@ import { EmptyState } from "./EmptyState";
 import { LoadingSpinner } from "./LoadingSpinner";
 import {
   History,
-  Eye,
   RotateCcw,
+  Trash2,
   ChevronDown,
   ChevronUp,
   AlertTriangle,
@@ -33,9 +33,11 @@ interface SnapshotDiff {
 interface SnapshotHistoryProps {
   objectDn: string;
   canRestore: boolean;
+  refreshTrigger?: number;
+  onRestored?: () => void;
 }
 
-export function SnapshotHistory({ objectDn, canRestore }: SnapshotHistoryProps) {
+export function SnapshotHistory({ objectDn, canRestore, refreshTrigger = 0, onRestored }: SnapshotHistoryProps) {
   const [snapshots, setSnapshots] = useState<ObjectSnapshot[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<number | null>(null);
@@ -61,7 +63,7 @@ export function SnapshotHistory({ objectDn, canRestore }: SnapshotHistoryProps) 
 
   useEffect(() => {
     fetchHistory();
-  }, [fetchHistory]);
+  }, [fetchHistory, refreshTrigger]);
 
   const handleToggle = useCallback(
     async (id: number) => {
@@ -88,10 +90,11 @@ export function SnapshotHistory({ objectDn, canRestore }: SnapshotHistoryProps) 
 
   const handleRestore = useCallback(
     async (snapshot: ObjectSnapshot) => {
+      const objectName = snapshot.objectDn.split(",")[0]?.replace("CN=", "") || snapshot.objectDn;
       const confirmed = await showConfirmation(
         "Restore from Snapshot",
-        `Restore ${snapshot.objectDn} to its state from ${formatTimestamp(snapshot.timestamp)}?`,
-        "This will overwrite current attribute values with the snapshot values. This action cannot be undone.",
+        `Restore "${objectName}" to its state from ${formatTimestamp(snapshot.timestamp)}?`,
+        "This will overwrite current attribute values with the snapshot values. Read-only attributes (objectClass, memberOf, timestamps, etc.) will be skipped.",
       );
 
       if (!confirmed) return;
@@ -99,15 +102,24 @@ export function SnapshotHistory({ objectDn, canRestore }: SnapshotHistoryProps) 
       setRestoring(true);
       try {
         await invoke("restore_from_snapshot", { snapshotId: snapshot.id });
+        // Delete the consumed snapshot
+        try {
+          await invoke("delete_snapshot", { snapshotId: snapshot.id });
+        } catch {
+          // Non-blocking: snapshot stays if delete fails
+        }
         notify("Object restored from snapshot successfully.", "success");
+        setExpandedId(null);
+        setDiffs(null);
         await fetchHistory();
+        onRestored?.();
       } catch (err) {
         notify(extractErrorMessage(err), "error");
       } finally {
         setRestoring(false);
       }
     },
-    [showConfirmation, notify, fetchHistory],
+    [showConfirmation, notify, fetchHistory, onRestored],
   );
 
   if (loading) {
@@ -157,14 +169,6 @@ export function SnapshotHistory({ objectDn, canRestore }: SnapshotHistoryProps) 
                 )}
               </button>
               <div className="flex items-center gap-1">
-                <button
-                  className="btn btn-sm btn-ghost"
-                  onClick={() => handleToggle(snap.id)}
-                  title="View details"
-                  data-testid={`snapshot-view-${snap.id}`}
-                >
-                  <Eye size={14} />
-                </button>
                 {canRestore && (
                   <button
                     className="btn btn-sm btn-ghost"
@@ -176,6 +180,28 @@ export function SnapshotHistory({ objectDn, canRestore }: SnapshotHistoryProps) 
                     <RotateCcw size={14} />
                   </button>
                 )}
+                <button
+                  className="btn btn-sm btn-ghost"
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    const confirmed = await showConfirmation(
+                      "Delete Snapshot",
+                      `Delete the "${snap.operationType}" snapshot from ${formatTimestamp(snap.timestamp)}?`,
+                      "This restore point will be permanently removed.",
+                    );
+                    if (!confirmed) return;
+                    try {
+                      await invoke("delete_snapshot", { snapshotId: snap.id });
+                      await fetchHistory();
+                    } catch {
+                      notify("Failed to delete snapshot", "error");
+                    }
+                  }}
+                  title="Delete snapshot"
+                  data-testid={`snapshot-delete-${snap.id}`}
+                >
+                  <Trash2 size={14} />
+                </button>
               </div>
             </div>
 

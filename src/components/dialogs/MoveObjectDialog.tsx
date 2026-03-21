@@ -30,7 +30,9 @@ export function MoveObjectDialog({
   onClose,
   onMoved,
 }: MoveObjectDialogProps) {
-  const [selectedOU, setSelectedOU] = useState<string | undefined>();
+  // Pre-select the current parent OU of the first target
+  const currentOU = targets[0]?.distinguishedName.split(",").slice(1).join(",") || undefined;
+  const [selectedOU, setSelectedOU] = useState<string | undefined>(currentOU);
   const [step, setStep] = useState<"pick" | "preview" | "moving">("pick");
   const [moving, setMoving] = useState(false);
   const { nodes, loading, error } = useOUTree({ silent: true });

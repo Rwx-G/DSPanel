@@ -87,9 +87,14 @@ impl ObjectSnapshotService {
 
     /// Captures a snapshot storing the provided attributes JSON.
     /// Returns the row ID of the inserted snapshot.
-    pub fn capture(&self, object_dn: &str, operation_type: &str, attributes_json: &str) -> i64 {
+    pub fn capture(
+        &self,
+        object_dn: &str,
+        operation_type: &str,
+        attributes_json: &str,
+        operator: &str,
+    ) -> i64 {
         let timestamp = chrono::Utc::now().to_rfc3339();
-        let operator = std::env::var("USERNAME").unwrap_or_else(|_| "Unknown".to_string());
 
         let conn = self.conn.lock().expect("lock poisoned");
         if let Err(e) = conn.execute(
@@ -156,6 +161,17 @@ impl ObjectSnapshotService {
     }
 
     /// Deletes snapshots older than `days` days. Returns count deleted.
+    /// Deletes a single snapshot by ID.
+    pub fn delete_snapshot(&self, id: i64) -> bool {
+        let conn = self.conn.lock().expect("lock poisoned");
+        conn.execute(
+            "DELETE FROM object_snapshots WHERE id = ?1",
+            rusqlite::params![id],
+        )
+        .map(|n| n > 0)
+        .unwrap_or(false)
+    }
+
     pub fn cleanup_expired(&self, days: i64) -> usize {
         let conn = self.conn.lock().expect("lock poisoned");
         let cutoff = chrono::Utc::now() - chrono::Duration::days(days);
@@ -190,6 +206,7 @@ mod tests {
             "CN=Test,DC=example,DC=com",
             "ModifyAttribute",
             r#"{"mail":["test@example.com"]}"#,
+            "test",
         );
         assert!(id > 0);
     }
@@ -197,8 +214,8 @@ mod tests {
     #[test]
     fn test_capture_increments_id() {
         let svc = ObjectSnapshotService::new_in_memory();
-        let id1 = svc.capture("dn1", "Op1", "{}");
-        let id2 = svc.capture("dn2", "Op2", "{}");
+        let id1 = svc.capture("dn1", "Op1", "{}", "test");
+        let id2 = svc.capture("dn2", "Op2", "{}", "test");
         assert!(id2 > id1);
     }
 
@@ -209,6 +226,7 @@ mod tests {
             "CN=User,DC=example,DC=com",
             "PasswordReset",
             r#"{"attr":"val"}"#,
+            "test",
         );
         let snapshot = svc.get_snapshot(id).unwrap();
         assert_eq!(snapshot.id, id);
@@ -226,9 +244,9 @@ mod tests {
     #[test]
     fn test_get_history_returns_matching_dn_only() {
         let svc = ObjectSnapshotService::new_in_memory();
-        svc.capture("dn1", "Op1", "{}");
-        svc.capture("dn2", "Op2", "{}");
-        svc.capture("dn1", "Op3", "{}");
+        svc.capture("dn1", "Op1", "{}", "test");
+        svc.capture("dn2", "Op2", "{}", "test");
+        svc.capture("dn1", "Op3", "{}", "test");
 
         let history = svc.get_history("dn1");
         assert_eq!(history.len(), 2);
@@ -240,9 +258,9 @@ mod tests {
     #[test]
     fn test_get_history_ordered_by_most_recent_first() {
         let svc = ObjectSnapshotService::new_in_memory();
-        svc.capture("dn1", "First", "{}");
-        svc.capture("dn1", "Second", "{}");
-        svc.capture("dn1", "Third", "{}");
+        svc.capture("dn1", "First", "{}", "test");
+        svc.capture("dn1", "Second", "{}", "test");
+        svc.capture("dn1", "Third", "{}", "test");
 
         let history = svc.get_history("dn1");
         assert_eq!(history.len(), 3);
@@ -254,7 +272,7 @@ mod tests {
     #[test]
     fn test_get_history_empty_for_unknown_dn() {
         let svc = ObjectSnapshotService::new_in_memory();
-        svc.capture("dn1", "Op", "{}");
+        svc.capture("dn1", "Op", "{}", "test");
         assert!(svc.get_history("unknown").is_empty());
     }
 
@@ -262,8 +280,8 @@ mod tests {
     fn test_count_returns_total() {
         let svc = ObjectSnapshotService::new_in_memory();
         assert_eq!(svc.count(), 0);
-        svc.capture("dn1", "Op1", "{}");
-        svc.capture("dn2", "Op2", "{}");
+        svc.capture("dn1", "Op1", "{}", "test");
+        svc.capture("dn2", "Op2", "{}", "test");
         assert_eq!(svc.count(), 2);
     }
 
@@ -283,7 +301,7 @@ mod tests {
         }
 
         // Insert a fresh one via the normal API
-        svc.capture("new_dn", "NewOp", "{}");
+        svc.capture("new_dn", "NewOp", "{}", "test");
 
         assert_eq!(svc.count(), 2);
 
@@ -298,7 +316,7 @@ mod tests {
     #[test]
     fn test_cleanup_expired_large_retention_keeps_all() {
         let svc = ObjectSnapshotService::new_in_memory();
-        svc.capture("dn1", "Op", "{}");
+        svc.capture("dn1", "Op", "{}", "test");
         // With a very large retention, nothing should be deleted
         let deleted = svc.cleanup_expired(365);
         assert_eq!(deleted, 0);
@@ -308,7 +326,7 @@ mod tests {
     #[test]
     fn test_snapshot_has_operator() {
         let svc = ObjectSnapshotService::new_in_memory();
-        let id = svc.capture("dn", "Op", "{}");
+        let id = svc.capture("dn", "Op", "{}", "test");
         let snapshot = svc.get_snapshot(id).unwrap();
         assert!(!snapshot.operator.is_empty());
     }
@@ -316,7 +334,7 @@ mod tests {
     #[test]
     fn test_snapshot_has_timestamp() {
         let svc = ObjectSnapshotService::new_in_memory();
-        let id = svc.capture("dn", "Op", "{}");
+        let id = svc.capture("dn", "Op", "{}", "test");
         let snapshot = svc.get_snapshot(id).unwrap();
         assert!(!snapshot.timestamp.is_empty());
     }
@@ -329,7 +347,7 @@ mod tests {
         };
         svc.init_schema();
         svc.init_schema(); // second call - should be a no-op
-        svc.capture("dn", "Op", "{}");
+        svc.capture("dn", "Op", "{}", "test");
         assert_eq!(svc.count(), 1);
     }
 
@@ -340,6 +358,7 @@ mod tests {
             "CN=\u{00e9}l\u{00e8}ve,DC=example,DC=com",
             "Modification",
             r#"{"displayName":["\u00e9l\u00e8ve"]}"#,
+            "test",
         );
         let snapshot = svc.get_snapshot(id).unwrap();
         assert!(snapshot.object_dn.contains('\u{00e9}'));
@@ -349,7 +368,7 @@ mod tests {
     fn test_large_attributes_json() {
         let svc = ObjectSnapshotService::new_in_memory();
         let large_json = format!(r#"{{"data":"{}"}}"#, "x".repeat(10_000));
-        let id = svc.capture("dn", "Op", &large_json);
+        let id = svc.capture("dn", "Op", &large_json, "test");
         let snapshot = svc.get_snapshot(id).unwrap();
         assert_eq!(snapshot.attributes_json.len(), large_json.len());
     }
@@ -374,7 +393,7 @@ mod tests {
                 conn: Mutex::new(conn),
             };
             svc.init_schema();
-            svc.capture("CN=Test", "TestOp", r#"{"a":"b"}"#);
+            svc.capture("CN=Test", "TestOp", r#"{"a":"b"}"#, "test");
             assert_eq!(svc.count(), 1);
         }
 

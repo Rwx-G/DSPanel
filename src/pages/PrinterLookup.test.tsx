@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { type ReactNode } from "react";
 import { PrinterLookup } from "./PrinterLookup";
 import { NotificationProvider } from "@/contexts/NotificationContext";
-import type { PrinterInfo } from "@/types/printer";
+import type { DirectoryEntry } from "@/types/directory";
 
 const mockInvoke = vi.fn();
 vi.mock("@tauri-apps/api/core", () => ({
@@ -31,6 +31,22 @@ vi.mock("@/hooks/useErrorHandler", () => ({
   }),
 }));
 
+vi.mock("@/contexts/DialogContext", () => ({
+  useDialog: () => ({
+    showConfirmation: vi.fn(),
+  }),
+}));
+
+vi.mock("@/hooks/useModifyAttribute", () => ({
+  useModifyAttribute: () => ({
+    pendingChanges: [],
+    saving: false,
+    stageChange: vi.fn(),
+    clearChanges: vi.fn(),
+    submitChanges: vi.fn(),
+  }),
+}));
+
 const mockHasPermission = vi.fn().mockReturnValue(false);
 vi.mock("@/hooks/usePermissions", () => ({
   usePermissions: () => ({
@@ -45,16 +61,33 @@ function Wrapper({ children }: { children: ReactNode }) {
   return <NotificationProvider>{children}</NotificationProvider>;
 }
 
-function makePrinter(overrides: Partial<PrinterInfo> = {}): PrinterInfo {
+function makePrinterEntry(
+  name: string,
+  overrides: Partial<DirectoryEntry> = {},
+): DirectoryEntry {
+  const dn = `CN=${name.replace(/\s/g, "-")},OU=Printers,DC=example,DC=com`;
   return {
-    dn: "CN=HP-LaserJet,OU=Printers,DC=example,DC=com",
-    name: "HP LaserJet",
-    location: "Floor 2, Room 201",
-    serverName: "PRINT-SRV01",
-    sharePath: "\\\\PRINT-SRV01\\HP-LaserJet",
-    driverName: "HP Universal Printing PCL 6",
-    description: "Main office printer",
+    distinguishedName: dn,
+    samAccountName: name,
+    displayName: name,
+    objectClass: "printQueue",
+    attributes: {
+      printerName: [name],
+      location: ["Floor 2, Room 201"],
+      serverName: ["PRINT-SRV01"],
+      uNCName: [`\\\\PRINT-SRV01\\${name.replace(/\s/g, "-")}`],
+      driverName: ["HP Universal Printing PCL 6"],
+      description: ["Main office printer"],
+    },
     ...overrides,
+  };
+}
+
+function makeBrowseResult(entries: DirectoryEntry[], hasMore = false) {
+  return {
+    entries,
+    totalCount: entries.length + (hasMore ? 50 : 0),
+    hasMore,
   };
 }
 
@@ -64,13 +97,22 @@ describe("PrinterLookup", () => {
     mockHasPermission.mockReturnValue(false);
   });
 
-  it("renders with search bar in initial state", () => {
+  it("renders with search bar in initial state", async () => {
+    mockInvoke.mockImplementation((cmd: string) => {
+      if (cmd === "browse_printers")
+        return Promise.resolve(makeBrowseResult([]));
+      return Promise.resolve(null);
+    });
+
     render(<PrinterLookup />, { wrapper: Wrapper });
     expect(screen.getByTestId("printer-lookup")).toBeInTheDocument();
     expect(screen.getByTestId("search-bar")).toBeInTheDocument();
-    expect(
-      screen.getByText("Search for printers"),
-    ).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("No printers available."),
+      ).toBeInTheDocument();
+    });
   });
 
   it("shows loading state during search", async () => {
@@ -80,37 +122,34 @@ describe("PrinterLookup", () => {
 
     render(<PrinterLookup />, { wrapper: Wrapper });
 
-    const input = screen.getByPlaceholderText(
-      "Search printers by name, location, or server...",
-    );
-    fireEvent.change(input, { target: { value: "HP" } });
-
     await waitFor(() => {
       expect(screen.getByTestId("printer-lookup-loading")).toBeInTheDocument();
     });
   });
 
   it("displays search results", async () => {
-    const printers = [
-      makePrinter(),
-      makePrinter({
-        dn: "CN=Canon-iR,OU=Printers,DC=example,DC=com",
-        name: "Canon iR-ADV",
-        location: "Floor 3",
+    const entries = [
+      makePrinterEntry("HP LaserJet"),
+      makePrinterEntry("Canon iR-ADV", {
+        distinguishedName: "CN=Canon-iR,OU=Printers,DC=example,DC=com",
+        attributes: {
+          printerName: ["Canon iR-ADV"],
+          location: ["Floor 3"],
+          serverName: ["PRINT-SRV01"],
+          uNCName: ["\\\\PRINT-SRV01\\Canon-iR"],
+          driverName: ["Canon Generic Plus"],
+          description: [""],
+        },
       }),
     ];
 
     mockInvoke.mockImplementation((cmd: string) => {
-      if (cmd === "search_printers") return Promise.resolve(printers);
+      if (cmd === "browse_printers")
+        return Promise.resolve(makeBrowseResult(entries));
       return Promise.resolve(null);
     });
 
     render(<PrinterLookup />, { wrapper: Wrapper });
-
-    const input = screen.getByPlaceholderText(
-      "Search printers by name, location, or server...",
-    );
-    fireEvent.change(input, { target: { value: "printer" } });
 
     await waitFor(() => {
       expect(screen.getByTestId("printer-results-list")).toBeInTheDocument();
@@ -122,16 +161,12 @@ describe("PrinterLookup", () => {
 
   it("shows empty state when no printers found", async () => {
     mockInvoke.mockImplementation((cmd: string) => {
-      if (cmd === "search_printers") return Promise.resolve([]);
+      if (cmd === "browse_printers")
+        return Promise.resolve(makeBrowseResult([]));
       return Promise.resolve(null);
     });
 
     render(<PrinterLookup />, { wrapper: Wrapper });
-
-    const input = screen.getByPlaceholderText(
-      "Search printers by name, location, or server...",
-    );
-    fireEvent.change(input, { target: { value: "xyz" } });
 
     await waitFor(() => {
       expect(screen.getByTestId("empty-state-title")).toHaveTextContent(
@@ -142,39 +177,30 @@ describe("PrinterLookup", () => {
 
   it("shows error state on search failure", async () => {
     mockInvoke.mockImplementation((cmd: string) => {
-      if (cmd === "search_printers")
+      if (cmd === "browse_printers")
         return Promise.reject(new Error("LDAP error"));
       return Promise.resolve(null);
     });
 
     render(<PrinterLookup />, { wrapper: Wrapper });
 
-    const input = screen.getByPlaceholderText(
-      "Search printers by name, location, or server...",
-    );
-    fireEvent.change(input, { target: { value: "HP" } });
-
     await waitFor(() => {
       expect(screen.getByTestId("printer-lookup-error")).toBeInTheDocument();
     });
 
-    expect(screen.getByText("Failed to search printers")).toBeInTheDocument();
+    expect(screen.getByText("Failed to load printers")).toBeInTheDocument();
   });
 
   it("shows printer detail when a printer is selected", async () => {
-    const printers = [makePrinter()];
+    const entries = [makePrinterEntry("HP LaserJet")];
 
     mockInvoke.mockImplementation((cmd: string) => {
-      if (cmd === "search_printers") return Promise.resolve(printers);
+      if (cmd === "browse_printers")
+        return Promise.resolve(makeBrowseResult(entries));
       return Promise.resolve(null);
     });
 
     render(<PrinterLookup />, { wrapper: Wrapper });
-
-    const input = screen.getByPlaceholderText(
-      "Search printers by name, location, or server...",
-    );
-    fireEvent.change(input, { target: { value: "HP" } });
 
     await waitFor(() => {
       expect(screen.getByTestId("printer-results-list")).toBeInTheDocument();
@@ -195,19 +221,15 @@ describe("PrinterLookup", () => {
 
   it("shows delete button for DomainAdmin", async () => {
     mockHasPermission.mockReturnValue(true);
-    const printers = [makePrinter()];
+    const entries = [makePrinterEntry("HP LaserJet")];
 
     mockInvoke.mockImplementation((cmd: string) => {
-      if (cmd === "search_printers") return Promise.resolve(printers);
+      if (cmd === "browse_printers")
+        return Promise.resolve(makeBrowseResult(entries));
       return Promise.resolve(null);
     });
 
     render(<PrinterLookup />, { wrapper: Wrapper });
-
-    const input = screen.getByPlaceholderText(
-      "Search printers by name, location, or server...",
-    );
-    fireEvent.change(input, { target: { value: "HP" } });
 
     await waitFor(() => {
       expect(screen.getByTestId("printer-results-list")).toBeInTheDocument();
@@ -225,19 +247,15 @@ describe("PrinterLookup", () => {
 
   it("does not show delete button for ReadOnly users", async () => {
     mockHasPermission.mockReturnValue(false);
-    const printers = [makePrinter()];
+    const entries = [makePrinterEntry("HP LaserJet")];
 
     mockInvoke.mockImplementation((cmd: string) => {
-      if (cmd === "search_printers") return Promise.resolve(printers);
+      if (cmd === "browse_printers")
+        return Promise.resolve(makeBrowseResult(entries));
       return Promise.resolve(null);
     });
 
     render(<PrinterLookup />, { wrapper: Wrapper });
-
-    const input = screen.getByPlaceholderText(
-      "Search printers by name, location, or server...",
-    );
-    fireEvent.change(input, { target: { value: "HP" } });
 
     await waitFor(() => {
       expect(screen.getByTestId("printer-results-list")).toBeInTheDocument();
@@ -256,19 +274,15 @@ describe("PrinterLookup", () => {
   });
 
   it("shows placeholder when no printer is selected", async () => {
-    const printers = [makePrinter()];
+    const entries = [makePrinterEntry("HP LaserJet")];
 
     mockInvoke.mockImplementation((cmd: string) => {
-      if (cmd === "search_printers") return Promise.resolve(printers);
+      if (cmd === "browse_printers")
+        return Promise.resolve(makeBrowseResult(entries));
       return Promise.resolve(null);
     });
 
     render(<PrinterLookup />, { wrapper: Wrapper });
-
-    const input = screen.getByPlaceholderText(
-      "Search printers by name, location, or server...",
-    );
-    fireEvent.change(input, { target: { value: "HP" } });
 
     await waitFor(() => {
       expect(screen.getByTestId("printer-results-list")).toBeInTheDocument();
@@ -281,17 +295,12 @@ describe("PrinterLookup", () => {
 
   it("shows retry button on error", async () => {
     mockInvoke.mockImplementation((cmd: string) => {
-      if (cmd === "search_printers")
+      if (cmd === "browse_printers")
         return Promise.reject(new Error("LDAP error"));
       return Promise.resolve(null);
     });
 
     render(<PrinterLookup />, { wrapper: Wrapper });
-
-    const input = screen.getByPlaceholderText(
-      "Search printers by name, location, or server...",
-    );
-    fireEvent.change(input, { target: { value: "HP" } });
 
     await waitFor(() => {
       expect(screen.getByText("Retry")).toBeInTheDocument();
@@ -299,25 +308,20 @@ describe("PrinterLookup", () => {
   });
 
   it("shows accessibility status for search results", async () => {
-    const printers = [
-      makePrinter(),
-      makePrinter({
-        dn: "CN=Canon,OU=Printers,DC=example,DC=com",
-        name: "Canon",
+    const entries = [
+      makePrinterEntry("HP LaserJet"),
+      makePrinterEntry("Canon iR-ADV", {
+        distinguishedName: "CN=Canon,OU=Printers,DC=example,DC=com",
       }),
     ];
 
     mockInvoke.mockImplementation((cmd: string) => {
-      if (cmd === "search_printers") return Promise.resolve(printers);
+      if (cmd === "browse_printers")
+        return Promise.resolve(makeBrowseResult(entries));
       return Promise.resolve(null);
     });
 
     render(<PrinterLookup />, { wrapper: Wrapper });
-
-    const input = screen.getByPlaceholderText(
-      "Search printers by name, location, or server...",
-    );
-    fireEvent.change(input, { target: { value: "printer" } });
 
     await waitFor(() => {
       const status = screen.getByTestId("printer-lookup-status");

@@ -19,23 +19,51 @@ import {
 import { usePermissions } from "@/hooks/usePermissions";
 import { useErrorHandler } from "@/hooks/useErrorHandler";
 import { useNotifications } from "@/contexts/NotificationContext";
-import type { PrinterInfo } from "@/types/printer";
+import { useDialog } from "@/contexts/DialogContext";
+import { useBrowse } from "@/hooks/useBrowse";
+import { useModifyAttribute } from "@/hooks/useModifyAttribute";
+import { type PrinterInfo, mapEntryToPrinter } from "@/types/printer";
 import { Printer, AlertCircle, Trash2, FolderInput } from "lucide-react";
 
+function usePrinterBrowse() {
+  return useBrowse<PrinterInfo>({
+    browseCommand: "browse_printers",
+    searchCommand: "search_printers",
+    mapEntry: mapEntryToPrinter,
+    clientFilter: (p, lower) =>
+      p.name.toLowerCase().includes(lower) ||
+      p.location.toLowerCase().includes(lower) ||
+      p.serverName.toLowerCase().includes(lower) ||
+      p.sharePath.toLowerCase().includes(lower),
+    itemKey: (p) => p.dn,
+    preloadAll: true,
+  });
+}
+
 export function PrinterLookup() {
-  const [query, setQuery] = useState("");
-  const [printers, setPrinters] = useState<PrinterInfo[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedPrinter, setSelectedPrinter] = useState<PrinterInfo | null>(
-    null,
-  );
+  const {
+    items: printers,
+    loading,
+    loadingMore,
+    error,
+    hasMore,
+    filterText,
+    setFilterText,
+    loadMore,
+    selectedItem: selectedPrinter,
+    setSelectedItem: setSelectedPrinter,
+    refresh,
+  } = usePrinterBrowse();
 
   const { hasPermission } = usePermissions();
-  const canDelete = hasPermission("DomainAdmin");
+  const canEdit = hasPermission("AccountOperator");
+  const canDelete = hasPermission("AccountOperator");
   const canMove = hasPermission("AccountOperator");
   const { handleError } = useErrorHandler();
   const { notify } = useNotifications();
+  const { showConfirmation } = useDialog();
+  const { pendingChanges, saving, stageChange, clearChanges, submitChanges } =
+    useModifyAttribute();
 
   const [contextMenuPos, setContextMenuPos] = useState<{
     x: number;
@@ -46,46 +74,40 @@ export function PrinterLookup() {
   );
   const [moveTargets, setMoveTargets] = useState<MoveTarget[] | null>(null);
 
-  const searchPrinters = useCallback(
-    async (searchQuery: string) => {
-      setQuery(searchQuery);
-      if (searchQuery.length < 2) {
-        setPrinters([]);
-        setError(null);
-        return;
-      }
-      setLoading(true);
-      setError(null);
-      try {
-        const results = await invoke<PrinterInfo[]>("search_printers", {
-          query: searchQuery,
-        });
-        setPrinters(results);
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        setError(msg);
-        setPrinters([]);
-        handleError(err, "searching printers");
-      } finally {
-        setLoading(false);
-      }
+  const handleEdit = useCallback(
+    (attributeName: string, oldValue: string, newValue: string) => {
+      stageChange(attributeName, oldValue, newValue);
     },
-    [handleError],
+    [stageChange],
   );
+
+  const handleSaveChanges = useCallback(async () => {
+    if (!selectedPrinter) return;
+    const confirmed = await showConfirmation(
+      "Save Changes",
+      `Apply ${pendingChanges.length} change(s) to "${selectedPrinter.name}"?`,
+      pendingChanges.map((c) => `${c.attributeName}: ${c.newValue}`).join("\n"),
+    );
+    if (!confirmed) return;
+    const success = await submitChanges(selectedPrinter.dn);
+    if (success) {
+      notify("Printer updated successfully", "success");
+      refresh();
+    }
+  }, [selectedPrinter, pendingChanges, showConfirmation, submitChanges, notify, refresh]);
 
   const handleDelete = useCallback(
     async (printer: PrinterInfo) => {
-      if (
-        !window.confirm(
-          `Are you sure you want to delete printer "${printer.name || printer.dn}"?`,
-        )
-      ) {
-        return;
-      }
+      const confirmed = await showConfirmation(
+        "Delete Printer",
+        `Are you sure you want to delete "${printer.name}"?`,
+        "This action cannot be undone.",
+      );
+      if (!confirmed) return;
       try {
         await invoke("delete_printer", { dn: printer.dn });
         notify("Printer deleted successfully", "success");
-        setPrinters((prev) => prev.filter((p) => p.dn !== printer.dn));
+        refresh();
         if (selectedPrinter?.dn === printer.dn) {
           setSelectedPrinter(null);
         }
@@ -93,7 +115,7 @@ export function PrinterLookup() {
         handleError(err, "deleting printer");
       }
     },
-    [selectedPrinter, handleError, notify],
+    [selectedPrinter, setSelectedPrinter, handleError, notify, refresh, showConfirmation],
   );
 
   const handleContextMenu = useCallback(
@@ -108,7 +130,7 @@ export function PrinterLookup() {
             setMoveTargets([
               {
                 distinguishedName: printer.dn,
-                displayName: printer.name || printer.dn,
+                displayName: printer.name,
               },
             ]);
           },
@@ -127,22 +149,22 @@ export function PrinterLookup() {
       {
         category: "General",
         items: [
-          { label: "Name", value: printer.name },
-          { label: "Location", value: printer.location },
-          { label: "Description", value: printer.description },
+          { label: "Name", value: printer.name, editable: canEdit, attributeName: "printerName" },
+          { label: "Location", value: printer.location, editable: canEdit, attributeName: "location" },
+          { label: "Description", value: printer.description, editable: canEdit, attributeName: "description" },
           { label: "Distinguished Name", value: printer.dn },
         ],
       },
       {
         category: "Server Info",
         items: [
-          { label: "Server Name", value: printer.serverName },
-          { label: "Share Path", value: printer.sharePath },
-          { label: "Driver Name", value: printer.driverName },
+          { label: "Server", value: printer.serverName, editable: canEdit, attributeName: "serverName" },
+          { label: "Share Path", value: printer.sharePath, editable: canEdit, attributeName: "uNCName" },
+          { label: "Driver", value: printer.driverName, editable: canEdit, attributeName: "driverName" },
         ],
       },
     ],
-    [],
+    [canEdit],
   );
 
   const renderPrinterItem = useCallback(
@@ -163,7 +185,7 @@ export function PrinterLookup() {
         />
         <div className="min-w-0 flex-1">
           <p className="truncate text-body font-medium text-[var(--color-text-primary)]">
-            {printer.name || printer.dn}
+            {printer.name}
           </p>
           <p className="truncate text-caption text-[var(--color-text-secondary)]">
             {printer.location || printer.serverName || "No location"}
@@ -171,7 +193,7 @@ export function PrinterLookup() {
         </div>
       </button>
     ),
-    [selectedPrinter, handleContextMenu],
+    [selectedPrinter, setSelectedPrinter, handleContextMenu],
   );
 
   return (
@@ -179,9 +201,9 @@ export function PrinterLookup() {
       <div className="flex items-center gap-2 border-b border-[var(--color-border-subtle)] px-3 py-2">
         <div className="flex-1">
           <SearchBar
-            value={query}
-            onChange={searchPrinters}
-            onSearch={searchPrinters}
+            value={filterText}
+            onChange={setFilterText}
+            onSearch={setFilterText}
             placeholder="Search printers by name, location, or server..."
             debounceMs={300}
           />
@@ -193,15 +215,11 @@ export function PrinterLookup() {
         aria-live="polite"
         data-testid="printer-lookup-status"
       >
-        {loading && "Searching printers..."}
+        {loading && "Loading printers..."}
         {!loading &&
           printers.length > 0 &&
           `${printers.length} printer${printers.length > 1 ? "s" : ""} found`}
-        {!loading &&
-          printers.length === 0 &&
-          !error &&
-          query.length >= 2 &&
-          "No printers found"}
+        {!loading && printers.length === 0 && !error && "No printers found"}
         {error && `Error: ${error}`}
       </div>
 
@@ -211,7 +229,7 @@ export function PrinterLookup() {
             className="flex flex-1 items-center justify-center"
             data-testid="printer-lookup-loading"
           >
-            <LoadingSpinner message="Searching printers..." />
+            <LoadingSpinner message="Loading printers..." />
           </div>
         )}
 
@@ -222,32 +240,23 @@ export function PrinterLookup() {
           >
             <EmptyState
               icon={<AlertCircle size={48} />}
-              title="Failed to search printers"
+              title="Failed to load printers"
               description={error}
-              action={{
-                label: "Retry",
-                onClick: () => searchPrinters(query),
-              }}
+              action={{ label: "Retry", onClick: refresh }}
             />
           </div>
         )}
 
-        {!loading && !error && query.length < 2 && (
-          <div className="flex flex-1 items-center justify-center">
-            <EmptyState
-              icon={<Printer size={48} />}
-              title="Search for printers"
-              description="Enter at least 2 characters to search."
-            />
-          </div>
-        )}
-
-        {!loading && !error && query.length >= 2 && printers.length === 0 && (
+        {!loading && !error && printers.length === 0 && (
           <div className="flex flex-1 items-center justify-center">
             <EmptyState
               icon={<Printer size={48} />}
               title="No printers found"
-              description={`No printers match "${query}".`}
+              description={
+                filterText
+                  ? `No printers match "${filterText}".`
+                  : "No printers available."
+              }
             />
           </div>
         )}
@@ -263,6 +272,8 @@ export function PrinterLookup() {
                 renderItem={renderPrinterItem}
                 estimateSize={52}
                 itemKey={(printer) => printer.dn}
+                loadingMore={loadingMore}
+                onEndReached={hasMore ? loadMore : undefined}
                 className="h-full"
               />
             </div>
@@ -273,13 +284,17 @@ export function PrinterLookup() {
             >
               {selectedPrinter ? (
                 <div data-testid="printer-detail">
-                  <div className="mb-4 flex items-center justify-between">
+                  <div className="mb-4">
                     <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">
-                      {selectedPrinter.name || selectedPrinter.dn}
+                      {selectedPrinter.name}
                     </h2>
+                  </div>
+
+                  <div className="mb-4 flex flex-wrap items-center gap-2">
                     {canDelete && (
                       <button
-                        className="btn btn-sm btn-ghost text-[var(--color-error)]"
+                        className="btn btn-sm flex items-center gap-1"
+                        style={{ color: "var(--color-error)", borderColor: "var(--color-error)" }}
                         onClick={() => handleDelete(selectedPrinter)}
                         data-testid="printer-delete-btn"
                       >
@@ -287,9 +302,46 @@ export function PrinterLookup() {
                         Delete
                       </button>
                     )}
+
+                    {pendingChanges.length > 0 && (
+                      <>
+                        <div className="mx-1 h-6 w-px bg-[var(--color-border-default)]" />
+                        <div
+                          className="flex items-center gap-2 rounded-lg border border-[var(--color-primary)] bg-[var(--color-primary-subtle)] px-3 py-1"
+                          data-testid="pending-changes-bar"
+                        >
+                          <span className="text-caption text-[var(--color-text-primary)]">
+                            {pendingChanges.length} change(s)
+                            {pendingChanges.map((c) => (
+                              <span
+                                key={c.attributeName}
+                                className="ml-1.5 inline-block rounded bg-[var(--color-surface-card)] px-1.5 py-0.5 text-[10px] font-mono"
+                              >
+                                {c.attributeName}
+                              </span>
+                            ))}
+                          </span>
+                          <button
+                            onClick={clearChanges}
+                            className="btn btn-sm btn-ghost"
+                          >
+                            Discard
+                          </button>
+                          <button
+                            onClick={handleSaveChanges}
+                            disabled={saving}
+                            className="btn btn-sm btn-primary"
+                          >
+                            {saving ? "Saving..." : "Save"}
+                          </button>
+                        </div>
+                      </>
+                    )}
                   </div>
+
                   <PropertyGrid
                     groups={buildPropertyGroups(selectedPrinter)}
+                    onEdit={canEdit ? handleEdit : undefined}
                   />
                 </div>
               ) : (
@@ -314,7 +366,7 @@ export function PrinterLookup() {
         <MoveObjectDialog
           targets={moveTargets}
           onClose={() => setMoveTargets(null)}
-          onMoved={() => searchPrinters(query)}
+          onMoved={refresh}
         />
       )}
     </div>

@@ -29,6 +29,33 @@ vi.mock("@/components/dialogs/GroupMembersDialog", () => ({
   ),
 }));
 
+vi.mock("@/hooks/usePermissions", () => ({
+  usePermissions: () => ({
+    level: "ReadOnly",
+    groups: [],
+    loading: false,
+    hasPermission: () => false,
+  }),
+}));
+
+vi.mock("@/contexts/DialogContext", () => ({
+  useDialog: () => ({
+    showConfirmation: vi.fn(),
+  }),
+}));
+
+vi.mock("@/contexts/NotificationContext", () => ({
+  useNotifications: () => ({
+    notify: vi.fn(),
+  }),
+}));
+
+vi.mock("@/hooks/useErrorHandler", () => ({
+  useErrorHandler: () => ({
+    handleError: vi.fn(),
+  }),
+}));
+
 import { invoke } from "@tauri-apps/api/core";
 const mockInvoke = vi.mocked(invoke);
 

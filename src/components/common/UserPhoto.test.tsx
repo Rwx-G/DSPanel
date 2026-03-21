@@ -86,7 +86,7 @@ describe("UserPhoto", () => {
 
     expect(screen.getByTestId("upload-photo-btn")).toBeInTheDocument();
     expect(screen.getByTestId("upload-photo-btn")).toHaveTextContent(
-      "Upload Photo",
+      "Upload",
     );
   });
 
@@ -106,7 +106,7 @@ describe("UserPhoto", () => {
 
     expect(screen.getByTestId("remove-photo-btn")).toBeInTheDocument();
     expect(screen.getByTestId("upload-photo-btn")).toHaveTextContent(
-      "Change Photo",
+      "Change",
     );
   });
 

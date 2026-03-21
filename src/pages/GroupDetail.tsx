@@ -32,8 +32,11 @@ import {
   Shield,
   Mail,
   FolderOpen,
+  Trash2,
   X,
 } from "lucide-react";
+import { useDialog } from "@/contexts/DialogContext";
+import { useErrorHandler } from "@/hooks/useErrorHandler";
 
 interface NestedMemberItemProps {
   entry: DirectoryEntry;
@@ -230,6 +233,7 @@ export interface GroupDetailProps {
   membersLoading: boolean;
   canManageMembers: boolean;
   onMembersRefresh: () => void;
+  onDeleted?: () => void;
 }
 
 export function GroupDetail({
@@ -238,8 +242,27 @@ export function GroupDetail({
   membersLoading,
   canManageMembers,
   onMembersRefresh,
+  onDeleted,
 }: GroupDetailProps) {
   const { notify } = useNotifications();
+  const { showConfirmation } = useDialog();
+  const { handleError } = useErrorHandler();
+
+  const handleDeleteGroup = useCallback(async () => {
+    const confirmed = await showConfirmation(
+      "Delete Group",
+      `Are you sure you want to delete "${group.displayName || group.samAccountName}"?`,
+      "This action cannot be undone.",
+    );
+    if (!confirmed) return;
+    try {
+      await invoke("delete_ad_object", { dn: group.distinguishedName });
+      notify("Group deleted successfully", "success");
+      onDeleted?.();
+    } catch (err) {
+      handleError(err, "deleting group");
+    }
+  }, [group, showConfirmation, onDeleted, notify, handleError]);
 
   // Member management state
   const [selectedMembers, setSelectedMembers] = useState<Set<string>>(
@@ -571,6 +594,17 @@ export function GroupDetail({
           {group.displayName || group.samAccountName}
         </h2>
         <div className="flex items-center gap-2">
+          {canManageMembers && (
+            <button
+              className="btn btn-sm flex items-center gap-1"
+              style={{ color: "var(--color-error)", borderColor: "var(--color-error)" }}
+              onClick={handleDeleteGroup}
+              data-testid="group-delete-btn"
+            >
+              <Trash2 size={14} />
+              Delete
+            </button>
+          )}
           <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${
             group.category === "Security"
               ? "bg-[var(--color-info)]/10 text-[var(--color-info)]"

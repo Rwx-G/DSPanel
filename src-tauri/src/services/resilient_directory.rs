@@ -402,6 +402,26 @@ where
         .map_err(|e| anyhow::anyhow!(e))
     }
 
+    async fn browse_contacts(&self, max_results: usize) -> Result<Vec<DirectoryEntry>> {
+        let inner_ref = self.inner.clone();
+        self.execute_with_resilience(|| {
+            let inner = inner_ref.clone();
+            async move { inner.browse_contacts(max_results).await }
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!(e))
+    }
+
+    async fn browse_printers(&self, max_results: usize) -> Result<Vec<DirectoryEntry>> {
+        let inner_ref = self.inner.clone();
+        self.execute_with_resilience(|| {
+            let inner = inner_ref.clone();
+            async move { inner.browse_printers(max_results).await }
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!(e))
+    }
+
     async fn get_schema_attributes(&self) -> Result<Vec<String>> {
         let inner_ref = self.inner.clone();
         self.execute_with_resilience(|| {

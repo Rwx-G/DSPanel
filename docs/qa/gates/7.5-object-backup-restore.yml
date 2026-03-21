@@ -1,0 +1,50 @@
+schema: 1
+story: "7.5"
+story_title: "Object Backup and Restore"
+gate: PASS
+status_reason: "All 8 acceptance criteria met. SQLite-backed ObjectSnapshotService with capture, history, diff, restore, and configurable retention. DomainAdmin for restore, history visible to all. 35 tests (28 Rust + 7 frontend)."
+reviewer: "Quinn (Test Architect)"
+updated: "2026-03-21T14:30:00Z"
+
+waiver: { active: false }
+
+top_issues: []
+
+quality_score: 97
+expires: "2026-04-04T00:00:00Z"
+
+evidence:
+  tests_reviewed: 35
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7, 8]
+    ac_gaps: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Restore operations gated to DomainAdmin. Read-only attributes excluded from restore. Audit trail on all restore ops."
+  performance:
+    status: PASS
+    notes: "SQLite indexes on object_dn and timestamp. Configurable retention with cleanup to prevent unbounded growth."
+  reliability:
+    status: PASS
+    notes: "Snapshot capture does not block write operations if it fails. In-memory fallback for tests."
+  maintainability:
+    status: PASS
+    notes: "Follows AuditService pattern for SQLite setup. Separate ObjectSnapshotService preserves backward compatibility with existing SnapshotService."
+
+history:
+  - at: "2026-03-21T14:30:00Z"
+    gate: PASS
+    note: "Initial review - all ACs met, score 97 due to snapshot capture scope"
+
+recommendations:
+  immediate: []
+  future:
+    - action: "Extend snapshot capture to contact and printer modifications (currently focused on user operations)"
+      refs: ["src-tauri/src/commands/mod.rs", "src-tauri/src/services/object_snapshot.rs"]
+    - action: "Add export functionality for snapshot history (CSV/JSON)"
+      refs: ["src/components/common/SnapshotHistory.tsx"]
+    - action: "Add automatic cleanup on application startup (currently manual via command)"
+      refs: ["src-tauri/src/services/object_snapshot.rs"]

@@ -1242,6 +1242,14 @@ impl DirectoryProvider for DemoDirectoryProvider {
         Ok(())
     }
 
+    async fn browse_contacts(&self, _max_results: usize) -> Result<Vec<DirectoryEntry>> {
+        Ok(Vec::new())
+    }
+
+    async fn browse_printers(&self, _max_results: usize) -> Result<Vec<DirectoryEntry>> {
+        Ok(Vec::new())
+    }
+
     async fn get_schema_attributes(&self) -> Result<Vec<String>> {
         Ok(vec![
             "cn".to_string(),

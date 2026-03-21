@@ -15,11 +15,42 @@ import { FilterBar, type FilterChip } from "@/components/data/FilterBar";
 import { GroupMembersDialog } from "@/components/dialogs/GroupMembersDialog";
 import { type DirectoryComputer } from "@/types/directory";
 import { parseCnFromDn } from "@/utils/dn";
-import { Users } from "lucide-react";
+import { Users, Trash2 } from "lucide-react";
 import { StateInTimeView } from "@/components/comparison/StateInTimeView";
+import { usePermissions } from "@/hooks/usePermissions";
+import { useDialog } from "@/contexts/DialogContext";
+import { useNotifications } from "@/contexts/NotificationContext";
+import { useErrorHandler } from "@/hooks/useErrorHandler";
 
-export function ComputerDetail({ computer }: { computer: DirectoryComputer }) {
+export function ComputerDetail({
+  computer,
+  onDeleted,
+}: {
+  computer: DirectoryComputer;
+  onDeleted?: () => void;
+}) {
   const [groupFilterText, setGroupFilterText] = useState("");
+  const { hasPermission } = usePermissions();
+  const canDelete = hasPermission("AccountOperator");
+  const { showConfirmation } = useDialog();
+  const { notify } = useNotifications();
+  const { handleError } = useErrorHandler();
+
+  const handleDeleteComputer = useCallback(async () => {
+    const confirmed = await showConfirmation(
+      "Delete Computer",
+      `Are you sure you want to delete "${computer.name}"?`,
+      "This action cannot be undone.",
+    );
+    if (!confirmed) return;
+    try {
+      await invoke("delete_ad_object", { dn: computer.distinguishedName });
+      notify("Computer deleted successfully", "success");
+      onDeleted?.();
+    } catch (err) {
+      handleError(err, "deleting computer");
+    }
+  }, [computer, showConfirmation, onDeleted, notify, handleError]);
   const [groupFilters, setGroupFilters] = useState<FilterChip[]>([]);
   const [contextMenuPos, setContextMenuPos] = useState<{
     x: number;
@@ -201,6 +232,17 @@ export function ComputerDetail({ computer }: { computer: DirectoryComputer }) {
           {computer.name}
         </h2>
         <div className="flex items-center gap-2">
+          {canDelete && (
+            <button
+              className="btn btn-sm flex items-center gap-1"
+              style={{ color: "var(--color-error)", borderColor: "var(--color-error)" }}
+              onClick={handleDeleteComputer}
+              data-testid="computer-delete-btn"
+            >
+              <Trash2 size={14} />
+              Delete
+            </button>
+          )}
           <StatusBadge
             text={computer.enabled ? "Enabled" : "Disabled"}
             variant={computer.enabled ? "success" : "error"}
