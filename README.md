@@ -8,7 +8,7 @@
   <img src="https://img.shields.io/badge/Rust-2021-orange.svg" alt="Rust">
   <img src="https://img.shields.io/badge/Tauri-v2-blue.svg" alt="Tauri">
   <img src="https://img.shields.io/badge/Platform-Windows%20|%20macOS%20|%20Linux-0078D6.svg" alt="Platform">
-  <img src="https://img.shields.io/badge/Status-v0.5.0-brightgreen.svg" alt="Status">
+  <img src="https://img.shields.io/badge/Status-v0.6.0-brightgreen.svg" alt="Status">
 </p>
 
 ---
@@ -145,6 +145,64 @@ cargo test --test ldap_integration -- --nocapture admin_
 export DSPANEL_LDAP_BIND_DN="CN=TestAdmin,CN=Users,DC=dspanel,DC=local"
 cargo test --test ldap_integration -- --nocapture
 ```
+
+## Configuration
+
+### LDAP Connection
+
+By default, DSPanel uses **GSSAPI (Kerberos)** authentication on the current
+user's domain. For environments requiring explicit credentials or custom servers:
+
+| Variable | Description | Default |
+| -------- | ----------- | ------- |
+| `DSPANEL_LDAP_SERVER` | LDAP server hostname or IP. Supports `ldaps://` and `ldap://` prefixes. | Auto-detected from `USERDNSDOMAIN` |
+| `DSPANEL_LDAP_BIND_DN` | Bind DN for simple bind authentication (e.g. `CN=svc,CN=Users,DC=corp,DC=local`) | GSSAPI |
+| `DSPANEL_LDAP_BIND_PASSWORD` | Password for simple bind | GSSAPI |
+| `DSPANEL_LDAP_USE_TLS` | Enable LDAPS (implicit TLS on port 636). Set to `true` or `1`. | `false` |
+| `DSPANEL_LDAP_STARTTLS` | Enable StartTLS (upgrade plaintext on port 389). Set to `true` or `1`. Mutually exclusive with LDAPS - if both set, LDAPS wins. | `false` |
+| `DSPANEL_LDAP_CA_CERT` | Path to a custom CA certificate file (PEM or DER). Added as trusted root alongside the system store. | System store only |
+| `DSPANEL_LDAP_TLS_SKIP_VERIFY` | Skip TLS certificate verification (lab/self-signed certs). Set to `true` or `1`. | `false` |
+
+All three credential variables (`SERVER`, `BIND_DN`, `BIND_PASSWORD`) must be set
+together. If only some are set, DSPanel falls back to GSSAPI with a warning.
+
+**Examples:**
+
+```bash
+# LDAPS (implicit TLS, port 636)
+DSPANEL_LDAP_SERVER=dc01.corp.local
+DSPANEL_LDAP_BIND_DN="CN=DSPanel-Svc,CN=Users,DC=corp,DC=local"
+DSPANEL_LDAP_BIND_PASSWORD="s3cur3!"
+DSPANEL_LDAP_USE_TLS=true
+
+# StartTLS (upgrade on port 389)
+DSPANEL_LDAP_SERVER=dc01.corp.local
+DSPANEL_LDAP_BIND_DN="CN=DSPanel-Svc,CN=Users,DC=corp,DC=local"
+DSPANEL_LDAP_BIND_PASSWORD="s3cur3!"
+DSPANEL_LDAP_STARTTLS=true
+
+# Internal PKI with custom CA certificate
+DSPANEL_LDAP_CA_CERT=/etc/ssl/certs/corp-ca.pem
+
+# Lab with self-signed certificate (skip all verification)
+DSPANEL_LDAP_TLS_SKIP_VERIFY=true
+```
+
+### Microsoft Graph (Exchange Online)
+
+Exchange Online diagnostics require an Azure AD App Registration. Configuration
+is done in-app via the Graph Settings panel (available in a future Settings page,
+Epic 12).
+
+**Required Azure AD permissions** (Application type, admin consent required):
+
+| Permission | Type | Purpose |
+| ---------- | ---- | ------- |
+| `Mail.Read` | Application | Read mailbox settings, folder sizes |
+| `User.Read.All` | Application | Read user profiles, proxy addresses |
+| `Reports.Read.All` | Application | Read mailbox usage reports (real quota) |
+
+The client secret is encrypted at rest using DPAPI (Windows) or base64 (other platforms).
 
 ## Project Structure
 

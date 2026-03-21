@@ -143,8 +143,40 @@ impl std::fmt::Debug for LdapAuthMode {
 pub struct LdapTlsConfig {
     /// Whether to use LDAPS (implicit TLS on port 636).
     pub enabled: bool,
+    /// Whether to use StartTLS (upgrade plaintext connection on port 389).
+    /// Mutually exclusive with `enabled` (LDAPS). If both are set, LDAPS wins.
+    pub starttls: bool,
     /// Whether to skip TLS certificate verification (lab environments only).
     pub skip_verify: bool,
+    /// Path to a custom CA certificate file (PEM or DER format).
+    /// When set, this certificate is added as a trusted root in addition to
+    /// the system certificate store. Useful for internal PKI / private CAs.
+    pub ca_cert_file: Option<String>,
+}
+
+/// Builds a custom `native_tls::TlsConnector` with the given CA certificate file.
+///
+/// Reads the file, tries PEM first then DER, and returns a connector with the
+/// certificate added as a trusted root.
+fn build_tls_connector_with_ca(
+    ca_cert_path: &str,
+    skip_verify: bool,
+) -> Result<native_tls::TlsConnector> {
+    let cert_data = std::fs::read(ca_cert_path).context("Failed to read CA certificate file")?;
+
+    // Try PEM first, fall back to DER
+    let certificate = native_tls::Certificate::from_pem(&cert_data)
+        .or_else(|_| native_tls::Certificate::from_der(&cert_data))
+        .context("Failed to parse CA certificate (tried PEM and DER formats)")?;
+
+    let mut builder = native_tls::TlsConnector::builder();
+    builder.add_root_certificate(certificate);
+    if skip_verify {
+        builder.danger_accept_invalid_certs(true);
+    }
+    builder
+        .build()
+        .context("Failed to build TLS connector with custom CA")
 }
 
 pub struct LdapDirectoryProvider {
@@ -222,7 +254,9 @@ impl LdapDirectoryProvider {
         let (host, url_tls) = parse_server_url(&server);
         let effective_tls = LdapTlsConfig {
             enabled: tls_config.enabled || url_tls,
+            starttls: tls_config.starttls,
             skip_verify: tls_config.skip_verify,
+            ca_cert_file: tls_config.ca_cert_file,
         };
 
         tracing::warn!(
@@ -253,7 +287,7 @@ impl LdapDirectoryProvider {
     ///
     /// E.g. "DC=dspanel,DC=local" -> "dspanel.local"
     fn dns_domain_from_base_dn(&self) -> Option<String> {
-        let base = self.base_dn.lock().unwrap().clone()?;
+        let base = self.base_dn.lock().expect("lock poisoned").clone()?;
         let parts: Vec<&str> = base
             .split(',')
             .filter_map(|p| {
@@ -274,7 +308,10 @@ impl LdapDirectoryProvider {
 
     /// Returns the authenticated user identity resolved via WhoAmI.
     pub fn resolved_user(&self) -> Option<String> {
-        self.authenticated_user.lock().unwrap().clone()
+        self.authenticated_user
+            .lock()
+            .expect("lock poisoned")
+            .clone()
     }
 
     /// Returns a pooled LDAP connection, creating one if needed.
@@ -299,7 +336,7 @@ impl LdapDirectoryProvider {
     async fn invalidate_connection(&self) {
         let mut guard = self.pool.lock().await;
         *guard = None;
-        *self.connected.lock().unwrap() = false;
+        *self.connected.lock().expect("lock poisoned") = false;
         tracing::info!("LDAP connection pool invalidated - will reconnect on next operation");
     }
 
@@ -355,17 +392,32 @@ impl LdapDirectoryProvider {
         } else {
             ("ldap", 389)
         };
-        tracing::debug!(host = %host, auth_mode = ?self.auth_mode, tls = self.tls_config.enabled, "Establishing LDAP connection");
+        tracing::debug!(
+            host = %host,
+            auth_mode = ?self.auth_mode,
+            tls = self.tls_config.enabled,
+            starttls = self.tls_config.starttls,
+            "Establishing LDAP connection"
+        );
 
         let mut settings =
             LdapConnSettings::new().set_conn_timeout(std::time::Duration::from_secs(10));
-        if self.tls_config.skip_verify {
+        if let Some(ref ca_path) = self.tls_config.ca_cert_file {
+            let connector = build_tls_connector_with_ca(ca_path, self.tls_config.skip_verify)?;
+            settings = settings.set_connector(connector);
+            tracing::info!(ca_cert = %ca_path, "Custom CA certificate loaded");
+        } else if self.tls_config.skip_verify {
             settings = settings.set_no_tls_verify(true);
+        }
+        if self.tls_config.starttls && !self.tls_config.enabled {
+            settings = settings.set_starttls(true);
         }
         let url = format!("{}://{}:{}", scheme, host, port);
         let (conn, mut ldap) = LdapConnAsync::with_settings(settings, &url).await.context(
             if self.tls_config.enabled {
                 "Failed to connect to LDAP server via LDAPS (TLS) - check certificate and port 636"
+            } else if self.tls_config.starttls {
+                "Failed to connect to LDAP server via StartTLS on port 389 - check certificate and server support"
             } else {
                 "Failed to connect to LDAP server"
             },
@@ -421,11 +473,11 @@ impl LdapDirectoryProvider {
                 .and_then(|v| v.first().cloned())
             {
                 tracing::info!("Base DN discovered: {}", dn);
-                *self.base_dn.lock().unwrap() = Some(dn);
+                *self.base_dn.lock().expect("lock poisoned") = Some(dn);
             }
         }
 
-        *self.connected.lock().unwrap() = true;
+        *self.connected.lock().expect("lock poisoned") = true;
         Ok(ldap)
     }
 
@@ -481,7 +533,12 @@ impl LdapDirectoryProvider {
             return Ok(Vec::new());
         }
 
-        let base = self.base_dn.lock().unwrap().clone().unwrap_or_default();
+        let base = self
+            .base_dn
+            .lock()
+            .expect("lock poisoned")
+            .clone()
+            .unwrap_or_default();
         let filter = filter.to_string();
         let attrs: Vec<String> = attrs.iter().map(|a| a.to_string()).collect();
 
@@ -654,8 +711,14 @@ async fn create_fresh_connection(
         ("ldap", 389)
     };
     let mut settings = LdapConnSettings::new().set_conn_timeout(std::time::Duration::from_secs(10));
-    if tls_config.skip_verify {
+    if let Some(ref ca_path) = tls_config.ca_cert_file {
+        let connector = build_tls_connector_with_ca(ca_path, tls_config.skip_verify)?;
+        settings = settings.set_connector(connector);
+    } else if tls_config.skip_verify {
         settings = settings.set_no_tls_verify(true);
+    }
+    if tls_config.starttls && !tls_config.enabled {
+        settings = settings.set_starttls(true);
     }
     let url = format!("{}://{}:{}", scheme, host, port);
     let (conn, mut ldap) = LdapConnAsync::with_settings(settings, &url)
@@ -768,7 +831,7 @@ fn search_entry_to_directory_entry(se: SearchEntry) -> DirectoryEntry {
 #[async_trait]
 impl DirectoryProvider for LdapDirectoryProvider {
     fn is_connected(&self) -> bool {
-        *self.connected.lock().unwrap()
+        *self.connected.lock().expect("lock poisoned")
     }
 
     fn domain_name(&self) -> Option<&str> {
@@ -776,7 +839,7 @@ impl DirectoryProvider for LdapDirectoryProvider {
     }
 
     fn base_dn(&self) -> Option<String> {
-        self.base_dn.lock().unwrap().clone()
+        self.base_dn.lock().expect("lock poisoned").clone()
     }
 
     async fn test_connection(&self) -> Result<bool> {
@@ -1173,7 +1236,7 @@ impl DirectoryProvider for LdapDirectoryProvider {
 
         tracing::info!(username = %username, "Authenticated identity resolved");
         // Store the resolved identity for later retrieval
-        *self.authenticated_user.lock().unwrap() = Some(username.clone());
+        *self.authenticated_user.lock().expect("lock poisoned") = Some(username.clone());
         let user = self.get_user_by_identity(&username).await?;
         match user {
             Some(entry) => {
@@ -1321,7 +1384,12 @@ impl DirectoryProvider for LdapDirectoryProvider {
             return Ok(Vec::new());
         }
 
-        let base = self.base_dn.lock().unwrap().clone().unwrap_or_default();
+        let base = self
+            .base_dn
+            .lock()
+            .expect("lock poisoned")
+            .clone()
+            .unwrap_or_default();
         let dn = user_dn.to_string();
         self.with_connection(|mut ldap| {
             let base = base.clone();
@@ -1355,7 +1423,12 @@ impl DirectoryProvider for LdapDirectoryProvider {
             return Ok(Vec::new());
         }
 
-        let base = self.base_dn.lock().unwrap().clone().unwrap_or_default();
+        let base = self
+            .base_dn
+            .lock()
+            .expect("lock poisoned")
+            .clone()
+            .unwrap_or_default();
         self.with_connection(|mut ldap| {
             let base = base.clone();
             async move {
@@ -1897,6 +1970,7 @@ fn build_ou_tree(flat_ous: &[(String, String)], base_dn: &str) -> Vec<OUNode> {
     children_of(flat_ous, &base_dn.to_lowercase())
 }
 
+#[allow(clippy::unwrap_used)]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2162,11 +2236,101 @@ mod tests {
             "secret".to_string(),
             LdapTlsConfig {
                 enabled: true,
+                starttls: false,
                 skip_verify: true,
+                ..Default::default()
             },
         );
         assert!(provider.tls_config.enabled);
+        assert!(!provider.tls_config.starttls);
         assert!(provider.tls_config.skip_verify);
+    }
+
+    #[test]
+    fn test_tls_config_starttls_flag() {
+        let provider = LdapDirectoryProvider::new_with_credentials(
+            "10.0.0.10".to_string(),
+            "CN=Test,DC=lab,DC=local".to_string(),
+            "secret".to_string(),
+            LdapTlsConfig {
+                enabled: false,
+                starttls: true,
+                skip_verify: false,
+                ..Default::default()
+            },
+        );
+        assert!(!provider.tls_config.enabled);
+        assert!(provider.tls_config.starttls);
+    }
+
+    #[test]
+    fn test_tls_config_ldaps_wins_over_starttls() {
+        let provider = LdapDirectoryProvider::new_with_credentials(
+            "10.0.0.10".to_string(),
+            "CN=Test,DC=lab,DC=local".to_string(),
+            "secret".to_string(),
+            LdapTlsConfig {
+                enabled: true,
+                starttls: true,
+                skip_verify: false,
+                ..Default::default()
+            },
+        );
+        // LDAPS takes precedence; starttls is stored but ignored when enabled=true
+        assert!(provider.tls_config.enabled);
+        assert!(provider.tls_config.starttls);
+    }
+
+    #[test]
+    fn test_tls_config_default_has_no_starttls() {
+        let config = LdapTlsConfig::default();
+        assert!(!config.enabled);
+        assert!(!config.starttls);
+        assert!(!config.skip_verify);
+        assert!(config.ca_cert_file.is_none());
+    }
+
+    #[test]
+    fn test_tls_config_ca_cert_file() {
+        let provider = LdapDirectoryProvider::new_with_credentials(
+            "10.0.0.10".to_string(),
+            "CN=Test,DC=lab,DC=local".to_string(),
+            "secret".to_string(),
+            LdapTlsConfig {
+                enabled: true,
+                ca_cert_file: Some("/path/to/ca.pem".to_string()),
+                ..Default::default()
+            },
+        );
+        assert!(provider.tls_config.enabled);
+        assert_eq!(
+            provider.tls_config.ca_cert_file.as_deref(),
+            Some("/path/to/ca.pem")
+        );
+    }
+
+    #[test]
+    fn test_build_tls_connector_with_ca_invalid_path() {
+        let result = build_tls_connector_with_ca("/nonexistent/ca.pem", false);
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Failed to read CA certificate file"));
+    }
+
+    #[test]
+    fn test_build_tls_connector_with_ca_invalid_content() {
+        // Write a temporary file with invalid certificate data
+        let tmp = std::env::temp_dir().join("dspanel_test_invalid_cert.pem");
+        std::fs::write(&tmp, b"not a certificate").unwrap();
+        let result = build_tls_connector_with_ca(tmp.to_str().unwrap(), false);
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Failed to parse CA certificate"));
+        let _ = std::fs::remove_file(&tmp);
     }
 
     #[tokio::test]

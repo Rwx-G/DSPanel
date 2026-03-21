@@ -412,6 +412,7 @@ pub fn read_acl_demo(path: &str) -> Vec<AceEntry> {
     aces
 }
 
+#[allow(clippy::unwrap_used)]
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -585,4 +585,137 @@ describe("UserDetail", () => {
     // Both map to "Last Logon" - Critical should win
     expect(screen.getByTestId("user-detail")).toBeInTheDocument();
   });
+
+  it("renders ExchangePanel when user has msExchMailboxGuid in rawAttributes", async () => {
+    const user = makeUser({
+      rawAttributes: {
+        msExchMailboxGuid: ["abc-123-guid"],
+        msExchRecipientTypeDetails: ["1"],
+        proxyAddresses: ["SMTP:jdoe@example.com"],
+      },
+    });
+    render(<UserDetail {...makeProps({ user })} />, {
+      wrapper: TestProviders,
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("exchange-panel")).toBeInTheDocument();
+    });
+  });
+
+  it("does not render ExchangePanel when user has no Exchange attributes", () => {
+    const user = makeUser({ rawAttributes: {} });
+    render(<UserDetail {...makeProps({ user })} />, {
+      wrapper: TestProviders,
+    });
+    expect(screen.queryByTestId("exchange-panel")).not.toBeInTheDocument();
+  });
+
+  it("renders ExchangeOnlinePanel when invoke returns data", async () => {
+    const { invoke } = await import("@tauri-apps/api/core");
+    const mockedInvoke = vi.mocked(invoke);
+    const exchangeOnlineData: import("@/types/exchange-online").ExchangeOnlineInfo =
+      {
+        primarySmtpAddress: "jdoe@example.com",
+        emailAliases: [],
+        forwardingSmtpAddress: null,
+        autoReplyStatus: "Disabled",
+        mailboxUsageBytes: 1024,
+        mailboxQuotaBytes: 10240,
+        usagePercentage: 10,
+        delegates: [],
+      };
+    mockedInvoke.mockImplementation((cmd: string) => {
+      if (cmd === "get_exchange_online_info") {
+        return Promise.resolve(exchangeOnlineData) as ReturnType<typeof invoke>;
+      }
+      return Promise.resolve(null) as ReturnType<typeof invoke>;
+    });
+
+    render(<UserDetail {...makeProps()} />, { wrapper: TestProviders });
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId("exchange-online-panel"),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("does not render ExchangeOnlinePanel when invoke returns null", async () => {
+    const { invoke } = await import("@tauri-apps/api/core");
+    const mockedInvoke = vi.mocked(invoke);
+    mockedInvoke.mockImplementation(() => {
+      return Promise.resolve(null) as ReturnType<typeof invoke>;
+    });
+
+    render(<UserDetail {...makeProps()} />, { wrapper: TestProviders });
+
+    // Wait a tick for the useEffect to settle
+    await waitFor(() => {
+      expect(screen.getByTestId("user-detail")).toBeInTheDocument();
+    });
+    expect(
+      screen.queryByTestId("exchange-online-panel"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows pending changes bar after staging a change via PropertyGrid", async () => {
+    // Mock usePermissions so canEdit is true
+    const permMod = await import("@/hooks/usePermissions");
+    vi.spyOn(permMod, "usePermissions").mockReturnValue({
+      hasPermission: () => true,
+      level: "AccountOperator" as import("@/types/permissions").PermissionLevel,
+      groups: [],
+      loading: false,
+    });
+
+    render(<UserDetail {...makeProps()} />, { wrapper: TestProviders });
+
+    // Click the edit button for displayName
+    const editBtn = screen.getByTestId("edit-btn-displayName");
+    fireEvent.click(editBtn);
+
+    // Type a new value in the input
+    const input = screen.getByTestId("edit-input-displayName");
+    fireEvent.change(input, { target: { value: "Jane Doe" } });
+
+    // Confirm the edit
+    fireEvent.click(screen.getByTestId("edit-confirm-displayName"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("pending-changes-bar")).toBeInTheDocument();
+    });
+    expect(screen.getByText(/1 change\(s\)/)).toBeInTheDocument();
+  });
+
+  it("clears pending changes when Discard button is clicked", async () => {
+    const permMod = await import("@/hooks/usePermissions");
+    vi.spyOn(permMod, "usePermissions").mockReturnValue({
+      hasPermission: () => true,
+      level: "AccountOperator" as import("@/types/permissions").PermissionLevel,
+      groups: [],
+      loading: false,
+    });
+
+    render(<UserDetail {...makeProps()} />, { wrapper: TestProviders });
+
+    // Stage a change
+    fireEvent.click(screen.getByTestId("edit-btn-displayName"));
+    fireEvent.change(screen.getByTestId("edit-input-displayName"), {
+      target: { value: "Jane Doe" },
+    });
+    fireEvent.click(screen.getByTestId("edit-confirm-displayName"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("pending-changes-bar")).toBeInTheDocument();
+    });
+
+    // Click Discard
+    fireEvent.click(screen.getByTestId("discard-changes-btn"));
+
+    await waitFor(() => {
+      expect(
+        screen.queryByTestId("pending-changes-bar"),
+      ).not.toBeInTheDocument();
+    });
+  });
 });

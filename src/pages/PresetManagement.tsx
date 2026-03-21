@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { Plus, Save, Trash2, Settings } from "lucide-react";
+import { Plus, Save, Trash2, Settings, AlertTriangle } from "lucide-react";
 import { usePresets } from "@/hooks/usePresets";
 import { usePresetPath } from "@/hooks/usePresetPath";
 import { useGroupSearch } from "@/hooks/useGroupSearch";
@@ -70,7 +70,7 @@ function PresetEditorWrapper() {
 }
 
 function PresetEditor() {
-  const { presets, loading, savePreset, deletePreset } = usePresets();
+  const { presets, loading, savePreset, deletePreset, acceptChecksum } = usePresets();
   const searchGroups = useGroupSearch();
   const { nodes: ouNodes, loading: ouLoading, error: ouError } = useOUTree({ silent: true });
   const { showConfirmation } = useDialog();
@@ -261,6 +261,13 @@ function PresetEditor() {
                     >
                       {preset.type}
                     </span>
+                    {preset.integrityWarning && (
+                      <AlertTriangle
+                        size={14}
+                        className="shrink-0 text-[var(--color-warning)]"
+                        aria-label="Preset modified externally"
+                      />
+                    )}
                   </div>
                   {preset.description && (
                     <div className="mt-0.5 text-caption text-[var(--color-text-secondary)] truncate">
@@ -283,6 +290,32 @@ function PresetEditor() {
           />
         ) : (
           <div className="space-y-4" data-testid="preset-editor-form">
+            {/* Integrity warning */}
+            {selectedIndex !== null && !isNew && presets[selectedIndex]?.integrityWarning && (
+              <div
+                className="flex items-start gap-2 rounded-md border border-[var(--color-warning)] bg-[var(--color-warning-subtle)] p-3"
+                data-testid="preset-integrity-warning"
+              >
+                <AlertTriangle size={16} className="shrink-0 mt-0.5 text-[var(--color-warning)]" />
+                <div className="flex-1">
+                  <div className="text-caption font-semibold text-[var(--color-warning)]">
+                    This preset was modified outside DSPanel
+                  </div>
+                  <div className="mt-0.5 text-caption text-[var(--color-text-secondary)]">
+                    The file on the network share has changed since it was last saved by DSPanel.
+                    Review the content below, then accept or re-save to clear this warning.
+                  </div>
+                  <button
+                    className="btn btn-sm mt-2"
+                    onClick={() => acceptChecksum(presets[selectedIndex].name)}
+                    data-testid="preset-accept-checksum"
+                  >
+                    Accept changes
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Validation errors */}
             {errors.length > 0 && (
               <div

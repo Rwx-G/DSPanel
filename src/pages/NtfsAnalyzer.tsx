@@ -1,11 +1,14 @@
 import { useState, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { parseBackendError } from "@/utils/errorMapping";
+import { usePlatform } from "@/hooks/usePlatform";
+import { EmptyState } from "@/components/common/EmptyState";
 import {
   FolderSearch,
   FolderOpen,
   Download,
   AlertTriangle,
+  Monitor,
   ShieldX,
   ChevronDown,
   ChevronRight,
@@ -180,6 +183,7 @@ function PathAclSection({
 }
 
 export function NtfsAnalyzer() {
+  const platform = usePlatform();
   const [uncPath, setUncPath] = useState("");
   const [depth, setDepth] = useState(0);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -289,6 +293,21 @@ export function NtfsAnalyzer() {
       aces: pr.aces.filter((ace) => !ace.isInherited),
     };
   });
+
+  if (platform && platform !== "windows") {
+    return (
+      <div
+        className="flex h-full items-center justify-center p-4"
+        data-testid="ntfs-analyzer-page"
+      >
+        <EmptyState
+          icon={<Monitor size={48} />}
+          title="Not available on this platform"
+          description="NTFS Permissions Analyzer requires Windows. NTFS ACL APIs are not available on macOS or Linux."
+        />
+      </div>
+    );
+  }
 
   return (
     <div

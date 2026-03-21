@@ -29,6 +29,12 @@ pub struct Preset {
     /// Additional LDAP attributes to set on the user (e.g., department, title).
     #[serde(default)]
     pub attributes: HashMap<String, String>,
+    /// Runtime flag: true if the file's SHA-256 checksum does not match the
+    /// last known checksum recorded by DSPanel. This indicates the preset was
+    /// modified outside DSPanel (e.g., edited directly on the network share).
+    /// Not persisted in preset JSON files.
+    #[serde(default, skip_deserializing)]
+    pub integrity_warning: bool,
 }
 
 impl Preset {
@@ -47,6 +53,7 @@ impl Preset {
     }
 }
 
+#[allow(clippy::unwrap_used)]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -59,6 +66,7 @@ mod tests {
             target_ou: "OU=Devs,DC=example,DC=com".to_string(),
             groups: vec!["CN=Developers,DC=example,DC=com".to_string()],
             attributes: HashMap::from([("department".to_string(), "Engineering".to_string())]),
+            integrity_warning: false,
         }
     }
 

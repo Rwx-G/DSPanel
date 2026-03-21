@@ -136,7 +136,7 @@ impl CircuitBreaker {
 
     /// Returns the current state of the circuit breaker.
     pub fn state(&self) -> CircuitState {
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock().expect("lock poisoned");
         Self::maybe_transition_to_half_open(&mut inner);
         inner.state
     }
@@ -146,7 +146,7 @@ impl CircuitBreaker {
     /// Returns `Ok(())` if the request is allowed, or `Err(DirectoryError)`
     /// if the circuit is open and the request should be rejected.
     pub fn check_allowed(&self) -> Result<(), DirectoryError> {
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock().expect("lock poisoned");
         Self::maybe_transition_to_half_open(&mut inner);
 
         match inner.state {
@@ -161,7 +161,7 @@ impl CircuitBreaker {
 
     /// Records a successful operation. Resets the circuit to Closed.
     pub fn record_success(&self) {
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock().expect("lock poisoned");
         if inner.state == CircuitState::HalfOpen {
             tracing::info!("Circuit breaker recovered - transitioning to Closed");
         }
@@ -172,7 +172,7 @@ impl CircuitBreaker {
 
     /// Records a failed operation. May transition to Open.
     pub fn record_failure(&self) {
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock().expect("lock poisoned");
         inner.consecutive_failures += 1;
         inner.last_failure_time = Some(Instant::now());
 
@@ -191,7 +191,7 @@ impl CircuitBreaker {
 
     /// Manually resets the circuit breaker to Closed state.
     pub fn reset(&self) {
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock().expect("lock poisoned");
         inner.state = CircuitState::Closed;
         inner.consecutive_failures = 0;
         inner.last_failure_time = None;
@@ -236,6 +236,7 @@ impl Default for TimeoutConfig {
     }
 }
 
+#[allow(clippy::unwrap_used)]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -564,5 +565,182 @@ mod tests {
         assert_eq!(config.graph_api, Duration::from_secs(15));
         assert_eq!(config.hibp, Duration::from_secs(5));
         assert_eq!(config.wmi, Duration::from_secs(10));
+    }
+
+    // -- Additional coverage tests --
+
+    #[tokio::test]
+    async fn test_retry_with_zero_multiplier_does_not_infinite_loop() {
+        let config = RetryConfig {
+            max_retries: 3,
+            initial_delay: Duration::from_millis(10),
+            multiplier: 0.0,
+        };
+
+        let delays: Arc<Mutex<Vec<Duration>>> = Arc::new(Mutex::new(Vec::new()));
+        let delays_clone = delays.clone();
+        let attempt = AtomicU32::new(0);
+
+        let result = retry_with_backoff(
+            &config,
+            || {
+                attempt.fetch_add(1, Ordering::SeqCst);
+                async { Err::<i32, _>(DirectoryError::Timeout) }
+            },
+            move |d| {
+                let delays = delays_clone.clone();
+                async move {
+                    delays.lock().unwrap().push(d);
+                }
+            },
+        )
+        .await;
+
+        assert!(result.is_err());
+        // 1 initial + 3 retries = 4 total attempts
+        assert_eq!(attempt.load(Ordering::SeqCst), 4);
+        let recorded = delays.lock().unwrap();
+        assert_eq!(recorded.len(), 3);
+        // First delay is initial_delay, subsequent delays collapse to zero
+        assert_eq!(recorded[0], Duration::from_millis(10));
+        assert_eq!(recorded[1], Duration::from_secs(0));
+        assert_eq!(recorded[2], Duration::from_secs(0));
+    }
+
+    #[tokio::test]
+    async fn test_retry_with_very_small_initial_delay() {
+        let config = RetryConfig {
+            max_retries: 5,
+            initial_delay: Duration::from_millis(1),
+            multiplier: 2.0,
+        };
+
+        let delays: Arc<Mutex<Vec<Duration>>> = Arc::new(Mutex::new(Vec::new()));
+        let delays_clone = delays.clone();
+
+        let _ = retry_with_backoff(
+            &config,
+            || async { Err::<i32, _>(DirectoryError::Busy) },
+            move |d| {
+                let delays = delays_clone.clone();
+                async move {
+                    delays.lock().unwrap().push(d);
+                }
+            },
+        )
+        .await;
+
+        let recorded = delays.lock().unwrap();
+        assert_eq!(recorded.len(), 5);
+        // Verify exponential growth from 1ms without overflow
+        assert_eq!(recorded[0], Duration::from_millis(1));
+        assert_eq!(recorded[1], Duration::from_millis(2));
+        assert_eq!(recorded[2], Duration::from_millis(4));
+        assert_eq!(recorded[3], Duration::from_millis(8));
+        assert_eq!(recorded[4], Duration::from_millis(16));
+    }
+
+    #[test]
+    fn test_circuit_breaker_half_open_allows_one_rejects_second() {
+        let config = CircuitBreakerConfig {
+            failure_threshold: 1,
+            recovery_timeout: Duration::from_millis(50),
+        };
+        let cb = CircuitBreaker::new(config);
+        cb.record_failure();
+        assert_eq!(cb.state(), CircuitState::Open);
+
+        // Wait for recovery timeout to transition to HalfOpen
+        std::thread::sleep(Duration::from_millis(60));
+
+        // First check transitions to HalfOpen and allows the request
+        assert!(cb.check_allowed().is_ok());
+        assert_eq!(cb.state(), CircuitState::HalfOpen);
+
+        // Simulate the probe request failing, which reopens the circuit
+        cb.record_failure();
+
+        // Second request should be rejected because circuit is Open again
+        assert!(cb.check_allowed().is_err());
+    }
+
+    #[test]
+    fn test_circuit_breaker_recovery_timeout_boundary() {
+        let timeout = Duration::from_millis(300);
+        let config = CircuitBreakerConfig {
+            failure_threshold: 1,
+            recovery_timeout: timeout,
+        };
+        let cb = CircuitBreaker::new(config);
+        cb.record_failure();
+        assert_eq!(cb.state(), CircuitState::Open);
+
+        // Sleep well under the timeout - should still be Open
+        std::thread::sleep(Duration::from_millis(50));
+        assert_eq!(cb.state(), CircuitState::Open);
+
+        // Sleep past the remaining timeout - should transition to HalfOpen
+        std::thread::sleep(Duration::from_millis(300));
+        assert_eq!(cb.state(), CircuitState::HalfOpen);
+    }
+
+    #[tokio::test]
+    async fn test_retry_exhaustion_returns_last_error_message() {
+        let config = RetryConfig {
+            max_retries: 2,
+            initial_delay: Duration::from_millis(1),
+            multiplier: 1.0,
+        };
+
+        let attempt = AtomicU32::new(0);
+        let result = retry_with_backoff(
+            &config,
+            || {
+                let n = attempt.fetch_add(1, Ordering::SeqCst);
+                async move {
+                    // Return different transient errors on each attempt
+                    match n {
+                        0 => Err::<i32, _>(DirectoryError::Timeout),
+                        1 => Err(DirectoryError::Busy),
+                        _ => Err(DirectoryError::ServerDown),
+                    }
+                }
+            },
+            |_| async {},
+        )
+        .await;
+
+        let err = result.unwrap_err();
+        // The last attempt (n=2) returns ServerDown
+        assert!(
+            matches!(err, DirectoryError::ServerDown),
+            "Expected ServerDown from last attempt, got: {err}"
+        );
+    }
+
+    #[test]
+    fn test_circuit_breaker_failure_count_resets_after_success_in_closed() {
+        let config = CircuitBreakerConfig {
+            failure_threshold: 3,
+            recovery_timeout: Duration::from_secs(60),
+        };
+        let cb = CircuitBreaker::new(config);
+
+        // Accumulate failures just below threshold
+        cb.record_failure();
+        cb.record_failure();
+        assert_eq!(cb.state(), CircuitState::Closed);
+
+        // A success should reset the counter
+        cb.record_success();
+        assert_eq!(cb.state(), CircuitState::Closed);
+
+        // Now we need 3 fresh failures to open, not just 1
+        cb.record_failure();
+        assert_eq!(cb.state(), CircuitState::Closed);
+        cb.record_failure();
+        assert_eq!(cb.state(), CircuitState::Closed);
+        cb.record_failure();
+        assert_eq!(cb.state(), CircuitState::Open);
     }
 }

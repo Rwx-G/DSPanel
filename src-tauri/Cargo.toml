@@ -1,6 +1,6 @@
 [package]
 name = "dspanel"
-version = "0.5.0"
+version = "0.6.0"
 description = "DSPanel - Active Directory management tool"
 authors = ["Romain G."]
 license = "Apache-2.0"
@@ -20,6 +20,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "time", "net", "process"] }
 ldap3 = { version = "0.11", features = ["tls-native"] }
+native-tls = "0.2"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 tracing-appender = "0.2"
@@ -29,7 +30,8 @@ async-trait = "0.1"
 chrono = { version = "0.4", features = ["serde"] }
 rand = "0.8"
 sha1 = "0.10"
-reqwest = { version = "0.12", features = ["rustls-tls"], default-features = false }
+sha2 = "0.10"
+reqwest = { version = "0.12", features = ["rustls-tls", "json"], default-features = false }
 hmac = "0.12"
 base32 = "0.5"
 qrcode = "0.14"
@@ -37,9 +39,11 @@ base64 = "0.22"
 uuid = { version = "1", features = ["v4"] }
 rfd = "0.15"
 quick-xml = "0.37"
+csv = "1"
 rusqlite = { version = "0.31", features = ["bundled"] }
 notify = { version = "7", features = ["macos_fsevent"] }
 notify-debouncer-mini = "0.5"
+keyring = { version = "3", features = ["sync-secret-service"] }
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.58", features = [
@@ -56,3 +60,4 @@ demo = []
 
 [dev-dependencies]
 tempfile = "3"
+mockito = "1"

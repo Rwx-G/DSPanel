@@ -1,0 +1,41 @@
+schema: 1
+story: "6.1"
+story_title: "Exchange On-Prem Attributes (LDAP)"
+gate: PASS
+status_reason: "All 6 acceptance criteria met with comprehensive test coverage (33 tests). Clean implementation following project patterns, no security or performance concerns."
+reviewer: "Quinn (Test Architect)"
+updated: "2026-03-20T18:40:00Z"
+
+waiver: { active: false }
+
+top_issues: []
+
+quality_score: 100
+expires: "2026-04-03T00:00:00Z"
+
+evidence:
+  tests_reviewed: 33
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6]
+    ac_gaps: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Read-only display, no new IPC surface, no secrets"
+  performance:
+    status: PASS
+    notes: "Client-side extraction, O(n) trivial, memoized"
+  reliability:
+    status: PASS
+    notes: "Graceful degradation when no Exchange attributes"
+  maintainability:
+    status: PASS
+    notes: "Clean separation, documented functions, consistent patterns"
+
+recommendations:
+  immediate: []
+  future:
+    - action: "Rust ExchangeMailboxInfo model is unused server-side; will be consumed in Story 6.2 (Graph API). Remove if 6.2 is dropped."
+      refs: ["src-tauri/src/models/exchange_mailbox.rs"]

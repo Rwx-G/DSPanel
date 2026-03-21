@@ -196,6 +196,7 @@ pub trait DirectoryProvider: Send + Sync {
     async fn get_schema_attributes(&self) -> Result<Vec<String>>;
 }
 
+#[allow(clippy::unwrap_used)]
 #[cfg(test)]
 pub mod tests {
     use super::*;

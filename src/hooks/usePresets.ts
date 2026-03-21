@@ -15,6 +15,8 @@ export interface UsePresetsReturn {
   savePreset: (preset: Preset) => Promise<boolean>;
   /** Deletes a preset by name. */
   deletePreset: (name: string) => Promise<boolean>;
+  /** Accepts a preset whose checksum has changed (acknowledges external modification). */
+  acceptChecksum: (name: string) => Promise<boolean>;
   /** Reloads the preset list from backend. */
   reload: () => void;
 }
@@ -88,5 +90,19 @@ export function usePresets(): UsePresetsReturn {
     [handleError, load],
   );
 
-  return { presets, loading, error, savePreset, deletePreset, reload: load };
+  const acceptChecksum = useCallback(
+    async (name: string): Promise<boolean> => {
+      try {
+        await invoke("accept_preset_checksum", { name });
+        await load();
+        return true;
+      } catch (err) {
+        handleError(err, "accepting preset checksum");
+        return false;
+      }
+    },
+    [handleError, load],
+  );
+
+  return { presets, loading, error, savePreset, deletePreset, acceptChecksum, reload: load };
 }

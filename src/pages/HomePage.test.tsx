@@ -7,6 +7,10 @@ vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
 }));
 
+vi.mock("@/hooks/usePlatform", () => ({
+  usePlatform: () => "windows",
+}));
+
 vi.mock("@/components/dialogs/MfaSetupDialog", () => ({
   MfaSetupDialog: ({
     onComplete,
@@ -37,6 +41,7 @@ function makeStatus(overrides: Partial<AppStatus> = {}): AppStatus {
     authenticatedUser: "jdoe@example.com",
     username: "jdoe",
     computerName: "WS001",
+    platform: "windows",
     userGroups: ["Domain Users", "Developers"],
     appVersion: "1.0.0",
     ...overrides,

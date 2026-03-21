@@ -55,6 +55,7 @@ pub fn compute_group_diff(groups_a: &[String], groups_b: &[String]) -> GroupComp
     }
 }
 
+#[allow(clippy::unwrap_used)]
 #[cfg(test)]
 mod tests {
     use super::*;

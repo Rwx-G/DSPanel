@@ -44,6 +44,7 @@ export interface AppStatus {
   authenticatedUser: string;
   username: string;
   computerName: string;
+  platform: string;
   userGroups: string[];
   appVersion: string;
 }
@@ -56,6 +57,7 @@ export function App() {
     authenticatedUser: "",
     username: "",
     computerName: "",
+    platform: "",
     userGroups: [],
     appVersion: APP_VERSION,
   });
@@ -102,6 +104,12 @@ export function App() {
         setStatus((s) => ({ ...s, computerName: name }));
       })
       .catch((e) => console.warn("Failed to get computer name:", e));
+
+    invoke<string>("get_platform")
+      .then((platform) => {
+        setStatus((s) => ({ ...s, platform }));
+      })
+      .catch((e) => console.warn("Failed to get platform:", e));
 
     invoke<string[]>("get_user_groups")
       .then((groups) => {

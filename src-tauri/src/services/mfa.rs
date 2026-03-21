@@ -89,6 +89,7 @@ impl MfaService {
     }
 
     /// Creates an MfaService without file persistence (for testing).
+    #[allow(clippy::unwrap_used)]
     #[cfg(test)]
     pub fn new_in_memory() -> Self {
         Self {
@@ -126,12 +127,12 @@ impl MfaService {
 
     fn persist(&self) {
         if let Some(ref path) = self.persist_path {
-            let secret = self.secret.lock().unwrap();
+            let secret = self.secret.lock().expect("lock poisoned");
             if let Some(ref s) = *secret {
                 use base64::Engine;
                 let data = MfaPersistedData {
                     secret_b64: base64::engine::general_purpose::STANDARD.encode(s),
-                    backup_codes: self.backup_codes.lock().unwrap().clone(),
+                    backup_codes: self.backup_codes.lock().expect("lock poisoned").clone(),
                 };
                 if let Ok(json) = serde_json::to_string(&data) {
                     match crate::services::dpapi::protect(json.as_bytes()) {
@@ -151,17 +152,17 @@ impl MfaService {
 
     /// Whether MFA has been configured (secret exists).
     pub fn is_configured(&self) -> bool {
-        self.secret.lock().unwrap().is_some()
+        self.secret.lock().expect("lock poisoned").is_some()
     }
 
     /// Returns the current MFA configuration.
     pub fn config(&self) -> MfaConfig {
-        self.config.lock().unwrap().clone()
+        self.config.lock().expect("lock poisoned").clone()
     }
 
     /// Updates the MFA configuration.
     pub fn set_config(&self, config: MfaConfig) {
-        *self.config.lock().unwrap() = config;
+        *self.config.lock().expect("lock poisoned") = config;
     }
 
     /// Whether a given action requires MFA verification.
@@ -169,7 +170,7 @@ impl MfaService {
         if !self.is_configured() {
             return false;
         }
-        let config = self.config.lock().unwrap();
+        let config = self.config.lock().expect("lock poisoned");
         match action {
             "PasswordReset" => config.require_for_password_reset,
             "AccountDisable" => config.require_for_account_disable,
@@ -192,7 +193,7 @@ impl MfaService {
             return Ok(());
         }
 
-        let last = self.last_verified.lock().unwrap();
+        let last = self.last_verified.lock().expect("lock poisoned");
         match *last {
             Some(ts) if ts.elapsed() < MFA_SESSION_WINDOW => Ok(()),
             _ => anyhow::bail!(
@@ -221,9 +222,9 @@ impl MfaService {
             })
             .collect();
 
-        *self.secret.lock().unwrap() = Some(secret);
-        *self.backup_codes.lock().unwrap() = backup_codes.clone();
-        *self.failed_attempts.lock().unwrap() = 0;
+        *self.secret.lock().expect("lock poisoned") = Some(secret);
+        *self.backup_codes.lock().expect("lock poisoned") = backup_codes.clone();
+        *self.failed_attempts.lock().expect("lock poisoned") = 0;
         self.persist();
 
         Ok(MfaSetupResult {
@@ -242,7 +243,7 @@ impl MfaService {
     /// Rate-limited: after 5 consecutive failures, verification is blocked.
     pub fn verify(&self, code: &str) -> Result<bool> {
         {
-            let attempts = self.failed_attempts.lock().unwrap();
+            let attempts = self.failed_attempts.lock().expect("lock poisoned");
             if *attempts >= Self::MAX_FAILED_ATTEMPTS {
                 anyhow::bail!(
                     "Too many failed MFA attempts ({}). Please wait before retrying.",
@@ -254,17 +255,17 @@ impl MfaService {
         let secret = self
             .secret
             .lock()
-            .unwrap()
+            .expect("lock poisoned")
             .clone()
             .context("MFA not configured")?;
 
         // Check backup codes first
         {
-            let mut backup_codes = self.backup_codes.lock().unwrap();
+            let mut backup_codes = self.backup_codes.lock().expect("lock poisoned");
             if let Some(pos) = backup_codes.iter().position(|c| c == code) {
                 backup_codes.remove(pos);
-                *self.failed_attempts.lock().unwrap() = 0;
-                *self.last_verified.lock().unwrap() = Some(Instant::now());
+                *self.failed_attempts.lock().expect("lock poisoned") = 0;
+                *self.last_verified.lock().expect("lock poisoned") = Some(Instant::now());
                 self.persist();
                 tracing::info!("MFA verified via backup code");
                 return Ok(true);
@@ -283,26 +284,26 @@ impl MfaService {
             let step = (current_step as i64 + offset) as u64;
             let expected = generate_totp(&secret, step)?;
             if expected == code {
-                *self.failed_attempts.lock().unwrap() = 0;
-                *self.last_verified.lock().unwrap() = Some(Instant::now());
+                *self.failed_attempts.lock().expect("lock poisoned") = 0;
+                *self.last_verified.lock().expect("lock poisoned") = Some(Instant::now());
                 return Ok(true);
             }
         }
 
-        *self.failed_attempts.lock().unwrap() += 1;
+        *self.failed_attempts.lock().expect("lock poisoned") += 1;
         Ok(false)
     }
 
     /// Resets the failed attempt counter (e.g., after a cooldown period).
     pub fn reset_failed_attempts(&self) {
-        *self.failed_attempts.lock().unwrap() = 0;
+        *self.failed_attempts.lock().expect("lock poisoned") = 0;
     }
 
     /// Revokes MFA setup by removing the stored secret and persisted file.
     pub fn revoke(&self) {
-        *self.secret.lock().unwrap() = None;
-        self.backup_codes.lock().unwrap().clear();
-        *self.failed_attempts.lock().unwrap() = 0;
+        *self.secret.lock().expect("lock poisoned") = None;
+        self.backup_codes.lock().expect("lock poisoned").clear();
+        *self.failed_attempts.lock().expect("lock poisoned") = 0;
         if let Some(ref path) = self.persist_path {
             let _ = fs::remove_file(path);
         }
@@ -328,6 +329,7 @@ fn generate_totp(secret: &[u8], time_step: u64) -> Result<String> {
     Ok(format!("{:06}", otp))
 }
 
+#[allow(clippy::unwrap_used)]
 #[cfg(test)]
 mod tests {
     use super::*;

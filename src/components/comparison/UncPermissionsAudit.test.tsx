@@ -8,6 +8,11 @@ vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
 }));
 
+const mockUsePlatform = vi.fn(() => "windows");
+vi.mock("@/hooks/usePlatform", () => ({
+  usePlatform: () => mockUsePlatform(),
+}));
+
 import { invoke } from "@tauri-apps/api/core";
 const mockInvoke = vi.mocked(invoke);
 
@@ -58,6 +63,17 @@ const MOCK_CROSS_REF: AceCrossReference[] = [
 describe("UncPermissionsAudit", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUsePlatform.mockReturnValue("windows");
+  });
+
+  it("shows platform unavailable message on non-Windows", () => {
+    mockUsePlatform.mockReturnValue("linux");
+    render(<UncPermissionsAudit userA={null} userB={null} />);
+    expect(screen.getByTestId("unc-permissions-audit")).toBeInTheDocument();
+    expect(
+      screen.getByText("Not available on this platform"),
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId("unc-path-input")).not.toBeInTheDocument();
   });
 
   it("renders UNC path input and audit button", () => {

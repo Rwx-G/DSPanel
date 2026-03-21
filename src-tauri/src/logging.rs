@@ -44,6 +44,7 @@ pub fn init_logging(log_dir: &str) {
 ///
 /// This is safe to call multiple times - subsequent calls are silently ignored
 /// by tracing_subscriber.
+#[allow(clippy::unwrap_used)]
 #[cfg(test)]
 pub fn init_test_logging() {
     let _ = tracing_subscriber::fmt()
@@ -52,6 +53,7 @@ pub fn init_test_logging() {
         .try_init();
 }
 
+#[allow(clippy::unwrap_used)]
 #[cfg(test)]
 mod tests {
     use super::*;

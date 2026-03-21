@@ -88,6 +88,7 @@ mod platform {
 
 pub use platform::{protect, unprotect};
 
+#[allow(clippy::unwrap_used)]
 #[cfg(test)]
 mod tests {
     use super::*;
