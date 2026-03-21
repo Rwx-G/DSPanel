@@ -1,0 +1,185 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { DnsKerberosValidation } from "./DnsKerberosValidation";
+import { type DnsKerberosReport } from "@/types/dns-validation";
+
+const mockInvoke = vi.fn();
+
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke: (...args: unknown[]) => mockInvoke(...args),
+}));
+
+const sampleReport: DnsKerberosReport = {
+  dnsResults: [
+    {
+      recordName: "_ldap._tcp.example.com",
+      expectedHosts: ["DC1.example.com", "DC2.example.com"],
+      actualHosts: ["DC1.example.com", "DC2.example.com"],
+      missingHosts: [],
+      extraHosts: [],
+      status: "Pass",
+    },
+    {
+      recordName: "_kerberos._tcp.example.com",
+      expectedHosts: ["DC1.example.com", "DC2.example.com"],
+      actualHosts: ["DC1.example.com"],
+      missingHosts: ["DC2.example.com"],
+      extraHosts: [],
+      status: "Fail",
+    },
+  ],
+  clockSkewResults: [
+    {
+      dcHostname: "DC1.example.com",
+      dcTime: "2026-03-21T12:00:00Z",
+      localTime: "2026-03-21T12:00:02Z",
+      skewSeconds: 2,
+      status: "Ok",
+    },
+    {
+      dcHostname: "DC2.example.com",
+      dcTime: "2026-03-21T12:05:00Z",
+      localTime: "2026-03-21T12:00:00Z",
+      skewSeconds: 300,
+      status: "Warning",
+    },
+  ],
+  checkedAt: "2026-03-21T12:00:00Z",
+};
+
+describe("DnsKerberosValidation", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("shows initial empty state with run button", () => {
+    render(<DnsKerberosValidation />);
+    expect(screen.getByText("Run Validation")).toBeInTheDocument();
+    expect(
+      screen.getByText("Click 'Run Validation' to check DNS SRV records and Kerberos clock skew."),
+    ).toBeInTheDocument();
+  });
+
+  it("shows loading state when running validation", async () => {
+    mockInvoke.mockReturnValue(new Promise(() => {}));
+    render(<DnsKerberosValidation />);
+
+    fireEvent.click(screen.getByTestId("run-button"));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Running DNS and Kerberos validation..."),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("displays DNS results after validation", async () => {
+    mockInvoke.mockResolvedValueOnce(sampleReport);
+    render(<DnsKerberosValidation />);
+
+    fireEvent.click(screen.getByTestId("run-button"));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("_ldap._tcp.example.com"),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText("_kerberos._tcp.example.com"),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("displays clock skew results", async () => {
+    mockInvoke.mockResolvedValueOnce(sampleReport);
+    render(<DnsKerberosValidation />);
+
+    fireEvent.click(screen.getByTestId("run-button"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("clock-skew-table")).toBeInTheDocument();
+      expect(screen.getByText("2s")).toBeInTheDocument();
+      expect(screen.getByText("300s")).toBeInTheDocument();
+    });
+  });
+
+  it("shows missing hosts for failed DNS records", async () => {
+    mockInvoke.mockResolvedValueOnce(sampleReport);
+    render(<DnsKerberosValidation />);
+
+    fireEvent.click(screen.getByTestId("run-button"));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Missing: DC2.example.com"),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("shows error state when validation fails", async () => {
+    mockInvoke.mockRejectedValueOnce("Permission denied");
+    render(<DnsKerberosValidation />);
+
+    fireEvent.click(screen.getByTestId("run-button"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Validation Failed")).toBeInTheDocument();
+    });
+  });
+
+  it("calls invoke with threshold parameter", async () => {
+    mockInvoke.mockResolvedValueOnce(sampleReport);
+    render(<DnsKerberosValidation />);
+
+    fireEvent.click(screen.getByTestId("run-button"));
+
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith(
+        "get_dns_kerberos_validation",
+        { thresholdSeconds: 300 },
+      );
+    });
+  });
+
+  it("changes threshold and passes new value", async () => {
+    mockInvoke.mockResolvedValue(sampleReport);
+    render(<DnsKerberosValidation />);
+
+    fireEvent.change(screen.getByTestId("threshold-select"), {
+      target: { value: "60" },
+    });
+
+    fireEvent.click(screen.getByTestId("run-button"));
+
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith(
+        "get_dns_kerberos_validation",
+        { thresholdSeconds: 60 },
+      );
+    });
+  });
+
+  it("shows export button after results are loaded", async () => {
+    mockInvoke.mockResolvedValueOnce(sampleReport);
+    render(<DnsKerberosValidation />);
+
+    fireEvent.click(screen.getByTestId("run-button"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("export-button")).toBeInTheDocument();
+    });
+  });
+
+  it("shows summary counts after validation", async () => {
+    mockInvoke.mockResolvedValueOnce(sampleReport);
+    render(<DnsKerberosValidation />);
+
+    fireEvent.click(screen.getByTestId("run-button"));
+
+    await waitFor(() => {
+      expect(screen.getByText(/1 pass/)).toBeInTheDocument();
+      expect(screen.getByText(/1 fail/)).toBeInTheDocument();
+      expect(screen.getByText(/1 ok/)).toBeInTheDocument();
+      expect(screen.getByText(/1 issues/)).toBeInTheDocument();
+    });
+  });
+});

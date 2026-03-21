@@ -16,6 +16,7 @@ import {
   Printer,
   Activity,
   GitBranch,
+  Globe,
   type LucideIcon,
 } from "lucide-react";
 import { useNavigation } from "@/contexts/NavigationContext";
@@ -38,6 +39,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   printer: Printer,
   activity: Activity,
   "git-branch": GitBranch,
+  globe: Globe,
 };
 
 const MODULES: SidebarModule[] = [
@@ -115,6 +117,13 @@ const MODULES: SidebarModule[] = [
     id: "replication-status",
     label: "Replication Status",
     icon: "git-branch",
+    group: "Infrastructure",
+    requiredLevel: "DomainAdmin",
+  },
+  {
+    id: "dns-kerberos",
+    label: "DNS & Kerberos",
+    icon: "globe",
     group: "Infrastructure",
     requiredLevel: "DomainAdmin",
   },
