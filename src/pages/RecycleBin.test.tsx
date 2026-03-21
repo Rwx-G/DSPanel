@@ -135,8 +135,8 @@ describe("RecycleBin", () => {
     fireEvent.change(input, { target: { value: "PC" } });
     await waitFor(() => {
       expect(screen.getAllByTestId("recycle-bin-row")).toHaveLength(1);
+      expect(screen.getByText("PC01")).toBeInTheDocument();
     });
-    expect(screen.getByText("PC01")).toBeInTheDocument();
   });
 
   it("opens restore dialog on Restore click", async () => {

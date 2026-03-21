@@ -3,10 +3,7 @@ use tauri::State;
 use std::time::{Duration, Instant};
 
 use crate::error::AppError;
-use crate::models::{
-    DeletedObject, DirectoryEntry, OUNode, ObjectSnapshot, Preset,
-    SnapshotDiff,
-};
+use crate::models::{DeletedObject, DirectoryEntry, OUNode, ObjectSnapshot, Preset, SnapshotDiff};
 use crate::services::app_settings::AppSettings;
 use crate::services::audit::AuditEntry;
 use crate::services::comparison::GroupComparisonResult;
@@ -42,23 +39,20 @@ async fn capture_snapshot(state: &AppState, object_dn: &str, operation: &str) {
     let cn = object_dn
         .split(',')
         .next()
-        .and_then(|part| part.strip_prefix("CN=").or_else(|| part.strip_prefix("cn=")))
+        .and_then(|part| {
+            part.strip_prefix("CN=")
+                .or_else(|| part.strip_prefix("cn="))
+        })
         .unwrap_or("");
 
     let attrs_json = if !cn.is_empty() {
         // Try user search first, then computer, then group
         let user_result = provider.search_users(cn, 5).await;
-        let entry = user_result
-            .ok()
-            .and_then(|entries| {
-                entries
-                    .into_iter()
-                    .find(|e| e.distinguished_name == object_dn)
-            })
-            .or_else(|| {
-                // Not found as user - attributes will be empty for non-user objects
-                None
-            });
+        let entry = user_result.ok().and_then(|entries| {
+            entries
+                .into_iter()
+                .find(|e| e.distinguished_name == object_dn)
+        });
 
         if let Some(entry) = entry {
             serde_json::to_string(&entry.attributes).unwrap_or_else(|_| "{}".to_string())
@@ -1388,10 +1382,7 @@ pub(crate) async fn update_managed_by_inner(
 
 /// Deletes a group by DN (requires DomainAdmin).
 /// Deletes any AD object by DN. Requires AccountOperator permission.
-pub(crate) async fn delete_ad_object_inner(
-    state: &AppState,
-    dn: &str,
-) -> Result<(), AppError> {
+pub(crate) async fn delete_ad_object_inner(state: &AppState, dn: &str) -> Result<(), AppError> {
     if !state
         .permission_service
         .has_permission(PermissionLevel::AccountOperator)
@@ -3078,7 +3069,10 @@ pub(crate) async fn capture_object_snapshot_inner(
     let cn = object_dn
         .split(',')
         .next()
-        .and_then(|part| part.strip_prefix("CN=").or_else(|| part.strip_prefix("cn=")))
+        .and_then(|part| {
+            part.strip_prefix("CN=")
+                .or_else(|| part.strip_prefix("cn="))
+        })
         .unwrap_or("");
 
     let attrs_json = if !cn.is_empty() {
@@ -3086,14 +3080,17 @@ pub(crate) async fn capture_object_snapshot_inner(
         entries
             .iter()
             .find(|e| e.distinguished_name == object_dn)
-            .map(|entry| serde_json::to_string(&entry.attributes).unwrap_or_else(|_| "{}".to_string()))
+            .map(|entry| {
+                serde_json::to_string(&entry.attributes).unwrap_or_else(|_| "{}".to_string())
+            })
             .unwrap_or_else(|| "{}".to_string())
     } else {
         "{}".to_string()
     };
-    let id = state
-        .object_snapshot_service
-        .capture(object_dn, operation_type, &attrs_json, &operator);
+    let id =
+        state
+            .object_snapshot_service
+            .capture(object_dn, operation_type, &attrs_json, &operator);
     Ok(id)
 }
 
@@ -3128,7 +3125,10 @@ pub(crate) async fn compute_snapshot_diff_inner(
         .object_dn
         .split(',')
         .next()
-        .and_then(|part| part.strip_prefix("CN=").or_else(|| part.strip_prefix("cn=")))
+        .and_then(|part| {
+            part.strip_prefix("CN=")
+                .or_else(|| part.strip_prefix("cn="))
+        })
         .unwrap_or("");
 
     let current_attrs: std::collections::HashMap<String, Vec<String>> = if !cn.is_empty() {
@@ -3194,16 +3194,31 @@ pub(crate) async fn restore_from_snapshot_inner(
 
     // Read-only / system attributes that cannot be modified via LDAP
     const SKIP_ATTRS: &[&str] = &[
-        "objectClass", "objectGuid", "objectSid", "objectCategory",
-        "distinguishedName", "cn", "name",
-        "whenCreated", "whenChanged",
-        "uSNCreated", "uSNChanged",
-        "instanceType", "objectVersion",
-        "pwdLastSet", "badPwdCount", "badPasswordTime",
-        "lastLogon", "lastLogonTimestamp", "lastLogoff",
-        "logonCount", "accountExpires",
-        "primaryGroupID", "sAMAccountType",
-        "isCriticalSystemObject", "dSCorePropagationData",
+        "objectClass",
+        "objectGuid",
+        "objectSid",
+        "objectCategory",
+        "distinguishedName",
+        "cn",
+        "name",
+        "whenCreated",
+        "whenChanged",
+        "uSNCreated",
+        "uSNChanged",
+        "instanceType",
+        "objectVersion",
+        "pwdLastSet",
+        "badPwdCount",
+        "badPasswordTime",
+        "lastLogon",
+        "lastLogonTimestamp",
+        "lastLogoff",
+        "logonCount",
+        "accountExpires",
+        "primaryGroupID",
+        "sAMAccountType",
+        "isCriticalSystemObject",
+        "dSCorePropagationData",
         "memberOf",
     ];
 
@@ -3214,7 +3229,10 @@ pub(crate) async fn restore_from_snapshot_inner(
     let cn = dn
         .split(',')
         .next()
-        .and_then(|part| part.strip_prefix("CN=").or_else(|| part.strip_prefix("cn=")))
+        .and_then(|part| {
+            part.strip_prefix("CN=")
+                .or_else(|| part.strip_prefix("cn="))
+        })
         .unwrap_or("");
     let current_attrs: std::collections::HashMap<String, Vec<String>> = if !cn.is_empty() {
         let entries = provider.search_users(cn, 10).await.unwrap_or_default();
@@ -3229,7 +3247,10 @@ pub(crate) async fn restore_from_snapshot_inner(
 
     // 1. Restore attributes that exist in the snapshot
     for (attr_name, values) in &stored_attrs {
-        if SKIP_ATTRS.iter().any(|&s| s.eq_ignore_ascii_case(attr_name)) {
+        if SKIP_ATTRS
+            .iter()
+            .any(|&s| s.eq_ignore_ascii_case(attr_name))
+        {
             continue;
         }
         if let Err(e) = provider.modify_attribute(dn, attr_name, values).await {
@@ -3250,7 +3271,10 @@ pub(crate) async fn restore_from_snapshot_inner(
 
     // 2. Clear attributes that exist now but were absent in the snapshot
     for attr_name in current_attrs.keys() {
-        if SKIP_ATTRS.iter().any(|&s| s.eq_ignore_ascii_case(attr_name)) {
+        if SKIP_ATTRS
+            .iter()
+            .any(|&s| s.eq_ignore_ascii_case(attr_name))
+        {
             continue;
         }
         if !stored_attrs.contains_key(attr_name) {

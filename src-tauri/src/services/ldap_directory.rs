@@ -1883,7 +1883,18 @@ impl DirectoryProvider for LdapDirectoryProvider {
                         &base,
                         ldap3::Scope::Subtree,
                         "(objectClass=contact)",
-                        vec!["cn", "displayName", "mail", "company", "department", "givenName", "sn", "telephoneNumber", "mobile", "description"],
+                        vec![
+                            "cn",
+                            "displayName",
+                            "mail",
+                            "company",
+                            "department",
+                            "givenName",
+                            "sn",
+                            "telephoneNumber",
+                            "mobile",
+                            "description",
+                        ],
                     )
                     .await
                     .context("Failed to browse contacts")?
@@ -1914,7 +1925,15 @@ impl DirectoryProvider for LdapDirectoryProvider {
                         &base,
                         ldap3::Scope::Subtree,
                         "(objectClass=printQueue)",
-                        vec!["cn", "printerName", "location", "serverName", "uNCName", "driverName", "description"],
+                        vec![
+                            "cn",
+                            "printerName",
+                            "location",
+                            "serverName",
+                            "uNCName",
+                            "driverName",
+                            "description",
+                        ],
                     )
                     .await
                     .context("Failed to browse printers")?

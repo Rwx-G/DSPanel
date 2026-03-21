@@ -16,38 +16,48 @@ access, contact and printer management, user photos, and object backup/restore.
 ### Added
 
 #### Move Objects Between OUs (7.1)
-- "Move to OU" context menu on users, computers, and groups (AccountOperator+)
-- MoveObjectDialog with OU picker and dry-run preview
+- "Move to OU" context menu on users, computers, groups, contacts, and printers (AccountOperator+)
+- MoveObjectDialog with OU picker, dry-run preview, and pre-selected current OU with auto-expand
 - Bulk move support via `bulk_move_objects` command with per-object result reporting
 - Audit logging for all move operations (success and failure)
 
 #### AD Recycle Bin (7.2)
 - Recycle Bin page listing deleted AD objects with name, type, deletion date, original OU
-- Search by name and filter by object type (user/computer/group)
-- Restore dialog with OU picker for target selection
-- Feature detection with warning when AD Recycle Bin is not enabled
+- Search by name and filter by object type (User, Computer, Group, Contact, Printer) with color-coded badges
+- Restore dialog with OU picker for target selection (pre-selects original OU)
+- AD Recycle Bin feature detection (case-insensitive, DN name + GUID matching) with warning UI
 - DomainAdmin permission gating on sidebar and all operations
 
 #### Contact and Printer Management (7.3)
-- Contact lookup page with search, PropertyGrid detail view, and CRUD operations
-- Printer lookup page with search and read-only detail view
-- Contact CRUD gated to AccountOperator+, printer management to DomainAdmin
+- Contact lookup page with auto-loaded list, search, PropertyGrid detail view, and inline editing
+- Printer lookup page with auto-loaded list, search, and inline editing for all fields
+- Contact CRUD gated to AccountOperator+, printer edit/delete to AccountOperator+
 - Sidebar entries for both pages in Directory group
 - Audit logging and snapshot capture on all write operations
 
 #### User Thumbnail Photo (7.4)
-- User thumbnail photo display in user detail view (or placeholder when none)
-- Upload photo button with file picker (JPG/PNG) and client-side Canvas resize to 96x96
+- User thumbnail photo display in user detail view (64px with border frame, or placeholder)
+- Upload photo button with file picker (JPG/PNG) and client-side Canvas center-crop resize to 96x96
 - Remove photo button to clear thumbnailPhoto attribute
 - AccountOperator+ permission for photo modifications
 - Audit trail for photo set/remove operations
 
 #### Object Backup and Restore (7.5)
-- SQLite-backed ObjectSnapshotService for capturing full AD attribute state
+- SQLite-backed ObjectSnapshotService for capturing full AD attribute state before every write operation
 - Snapshot history, diff comparison, and restore-from-snapshot capabilities
 - SnapshotHistory component in user detail view with expandable diff viewer
+- Auto-refresh snapshot list after save, delete consumed snapshot after restore
+- Restore skips read-only attributes and clears attributes absent from snapshot
 - Configurable snapshot retention with automatic cleanup
-- DomainAdmin permission for restore operations
+- DomainAdmin permission for restore operations, authenticated LDAP user as operator
+
+#### General
+- Delete button on user, group, and computer detail views (AccountOperator+)
+- Generic `delete_ad_object` command with snapshot capture and audit logging
+- `useBrowse.refresh()` reloads all pages when preloadAll is active
+- TreeView auto-expands and auto-scrolls to pre-selected node
+- Confirmation dialogs (ConfirmationDialog) for all destructive actions
+- AD test data script: `scripts/populate-ad-epic7.ps1` (100 contacts, 20 printers, Recycle Bin)
 
 ## [0.6.0] - 2026-03-20
 
