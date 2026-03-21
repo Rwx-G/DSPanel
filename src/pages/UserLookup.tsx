@@ -21,7 +21,12 @@ import {
   type ContextMenuItem,
 } from "@/components/common/ContextMenu";
 import { UserDetail } from "@/pages/UserDetail";
-import { UserX, UserMinus, AlertCircle, User, GitCompareArrows } from "lucide-react";
+import { UserX, UserMinus, AlertCircle, User, GitCompareArrows, FolderInput } from "lucide-react";
+import { usePermissions } from "@/hooks/usePermissions";
+import {
+  MoveObjectDialog,
+  type MoveTarget,
+} from "@/components/dialogs/MoveObjectDialog";
 
 type HealthFilter = "all" | "healthy" | "warning" | "critical";
 
@@ -43,6 +48,9 @@ export function UserLookup() {
 
   const [healthFilter, setHealthFilter] = useState<HealthFilter>("all");
   const [schemaAttributes, setSchemaAttributes] = useState<string[]>([]);
+  const { hasPermission } = usePermissions();
+  const canMove = hasPermission("AccountOperator");
+  const [moveTargets, setMoveTargets] = useState<MoveTarget[] | null>(null);
 
   useEffect(() => {
     invoke<string[]>("get_schema_attributes")
@@ -194,6 +202,21 @@ export function UserLookup() {
         },
       };
 
+      const moveItem: ContextMenuItem | null = canMove
+        ? {
+            label: "Move to OU",
+            icon: <FolderInput size={14} />,
+            onClick: () => {
+              setMoveTargets([
+                {
+                  distinguishedName: user.distinguishedName,
+                  displayName: user.displayName || user.samAccountName,
+                },
+              ]);
+            },
+          }
+        : null;
+
       if (!selectedUser) {
         setContextMenuItems([
           {
@@ -203,6 +226,7 @@ export function UserLookup() {
             disabled: true,
           },
           offboardItem,
+          ...(moveItem ? [moveItem] : []),
         ]);
         setContextMenuPos({ x: e.clientX, y: e.clientY });
         return;
@@ -217,6 +241,7 @@ export function UserLookup() {
             disabled: true,
           },
           offboardItem,
+          ...(moveItem ? [moveItem] : []),
         ]);
         setContextMenuPos({ x: e.clientX, y: e.clientY });
         return;
@@ -237,10 +262,11 @@ export function UserLookup() {
           },
         },
         offboardItem,
+        ...(moveItem ? [moveItem] : []),
       ]);
       setContextMenuPos({ x: e.clientX, y: e.clientY });
     },
-    [selectedUser, openTab],
+    [selectedUser, openTab, canMove],
   );
 
   const filteredUsers = useMemo(() => {
@@ -450,6 +476,14 @@ export function UserLookup() {
         position={contextMenuPos}
         onClose={() => setContextMenuPos(null)}
       />
+
+      {moveTargets && (
+        <MoveObjectDialog
+          targets={moveTargets}
+          onClose={() => setMoveTargets(null)}
+          onMoved={refresh}
+        />
+      )}
     </div>
   );
 }
