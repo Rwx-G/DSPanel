@@ -3,6 +3,7 @@ use tauri::State;
 use std::time::{Duration, Instant};
 
 use crate::error::AppError;
+use crate::models::dc_health::DcHealthResult;
 use crate::models::{DeletedObject, DirectoryEntry, OUNode, ObjectSnapshot, Preset, SnapshotDiff};
 use crate::services::app_settings::AppSettings;
 use crate::services::audit::AuditEntry;
@@ -3385,6 +3386,38 @@ pub async fn remove_thumbnail_photo(
     state: State<'_, AppState>,
 ) -> Result<(), AppError> {
     remove_thumbnail_photo_inner(&state, &user_dn).await
+}
+
+// ---------------------------------------------------------------------------
+// Infrastructure Health - Inner functions
+// ---------------------------------------------------------------------------
+
+/// Returns the health status of all domain controllers.
+/// Requires DomainAdmin permission.
+pub(crate) async fn get_dc_health_inner(state: &AppState) -> Result<Vec<DcHealthResult>, AppError> {
+    if !state
+        .permission_service
+        .has_permission(PermissionLevel::DomainAdmin)
+    {
+        return Err(AppError::PermissionDenied(
+            "DC health checks require DomainAdmin permission".to_string(),
+        ));
+    }
+
+    let provider = state.directory_provider.clone();
+    crate::services::dc_health::check_all_dc_health(provider)
+        .await
+        .map_err(|e| AppError::Directory(e.to_string()))
+}
+
+// ---------------------------------------------------------------------------
+// Infrastructure Health - Tauri commands
+// ---------------------------------------------------------------------------
+
+/// Returns health status of all domain controllers.
+#[tauri::command]
+pub async fn get_dc_health(state: State<'_, AppState>) -> Result<Vec<DcHealthResult>, AppError> {
+    get_dc_health_inner(&state).await
 }
 
 #[allow(clippy::unwrap_used)]
