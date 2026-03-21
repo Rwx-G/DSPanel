@@ -7,16 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-03-21
+
+Epic 7 - Administration and Object Management. Administrative tools for
+DomainAdmin/AccountOperator users: moving objects between OUs, AD Recycle Bin
+access, contact and printer management, user photos, and object backup/restore.
+
 ### Added
 
-- User thumbnail photo management in user detail view (get, set, remove thumbnailPhoto AD attribute)
-- Frontend image resizing via HTML Canvas (center-crop to 96x96 JPEG) - no new Rust dependencies
-- Upload and remove photo buttons for AccountOperator+ users
-- Audit trail entries for photo set/remove operations with snapshot capture
-- Object Backup and Restore: SQLite-backed ObjectSnapshotService captures full AD attribute state before modifications
-- Snapshot history, diff comparison, and restore-from-snapshot commands (capture, get_history, get_snapshot, compute_diff, restore, cleanup)
-- SnapshotHistory UI component in user detail view with expandable diff viewer and restore button (DomainAdmin)
-- Audit trail for snapshot restore operations (success and failure)
+#### Move Objects Between OUs (7.1)
+- "Move to OU" context menu on users, computers, and groups (AccountOperator+)
+- MoveObjectDialog with OU picker and dry-run preview
+- Bulk move support via `bulk_move_objects` command with per-object result reporting
+- Audit logging for all move operations (success and failure)
+
+#### AD Recycle Bin (7.2)
+- Recycle Bin page listing deleted AD objects with name, type, deletion date, original OU
+- Search by name and filter by object type (user/computer/group)
+- Restore dialog with OU picker for target selection
+- Feature detection with warning when AD Recycle Bin is not enabled
+- DomainAdmin permission gating on sidebar and all operations
+
+#### Contact and Printer Management (7.3)
+- Contact lookup page with search, PropertyGrid detail view, and CRUD operations
+- Printer lookup page with search and read-only detail view
+- Contact CRUD gated to AccountOperator+, printer management to DomainAdmin
+- Sidebar entries for both pages in Directory group
+- Audit logging and snapshot capture on all write operations
+
+#### User Thumbnail Photo (7.4)
+- User thumbnail photo display in user detail view (or placeholder when none)
+- Upload photo button with file picker (JPG/PNG) and client-side Canvas resize to 96x96
+- Remove photo button to clear thumbnailPhoto attribute
+- AccountOperator+ permission for photo modifications
+- Audit trail for photo set/remove operations
+
+#### Object Backup and Restore (7.5)
+- SQLite-backed ObjectSnapshotService for capturing full AD attribute state
+- Snapshot history, diff comparison, and restore-from-snapshot capabilities
+- SnapshotHistory component in user detail view with expandable diff viewer
+- Configurable snapshot retention with automatic cleanup
+- DomainAdmin permission for restore operations
 
 ## [0.6.0] - 2026-03-20
 
