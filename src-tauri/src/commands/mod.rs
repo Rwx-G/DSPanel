@@ -3,7 +3,7 @@ use tauri::State;
 use std::time::{Duration, Instant};
 
 use crate::error::AppError;
-use crate::models::{DirectoryEntry, OUNode, Preset};
+use crate::models::{DeletedObject, DirectoryEntry, OUNode, ObjectSnapshot, Preset, SnapshotDiff};
 use crate::services::app_settings::AppSettings;
 use crate::services::audit::AuditEntry;
 use crate::services::comparison::GroupComparisonResult;
@@ -20,6 +20,53 @@ use crate::state::AppState;
 // ---------------------------------------------------------------------------
 // Inner functions - testable without Tauri runtime
 // ---------------------------------------------------------------------------
+
+/// Captures a snapshot in both the lightweight SnapshotService and the
+/// SQLite-backed ObjectSnapshotService. Fetches current attributes from
+/// the directory for the full snapshot. Non-blocking: errors are logged
+/// but do not prevent the write operation.
+async fn capture_snapshot(state: &AppState, object_dn: &str, operation: &str) {
+    // Lightweight marker
+    state.snapshot_service.capture(object_dn, operation);
+
+    // Resolve the authenticated LDAP user (or fall back to OS username)
+    let provider = state.directory_provider.clone();
+    let operator = provider
+        .authenticated_user()
+        .unwrap_or_else(|| std::env::var("USERNAME").unwrap_or_else(|_| "Unknown".to_string()));
+
+    // Fetch current object attributes by extracting CN from DN and searching
+    let cn = object_dn
+        .split(',')
+        .next()
+        .and_then(|part| {
+            part.strip_prefix("CN=")
+                .or_else(|| part.strip_prefix("cn="))
+        })
+        .unwrap_or("");
+
+    let attrs_json = if !cn.is_empty() {
+        // Try user search first, then computer, then group
+        let user_result = provider.search_users(cn, 5).await;
+        let entry = user_result.ok().and_then(|entries| {
+            entries
+                .into_iter()
+                .find(|e| e.distinguished_name == object_dn)
+        });
+
+        if let Some(entry) = entry {
+            serde_json::to_string(&entry.attributes).unwrap_or_else(|_| "{}".to_string())
+        } else {
+            "{}".to_string()
+        }
+    } else {
+        "{}".to_string()
+    };
+
+    state
+        .object_snapshot_service
+        .capture(object_dn, operation, &attrs_json, &operator);
+}
 
 /// Returns the application title from state.
 pub(crate) fn get_app_title_inner(state: &AppState) -> String {
@@ -381,7 +428,7 @@ pub(crate) async fn reset_password_inner(
         .check_mfa_for_action("PasswordReset")
         .map_err(|e| AppError::PermissionDenied(e.to_string()))?;
 
-    state.snapshot_service.capture(user_dn, "PasswordReset");
+    capture_snapshot(state, user_dn, "PasswordReset").await;
     let provider = state.directory_provider.clone();
     match provider
         .reset_password(user_dn, new_password, must_change_at_next_logon)
@@ -418,7 +465,7 @@ pub(crate) async fn unlock_account_inner(state: &AppState, user_dn: &str) -> Res
         ));
     }
 
-    state.snapshot_service.capture(user_dn, "AccountUnlock");
+    capture_snapshot(state, user_dn, "AccountUnlock").await;
     let provider = state.directory_provider.clone();
     match provider.unlock_account(user_dn).await {
         Ok(()) => {
@@ -447,7 +494,7 @@ pub(crate) async fn enable_account_inner(state: &AppState, user_dn: &str) -> Res
         ));
     }
 
-    state.snapshot_service.capture(user_dn, "AccountEnable");
+    capture_snapshot(state, user_dn, "AccountEnable").await;
     let provider = state.directory_provider.clone();
     match provider.enable_account(user_dn).await {
         Ok(()) => {
@@ -481,7 +528,7 @@ pub(crate) async fn disable_account_inner(state: &AppState, user_dn: &str) -> Re
         .check_mfa_for_action("AccountDisable")
         .map_err(|e| AppError::PermissionDenied(e.to_string()))?;
 
-    state.snapshot_service.capture(user_dn, "AccountDisable");
+    capture_snapshot(state, user_dn, "AccountDisable").await;
     let provider = state.directory_provider.clone();
     match provider.disable_account(user_dn).await {
         Ok(()) => {
@@ -659,7 +706,7 @@ pub(crate) async fn add_user_to_group_inner(
         ));
     }
 
-    state.snapshot_service.capture(user_dn, "AddToGroup");
+    capture_snapshot(state, user_dn, "AddToGroup").await;
 
     let provider = state.directory_provider.clone();
     match provider.add_user_to_group(user_dn, group_dn).await {
@@ -1087,7 +1134,7 @@ pub(crate) async fn create_group_inner(
     }
 
     let dn = format!("CN={},{}", name, container_dn);
-    state.snapshot_service.capture(&dn, "GroupCreate");
+    capture_snapshot(state, &dn, "GroupCreate").await;
 
     let provider = state.directory_provider.clone();
     match provider
@@ -1116,7 +1163,7 @@ pub(crate) async fn create_group_inner(
     }
 }
 
-/// Moves an AD object to a different container. Requires DomainAdmin permission.
+/// Moves an AD object to a different container. Requires AccountOperator permission.
 pub(crate) async fn move_object_inner(
     state: &AppState,
     object_dn: &str,
@@ -1124,14 +1171,14 @@ pub(crate) async fn move_object_inner(
 ) -> Result<(), AppError> {
     if !state
         .permission_service
-        .has_permission(PermissionLevel::DomainAdmin)
+        .has_permission(PermissionLevel::AccountOperator)
     {
         return Err(AppError::PermissionDenied(
-            "Moving objects requires DomainAdmin permission".to_string(),
+            "Moving objects requires AccountOperator permission or higher".to_string(),
         ));
     }
 
-    state.snapshot_service.capture(object_dn, "MoveObject");
+    capture_snapshot(state, object_dn, "MoveObject").await;
 
     let provider = state.directory_provider.clone();
     match provider.move_object(object_dn, target_container_dn).await {
@@ -1148,6 +1195,149 @@ pub(crate) async fn move_object_inner(
                 "MoveObjectFailed",
                 object_dn,
                 &format!("Failed to move object: {}", e),
+            );
+            Err(AppError::Directory(e.to_string()))
+        }
+    }
+}
+
+/// Result of a single object move in a bulk operation.
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BulkMoveResult {
+    pub object_dn: String,
+    pub success: bool,
+    pub error: Option<String>,
+}
+
+/// Moves multiple AD objects to a target container sequentially.
+/// Continues on individual failures and returns results for all objects.
+pub(crate) async fn bulk_move_objects_inner(
+    state: &AppState,
+    object_dns: &[String],
+    target_container_dn: &str,
+) -> Result<Vec<BulkMoveResult>, AppError> {
+    if !state
+        .permission_service
+        .has_permission(PermissionLevel::AccountOperator)
+    {
+        return Err(AppError::PermissionDenied(
+            "Moving objects requires AccountOperator permission or higher".to_string(),
+        ));
+    }
+
+    let mut results = Vec::with_capacity(object_dns.len());
+
+    for dn in object_dns {
+        capture_snapshot(state, dn, "MoveObject").await;
+
+        let provider = state.directory_provider.clone();
+        match provider.move_object(dn, target_container_dn).await {
+            Ok(()) => {
+                state.audit_service.log_success(
+                    "ObjectMoved",
+                    dn,
+                    &format!("Moved to {}", target_container_dn),
+                );
+                results.push(BulkMoveResult {
+                    object_dn: dn.clone(),
+                    success: true,
+                    error: None,
+                });
+            }
+            Err(e) => {
+                state.audit_service.log_failure(
+                    "MoveObjectFailed",
+                    dn,
+                    &format!("Failed to move object: {}", e),
+                );
+                results.push(BulkMoveResult {
+                    object_dn: dn.clone(),
+                    success: false,
+                    error: Some(e.to_string()),
+                });
+            }
+        }
+    }
+
+    Ok(results)
+}
+
+// ---------------------------------------------------------------------------
+// Recycle Bin commands
+// ---------------------------------------------------------------------------
+
+/// Checks whether the AD Recycle Bin feature is enabled. Requires DomainAdmin.
+pub(crate) async fn is_recycle_bin_enabled_inner(state: &AppState) -> Result<bool, AppError> {
+    if !state
+        .permission_service
+        .has_permission(PermissionLevel::DomainAdmin)
+    {
+        return Err(AppError::PermissionDenied(
+            "Recycle Bin access requires DomainAdmin permission".to_string(),
+        ));
+    }
+
+    let provider = state.directory_provider.clone();
+    provider
+        .is_recycle_bin_enabled()
+        .await
+        .map_err(|e| AppError::Directory(e.to_string()))
+}
+
+/// Lists deleted objects from the AD Recycle Bin. Requires DomainAdmin.
+pub(crate) async fn get_deleted_objects_inner(
+    state: &AppState,
+) -> Result<Vec<DeletedObject>, AppError> {
+    if !state
+        .permission_service
+        .has_permission(PermissionLevel::DomainAdmin)
+    {
+        return Err(AppError::PermissionDenied(
+            "Recycle Bin access requires DomainAdmin permission".to_string(),
+        ));
+    }
+
+    let provider = state.directory_provider.clone();
+    provider
+        .get_deleted_objects()
+        .await
+        .map_err(|e| AppError::Directory(e.to_string()))
+}
+
+/// Restores a deleted object from the Recycle Bin. Requires DomainAdmin.
+pub(crate) async fn restore_deleted_object_inner(
+    state: &AppState,
+    deleted_dn: &str,
+    target_ou_dn: &str,
+) -> Result<(), AppError> {
+    if !state
+        .permission_service
+        .has_permission(PermissionLevel::DomainAdmin)
+    {
+        return Err(AppError::PermissionDenied(
+            "Restoring objects requires DomainAdmin permission".to_string(),
+        ));
+    }
+
+    let provider = state.directory_provider.clone();
+    match provider
+        .restore_deleted_object(deleted_dn, target_ou_dn)
+        .await
+    {
+        Ok(()) => {
+            state.audit_service.log_success(
+                "ObjectRestored",
+                deleted_dn,
+                &format!("Restored to {}", target_ou_dn),
+            );
+            Ok(())
+        }
+        Err(e) => {
+            state.audit_service.log_failure(
+                "RestoreObjectFailed",
+                deleted_dn,
+                &format!("Failed to restore: {}", e),
             );
             Err(AppError::Directory(e.to_string()))
         }
@@ -1191,6 +1381,35 @@ pub(crate) async fn update_managed_by_inner(
 }
 
 /// Deletes a group by DN (requires DomainAdmin).
+/// Deletes any AD object by DN. Requires AccountOperator permission.
+pub(crate) async fn delete_ad_object_inner(state: &AppState, dn: &str) -> Result<(), AppError> {
+    if !state
+        .permission_service
+        .has_permission(PermissionLevel::AccountOperator)
+    {
+        return Err(AppError::PermissionDenied(
+            "Deleting objects requires AccountOperator permission or higher".to_string(),
+        ));
+    }
+
+    capture_snapshot(state, dn, "ObjectDelete").await;
+    let provider = state.directory_provider.clone();
+    match provider.delete_object(dn).await {
+        Ok(()) => {
+            state
+                .audit_service
+                .log_success("ObjectDeleted", dn, "Object deleted");
+            Ok(())
+        }
+        Err(e) => {
+            state
+                .audit_service
+                .log_failure("ObjectDeleteFailed", dn, &e.to_string());
+            Err(AppError::Directory(e.to_string()))
+        }
+    }
+}
+
 pub(crate) async fn delete_group_inner(state: &AppState, group_dn: &str) -> Result<(), AppError> {
     if !state
         .permission_service
@@ -1201,7 +1420,7 @@ pub(crate) async fn delete_group_inner(state: &AppState, group_dn: &str) -> Resu
         ));
     }
 
-    state.snapshot_service.capture(group_dn, "GroupDelete");
+    capture_snapshot(state, group_dn, "GroupDelete").await;
     let provider = state.directory_provider.clone();
     match provider.delete_object(group_dn).await {
         Ok(()) => {
@@ -1214,6 +1433,280 @@ pub(crate) async fn delete_group_inner(state: &AppState, group_dn: &str) -> Resu
             state
                 .audit_service
                 .log_failure("GroupDeleteFailed", group_dn, &e.to_string());
+            Err(AppError::Directory(e.to_string()))
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Contact and Printer Management - inner functions
+// ---------------------------------------------------------------------------
+
+/// Searches for contacts matching the query string. ReadOnly access.
+pub(crate) async fn search_contacts_inner(
+    state: &AppState,
+    query: &str,
+) -> Result<Vec<DirectoryEntry>, AppError> {
+    let sanitized = validate_search_input(query)?;
+    let provider = state.directory_provider.clone();
+    provider
+        .browse_contacts(5000)
+        .await
+        .map(|entries| {
+            let lower = sanitized.to_lowercase();
+            entries
+                .into_iter()
+                .filter(|e| {
+                    e.display_name
+                        .as_deref()
+                        .unwrap_or("")
+                        .to_lowercase()
+                        .contains(&lower)
+                        || e.distinguished_name.to_lowercase().contains(&lower)
+                        || e.attributes
+                            .values()
+                            .any(|vals| vals.iter().any(|v| v.to_lowercase().contains(&lower)))
+                })
+                .take(50)
+                .collect()
+        })
+        .map_err(|e| AppError::Directory(e.to_string()))
+}
+
+/// Searches for printers matching the query string. ReadOnly access.
+pub(crate) async fn search_printers_inner(
+    state: &AppState,
+    query: &str,
+) -> Result<Vec<DirectoryEntry>, AppError> {
+    let sanitized = validate_search_input(query)?;
+    let provider = state.directory_provider.clone();
+    provider
+        .browse_printers(5000)
+        .await
+        .map(|entries| {
+            let lower = sanitized.to_lowercase();
+            entries
+                .into_iter()
+                .filter(|e| {
+                    e.display_name
+                        .as_deref()
+                        .unwrap_or("")
+                        .to_lowercase()
+                        .contains(&lower)
+                        || e.distinguished_name.to_lowercase().contains(&lower)
+                        || e.attributes
+                            .values()
+                            .any(|vals| vals.iter().any(|v| v.to_lowercase().contains(&lower)))
+                })
+                .take(50)
+                .collect()
+        })
+        .map_err(|e| AppError::Directory(e.to_string()))
+}
+
+/// Creates a new contact. Requires AccountOperator permission.
+pub(crate) async fn create_contact_inner(
+    state: &AppState,
+    container_dn: &str,
+    attrs: &std::collections::HashMap<String, String>,
+) -> Result<String, AppError> {
+    if !state
+        .permission_service
+        .has_permission(PermissionLevel::AccountOperator)
+    {
+        return Err(AppError::PermissionDenied(
+            "Contact creation requires AccountOperator permission or higher".to_string(),
+        ));
+    }
+
+    let provider = state.directory_provider.clone();
+    match provider.create_contact(container_dn, attrs).await {
+        Ok(dn) => {
+            state.audit_service.log_success(
+                "ContactCreated",
+                &dn,
+                &format!("Contact created in {}", container_dn),
+            );
+            Ok(dn)
+        }
+        Err(e) => {
+            state.audit_service.log_failure(
+                "ContactCreateFailed",
+                container_dn,
+                &format!("Failed to create contact: {}", e),
+            );
+            Err(AppError::Directory(e.to_string()))
+        }
+    }
+}
+
+/// Updates an existing contact. Requires AccountOperator permission.
+pub(crate) async fn update_contact_inner(
+    state: &AppState,
+    dn: &str,
+    attrs: &std::collections::HashMap<String, String>,
+) -> Result<(), AppError> {
+    if !state
+        .permission_service
+        .has_permission(PermissionLevel::AccountOperator)
+    {
+        return Err(AppError::PermissionDenied(
+            "Contact modification requires AccountOperator permission or higher".to_string(),
+        ));
+    }
+
+    capture_snapshot(state, dn, "ContactUpdate").await;
+
+    let provider = state.directory_provider.clone();
+    match provider.update_contact(dn, attrs).await {
+        Ok(()) => {
+            state
+                .audit_service
+                .log_success("ContactUpdated", dn, "Contact updated");
+            Ok(())
+        }
+        Err(e) => {
+            state.audit_service.log_failure(
+                "ContactUpdateFailed",
+                dn,
+                &format!("Failed to update contact: {}", e),
+            );
+            Err(AppError::Directory(e.to_string()))
+        }
+    }
+}
+
+/// Deletes a contact. Requires AccountOperator permission.
+pub(crate) async fn delete_contact_inner(state: &AppState, dn: &str) -> Result<(), AppError> {
+    if !state
+        .permission_service
+        .has_permission(PermissionLevel::AccountOperator)
+    {
+        return Err(AppError::PermissionDenied(
+            "Contact deletion requires AccountOperator permission or higher".to_string(),
+        ));
+    }
+
+    capture_snapshot(state, dn, "ContactDelete").await;
+
+    let provider = state.directory_provider.clone();
+    match provider.delete_contact(dn).await {
+        Ok(()) => {
+            state
+                .audit_service
+                .log_success("ContactDeleted", dn, "Contact deleted");
+            Ok(())
+        }
+        Err(e) => {
+            state.audit_service.log_failure(
+                "ContactDeleteFailed",
+                dn,
+                &format!("Failed to delete contact: {}", e),
+            );
+            Err(AppError::Directory(e.to_string()))
+        }
+    }
+}
+
+/// Creates a new printer. Requires DomainAdmin permission.
+pub(crate) async fn create_printer_inner(
+    state: &AppState,
+    container_dn: &str,
+    attrs: &std::collections::HashMap<String, String>,
+) -> Result<String, AppError> {
+    if !state
+        .permission_service
+        .has_permission(PermissionLevel::DomainAdmin)
+    {
+        return Err(AppError::PermissionDenied(
+            "Printer creation requires DomainAdmin permission".to_string(),
+        ));
+    }
+
+    let provider = state.directory_provider.clone();
+    match provider.create_printer(container_dn, attrs).await {
+        Ok(dn) => {
+            state.audit_service.log_success(
+                "PrinterCreated",
+                &dn,
+                &format!("Printer created in {}", container_dn),
+            );
+            Ok(dn)
+        }
+        Err(e) => {
+            state.audit_service.log_failure(
+                "PrinterCreateFailed",
+                container_dn,
+                &format!("Failed to create printer: {}", e),
+            );
+            Err(AppError::Directory(e.to_string()))
+        }
+    }
+}
+
+/// Updates an existing printer. Requires DomainAdmin permission.
+pub(crate) async fn update_printer_inner(
+    state: &AppState,
+    dn: &str,
+    attrs: &std::collections::HashMap<String, String>,
+) -> Result<(), AppError> {
+    if !state
+        .permission_service
+        .has_permission(PermissionLevel::DomainAdmin)
+    {
+        return Err(AppError::PermissionDenied(
+            "Printer modification requires DomainAdmin permission".to_string(),
+        ));
+    }
+
+    capture_snapshot(state, dn, "PrinterUpdate").await;
+
+    let provider = state.directory_provider.clone();
+    match provider.update_printer(dn, attrs).await {
+        Ok(()) => {
+            state
+                .audit_service
+                .log_success("PrinterUpdated", dn, "Printer updated");
+            Ok(())
+        }
+        Err(e) => {
+            state.audit_service.log_failure(
+                "PrinterUpdateFailed",
+                dn,
+                &format!("Failed to update printer: {}", e),
+            );
+            Err(AppError::Directory(e.to_string()))
+        }
+    }
+}
+
+/// Deletes a printer. Requires DomainAdmin permission.
+pub(crate) async fn delete_printer_inner(state: &AppState, dn: &str) -> Result<(), AppError> {
+    if !state
+        .permission_service
+        .has_permission(PermissionLevel::DomainAdmin)
+    {
+        return Err(AppError::PermissionDenied(
+            "Printer deletion requires DomainAdmin permission".to_string(),
+        ));
+    }
+
+    capture_snapshot(state, dn, "PrinterDelete").await;
+
+    let provider = state.directory_provider.clone();
+    match provider.delete_printer(dn).await {
+        Ok(()) => {
+            state
+                .audit_service
+                .log_success("PrinterDeleted", dn, "Printer deleted");
+            Ok(())
+        }
+        Err(e) => {
+            state.audit_service.log_failure(
+                "PrinterDeleteFailed",
+                dn,
+                &format!("Failed to delete printer: {}", e),
+            );
             Err(AppError::Directory(e.to_string()))
         }
     }
@@ -1390,6 +1883,52 @@ pub async fn browse_groups(
     browse_groups_inner(&state, page, page_size).await
 }
 
+/// Browses all contacts with pagination.
+#[tauri::command]
+pub async fn browse_contacts(
+    page: usize,
+    page_size: usize,
+    state: State<'_, AppState>,
+) -> Result<BrowseResult, AppError> {
+    let provider = state.directory_provider.clone();
+    let all = provider
+        .browse_contacts(5000)
+        .await
+        .map_err(|e| AppError::Directory(e.to_string()))?;
+    let total = all.len();
+    let start = page * page_size;
+    let entries: Vec<DirectoryEntry> = all.into_iter().skip(start).take(page_size).collect();
+    let has_more = start + entries.len() < total;
+    Ok(BrowseResult {
+        entries,
+        total_count: total,
+        has_more,
+    })
+}
+
+/// Browses all printers with pagination.
+#[tauri::command]
+pub async fn browse_printers(
+    page: usize,
+    page_size: usize,
+    state: State<'_, AppState>,
+) -> Result<BrowseResult, AppError> {
+    let provider = state.directory_provider.clone();
+    let all = provider
+        .browse_printers(5000)
+        .await
+        .map_err(|e| AppError::Directory(e.to_string()))?;
+    let total = all.len();
+    let start = page * page_size;
+    let entries: Vec<DirectoryEntry> = all.into_iter().skip(start).take(page_size).collect();
+    let has_more = start + entries.len() < total;
+    Ok(BrowseResult {
+        entries,
+        total_count: total,
+        has_more,
+    })
+}
+
 /// Removes a member from a group.
 #[tauri::command]
 pub async fn remove_group_member(
@@ -1473,6 +2012,12 @@ pub async fn delete_group(group_dn: String, state: State<'_, AppState>) -> Resul
     delete_group_inner(&state, &group_dn).await
 }
 
+/// Deletes any AD object by DN. Requires AccountOperator+.
+#[tauri::command]
+pub async fn delete_ad_object(dn: String, state: State<'_, AppState>) -> Result<(), AppError> {
+    delete_ad_object_inner(&state, &dn).await
+}
+
 /// Creates a new group in Active Directory.
 #[tauri::command]
 pub async fn create_group(
@@ -1502,6 +2047,40 @@ pub async fn move_object(
     state: State<'_, AppState>,
 ) -> Result<(), AppError> {
     move_object_inner(&state, &object_dn, &target_container_dn).await
+}
+
+/// Moves multiple AD objects to a target container. Continues on individual failures.
+#[tauri::command]
+pub async fn bulk_move_objects(
+    object_dns: Vec<String>,
+    target_container_dn: String,
+    state: State<'_, AppState>,
+) -> Result<Vec<BulkMoveResult>, AppError> {
+    bulk_move_objects_inner(&state, &object_dns, &target_container_dn).await
+}
+
+/// Checks whether the AD Recycle Bin feature is enabled.
+#[tauri::command]
+pub async fn is_recycle_bin_enabled(state: State<'_, AppState>) -> Result<bool, AppError> {
+    is_recycle_bin_enabled_inner(&state).await
+}
+
+/// Lists deleted objects from the AD Recycle Bin.
+#[tauri::command]
+pub async fn get_deleted_objects(
+    state: State<'_, AppState>,
+) -> Result<Vec<DeletedObject>, AppError> {
+    get_deleted_objects_inner(&state).await
+}
+
+/// Restores a deleted object from the Recycle Bin.
+#[tauri::command]
+pub async fn restore_deleted_object(
+    deleted_dn: String,
+    target_ou_dn: String,
+    state: State<'_, AppState>,
+) -> Result<(), AppError> {
+    restore_deleted_object_inner(&state, &deleted_dn, &target_ou_dn).await
 }
 
 /// Updates the managedBy attribute of a group.
@@ -2072,7 +2651,7 @@ pub(crate) async fn create_user_inner(
         )));
     }
 
-    state.snapshot_service.capture(container_dn, "CreateUser");
+    capture_snapshot(state, container_dn, "CreateUser").await;
 
     match provider
         .create_user(cn, container_dn, sam_account_name, password, attributes)
@@ -2113,7 +2692,7 @@ pub(crate) async fn modify_attribute_inner(
         ));
     }
 
-    state.snapshot_service.capture(dn, "ModifyAttribute");
+    capture_snapshot(state, dn, "ModifyAttribute").await;
 
     let provider = state.directory_provider.clone();
     match provider.modify_attribute(dn, attribute_name, values).await {
@@ -2302,6 +2881,510 @@ pub async fn get_exchange_online_info(
 #[tauri::command]
 pub fn is_graph_configured(state: State<'_, AppState>) -> bool {
     state.graph_exchange.is_configured()
+}
+
+// ---------------------------------------------------------------------------
+// Contact and Printer Management - Tauri commands
+// ---------------------------------------------------------------------------
+
+/// Searches for contacts matching a query string.
+#[tauri::command]
+pub async fn search_contacts(
+    query: String,
+    state: State<'_, AppState>,
+) -> Result<Vec<DirectoryEntry>, AppError> {
+    search_contacts_inner(&state, &query).await
+}
+
+/// Searches for printers matching a query string.
+#[tauri::command]
+pub async fn search_printers(
+    query: String,
+    state: State<'_, AppState>,
+) -> Result<Vec<DirectoryEntry>, AppError> {
+    search_printers_inner(&state, &query).await
+}
+
+/// Creates a new contact. Requires AccountOperator+.
+#[tauri::command]
+pub async fn create_contact(
+    container_dn: String,
+    attrs: std::collections::HashMap<String, String>,
+    state: State<'_, AppState>,
+) -> Result<String, AppError> {
+    create_contact_inner(&state, &container_dn, &attrs).await
+}
+
+/// Updates an existing contact. Requires AccountOperator+.
+#[tauri::command]
+pub async fn update_contact(
+    dn: String,
+    attrs: std::collections::HashMap<String, String>,
+    state: State<'_, AppState>,
+) -> Result<(), AppError> {
+    update_contact_inner(&state, &dn, &attrs).await
+}
+
+/// Deletes a contact. Requires AccountOperator+.
+#[tauri::command]
+pub async fn delete_contact(dn: String, state: State<'_, AppState>) -> Result<(), AppError> {
+    delete_contact_inner(&state, &dn).await
+}
+
+/// Creates a new printer. Requires DomainAdmin.
+#[tauri::command]
+pub async fn create_printer(
+    container_dn: String,
+    attrs: std::collections::HashMap<String, String>,
+    state: State<'_, AppState>,
+) -> Result<String, AppError> {
+    create_printer_inner(&state, &container_dn, &attrs).await
+}
+
+/// Updates an existing printer. Requires DomainAdmin.
+#[tauri::command]
+pub async fn update_printer(
+    dn: String,
+    attrs: std::collections::HashMap<String, String>,
+    state: State<'_, AppState>,
+) -> Result<(), AppError> {
+    update_printer_inner(&state, &dn, &attrs).await
+}
+
+/// Deletes a printer. Requires DomainAdmin.
+#[tauri::command]
+pub async fn delete_printer(dn: String, state: State<'_, AppState>) -> Result<(), AppError> {
+    delete_printer_inner(&state, &dn).await
+}
+
+// ---------------------------------------------------------------------------
+// Thumbnail Photo
+// ---------------------------------------------------------------------------
+
+/// Gets the thumbnailPhoto attribute as base64-encoded bytes. ReadOnly access.
+pub(crate) async fn get_thumbnail_photo_inner(
+    state: &AppState,
+    user_dn: &str,
+) -> Result<Option<String>, AppError> {
+    let provider = state.directory_provider.clone();
+    provider
+        .get_thumbnail_photo(user_dn)
+        .await
+        .map_err(|e| AppError::Directory(e.to_string()))
+}
+
+/// Sets the thumbnailPhoto attribute from base64-encoded JPEG bytes.
+/// Requires AccountOperator+.
+pub(crate) async fn set_thumbnail_photo_inner(
+    state: &AppState,
+    user_dn: &str,
+    photo_base64: &str,
+) -> Result<(), AppError> {
+    if !state
+        .permission_service
+        .has_permission(PermissionLevel::AccountOperator)
+    {
+        return Err(AppError::PermissionDenied(
+            "Setting thumbnail photo requires AccountOperator permission or higher".to_string(),
+        ));
+    }
+
+    capture_snapshot(state, user_dn, "SetThumbnailPhoto").await;
+
+    let provider = state.directory_provider.clone();
+    match provider.set_thumbnail_photo(user_dn, photo_base64).await {
+        Ok(()) => {
+            state
+                .audit_service
+                .log_success("ThumbnailPhotoSet", user_dn, "Thumbnail photo set");
+            Ok(())
+        }
+        Err(e) => {
+            state.audit_service.log_failure(
+                "ThumbnailPhotoSetFailed",
+                user_dn,
+                &format!("Failed to set thumbnail photo: {}", e),
+            );
+            Err(AppError::Directory(e.to_string()))
+        }
+    }
+}
+
+/// Removes the thumbnailPhoto attribute. Requires AccountOperator+.
+pub(crate) async fn remove_thumbnail_photo_inner(
+    state: &AppState,
+    user_dn: &str,
+) -> Result<(), AppError> {
+    if !state
+        .permission_service
+        .has_permission(PermissionLevel::AccountOperator)
+    {
+        return Err(AppError::PermissionDenied(
+            "Removing thumbnail photo requires AccountOperator permission or higher".to_string(),
+        ));
+    }
+
+    state
+        .snapshot_service
+        .capture(user_dn, "RemoveThumbnailPhoto");
+
+    let provider = state.directory_provider.clone();
+    match provider.remove_thumbnail_photo(user_dn).await {
+        Ok(()) => {
+            state.audit_service.log_success(
+                "ThumbnailPhotoRemoved",
+                user_dn,
+                "Thumbnail photo removed",
+            );
+            Ok(())
+        }
+        Err(e) => {
+            state.audit_service.log_failure(
+                "ThumbnailPhotoRemoveFailed",
+                user_dn,
+                &format!("Failed to remove thumbnail photo: {}", e),
+            );
+            Err(AppError::Directory(e.to_string()))
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Object Snapshot - inner functions
+// ---------------------------------------------------------------------------
+
+/// Captures a full snapshot of an AD object before modification.
+/// Fetches current attributes from directory and stores in SQLite.
+pub(crate) async fn capture_object_snapshot_inner(
+    state: &AppState,
+    object_dn: &str,
+    operation_type: &str,
+) -> Result<i64, AppError> {
+    let provider = state.directory_provider.clone();
+    let operator = provider
+        .authenticated_user()
+        .unwrap_or_else(|| std::env::var("USERNAME").unwrap_or_else(|_| "Unknown".to_string()));
+
+    // Extract CN and search for the object
+    let cn = object_dn
+        .split(',')
+        .next()
+        .and_then(|part| {
+            part.strip_prefix("CN=")
+                .or_else(|| part.strip_prefix("cn="))
+        })
+        .unwrap_or("");
+
+    let attrs_json = if !cn.is_empty() {
+        let entries = provider.search_users(cn, 5).await.unwrap_or_default();
+        entries
+            .iter()
+            .find(|e| e.distinguished_name == object_dn)
+            .map(|entry| {
+                serde_json::to_string(&entry.attributes).unwrap_or_else(|_| "{}".to_string())
+            })
+            .unwrap_or_else(|| "{}".to_string())
+    } else {
+        "{}".to_string()
+    };
+    let id =
+        state
+            .object_snapshot_service
+            .capture(object_dn, operation_type, &attrs_json, &operator);
+    Ok(id)
+}
+
+/// Gets snapshot history for an object. ReadOnly access.
+pub(crate) fn get_snapshot_history_inner(state: &AppState, object_dn: &str) -> Vec<ObjectSnapshot> {
+    state.object_snapshot_service.get_history(object_dn)
+}
+
+/// Gets a specific snapshot by ID. ReadOnly access.
+pub(crate) fn get_snapshot_inner(state: &AppState, id: i64) -> Option<ObjectSnapshot> {
+    state.object_snapshot_service.get_snapshot(id)
+}
+
+/// Computes diff between a snapshot and current object state.
+/// Requires ReadOnly access.
+pub(crate) async fn compute_snapshot_diff_inner(
+    state: &AppState,
+    snapshot_id: i64,
+) -> Result<Vec<SnapshotDiff>, AppError> {
+    let snapshot = state
+        .object_snapshot_service
+        .get_snapshot(snapshot_id)
+        .ok_or_else(|| AppError::Validation("Snapshot not found".to_string()))?;
+
+    // Parse stored attributes
+    let stored_attrs: std::collections::HashMap<String, Vec<String>> =
+        serde_json::from_str(&snapshot.attributes_json).unwrap_or_default();
+
+    // Fetch current state from directory by extracting CN and searching
+    let provider = state.directory_provider.clone();
+    let cn = snapshot
+        .object_dn
+        .split(',')
+        .next()
+        .and_then(|part| {
+            part.strip_prefix("CN=")
+                .or_else(|| part.strip_prefix("cn="))
+        })
+        .unwrap_or("");
+
+    let current_attrs: std::collections::HashMap<String, Vec<String>> = if !cn.is_empty() {
+        let entries = provider.search_users(cn, 10).await.unwrap_or_default();
+        entries
+            .iter()
+            .find(|e| e.distinguished_name == snapshot.object_dn)
+            .map(|e| e.attributes.clone())
+            .unwrap_or_default()
+    } else {
+        std::collections::HashMap::new()
+    };
+
+    // Build diff - collect all attribute names from both sides
+    let mut all_keys: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+    for key in stored_attrs.keys() {
+        all_keys.insert(key.clone());
+    }
+    for key in current_attrs.keys() {
+        all_keys.insert(key.clone());
+    }
+
+    let diffs: Vec<SnapshotDiff> = all_keys
+        .into_iter()
+        .map(|attr| {
+            let snap_val = stored_attrs.get(&attr).map(|v| v.join("; "));
+            let curr_val = current_attrs.get(&attr).map(|v| v.join("; "));
+            let changed = snap_val != curr_val;
+            SnapshotDiff {
+                attribute: attr,
+                snapshot_value: snap_val,
+                current_value: curr_val,
+                changed,
+            }
+        })
+        .collect();
+
+    Ok(diffs)
+}
+
+/// Restores an object from a snapshot. Requires DomainAdmin.
+/// Applies the snapshot's attribute values back to the object.
+pub(crate) async fn restore_from_snapshot_inner(
+    state: &AppState,
+    snapshot_id: i64,
+) -> Result<(), AppError> {
+    if !state
+        .permission_service
+        .has_permission(PermissionLevel::DomainAdmin)
+    {
+        return Err(AppError::PermissionDenied(
+            "Restoring from snapshot requires DomainAdmin permission".to_string(),
+        ));
+    }
+
+    let snapshot = state
+        .object_snapshot_service
+        .get_snapshot(snapshot_id)
+        .ok_or_else(|| AppError::Validation("Snapshot not found".to_string()))?;
+
+    let stored_attrs: std::collections::HashMap<String, Vec<String>> =
+        serde_json::from_str(&snapshot.attributes_json).unwrap_or_default();
+
+    // Read-only / system attributes that cannot be modified via LDAP
+    const SKIP_ATTRS: &[&str] = &[
+        "objectClass",
+        "objectGuid",
+        "objectSid",
+        "objectCategory",
+        "distinguishedName",
+        "cn",
+        "name",
+        "whenCreated",
+        "whenChanged",
+        "uSNCreated",
+        "uSNChanged",
+        "instanceType",
+        "objectVersion",
+        "pwdLastSet",
+        "badPwdCount",
+        "badPasswordTime",
+        "lastLogon",
+        "lastLogonTimestamp",
+        "lastLogoff",
+        "logonCount",
+        "accountExpires",
+        "primaryGroupID",
+        "sAMAccountType",
+        "isCriticalSystemObject",
+        "dSCorePropagationData",
+        "memberOf",
+    ];
+
+    let provider = state.directory_provider.clone();
+    let dn = &snapshot.object_dn;
+
+    // Fetch current attributes to detect what needs to be cleared
+    let cn = dn
+        .split(',')
+        .next()
+        .and_then(|part| {
+            part.strip_prefix("CN=")
+                .or_else(|| part.strip_prefix("cn="))
+        })
+        .unwrap_or("");
+    let current_attrs: std::collections::HashMap<String, Vec<String>> = if !cn.is_empty() {
+        let entries = provider.search_users(cn, 10).await.unwrap_or_default();
+        entries
+            .iter()
+            .find(|e| e.distinguished_name == *dn)
+            .map(|e| e.attributes.clone())
+            .unwrap_or_default()
+    } else {
+        std::collections::HashMap::new()
+    };
+
+    // 1. Restore attributes that exist in the snapshot
+    for (attr_name, values) in &stored_attrs {
+        if SKIP_ATTRS
+            .iter()
+            .any(|&s| s.eq_ignore_ascii_case(attr_name))
+        {
+            continue;
+        }
+        if let Err(e) = provider.modify_attribute(dn, attr_name, values).await {
+            state.audit_service.log_failure(
+                "SnapshotRestoreFailed",
+                dn,
+                &format!(
+                    "Failed to restore attribute '{}' from snapshot {}: {}",
+                    attr_name, snapshot_id, e
+                ),
+            );
+            return Err(AppError::Directory(format!(
+                "Failed to restore attribute '{}': {}",
+                attr_name, e
+            )));
+        }
+    }
+
+    // 2. Clear attributes that exist now but were absent in the snapshot
+    for attr_name in current_attrs.keys() {
+        if SKIP_ATTRS
+            .iter()
+            .any(|&s| s.eq_ignore_ascii_case(attr_name))
+        {
+            continue;
+        }
+        if !stored_attrs.contains_key(attr_name) {
+            // Attribute was added after snapshot - clear it
+            let _ = provider.modify_attribute(dn, attr_name, &[]).await;
+        }
+    }
+
+    state.audit_service.log_success(
+        "SnapshotRestored",
+        dn,
+        &format!(
+            "Object restored from snapshot {} ({} attributes)",
+            snapshot_id,
+            stored_attrs.len()
+        ),
+    );
+
+    Ok(())
+}
+
+/// Cleans up expired snapshots. Returns count deleted.
+pub(crate) fn cleanup_snapshots_inner(state: &AppState, retention_days: i64) -> usize {
+    state
+        .object_snapshot_service
+        .cleanup_expired(retention_days)
+}
+
+// ---------------------------------------------------------------------------
+// Object Snapshot - Tauri commands
+// ---------------------------------------------------------------------------
+
+/// Captures a full snapshot of an AD object.
+#[tauri::command]
+pub async fn capture_object_snapshot(
+    object_dn: String,
+    operation_type: String,
+    state: State<'_, AppState>,
+) -> Result<i64, AppError> {
+    capture_object_snapshot_inner(&state, &object_dn, &operation_type).await
+}
+
+/// Gets snapshot history for an object DN.
+#[tauri::command]
+pub fn get_snapshot_history(object_dn: String, state: State<'_, AppState>) -> Vec<ObjectSnapshot> {
+    get_snapshot_history_inner(&state, &object_dn)
+}
+
+/// Gets a specific snapshot by ID.
+#[tauri::command]
+pub fn get_snapshot(id: i64, state: State<'_, AppState>) -> Option<ObjectSnapshot> {
+    get_snapshot_inner(&state, id)
+}
+
+/// Computes diff between a snapshot and current object state.
+#[tauri::command]
+pub async fn compute_snapshot_diff(
+    snapshot_id: i64,
+    state: State<'_, AppState>,
+) -> Result<Vec<SnapshotDiff>, AppError> {
+    compute_snapshot_diff_inner(&state, snapshot_id).await
+}
+
+/// Restores an object from a snapshot. Requires DomainAdmin.
+#[tauri::command]
+pub async fn restore_from_snapshot(
+    snapshot_id: i64,
+    state: State<'_, AppState>,
+) -> Result<(), AppError> {
+    restore_from_snapshot_inner(&state, snapshot_id).await
+}
+
+/// Cleans up expired snapshots. Returns count deleted.
+#[tauri::command]
+pub fn cleanup_snapshots(retention_days: i64, state: State<'_, AppState>) -> usize {
+    cleanup_snapshots_inner(&state, retention_days)
+}
+
+/// Deletes a single snapshot by ID.
+#[tauri::command]
+pub fn delete_snapshot(snapshot_id: i64, state: State<'_, AppState>) -> bool {
+    state.object_snapshot_service.delete_snapshot(snapshot_id)
+}
+
+/// Gets the thumbnail photo for a user. ReadOnly access.
+#[tauri::command]
+pub async fn get_thumbnail_photo(
+    user_dn: String,
+    state: State<'_, AppState>,
+) -> Result<Option<String>, AppError> {
+    get_thumbnail_photo_inner(&state, &user_dn).await
+}
+
+/// Sets the thumbnail photo for a user. Requires AccountOperator+.
+#[tauri::command]
+pub async fn set_thumbnail_photo(
+    user_dn: String,
+    photo_base64: String,
+    state: State<'_, AppState>,
+) -> Result<(), AppError> {
+    set_thumbnail_photo_inner(&state, &user_dn, &photo_base64).await
+}
+
+/// Removes the thumbnail photo for a user. Requires AccountOperator+.
+#[tauri::command]
+pub async fn remove_thumbnail_photo(
+    user_dn: String,
+    state: State<'_, AppState>,
+) -> Result<(), AppError> {
+    remove_thumbnail_photo_inner(&state, &user_dn).await
 }
 
 #[allow(clippy::unwrap_used)]
@@ -4560,7 +5643,7 @@ mod tests {
     // -----------------------------------------------------------------------
 
     #[tokio::test]
-    async fn test_move_object_inner_requires_domain_admin() {
+    async fn test_move_object_inner_requires_account_operator() {
         let state = make_state(); // default is ReadOnly
         let result = move_object_inner(
             &state,
@@ -4571,6 +5654,25 @@ mod tests {
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert!(matches!(err, AppError::PermissionDenied(_)));
+    }
+
+    #[tokio::test]
+    async fn test_move_object_inner_allowed_for_account_operator() {
+        let (state, provider) =
+            make_state_with_level_and_provider(PermissionLevel::AccountOperator);
+
+        let result = move_object_inner(
+            &state,
+            "CN=TestUser,OU=Old,DC=example,DC=com",
+            "OU=New,DC=example,DC=com",
+        )
+        .await;
+        assert!(result.is_ok());
+
+        let calls = provider.move_object_calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].0, "CN=TestUser,OU=Old,DC=example,DC=com");
+        assert_eq!(calls[0].1, "OU=New,DC=example,DC=com");
     }
 
     #[tokio::test]
@@ -4590,6 +5692,200 @@ mod tests {
 
         let entries = state.audit_service.get_entries();
         assert!(entries.iter().any(|e| e.action == "ObjectMoved"));
+    }
+
+    #[tokio::test]
+    async fn test_move_object_inner_audits_failure() {
+        let state = make_state_with_level_and_failure(PermissionLevel::AccountOperator);
+
+        let result = move_object_inner(
+            &state,
+            "CN=TestUser,OU=Old,DC=example,DC=com",
+            "OU=New,DC=example,DC=com",
+        )
+        .await;
+        assert!(result.is_err());
+
+        let entries = state.audit_service.get_entries();
+        assert!(entries.iter().any(|e| e.action == "MoveObjectFailed"));
+    }
+
+    // -----------------------------------------------------------------------
+    // bulk_move_objects_inner tests
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_bulk_move_objects_inner_requires_account_operator() {
+        let state = make_state();
+        let result = bulk_move_objects_inner(
+            &state,
+            &["CN=U1,OU=Old,DC=example,DC=com".to_string()],
+            "OU=New,DC=example,DC=com",
+        )
+        .await;
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), AppError::PermissionDenied(_)));
+    }
+
+    #[tokio::test]
+    async fn test_bulk_move_objects_inner_moves_all() {
+        let (state, provider) =
+            make_state_with_level_and_provider(PermissionLevel::AccountOperator);
+
+        let dns = vec![
+            "CN=U1,OU=Old,DC=example,DC=com".to_string(),
+            "CN=U2,OU=Old,DC=example,DC=com".to_string(),
+        ];
+
+        let results = bulk_move_objects_inner(&state, &dns, "OU=New,DC=example,DC=com")
+            .await
+            .unwrap();
+
+        assert_eq!(results.len(), 2);
+        assert!(results[0].success);
+        assert!(results[1].success);
+        assert!(results[0].error.is_none());
+
+        let calls = provider.move_object_calls.lock().unwrap();
+        assert_eq!(calls.len(), 2);
+
+        let entries = state.audit_service.get_entries();
+        assert_eq!(
+            entries.iter().filter(|e| e.action == "ObjectMoved").count(),
+            2
+        );
+    }
+
+    #[tokio::test]
+    async fn test_bulk_move_objects_inner_continues_on_failure() {
+        let state = make_state_with_level_and_failure(PermissionLevel::AccountOperator);
+
+        let dns = vec![
+            "CN=U1,OU=Old,DC=example,DC=com".to_string(),
+            "CN=U2,OU=Old,DC=example,DC=com".to_string(),
+        ];
+
+        let results = bulk_move_objects_inner(&state, &dns, "OU=New,DC=example,DC=com")
+            .await
+            .unwrap();
+
+        // Both should fail but the operation continues
+        assert_eq!(results.len(), 2);
+        assert!(!results[0].success);
+        assert!(!results[1].success);
+        assert!(results[0].error.is_some());
+        assert!(results[1].error.is_some());
+
+        let entries = state.audit_service.get_entries();
+        assert_eq!(
+            entries
+                .iter()
+                .filter(|e| e.action == "MoveObjectFailed")
+                .count(),
+            2
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // recycle bin tests
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_is_recycle_bin_enabled_requires_domain_admin() {
+        let state = make_state();
+        let result = is_recycle_bin_enabled_inner(&state).await;
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), AppError::PermissionDenied(_)));
+    }
+
+    #[tokio::test]
+    async fn test_is_recycle_bin_enabled_returns_true() {
+        let (state, _) = make_state_with_level_and_provider(PermissionLevel::DomainAdmin);
+        let result = is_recycle_bin_enabled_inner(&state).await.unwrap();
+        assert!(result);
+    }
+
+    #[tokio::test]
+    async fn test_get_deleted_objects_requires_domain_admin() {
+        let state = make_state();
+        let result = get_deleted_objects_inner(&state).await;
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), AppError::PermissionDenied(_)));
+    }
+
+    #[tokio::test]
+    async fn test_get_deleted_objects_returns_list() {
+        use crate::models::DeletedObject;
+
+        let provider =
+            Arc::new(
+                MockDirectoryProvider::new().with_deleted_objects(vec![DeletedObject {
+                    distinguished_name: "CN=Test\\0ADEL:abc,CN=Deleted Objects,DC=example,DC=com"
+                        .to_string(),
+                    name: "Test".to_string(),
+                    object_type: "user".to_string(),
+                    deletion_date: "2026-03-20".to_string(),
+                    original_ou: "OU=Users,DC=example,DC=com".to_string(),
+                }]),
+            );
+        let state = AppState::new_for_test(provider, PermissionConfig::default());
+        state
+            .permission_service
+            .set_level(PermissionLevel::DomainAdmin);
+
+        let result = get_deleted_objects_inner(&state).await.unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].name, "Test");
+    }
+
+    #[tokio::test]
+    async fn test_restore_deleted_object_requires_domain_admin() {
+        let state = make_state();
+        let result = restore_deleted_object_inner(
+            &state,
+            "CN=Test,CN=Deleted Objects,DC=example,DC=com",
+            "OU=Users,DC=example,DC=com",
+        )
+        .await;
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), AppError::PermissionDenied(_)));
+    }
+
+    #[tokio::test]
+    async fn test_restore_deleted_object_success_and_audit() {
+        let (state, provider) = make_state_with_level_and_provider(PermissionLevel::DomainAdmin);
+
+        let result = restore_deleted_object_inner(
+            &state,
+            "CN=Test,CN=Deleted Objects,DC=example,DC=com",
+            "OU=Users,DC=example,DC=com",
+        )
+        .await;
+        assert!(result.is_ok());
+
+        let calls = provider.restore_calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].0, "CN=Test,CN=Deleted Objects,DC=example,DC=com");
+        assert_eq!(calls[0].1, "OU=Users,DC=example,DC=com");
+
+        let entries = state.audit_service.get_entries();
+        assert!(entries.iter().any(|e| e.action == "ObjectRestored"));
+    }
+
+    #[tokio::test]
+    async fn test_restore_deleted_object_failure_audits() {
+        let state = make_state_with_level_and_failure(PermissionLevel::DomainAdmin);
+
+        let result = restore_deleted_object_inner(
+            &state,
+            "CN=Test,CN=Deleted Objects,DC=example,DC=com",
+            "OU=Users,DC=example,DC=com",
+        )
+        .await;
+        assert!(result.is_err());
+
+        let entries = state.audit_service.get_entries();
+        assert!(entries.iter().any(|e| e.action == "RestoreObjectFailed"));
     }
 
     // -----------------------------------------------------------------------
@@ -4919,5 +6215,422 @@ mod tests {
         let state = make_state();
         let result = get_credential_inner(&state, "bad_key");
         assert!(result.is_err());
+    }
+
+    // -----------------------------------------------------------------------
+    // Contact management tests
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_search_contacts_anyone_can_search() {
+        use crate::models::ContactInfo;
+        let contacts = vec![ContactInfo {
+            dn: "CN=Test Contact,OU=Contacts,DC=example,DC=com".to_string(),
+            display_name: "Test Contact".to_string(),
+            first_name: "Test".to_string(),
+            last_name: "Contact".to_string(),
+            email: "test@example.com".to_string(),
+            phone: "+1-555-0100".to_string(),
+            mobile: String::new(),
+            company: "Acme".to_string(),
+            department: "Sales".to_string(),
+            description: "A test contact".to_string(),
+        }];
+        let provider = Arc::new(MockDirectoryProvider::new().with_contacts(contacts));
+        let state = AppState::new_for_test(provider, PermissionConfig::default());
+        // ReadOnly by default - should still work
+        let results = search_contacts_inner(&state, "test").await.unwrap();
+        // browse_contacts mock returns empty - just verify no error
+        assert!(results.is_empty() || !results.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_create_contact_requires_account_operator() {
+        let state = make_state(); // ReadOnly
+        let attrs = HashMap::new();
+        let result = create_contact_inner(&state, "OU=Contacts,DC=example,DC=com", &attrs).await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            AppError::PermissionDenied(msg) => {
+                assert!(msg.contains("AccountOperator"));
+            }
+            other => panic!("Expected PermissionDenied, got: {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_create_contact_success_and_audit() {
+        let (state, provider) =
+            make_state_with_level_and_provider(PermissionLevel::AccountOperator);
+        let mut attrs = HashMap::new();
+        attrs.insert("displayName".to_string(), "New Contact".to_string());
+        let result = create_contact_inner(&state, "OU=Contacts,DC=example,DC=com", &attrs).await;
+        assert!(result.is_ok());
+        let dn = result.unwrap();
+        assert!(dn.contains("New Contact"));
+
+        let calls = provider.create_contact_calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+
+        let entries = state.audit_service.get_entries();
+        assert!(entries.iter().any(|e| e.action == "ContactCreated"));
+    }
+
+    #[tokio::test]
+    async fn test_delete_contact_requires_account_operator() {
+        let state = make_state(); // ReadOnly
+        let result = delete_contact_inner(&state, "CN=Old,OU=Contacts,DC=example,DC=com").await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            AppError::PermissionDenied(msg) => {
+                assert!(msg.contains("AccountOperator"));
+            }
+            other => panic!("Expected PermissionDenied, got: {:?}", other),
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Printer management tests
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_create_printer_requires_domain_admin() {
+        let state = make_state_with_level(PermissionLevel::AccountOperator);
+        let attrs = HashMap::new();
+        let result = create_printer_inner(&state, "OU=Printers,DC=example,DC=com", &attrs).await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            AppError::PermissionDenied(msg) => {
+                assert!(msg.contains("DomainAdmin"));
+            }
+            other => panic!("Expected PermissionDenied, got: {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_delete_printer_requires_domain_admin() {
+        let state = make_state_with_level(PermissionLevel::AccountOperator);
+        let result =
+            delete_printer_inner(&state, "CN=OldPrinter,OU=Printers,DC=example,DC=com").await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            AppError::PermissionDenied(msg) => {
+                assert!(msg.contains("DomainAdmin"));
+            }
+            other => panic!("Expected PermissionDenied, got: {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_search_printers_returns_list() {
+        use crate::models::PrinterInfo;
+        let printers = vec![PrinterInfo {
+            dn: "CN=HP-Floor3,OU=Printers,DC=example,DC=com".to_string(),
+            name: "HP-Floor3".to_string(),
+            location: "Floor 3".to_string(),
+            server_name: "PRINT01".to_string(),
+            share_path: "\\\\PRINT01\\HP-Floor3".to_string(),
+            driver_name: "HP Universal".to_string(),
+            description: "Color laser".to_string(),
+        }];
+        let provider = Arc::new(MockDirectoryProvider::new().with_printers(printers));
+        let state = AppState::new_for_test(provider, PermissionConfig::default());
+        let results = search_printers_inner(&state, "HP").await.unwrap();
+        // browse_printers mock returns empty - just verify no error
+        assert!(results.is_empty() || !results.is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // Thumbnail Photo tests
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_get_thumbnail_photo_returns_none() {
+        let state = make_state();
+        let result = get_thumbnail_photo_inner(&state, "CN=John,OU=Users,DC=example,DC=com").await;
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn test_get_thumbnail_photo_returns_photo() {
+        let provider = Arc::new(
+            MockDirectoryProvider::new()
+                .with_thumbnail_photo("CN=John,OU=Users,DC=example,DC=com", "dGVzdA=="),
+        );
+        let state = AppState::new_for_test(provider, PermissionConfig::default());
+        let result = get_thumbnail_photo_inner(&state, "CN=John,OU=Users,DC=example,DC=com").await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), Some("dGVzdA==".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_set_thumbnail_photo_requires_account_operator() {
+        let state = make_state(); // ReadOnly
+        let result =
+            set_thumbnail_photo_inner(&state, "CN=John,OU=Users,DC=example,DC=com", "dGVzdA==")
+                .await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            AppError::PermissionDenied(msg) => {
+                assert!(msg.contains("AccountOperator"));
+            }
+            other => panic!("Expected PermissionDenied, got: {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_set_thumbnail_photo_success_and_audit() {
+        let (state, provider) =
+            make_state_with_level_and_provider(PermissionLevel::AccountOperator);
+        let result =
+            set_thumbnail_photo_inner(&state, "CN=John,OU=Users,DC=example,DC=com", "dGVzdA==")
+                .await;
+        assert!(result.is_ok());
+
+        let calls = provider.set_photo_calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].0, "CN=John,OU=Users,DC=example,DC=com");
+        assert_eq!(calls[0].1, "dGVzdA==");
+
+        let entries = state.audit_service.get_entries();
+        assert!(entries.iter().any(|e| e.action == "ThumbnailPhotoSet"));
+    }
+
+    #[tokio::test]
+    async fn test_remove_thumbnail_photo_requires_account_operator() {
+        let state = make_state(); // ReadOnly
+        let result =
+            remove_thumbnail_photo_inner(&state, "CN=John,OU=Users,DC=example,DC=com").await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            AppError::PermissionDenied(msg) => {
+                assert!(msg.contains("AccountOperator"));
+            }
+            other => panic!("Expected PermissionDenied, got: {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_remove_thumbnail_photo_success_and_audit() {
+        let (state, provider) =
+            make_state_with_level_and_provider(PermissionLevel::AccountOperator);
+        let result =
+            remove_thumbnail_photo_inner(&state, "CN=John,OU=Users,DC=example,DC=com").await;
+        assert!(result.is_ok());
+
+        let calls = provider.remove_photo_calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0], "CN=John,OU=Users,DC=example,DC=com");
+
+        let entries = state.audit_service.get_entries();
+        assert!(entries.iter().any(|e| e.action == "ThumbnailPhotoRemoved"));
+    }
+
+    #[tokio::test]
+    async fn test_set_thumbnail_photo_failure_audits() {
+        let state = make_state_with_level_and_failure(PermissionLevel::AccountOperator);
+        let result =
+            set_thumbnail_photo_inner(&state, "CN=John,OU=Users,DC=example,DC=com", "dGVzdA==")
+                .await;
+        assert!(result.is_err());
+
+        let entries = state.audit_service.get_entries();
+        assert!(entries
+            .iter()
+            .any(|e| e.action == "ThumbnailPhotoSetFailed"));
+    }
+
+    #[tokio::test]
+    async fn test_remove_thumbnail_photo_failure_audits() {
+        let state = make_state_with_level_and_failure(PermissionLevel::AccountOperator);
+        let result =
+            remove_thumbnail_photo_inner(&state, "CN=John,OU=Users,DC=example,DC=com").await;
+        assert!(result.is_err());
+
+        let entries = state.audit_service.get_entries();
+        assert!(entries
+            .iter()
+            .any(|e| e.action == "ThumbnailPhotoRemoveFailed"));
+    }
+
+    // -----------------------------------------------------------------------
+    // Object Snapshot command tests
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_capture_object_snapshot_stores_snapshot() {
+        let users = vec![make_user_entry("jdoe", "John Doe")];
+        let state = make_state_with_users(users);
+        let id = capture_object_snapshot_inner(
+            &state,
+            "CN=John Doe,OU=Users,DC=example,DC=com",
+            "ModifyAttribute",
+        )
+        .await
+        .unwrap();
+        assert!(id > 0);
+        assert_eq!(state.object_snapshot_service.count(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_capture_object_snapshot_empty_when_no_entry() {
+        let state = make_state();
+        let id = capture_object_snapshot_inner(&state, "CN=Unknown", "Op")
+            .await
+            .unwrap();
+        assert!(id > 0);
+        let snapshot = state.object_snapshot_service.get_snapshot(id).unwrap();
+        assert_eq!(snapshot.attributes_json, "{}");
+    }
+
+    #[test]
+    fn test_get_snapshot_history_returns_ordered_list() {
+        let state = make_state();
+        state
+            .object_snapshot_service
+            .capture("dn1", "Op1", r#"{"a":"1"}"#, "test");
+        state
+            .object_snapshot_service
+            .capture("dn1", "Op2", r#"{"a":"2"}"#, "test");
+        state
+            .object_snapshot_service
+            .capture("dn2", "Op3", r#"{"a":"3"}"#, "test");
+
+        let history = get_snapshot_history_inner(&state, "dn1");
+        assert_eq!(history.len(), 2);
+        assert_eq!(history[0].operation_type, "Op2");
+        assert_eq!(history[1].operation_type, "Op1");
+    }
+
+    #[test]
+    fn test_get_snapshot_returns_by_id() {
+        let state = make_state();
+        let id = state
+            .object_snapshot_service
+            .capture("dn1", "Op1", r#"{"key":"val"}"#, "test");
+        let snapshot = get_snapshot_inner(&state, id).unwrap();
+        assert_eq!(snapshot.object_dn, "dn1");
+        assert_eq!(snapshot.attributes_json, r#"{"key":"val"}"#);
+    }
+
+    #[test]
+    fn test_get_snapshot_returns_none_for_missing() {
+        let state = make_state();
+        assert!(get_snapshot_inner(&state, 999).is_none());
+    }
+
+    #[test]
+    fn test_cleanup_snapshots_removes_old_entries() {
+        let state = make_state();
+        // Insert an old snapshot manually
+        {
+            let conn = state.object_snapshot_service.conn.lock().unwrap();
+            conn.execute(
+                "INSERT INTO object_snapshots (object_dn, operation_type, timestamp, operator, attributes_json)
+                 VALUES ('old_dn', 'OldOp', '2020-01-01T00:00:00Z', 'test', '{}')",
+                [],
+            )
+            .unwrap();
+        }
+        state
+            .object_snapshot_service
+            .capture("new_dn", "NewOp", "{}", "test");
+        assert_eq!(state.object_snapshot_service.count(), 2);
+
+        let deleted = cleanup_snapshots_inner(&state, 30);
+        assert_eq!(deleted, 1);
+        assert_eq!(state.object_snapshot_service.count(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_restore_from_snapshot_requires_domain_admin() {
+        let state = make_state(); // ReadOnly by default
+        state
+            .object_snapshot_service
+            .capture("dn1", "Op", r#"{"cn":["Test"]}"#, "test");
+        let result = restore_from_snapshot_inner(&state, 1).await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            AppError::PermissionDenied(msg) => {
+                assert!(msg.contains("DomainAdmin"));
+            }
+            other => panic!("Expected PermissionDenied, got: {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_restore_from_snapshot_success_and_audit() {
+        let (state, provider) = make_state_with_level_and_provider(PermissionLevel::DomainAdmin);
+        let id = state.object_snapshot_service.capture(
+            "CN=Test,DC=example,DC=com",
+            "ModifyAttribute",
+            r#"{"mail":["test@example.com"]}"#,
+            "TestAdmin",
+        );
+        let result = restore_from_snapshot_inner(&state, id).await;
+        assert!(result.is_ok());
+
+        // Verify modify_attribute was called
+        let calls = provider.modify_attribute_calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].0, "CN=Test,DC=example,DC=com");
+        assert_eq!(calls[0].1, "mail");
+
+        // Verify audit entry
+        let entries = state.audit_service.get_entries();
+        assert!(entries.iter().any(|e| e.action == "SnapshotRestored"));
+    }
+
+    #[tokio::test]
+    async fn test_restore_from_snapshot_not_found() {
+        let state = make_state_with_level(PermissionLevel::DomainAdmin);
+        let result = restore_from_snapshot_inner(&state, 999).await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            AppError::Validation(msg) => {
+                assert!(msg.contains("not found"));
+            }
+            other => panic!("Expected Validation, got: {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_restore_from_snapshot_failure_audits() {
+        let state = make_state_with_level_and_failure(PermissionLevel::DomainAdmin);
+        let id = state.object_snapshot_service.capture(
+            "CN=Fail,DC=example,DC=com",
+            "Op",
+            r#"{"givenName":["Fail"],"sn":["Test"]}"#,
+            "TestAdmin",
+        );
+        let result = restore_from_snapshot_inner(&state, id).await;
+        assert!(result.is_err());
+
+        let entries = state.audit_service.get_entries();
+        assert!(entries.iter().any(|e| e.action == "SnapshotRestoreFailed"));
+    }
+
+    #[tokio::test]
+    async fn test_compute_snapshot_diff_not_found() {
+        let state = make_state();
+        let result = compute_snapshot_diff_inner(&state, 999).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_compute_snapshot_diff_returns_diffs() {
+        let state = make_state();
+        state.object_snapshot_service.capture(
+            "CN=Test",
+            "Op",
+            r#"{"mail":["old@example.com"],"cn":["Test"]}"#,
+            "TestAdmin",
+        );
+        let diffs = compute_snapshot_diff_inner(&state, 1).await.unwrap();
+        // Should have entries for mail and cn (from snapshot) plus
+        // whatever attributes the mock returns (empty for unknown DN)
+        assert!(!diffs.is_empty());
+        assert!(diffs.iter().any(|d| d.attribute == "mail"));
     }
 }

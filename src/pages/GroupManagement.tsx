@@ -15,7 +15,15 @@ import { useGroupBrowse } from "@/hooks/useGroupBrowse";
 import { useNavigation } from "@/contexts/NavigationContext";
 import { usePermissions } from "@/hooks/usePermissions";
 import { GroupDetail } from "@/pages/GroupDetail";
-import { Users, AlertCircle, Shield, Mail } from "lucide-react";
+import {
+  ContextMenu,
+  type ContextMenuItem,
+} from "@/components/common/ContextMenu";
+import {
+  MoveObjectDialog,
+  type MoveTarget,
+} from "@/components/dialogs/MoveObjectDialog";
+import { Users, AlertCircle, Shield, Mail, FolderInput } from "lucide-react";
 
 const SCOPE_LABELS: Record<string, string> = {
   Global: "Global",
@@ -134,6 +142,15 @@ export function GroupManagement() {
 
   const { hasPermission } = usePermissions();
   const canManageMembers = hasPermission("AccountOperator");
+  const canMove = hasPermission("AccountOperator");
+  const [moveTargets, setMoveTargets] = useState<MoveTarget[] | null>(null);
+  const [contextMenuPos, setContextMenuPos] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
+  const [contextMenuItems, setContextMenuItems] = useState<ContextMenuItem[]>(
+    [],
+  );
 
   const [members, setMembers] = useState<DirectoryEntry[]>([]);
   const [membersLoading, setMembersLoading] = useState(false);
@@ -228,6 +245,32 @@ export function GroupManagement() {
     [setFilterText],
   );
 
+  const handleGroupContextMenu = useCallback(
+    (e: React.MouseEvent, group: DirectoryGroup) => {
+      e.preventDefault();
+      const items: ContextMenuItem[] = [];
+      if (canMove) {
+        items.push({
+          label: "Move to OU",
+          icon: <FolderInput size={14} />,
+          onClick: () => {
+            setMoveTargets([
+              {
+                distinguishedName: group.distinguishedName,
+                displayName: group.displayName || group.samAccountName,
+              },
+            ]);
+          },
+        });
+      }
+      if (items.length > 0) {
+        setContextMenuItems(items);
+        setContextMenuPos({ x: e.clientX, y: e.clientY });
+      }
+    },
+    [canMove],
+  );
+
   const renderGroupItem = useCallback(
     (group: DirectoryGroup) => (
       <button
@@ -237,6 +280,7 @@ export function GroupManagement() {
             : ""
         }`}
         onClick={() => setSelectedGroup(group)}
+        onContextMenu={(e) => handleGroupContextMenu(e, group)}
         data-testid={`group-result-${group.samAccountName}`}
       >
         <Users
@@ -254,7 +298,7 @@ export function GroupManagement() {
         <GroupBadge group={group} />
       </button>
     ),
-    [selectedGroup, setSelectedGroup],
+    [selectedGroup, setSelectedGroup, handleGroupContextMenu],
   );
 
   return (
@@ -381,6 +425,10 @@ export function GroupManagement() {
                   membersLoading={membersLoading}
                   canManageMembers={canManageMembers}
                   onMembersRefresh={loadMembers}
+                  onDeleted={() => {
+                    setSelectedGroup(null);
+                    refresh();
+                  }}
                 />
               ) : (
                 <div className="flex h-full items-center justify-center">
@@ -393,6 +441,20 @@ export function GroupManagement() {
           </>
         )}
       </div>
+
+      <ContextMenu
+        items={contextMenuItems}
+        position={contextMenuPos}
+        onClose={() => setContextMenuPos(null)}
+      />
+
+      {moveTargets && (
+        <MoveObjectDialog
+          targets={moveTargets}
+          onClose={() => setMoveTargets(null)}
+          onMoved={refresh}
+        />
+      )}
     </div>
   );
 }

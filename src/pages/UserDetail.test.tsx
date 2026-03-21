@@ -59,6 +59,10 @@ vi.mock("@/components/comparison/StateInTimeView", () => ({
   StateInTimeView: () => <div data-testid="state-in-time-view" />,
 }));
 
+vi.mock("@/components/common/SnapshotHistory", () => ({
+  SnapshotHistory: () => <div data-testid="snapshot-history-mock" />,
+}));
+
 vi.mock("@/components/dialogs/PasswordResetDialog", () => ({
   PasswordResetDialog: ({
     onClose,

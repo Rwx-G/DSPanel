@@ -1,0 +1,46 @@
+schema: 1
+story: "7.1"
+story_title: "Move Objects Between OUs"
+gate: PASS
+status_reason: "All 7 acceptance criteria met. Move to OU with dry-run preview, bulk support, AccountOperator+ gating, and audit logging. 18 tests (7 Rust + 11 frontend)."
+reviewer: "Quinn (Test Architect)"
+updated: "2026-03-21T14:30:00Z"
+
+waiver: { active: false }
+
+top_issues: []
+
+quality_score: 100
+expires: "2026-04-04T00:00:00Z"
+
+evidence:
+  tests_reviewed: 18
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7]
+    ac_gaps: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "AccountOperator+ permission enforced on backend and frontend. Snapshot captured before every move."
+  performance:
+    status: PASS
+    notes: "Bulk moves processed sequentially with per-object result reporting."
+  reliability:
+    status: PASS
+    notes: "Bulk moves continue on individual failure. LDAP with_connection auto-reconnect."
+  maintainability:
+    status: PASS
+    notes: "Reuses existing OUPicker, ContextMenu, DialogShell components. Follows established trait pattern."
+
+history:
+  - at: "2026-03-21T14:30:00Z"
+    gate: PASS
+    note: "Initial review - all ACs met, comprehensive test coverage"
+
+recommendations:
+  immediate: []
+  future:
+    - action: "Consider progress indicator for bulk moves with many objects"
+      refs: ["src/components/dialogs/MoveObjectDialog.tsx"]

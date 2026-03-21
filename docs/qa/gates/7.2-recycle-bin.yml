@@ -1,0 +1,48 @@
+schema: 1
+story: "7.2"
+story_title: "AD Recycle Bin"
+gate: PASS
+status_reason: "All 7 acceptance criteria met. Recycle Bin browsing with search/filter, restore with OU picker, feature detection warning, DomainAdmin gating, and audit logging. 16 tests (8 Rust + 8 frontend)."
+reviewer: "Quinn (Test Architect)"
+updated: "2026-03-21T14:30:00Z"
+
+waiver: { active: false }
+
+top_issues: []
+
+quality_score: 98
+expires: "2026-04-04T00:00:00Z"
+
+evidence:
+  tests_reviewed: 16
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7]
+    ac_gaps: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "DomainAdmin permission enforced on all Recycle Bin operations. ShowDeletedControl OID used correctly."
+  performance:
+    status: PASS
+    notes: "Client-side filtering on fetched results. No pagination for large Recycle Bins yet."
+  reliability:
+    status: PASS
+    notes: "Feature detection prevents errors on domains without Recycle Bin enabled. LDAP auto-reconnect."
+  maintainability:
+    status: PASS
+    notes: "Clean separation of concerns. Reuses OUPicker for restore target selection."
+
+history:
+  - at: "2026-03-21T14:30:00Z"
+    gate: PASS
+    note: "Initial review - all ACs met, score 98 due to future pagination need"
+
+recommendations:
+  immediate: []
+  future:
+    - action: "Add server-side pagination for domains with large numbers of deleted objects"
+      refs: ["src-tauri/src/services/ldap_directory.rs", "src/pages/RecycleBin.tsx"]
+    - action: "Add bulk restore support for restoring multiple objects at once"
+      refs: ["src/pages/RecycleBin.tsx"]

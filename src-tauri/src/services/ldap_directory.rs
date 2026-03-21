@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use ldap3::controls::{self, RawControl};
 use ldap3::{LdapConnAsync, LdapConnSettings, Mod, Scope, SearchEntry};
 
-use crate::models::{DirectoryEntry, OUNode};
+use crate::models::{ContactInfo, DirectoryEntry, OUNode, PrinterInfo};
 use crate::services::directory::DirectoryProvider;
 
 /// LDAP attributes to retrieve for user searches.
@@ -56,6 +56,34 @@ const GROUP_ATTRS: &[&str] = &[
     "groupType",
     "member",
     "description",
+];
+
+/// LDAP attributes to retrieve for contact searches.
+const CONTACT_ATTRS: &[&str] = &[
+    "distinguishedName",
+    "displayName",
+    "givenName",
+    "sn",
+    "mail",
+    "telephoneNumber",
+    "mobile",
+    "company",
+    "department",
+    "description",
+    "objectClass",
+];
+
+/// LDAP attributes to retrieve for printer (printQueue) searches.
+const PRINTER_ATTRS: &[&str] = &[
+    "distinguishedName",
+    "printerName",
+    "cn",
+    "location",
+    "serverName",
+    "uNCName",
+    "driverName",
+    "description",
+    "objectClass",
 ];
 
 /// Maximum allowed length for search input queries.
@@ -1842,6 +1870,87 @@ impl DirectoryProvider for LdapDirectoryProvider {
         Ok((can_write_user, can_write_group, can_create))
     }
 
+    async fn browse_contacts(&self, max_results: usize) -> Result<Vec<DirectoryEntry>> {
+        let base_dn = self
+            .base_dn()
+            .ok_or_else(|| anyhow::anyhow!("Not connected"))?;
+        let max = max_results;
+        self.with_connection(|mut ldap| {
+            let base = base_dn.clone();
+            async move {
+                let (rs, _) = ldap
+                    .search(
+                        &base,
+                        ldap3::Scope::Subtree,
+                        "(objectClass=contact)",
+                        vec![
+                            "cn",
+                            "displayName",
+                            "mail",
+                            "company",
+                            "department",
+                            "givenName",
+                            "sn",
+                            "telephoneNumber",
+                            "mobile",
+                            "description",
+                        ],
+                    )
+                    .await
+                    .context("Failed to browse contacts")?
+                    .success()
+                    .context("Browse contacts returned error")?;
+
+                let entries: Vec<DirectoryEntry> = rs
+                    .into_iter()
+                    .take(max)
+                    .map(|e| search_entry_to_directory_entry(ldap3::SearchEntry::construct(e)))
+                    .collect();
+                Ok(entries)
+            }
+        })
+        .await
+    }
+
+    async fn browse_printers(&self, max_results: usize) -> Result<Vec<DirectoryEntry>> {
+        let base_dn = self
+            .base_dn()
+            .ok_or_else(|| anyhow::anyhow!("Not connected"))?;
+        let max = max_results;
+        self.with_connection(|mut ldap| {
+            let base = base_dn.clone();
+            async move {
+                let (rs, _) = ldap
+                    .search(
+                        &base,
+                        ldap3::Scope::Subtree,
+                        "(objectClass=printQueue)",
+                        vec![
+                            "cn",
+                            "printerName",
+                            "location",
+                            "serverName",
+                            "uNCName",
+                            "driverName",
+                            "description",
+                        ],
+                    )
+                    .await
+                    .context("Failed to browse printers")?
+                    .success()
+                    .context("Browse printers returned error")?;
+
+                let entries: Vec<DirectoryEntry> = rs
+                    .into_iter()
+                    .take(max)
+                    .map(|e| search_entry_to_directory_entry(ldap3::SearchEntry::construct(e)))
+                    .collect();
+                Ok(entries)
+            }
+        })
+        .await
+    }
+
     async fn get_schema_attributes(&self) -> Result<Vec<String>> {
         if self.domain.is_none() {
             return Ok(Vec::new());
@@ -1923,6 +2032,506 @@ impl DirectoryProvider for LdapDirectoryProvider {
 
         names.sort();
         Ok(names)
+    }
+
+    async fn is_recycle_bin_enabled(&self) -> Result<bool> {
+        let base_dn = self
+            .base_dn()
+            .ok_or_else(|| anyhow::anyhow!("Not connected - no base DN"))?;
+
+        let config_dn = format!("CN=Partitions,CN=Configuration,{}", base_dn);
+
+        self.with_connection(|mut ldap| {
+            let config_dn = config_dn.clone();
+            async move {
+                let (rs, _) = ldap
+                    .search(
+                        &config_dn,
+                        ldap3::Scope::Base,
+                        "(objectClass=*)",
+                        vec!["msDS-EnabledFeature"],
+                    )
+                    .await
+                    .context("Failed to query Recycle Bin feature status")?
+                    .success()
+                    .context("Recycle Bin feature query returned error")?;
+
+                for entry in rs {
+                    let se = ldap3::SearchEntry::construct(entry);
+                    // Case-insensitive attr lookup: some ADs return lowercase attr names
+                    let features = se
+                        .attrs
+                        .iter()
+                        .find(|(k, _)| k.eq_ignore_ascii_case("msDS-EnabledFeature"))
+                        .map(|(_, v)| v);
+                    if let Some(features) = features {
+                        for feature in features {
+                            let lower = feature.to_lowercase();
+                            // Match by DN name or by feature GUID
+                            if lower.contains("recycle bin feature")
+                                || lower.contains("766ddcd8-acd0-445e-f3b9-a7f9b6744f2a")
+                            {
+                                return Ok(true);
+                            }
+                        }
+                    }
+                }
+                Ok(false)
+            }
+        })
+        .await
+    }
+
+    async fn get_deleted_objects(&self) -> Result<Vec<crate::models::DeletedObject>> {
+        let base_dn = self
+            .base_dn()
+            .ok_or_else(|| anyhow::anyhow!("Not connected - no base DN"))?;
+
+        let deleted_container = format!("CN=Deleted Objects,{}", base_dn);
+
+        self.with_connection(|mut ldap| {
+            let deleted_container = deleted_container.clone();
+            async move {
+                let show_deleted = ldap3::controls::RawControl {
+                    ctype: "1.2.840.113556.1.4.417".to_string(),
+                    crit: true,
+                    val: None,
+                };
+                ldap.with_controls(vec![show_deleted]);
+
+                let (rs, _) = ldap
+                    .search(
+                        &deleted_container,
+                        ldap3::Scope::OneLevel,
+                        "(isDeleted=TRUE)",
+                        vec![
+                            "cn",
+                            "objectClass",
+                            "lastKnownParent",
+                            "whenChanged",
+                            "distinguishedName",
+                        ],
+                    )
+                    .await
+                    .context("Failed to search deleted objects")?
+                    .success()
+                    .context("Deleted objects search returned error")?;
+
+                let mut objects = Vec::new();
+                for entry in rs {
+                    let se = ldap3::SearchEntry::construct(entry);
+                    let cn = se
+                        .attrs
+                        .get("cn")
+                        .and_then(|v| v.first())
+                        .cloned()
+                        .unwrap_or_default();
+                    // Strip DEL:<guid> suffix - AD uses \0A (newline) or \0 as separator
+                    let name = if let Some(pos) = cn.find("\nDEL:") {
+                        cn[..pos].to_string()
+                    } else if let Some(pos) = cn.find('\0') {
+                        cn[..pos].to_string()
+                    } else if let Some(pos) = cn.find(" DEL:") {
+                        cn[..pos].to_string()
+                    } else if let Some(pos) = cn.find("\rDEL:") {
+                        cn[..pos].to_string()
+                    } else {
+                        // Fallback: strip anything after " DEL:" or any DEL:<guid> pattern
+                        let re_stripped = cn
+                            .find("DEL:")
+                            .map(|pos| cn[..pos].trim_end().to_string())
+                            .unwrap_or_else(|| cn.clone());
+                        re_stripped
+                    };
+                    let object_type = se
+                        .attrs
+                        .get("objectClass")
+                        .map(|classes| {
+                            if classes.iter().any(|c| c == "computer") {
+                                "computer"
+                            } else if classes.iter().any(|c| c == "user") {
+                                "user"
+                            } else if classes.iter().any(|c| c == "group") {
+                                "group"
+                            } else if classes.iter().any(|c| c == "contact") {
+                                "contact"
+                            } else if classes.iter().any(|c| c == "printQueue") {
+                                "printQueue"
+                            } else {
+                                "other"
+                            }
+                        })
+                        .unwrap_or("other")
+                        .to_string();
+                    let deletion_date = se
+                        .attrs
+                        .get("whenChanged")
+                        .and_then(|v| v.first())
+                        .cloned()
+                        .unwrap_or_default();
+                    let original_ou = se
+                        .attrs
+                        .get("lastKnownParent")
+                        .and_then(|v| v.first())
+                        .cloned()
+                        .unwrap_or_default();
+
+                    objects.push(crate::models::DeletedObject {
+                        distinguished_name: se.dn,
+                        name,
+                        object_type,
+                        deletion_date,
+                        original_ou,
+                    });
+                }
+
+                Ok(objects)
+            }
+        })
+        .await
+    }
+
+    async fn restore_deleted_object(&self, deleted_dn: &str, target_ou_dn: &str) -> Result<()> {
+        // Extract clean CN by stripping the \0ADEL:<guid> suffix
+        let cn_part = deleted_dn.split(',').next().unwrap_or(deleted_dn);
+        let cn = cn_part
+            .strip_prefix("CN=")
+            .or_else(|| cn_part.strip_prefix("cn="))
+            .unwrap_or(cn_part);
+        // Handle both \0ADEL: (binary null) and \0ADEL: (literal backslash-0)
+        let clean_cn = if let Some(pos) = cn.find('\0') {
+            &cn[..pos]
+        } else if let Some(pos) = cn.find("\\0ADEL:") {
+            &cn[..pos]
+        } else if let Some(pos) = cn.find("\\0a") {
+            &cn[..pos]
+        } else {
+            cn
+        };
+        let new_dn = format!("CN={},{}", clean_cn, target_ou_dn);
+        let target = target_ou_dn.to_string();
+
+        self.with_connection(|mut ldap| {
+            let new_dn = new_dn.clone();
+            let target = target.clone();
+            async move {
+                // ShowDeletedControl is required to access deleted objects
+                let show_deleted = ldap3::controls::RawControl {
+                    ctype: "1.2.840.113556.1.4.417".to_string(),
+                    crit: true,
+                    val: None,
+                };
+                ldap.with_controls(vec![show_deleted]);
+
+                // AD restore: single modify that removes isDeleted and sets new DN
+                let mods = vec![
+                    ldap3::Mod::Delete("isDeleted", std::collections::HashSet::new()),
+                    ldap3::Mod::Replace(
+                        "distinguishedName",
+                        std::collections::HashSet::from([new_dn.as_str()]),
+                    ),
+                ];
+
+                ldap.modify(deleted_dn, mods)
+                    .await
+                    .context("Failed to restore deleted object")?
+                    .success()
+                    .context("Restore deleted object returned error")?;
+
+                tracing::info!(
+                    deleted_dn = %deleted_dn,
+                    target_ou = %target,
+                    "Deleted object restored"
+                );
+                Ok(())
+            }
+        })
+        .await
+    }
+
+    async fn search_contacts(&self, filter: &str, max_results: usize) -> Result<Vec<ContactInfo>> {
+        let validated = validate_search_input(filter)?;
+        let escaped = ldap_escape(validated);
+        let ldap_filter = format!(
+            "(&(objectClass=contact)(|(displayName=*{}*)(mail=*{}*)(cn=*{}*)))",
+            escaped, escaped, escaped
+        );
+        let entries = self
+            .search(&ldap_filter, CONTACT_ATTRS, max_results)
+            .await?;
+        Ok(entries
+            .into_iter()
+            .map(|e| {
+                let first_name = e.get_attribute("givenName").unwrap_or("").to_string();
+                let last_name = e.get_attribute("sn").unwrap_or("").to_string();
+                let email = e.get_attribute("mail").unwrap_or("").to_string();
+                let phone = e.get_attribute("telephoneNumber").unwrap_or("").to_string();
+                let mobile = e.get_attribute("mobile").unwrap_or("").to_string();
+                let company = e.get_attribute("company").unwrap_or("").to_string();
+                let department = e.get_attribute("department").unwrap_or("").to_string();
+                let description = e.get_attribute("description").unwrap_or("").to_string();
+                let display_name = e.display_name.unwrap_or_default();
+                ContactInfo {
+                    dn: e.distinguished_name,
+                    display_name,
+                    first_name,
+                    last_name,
+                    email,
+                    phone,
+                    mobile,
+                    company,
+                    department,
+                    description,
+                }
+            })
+            .collect())
+    }
+
+    async fn search_printers(&self, filter: &str, max_results: usize) -> Result<Vec<PrinterInfo>> {
+        let validated = validate_search_input(filter)?;
+        let escaped = ldap_escape(validated);
+        let ldap_filter = format!(
+            "(&(objectClass=printQueue)(|(printerName=*{}*)(cn=*{}*)(location=*{}*)))",
+            escaped, escaped, escaped
+        );
+        let entries = self
+            .search(&ldap_filter, PRINTER_ATTRS, max_results)
+            .await?;
+        Ok(entries
+            .into_iter()
+            .map(|e| {
+                let name = e
+                    .get_attribute("printerName")
+                    .or_else(|| e.get_attribute("cn"))
+                    .unwrap_or("")
+                    .to_string();
+                let location = e.get_attribute("location").unwrap_or("").to_string();
+                let server_name = e.get_attribute("serverName").unwrap_or("").to_string();
+                let share_path = e.get_attribute("uNCName").unwrap_or("").to_string();
+                let driver_name = e.get_attribute("driverName").unwrap_or("").to_string();
+                let description = e.get_attribute("description").unwrap_or("").to_string();
+                PrinterInfo {
+                    dn: e.distinguished_name,
+                    name,
+                    location,
+                    server_name,
+                    share_path,
+                    driver_name,
+                    description,
+                }
+            })
+            .collect())
+    }
+
+    async fn create_contact(
+        &self,
+        container_dn: &str,
+        attrs: &HashMap<String, String>,
+    ) -> Result<String> {
+        let cn = attrs
+            .get("displayName")
+            .cloned()
+            .unwrap_or_else(|| "Contact".to_string());
+        let dn = format!("CN={},{}", cn, container_dn);
+        let dn_clone = dn.clone();
+        let attrs_owned = attrs.clone();
+
+        self.with_connection(|mut ldap| {
+            let dn = dn_clone.clone();
+            let attrs_owned = attrs_owned.clone();
+            async move {
+                let mut ldap_attrs: Vec<(String, HashSet<String>)> = vec![(
+                    "objectClass".to_string(),
+                    HashSet::from(["contact".to_string()]),
+                )];
+                for (key, value) in &attrs_owned {
+                    if !value.is_empty() {
+                        ldap_attrs.push((key.clone(), HashSet::from([value.clone()])));
+                    }
+                }
+                ldap.add(&dn, ldap_attrs)
+                    .await
+                    .context("Failed to create contact")?
+                    .success()
+                    .context("Create contact LDAP operation returned error")?;
+
+                tracing::info!(dn = %dn, "Contact created");
+                Ok(dn)
+            }
+        })
+        .await
+    }
+
+    async fn update_contact(&self, dn: &str, attrs: &HashMap<String, String>) -> Result<()> {
+        let dn_owned = dn.to_string();
+        let attrs_owned = attrs.clone();
+        self.with_connection(|mut ldap| {
+            let dn = dn_owned.clone();
+            let attrs_owned = attrs_owned.clone();
+            async move {
+                let mods: Vec<Mod<String>> = attrs_owned
+                    .iter()
+                    .map(|(k, v)| Mod::Replace(k.clone(), HashSet::from([v.clone()])))
+                    .collect();
+                ldap.modify(&dn, mods)
+                    .await
+                    .context("Failed to update contact")?
+                    .success()
+                    .context("Update contact LDAP operation returned error")?;
+
+                tracing::info!(dn = %dn, "Contact updated");
+                Ok(())
+            }
+        })
+        .await
+    }
+
+    async fn delete_contact(&self, dn: &str) -> Result<()> {
+        self.delete_object(dn).await
+    }
+
+    async fn create_printer(
+        &self,
+        container_dn: &str,
+        attrs: &HashMap<String, String>,
+    ) -> Result<String> {
+        let cn = attrs
+            .get("printerName")
+            .cloned()
+            .unwrap_or_else(|| "Printer".to_string());
+        let dn = format!("CN={},{}", cn, container_dn);
+        let dn_clone = dn.clone();
+        let attrs_owned = attrs.clone();
+
+        self.with_connection(|mut ldap| {
+            let dn = dn_clone.clone();
+            let attrs_owned = attrs_owned.clone();
+            async move {
+                let mut ldap_attrs: Vec<(String, HashSet<String>)> = vec![(
+                    "objectClass".to_string(),
+                    HashSet::from(["printQueue".to_string()]),
+                )];
+                for (key, value) in &attrs_owned {
+                    if !value.is_empty() {
+                        ldap_attrs.push((key.clone(), HashSet::from([value.clone()])));
+                    }
+                }
+                ldap.add(&dn, ldap_attrs)
+                    .await
+                    .context("Failed to create printer")?
+                    .success()
+                    .context("Create printer LDAP operation returned error")?;
+
+                tracing::info!(dn = %dn, "Printer created");
+                Ok(dn)
+            }
+        })
+        .await
+    }
+
+    async fn update_printer(&self, dn: &str, attrs: &HashMap<String, String>) -> Result<()> {
+        let dn_owned = dn.to_string();
+        let attrs_owned = attrs.clone();
+        self.with_connection(|mut ldap| {
+            let dn = dn_owned.clone();
+            let attrs_owned = attrs_owned.clone();
+            async move {
+                let mods: Vec<Mod<String>> = attrs_owned
+                    .iter()
+                    .map(|(k, v)| Mod::Replace(k.clone(), HashSet::from([v.clone()])))
+                    .collect();
+                ldap.modify(&dn, mods)
+                    .await
+                    .context("Failed to update printer")?
+                    .success()
+                    .context("Update printer LDAP operation returned error")?;
+
+                tracing::info!(dn = %dn, "Printer updated");
+                Ok(())
+            }
+        })
+        .await
+    }
+
+    async fn delete_printer(&self, dn: &str) -> Result<()> {
+        self.delete_object(dn).await
+    }
+
+    async fn get_thumbnail_photo(&self, user_dn: &str) -> Result<Option<String>> {
+        use base64::Engine;
+
+        let dn_owned = user_dn.to_string();
+        self.with_connection(|mut ldap| {
+            let dn = dn_owned.clone();
+            async move {
+                let (entries, _) = ldap
+                    .search(&dn, Scope::Base, "(objectClass=*)", vec!["thumbnailPhoto"])
+                    .await
+                    .context("Failed to search for thumbnailPhoto")?
+                    .success()
+                    .context("thumbnailPhoto search returned error")?;
+
+                if let Some(entry) = entries.into_iter().next() {
+                    let se = SearchEntry::construct(entry);
+                    if let Some(bin_values) = se.bin_attrs.get("thumbnailPhoto") {
+                        if let Some(bytes) = bin_values.first() {
+                            let encoded = base64::engine::general_purpose::STANDARD.encode(bytes);
+                            return Ok(Some(encoded));
+                        }
+                    }
+                }
+                Ok(None)
+            }
+        })
+        .await
+    }
+
+    async fn set_thumbnail_photo(&self, user_dn: &str, photo_base64: &str) -> Result<()> {
+        use base64::Engine;
+
+        let photo_bytes = base64::engine::general_purpose::STANDARD
+            .decode(photo_base64)
+            .context("Invalid base64 in photo data")?;
+        let dn_owned = user_dn.to_string();
+        self.with_connection(|mut ldap| {
+            let dn = dn_owned.clone();
+            let bytes = photo_bytes.clone();
+            async move {
+                let mods: Vec<Mod<Vec<u8>>> = vec![Mod::Replace(
+                    b"thumbnailPhoto".to_vec(),
+                    HashSet::from([bytes]),
+                )];
+                ldap.modify(&dn, mods)
+                    .await
+                    .context("Failed to set thumbnailPhoto")?
+                    .success()
+                    .context("Set thumbnailPhoto LDAP operation returned error")?;
+
+                tracing::info!(dn = %dn, "thumbnailPhoto set");
+                Ok(())
+            }
+        })
+        .await
+    }
+
+    async fn remove_thumbnail_photo(&self, user_dn: &str) -> Result<()> {
+        let dn_owned = user_dn.to_string();
+        self.with_connection(|mut ldap| {
+            let dn = dn_owned.clone();
+            async move {
+                let mods: Vec<Mod<Vec<u8>>> =
+                    vec![Mod::Delete(b"thumbnailPhoto".to_vec(), HashSet::new())];
+                ldap.modify(&dn, mods)
+                    .await
+                    .context("Failed to remove thumbnailPhoto")?
+                    .success()
+                    .context("Remove thumbnailPhoto LDAP operation returned error")?;
+
+                tracing::info!(dn = %dn, "thumbnailPhoto removed");
+                Ok(())
+            }
+        })
+        .await
     }
 }
 

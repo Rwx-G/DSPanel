@@ -21,14 +21,18 @@ import { GroupMembersDialog } from "@/components/dialogs/GroupMembersDialog";
 import { type DirectoryUser } from "@/types/directory";
 import type { AccountHealthStatus, HealthLevel } from "@/types/health";
 import { parseCnFromDn } from "@/utils/dn";
-import { Users, FolderOpen, Save, ArrowUp, AlertTriangle } from "lucide-react";
+import { Users, FolderOpen, Save, ArrowUp, AlertTriangle, Trash2 } from "lucide-react";
 import { useNavigation } from "@/contexts/NavigationContext";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useModifyAttribute } from "@/hooks/useModifyAttribute";
 import { useDialog } from "@/contexts/DialogContext";
+import { useNotifications } from "@/contexts/NotificationContext";
+import { useErrorHandler } from "@/hooks/useErrorHandler";
 import { StateInTimeView } from "@/components/comparison/StateInTimeView";
+import { SnapshotHistory } from "@/components/common/SnapshotHistory";
 import { ExchangePanel } from "@/components/data/ExchangePanel";
 import { ExchangeOnlinePanel } from "@/components/data/ExchangeOnlinePanel";
+import { UserPhoto } from "@/components/common/UserPhoto";
 import { extractExchangeInfo } from "@/types/exchange";
 import { type ExchangeOnlineInfo } from "@/types/exchange-online";
 import { invoke } from "@tauri-apps/api/core";
@@ -60,6 +64,7 @@ export interface UserDetailProps {
   groupFilterText: string;
   onGroupFilterText: (value: string) => void;
   onRefresh?: () => void;
+  onDeleted?: () => void;
   schemaAttributes?: string[];
 }
 
@@ -71,6 +76,7 @@ export function UserDetail({
   groupFilterText: _groupFilterText,
   onGroupFilterText,
   onRefresh,
+  onDeleted,
   schemaAttributes,
 }: UserDetailProps) {
   const [groupFilters, setGroupFilters] = useState<FilterChip[]>([]);
@@ -93,8 +99,27 @@ export function UserDetail({
   const { pendingChanges, saving, stageChange, clearChanges, submitChanges } =
     useModifyAttribute();
   const { showConfirmation, showCustomDialog } = useDialog();
+  const { handleError } = useErrorHandler();
+  const [snapshotRefresh, setSnapshotRefresh] = useState(0);
 
   const handleRefresh = onRefresh ?? (() => {});
+  const { notify } = useNotifications();
+
+  const handleDeleteUser = useCallback(async () => {
+    const confirmed = await showConfirmation(
+      "Delete User",
+      `Are you sure you want to delete "${user.displayName || user.samAccountName}"?`,
+      "This action cannot be undone. The object will be moved to the AD Recycle Bin if enabled.",
+    );
+    if (!confirmed) return;
+    try {
+      await invoke("delete_ad_object", { dn: user.distinguishedName });
+      notify("User deleted successfully", "success");
+      onDeleted?.();
+    } catch (err) {
+      handleError(err, "deleting user");
+    }
+  }, [user, showConfirmation, onDeleted, notify, handleError]);
 
   const handleSaveChanges = useCallback(async () => {
     if (pendingChanges.length === 0) return;
@@ -183,6 +208,7 @@ export function UserDetail({
     const success = await submitChanges(user.distinguishedName);
     if (success) {
       handleRefresh();
+      setSnapshotRefresh((n) => n + 1);
     }
   }, [
     pendingChanges,
@@ -379,23 +405,33 @@ export function UserDetail({
 
   return (
     <div className="space-y-4" data-testid="user-detail">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">
-          {user.displayName || user.samAccountName}
-        </h2>
-        <div className="flex items-center gap-2">
-          {healthStatus && <HealthBadge healthStatus={healthStatus} />}
-          <StatusBadge
-            text={user.enabled ? "Enabled" : "Disabled"}
-            variant={user.enabled ? "success" : "error"}
-          />
-          {user.lockedOut && <StatusBadge text="Locked" variant="warning" />}
-        </div>
-      </div>
+      <div className="flex items-center gap-4">
+        <UserPhoto
+          userDn={user.distinguishedName}
+          displayName={user.displayName || user.samAccountName}
+          canEdit={canEdit}
+          size={64}
+        />
+        <div className="flex-1 min-w-0 flex flex-col justify-center">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">
+              {user.displayName || user.samAccountName}
+            </h2>
+            <div className="flex items-center gap-2">
+              {healthStatus && <HealthBadge healthStatus={healthStatus} />}
+              <StatusBadge
+                text={user.enabled ? "Enabled" : "Disabled"}
+                variant={user.enabled ? "success" : "error"}
+              />
+              {user.lockedOut && <StatusBadge text="Locked" variant="warning" />}
+            </div>
+          </div>
 
-      <div className="flex items-center gap-1 text-caption text-[var(--color-text-secondary)]">
-        <span>{user.samAccountName}</span>
-        <CopyButton text={user.samAccountName} />
+          <div className="flex items-center gap-1 text-caption text-[var(--color-text-secondary)]">
+            <span>{user.samAccountName}</span>
+            <CopyButton text={user.samAccountName} />
+          </div>
+        </div>
       </div>
 
       {/* Actions row: user actions + pending changes inline */}
@@ -409,6 +445,18 @@ export function UserDetail({
           onRefresh={handleRefresh}
           onResetPassword={() => setShowPasswordReset(true)}
         />
+
+        {canEdit && (
+          <button
+            className="btn btn-sm flex items-center gap-1"
+            style={{ color: "var(--color-error)", borderColor: "var(--color-error)" }}
+            onClick={handleDeleteUser}
+            data-testid="user-delete-btn"
+          >
+            <Trash2 size={14} />
+            Delete
+          </button>
+        )}
 
         {pendingChanges.length > 0 && (
           <>
@@ -505,6 +553,20 @@ export function UserDetail({
           Replication History
         </h3>
         <StateInTimeView objectDn={user.distinguishedName} objectType="user" />
+      </div>
+
+      <div className="border-t border-[var(--color-border-default)]" />
+
+      <div data-testid="user-snapshot-section">
+        <h3 className="mb-2 text-body font-semibold text-[var(--color-text-primary)]">
+          Object Snapshots
+        </h3>
+        <SnapshotHistory
+          objectDn={user.distinguishedName}
+          canRestore={hasPermission("DomainAdmin")}
+          refreshTrigger={snapshotRefresh}
+          onRestored={handleRefresh}
+        />
       </div>
 
       <ContextMenu

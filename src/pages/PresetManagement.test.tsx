@@ -346,10 +346,12 @@ describe("PresetManagement", () => {
 
     fireEvent.click(screen.getByTestId("preset-new-btn"));
 
-    const deleteBtn = screen.getByTestId(
-      "preset-delete-btn",
-    ) as HTMLButtonElement;
-    expect(deleteBtn.disabled).toBe(true);
+    await waitFor(() => {
+      const deleteBtn = screen.getByTestId(
+        "preset-delete-btn",
+      ) as HTMLButtonElement;
+      expect(deleteBtn.disabled).toBe(true);
+    });
   });
 
   it("validates name uniqueness for new presets", async () => {

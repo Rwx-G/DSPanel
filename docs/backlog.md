@@ -15,6 +15,10 @@ Items deferred from QA reviews. None are blocking - all stories are PASS.
 | Source | Item | Refs |
 | ------ | ---- | ---- |
 | Epic 6 QA | Interactive Browser auth (device code flow) as alternative to client secret for Graph API | `graph_exchange.rs`, Epic 12 (Story 12.2) |
+| Epic 7 QA | Bulk restore for Recycle Bin (currently single object only) | `RecycleBin.tsx`, Story 7.2 |
+| Epic 7 QA | Snapshot capture for contact/printer modifications | `object_snapshot.rs`, Story 7.5 |
+| Epic 7 QA | Export snapshot history (CSV/JSON) | `SnapshotHistory.tsx`, Story 7.5 |
+| Epic 7 QA | Server-side pagination for large Recycle Bin contents | `ldap_directory.rs`, Story 7.2 |
 
 ## Dependencies (checked 2026-03-20)
 

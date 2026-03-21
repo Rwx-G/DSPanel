@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, type ReactNode } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo, type ReactNode } from "react";
 import { ChevronRight, ChevronDown } from "lucide-react";
 
 export interface TreeNode {
@@ -76,6 +76,14 @@ function TreeNodeItem({
   const isAncestorOfSelected = ancestorOfSelectedIds.has(node.id);
   const hasChildren =
     (node.children && node.children.length > 0) || node.hasChildren;
+  const itemRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to the selected node when first rendered
+  useEffect(() => {
+    if (isSelected && itemRef.current) {
+      itemRef.current.scrollIntoView({ block: "center", behavior: "smooth" });
+    }
+  }, [isSelected]);
 
   return (
     <div
@@ -85,6 +93,7 @@ function TreeNodeItem({
       aria-selected={isSelected}
     >
       <div
+        ref={itemRef}
         className={`relative flex items-center gap-1 px-2 py-1 cursor-pointer transition-colors ${
           isSelected
             ? "bg-[var(--color-primary-subtle)] text-[var(--color-primary)] font-medium"
@@ -163,12 +172,24 @@ export function TreeView({
   multiSelect = false,
 }: TreeViewProps) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const initialExpandDone = useRef(false);
 
   const parentMap = useMemo(() => buildParentMap(nodes), [nodes]);
   const ancestorOfSelectedIds = useMemo(
     () => getAncestorIds(selectedIds, parentMap),
     [selectedIds, parentMap],
   );
+
+  // Auto-expand ancestors of the initial selection so the selected node is visible
+  useEffect(() => {
+    if (initialExpandDone.current || ancestorOfSelectedIds.size === 0) return;
+    initialExpandDone.current = true;
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      for (const id of ancestorOfSelectedIds) next.add(id);
+      return next;
+    });
+  }, [ancestorOfSelectedIds]);
 
   const handleToggle = useCallback(
     async (id: string, node: TreeNode) => {

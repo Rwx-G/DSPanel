@@ -4,10 +4,19 @@ import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { EmptyState } from "@/components/common/EmptyState";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { VirtualizedList } from "@/components/data/VirtualizedList";
+import {
+  ContextMenu,
+  type ContextMenuItem,
+} from "@/components/common/ContextMenu";
 import { type DirectoryComputer, mapEntryToComputer } from "@/types/directory";
 import { useBrowse } from "@/hooks/useBrowse";
+import { usePermissions } from "@/hooks/usePermissions";
 import { ComputerDetail } from "@/pages/ComputerDetail";
-import { MonitorX, AlertCircle, Monitor } from "lucide-react";
+import {
+  MoveObjectDialog,
+  type MoveTarget,
+} from "@/components/dialogs/MoveObjectDialog";
+import { MonitorX, AlertCircle, Monitor, FolderInput } from "lucide-react";
 
 type StatusFilter = "all" | "enabled" | "disabled";
 type OsFilter = "all" | "windows" | "other";
@@ -42,6 +51,16 @@ export function ComputerLookup() {
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [osFilter, setOsFilter] = useState<OsFilter>("all");
+  const { hasPermission } = usePermissions();
+  const canMove = hasPermission("AccountOperator");
+  const [moveTargets, setMoveTargets] = useState<MoveTarget[] | null>(null);
+  const [contextMenuPos, setContextMenuPos] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
+  const [contextMenuItems, setContextMenuItems] = useState<ContextMenuItem[]>(
+    [],
+  );
 
   const filteredComputers = useMemo(() => {
     let result = computers;
@@ -83,6 +102,32 @@ export function ComputerLookup() {
     [setFilterText],
   );
 
+  const handleComputerContextMenu = useCallback(
+    (e: React.MouseEvent, computer: DirectoryComputer) => {
+      e.preventDefault();
+      const items: ContextMenuItem[] = [];
+      if (canMove) {
+        items.push({
+          label: "Move to OU",
+          icon: <FolderInput size={14} />,
+          onClick: () => {
+            setMoveTargets([
+              {
+                distinguishedName: computer.distinguishedName,
+                displayName: computer.name,
+              },
+            ]);
+          },
+        });
+      }
+      if (items.length > 0) {
+        setContextMenuItems(items);
+        setContextMenuPos({ x: e.clientX, y: e.clientY });
+      }
+    },
+    [canMove],
+  );
+
   const renderComputerItem = useCallback(
     (computer: DirectoryComputer) => (
       <button
@@ -92,6 +137,7 @@ export function ComputerLookup() {
             : ""
         }`}
         onClick={() => setSelectedComputer(computer)}
+        onContextMenu={(e) => handleComputerContextMenu(e, computer)}
         data-testid={`computer-result-${computer.name}`}
       >
         <Monitor
@@ -112,7 +158,7 @@ export function ComputerLookup() {
         />
       </button>
     ),
-    [selectedComputer, setSelectedComputer],
+    [selectedComputer, setSelectedComputer, handleComputerContextMenu],
   );
 
   return (
@@ -245,7 +291,13 @@ export function ComputerLookup() {
               data-testid="computer-detail-panel"
             >
               {selectedComputer ? (
-                <ComputerDetail computer={selectedComputer} />
+                <ComputerDetail
+                  computer={selectedComputer}
+                  onDeleted={() => {
+                    setSelectedComputer(null);
+                    refresh();
+                  }}
+                />
               ) : (
                 <div className="flex h-full items-center justify-center">
                   <p className="text-body text-[var(--color-text-secondary)]">
@@ -257,6 +309,20 @@ export function ComputerLookup() {
           </>
         )}
       </div>
+
+      <ContextMenu
+        items={contextMenuItems}
+        position={contextMenuPos}
+        onClose={() => setContextMenuPos(null)}
+      />
+
+      {moveTargets && (
+        <MoveObjectDialog
+          targets={moveTargets}
+          onClose={() => setMoveTargets(null)}
+          onMoved={refresh}
+        />
+      )}
     </div>
   );
 }

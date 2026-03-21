@@ -1,6 +1,7 @@
-use crate::models::{DirectoryEntry, OUNode};
+use crate::models::{ContactInfo, DeletedObject, DirectoryEntry, OUNode, PrinterInfo};
 use anyhow::Result;
 use async_trait::async_trait;
+use std::collections::HashMap;
 
 /// Abstraction over directory service operations.
 ///
@@ -194,6 +195,76 @@ pub trait DirectoryProvider: Send + Sync {
     /// Queries the schema naming context for attributeSchema objects that
     /// apply to the "user" class. Returns just the `lDAPDisplayName` values.
     async fn get_schema_attributes(&self) -> Result<Vec<String>>;
+
+    /// Fetches all contact objects (up to `max_results`) for browsing.
+    async fn browse_contacts(&self, max_results: usize) -> Result<Vec<DirectoryEntry>>;
+
+    /// Fetches all printer objects (up to `max_results`) for browsing.
+    async fn browse_printers(&self, max_results: usize) -> Result<Vec<DirectoryEntry>>;
+
+    /// Checks whether the AD Recycle Bin optional feature is enabled.
+    ///
+    /// Looks for the Recycle Bin feature GUID in `msDS-EnabledFeature`
+    /// on `CN=Partitions,CN=Configuration,<forest DN>`.
+    async fn is_recycle_bin_enabled(&self) -> Result<bool>;
+
+    /// Lists deleted objects from the AD Recycle Bin.
+    ///
+    /// Searches `CN=Deleted Objects,<domain DN>` with `isDeleted=TRUE`
+    /// and the `ShowDeletedControl` (OID 1.2.840.113556.1.4.417).
+    async fn get_deleted_objects(&self) -> Result<Vec<DeletedObject>>;
+
+    /// Restores a deleted object from the Recycle Bin.
+    ///
+    /// Removes the `isDeleted` attribute and moves the object to the
+    /// specified target OU. If `target_ou_dn` is empty, restores to
+    /// the original OU stored in `lastKnownParent`.
+    async fn restore_deleted_object(&self, deleted_dn: &str, target_ou_dn: &str) -> Result<()>;
+
+    /// Searches for contact objects matching the filter.
+    async fn search_contacts(&self, filter: &str, max_results: usize) -> Result<Vec<ContactInfo>>;
+
+    /// Searches for printer (printQueue) objects matching the filter.
+    async fn search_printers(&self, filter: &str, max_results: usize) -> Result<Vec<PrinterInfo>>;
+
+    /// Creates a new contact in the specified container.
+    ///
+    /// Returns the DN of the created contact.
+    async fn create_contact(
+        &self,
+        container_dn: &str,
+        attrs: &HashMap<String, String>,
+    ) -> Result<String>;
+
+    /// Updates an existing contact's attributes.
+    async fn update_contact(&self, dn: &str, attrs: &HashMap<String, String>) -> Result<()>;
+
+    /// Deletes a contact by its DN.
+    async fn delete_contact(&self, dn: &str) -> Result<()>;
+
+    /// Creates a new printer (printQueue) in the specified container.
+    ///
+    /// Returns the DN of the created printer.
+    async fn create_printer(
+        &self,
+        container_dn: &str,
+        attrs: &HashMap<String, String>,
+    ) -> Result<String>;
+
+    /// Updates an existing printer's attributes.
+    async fn update_printer(&self, dn: &str, attrs: &HashMap<String, String>) -> Result<()>;
+
+    /// Deletes a printer by its DN.
+    async fn delete_printer(&self, dn: &str) -> Result<()>;
+
+    /// Gets the thumbnailPhoto attribute as base64-encoded bytes.
+    async fn get_thumbnail_photo(&self, user_dn: &str) -> Result<Option<String>>;
+
+    /// Sets the thumbnailPhoto attribute from base64-encoded JPEG bytes.
+    async fn set_thumbnail_photo(&self, user_dn: &str, photo_base64: &str) -> Result<()>;
+
+    /// Removes the thumbnailPhoto attribute.
+    async fn remove_thumbnail_photo(&self, user_dn: &str) -> Result<()>;
 }
 
 #[allow(clippy::unwrap_used)]
@@ -232,6 +303,20 @@ pub mod tests {
         cannot_change_password: Mutex<bool>,
         replication_metadata: Mutex<Option<String>>,
         ou_tree: Mutex<Vec<OUNode>>,
+        recycle_bin_enabled: Mutex<bool>,
+        deleted_objects: Mutex<Vec<DeletedObject>>,
+        pub restore_calls: Mutex<Vec<(String, String)>>,
+        contacts: Mutex<Vec<ContactInfo>>,
+        printers: Mutex<Vec<PrinterInfo>>,
+        pub create_contact_calls: Mutex<Vec<(String, HashMap<String, String>)>>,
+        pub update_contact_calls: Mutex<Vec<(String, HashMap<String, String>)>>,
+        pub delete_contact_calls: Mutex<Vec<String>>,
+        pub create_printer_calls: Mutex<Vec<(String, HashMap<String, String>)>>,
+        pub update_printer_calls: Mutex<Vec<(String, HashMap<String, String>)>>,
+        pub delete_printer_calls: Mutex<Vec<String>>,
+        thumbnail_photos: Mutex<HashMap<String, String>>,
+        pub set_photo_calls: Mutex<Vec<(String, String)>>,
+        pub remove_photo_calls: Mutex<Vec<String>>,
     }
 
     impl Default for MockDirectoryProvider {
@@ -267,6 +352,20 @@ pub mod tests {
                 cannot_change_password: Mutex::new(false),
                 replication_metadata: Mutex::new(None),
                 ou_tree: Mutex::new(Vec::new()),
+                recycle_bin_enabled: Mutex::new(true),
+                deleted_objects: Mutex::new(Vec::new()),
+                restore_calls: Mutex::new(Vec::new()),
+                contacts: Mutex::new(Vec::new()),
+                printers: Mutex::new(Vec::new()),
+                create_contact_calls: Mutex::new(Vec::new()),
+                update_contact_calls: Mutex::new(Vec::new()),
+                delete_contact_calls: Mutex::new(Vec::new()),
+                create_printer_calls: Mutex::new(Vec::new()),
+                update_printer_calls: Mutex::new(Vec::new()),
+                delete_printer_calls: Mutex::new(Vec::new()),
+                thumbnail_photos: Mutex::new(HashMap::new()),
+                set_photo_calls: Mutex::new(Vec::new()),
+                remove_photo_calls: Mutex::new(Vec::new()),
             }
         }
 
@@ -296,6 +395,20 @@ pub mod tests {
                 cannot_change_password: Mutex::new(false),
                 replication_metadata: Mutex::new(None),
                 ou_tree: Mutex::new(Vec::new()),
+                recycle_bin_enabled: Mutex::new(false),
+                deleted_objects: Mutex::new(Vec::new()),
+                restore_calls: Mutex::new(Vec::new()),
+                contacts: Mutex::new(Vec::new()),
+                printers: Mutex::new(Vec::new()),
+                create_contact_calls: Mutex::new(Vec::new()),
+                update_contact_calls: Mutex::new(Vec::new()),
+                delete_contact_calls: Mutex::new(Vec::new()),
+                create_printer_calls: Mutex::new(Vec::new()),
+                update_printer_calls: Mutex::new(Vec::new()),
+                delete_printer_calls: Mutex::new(Vec::new()),
+                thumbnail_photos: Mutex::new(HashMap::new()),
+                set_photo_calls: Mutex::new(Vec::new()),
+                remove_photo_calls: Mutex::new(Vec::new()),
             }
         }
 
@@ -331,6 +444,34 @@ pub mod tests {
 
         pub fn with_ou_tree(self, tree: Vec<OUNode>) -> Self {
             *self.ou_tree.lock().unwrap() = tree;
+            self
+        }
+
+        pub fn with_deleted_objects(self, objects: Vec<DeletedObject>) -> Self {
+            *self.deleted_objects.lock().unwrap() = objects;
+            self
+        }
+
+        pub fn with_recycle_bin_disabled(self) -> Self {
+            *self.recycle_bin_enabled.lock().unwrap() = false;
+            self
+        }
+
+        pub fn with_contacts(self, contacts: Vec<ContactInfo>) -> Self {
+            *self.contacts.lock().unwrap() = contacts;
+            self
+        }
+
+        pub fn with_printers(self, printers: Vec<PrinterInfo>) -> Self {
+            *self.printers.lock().unwrap() = printers;
+            self
+        }
+
+        pub fn with_thumbnail_photo(self, dn: &str, photo_base64: &str) -> Self {
+            self.thumbnail_photos
+                .lock()
+                .unwrap()
+                .insert(dn.to_string(), photo_base64.to_string());
             self
         }
 
@@ -589,6 +730,16 @@ pub mod tests {
             ])
         }
 
+        async fn browse_contacts(&self, _max_results: usize) -> Result<Vec<DirectoryEntry>> {
+            self.check_failure()?;
+            Ok(Vec::new())
+        }
+
+        async fn browse_printers(&self, _max_results: usize) -> Result<Vec<DirectoryEntry>> {
+            self.check_failure()?;
+            Ok(Vec::new())
+        }
+
         async fn create_user(
             &self,
             cn: &str,
@@ -632,6 +783,143 @@ pub mod tests {
         async fn probe_effective_permissions(&self) -> Result<(bool, bool, bool)> {
             self.check_failure()?;
             Ok((false, false, false))
+        }
+
+        async fn is_recycle_bin_enabled(&self) -> Result<bool> {
+            self.check_failure()?;
+            Ok(*self.recycle_bin_enabled.lock().unwrap())
+        }
+
+        async fn get_deleted_objects(&self) -> Result<Vec<DeletedObject>> {
+            self.check_failure()?;
+            Ok(self.deleted_objects.lock().unwrap().clone())
+        }
+
+        async fn restore_deleted_object(&self, deleted_dn: &str, target_ou_dn: &str) -> Result<()> {
+            self.check_failure()?;
+            self.restore_calls
+                .lock()
+                .unwrap()
+                .push((deleted_dn.to_string(), target_ou_dn.to_string()));
+            Ok(())
+        }
+
+        async fn search_contacts(
+            &self,
+            _filter: &str,
+            max_results: usize,
+        ) -> Result<Vec<ContactInfo>> {
+            self.check_failure()?;
+            let contacts = self.contacts.lock().unwrap();
+            Ok(contacts.iter().take(max_results).cloned().collect())
+        }
+
+        async fn search_printers(
+            &self,
+            _filter: &str,
+            max_results: usize,
+        ) -> Result<Vec<PrinterInfo>> {
+            self.check_failure()?;
+            let printers = self.printers.lock().unwrap();
+            Ok(printers.iter().take(max_results).cloned().collect())
+        }
+
+        async fn create_contact(
+            &self,
+            container_dn: &str,
+            attrs: &HashMap<String, String>,
+        ) -> Result<String> {
+            self.check_failure()?;
+            let cn = attrs
+                .get("displayName")
+                .cloned()
+                .unwrap_or_else(|| "Contact".to_string());
+            self.create_contact_calls
+                .lock()
+                .unwrap()
+                .push((container_dn.to_string(), attrs.clone()));
+            Ok(format!("CN={},{}", cn, container_dn))
+        }
+
+        async fn update_contact(&self, dn: &str, attrs: &HashMap<String, String>) -> Result<()> {
+            self.check_failure()?;
+            self.update_contact_calls
+                .lock()
+                .unwrap()
+                .push((dn.to_string(), attrs.clone()));
+            Ok(())
+        }
+
+        async fn delete_contact(&self, dn: &str) -> Result<()> {
+            self.check_failure()?;
+            self.delete_contact_calls
+                .lock()
+                .unwrap()
+                .push(dn.to_string());
+            Ok(())
+        }
+
+        async fn create_printer(
+            &self,
+            container_dn: &str,
+            attrs: &HashMap<String, String>,
+        ) -> Result<String> {
+            self.check_failure()?;
+            let cn = attrs
+                .get("printerName")
+                .cloned()
+                .unwrap_or_else(|| "Printer".to_string());
+            self.create_printer_calls
+                .lock()
+                .unwrap()
+                .push((container_dn.to_string(), attrs.clone()));
+            Ok(format!("CN={},{}", cn, container_dn))
+        }
+
+        async fn update_printer(&self, dn: &str, attrs: &HashMap<String, String>) -> Result<()> {
+            self.check_failure()?;
+            self.update_printer_calls
+                .lock()
+                .unwrap()
+                .push((dn.to_string(), attrs.clone()));
+            Ok(())
+        }
+
+        async fn delete_printer(&self, dn: &str) -> Result<()> {
+            self.check_failure()?;
+            self.delete_printer_calls
+                .lock()
+                .unwrap()
+                .push(dn.to_string());
+            Ok(())
+        }
+
+        async fn get_thumbnail_photo(&self, user_dn: &str) -> Result<Option<String>> {
+            self.check_failure()?;
+            Ok(self.thumbnail_photos.lock().unwrap().get(user_dn).cloned())
+        }
+
+        async fn set_thumbnail_photo(&self, user_dn: &str, photo_base64: &str) -> Result<()> {
+            self.check_failure()?;
+            self.set_photo_calls
+                .lock()
+                .unwrap()
+                .push((user_dn.to_string(), photo_base64.to_string()));
+            self.thumbnail_photos
+                .lock()
+                .unwrap()
+                .insert(user_dn.to_string(), photo_base64.to_string());
+            Ok(())
+        }
+
+        async fn remove_thumbnail_photo(&self, user_dn: &str) -> Result<()> {
+            self.check_failure()?;
+            self.remove_photo_calls
+                .lock()
+                .unwrap()
+                .push(user_dn.to_string());
+            self.thumbnail_photos.lock().unwrap().remove(user_dn);
+            Ok(())
         }
     }
 

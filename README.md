@@ -8,7 +8,7 @@
   <img src="https://img.shields.io/badge/Rust-2021-orange.svg" alt="Rust">
   <img src="https://img.shields.io/badge/Tauri-v2-blue.svg" alt="Tauri">
   <img src="https://img.shields.io/badge/Platform-Windows%20|%20macOS%20|%20Linux-0078D6.svg" alt="Platform">
-  <img src="https://img.shields.io/badge/Status-v0.6.0-brightgreen.svg" alt="Status">
+  <img src="https://img.shields.io/badge/Status-v0.7.0-brightgreen.svg" alt="Status">
 </p>
 
 ---
@@ -23,13 +23,18 @@ DSPanel is an open source cross-platform desktop application (Rust/Tauri v2) tha
 - **Account Comparison** - Side-by-side user comparison with visual group delta
 - **NTFS Permissions Audit** - Cross-reference folder permissions with AD groups to diagnose access issues
 - **Group Management** - Tree/flat views, drag-and-drop, bulk operations (Add/Delete/Transfer)
+- **Contact & Printer Management** - Browse, search, and edit AD contacts and printers with inline editing
 - **Onboarding/Offboarding Wizards** - Guided workflows with declarative presets (JSON)
 - **Support Actions** - Password reset, unlock, enable/disable with secure password generation
+- **User Photos** - View, upload (auto-resize to 96x96), and remove AD thumbnail photos
+- **Move Objects** - Move users, computers, groups, contacts, printers between OUs with dry-run preview
+- **AD Recycle Bin** - Browse and restore deleted objects with type filtering and OU picker
+- **Object Snapshots** - SQLite-backed attribute snapshots before every write, with diff viewer and restore
 - **Exchange Diagnostics** - Read-only mailbox info for on-prem (LDAP) and Online (Graph)
+- **Audit Trail** - Full internal action logging for compliance
 - **Infrastructure Health** - DC health, replication status, DNS checks, AD topology map
 - **Security Dashboard** - Domain risk score, privileged accounts monitoring, AD attack detection
 - **Reports & Export** - CSV/PDF export, scheduled reports, compliance templates (GDPR, HIPAA, SOX)
-- **Audit Trail** - Full internal action logging for compliance
 - **Extensibility** - External script execution, webhooks, GPO viewer, automation triggers
 
 ### Adaptive Permissions

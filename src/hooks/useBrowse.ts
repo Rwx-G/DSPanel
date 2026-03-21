@@ -107,51 +107,56 @@ export function useBrowse<T>({
     [browseCommand],
   );
 
+  // Loads all pages sequentially (used for preloadAll and refresh)
+  const loadAllPages = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    setAllBrowseItems([]);
+    setDisplayedItems([]);
+    setBrowsePageLoaded(0);
+    setMode("browse");
+    try {
+      let page = 0;
+      let allItems: T[] = [];
+      let more = true;
+
+      while (more) {
+        const result = await invoke<BrowseResult>(browseCommand, {
+          page,
+          pageSize: PAGE_SIZE,
+        });
+        const mapped = result.entries.map((e) => mapEntryRef.current(e));
+        allItems = [...allItems, ...mapped];
+        setAllBrowseItems(allItems);
+        setDisplayedItems(allItems);
+        setTotalCount(result.totalCount);
+        more = result.hasMore;
+        page++;
+      }
+
+      setHasMore(false);
+      setBrowsePageLoaded(page - 1);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to load items",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [browseCommand]);
+
   // Load first page on mount, then preload remaining pages if requested
   useEffect(() => {
     if (!mountedRef.current) {
       mountedRef.current = true;
 
       if (preloadAll) {
-        // Load all pages sequentially
-        const loadAll = async () => {
-          setLoading(true);
-          setError(null);
-          try {
-            let page = 0;
-            let allItems: T[] = [];
-            let more = true;
-
-            while (more) {
-              const result = await invoke<BrowseResult>(browseCommand, {
-                page,
-                pageSize: PAGE_SIZE,
-              });
-              const mapped = result.entries.map((e) => mapEntryRef.current(e));
-              allItems = [...allItems, ...mapped];
-              setAllBrowseItems(allItems);
-              setDisplayedItems(allItems);
-              setTotalCount(result.totalCount);
-              more = result.hasMore;
-              page++;
-            }
-
-            setHasMore(false);
-            setBrowsePageLoaded(page - 1);
-          } catch (err) {
-            setError(
-              err instanceof Error ? err.message : "Failed to load items",
-            );
-          } finally {
-            setLoading(false);
-          }
-        };
-        loadAll();
+        loadAllPages();
       } else {
         loadBrowsePage(0, false);
       }
     }
-  }, [loadBrowsePage, preloadAll, browseCommand]);
+  }, [loadBrowsePage, preloadAll, loadAllPages]);
 
   const setFilterText = useCallback(
     async (text: string) => {
@@ -216,14 +221,18 @@ export function useBrowse<T>({
   }, []);
 
   const refresh = useCallback(() => {
-    setAllBrowseItems([]);
-    setDisplayedItems([]);
-    setBrowsePageLoaded(0);
     setFilterTextState("");
-    setMode("browse");
     setSelectedItem(null);
-    loadBrowsePage(0, false);
-  }, [loadBrowsePage]);
+    if (preloadAll) {
+      loadAllPages();
+    } else {
+      setAllBrowseItems([]);
+      setDisplayedItems([]);
+      setBrowsePageLoaded(0);
+      setMode("browse");
+      loadBrowsePage(0, false);
+    }
+  }, [preloadAll, loadAllPages, loadBrowsePage]);
 
   return {
     items: displayedItems,

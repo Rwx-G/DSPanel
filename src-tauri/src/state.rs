@@ -5,8 +5,8 @@ use crate::models::DirectoryEntry;
 use crate::services::credential_store::CredentialStore;
 use crate::services::graph_exchange::GraphExchangeService;
 use crate::services::{
-    AppSettingsService, AuditService, DirectoryProvider, MfaService, PermissionConfig,
-    PermissionService, PresetService, SnapshotService,
+    AppSettingsService, AuditService, DirectoryProvider, MfaService, ObjectSnapshotService,
+    PermissionConfig, PermissionService, PresetService, SnapshotService,
 };
 
 /// Global application state managed by Tauri.
@@ -30,6 +30,8 @@ pub struct AppState {
     pub http_client: reqwest::Client,
     /// Snapshot service for capturing object state before modifications.
     pub snapshot_service: SnapshotService,
+    /// Object snapshot service for full SQLite-backed attribute snapshots.
+    pub object_snapshot_service: ObjectSnapshotService,
     /// Preset service for managing onboarding/offboarding preset files.
     pub preset_service: PresetService,
     /// Application settings service (disabled OU, Graph config, etc.).
@@ -63,6 +65,7 @@ impl AppState {
             mfa_service: MfaService::new(),
             http_client,
             snapshot_service: SnapshotService::new(),
+            object_snapshot_service: ObjectSnapshotService::new(),
             preset_service: PresetService::new(),
             app_settings: AppSettingsService::new(),
             graph_exchange: GraphExchangeService::new(),
@@ -91,6 +94,7 @@ impl AppState {
             mfa_service: MfaService::new_in_memory(),
             http_client: reqwest::Client::new(),
             snapshot_service: SnapshotService::new(),
+            object_snapshot_service: ObjectSnapshotService::new_in_memory(),
             preset_service: PresetService::new(),
             app_settings: AppSettingsService::new(),
             graph_exchange: GraphExchangeService::new(),

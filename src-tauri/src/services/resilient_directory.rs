@@ -5,7 +5,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 
 use crate::error::DirectoryError;
-use crate::models::{DirectoryEntry, OUNode};
+use crate::models::{ContactInfo, DirectoryEntry, OUNode, PrinterInfo};
 use crate::services::directory::DirectoryProvider;
 use crate::services::resilience::{retry_with_backoff, CircuitBreaker, RetryConfig};
 
@@ -402,6 +402,26 @@ where
         .map_err(|e| anyhow::anyhow!(e))
     }
 
+    async fn browse_contacts(&self, max_results: usize) -> Result<Vec<DirectoryEntry>> {
+        let inner_ref = self.inner.clone();
+        self.execute_with_resilience(|| {
+            let inner = inner_ref.clone();
+            async move { inner.browse_contacts(max_results).await }
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!(e))
+    }
+
+    async fn browse_printers(&self, max_results: usize) -> Result<Vec<DirectoryEntry>> {
+        let inner_ref = self.inner.clone();
+        self.execute_with_resilience(|| {
+            let inner = inner_ref.clone();
+            async move { inner.browse_printers(max_results).await }
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!(e))
+    }
+
     async fn get_schema_attributes(&self) -> Result<Vec<String>> {
         let inner_ref = self.inner.clone();
         self.execute_with_resilience(|| {
@@ -472,6 +492,160 @@ where
         })
         .await
         .map_err(|e| anyhow::anyhow!(e))
+    }
+
+    async fn is_recycle_bin_enabled(&self) -> Result<bool> {
+        let inner_ref = self.inner.clone();
+        self.execute_with_resilience(|| {
+            let inner = inner_ref.clone();
+            async move { inner.is_recycle_bin_enabled().await }
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!(e))
+    }
+
+    async fn get_deleted_objects(&self) -> Result<Vec<crate::models::DeletedObject>> {
+        let inner_ref = self.inner.clone();
+        self.execute_with_resilience(|| {
+            let inner = inner_ref.clone();
+            async move { inner.get_deleted_objects().await }
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!(e))
+    }
+
+    async fn restore_deleted_object(&self, deleted_dn: &str, target_ou_dn: &str) -> Result<()> {
+        let d = deleted_dn.to_string();
+        let t = target_ou_dn.to_string();
+        let inner_ref = self.inner.clone();
+        self.execute_with_resilience(|| {
+            let inner = inner_ref.clone();
+            let d = d.clone();
+            let t = t.clone();
+            async move { inner.restore_deleted_object(&d, &t).await }
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!(e))
+    }
+
+    async fn search_contacts(&self, filter: &str, max_results: usize) -> Result<Vec<ContactInfo>> {
+        let filter = filter.to_string();
+        resilient_call!(self, filter, |inner, f| inner
+            .search_contacts(&f, max_results)
+            .await)
+    }
+
+    async fn search_printers(&self, filter: &str, max_results: usize) -> Result<Vec<PrinterInfo>> {
+        let filter = filter.to_string();
+        resilient_call!(self, filter, |inner, f| inner
+            .search_printers(&f, max_results)
+            .await)
+    }
+
+    async fn create_contact(
+        &self,
+        container_dn: &str,
+        attrs: &std::collections::HashMap<String, String>,
+    ) -> Result<String> {
+        let container = container_dn.to_string();
+        let attrs = attrs.clone();
+        let inner_ref = self.inner.clone();
+        self.execute_with_resilience(|| {
+            let inner = inner_ref.clone();
+            let c = container.clone();
+            let a = attrs.clone();
+            async move { inner.create_contact(&c, &a).await }
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!(e))
+    }
+
+    async fn update_contact(
+        &self,
+        dn: &str,
+        attrs: &std::collections::HashMap<String, String>,
+    ) -> Result<()> {
+        let dn = dn.to_string();
+        let attrs = attrs.clone();
+        let inner_ref = self.inner.clone();
+        self.execute_with_resilience(|| {
+            let inner = inner_ref.clone();
+            let d = dn.clone();
+            let a = attrs.clone();
+            async move { inner.update_contact(&d, &a).await }
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!(e))
+    }
+
+    async fn delete_contact(&self, dn: &str) -> Result<()> {
+        let dn = dn.to_string();
+        resilient_call!(self, dn, |inner, d| inner.delete_contact(&d).await)
+    }
+
+    async fn create_printer(
+        &self,
+        container_dn: &str,
+        attrs: &std::collections::HashMap<String, String>,
+    ) -> Result<String> {
+        let container = container_dn.to_string();
+        let attrs = attrs.clone();
+        let inner_ref = self.inner.clone();
+        self.execute_with_resilience(|| {
+            let inner = inner_ref.clone();
+            let c = container.clone();
+            let a = attrs.clone();
+            async move { inner.create_printer(&c, &a).await }
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!(e))
+    }
+
+    async fn update_printer(
+        &self,
+        dn: &str,
+        attrs: &std::collections::HashMap<String, String>,
+    ) -> Result<()> {
+        let dn = dn.to_string();
+        let attrs = attrs.clone();
+        let inner_ref = self.inner.clone();
+        self.execute_with_resilience(|| {
+            let inner = inner_ref.clone();
+            let d = dn.clone();
+            let a = attrs.clone();
+            async move { inner.update_printer(&d, &a).await }
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!(e))
+    }
+
+    async fn delete_printer(&self, dn: &str) -> Result<()> {
+        let dn = dn.to_string();
+        resilient_call!(self, dn, |inner, d| inner.delete_printer(&d).await)
+    }
+
+    async fn get_thumbnail_photo(&self, user_dn: &str) -> Result<Option<String>> {
+        let dn = user_dn.to_string();
+        resilient_call!(self, dn, |inner, d| inner.get_thumbnail_photo(&d).await)
+    }
+
+    async fn set_thumbnail_photo(&self, user_dn: &str, photo_base64: &str) -> Result<()> {
+        let dn = user_dn.to_string();
+        let photo = photo_base64.to_string();
+        let inner_ref = self.inner.clone();
+        self.execute_with_resilience(|| {
+            let inner = inner_ref.clone();
+            let d = dn.clone();
+            let p = photo.clone();
+            async move { inner.set_thumbnail_photo(&d, &p).await }
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!(e))
+    }
+
+    async fn remove_thumbnail_photo(&self, user_dn: &str) -> Result<()> {
+        let dn = user_dn.to_string();
+        resilient_call!(self, dn, |inner, d| inner.remove_thumbnail_photo(&d).await)
     }
 }
 
