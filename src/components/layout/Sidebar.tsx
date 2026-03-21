@@ -17,6 +17,7 @@ import {
   Activity,
   GitBranch,
   Globe,
+  Network,
   type LucideIcon,
 } from "lucide-react";
 import { useNavigation } from "@/contexts/NavigationContext";
@@ -40,6 +41,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   activity: Activity,
   "git-branch": GitBranch,
   globe: Globe,
+  network: Network,
 };
 
 const MODULES: SidebarModule[] = [
@@ -124,6 +126,13 @@ const MODULES: SidebarModule[] = [
     id: "dns-kerberos",
     label: "DNS & Kerberos",
     icon: "globe",
+    group: "Infrastructure",
+    requiredLevel: "DomainAdmin",
+  },
+  {
+    id: "topology",
+    label: "AD Topology",
+    icon: "network",
     group: "Infrastructure",
     requiredLevel: "DomainAdmin",
   },
