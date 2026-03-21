@@ -7,6 +7,7 @@ use crate::models::dc_health::DcHealthResult;
 use crate::models::dns_validation::DnsKerberosReport;
 use crate::models::replication_status::ReplicationPartnership;
 use crate::models::system_metrics::SystemMetrics;
+use crate::models::topology::TopologyData;
 use crate::models::{DeletedObject, DirectoryEntry, OUNode, ObjectSnapshot, Preset, SnapshotDiff};
 use crate::services::app_settings::AppSettings;
 use crate::services::audit::AuditEntry;
@@ -3563,6 +3564,38 @@ pub async fn get_workstation_metrics(
     state: State<'_, AppState>,
 ) -> Result<SystemMetrics, AppError> {
     get_workstation_metrics_inner(&state, &hostname).await
+}
+
+// ---------------------------------------------------------------------------
+// Topology - Inner functions
+// ---------------------------------------------------------------------------
+
+/// Returns the AD topology (sites, DCs, replication links, site links).
+/// Requires DomainAdmin permission.
+pub(crate) async fn get_topology_inner(state: &AppState) -> Result<TopologyData, AppError> {
+    if !state
+        .permission_service
+        .has_permission(PermissionLevel::DomainAdmin)
+    {
+        return Err(AppError::PermissionDenied(
+            "Topology visualization requires DomainAdmin permission".to_string(),
+        ));
+    }
+
+    let provider = state.directory_provider.clone();
+    crate::services::topology::get_topology(provider)
+        .await
+        .map_err(|e| AppError::Directory(e.to_string()))
+}
+
+// ---------------------------------------------------------------------------
+// Topology - Tauri commands
+// ---------------------------------------------------------------------------
+
+/// Returns the AD topology data for visualization.
+#[tauri::command]
+pub async fn get_topology(state: State<'_, AppState>) -> Result<TopologyData, AppError> {
+    get_topology_inner(&state).await
 }
 
 #[allow(clippy::unwrap_used)]

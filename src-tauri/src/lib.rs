@@ -301,6 +301,7 @@ pub fn run() {
             commands::force_replication_cmd,
             commands::get_dns_kerberos_validation,
             commands::get_workstation_metrics,
+            commands::get_topology,
         ])
         .run(tauri::generate_context!())
         .unwrap_or_else(|e| {

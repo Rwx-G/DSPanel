@@ -24,6 +24,7 @@ pub mod replication_status;
 pub mod resilience;
 pub mod resilient_directory;
 pub mod snapshot;
+pub mod topology;
 pub mod workstation_monitor;
 
 pub use app_settings::AppSettingsService;
