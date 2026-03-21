@@ -3,7 +3,7 @@ use tauri::State;
 use std::time::{Duration, Instant};
 
 use crate::error::AppError;
-use crate::models::{DeletedObject, DirectoryEntry, OUNode, Preset};
+use crate::models::{ContactInfo, DeletedObject, DirectoryEntry, OUNode, Preset, PrinterInfo};
 use crate::services::app_settings::AppSettings;
 use crate::services::audit::AuditEntry;
 use crate::services::comparison::GroupComparisonResult;
@@ -1365,6 +1365,250 @@ pub(crate) async fn delete_group_inner(state: &AppState, group_dn: &str) -> Resu
 }
 
 // ---------------------------------------------------------------------------
+// Contact and Printer Management - inner functions
+// ---------------------------------------------------------------------------
+
+/// Searches for contacts matching the query string. ReadOnly access.
+pub(crate) async fn search_contacts_inner(
+    state: &AppState,
+    query: &str,
+) -> Result<Vec<ContactInfo>, AppError> {
+    let sanitized = validate_search_input(query)?;
+    let provider = state.directory_provider.clone();
+    provider
+        .search_contacts(&sanitized, 50)
+        .await
+        .map_err(|e| AppError::Directory(e.to_string()))
+}
+
+/// Searches for printers matching the query string. ReadOnly access.
+pub(crate) async fn search_printers_inner(
+    state: &AppState,
+    query: &str,
+) -> Result<Vec<PrinterInfo>, AppError> {
+    let sanitized = validate_search_input(query)?;
+    let provider = state.directory_provider.clone();
+    provider
+        .search_printers(&sanitized, 50)
+        .await
+        .map_err(|e| AppError::Directory(e.to_string()))
+}
+
+/// Creates a new contact. Requires AccountOperator permission.
+pub(crate) async fn create_contact_inner(
+    state: &AppState,
+    container_dn: &str,
+    attrs: &std::collections::HashMap<String, String>,
+) -> Result<String, AppError> {
+    if !state
+        .permission_service
+        .has_permission(PermissionLevel::AccountOperator)
+    {
+        return Err(AppError::PermissionDenied(
+            "Contact creation requires AccountOperator permission or higher".to_string(),
+        ));
+    }
+
+    let provider = state.directory_provider.clone();
+    match provider.create_contact(container_dn, attrs).await {
+        Ok(dn) => {
+            state.audit_service.log_success(
+                "ContactCreated",
+                &dn,
+                &format!("Contact created in {}", container_dn),
+            );
+            Ok(dn)
+        }
+        Err(e) => {
+            state.audit_service.log_failure(
+                "ContactCreateFailed",
+                container_dn,
+                &format!("Failed to create contact: {}", e),
+            );
+            Err(AppError::Directory(e.to_string()))
+        }
+    }
+}
+
+/// Updates an existing contact. Requires AccountOperator permission.
+pub(crate) async fn update_contact_inner(
+    state: &AppState,
+    dn: &str,
+    attrs: &std::collections::HashMap<String, String>,
+) -> Result<(), AppError> {
+    if !state
+        .permission_service
+        .has_permission(PermissionLevel::AccountOperator)
+    {
+        return Err(AppError::PermissionDenied(
+            "Contact modification requires AccountOperator permission or higher".to_string(),
+        ));
+    }
+
+    state.snapshot_service.capture(dn, "ContactUpdate");
+
+    let provider = state.directory_provider.clone();
+    match provider.update_contact(dn, attrs).await {
+        Ok(()) => {
+            state
+                .audit_service
+                .log_success("ContactUpdated", dn, "Contact updated");
+            Ok(())
+        }
+        Err(e) => {
+            state.audit_service.log_failure(
+                "ContactUpdateFailed",
+                dn,
+                &format!("Failed to update contact: {}", e),
+            );
+            Err(AppError::Directory(e.to_string()))
+        }
+    }
+}
+
+/// Deletes a contact. Requires AccountOperator permission.
+pub(crate) async fn delete_contact_inner(
+    state: &AppState,
+    dn: &str,
+) -> Result<(), AppError> {
+    if !state
+        .permission_service
+        .has_permission(PermissionLevel::AccountOperator)
+    {
+        return Err(AppError::PermissionDenied(
+            "Contact deletion requires AccountOperator permission or higher".to_string(),
+        ));
+    }
+
+    state.snapshot_service.capture(dn, "ContactDelete");
+
+    let provider = state.directory_provider.clone();
+    match provider.delete_contact(dn).await {
+        Ok(()) => {
+            state
+                .audit_service
+                .log_success("ContactDeleted", dn, "Contact deleted");
+            Ok(())
+        }
+        Err(e) => {
+            state.audit_service.log_failure(
+                "ContactDeleteFailed",
+                dn,
+                &format!("Failed to delete contact: {}", e),
+            );
+            Err(AppError::Directory(e.to_string()))
+        }
+    }
+}
+
+/// Creates a new printer. Requires DomainAdmin permission.
+pub(crate) async fn create_printer_inner(
+    state: &AppState,
+    container_dn: &str,
+    attrs: &std::collections::HashMap<String, String>,
+) -> Result<String, AppError> {
+    if !state
+        .permission_service
+        .has_permission(PermissionLevel::DomainAdmin)
+    {
+        return Err(AppError::PermissionDenied(
+            "Printer creation requires DomainAdmin permission".to_string(),
+        ));
+    }
+
+    let provider = state.directory_provider.clone();
+    match provider.create_printer(container_dn, attrs).await {
+        Ok(dn) => {
+            state.audit_service.log_success(
+                "PrinterCreated",
+                &dn,
+                &format!("Printer created in {}", container_dn),
+            );
+            Ok(dn)
+        }
+        Err(e) => {
+            state.audit_service.log_failure(
+                "PrinterCreateFailed",
+                container_dn,
+                &format!("Failed to create printer: {}", e),
+            );
+            Err(AppError::Directory(e.to_string()))
+        }
+    }
+}
+
+/// Updates an existing printer. Requires DomainAdmin permission.
+pub(crate) async fn update_printer_inner(
+    state: &AppState,
+    dn: &str,
+    attrs: &std::collections::HashMap<String, String>,
+) -> Result<(), AppError> {
+    if !state
+        .permission_service
+        .has_permission(PermissionLevel::DomainAdmin)
+    {
+        return Err(AppError::PermissionDenied(
+            "Printer modification requires DomainAdmin permission".to_string(),
+        ));
+    }
+
+    state.snapshot_service.capture(dn, "PrinterUpdate");
+
+    let provider = state.directory_provider.clone();
+    match provider.update_printer(dn, attrs).await {
+        Ok(()) => {
+            state
+                .audit_service
+                .log_success("PrinterUpdated", dn, "Printer updated");
+            Ok(())
+        }
+        Err(e) => {
+            state.audit_service.log_failure(
+                "PrinterUpdateFailed",
+                dn,
+                &format!("Failed to update printer: {}", e),
+            );
+            Err(AppError::Directory(e.to_string()))
+        }
+    }
+}
+
+/// Deletes a printer. Requires DomainAdmin permission.
+pub(crate) async fn delete_printer_inner(
+    state: &AppState,
+    dn: &str,
+) -> Result<(), AppError> {
+    if !state
+        .permission_service
+        .has_permission(PermissionLevel::DomainAdmin)
+    {
+        return Err(AppError::PermissionDenied(
+            "Printer deletion requires DomainAdmin permission".to_string(),
+        ));
+    }
+
+    state.snapshot_service.capture(dn, "PrinterDelete");
+
+    let provider = state.directory_provider.clone();
+    match provider.delete_printer(dn).await {
+        Ok(()) => {
+            state
+                .audit_service
+                .log_success("PrinterDeleted", dn, "Printer deleted");
+            Ok(())
+        }
+        Err(e) => {
+            state.audit_service.log_failure(
+                "PrinterDeleteFailed",
+                dn,
+                &format!("Failed to delete printer: {}", e),
+            );
+            Err(AppError::Directory(e.to_string()))
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tauri commands - thin wrappers
 // ---------------------------------------------------------------------------
 
@@ -2483,6 +2727,86 @@ pub async fn get_exchange_online_info(
 #[tauri::command]
 pub fn is_graph_configured(state: State<'_, AppState>) -> bool {
     state.graph_exchange.is_configured()
+}
+
+// ---------------------------------------------------------------------------
+// Contact and Printer Management - Tauri commands
+// ---------------------------------------------------------------------------
+
+/// Searches for contacts matching a query string.
+#[tauri::command]
+pub async fn search_contacts(
+    query: String,
+    state: State<'_, AppState>,
+) -> Result<Vec<ContactInfo>, AppError> {
+    search_contacts_inner(&state, &query).await
+}
+
+/// Searches for printers matching a query string.
+#[tauri::command]
+pub async fn search_printers(
+    query: String,
+    state: State<'_, AppState>,
+) -> Result<Vec<PrinterInfo>, AppError> {
+    search_printers_inner(&state, &query).await
+}
+
+/// Creates a new contact. Requires AccountOperator+.
+#[tauri::command]
+pub async fn create_contact(
+    container_dn: String,
+    attrs: std::collections::HashMap<String, String>,
+    state: State<'_, AppState>,
+) -> Result<String, AppError> {
+    create_contact_inner(&state, &container_dn, &attrs).await
+}
+
+/// Updates an existing contact. Requires AccountOperator+.
+#[tauri::command]
+pub async fn update_contact(
+    dn: String,
+    attrs: std::collections::HashMap<String, String>,
+    state: State<'_, AppState>,
+) -> Result<(), AppError> {
+    update_contact_inner(&state, &dn, &attrs).await
+}
+
+/// Deletes a contact. Requires AccountOperator+.
+#[tauri::command]
+pub async fn delete_contact(
+    dn: String,
+    state: State<'_, AppState>,
+) -> Result<(), AppError> {
+    delete_contact_inner(&state, &dn).await
+}
+
+/// Creates a new printer. Requires DomainAdmin.
+#[tauri::command]
+pub async fn create_printer(
+    container_dn: String,
+    attrs: std::collections::HashMap<String, String>,
+    state: State<'_, AppState>,
+) -> Result<String, AppError> {
+    create_printer_inner(&state, &container_dn, &attrs).await
+}
+
+/// Updates an existing printer. Requires DomainAdmin.
+#[tauri::command]
+pub async fn update_printer(
+    dn: String,
+    attrs: std::collections::HashMap<String, String>,
+    state: State<'_, AppState>,
+) -> Result<(), AppError> {
+    update_printer_inner(&state, &dn, &attrs).await
+}
+
+/// Deletes a printer. Requires DomainAdmin.
+#[tauri::command]
+pub async fn delete_printer(
+    dn: String,
+    state: State<'_, AppState>,
+) -> Result<(), AppError> {
+    delete_printer_inner(&state, &dn).await
 }
 
 #[allow(clippy::unwrap_used)]
@@ -5314,5 +5638,132 @@ mod tests {
         let state = make_state();
         let result = get_credential_inner(&state, "bad_key");
         assert!(result.is_err());
+    }
+
+    // -----------------------------------------------------------------------
+    // Contact management tests
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_search_contacts_anyone_can_search() {
+        use crate::models::ContactInfo;
+        let contacts = vec![ContactInfo {
+            dn: "CN=Test Contact,OU=Contacts,DC=example,DC=com".to_string(),
+            display_name: "Test Contact".to_string(),
+            first_name: "Test".to_string(),
+            last_name: "Contact".to_string(),
+            email: "test@example.com".to_string(),
+            phone: "+1-555-0100".to_string(),
+            mobile: String::new(),
+            company: "Acme".to_string(),
+            department: "Sales".to_string(),
+            description: "A test contact".to_string(),
+        }];
+        let provider = Arc::new(MockDirectoryProvider::new().with_contacts(contacts));
+        let state = AppState::new_for_test(provider, PermissionConfig::default());
+        // ReadOnly by default - should still work
+        let results = search_contacts_inner(&state, "test").await.unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].display_name, "Test Contact");
+    }
+
+    #[tokio::test]
+    async fn test_create_contact_requires_account_operator() {
+        let state = make_state(); // ReadOnly
+        let attrs = HashMap::new();
+        let result =
+            create_contact_inner(&state, "OU=Contacts,DC=example,DC=com", &attrs).await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            AppError::PermissionDenied(msg) => {
+                assert!(msg.contains("AccountOperator"));
+            }
+            other => panic!("Expected PermissionDenied, got: {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_create_contact_success_and_audit() {
+        let (state, provider) =
+            make_state_with_level_and_provider(PermissionLevel::AccountOperator);
+        let mut attrs = HashMap::new();
+        attrs.insert("displayName".to_string(), "New Contact".to_string());
+        let result =
+            create_contact_inner(&state, "OU=Contacts,DC=example,DC=com", &attrs).await;
+        assert!(result.is_ok());
+        let dn = result.unwrap();
+        assert!(dn.contains("New Contact"));
+
+        let calls = provider.create_contact_calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+
+        let entries = state.audit_service.get_entries();
+        assert!(entries.iter().any(|e| e.action == "ContactCreated"));
+    }
+
+    #[tokio::test]
+    async fn test_delete_contact_requires_account_operator() {
+        let state = make_state(); // ReadOnly
+        let result =
+            delete_contact_inner(&state, "CN=Old,OU=Contacts,DC=example,DC=com").await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            AppError::PermissionDenied(msg) => {
+                assert!(msg.contains("AccountOperator"));
+            }
+            other => panic!("Expected PermissionDenied, got: {:?}", other),
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Printer management tests
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_create_printer_requires_domain_admin() {
+        let state = make_state_with_level(PermissionLevel::AccountOperator);
+        let attrs = HashMap::new();
+        let result =
+            create_printer_inner(&state, "OU=Printers,DC=example,DC=com", &attrs).await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            AppError::PermissionDenied(msg) => {
+                assert!(msg.contains("DomainAdmin"));
+            }
+            other => panic!("Expected PermissionDenied, got: {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_delete_printer_requires_domain_admin() {
+        let state = make_state_with_level(PermissionLevel::AccountOperator);
+        let result =
+            delete_printer_inner(&state, "CN=OldPrinter,OU=Printers,DC=example,DC=com").await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            AppError::PermissionDenied(msg) => {
+                assert!(msg.contains("DomainAdmin"));
+            }
+            other => panic!("Expected PermissionDenied, got: {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_search_printers_returns_list() {
+        use crate::models::PrinterInfo;
+        let printers = vec![PrinterInfo {
+            dn: "CN=HP-Floor3,OU=Printers,DC=example,DC=com".to_string(),
+            name: "HP-Floor3".to_string(),
+            location: "Floor 3".to_string(),
+            server_name: "PRINT01".to_string(),
+            share_path: "\\\\PRINT01\\HP-Floor3".to_string(),
+            driver_name: "HP Universal".to_string(),
+            description: "Color laser".to_string(),
+        }];
+        let provider = Arc::new(MockDirectoryProvider::new().with_printers(printers));
+        let state = AppState::new_for_test(provider, PermissionConfig::default());
+        let results = search_printers_inner(&state, "HP").await.unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].name, "HP-Floor3");
     }
 }

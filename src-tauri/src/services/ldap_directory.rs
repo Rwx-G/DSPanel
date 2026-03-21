@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use ldap3::controls::{self, RawControl};
 use ldap3::{LdapConnAsync, LdapConnSettings, Mod, Scope, SearchEntry};
 
-use crate::models::{DirectoryEntry, OUNode};
+use crate::models::{ContactInfo, DirectoryEntry, OUNode, PrinterInfo};
 use crate::services::directory::DirectoryProvider;
 
 /// LDAP attributes to retrieve for user searches.
@@ -56,6 +56,34 @@ const GROUP_ATTRS: &[&str] = &[
     "groupType",
     "member",
     "description",
+];
+
+/// LDAP attributes to retrieve for contact searches.
+const CONTACT_ATTRS: &[&str] = &[
+    "distinguishedName",
+    "displayName",
+    "givenName",
+    "sn",
+    "mail",
+    "telephoneNumber",
+    "mobile",
+    "company",
+    "department",
+    "description",
+    "objectClass",
+];
+
+/// LDAP attributes to retrieve for printer (printQueue) searches.
+const PRINTER_ATTRS: &[&str] = &[
+    "distinguishedName",
+    "printerName",
+    "cn",
+    "location",
+    "serverName",
+    "uNCName",
+    "driverName",
+    "description",
+    "objectClass",
 ];
 
 /// Maximum allowed length for search input queries.
@@ -2100,6 +2128,218 @@ impl DirectoryProvider for LdapDirectoryProvider {
             }
         })
         .await
+    }
+
+    async fn search_contacts(
+        &self,
+        filter: &str,
+        max_results: usize,
+    ) -> Result<Vec<ContactInfo>> {
+        let validated = validate_search_input(filter)?;
+        let escaped = ldap_escape(validated);
+        let ldap_filter = format!(
+            "(&(objectClass=contact)(|(displayName=*{}*)(mail=*{}*)(cn=*{}*)))",
+            escaped, escaped, escaped
+        );
+        let entries = self.search(&ldap_filter, CONTACT_ATTRS, max_results).await?;
+        Ok(entries
+            .into_iter()
+            .map(|e| {
+                let first_name = e.get_attribute("givenName").unwrap_or("").to_string();
+                let last_name = e.get_attribute("sn").unwrap_or("").to_string();
+                let email = e.get_attribute("mail").unwrap_or("").to_string();
+                let phone = e.get_attribute("telephoneNumber").unwrap_or("").to_string();
+                let mobile = e.get_attribute("mobile").unwrap_or("").to_string();
+                let company = e.get_attribute("company").unwrap_or("").to_string();
+                let department = e.get_attribute("department").unwrap_or("").to_string();
+                let description = e.get_attribute("description").unwrap_or("").to_string();
+                let display_name = e.display_name.unwrap_or_default();
+                ContactInfo {
+                    dn: e.distinguished_name,
+                    display_name,
+                    first_name,
+                    last_name,
+                    email,
+                    phone,
+                    mobile,
+                    company,
+                    department,
+                    description,
+                }
+            })
+            .collect())
+    }
+
+    async fn search_printers(
+        &self,
+        filter: &str,
+        max_results: usize,
+    ) -> Result<Vec<PrinterInfo>> {
+        let validated = validate_search_input(filter)?;
+        let escaped = ldap_escape(validated);
+        let ldap_filter = format!(
+            "(&(objectClass=printQueue)(|(printerName=*{}*)(cn=*{}*)(location=*{}*)))",
+            escaped, escaped, escaped
+        );
+        let entries = self.search(&ldap_filter, PRINTER_ATTRS, max_results).await?;
+        Ok(entries
+            .into_iter()
+            .map(|e| {
+                let name = e
+                    .get_attribute("printerName")
+                    .or_else(|| e.get_attribute("cn"))
+                    .unwrap_or("")
+                    .to_string();
+                let location = e.get_attribute("location").unwrap_or("").to_string();
+                let server_name = e.get_attribute("serverName").unwrap_or("").to_string();
+                let share_path = e.get_attribute("uNCName").unwrap_or("").to_string();
+                let driver_name = e.get_attribute("driverName").unwrap_or("").to_string();
+                let description = e.get_attribute("description").unwrap_or("").to_string();
+                PrinterInfo {
+                    dn: e.distinguished_name,
+                    name,
+                    location,
+                    server_name,
+                    share_path,
+                    driver_name,
+                    description,
+                }
+            })
+            .collect())
+    }
+
+    async fn create_contact(
+        &self,
+        container_dn: &str,
+        attrs: &HashMap<String, String>,
+    ) -> Result<String> {
+        let cn = attrs
+            .get("displayName")
+            .cloned()
+            .unwrap_or_else(|| "Contact".to_string());
+        let dn = format!("CN={},{}", cn, container_dn);
+        let dn_clone = dn.clone();
+        let attrs_owned = attrs.clone();
+
+        self.with_connection(|mut ldap| {
+            let dn = dn_clone.clone();
+            let attrs_owned = attrs_owned.clone();
+            async move {
+                let mut ldap_attrs: Vec<(String, HashSet<String>)> = vec![(
+                    "objectClass".to_string(),
+                    HashSet::from(["contact".to_string()]),
+                )];
+                for (key, value) in &attrs_owned {
+                    if !value.is_empty() {
+                        ldap_attrs.push((key.clone(), HashSet::from([value.clone()])));
+                    }
+                }
+                ldap.add(&dn, ldap_attrs)
+                    .await
+                    .context("Failed to create contact")?
+                    .success()
+                    .context("Create contact LDAP operation returned error")?;
+
+                tracing::info!(dn = %dn, "Contact created");
+                Ok(dn)
+            }
+        })
+        .await
+    }
+
+    async fn update_contact(&self, dn: &str, attrs: &HashMap<String, String>) -> Result<()> {
+        let dn_owned = dn.to_string();
+        let attrs_owned = attrs.clone();
+        self.with_connection(|mut ldap| {
+            let dn = dn_owned.clone();
+            let attrs_owned = attrs_owned.clone();
+            async move {
+                let mods: Vec<Mod<String>> = attrs_owned
+                    .iter()
+                    .map(|(k, v)| Mod::Replace(k.clone(), HashSet::from([v.clone()])))
+                    .collect();
+                ldap.modify(&dn, mods)
+                    .await
+                    .context("Failed to update contact")?
+                    .success()
+                    .context("Update contact LDAP operation returned error")?;
+
+                tracing::info!(dn = %dn, "Contact updated");
+                Ok(())
+            }
+        })
+        .await
+    }
+
+    async fn delete_contact(&self, dn: &str) -> Result<()> {
+        self.delete_object(dn).await
+    }
+
+    async fn create_printer(
+        &self,
+        container_dn: &str,
+        attrs: &HashMap<String, String>,
+    ) -> Result<String> {
+        let cn = attrs
+            .get("printerName")
+            .cloned()
+            .unwrap_or_else(|| "Printer".to_string());
+        let dn = format!("CN={},{}", cn, container_dn);
+        let dn_clone = dn.clone();
+        let attrs_owned = attrs.clone();
+
+        self.with_connection(|mut ldap| {
+            let dn = dn_clone.clone();
+            let attrs_owned = attrs_owned.clone();
+            async move {
+                let mut ldap_attrs: Vec<(String, HashSet<String>)> = vec![(
+                    "objectClass".to_string(),
+                    HashSet::from(["printQueue".to_string()]),
+                )];
+                for (key, value) in &attrs_owned {
+                    if !value.is_empty() {
+                        ldap_attrs.push((key.clone(), HashSet::from([value.clone()])));
+                    }
+                }
+                ldap.add(&dn, ldap_attrs)
+                    .await
+                    .context("Failed to create printer")?
+                    .success()
+                    .context("Create printer LDAP operation returned error")?;
+
+                tracing::info!(dn = %dn, "Printer created");
+                Ok(dn)
+            }
+        })
+        .await
+    }
+
+    async fn update_printer(&self, dn: &str, attrs: &HashMap<String, String>) -> Result<()> {
+        let dn_owned = dn.to_string();
+        let attrs_owned = attrs.clone();
+        self.with_connection(|mut ldap| {
+            let dn = dn_owned.clone();
+            let attrs_owned = attrs_owned.clone();
+            async move {
+                let mods: Vec<Mod<String>> = attrs_owned
+                    .iter()
+                    .map(|(k, v)| Mod::Replace(k.clone(), HashSet::from([v.clone()])))
+                    .collect();
+                ldap.modify(&dn, mods)
+                    .await
+                    .context("Failed to update printer")?
+                    .success()
+                    .context("Update printer LDAP operation returned error")?;
+
+                tracing::info!(dn = %dn, "Printer updated");
+                Ok(())
+            }
+        })
+        .await
+    }
+
+    async fn delete_printer(&self, dn: &str) -> Result<()> {
+        self.delete_object(dn).await
     }
 }
 

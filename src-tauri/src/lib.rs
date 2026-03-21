@@ -275,6 +275,14 @@ pub fn run() {
             commands::test_graph_connection,
             commands::get_exchange_online_info,
             commands::is_graph_configured,
+            commands::search_contacts,
+            commands::search_printers,
+            commands::create_contact,
+            commands::update_contact,
+            commands::delete_contact,
+            commands::create_printer,
+            commands::update_printer,
+            commands::delete_printer,
         ])
         .run(tauri::generate_context!())
         .unwrap_or_else(|e| {

@@ -7,7 +7,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use std::collections::HashMap;
 
-use crate::models::{DirectoryEntry, OUNode};
+use crate::models::{ContactInfo, DirectoryEntry, OUNode, PrinterInfo};
 use crate::services::directory::DirectoryProvider;
 
 pub struct DemoDirectoryProvider;
@@ -1275,6 +1275,114 @@ impl DirectoryProvider for DemoDirectoryProvider {
         _deleted_dn: &str,
         _target_ou_dn: &str,
     ) -> Result<()> {
+        Ok(())
+    }
+
+    async fn search_contacts(
+        &self,
+        _filter: &str,
+        _max_results: usize,
+    ) -> Result<Vec<ContactInfo>> {
+        Ok(vec![
+            ContactInfo {
+                dn: "CN=External Partner,OU=Contacts,DC=demo,DC=local".to_string(),
+                display_name: "External Partner".to_string(),
+                first_name: "External".to_string(),
+                last_name: "Partner".to_string(),
+                email: "partner@external.com".to_string(),
+                phone: "+1-555-0100".to_string(),
+                mobile: "+1-555-0101".to_string(),
+                company: "Partner Corp".to_string(),
+                department: "Sales".to_string(),
+                description: "External sales contact".to_string(),
+            },
+            ContactInfo {
+                dn: "CN=Vendor Support,OU=Contacts,DC=demo,DC=local".to_string(),
+                display_name: "Vendor Support".to_string(),
+                first_name: "Vendor".to_string(),
+                last_name: "Support".to_string(),
+                email: "support@vendor.com".to_string(),
+                phone: "+1-555-0200".to_string(),
+                mobile: String::new(),
+                company: "Vendor Inc".to_string(),
+                department: "Support".to_string(),
+                description: "Vendor technical support".to_string(),
+            },
+        ])
+    }
+
+    async fn search_printers(
+        &self,
+        _filter: &str,
+        _max_results: usize,
+    ) -> Result<Vec<PrinterInfo>> {
+        Ok(vec![
+            PrinterInfo {
+                dn: "CN=HP-Floor3,OU=Printers,DC=demo,DC=local".to_string(),
+                name: "HP-Floor3".to_string(),
+                location: "Building A, Floor 3".to_string(),
+                server_name: "PRINT01".to_string(),
+                share_path: "\\\\PRINT01\\HP-Floor3".to_string(),
+                driver_name: "HP Universal Printing PCL 6".to_string(),
+                description: "Color laser printer".to_string(),
+            },
+            PrinterInfo {
+                dn: "CN=Canon-Lobby,OU=Printers,DC=demo,DC=local".to_string(),
+                name: "Canon-Lobby".to_string(),
+                location: "Building A, Lobby".to_string(),
+                server_name: "PRINT01".to_string(),
+                share_path: "\\\\PRINT01\\Canon-Lobby".to_string(),
+                driver_name: "Canon Generic Plus UFR II".to_string(),
+                description: "Reception area printer".to_string(),
+            },
+        ])
+    }
+
+    async fn create_contact(
+        &self,
+        container_dn: &str,
+        attrs: &HashMap<String, String>,
+    ) -> Result<String> {
+        let cn = attrs
+            .get("displayName")
+            .cloned()
+            .unwrap_or_else(|| "Contact".to_string());
+        Ok(format!("CN={},{}", cn, container_dn))
+    }
+
+    async fn update_contact(
+        &self,
+        _dn: &str,
+        _attrs: &HashMap<String, String>,
+    ) -> Result<()> {
+        Ok(())
+    }
+
+    async fn delete_contact(&self, _dn: &str) -> Result<()> {
+        Ok(())
+    }
+
+    async fn create_printer(
+        &self,
+        container_dn: &str,
+        attrs: &HashMap<String, String>,
+    ) -> Result<String> {
+        let cn = attrs
+            .get("printerName")
+            .cloned()
+            .unwrap_or_else(|| "Printer".to_string());
+        Ok(format!("CN={},{}", cn, container_dn))
+    }
+
+    async fn update_printer(
+        &self,
+        _dn: &str,
+        _attrs: &HashMap<String, String>,
+    ) -> Result<()> {
+        Ok(())
+    }
+
+    async fn delete_printer(&self, _dn: &str) -> Result<()> {
         Ok(())
     }
 }

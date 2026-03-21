@@ -1,6 +1,7 @@
-use crate::models::{DeletedObject, DirectoryEntry, OUNode};
+use crate::models::{ContactInfo, DeletedObject, DirectoryEntry, OUNode, PrinterInfo};
 use anyhow::Result;
 use async_trait::async_trait;
+use std::collections::HashMap;
 
 /// Abstraction over directory service operations.
 ///
@@ -217,6 +218,50 @@ pub trait DirectoryProvider: Send + Sync {
         deleted_dn: &str,
         target_ou_dn: &str,
     ) -> Result<()>;
+
+    /// Searches for contact objects matching the filter.
+    async fn search_contacts(
+        &self,
+        filter: &str,
+        max_results: usize,
+    ) -> Result<Vec<ContactInfo>>;
+
+    /// Searches for printer (printQueue) objects matching the filter.
+    async fn search_printers(
+        &self,
+        filter: &str,
+        max_results: usize,
+    ) -> Result<Vec<PrinterInfo>>;
+
+    /// Creates a new contact in the specified container.
+    ///
+    /// Returns the DN of the created contact.
+    async fn create_contact(
+        &self,
+        container_dn: &str,
+        attrs: &HashMap<String, String>,
+    ) -> Result<String>;
+
+    /// Updates an existing contact's attributes.
+    async fn update_contact(&self, dn: &str, attrs: &HashMap<String, String>) -> Result<()>;
+
+    /// Deletes a contact by its DN.
+    async fn delete_contact(&self, dn: &str) -> Result<()>;
+
+    /// Creates a new printer (printQueue) in the specified container.
+    ///
+    /// Returns the DN of the created printer.
+    async fn create_printer(
+        &self,
+        container_dn: &str,
+        attrs: &HashMap<String, String>,
+    ) -> Result<String>;
+
+    /// Updates an existing printer's attributes.
+    async fn update_printer(&self, dn: &str, attrs: &HashMap<String, String>) -> Result<()>;
+
+    /// Deletes a printer by its DN.
+    async fn delete_printer(&self, dn: &str) -> Result<()>;
 }
 
 #[allow(clippy::unwrap_used)]
@@ -258,6 +303,14 @@ pub mod tests {
         recycle_bin_enabled: Mutex<bool>,
         deleted_objects: Mutex<Vec<DeletedObject>>,
         pub restore_calls: Mutex<Vec<(String, String)>>,
+        contacts: Mutex<Vec<ContactInfo>>,
+        printers: Mutex<Vec<PrinterInfo>>,
+        pub create_contact_calls: Mutex<Vec<(String, HashMap<String, String>)>>,
+        pub update_contact_calls: Mutex<Vec<(String, HashMap<String, String>)>>,
+        pub delete_contact_calls: Mutex<Vec<String>>,
+        pub create_printer_calls: Mutex<Vec<(String, HashMap<String, String>)>>,
+        pub update_printer_calls: Mutex<Vec<(String, HashMap<String, String>)>>,
+        pub delete_printer_calls: Mutex<Vec<String>>,
     }
 
     impl Default for MockDirectoryProvider {
@@ -296,6 +349,14 @@ pub mod tests {
                 recycle_bin_enabled: Mutex::new(true),
                 deleted_objects: Mutex::new(Vec::new()),
                 restore_calls: Mutex::new(Vec::new()),
+                contacts: Mutex::new(Vec::new()),
+                printers: Mutex::new(Vec::new()),
+                create_contact_calls: Mutex::new(Vec::new()),
+                update_contact_calls: Mutex::new(Vec::new()),
+                delete_contact_calls: Mutex::new(Vec::new()),
+                create_printer_calls: Mutex::new(Vec::new()),
+                update_printer_calls: Mutex::new(Vec::new()),
+                delete_printer_calls: Mutex::new(Vec::new()),
             }
         }
 
@@ -328,6 +389,14 @@ pub mod tests {
                 recycle_bin_enabled: Mutex::new(false),
                 deleted_objects: Mutex::new(Vec::new()),
                 restore_calls: Mutex::new(Vec::new()),
+                contacts: Mutex::new(Vec::new()),
+                printers: Mutex::new(Vec::new()),
+                create_contact_calls: Mutex::new(Vec::new()),
+                update_contact_calls: Mutex::new(Vec::new()),
+                delete_contact_calls: Mutex::new(Vec::new()),
+                create_printer_calls: Mutex::new(Vec::new()),
+                update_printer_calls: Mutex::new(Vec::new()),
+                delete_printer_calls: Mutex::new(Vec::new()),
             }
         }
 
@@ -373,6 +442,16 @@ pub mod tests {
 
         pub fn with_recycle_bin_disabled(self) -> Self {
             *self.recycle_bin_enabled.lock().unwrap() = false;
+            self
+        }
+
+        pub fn with_contacts(self, contacts: Vec<ContactInfo>) -> Self {
+            *self.contacts.lock().unwrap() = contacts;
+            self
+        }
+
+        pub fn with_printers(self, printers: Vec<PrinterInfo>) -> Self {
+            *self.printers.lock().unwrap() = printers;
             self
         }
 
@@ -696,6 +775,96 @@ pub mod tests {
                 .lock()
                 .unwrap()
                 .push((deleted_dn.to_string(), target_ou_dn.to_string()));
+            Ok(())
+        }
+
+        async fn search_contacts(
+            &self,
+            _filter: &str,
+            max_results: usize,
+        ) -> Result<Vec<ContactInfo>> {
+            self.check_failure()?;
+            let contacts = self.contacts.lock().unwrap();
+            Ok(contacts.iter().take(max_results).cloned().collect())
+        }
+
+        async fn search_printers(
+            &self,
+            _filter: &str,
+            max_results: usize,
+        ) -> Result<Vec<PrinterInfo>> {
+            self.check_failure()?;
+            let printers = self.printers.lock().unwrap();
+            Ok(printers.iter().take(max_results).cloned().collect())
+        }
+
+        async fn create_contact(
+            &self,
+            container_dn: &str,
+            attrs: &HashMap<String, String>,
+        ) -> Result<String> {
+            self.check_failure()?;
+            let cn = attrs
+                .get("displayName")
+                .cloned()
+                .unwrap_or_else(|| "Contact".to_string());
+            self.create_contact_calls
+                .lock()
+                .unwrap()
+                .push((container_dn.to_string(), attrs.clone()));
+            Ok(format!("CN={},{}", cn, container_dn))
+        }
+
+        async fn update_contact(&self, dn: &str, attrs: &HashMap<String, String>) -> Result<()> {
+            self.check_failure()?;
+            self.update_contact_calls
+                .lock()
+                .unwrap()
+                .push((dn.to_string(), attrs.clone()));
+            Ok(())
+        }
+
+        async fn delete_contact(&self, dn: &str) -> Result<()> {
+            self.check_failure()?;
+            self.delete_contact_calls
+                .lock()
+                .unwrap()
+                .push(dn.to_string());
+            Ok(())
+        }
+
+        async fn create_printer(
+            &self,
+            container_dn: &str,
+            attrs: &HashMap<String, String>,
+        ) -> Result<String> {
+            self.check_failure()?;
+            let cn = attrs
+                .get("printerName")
+                .cloned()
+                .unwrap_or_else(|| "Printer".to_string());
+            self.create_printer_calls
+                .lock()
+                .unwrap()
+                .push((container_dn.to_string(), attrs.clone()));
+            Ok(format!("CN={},{}", cn, container_dn))
+        }
+
+        async fn update_printer(&self, dn: &str, attrs: &HashMap<String, String>) -> Result<()> {
+            self.check_failure()?;
+            self.update_printer_calls
+                .lock()
+                .unwrap()
+                .push((dn.to_string(), attrs.clone()));
+            Ok(())
+        }
+
+        async fn delete_printer(&self, dn: &str) -> Result<()> {
+            self.check_failure()?;
+            self.delete_printer_calls
+                .lock()
+                .unwrap()
+                .push(dn.to_string());
             Ok(())
         }
     }

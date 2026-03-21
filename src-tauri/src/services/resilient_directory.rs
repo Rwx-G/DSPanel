@@ -5,7 +5,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 
 use crate::error::DirectoryError;
-use crate::models::{DirectoryEntry, OUNode};
+use crate::models::{ContactInfo, DirectoryEntry, OUNode, PrinterInfo};
 use crate::services::directory::DirectoryProvider;
 use crate::services::resilience::{retry_with_backoff, CircuitBreaker, RetryConfig};
 
@@ -510,6 +510,110 @@ where
         })
         .await
         .map_err(|e| anyhow::anyhow!(e))
+    }
+
+    async fn search_contacts(
+        &self,
+        filter: &str,
+        max_results: usize,
+    ) -> Result<Vec<ContactInfo>> {
+        let filter = filter.to_string();
+        resilient_call!(self, filter, |inner, f| inner
+            .search_contacts(&f, max_results)
+            .await)
+    }
+
+    async fn search_printers(
+        &self,
+        filter: &str,
+        max_results: usize,
+    ) -> Result<Vec<PrinterInfo>> {
+        let filter = filter.to_string();
+        resilient_call!(self, filter, |inner, f| inner
+            .search_printers(&f, max_results)
+            .await)
+    }
+
+    async fn create_contact(
+        &self,
+        container_dn: &str,
+        attrs: &std::collections::HashMap<String, String>,
+    ) -> Result<String> {
+        let container = container_dn.to_string();
+        let attrs = attrs.clone();
+        let inner_ref = self.inner.clone();
+        self.execute_with_resilience(|| {
+            let inner = inner_ref.clone();
+            let c = container.clone();
+            let a = attrs.clone();
+            async move { inner.create_contact(&c, &a).await }
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!(e))
+    }
+
+    async fn update_contact(
+        &self,
+        dn: &str,
+        attrs: &std::collections::HashMap<String, String>,
+    ) -> Result<()> {
+        let dn = dn.to_string();
+        let attrs = attrs.clone();
+        let inner_ref = self.inner.clone();
+        self.execute_with_resilience(|| {
+            let inner = inner_ref.clone();
+            let d = dn.clone();
+            let a = attrs.clone();
+            async move { inner.update_contact(&d, &a).await }
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!(e))
+    }
+
+    async fn delete_contact(&self, dn: &str) -> Result<()> {
+        let dn = dn.to_string();
+        resilient_call!(self, dn, |inner, d| inner.delete_contact(&d).await)
+    }
+
+    async fn create_printer(
+        &self,
+        container_dn: &str,
+        attrs: &std::collections::HashMap<String, String>,
+    ) -> Result<String> {
+        let container = container_dn.to_string();
+        let attrs = attrs.clone();
+        let inner_ref = self.inner.clone();
+        self.execute_with_resilience(|| {
+            let inner = inner_ref.clone();
+            let c = container.clone();
+            let a = attrs.clone();
+            async move { inner.create_printer(&c, &a).await }
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!(e))
+    }
+
+    async fn update_printer(
+        &self,
+        dn: &str,
+        attrs: &std::collections::HashMap<String, String>,
+    ) -> Result<()> {
+        let dn = dn.to_string();
+        let attrs = attrs.clone();
+        let inner_ref = self.inner.clone();
+        self.execute_with_resilience(|| {
+            let inner = inner_ref.clone();
+            let d = dn.clone();
+            let a = attrs.clone();
+            async move { inner.update_printer(&d, &a).await }
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!(e))
+    }
+
+    async fn delete_printer(&self, dn: &str) -> Result<()> {
+        let dn = dn.to_string();
+        resilient_call!(self, dn, |inner, d| inner.delete_printer(&d).await)
     }
 }
 
