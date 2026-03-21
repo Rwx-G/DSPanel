@@ -14,6 +14,7 @@ import {
   Trash2,
   Contact,
   Printer,
+  Activity,
   type LucideIcon,
 } from "lucide-react";
 import { useNavigation } from "@/contexts/NavigationContext";
@@ -34,6 +35,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   "recycle-bin": Trash2,
   contact: Contact,
   printer: Printer,
+  activity: Activity,
 };
 
 const MODULES: SidebarModule[] = [
@@ -98,6 +100,13 @@ const MODULES: SidebarModule[] = [
     label: "Recycle Bin",
     icon: "recycle-bin",
     group: "Directory",
+    requiredLevel: "DomainAdmin",
+  },
+  {
+    id: "infrastructure-health",
+    label: "Infrastructure Health",
+    icon: "activity",
+    group: "Infrastructure",
     requiredLevel: "DomainAdmin",
   },
   {
