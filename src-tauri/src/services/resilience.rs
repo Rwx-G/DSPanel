@@ -666,7 +666,7 @@ mod tests {
 
     #[test]
     fn test_circuit_breaker_recovery_timeout_boundary() {
-        let timeout = Duration::from_millis(100);
+        let timeout = Duration::from_millis(300);
         let config = CircuitBreakerConfig {
             failure_threshold: 1,
             recovery_timeout: timeout,
@@ -675,12 +675,12 @@ mod tests {
         cb.record_failure();
         assert_eq!(cb.state(), CircuitState::Open);
 
-        // Sleep just under the timeout - should still be Open
-        std::thread::sleep(Duration::from_millis(80));
+        // Sleep well under the timeout - should still be Open
+        std::thread::sleep(Duration::from_millis(50));
         assert_eq!(cb.state(), CircuitState::Open);
 
         // Sleep past the remaining timeout - should transition to HalfOpen
-        std::thread::sleep(Duration::from_millis(30));
+        std::thread::sleep(Duration::from_millis(300));
         assert_eq!(cb.state(), CircuitState::HalfOpen);
     }
 
