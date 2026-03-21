@@ -1261,8 +1261,8 @@ impl DirectoryProvider for DemoDirectoryProvider {
 
     async fn get_deleted_objects(&self) -> Result<Vec<crate::models::DeletedObject>> {
         Ok(vec![crate::models::DeletedObject {
-            distinguished_name:
-                "CN=Old User\\0ADEL:abc123,CN=Deleted Objects,DC=demo,DC=local".to_string(),
+            distinguished_name: "CN=Old User\\0ADEL:abc123,CN=Deleted Objects,DC=demo,DC=local"
+                .to_string(),
             name: "Old User".to_string(),
             object_type: "user".to_string(),
             deletion_date: "2026-03-15T10:30:00Z".to_string(),
@@ -1270,11 +1270,7 @@ impl DirectoryProvider for DemoDirectoryProvider {
         }])
     }
 
-    async fn restore_deleted_object(
-        &self,
-        _deleted_dn: &str,
-        _target_ou_dn: &str,
-    ) -> Result<()> {
+    async fn restore_deleted_object(&self, _deleted_dn: &str, _target_ou_dn: &str) -> Result<()> {
         Ok(())
     }
 
@@ -1350,11 +1346,7 @@ impl DirectoryProvider for DemoDirectoryProvider {
         Ok(format!("CN={},{}", cn, container_dn))
     }
 
-    async fn update_contact(
-        &self,
-        _dn: &str,
-        _attrs: &HashMap<String, String>,
-    ) -> Result<()> {
+    async fn update_contact(&self, _dn: &str, _attrs: &HashMap<String, String>) -> Result<()> {
         Ok(())
     }
 
@@ -1374,11 +1366,7 @@ impl DirectoryProvider for DemoDirectoryProvider {
         Ok(format!("CN={},{}", cn, container_dn))
     }
 
-    async fn update_printer(
-        &self,
-        _dn: &str,
-        _attrs: &HashMap<String, String>,
-    ) -> Result<()> {
+    async fn update_printer(&self, _dn: &str, _attrs: &HashMap<String, String>) -> Result<()> {
         Ok(())
     }
 

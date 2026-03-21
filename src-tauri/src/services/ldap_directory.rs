@@ -2081,15 +2081,8 @@ impl DirectoryProvider for LdapDirectoryProvider {
         .await
     }
 
-    async fn restore_deleted_object(
-        &self,
-        deleted_dn: &str,
-        target_ou_dn: &str,
-    ) -> Result<()> {
-        let cn_part = deleted_dn
-            .split(',')
-            .next()
-            .unwrap_or(deleted_dn);
+    async fn restore_deleted_object(&self, deleted_dn: &str, target_ou_dn: &str) -> Result<()> {
+        let cn_part = deleted_dn.split(',').next().unwrap_or(deleted_dn);
         let cn = cn_part
             .strip_prefix("CN=")
             .or_else(|| cn_part.strip_prefix("cn="))
@@ -2130,18 +2123,16 @@ impl DirectoryProvider for LdapDirectoryProvider {
         .await
     }
 
-    async fn search_contacts(
-        &self,
-        filter: &str,
-        max_results: usize,
-    ) -> Result<Vec<ContactInfo>> {
+    async fn search_contacts(&self, filter: &str, max_results: usize) -> Result<Vec<ContactInfo>> {
         let validated = validate_search_input(filter)?;
         let escaped = ldap_escape(validated);
         let ldap_filter = format!(
             "(&(objectClass=contact)(|(displayName=*{}*)(mail=*{}*)(cn=*{}*)))",
             escaped, escaped, escaped
         );
-        let entries = self.search(&ldap_filter, CONTACT_ATTRS, max_results).await?;
+        let entries = self
+            .search(&ldap_filter, CONTACT_ATTRS, max_results)
+            .await?;
         Ok(entries
             .into_iter()
             .map(|e| {
@@ -2170,18 +2161,16 @@ impl DirectoryProvider for LdapDirectoryProvider {
             .collect())
     }
 
-    async fn search_printers(
-        &self,
-        filter: &str,
-        max_results: usize,
-    ) -> Result<Vec<PrinterInfo>> {
+    async fn search_printers(&self, filter: &str, max_results: usize) -> Result<Vec<PrinterInfo>> {
         let validated = validate_search_input(filter)?;
         let escaped = ldap_escape(validated);
         let ldap_filter = format!(
             "(&(objectClass=printQueue)(|(printerName=*{}*)(cn=*{}*)(location=*{}*)))",
             escaped, escaped, escaped
         );
-        let entries = self.search(&ldap_filter, PRINTER_ATTRS, max_results).await?;
+        let entries = self
+            .search(&ldap_filter, PRINTER_ATTRS, max_results)
+            .await?;
         Ok(entries
             .into_iter()
             .map(|e| {
@@ -2350,12 +2339,7 @@ impl DirectoryProvider for LdapDirectoryProvider {
             let dn = dn_owned.clone();
             async move {
                 let (entries, _) = ldap
-                    .search(
-                        &dn,
-                        Scope::Base,
-                        "(objectClass=*)",
-                        vec!["thumbnailPhoto"],
-                    )
+                    .search(&dn, Scope::Base, "(objectClass=*)", vec!["thumbnailPhoto"])
                     .await
                     .context("Failed to search for thumbnailPhoto")?
                     .success()
@@ -2365,8 +2349,7 @@ impl DirectoryProvider for LdapDirectoryProvider {
                     let se = SearchEntry::construct(entry);
                     if let Some(bin_values) = se.bin_attrs.get("thumbnailPhoto") {
                         if let Some(bytes) = bin_values.first() {
-                            let encoded =
-                                base64::engine::general_purpose::STANDARD.encode(bytes);
+                            let encoded = base64::engine::general_purpose::STANDARD.encode(bytes);
                             return Ok(Some(encoded));
                         }
                     }
@@ -2410,10 +2393,8 @@ impl DirectoryProvider for LdapDirectoryProvider {
         self.with_connection(|mut ldap| {
             let dn = dn_owned.clone();
             async move {
-                let mods: Vec<Mod<Vec<u8>>> = vec![Mod::Delete(
-                    b"thumbnailPhoto".to_vec(),
-                    HashSet::new(),
-                )];
+                let mods: Vec<Mod<Vec<u8>>> =
+                    vec![Mod::Delete(b"thumbnailPhoto".to_vec(), HashSet::new())];
                 ldap.modify(&dn, mods)
                     .await
                     .context("Failed to remove thumbnailPhoto")?

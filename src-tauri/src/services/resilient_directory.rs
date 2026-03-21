@@ -494,11 +494,7 @@ where
         .map_err(|e| anyhow::anyhow!(e))
     }
 
-    async fn restore_deleted_object(
-        &self,
-        deleted_dn: &str,
-        target_ou_dn: &str,
-    ) -> Result<()> {
+    async fn restore_deleted_object(&self, deleted_dn: &str, target_ou_dn: &str) -> Result<()> {
         let d = deleted_dn.to_string();
         let t = target_ou_dn.to_string();
         let inner_ref = self.inner.clone();
@@ -512,22 +508,14 @@ where
         .map_err(|e| anyhow::anyhow!(e))
     }
 
-    async fn search_contacts(
-        &self,
-        filter: &str,
-        max_results: usize,
-    ) -> Result<Vec<ContactInfo>> {
+    async fn search_contacts(&self, filter: &str, max_results: usize) -> Result<Vec<ContactInfo>> {
         let filter = filter.to_string();
         resilient_call!(self, filter, |inner, f| inner
             .search_contacts(&f, max_results)
             .await)
     }
 
-    async fn search_printers(
-        &self,
-        filter: &str,
-        max_results: usize,
-    ) -> Result<Vec<PrinterInfo>> {
+    async fn search_printers(&self, filter: &str, max_results: usize) -> Result<Vec<PrinterInfo>> {
         let filter = filter.to_string();
         resilient_call!(self, filter, |inner, f| inner
             .search_printers(&f, max_results)

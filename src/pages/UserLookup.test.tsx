@@ -48,6 +48,10 @@ vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(() => Promise.resolve(null)),
 }));
 
+vi.mock("@/components/common/SnapshotHistory", () => ({
+  SnapshotHistory: () => <div data-testid="snapshot-history-mock" />,
+}));
+
 // IntersectionObserver is not available in jsdom (needed by UserDetail)
 class MockIntersectionObserver {
   observe() {}

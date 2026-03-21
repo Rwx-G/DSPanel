@@ -213,25 +213,13 @@ pub trait DirectoryProvider: Send + Sync {
     /// Removes the `isDeleted` attribute and moves the object to the
     /// specified target OU. If `target_ou_dn` is empty, restores to
     /// the original OU stored in `lastKnownParent`.
-    async fn restore_deleted_object(
-        &self,
-        deleted_dn: &str,
-        target_ou_dn: &str,
-    ) -> Result<()>;
+    async fn restore_deleted_object(&self, deleted_dn: &str, target_ou_dn: &str) -> Result<()>;
 
     /// Searches for contact objects matching the filter.
-    async fn search_contacts(
-        &self,
-        filter: &str,
-        max_results: usize,
-    ) -> Result<Vec<ContactInfo>>;
+    async fn search_contacts(&self, filter: &str, max_results: usize) -> Result<Vec<ContactInfo>>;
 
     /// Searches for printer (printQueue) objects matching the filter.
-    async fn search_printers(
-        &self,
-        filter: &str,
-        max_results: usize,
-    ) -> Result<Vec<PrinterInfo>>;
+    async fn search_printers(&self, filter: &str, max_results: usize) -> Result<Vec<PrinterInfo>>;
 
     /// Creates a new contact in the specified container.
     ///
@@ -791,11 +779,7 @@ pub mod tests {
             Ok(self.deleted_objects.lock().unwrap().clone())
         }
 
-        async fn restore_deleted_object(
-            &self,
-            deleted_dn: &str,
-            target_ou_dn: &str,
-        ) -> Result<()> {
+        async fn restore_deleted_object(&self, deleted_dn: &str, target_ou_dn: &str) -> Result<()> {
             self.check_failure()?;
             self.restore_calls
                 .lock()
@@ -896,12 +880,7 @@ pub mod tests {
 
         async fn get_thumbnail_photo(&self, user_dn: &str) -> Result<Option<String>> {
             self.check_failure()?;
-            Ok(self
-                .thumbnail_photos
-                .lock()
-                .unwrap()
-                .get(user_dn)
-                .cloned())
+            Ok(self.thumbnail_photos.lock().unwrap().get(user_dn).cloned())
         }
 
         async fn set_thumbnail_photo(&self, user_dn: &str, photo_base64: &str) -> Result<()> {

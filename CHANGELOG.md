@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Frontend image resizing via HTML Canvas (center-crop to 96x96 JPEG) - no new Rust dependencies
 - Upload and remove photo buttons for AccountOperator+ users
 - Audit trail entries for photo set/remove operations with snapshot capture
+- Object Backup and Restore: SQLite-backed ObjectSnapshotService captures full AD attribute state before modifications
+- Snapshot history, diff comparison, and restore-from-snapshot commands (capture, get_history, get_snapshot, compute_diff, restore, cleanup)
+- SnapshotHistory UI component in user detail view with expandable diff viewer and restore button (DomainAdmin)
+- Audit trail for snapshot restore operations (success and failure)
 
 ## [0.6.0] - 2026-03-20
 

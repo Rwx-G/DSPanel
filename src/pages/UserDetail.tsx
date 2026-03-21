@@ -27,6 +27,7 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { useModifyAttribute } from "@/hooks/useModifyAttribute";
 import { useDialog } from "@/contexts/DialogContext";
 import { StateInTimeView } from "@/components/comparison/StateInTimeView";
+import { SnapshotHistory } from "@/components/common/SnapshotHistory";
 import { ExchangePanel } from "@/components/data/ExchangePanel";
 import { ExchangeOnlinePanel } from "@/components/data/ExchangeOnlinePanel";
 import { UserPhoto } from "@/components/common/UserPhoto";
@@ -515,6 +516,18 @@ export function UserDetail({
           Replication History
         </h3>
         <StateInTimeView objectDn={user.distinguishedName} objectType="user" />
+      </div>
+
+      <div className="border-t border-[var(--color-border-default)]" />
+
+      <div data-testid="user-snapshot-section">
+        <h3 className="mb-2 text-body font-semibold text-[var(--color-text-primary)]">
+          Object Snapshots
+        </h3>
+        <SnapshotHistory
+          objectDn={user.distinguishedName}
+          canRestore={hasPermission("DomainAdmin")}
+        />
       </div>
 
       <ContextMenu
