@@ -647,6 +647,24 @@ where
         let dn = user_dn.to_string();
         resilient_call!(self, dn, |inner, d| inner.remove_thumbnail_photo(&d).await)
     }
+
+    async fn search_configuration(
+        &self,
+        search_base: &str,
+        filter: &str,
+    ) -> Result<Vec<DirectoryEntry>> {
+        let inner_ref = self.inner.clone();
+        let base = search_base.to_string();
+        let filt = filter.to_string();
+        self.execute_with_resilience(|| {
+            let inner = inner_ref.clone();
+            let b = base.clone();
+            let f = filt.clone();
+            async move { inner.search_configuration(&b, &f).await }
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!(e))
+    }
 }
 
 #[allow(clippy::unwrap_used)]

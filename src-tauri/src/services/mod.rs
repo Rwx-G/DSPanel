@@ -3,6 +3,7 @@ pub mod audit;
 pub mod comparison;
 pub mod credential_store;
 pub mod dacl;
+pub mod dc_health;
 #[cfg(feature = "demo")]
 pub mod demo_provider;
 pub mod directory;

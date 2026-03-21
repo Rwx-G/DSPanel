@@ -1402,6 +1402,35 @@ impl DirectoryProvider for DemoDirectoryProvider {
     async fn remove_thumbnail_photo(&self, _user_dn: &str) -> Result<()> {
         Ok(())
     }
+
+    async fn search_configuration(
+        &self,
+        _search_base: &str,
+        _filter: &str,
+    ) -> Result<Vec<DirectoryEntry>> {
+        // Return sample DC entries for demo mode
+        let mut dc1 = DirectoryEntry::new(
+            "CN=DC1,CN=Servers,CN=Default-First-Site-Name,CN=Sites,CN=Configuration,DC=contoso,DC=com".to_string(),
+        );
+        dc1.attributes.insert(
+            "dNSHostName".to_string(),
+            vec!["DC1.contoso.com".to_string()],
+        );
+        dc1.attributes
+            .insert("options".to_string(), vec!["1".to_string()]);
+
+        let mut dc2 = DirectoryEntry::new(
+            "CN=DC2,CN=Servers,CN=Default-First-Site-Name,CN=Sites,CN=Configuration,DC=contoso,DC=com".to_string(),
+        );
+        dc2.attributes.insert(
+            "dNSHostName".to_string(),
+            vec!["DC2.contoso.com".to_string()],
+        );
+        dc2.attributes
+            .insert("options".to_string(), vec!["0".to_string()]);
+
+        Ok(vec![dc1, dc2])
+    }
 }
 
 fn sample_ou_tree() -> Vec<OUNode> {

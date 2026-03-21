@@ -2533,6 +2533,48 @@ impl DirectoryProvider for LdapDirectoryProvider {
         })
         .await
     }
+
+    async fn search_configuration(
+        &self,
+        search_base: &str,
+        filter: &str,
+    ) -> Result<Vec<DirectoryEntry>> {
+        let base_owned = search_base.to_string();
+        let filter_owned = filter.to_string();
+
+        self.with_connection(|mut ldap| {
+            let base = base_owned.clone();
+            let filt = filter_owned.clone();
+            async move {
+                let (rs, _) = ldap
+                    .search(
+                        &base,
+                        ldap3::Scope::Subtree,
+                        &filt,
+                        vec!["*", "dNSHostName", "options"],
+                    )
+                    .await
+                    .context("Configuration search failed")?
+                    .success()
+                    .context("Configuration search returned error")?;
+
+                let entries: Vec<DirectoryEntry> = rs
+                    .into_iter()
+                    .map(|re| {
+                        let se = ldap3::SearchEntry::construct(re);
+                        let mut entry = DirectoryEntry::new(se.dn);
+                        for (key, values) in se.attrs {
+                            entry.attributes.insert(key, values);
+                        }
+                        entry
+                    })
+                    .collect();
+
+                Ok(entries)
+            }
+        })
+        .await
+    }
 }
 
 /// Builds a hierarchical OU tree from a flat list of (DN, name) pairs.

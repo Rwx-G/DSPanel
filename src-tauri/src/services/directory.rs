@@ -265,6 +265,17 @@ pub trait DirectoryProvider: Send + Sync {
 
     /// Removes the thumbnailPhoto attribute.
     async fn remove_thumbnail_photo(&self, user_dn: &str) -> Result<()>;
+
+    /// Searches the AD Configuration partition with a custom LDAP filter.
+    ///
+    /// Performs a subtree search starting from `search_base` with the given
+    /// `filter`. Returns matching entries as `DirectoryEntry` objects.
+    /// Used for querying Sites and Services, replication topology, etc.
+    async fn search_configuration(
+        &self,
+        search_base: &str,
+        filter: &str,
+    ) -> Result<Vec<DirectoryEntry>>;
 }
 
 #[allow(clippy::unwrap_used)]
@@ -317,6 +328,7 @@ pub mod tests {
         thumbnail_photos: Mutex<HashMap<String, String>>,
         pub set_photo_calls: Mutex<Vec<(String, String)>>,
         pub remove_photo_calls: Mutex<Vec<String>>,
+        configuration_entries: Mutex<Vec<DirectoryEntry>>,
     }
 
     impl Default for MockDirectoryProvider {
@@ -366,6 +378,7 @@ pub mod tests {
                 thumbnail_photos: Mutex::new(HashMap::new()),
                 set_photo_calls: Mutex::new(Vec::new()),
                 remove_photo_calls: Mutex::new(Vec::new()),
+                configuration_entries: Mutex::new(Vec::new()),
             }
         }
 
@@ -409,6 +422,7 @@ pub mod tests {
                 thumbnail_photos: Mutex::new(HashMap::new()),
                 set_photo_calls: Mutex::new(Vec::new()),
                 remove_photo_calls: Mutex::new(Vec::new()),
+                configuration_entries: Mutex::new(Vec::new()),
             }
         }
 
@@ -472,6 +486,11 @@ pub mod tests {
                 .lock()
                 .unwrap()
                 .insert(dn.to_string(), photo_base64.to_string());
+            self
+        }
+
+        pub fn with_configuration_entries(self, entries: Vec<DirectoryEntry>) -> Self {
+            *self.configuration_entries.lock().unwrap() = entries;
             self
         }
 
@@ -920,6 +939,15 @@ pub mod tests {
                 .push(user_dn.to_string());
             self.thumbnail_photos.lock().unwrap().remove(user_dn);
             Ok(())
+        }
+
+        async fn search_configuration(
+            &self,
+            _search_base: &str,
+            _filter: &str,
+        ) -> Result<Vec<DirectoryEntry>> {
+            self.check_failure()?;
+            Ok(self.configuration_entries.lock().unwrap().clone())
         }
     }
 
