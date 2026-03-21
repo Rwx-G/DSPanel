@@ -14,6 +14,13 @@ Items deferred from QA reviews. None are blocking - all stories are PASS.
 
 | Source | Item | Refs |
 | ------ | ---- | ---- |
+| Epic 8 QA | Integrate WorkstationMonitoringPanel into ComputerLookup detail view | `ComputerLookup.tsx`, `WorkstationMonitoringPanel.tsx`, Story 8.4 |
+| Epic 8 QA | Add click-to-detail interaction on topology nodes/edges | `TopologyView.tsx`, Story 8.5 |
+| Epic 8 QA | Force-directed layout for complex multi-site topologies | `TopologyView.tsx`, Story 8.5 |
+| Epic 8 QA | Add _ldap._tcp.dc._msdcs SRV record validation | `dns_validation.rs`, Story 8.3 |
+| Epic 8 QA | LDAP msDS-ReplNeighbor for richer replication status data | `replication_status.rs`, Story 8.2 |
+| Epic 8 QA | Service list filtering (auto-start only) for workstation monitoring | `WorkstationMonitoringPanel.tsx`, Story 8.4 |
+| Epic 8 QA | Group DC cards by site in health dashboard for multi-site environments | `InfrastructureHealth.tsx`, Story 8.1 |
 | Epic 6 QA | Interactive Browser auth (device code flow) as alternative to client secret for Graph API | `graph_exchange.rs`, Epic 12 (Story 12.2) |
 | Epic 7 QA | Bulk restore for Recycle Bin (currently single object only) | `RecycleBin.tsx`, Story 7.2 |
 | Epic 7 QA | Snapshot capture for contact/printer modifications | `object_snapshot.rs`, Story 7.5 |
