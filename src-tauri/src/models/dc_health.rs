@@ -12,6 +12,10 @@ pub struct DomainControllerInfo {
     pub is_global_catalog: bool,
     /// The distinguished name of the server object.
     pub server_dn: String,
+    /// FSMO roles held by this DC (e.g., "PDC", "RID", "Infrastructure").
+    pub fsmo_roles: Vec<String>,
+    /// DC functional level label (e.g., "Windows Server 2016").
+    pub functional_level: Option<String>,
 }
 
 /// The overall health status level for a DC.
@@ -142,6 +146,8 @@ mod tests {
                 site_name: "Default-First-Site".to_string(),
                 is_global_catalog: true,
                 server_dn: "CN=DC1,CN=Servers,CN=Default-First-Site,CN=Sites,CN=Configuration,DC=example,DC=com".to_string(),
+                fsmo_roles: vec!["PDC".to_string(), "RID".to_string()],
+                functional_level: Some("Windows Server 2016".to_string()),
             },
             overall_status: DcHealthLevel::Healthy,
             checks: vec![DcHealthCheck {

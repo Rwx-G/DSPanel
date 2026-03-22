@@ -2575,6 +2575,39 @@ impl DirectoryProvider for LdapDirectoryProvider {
         })
         .await
     }
+
+    async fn read_entry(&self, dn: &str) -> Result<Option<DirectoryEntry>> {
+        let dn_owned = dn.to_string();
+
+        self.with_connection(|mut ldap| {
+            let dn = dn_owned.clone();
+            async move {
+                let (rs, _) = ldap
+                    .search(
+                        &dn,
+                        ldap3::Scope::Base,
+                        "(objectClass=*)",
+                        vec!["*", "currentTime", "fSMORoleOwner", "msDS-Behavior-Version"],
+                    )
+                    .await
+                    .context("Base scope read failed")?
+                    .success()
+                    .context("Base scope read returned error")?;
+
+                let entry = rs.into_iter().next().map(|re| {
+                    let se = ldap3::SearchEntry::construct(re);
+                    let mut entry = DirectoryEntry::new(se.dn);
+                    for (key, values) in se.attrs {
+                        entry.attributes.insert(key, values);
+                    }
+                    entry
+                });
+
+                Ok(entry)
+            }
+        })
+        .await
+    }
 }
 
 /// Builds a hierarchical OU tree from a flat list of (DN, name) pairs.

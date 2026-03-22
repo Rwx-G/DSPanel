@@ -665,6 +665,18 @@ where
         .await
         .map_err(|e| anyhow::anyhow!(e))
     }
+
+    async fn read_entry(&self, dn: &str) -> Result<Option<DirectoryEntry>> {
+        let inner_ref = self.inner.clone();
+        let dn_owned = dn.to_string();
+        self.execute_with_resilience(|| {
+            let inner = inner_ref.clone();
+            let d = dn_owned.clone();
+            async move { inner.read_entry(&d).await }
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!(e))
+    }
 }
 
 #[allow(clippy::unwrap_used)]

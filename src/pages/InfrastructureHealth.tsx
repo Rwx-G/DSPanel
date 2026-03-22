@@ -6,10 +6,10 @@ import {
   RefreshCw,
   Server,
   Shield,
-  HardDrive,
   Globe,
   Activity,
   FolderSync,
+  Clock,
   ChevronRight,
   ChevronDown,
   AlertCircle,
@@ -72,10 +72,14 @@ function checkIcon(name: string, size = 14) {
       return <Activity size={size} className="shrink-0" />;
     case "Services":
       return <Server size={size} className="shrink-0" />;
-    case "Disk":
-      return <HardDrive size={size} className="shrink-0" />;
+    case "Replication":
+      return <RefreshCw size={size} className="shrink-0" />;
     case "SYSVOL":
       return <FolderSync size={size} className="shrink-0" />;
+    case "Clock":
+      return <Clock size={size} className="shrink-0" />;
+    case "Account":
+      return <Shield size={size} className="shrink-0" />;
     default:
       return <Shield size={size} className="shrink-0" />;
   }
@@ -115,9 +119,20 @@ function DcHealthCard({
                 GC
               </span>
             )}
+            {result.dc.fsmoRoles.map((role) => (
+              <span
+                key={role}
+                className="rounded bg-[var(--color-text-secondary)] px-1.5 py-0.5 text-[10px] font-medium text-white"
+              >
+                {role}
+              </span>
+            ))}
           </div>
           <span className="text-caption text-[var(--color-text-secondary)]">
             Site: {result.dc.siteName}
+            {result.dc.functionalLevel && (
+              <> - {result.dc.functionalLevel}</>
+            )}
           </span>
         </div>
 
@@ -145,16 +160,16 @@ function DcHealthCard({
       {/* Expanded detail panel */}
       {isExpanded && (
         <div
-          className="border-t border-[var(--color-border-default)] px-3 py-2"
+          className="border-t border-[var(--color-border-default)] px-4 py-3"
           data-testid={`dc-detail-${result.dc.hostname}`}
         >
           <table className="w-full text-caption">
             <thead>
               <tr className="text-left text-[var(--color-text-secondary)]">
-                <th className="pb-1 font-medium">Check</th>
-                <th className="pb-1 font-medium">Status</th>
-                <th className="pb-1 font-medium">Details</th>
-                <th className="pb-1 font-medium">Value</th>
+                <th className="pb-2 pr-6 font-medium">Check</th>
+                <th className="pb-2 pr-6 font-medium">Status</th>
+                <th className="pb-2 pr-6 font-medium">Details</th>
+                <th className="pb-2 font-medium">Value</th>
               </tr>
             </thead>
             <tbody>
@@ -175,19 +190,19 @@ function DcHealthCard({
 function CheckRow({ check }: { check: DcHealthCheck }) {
   return (
     <tr className="border-t border-[var(--color-border-subtle)]">
-      <td className="py-1.5">
-        <div className="flex items-center gap-1.5 text-[var(--color-text-primary)]">
+      <td className="py-2 pr-6">
+        <div className="flex items-center gap-2 text-[var(--color-text-primary)]">
           {checkIcon(check.name)}
           {check.name}
         </div>
       </td>
-      <td className="py-1.5">
+      <td className="py-2 pr-6">
         <StatusIcon level={check.status} size={14} />
       </td>
-      <td className="py-1.5 text-[var(--color-text-secondary)]">
+      <td className="py-2 pr-6 text-[var(--color-text-secondary)]">
         {check.message}
       </td>
-      <td className="py-1.5 font-mono text-[var(--color-text-secondary)]">
+      <td className="py-2 font-mono text-[var(--color-text-secondary)]">
         {check.value ?? "-"}
       </td>
     </tr>
@@ -199,7 +214,7 @@ export function InfrastructureHealth() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshInterval, setRefreshInterval] = useState(60);
-  const [expandedDc, setExpandedDc] = useState<string | null>(null);
+  const [collapsedDcs, setCollapsedDcs] = useState<Set<string>>(new Set());
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchHealth = useCallback(async () => {
@@ -240,7 +255,15 @@ export function InfrastructureHealth() {
   }, [refreshInterval, fetchHealth]);
 
   const handleToggleDc = (hostname: string) => {
-    setExpandedDc((prev) => (prev === hostname ? null : hostname));
+    setCollapsedDcs((prev) => {
+      const next = new Set(prev);
+      if (next.has(hostname)) {
+        next.delete(hostname);
+      } else {
+        next.add(hostname);
+      }
+      return next;
+    });
   };
 
   const healthySummary = results.filter(
@@ -327,12 +350,12 @@ export function InfrastructureHealth() {
             description="No domain controllers were discovered in the AD configuration."
           />
         ) : (
-          <div className="grid gap-3 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+          <div className="flex flex-col gap-4">
             {results.map((result) => (
               <DcHealthCard
                 key={result.dc.hostname}
                 result={result}
-                isExpanded={expandedDc === result.dc.hostname}
+                isExpanded={!collapsedDcs.has(result.dc.hostname)}
                 onToggle={() => handleToggleDc(result.dc.hostname)}
               />
             ))}

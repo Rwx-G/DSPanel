@@ -1431,6 +1431,10 @@ impl DirectoryProvider for DemoDirectoryProvider {
 
         Ok(vec![dc1, dc2])
     }
+
+    async fn read_entry(&self, _dn: &str) -> Result<Option<DirectoryEntry>> {
+        Ok(None)
+    }
 }
 
 fn sample_ou_tree() -> Vec<OUNode> {

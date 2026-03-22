@@ -5,6 +5,8 @@ export interface DomainControllerInfo {
   siteName: string;
   isGlobalCatalog: boolean;
   serverDn: string;
+  fsmoRoles: string[];
+  functionalLevel: string | null;
 }
 
 export interface DcHealthCheck {

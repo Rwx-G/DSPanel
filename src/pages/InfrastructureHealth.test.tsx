@@ -118,15 +118,9 @@ describe("InfrastructureHealth", () => {
     });
   });
 
-  it("expands DC card on click to show details", async () => {
+  it("shows DC card expanded by default with details", async () => {
     mockInvoke.mockResolvedValueOnce([healthyDc]);
     render(<InfrastructureHealth />);
-
-    await waitFor(() => {
-      expect(screen.getByText("DC1.example.com")).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByTestId("dc-card-toggle-DC1.example.com"));
 
     await waitFor(() => {
       expect(screen.getByTestId("dc-detail-DC1.example.com")).toBeInTheDocument();
@@ -134,19 +128,19 @@ describe("InfrastructureHealth", () => {
     });
   });
 
-  it("collapses DC card on second click", async () => {
+  it("collapses DC card on click and re-expands on second click", async () => {
     mockInvoke.mockResolvedValueOnce([healthyDc]);
     render(<InfrastructureHealth />);
 
     await waitFor(() => {
-      expect(screen.getByText("DC1.example.com")).toBeInTheDocument();
+      expect(screen.getByTestId("dc-detail-DC1.example.com")).toBeInTheDocument();
     });
 
     fireEvent.click(screen.getByTestId("dc-card-toggle-DC1.example.com"));
-    expect(screen.getByTestId("dc-detail-DC1.example.com")).toBeInTheDocument();
+    expect(screen.queryByTestId("dc-detail-DC1.example.com")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId("dc-card-toggle-DC1.example.com"));
-    expect(screen.queryByTestId("dc-detail-DC1.example.com")).not.toBeInTheDocument();
+    expect(screen.getByTestId("dc-detail-DC1.example.com")).toBeInTheDocument();
   });
 
   it("shows error state when fetch fails", async () => {

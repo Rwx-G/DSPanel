@@ -276,6 +276,13 @@ pub trait DirectoryProvider: Send + Sync {
         search_base: &str,
         filter: &str,
     ) -> Result<Vec<DirectoryEntry>>;
+
+    /// Reads a single entry at the exact DN using LDAP Base scope.
+    ///
+    /// Use this for rootDSE queries (dn = "") or reading specific objects
+    /// like FSMO role holders where Subtree would return too many results.
+    /// Returns the entry if found, or None.
+    async fn read_entry(&self, dn: &str) -> Result<Option<DirectoryEntry>>;
 }
 
 #[allow(clippy::unwrap_used)]
@@ -948,6 +955,11 @@ pub mod tests {
         ) -> Result<Vec<DirectoryEntry>> {
             self.check_failure()?;
             Ok(self.configuration_entries.lock().unwrap().clone())
+        }
+
+        async fn read_entry(&self, _dn: &str) -> Result<Option<DirectoryEntry>> {
+            self.check_failure()?;
+            Ok(self.configuration_entries.lock().unwrap().first().cloned())
         }
     }
 

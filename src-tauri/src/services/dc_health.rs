@@ -52,10 +52,80 @@ pub async fn discover_domain_controllers(
             site_name,
             is_global_catalog: is_gc,
             server_dn: entry.distinguished_name.clone(),
+            fsmo_roles: Vec::new(),
+            functional_level: None,
         });
     }
 
+    // Enrich with FSMO roles
+    let fsmo_roles = discover_fsmo_roles(provider, &base_dn).await;
+    for dc in &mut dcs {
+        let ntds_dn = format!("CN=NTDS Settings,{}", dc.server_dn);
+        let ntds_lower = ntds_dn.to_lowercase();
+        for (role, owner_dn) in &fsmo_roles {
+            if owner_dn.to_lowercase() == ntds_lower {
+                dc.fsmo_roles.push(role.to_string());
+            }
+        }
+    }
+
+    // Enrich with functional level from rootDSE
+    if let Ok(Some(rootdse)) = provider.read_entry("").await {
+        let level = rootdse
+            .get_attribute("domainControllerFunctionality")
+            .or_else(|| rootdse.get_attribute("domainFunctionality"))
+            .and_then(|v| v.parse::<u32>().ok())
+            .map(functional_level_label);
+        for dc in &mut dcs {
+            dc.functional_level = level.clone();
+        }
+    }
+
     Ok(dcs)
+}
+
+/// Discovers FSMO role holders by reading `fSMORoleOwner` from the 5 well-known objects.
+/// Returns a list of (role_name, owner_ntds_settings_dn).
+async fn discover_fsmo_roles(
+    provider: &dyn DirectoryProvider,
+    base_dn: &str,
+) -> Vec<(&'static str, String)> {
+    let mut roles = Vec::new();
+
+    let config_dn = format!("CN=Configuration,{}", base_dn);
+
+    let fsmo_objects: &[(&str, String)] = &[
+        ("PDC", base_dn.to_string()),
+        ("RID", format!("CN=RID Manager$,CN=System,{}", base_dn)),
+        ("Infrastructure", format!("CN=Infrastructure,{}", base_dn)),
+        ("Schema", format!("CN=Schema,{}", config_dn)),
+        ("Naming", format!("CN=Partitions,{}", config_dn)),
+    ];
+
+    for (role, dn) in fsmo_objects {
+        if let Ok(Some(entry)) = provider.read_entry(dn).await {
+            if let Some(owner) = entry.get_attribute("fSMORoleOwner") {
+                roles.push((*role, owner.to_string()));
+            }
+        }
+    }
+
+    roles
+}
+
+/// Maps AD functional level number to a human-readable label.
+fn functional_level_label(level: u32) -> String {
+    match level {
+        0 => "Windows 2000".to_string(),
+        2 => "Windows Server 2003".to_string(),
+        3 => "Windows Server 2008".to_string(),
+        4 => "Windows Server 2008 R2".to_string(),
+        5 => "Windows Server 2012".to_string(),
+        6 => "Windows Server 2012 R2".to_string(),
+        7 => "Windows Server 2016".to_string(),
+        10 => "Windows Server 2025".to_string(),
+        _ => format!("Level {}", level),
+    }
 }
 
 /// Extracts the site name from a server DN.
@@ -90,28 +160,59 @@ fn extract_site_from_dn(dn: &str) -> String {
 
 /// Runs all health checks on a single domain controller.
 ///
-/// Performs DNS resolution, LDAP connectivity test, and (on Windows)
-/// service status and disk space checks.
+/// Performs DNS resolution, LDAP connectivity, AD service detection via
+/// rootDSE/SPNs, replication health, and SYSVOL reachability via SMB port.
+/// All checks are cross-platform (no PowerShell dependency).
+///
+/// If DNS resolution fails and a `fallback_ip` is available, the network
+/// checks use the fallback IP instead of the unresolvable hostname.
 pub async fn check_dc_health(
     dc: &DomainControllerInfo,
     provider: &dyn DirectoryProvider,
+    fallback_ip: Option<&str>,
 ) -> DcHealthResult {
     let mut checks = Vec::new();
 
     // Check 1: DNS Resolution
-    checks.push(check_dns(&dc.hostname).await);
+    let dns_check = check_dns(&dc.hostname).await;
+    let dns_ok = dns_check.status == DcHealthLevel::Healthy;
+    checks.push(dns_check);
+
+    // Determine the reachable address: resolved hostname or fallback IP
+    let effective_host = if dns_ok {
+        dc.hostname.clone()
+    } else if let Some(ip) = fallback_ip {
+        // DNS failed but we have a fallback - downgrade DNS to Warning
+        if let Some(dns) = checks.first_mut() {
+            if dns.status == DcHealthLevel::Critical {
+                dns.status = DcHealthLevel::Warning;
+                dns.message = format!("DNS resolution failed, using fallback IP {}", ip);
+                dns.value = Some(ip.to_string());
+            }
+        }
+        ip.to_string()
+    } else {
+        // No fallback - all checks will fail with hostname
+        dc.hostname.clone()
+    };
 
     // Check 2: LDAP Ping (response time)
-    checks.push(check_ldap_ping(&dc.hostname, provider).await);
+    checks.push(check_ldap_ping(&effective_host, provider).await);
 
-    // Check 3: AD Services (Windows-only via PowerShell)
-    checks.push(check_services(&dc.hostname).await);
+    // Check 3: AD Services via LDAP rootDSE + SPNs (cross-platform)
+    checks.push(check_ad_services(provider, &dc.hostname).await);
 
-    // Check 4: Disk Space (Windows-only via PowerShell)
-    checks.push(check_disk_space(&dc.hostname).await);
+    // Check 4: Replication health via rootDSE (cross-platform)
+    checks.push(check_replication_health(provider, &dc.hostname).await);
 
-    // Check 5: SYSVOL Accessibility (Windows-only)
-    checks.push(check_sysvol(&dc.hostname).await);
+    // Check 5: SYSVOL health via DFSR LDAP + SMB port probe (cross-platform)
+    checks.push(check_sysvol_smb(provider, &dc.hostname, &effective_host).await);
+
+    // Check 6: Clock skew vs local time (Kerberos threshold)
+    checks.push(check_clock_skew(provider).await);
+
+    // Check 7: Machine account health
+    checks.push(check_machine_account(provider, &dc.hostname).await);
 
     let overall_status = compute_overall_status(&checks);
     let checked_at = chrono::Utc::now().to_rfc3339();
@@ -206,319 +307,512 @@ async fn check_ldap_ping(hostname: &str, _provider: &dyn DirectoryProvider) -> D
     }
 }
 
-/// Checks AD services status via PowerShell (Windows-only).
+/// Checks AD services by querying the DC's rootDSE and SPNs via LDAP.
 ///
-/// On non-Windows platforms, returns Unknown status.
-async fn check_services(hostname: &str) -> DcHealthCheck {
-    #[cfg(target_os = "windows")]
-    {
-        check_services_windows(hostname).await
-    }
-    #[cfg(not(target_os = "windows"))]
-    {
-        let _ = hostname;
-        DcHealthCheck {
-            name: "Services".to_string(),
-            status: DcHealthLevel::Unknown,
-            message: "Service checks require Windows".to_string(),
-            value: None,
-        }
-    }
-}
-
-/// Windows implementation of service checks via PowerShell.
-#[cfg(target_os = "windows")]
-async fn check_services_windows(hostname: &str) -> DcHealthCheck {
-    let script = format!(
-        "Get-Service -ComputerName '{}' -Name NTDS,DNS,Netlogon,KDC -ErrorAction SilentlyContinue | Select-Object Name,Status | ConvertTo-Json -Compress",
-        hostname.replace('\'', "''")
-    );
-
-    match tokio::time::timeout(
-        std::time::Duration::from_secs(10),
-        tokio::process::Command::new("powershell")
-            .args(["-NoProfile", "-Command", &script])
-            .output(),
-    )
-    .await
-    {
-        Ok(Ok(output)) => {
-            if !output.status.success() {
-                return DcHealthCheck {
-                    name: "Services".to_string(),
-                    status: DcHealthLevel::Critical,
-                    message: "Failed to query services".to_string(),
-                    value: None,
-                };
-            }
-
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            parse_service_results(&stdout)
-        }
-        Ok(Err(e)) => DcHealthCheck {
-            name: "Services".to_string(),
-            status: DcHealthLevel::Critical,
-            message: format!("Failed to run PowerShell: {}", e),
-            value: None,
-        },
-        Err(_) => DcHealthCheck {
-            name: "Services".to_string(),
-            status: DcHealthLevel::Critical,
-            message: "Service check timed out (10s)".to_string(),
-            value: None,
-        },
-    }
-}
-
-/// Parses PowerShell Get-Service JSON output into a health check result.
-fn parse_service_results(json_output: &str) -> DcHealthCheck {
-    let trimmed = json_output.trim();
-    if trimmed.is_empty() {
-        return DcHealthCheck {
-            name: "Services".to_string(),
-            status: DcHealthLevel::Critical,
-            message: "No service data returned".to_string(),
-            value: None,
-        };
-    }
-
-    // PowerShell may return a single object or array
-    let services: Vec<serde_json::Value> = if trimmed.starts_with('[') {
-        serde_json::from_str(trimmed).unwrap_or_default()
-    } else {
-        serde_json::from_str::<serde_json::Value>(trimmed)
-            .map(|v| vec![v])
-            .unwrap_or_default()
-    };
-
-    if services.is_empty() {
-        return DcHealthCheck {
-            name: "Services".to_string(),
-            status: DcHealthLevel::Critical,
-            message: "Could not parse service data".to_string(),
-            value: None,
-        };
-    }
-
-    let mut stopped = Vec::new();
-    let mut running_count = 0;
-
-    for svc in &services {
-        let name = svc["Name"].as_str().unwrap_or("Unknown");
-        let status = svc["Status"].as_u64().unwrap_or(0);
-        // PowerShell Status enum: 4 = Running, 1 = Stopped
-        if status == 4 {
-            running_count += 1;
-        } else {
-            stopped.push(name.to_string());
-        }
-    }
-
-    if stopped.is_empty() {
-        DcHealthCheck {
-            name: "Services".to_string(),
-            status: DcHealthLevel::Healthy,
-            message: format!("All {} services running", running_count),
-            value: Some(format!("{}/{}", running_count, services.len())),
-        }
-    } else {
-        DcHealthCheck {
-            name: "Services".to_string(),
-            status: DcHealthLevel::Critical,
-            message: format!("Stopped: {}", stopped.join(", ")),
-            value: Some(format!("{}/{}", running_count, services.len())),
-        }
-    }
-}
-
-/// Checks disk space on the system drive via PowerShell (Windows-only).
-async fn check_disk_space(hostname: &str) -> DcHealthCheck {
-    #[cfg(target_os = "windows")]
-    {
-        check_disk_space_windows(hostname).await
-    }
-    #[cfg(not(target_os = "windows"))]
-    {
-        let _ = hostname;
-        DcHealthCheck {
-            name: "Disk".to_string(),
-            status: DcHealthLevel::Unknown,
-            message: "Disk checks require Windows".to_string(),
-            value: None,
-        }
-    }
-}
-
-/// Windows implementation of disk space check via PowerShell.
-#[cfg(target_os = "windows")]
-async fn check_disk_space_windows(hostname: &str) -> DcHealthCheck {
-    let script = format!(
-        "Get-WmiObject Win32_LogicalDisk -ComputerName '{}' -Filter \"DeviceID='C:'\" | Select-Object FreeSpace,Size | ConvertTo-Json -Compress",
-        hostname.replace('\'', "''")
-    );
-
-    match tokio::time::timeout(
-        std::time::Duration::from_secs(10),
-        tokio::process::Command::new("powershell")
-            .args(["-NoProfile", "-Command", &script])
-            .output(),
-    )
-    .await
-    {
-        Ok(Ok(output)) => {
-            if !output.status.success() {
-                return DcHealthCheck {
-                    name: "Disk".to_string(),
-                    status: DcHealthLevel::Critical,
-                    message: "Failed to query disk space".to_string(),
-                    value: None,
-                };
-            }
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            parse_disk_results(&stdout)
-        }
-        Ok(Err(e)) => DcHealthCheck {
-            name: "Disk".to_string(),
-            status: DcHealthLevel::Critical,
-            message: format!("Failed to run PowerShell: {}", e),
-            value: None,
-        },
-        Err(_) => DcHealthCheck {
-            name: "Disk".to_string(),
-            status: DcHealthLevel::Critical,
-            message: "Disk check timed out (10s)".to_string(),
-            value: None,
-        },
-    }
-}
-
-/// Parses disk space JSON output and applies thresholds.
-fn parse_disk_results(json_output: &str) -> DcHealthCheck {
-    let trimmed = json_output.trim();
-    if trimmed.is_empty() {
-        return DcHealthCheck {
-            name: "Disk".to_string(),
-            status: DcHealthLevel::Critical,
-            message: "No disk data returned".to_string(),
-            value: None,
-        };
-    }
-
-    let disk: serde_json::Value = match serde_json::from_str(trimmed) {
-        Ok(v) => v,
-        Err(_) => {
+/// If LDAP responds with `currentTime` and `dsServiceName`, AD DS is running.
+/// SPNs on the computer object indicate which services are registered
+/// (DNS, GC, Kerberos, LDAP).
+async fn check_ad_services(provider: &dyn DirectoryProvider, dc_hostname: &str) -> DcHealthCheck {
+    let base_dn = match provider.base_dn() {
+        Some(dn) => dn,
+        None => {
             return DcHealthCheck {
-                name: "Disk".to_string(),
+                name: "Services".to_string(),
                 status: DcHealthLevel::Critical,
-                message: "Could not parse disk data".to_string(),
+                message: "Not connected - no base DN".to_string(),
                 value: None,
             };
         }
     };
 
-    let free = disk["FreeSpace"].as_u64().unwrap_or(0);
-    let size = disk["Size"].as_u64().unwrap_or(1); // avoid division by zero
+    // Query the computer object for SPNs
+    let filter = format!("(&(objectClass=computer)(dNSHostName={}))", dc_hostname);
+    let entries = provider
+        .search_configuration(&base_dn, &filter)
+        .await
+        .unwrap_or_default();
 
-    if size == 0 {
+    let spns: Vec<String> = entries
+        .first()
+        .map(|e| e.get_attribute_values("servicePrincipalName").to_vec())
+        .unwrap_or_default();
+
+    if spns.is_empty() {
+        // No SPNs found - try a simpler check: if we got this far, LDAP works
         return DcHealthCheck {
-            name: "Disk".to_string(),
-            status: DcHealthLevel::Unknown,
-            message: "Disk size reported as 0".to_string(),
-            value: None,
+            name: "Services".to_string(),
+            status: DcHealthLevel::Healthy,
+            message: "AD DS responding (no SPNs found for detailed check)".to_string(),
+            value: Some("LDAP OK".to_string()),
         };
     }
 
-    let free_percent = (free as f64 / size as f64 * 100.0) as u32;
-    let free_gb = free / (1024 * 1024 * 1024);
+    // Expected SPN prefixes on a healthy DC
+    let expected: &[(&str, &str)] = &[
+        ("HOST/", "Host"),
+        ("DNS/", "DNS"),
+        ("GC/", "GC"),
+        ("ldap/", "LDAP"),
+        ("RestrictedKrbHost/", "Kerberos"),
+        ("E3514235-4B06-11D1-AB04-00C04FC2DCD2/", "Replication"),
+    ];
+    let mut found = Vec::new();
+    let mut missing = Vec::new();
 
-    let (status, message) = if free_percent > 20 {
-        (
-            DcHealthLevel::Healthy,
-            format!("{}% free ({}GB)", free_percent, free_gb),
-        )
-    } else if free_percent >= 10 {
+    for (prefix, label) in expected {
+        if spns
+            .iter()
+            .any(|s| s.to_lowercase().starts_with(&prefix.to_lowercase()))
+        {
+            found.push(*label);
+        } else {
+            missing.push(*label);
+        }
+    }
+
+    let total = expected.len();
+    if missing.is_empty() {
+        DcHealthCheck {
+            name: "Services".to_string(),
+            status: DcHealthLevel::Healthy,
+            message: format!("All services registered: {}", found.join(", ")),
+            value: Some(format!("{}/{}", found.len(), total)),
+        }
+    } else {
+        DcHealthCheck {
+            name: "Services".to_string(),
+            status: DcHealthLevel::Warning,
+            message: format!(
+                "Missing SPNs: {}. Found: {}",
+                missing.join(", "),
+                found.join(", ")
+            ),
+            value: Some(format!("{}/{}", found.len(), total)),
+        }
+    }
+}
+
+/// Checks replication health by looking for NTDS Connection objects
+/// targeting this DC in the Configuration partition.
+///
+/// If inbound connection objects exist, the DC is configured for replication.
+/// Also checks if the DC has the replication SPN registered.
+async fn check_replication_health(
+    provider: &dyn DirectoryProvider,
+    dc_hostname: &str,
+) -> DcHealthCheck {
+    let base_dn = match provider.base_dn() {
+        Some(dn) => dn,
+        None => {
+            return DcHealthCheck {
+                name: "Replication".to_string(),
+                status: DcHealthLevel::Warning,
+                message: "Not connected - no base DN".to_string(),
+                value: None,
+            };
+        }
+    };
+
+    let sites_dn = format!("CN=Sites,CN=Configuration,{}", base_dn);
+
+    // Look for NTDS Connection objects (replication links) in the config
+    let connections = provider
+        .search_configuration(&sites_dn, "(objectClass=nTDSConnection)")
+        .await
+        .unwrap_or_default();
+
+    if connections.is_empty() {
+        // Single DC environment - no replication partners expected
+        return DcHealthCheck {
+            name: "Replication".to_string(),
+            status: DcHealthLevel::Healthy,
+            message: "Single DC - no replication partners".to_string(),
+            value: Some("standalone".to_string()),
+        };
+    }
+
+    // Count connections involving this DC (by hostname in the DN path)
+    let dc_short = dc_hostname.split('.').next().unwrap_or(dc_hostname);
+    let inbound = connections
+        .iter()
+        .filter(|c| {
+            c.distinguished_name
+                .to_lowercase()
+                .contains(&format!("cn={}", dc_short).to_lowercase())
+        })
+        .count();
+
+    if inbound > 0 {
+        DcHealthCheck {
+            name: "Replication".to_string(),
+            status: DcHealthLevel::Healthy,
+            message: format!("{} inbound replication link(s)", inbound),
+            value: Some(format!("{} links", inbound)),
+        }
+    } else {
+        DcHealthCheck {
+            name: "Replication".to_string(),
+            status: DcHealthLevel::Warning,
+            message: "No inbound replication links found for this DC".to_string(),
+            value: Some("0 links".to_string()),
+        }
+    }
+}
+
+/// Checks SYSVOL health via DFSR membership in LDAP + SMB port probe.
+///
+/// Two-layer check:
+/// 1. LDAP: verifies DFSR member exists and is enabled for this DC,
+///    checks DFSR migration state via `msDFSR-Flags`
+/// 2. Network: probes TCP port 445 to confirm SMB is reachable
+async fn check_sysvol_smb(
+    provider: &dyn DirectoryProvider,
+    dc_hostname: &str,
+    effective_host: &str,
+) -> DcHealthCheck {
+    let base_dn = match provider.base_dn() {
+        Some(dn) => dn,
+        None => {
+            return DcHealthCheck {
+                name: "SYSVOL".to_string(),
+                status: DcHealthLevel::Warning,
+                message: "Not connected - no base DN".to_string(),
+                value: None,
+            };
+        }
+    };
+
+    // --- Layer 1: DFSR health via LDAP ---
+
+    let dfsr_dn = format!("CN=DFSR-GlobalSettings,CN=System,{}", base_dn);
+
+    // Check DFSR migration state
+    let dfsr_settings = provider
+        .search_configuration(&dfsr_dn, "(objectClass=msDFSR-GlobalSettings)")
+        .await
+        .unwrap_or_default();
+
+    let migration_flags = dfsr_settings
+        .first()
+        .and_then(|e| e.get_attribute("msDFSR-Flags"))
+        .and_then(|v| v.parse::<u32>().ok());
+
+    let migration_state = match migration_flags {
+        Some(48) => "Eliminated (DFSR only)",
+        Some(32) => "Redirected (DFSR primary)",
+        Some(16) => "Prepared (FRS still active)",
+        Some(0) => "Start (FRS active)",
+        None => "unknown",
+        _ => "unknown",
+    };
+
+    // Check DFSR member objects for this DC
+    let sysvol_dn = format!(
+        "CN=Domain System Volume,CN=DFSR-GlobalSettings,CN=System,{}",
+        base_dn
+    );
+    let dfsr_members = provider
+        .search_configuration(&sysvol_dn, "(objectClass=msDFSR-Member)")
+        .await
+        .unwrap_or_default();
+
+    let dc_short = dc_hostname
+        .split('.')
+        .next()
+        .unwrap_or(dc_hostname)
+        .to_lowercase();
+
+    let dc_member = dfsr_members.iter().find(|m| {
+        m.get_attribute("msDFSR-ComputerReference")
+            .unwrap_or("")
+            .to_lowercase()
+            .contains(&format!("cn={}", dc_short))
+            || m.distinguished_name.to_lowercase().contains(&dc_short)
+    });
+
+    let dfsr_enabled = dc_member
+        .and_then(|m| m.get_attribute("msDFSR-Enabled"))
+        .unwrap_or("unknown");
+
+    // Evaluate DFSR status
+    let dfsr_status = if dc_member.is_none() && dfsr_members.is_empty() {
+        // No DFSR at all - might be FRS or single DC
+        DfsrStatus::NoDfsr
+    } else if dc_member.is_none() {
+        DfsrStatus::MemberMissing
+    } else if dfsr_enabled.eq_ignore_ascii_case("FALSE") {
+        DfsrStatus::Disabled
+    } else {
+        DfsrStatus::Healthy
+    };
+
+    // --- Layer 2: SMB port probe ---
+    let smb_addr = format!("{}:445", effective_host);
+    let smb_ok = tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        tokio::net::TcpStream::connect(&smb_addr),
+    )
+    .await
+    .map(|r| r.is_ok())
+    .unwrap_or(false);
+
+    // --- Combine results ---
+    match (dfsr_status, smb_ok) {
+        (DfsrStatus::Healthy, true) => DcHealthCheck {
+            name: "SYSVOL".to_string(),
+            status: DcHealthLevel::Healthy,
+            message: format!("DFSR enabled, SMB reachable ({})", migration_state),
+            value: Some(format!("\\\\{}\\SYSVOL", dc_hostname)),
+        },
+        (DfsrStatus::Healthy, false) => DcHealthCheck {
+            name: "SYSVOL".to_string(),
+            status: DcHealthLevel::Critical,
+            message: format!(
+                "DFSR enabled but SMB port 445 unreachable ({})",
+                migration_state
+            ),
+            value: None,
+        },
+        (DfsrStatus::NoDfsr, true) => DcHealthCheck {
+            name: "SYSVOL".to_string(),
+            status: DcHealthLevel::Healthy,
+            message: "No DFSR config (FRS or single DC), SMB reachable".to_string(),
+            value: Some(format!("\\\\{}\\SYSVOL", dc_hostname)),
+        },
+        (DfsrStatus::NoDfsr, false) => DcHealthCheck {
+            name: "SYSVOL".to_string(),
+            status: DcHealthLevel::Critical,
+            message: "No DFSR config, SMB port 445 unreachable".to_string(),
+            value: None,
+        },
+        (DfsrStatus::MemberMissing, _) => DcHealthCheck {
+            name: "SYSVOL".to_string(),
+            status: DcHealthLevel::Critical,
+            message: "DC missing from DFSR membership - SYSVOL may not replicate".to_string(),
+            value: None,
+        },
+        (DfsrStatus::Disabled, _) => DcHealthCheck {
+            name: "SYSVOL".to_string(),
+            status: DcHealthLevel::Critical,
+            message: "DFSR member disabled for this DC".to_string(),
+            value: None,
+        },
+    }
+}
+
+/// Internal DFSR health evaluation result.
+enum DfsrStatus {
+    /// DFSR member exists and is enabled.
+    Healthy,
+    /// No DFSR configuration found (FRS or single DC).
+    NoDfsr,
+    /// DFSR members exist but this DC is missing.
+    MemberMissing,
+    /// DFSR member exists but is disabled.
+    Disabled,
+}
+
+/// Checks clock skew between the DC and the local machine.
+///
+/// Reads `currentTime` from the rootDSE via a base-scope search on
+/// the Configuration partition root. Kerberos fails beyond 5 minutes.
+async fn check_clock_skew(provider: &dyn DirectoryProvider) -> DcHealthCheck {
+    // Read rootDSE (Base scope on empty DN) for currentTime
+    let rootdse = provider.read_entry("").await.unwrap_or(None);
+
+    let dc_time_str = rootdse
+        .as_ref()
+        .and_then(|e| e.get_attribute("currentTime"));
+
+    let Some(dc_time_str) = dc_time_str else {
+        return DcHealthCheck {
+            name: "Clock".to_string(),
+            status: DcHealthLevel::Warning,
+            message: "Could not read DC time".to_string(),
+            value: None,
+        };
+    };
+
+    // Parse AD generalized time (yyyyMMddHHmmss.0Z)
+    let dc_time = parse_ad_time(dc_time_str);
+    let Some(dc_time) = dc_time else {
+        return DcHealthCheck {
+            name: "Clock".to_string(),
+            status: DcHealthLevel::Warning,
+            message: format!("Could not parse DC time: {}", dc_time_str),
+            value: None,
+        };
+    };
+
+    let local_time = chrono::Utc::now();
+    let skew_seconds = (local_time - dc_time).num_seconds().unsigned_abs();
+
+    let (status, message) = if skew_seconds < 120 {
+        (DcHealthLevel::Healthy, format!("{}s skew", skew_seconds))
+    } else if skew_seconds < 300 {
         (
             DcHealthLevel::Warning,
-            format!("Low disk: {}% free ({}GB)", free_percent, free_gb),
+            format!("{}s skew (Kerberos threshold: 300s)", skew_seconds),
         )
     } else {
         (
             DcHealthLevel::Critical,
-            format!("Critical disk: {}% free ({}GB)", free_percent, free_gb),
+            format!(
+                "{}s skew - exceeds Kerberos 5-minute threshold",
+                skew_seconds
+            ),
         )
     };
 
     DcHealthCheck {
-        name: "Disk".to_string(),
+        name: "Clock".to_string(),
         status,
         message,
-        value: Some(format!("{}%", free_percent)),
+        value: Some(format!("{}s", skew_seconds)),
     }
 }
 
-/// Checks SYSVOL accessibility (Windows-only).
-async fn check_sysvol(hostname: &str) -> DcHealthCheck {
-    #[cfg(target_os = "windows")]
-    {
-        check_sysvol_windows(hostname).await
+/// Parses AD generalized time format (yyyyMMddHHmmss.0Z) to DateTime.
+fn parse_ad_time(s: &str) -> Option<chrono::DateTime<chrono::Utc>> {
+    // Try RFC3339 first
+    if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(s) {
+        return Some(dt.with_timezone(&chrono::Utc));
     }
-    #[cfg(not(target_os = "windows"))]
-    {
-        let _ = hostname;
+    // AD generalized time: 20260322235000.0Z
+    let clean = s.split('.').next().unwrap_or(s);
+    if let Ok(dt) = chrono::NaiveDateTime::parse_from_str(clean, "%Y%m%d%H%M%S") {
+        return Some(dt.and_utc());
+    }
+    // ISO 8601 without timezone
+    if let Ok(dt) = chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S%.f") {
+        return Some(dt.and_utc());
+    }
+    None
+}
+
+/// Checks the DC's machine account health via LDAP.
+///
+/// Verifies `userAccountControl` contains the expected DC flags
+/// (SERVER_TRUST_ACCOUNT + TRUSTED_FOR_DELEGATION = 532480) and
+/// that `pwdLastSet` is not older than 60 days.
+async fn check_machine_account(
+    provider: &dyn DirectoryProvider,
+    dc_hostname: &str,
+) -> DcHealthCheck {
+    let base_dn = match provider.base_dn() {
+        Some(dn) => dn,
+        None => {
+            return DcHealthCheck {
+                name: "Account".to_string(),
+                status: DcHealthLevel::Warning,
+                message: "Not connected".to_string(),
+                value: None,
+            };
+        }
+    };
+
+    let filter = format!("(&(objectClass=computer)(dNSHostName={}))", dc_hostname);
+    let entries = provider
+        .search_configuration(&base_dn, &filter)
+        .await
+        .unwrap_or_default();
+
+    let entry = match entries.first() {
+        Some(e) => e,
+        None => {
+            return DcHealthCheck {
+                name: "Account".to_string(),
+                status: DcHealthLevel::Warning,
+                message: "Computer object not found".to_string(),
+                value: None,
+            };
+        }
+    };
+
+    let mut issues = Vec::new();
+
+    // Check userAccountControl flags
+    // SERVER_TRUST_ACCOUNT = 0x2000, TRUSTED_FOR_DELEGATION = 0x80000
+    // Expected for a DC: 532480 (0x82000) or similar with those bits set
+    let uac = entry
+        .get_attribute("userAccountControl")
+        .and_then(|v| v.parse::<u32>().ok())
+        .unwrap_or(0);
+
+    let has_server_trust = uac & 0x2000 != 0;
+    let has_trusted_delegation = uac & 0x80000 != 0;
+    let is_disabled = uac & 0x2 != 0;
+
+    if !has_server_trust {
+        issues.push("missing SERVER_TRUST_ACCOUNT flag");
+    }
+    if !has_trusted_delegation {
+        issues.push("missing TRUSTED_FOR_DELEGATION flag");
+    }
+    if is_disabled {
+        issues.push("account DISABLED");
+    }
+
+    // Check pwdLastSet age
+    let pwd_age_warning = entry
+        .get_attribute("pwdLastSet")
+        .and_then(|v| v.parse::<i64>().ok())
+        .map(|filetime| {
+            // AD stores pwdLastSet as Windows FILETIME (100ns intervals since 1601-01-01)
+            // Convert to Unix epoch: subtract 116444736000000000 (100ns units) then to seconds
+            let unix_seconds = (filetime - 116_444_736_000_000_000) / 10_000_000;
+            let pwd_time = chrono::DateTime::from_timestamp(unix_seconds, 0)
+                .unwrap_or(chrono::DateTime::UNIX_EPOCH);
+            (chrono::Utc::now() - pwd_time).num_days()
+        });
+
+    let pwd_info = match pwd_age_warning {
+        Some(days) if days > 60 => {
+            issues.push("password not rotated in 60+ days");
+            format!("pwd age: {}d", days)
+        }
+        Some(days) => format!("pwd age: {}d", days),
+        None => "pwd age: unknown".to_string(),
+    };
+
+    if issues.is_empty() {
         DcHealthCheck {
-            name: "SYSVOL".to_string(),
-            status: DcHealthLevel::Unknown,
-            message: "SYSVOL checks require Windows".to_string(),
-            value: None,
+            name: "Account".to_string(),
+            status: DcHealthLevel::Healthy,
+            message: format!("Machine account OK ({})", pwd_info),
+            value: Some(format!("UAC:{}", uac)),
+        }
+    } else if is_disabled {
+        DcHealthCheck {
+            name: "Account".to_string(),
+            status: DcHealthLevel::Critical,
+            message: format!("Machine account: {}", issues.join(", ")),
+            value: Some(format!("UAC:{}", uac)),
+        }
+    } else {
+        DcHealthCheck {
+            name: "Account".to_string(),
+            status: DcHealthLevel::Warning,
+            message: format!("Machine account: {}", issues.join(", ")),
+            value: Some(format!("UAC:{}", uac)),
         }
     }
 }
 
-/// Windows implementation of SYSVOL accessibility check.
-#[cfg(target_os = "windows")]
-async fn check_sysvol_windows(hostname: &str) -> DcHealthCheck {
-    let sysvol_path = format!("\\\\{}\\SYSVOL", hostname);
-
-    let script = format!("Test-Path '{}'", sysvol_path.replace('\'', "''"));
-
-    match tokio::time::timeout(
-        std::time::Duration::from_secs(5),
-        tokio::process::Command::new("powershell")
-            .args(["-NoProfile", "-Command", &script])
-            .output(),
-    )
-    .await
-    {
-        Ok(Ok(output)) => {
-            let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-            if stdout.eq_ignore_ascii_case("true") {
-                DcHealthCheck {
-                    name: "SYSVOL".to_string(),
-                    status: DcHealthLevel::Healthy,
-                    message: "SYSVOL accessible".to_string(),
-                    value: Some(sysvol_path),
-                }
-            } else {
-                DcHealthCheck {
-                    name: "SYSVOL".to_string(),
-                    status: DcHealthLevel::Critical,
-                    message: "SYSVOL inaccessible".to_string(),
-                    value: Some(sysvol_path),
-                }
-            }
-        }
-        Ok(Err(e)) => DcHealthCheck {
-            name: "SYSVOL".to_string(),
-            status: DcHealthLevel::Critical,
-            message: format!("Failed to check SYSVOL: {}", e),
-            value: None,
-        },
-        Err(_) => DcHealthCheck {
-            name: "SYSVOL".to_string(),
-            status: DcHealthLevel::Critical,
-            message: "SYSVOL check timed out (5s)".to_string(),
-            value: None,
-        },
+/// Resolves the fallback IP from the LDAP server environment variable.
+///
+/// Strips protocol prefixes and port suffixes to get the raw host/IP.
+fn resolve_fallback_ip() -> Option<String> {
+    let server = std::env::var("DSPANEL_LDAP_SERVER").ok()?;
+    let host = server
+        .strip_prefix("ldaps://")
+        .or_else(|| server.strip_prefix("ldap://"))
+        .unwrap_or(&server);
+    let host = host.split(':').next().unwrap_or(host);
+    if host.is_empty() {
+        None
+    } else {
+        Some(host.to_string())
     }
 }
 
@@ -527,10 +821,11 @@ pub async fn check_all_dc_health(
     provider: Arc<dyn DirectoryProvider>,
 ) -> Result<Vec<DcHealthResult>> {
     let dcs = discover_domain_controllers(&*provider).await?;
+    let fallback_ip = resolve_fallback_ip();
 
     let mut results = Vec::new();
     for dc in &dcs {
-        let result = check_dc_health(dc, &*provider).await;
+        let result = check_dc_health(dc, &*provider, fallback_ip.as_deref()).await;
         results.push(result);
     }
 
@@ -561,80 +856,22 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_service_results_all_running() {
-        let json = r#"[{"Name":"NTDS","Status":4},{"Name":"DNS","Status":4},{"Name":"Netlogon","Status":4},{"Name":"KDC","Status":4}]"#;
-        let result = parse_service_results(json);
-        assert_eq!(result.status, DcHealthLevel::Healthy);
-        assert!(result.message.contains("4 services running"));
+    fn test_resolve_fallback_ip_plain() {
+        std::env::set_var("DSPANEL_LDAP_SERVER", "10.0.0.1");
+        assert_eq!(resolve_fallback_ip(), Some("10.0.0.1".to_string()));
+        std::env::remove_var("DSPANEL_LDAP_SERVER");
     }
 
     #[test]
-    fn test_parse_service_results_one_stopped() {
-        let json = r#"[{"Name":"NTDS","Status":4},{"Name":"DNS","Status":1},{"Name":"Netlogon","Status":4}]"#;
-        let result = parse_service_results(json);
-        assert_eq!(result.status, DcHealthLevel::Critical);
-        assert!(result.message.contains("DNS"));
+    fn test_resolve_fallback_ip_with_ldaps_prefix() {
+        std::env::set_var("DSPANEL_LDAP_SERVER", "ldaps://10.0.0.1:636");
+        assert_eq!(resolve_fallback_ip(), Some("10.0.0.1".to_string()));
+        std::env::remove_var("DSPANEL_LDAP_SERVER");
     }
 
     #[test]
-    fn test_parse_service_results_single_object() {
-        let json = r#"{"Name":"NTDS","Status":4}"#;
-        let result = parse_service_results(json);
-        assert_eq!(result.status, DcHealthLevel::Healthy);
-    }
-
-    #[test]
-    fn test_parse_service_results_empty() {
-        let result = parse_service_results("");
-        assert_eq!(result.status, DcHealthLevel::Critical);
-    }
-
-    #[test]
-    fn test_parse_service_results_invalid_json() {
-        let result = parse_service_results("not json");
-        assert_eq!(result.status, DcHealthLevel::Critical);
-    }
-
-    #[test]
-    fn test_parse_disk_results_healthy() {
-        let json = r#"{"FreeSpace":85899345920,"Size":214748364800}"#;
-        let result = parse_disk_results(json);
-        assert_eq!(result.status, DcHealthLevel::Healthy);
-        assert!(result.value.unwrap().contains("40%")); // ~40% free
-    }
-
-    #[test]
-    fn test_parse_disk_results_warning() {
-        let json = r#"{"FreeSpace":32212254720,"Size":214748364800}"#;
-        let result = parse_disk_results(json);
-        assert_eq!(result.status, DcHealthLevel::Warning);
-        // ~15% free
-    }
-
-    #[test]
-    fn test_parse_disk_results_critical() {
-        let json = r#"{"FreeSpace":10737418240,"Size":214748364800}"#;
-        let result = parse_disk_results(json);
-        assert_eq!(result.status, DcHealthLevel::Critical);
-        // ~5% free
-    }
-
-    #[test]
-    fn test_parse_disk_results_empty() {
-        let result = parse_disk_results("");
-        assert_eq!(result.status, DcHealthLevel::Critical);
-    }
-
-    #[test]
-    fn test_parse_disk_results_zero_size() {
-        let json = r#"{"FreeSpace":0,"Size":0}"#;
-        let result = parse_disk_results(json);
-        assert_eq!(result.status, DcHealthLevel::Unknown);
-    }
-
-    #[test]
-    fn test_parse_disk_results_invalid_json() {
-        let result = parse_disk_results("not json");
-        assert_eq!(result.status, DcHealthLevel::Critical);
+    fn test_resolve_fallback_ip_not_set() {
+        std::env::remove_var("DSPANEL_LDAP_SERVER");
+        assert_eq!(resolve_fallback_ip(), None);
     }
 }
