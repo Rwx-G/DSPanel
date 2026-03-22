@@ -166,7 +166,7 @@ user's domain. For environments requiring explicit credentials or custom servers
 | `DSPANEL_LDAP_USE_TLS` | Enable LDAPS (implicit TLS on port 636). Set to `true` or `1`. | `false` |
 | `DSPANEL_LDAP_STARTTLS` | Enable StartTLS (upgrade plaintext on port 389). Set to `true` or `1`. Mutually exclusive with LDAPS - if both set, LDAPS wins. | `false` |
 | `DSPANEL_LDAP_CA_CERT` | Path to a custom CA certificate file (PEM or DER). Added as trusted root alongside the system store. | System store only |
-| `DSPANEL_LDAP_TLS_SKIP_VERIFY` | Skip TLS certificate verification (lab/self-signed certs). Set to `true` or `1`. | `false` |
+| `DSPANEL_LDAP_TLS_SKIP_VERIFY` | **Development only.** Skip TLS certificate verification. Disables hostname and chain validation, making the connection vulnerable to MITM attacks. Never use in production - use `DSPANEL_LDAP_CA_CERT` instead. | `false` |
 
 All three credential variables (`SERVER`, `BIND_DN`, `BIND_PASSWORD`) must be set
 together. If only some are set, DSPanel falls back to GSSAPI with a warning.
@@ -189,7 +189,7 @@ DSPANEL_LDAP_STARTTLS=true
 # Internal PKI with custom CA certificate
 DSPANEL_LDAP_CA_CERT=/etc/ssl/certs/corp-ca.pem
 
-# Lab with self-signed certificate (skip all verification)
+# Lab/dev only - skip TLS verification (INSECURE, vulnerable to MITM)
 DSPANEL_LDAP_TLS_SKIP_VERIFY=true
 ```
 
