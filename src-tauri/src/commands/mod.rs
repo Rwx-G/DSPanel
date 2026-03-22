@@ -2980,6 +2980,9 @@ pub(crate) async fn get_thumbnail_photo_inner(
 
 /// Sets the thumbnailPhoto attribute from base64-encoded JPEG bytes.
 /// Requires AccountOperator+.
+/// Maximum thumbnail photo size in bytes (100 KB - AD limit).
+const MAX_THUMBNAIL_PHOTO_BYTES: usize = 102_400;
+
 pub(crate) async fn set_thumbnail_photo_inner(
     state: &AppState,
     user_dn: &str,
@@ -2992,6 +2995,16 @@ pub(crate) async fn set_thumbnail_photo_inner(
         return Err(AppError::PermissionDenied(
             "Setting thumbnail photo requires AccountOperator permission or higher".to_string(),
         ));
+    }
+
+    // Validate decoded size before sending to LDAP
+    let decoded_size = photo_base64.len() * 3 / 4;
+    if decoded_size > MAX_THUMBNAIL_PHOTO_BYTES {
+        return Err(AppError::Validation(format!(
+            "Photo exceeds maximum size of {}KB (got ~{}KB)",
+            MAX_THUMBNAIL_PHOTO_BYTES / 1024,
+            decoded_size / 1024
+        )));
     }
 
     capture_snapshot(state, user_dn, "SetThumbnailPhoto").await;
