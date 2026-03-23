@@ -166,10 +166,10 @@ export function ReplicationStatus() {
         targetDc: p.targetDc,
         namingContext: p.namingContext,
       });
-      notify("success", result);
+      notify(result, "success");
       fetchPartnerships();
     } catch (e: unknown) {
-      notify("error", extractErrorMessage(e));
+      notify(extractErrorMessage(e), "error");
     } finally {
       setForcingReplication(null);
     }
