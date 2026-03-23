@@ -66,21 +66,24 @@ function ScoreGauge({ score, zone }: { score: number; zone: RiskZone }) {
     { start: 0.7, end: 1, color: "var(--color-success)" },
   ];
 
-  // Convert fraction (0-1) to a point on the semi-circle arc
+  // Convert fraction (0-1) to a point on the semi-circle arc.
+  // frac=0 (score 0) maps to the LEFT (angle PI = 180 degrees).
+  // frac=1 (score 100) maps to the RIGHT (angle 0 degrees).
   function fractionToPoint(frac: number): { x: number; y: number } {
-    const angle = Math.PI * (1 - frac); // 180 to 0 degrees
+    const angle = Math.PI * (1 - frac);
     return {
       x: cx + radius * Math.cos(angle),
       y: cy - radius * Math.sin(angle),
     };
   }
 
-  // Generate arc path for a fraction range
+  // Generate arc path for a fraction range.
+  // SVG arc sweep-flag=1 draws clockwise (left to right on upper half).
   function arcPath(startFrac: number, endFrac: number): string {
     const start = fractionToPoint(startFrac);
     const end = fractionToPoint(endFrac);
     const largeArc = endFrac - startFrac > 0.5 ? 1 : 0;
-    return `M ${start.x} ${start.y} A ${radius} ${radius} 0 ${largeArc} 0 ${end.x} ${end.y}`;
+    return `M ${start.x} ${start.y} A ${radius} ${radius} 0 ${largeArc} 1 ${end.x} ${end.y}`;
   }
 
   // Needle position
@@ -147,7 +150,7 @@ function ScoreGauge({ score, zone }: { score: number; zone: RiskZone }) {
           style={{ color: zoneColor(zone) }}
           data-testid="risk-score-value"
         >
-          {score}
+          {Math.round(score)}
         </span>
         <span
           className="text-body font-semibold mt-1 flex items-center gap-1"
@@ -199,7 +202,7 @@ function FactorCard({ factor }: { factor: RiskFactor }) {
           {factor.name}
         </span>
         <div className="flex items-center gap-2 text-[11px] text-[var(--color-text-secondary)]">
-          <span>Score: {factor.score}</span>
+          <span>Score: {Math.round(factor.score)}</span>
           <span>Weight: {factor.weight}%</span>
         </div>
       </div>
@@ -256,7 +259,7 @@ function TrendSparkline({ history }: { history: RiskScoreHistory[] }) {
               key={i}
               className="flex-1 rounded-t-sm transition-all"
               style={{ height, backgroundColor: color, minWidth: 4 }}
-              title={`${entry.date}: ${entry.totalScore}`}
+              title={`${entry.date}: ${Math.round(entry.totalScore)}`}
               data-testid="trend-bar"
             />
           );
@@ -312,7 +315,7 @@ export function RiskScoreDashboard() {
               data-testid="toolbar-zone"
             >
               <ZoneIcon zone={result.zone} size={14} />
-              {result.totalScore}/100 - {zoneLabel(result.zone)}
+              {Math.round(result.totalScore)}/100 - {zoneLabel(result.zone)}
             </span>
           )}
           <button
@@ -360,7 +363,20 @@ export function RiskScoreDashboard() {
               {/* Gauge */}
               <div className="flex flex-col items-center justify-center rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-6">
                 <ScoreGauge score={result.totalScore} zone={result.zone} />
-                <span className="mt-3 text-[11px] text-[var(--color-text-secondary)]">
+                {result.worstFactorScore < 70 && (
+                  <div
+                    className="mt-3 flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-medium"
+                    style={{
+                      color: result.worstFactorScore <= 40 ? "var(--color-error)" : "var(--color-warning)",
+                      backgroundColor: result.worstFactorScore <= 40 ? "var(--color-error-bg)" : "var(--color-warning-bg)",
+                    }}
+                    data-testid="worst-factor-badge"
+                  >
+                    <AlertTriangle size={12} />
+                    Weakest: {result.worstFactorName} ({Math.round(result.worstFactorScore)}/100)
+                  </div>
+                )}
+                <span className="mt-2 text-[11px] text-[var(--color-text-secondary)]">
                   Computed at {new Date(result.computedAt).toLocaleString()}
                 </span>
               </div>

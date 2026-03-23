@@ -650,7 +650,10 @@ pub async fn compute_risk_score(
 ) -> Result<RiskScoreResult> {
     let mut factors = Vec::new();
 
-    // Factor 1: Privileged Account Hygiene
+    // Collect domain findings once for reuse across factors
+    let domain_findings = get_domain_security_findings(provider.clone()).await;
+
+    // Factor 1: Privileged Account Hygiene (enriched with kerberoastable, protected users)
     let priv_score = compute_privileged_hygiene_factor(provider.clone()).await;
     factors.push(RiskFactor {
         id: "privileged_hygiene".to_string(),
@@ -683,7 +686,18 @@ pub async fn compute_risk_score(
         recommendations: stale_score.2,
     });
 
-    // Factor 4: Dangerous Configurations
+    // Factor 4: Kerberos Security (NEW - uses domain findings)
+    let kerb_score = compute_kerberos_security_factor(provider.clone(), &domain_findings).await;
+    factors.push(RiskFactor {
+        id: "kerberos_security".to_string(),
+        name: "Kerberos Security".to_string(),
+        score: kerb_score.0,
+        weight: weights.kerberos_security,
+        explanation: kerb_score.1,
+        recommendations: kerb_score.2,
+    });
+
+    // Factor 5: Dangerous Configurations
     let danger_score = compute_dangerous_configs_factor(provider.clone()).await;
     factors.push(RiskFactor {
         id: "dangerous_configs".to_string(),
@@ -692,6 +706,17 @@ pub async fn compute_risk_score(
         weight: weights.dangerous_configs,
         explanation: danger_score.1,
         recommendations: danger_score.2,
+    });
+
+    // Factor 6: Infrastructure Hardening (NEW - uses domain findings)
+    let infra_score = compute_infrastructure_hardening_factor(&domain_findings);
+    factors.push(RiskFactor {
+        id: "infrastructure_hardening".to_string(),
+        name: "Infrastructure Hardening".to_string(),
+        score: infra_score.0,
+        weight: weights.infrastructure_hardening,
+        explanation: infra_score.1,
+        recommendations: infra_score.2,
     });
 
     // Compute weighted total
@@ -706,6 +731,14 @@ pub async fn compute_risk_score(
         0.0
     };
 
+    // Worst factor (PingCastle-style "weakest link" indicator)
+    let worst = factors
+        .iter()
+        .min_by(|a, b| a.score.partial_cmp(&b.score).unwrap_or(std::cmp::Ordering::Equal));
+    let (worst_factor_name, worst_factor_score) = worst
+        .map(|f| (f.name.clone(), f.score))
+        .unwrap_or_else(|| ("None".to_string(), 100.0));
+
     let zone = match total_score as u32 {
         0..=40 => RiskZone::Red,
         41..=70 => RiskZone::Orange,
@@ -715,6 +748,8 @@ pub async fn compute_risk_score(
     Ok(RiskScoreResult {
         total_score,
         zone,
+        worst_factor_name,
+        worst_factor_score,
         factors,
         computed_at: Utc::now().to_rfc3339(),
     })
@@ -747,7 +782,7 @@ async fn compute_privileged_hygiene_factor(
 
             (
                 score,
-                format!("{}/{} privileged accounts have no alerts", total as usize - with_alerts as usize, total as usize),
+                format!("{}/{} privileged accounts have security alerts", with_alerts as usize, total as usize),
                 recommendations,
             )
         }
@@ -986,6 +1021,145 @@ async fn compute_dangerous_configs_factor(
         Ok(_) => (100.0, "No user accounts found to assess".to_string(), vec![]),
         Err(_) => (50.0, "Could not retrieve user accounts for configuration audit".to_string(), vec![]),
     }
+}
+
+/// Scores Kerberos security posture (0-100).
+///
+/// Evaluates: KRBTGT password age, Kerberoastable privileged accounts,
+/// AS-REP Roastable accounts, Protected Users group adoption.
+async fn compute_kerberos_security_factor(
+    provider: Arc<dyn DirectoryProvider>,
+    domain_findings: &DomainSecurityFindings,
+) -> (f64, String, Vec<String>) {
+    let mut score = 100.0_f64;
+    let mut issues = Vec::new();
+    let mut recommendations = Vec::new();
+
+    // KRBTGT password age (from domain findings)
+    if let Some(age) = domain_findings.krbtgt_password_age_days {
+        if age > KRBTGT_PASSWORD_AGE_THRESHOLD_DAYS {
+            score -= 30.0;
+            issues.push(format!("KRBTGT password {} days old", age));
+            recommendations.push("Reset KRBTGT password twice with 12-hour interval".to_string());
+        } else if age > 90 {
+            score -= 10.0;
+            issues.push(format!("KRBTGT password {} days old (consider resetting)", age));
+        }
+    }
+
+    // Check privileged accounts for Kerberos weaknesses
+    let report = get_privileged_accounts_report(provider, &[]).await;
+    if let Ok(report) = report {
+        let total = report.accounts.len().max(1) as f64;
+
+        // Kerberoastable privileged accounts (proportional)
+        let kerberoastable = report.accounts.iter().filter(|a| a.kerberoastable).count();
+        if kerberoastable > 0 {
+            let penalty = (kerberoastable as f64 / total * 30.0).min(25.0);
+            score -= penalty;
+            issues.push(format!("{}/{} privileged accounts Kerberoastable", kerberoastable, total as usize));
+            recommendations.push("Remove SPNs from privileged user accounts or use gMSA".to_string());
+        }
+
+        // AS-REP Roastable (proportional)
+        let asrep = report.accounts.iter().filter(|a| a.asrep_roastable).count();
+        if asrep > 0 {
+            let penalty = (asrep as f64 / total * 30.0).min(25.0);
+            score -= penalty;
+            issues.push(format!("{} AS-REP Roastable account(s)", asrep));
+            recommendations.push("Enable Kerberos pre-authentication on all accounts".to_string());
+        }
+
+        // Protected Users adoption (proportional)
+        let enabled_accounts: Vec<_> = report.accounts.iter().filter(|a| a.enabled).collect();
+        let not_protected = enabled_accounts.iter().filter(|a| !a.in_protected_users).count();
+        if !enabled_accounts.is_empty() && not_protected > 0 {
+            let ratio = not_protected as f64 / enabled_accounts.len() as f64;
+            let penalty = (ratio * 20.0).min(20.0);
+            score -= penalty;
+            issues.push(format!("{}/{} enabled admins not in Protected Users", not_protected, enabled_accounts.len()));
+            recommendations.push("Add all privileged accounts to the Protected Users group".to_string());
+        }
+    }
+
+    let explanation = if issues.is_empty() {
+        "Kerberos configuration meets security best practices".to_string()
+    } else {
+        format!("Issues: {}", issues.join("; "))
+    };
+
+    (score.clamp(0.0, 100.0), explanation, recommendations)
+}
+
+/// Scores infrastructure hardening posture (0-100).
+///
+/// Evaluates: LAPS coverage, Recycle Bin, Fine-Grained Password Policies,
+/// domain functional level, LDAP signing.
+fn compute_infrastructure_hardening_factor(
+    domain_findings: &DomainSecurityFindings,
+) -> (f64, String, Vec<String>) {
+    let mut score = 100.0_f64;
+    let mut issues = Vec::new();
+    let mut recommendations = Vec::new();
+
+    // LAPS coverage (proportional)
+    if let Some(pct) = domain_findings.laps_coverage_percent {
+        if pct < 50.0 {
+            score -= 30.0;
+            issues.push(format!("LAPS coverage {:.0}%", pct));
+            recommendations.push("Deploy LAPS to all workstations and servers".to_string());
+        } else if pct < 80.0 {
+            score -= 15.0;
+            issues.push(format!("LAPS coverage {:.0}% (target: 80%+)", pct));
+            recommendations.push("Extend LAPS deployment to remaining computers".to_string());
+        }
+    } else if domain_findings.total_computer_count > 0 {
+        score -= 30.0;
+        issues.push("LAPS not deployed".to_string());
+        recommendations.push("Deploy LAPS for local admin password management".to_string());
+    }
+
+    // Recycle Bin
+    if domain_findings.recycle_bin_enabled == Some(false) {
+        score -= 15.0;
+        issues.push("AD Recycle Bin disabled".to_string());
+        recommendations.push("Enable AD Recycle Bin for object recovery capability".to_string());
+    }
+
+    // Fine-Grained Password Policies
+    if domain_findings.pso_count == 0 {
+        score -= 10.0;
+        issues.push("No Fine-Grained Password Policies".to_string());
+        recommendations.push("Create PSOs for privileged accounts with stronger password requirements".to_string());
+    }
+
+    // Domain functional level
+    if let Some(ref level) = domain_findings.domain_functional_level {
+        if level.contains("2008") || level.contains("2003") || level.contains("2000") {
+            score -= 20.0;
+            issues.push(format!("Domain functional level: {}", level));
+            recommendations.push("Upgrade domain functional level to Windows Server 2016+".to_string());
+        } else if level.contains("2012") && !level.contains("R2") {
+            score -= 10.0;
+            issues.push(format!("Domain functional level: {} (consider upgrading)", level));
+        }
+    }
+
+    // RBCD count as infrastructure concern
+    if domain_findings.rbcd_configured_count > 0 {
+        let penalty = (domain_findings.rbcd_configured_count as f64 * 5.0).min(15.0);
+        score -= penalty;
+        issues.push(format!("{} RBCD delegation(s)", domain_findings.rbcd_configured_count));
+        recommendations.push("Audit Resource-Based Constrained Delegation configurations".to_string());
+    }
+
+    let explanation = if issues.is_empty() {
+        "Infrastructure hardening meets security best practices".to_string()
+    } else {
+        format!("Issues: {}", issues.join("; "))
+    };
+
+    (score.clamp(0.0, 100.0), explanation, recommendations)
 }
 
 /// Service for storing and retrieving risk score history.
@@ -1615,6 +1789,8 @@ mod tests {
         let result = RiskScoreResult {
             total_score: 75.0,
             zone: RiskZone::Green,
+            worst_factor_name: "Test".to_string(),
+            worst_factor_score: 75.0,
             factors: vec![],
             computed_at: Utc::now().to_rfc3339(),
         };
@@ -1630,6 +1806,8 @@ mod tests {
         let result1 = RiskScoreResult {
             total_score: 60.0,
             zone: RiskZone::Orange,
+            worst_factor_name: "Test".to_string(),
+            worst_factor_score: 60.0,
             factors: vec![],
             computed_at: Utc::now().to_rfc3339(),
         };
@@ -1638,6 +1816,8 @@ mod tests {
         let result2 = RiskScoreResult {
             total_score: 80.0,
             zone: RiskZone::Green,
+            worst_factor_name: "Test".to_string(),
+            worst_factor_score: 80.0,
             factors: vec![],
             computed_at: Utc::now().to_rfc3339(),
         };

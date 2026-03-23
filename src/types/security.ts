@@ -72,6 +72,8 @@ export type RiskZone = "Red" | "Orange" | "Green";
 export interface RiskScoreResult {
   totalScore: number;
   zone: RiskZone;
+  worstFactorName: string;
+  worstFactorScore: number;
   factors: RiskFactor[];
   computedAt: string;
 }

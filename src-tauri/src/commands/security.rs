@@ -236,7 +236,7 @@ mod tests {
         assert!(result.is_ok());
         let score = result.unwrap();
         assert!(score.total_score >= 0.0 && score.total_score <= 100.0);
-        assert_eq!(score.factors.len(), 4);
+        assert_eq!(score.factors.len(), 6);
     }
 
     #[test]

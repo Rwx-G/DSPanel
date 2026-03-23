@@ -13,6 +13,8 @@ const mockInvoke = vi.mocked(invoke);
 const mockResult: RiskScoreResult = {
   totalScore: 72,
   zone: "Green",
+  worstFactorName: "Privileged Accounts",
+  worstFactorScore: 55,
   factors: [
     {
       id: "password-policy",

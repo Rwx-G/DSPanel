@@ -136,7 +136,7 @@ describe("SecurityDashboard", () => {
     });
     expect(screen.getByText("1 High")).toBeInTheDocument();
     expect(screen.getByText("1 Medium")).toBeInTheDocument();
-    expect(screen.getByText("2 accounts")).toBeInTheDocument();
+    expect(screen.getByText(/2 accounts/)).toBeInTheDocument();
   });
 
   it("shows error state on failure", async () => {

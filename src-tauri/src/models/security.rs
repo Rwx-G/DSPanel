@@ -155,6 +155,10 @@ pub struct RiskScoreResult {
     pub total_score: f64,
     /// Color zone based on the total score.
     pub zone: RiskZone,
+    /// Worst factor name and score (PingCastle-style "weakest link" indicator).
+    pub worst_factor_name: String,
+    /// Worst factor score.
+    pub worst_factor_score: f64,
     /// Individual factor breakdowns.
     pub factors: Vec<RiskFactor>,
     /// Timestamp of computation (ISO 8601).
@@ -178,16 +182,20 @@ pub struct RiskWeights {
     pub privileged_hygiene: f64,
     pub password_policy: f64,
     pub stale_accounts: f64,
+    pub kerberos_security: f64,
     pub dangerous_configs: f64,
+    pub infrastructure_hardening: f64,
 }
 
 impl Default for RiskWeights {
     fn default() -> Self {
         Self {
-            privileged_hygiene: 30.0,
-            password_policy: 25.0,
-            stale_accounts: 25.0,
-            dangerous_configs: 20.0,
+            privileged_hygiene: 20.0,
+            password_policy: 15.0,
+            stale_accounts: 15.0,
+            kerberos_security: 20.0,
+            dangerous_configs: 15.0,
+            infrastructure_hardening: 15.0,
         }
     }
 }
@@ -418,6 +426,8 @@ mod tests {
         let result = RiskScoreResult {
             total_score: 72.5,
             zone: RiskZone::Green,
+            worst_factor_name: "Privileged Account Hygiene".to_string(),
+            worst_factor_score: 80.0,
             factors: vec![RiskFactor {
                 id: "privileged_hygiene".to_string(),
                 name: "Privileged Account Hygiene".to_string(),
@@ -440,7 +450,9 @@ mod tests {
         let total = weights.privileged_hygiene
             + weights.password_policy
             + weights.stale_accounts
-            + weights.dangerous_configs;
+            + weights.kerberos_security
+            + weights.dangerous_configs
+            + weights.infrastructure_hardening;
         assert!((total - 100.0).abs() < f64::EPSILON);
     }
 
