@@ -277,6 +277,10 @@ pub fn run() {
             commands::get_workstation_metrics,
             commands::get_topology,
             commands::get_privileged_accounts,
+            commands::get_risk_score,
+            commands::get_risk_score_history,
+            commands::detect_ad_attacks,
+            commands::get_escalation_paths,
         ])
         .run(tauri::generate_context!())
         .unwrap_or_else(|e| {

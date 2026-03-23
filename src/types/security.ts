@@ -31,3 +31,79 @@ export interface PrivilegedAccountsReport {
   summary: AlertSummary;
   scannedAt: string;
 }
+
+// Story 9.2: Domain Risk Score
+
+export interface RiskFactor {
+  id: string;
+  name: string;
+  score: number;
+  weight: number;
+  explanation: string;
+  recommendations: string[];
+}
+
+export type RiskZone = "Red" | "Orange" | "Green";
+
+export interface RiskScoreResult {
+  totalScore: number;
+  zone: RiskZone;
+  factors: RiskFactor[];
+  computedAt: string;
+}
+
+export interface RiskScoreHistory {
+  date: string;
+  totalScore: number;
+}
+
+// Story 9.3: Attack Detection
+
+export type AttackType = "GoldenTicket" | "DCSync" | "DCShadow" | "AbnormalKerberos";
+
+export interface AttackAlert {
+  attackType: AttackType;
+  severity: AlertSeverity;
+  timestamp: string;
+  source: string;
+  description: string;
+  recommendation: string;
+  eventId: number | null;
+}
+
+export interface AttackDetectionReport {
+  alerts: AttackAlert[];
+  timeWindowHours: number;
+  scannedAt: string;
+}
+
+// Story 9.4: Escalation Paths
+
+export type NodeType = "User" | "Group";
+export type EdgeType = "Membership" | "Ownership" | "Delegation";
+
+export interface GraphNode {
+  dn: string;
+  displayName: string;
+  nodeType: NodeType;
+  isPrivileged: boolean;
+}
+
+export interface GraphEdge {
+  sourceDn: string;
+  targetDn: string;
+  edgeType: EdgeType;
+}
+
+export interface EscalationPath {
+  nodes: string[];
+  hopCount: number;
+  isCritical: boolean;
+}
+
+export interface EscalationGraphResult {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+  criticalPaths: EscalationPath[];
+  computedAt: string;
+}
