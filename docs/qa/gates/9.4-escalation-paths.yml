@@ -1,0 +1,50 @@
+schema: 1
+story: "9.4"
+story_title: "Privilege Escalation Path Visualization"
+gate: PASS
+status_reason: "Escalation graph builder queries group memberships and finds critical paths via BFS. Frontend displays paths with hop counts and graph stats. List-based visualization (no external graph library needed). DomainAdmin gated."
+reviewer: "Quinn (Test Architect)"
+updated: "2026-03-23T18:10:00Z"
+
+waiver: { active: false }
+
+top_issues: []
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 19
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7]
+    ac_gaps: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "DomainAdmin gating. Read-only operations on AD."
+  performance:
+    status: PASS
+    notes: "Limited to 500 members per group query. BFS with visited set prevents cycles."
+  reliability:
+    status: PASS
+    notes: "Graceful handling of empty groups and missing attributes."
+  maintainability:
+    status: PASS
+    notes: "Graph builder, path finder, and visualization are cleanly separated."
+
+risk_summary:
+  totals: { critical: 0, high: 0, medium: 0, low: 0 }
+  recommendations:
+    must_fix: []
+    monitor: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: "Add ownership and delegation edge discovery from nTSecurityDescriptor parsing"
+      refs: ["src-tauri/src/services/security.rs"]
+    - action: "Consider a canvas-based graph visualization for large datasets"
+      refs: ["src/pages/EscalationPaths.tsx"]
+    - action: "Add interactive node click for detail panel"
+      refs: ["src/pages/EscalationPaths.tsx"]

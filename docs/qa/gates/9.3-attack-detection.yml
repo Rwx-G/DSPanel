@@ -1,0 +1,48 @@
+schema: 1
+story: "9.3"
+story_title: "AD Attack Detection"
+gate: PASS
+status_reason: "Attack detection analyzes Windows Security event logs for Golden Ticket, DCSync, DCShadow patterns. Alert dashboard with configurable time window, severity badges, and recommended actions. DomainAdmin gated."
+reviewer: "Quinn (Test Architect)"
+updated: "2026-03-23T18:10:00Z"
+
+waiver: { active: false }
+
+top_issues: []
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 15
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7]
+    ac_gaps: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "DomainAdmin gating. PowerShell commands use -NoProfile -NonInteractive. No credential exposure."
+  performance:
+    status: PASS
+    notes: "On-demand scanning with configurable time window. MaxEvents limit on queries."
+  reliability:
+    status: PASS
+    notes: "Graceful handling of non-Windows platforms (empty report). PowerShell failures caught."
+  maintainability:
+    status: PASS
+    notes: "Each attack type has clear detection logic. Platform-specific code isolated with cfg attributes."
+
+risk_summary:
+  totals: { critical: 0, high: 0, medium: 0, low: 0 }
+  recommendations:
+    must_fix: []
+    monitor: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: "Add individual threshold configuration per attack type in settings"
+      refs: ["src/pages/AttackDetection.tsx", "src-tauri/src/services/security.rs"]
+    - action: "Add Abnormal Kerberos detection (event 4769 analysis)"
+      refs: ["src-tauri/src/services/security.rs"]

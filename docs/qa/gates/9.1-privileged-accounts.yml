@@ -1,0 +1,48 @@
+schema: 1
+story: "9.1"
+story_title: "Privileged Accounts Dashboard"
+gate: PASS
+status_reason: "All core ACs met. Backend service queries privileged groups with alert detection, frontend displays accounts with severity badges, CSV export, and DomainAdmin gating. Comprehensive test coverage (21 Rust + 15 frontend tests)."
+reviewer: "Quinn (Test Architect)"
+updated: "2026-03-23T18:10:00Z"
+
+waiver: { active: false }
+
+top_issues: []
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 36
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7]
+    ac_gaps: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Permission gating enforced at command level. No secrets in code."
+  performance:
+    status: PASS
+    notes: "Async queries with configurable group list. Sorted results."
+  reliability:
+    status: PASS
+    notes: "Error handling at every level. Graceful fallbacks for missing attributes."
+  maintainability:
+    status: PASS
+    notes: "Clean separation: models, services, commands. Follows existing patterns."
+
+risk_summary:
+  totals: { critical: 0, high: 0, medium: 0, low: 0 }
+  recommendations:
+    must_fix: []
+    monitor: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: "Add PDF export alongside CSV"
+      refs: ["src/pages/SecurityDashboard.tsx"]
+    - action: "Add UI panel for configuring additional privileged groups"
+      refs: ["src/pages/SecurityDashboard.tsx", "src-tauri/src/services/app_settings.rs"]
