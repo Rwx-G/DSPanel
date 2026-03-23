@@ -213,7 +213,7 @@ describe("SecurityDashboard", () => {
     });
   });
 
-  it("displays severity badges for each alert", async () => {
+  it("displays alert badges for accounts with alerts", async () => {
     mockInvoke.mockResolvedValue(mockReport);
     render(<SecurityDashboard />);
 
@@ -221,8 +221,8 @@ describe("SecurityDashboard", () => {
       expect(screen.getByTestId("privileged-accounts-table")).toBeInTheDocument();
     });
 
-    // The first account has Critical and High badges
-    const criticalBadges = screen.getAllByText("Critical");
-    expect(criticalBadges.length).toBeGreaterThan(0);
+    // Each account with alerts gets an AlertBadge
+    const badges = screen.getAllByTestId("alert-badge");
+    expect(badges.length).toBeGreaterThan(0);
   });
 });

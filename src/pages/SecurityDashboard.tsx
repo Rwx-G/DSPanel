@@ -2,13 +2,12 @@ import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { EmptyState } from "@/components/common/EmptyState";
+import { AlertBadge } from "@/components/common/AlertBadge";
 import {
   RefreshCw,
   ShieldAlert,
   AlertCircle,
   AlertTriangle,
-  CheckCircle,
-  Info,
   Download,
   ChevronDown,
   ChevronRight,
@@ -16,42 +15,9 @@ import {
 import {
   type PrivilegedAccountsReport,
   type PrivilegedAccountInfo,
-  type AlertSeverity,
 } from "@/types/security";
 import { extractErrorMessage } from "@/utils/errorMapping";
 import { exportTableToCsv } from "@/utils/csvExport";
-
-function severityColor(severity: AlertSeverity): string {
-  switch (severity) {
-    case "Critical":
-      return "var(--color-error)";
-    case "High":
-      return "var(--color-warning)";
-    case "Medium":
-      return "var(--color-caution, var(--color-warning))";
-    case "Info":
-      return "var(--color-info, var(--color-text-secondary))";
-  }
-}
-
-function SeverityBadge({ severity, message }: { severity: AlertSeverity; message: string }) {
-  return (
-    <span
-      className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium"
-      style={{
-        color: severityColor(severity),
-        backgroundColor: `color-mix(in srgb, ${severityColor(severity)} 12%, transparent)`,
-      }}
-      title={message}
-    >
-      {severity === "Critical" && <AlertCircle size={10} />}
-      {severity === "High" && <AlertTriangle size={10} />}
-      {severity === "Medium" && <AlertTriangle size={10} />}
-      {severity === "Info" && <Info size={10} />}
-      {severity}
-    </span>
-  );
-}
 
 function AccountRow({
   account,
@@ -109,17 +75,7 @@ function AccountRow({
           />
         </td>
         <td className="px-3 py-2">
-          {hasAlerts ? (
-            <div className="flex flex-wrap gap-1">
-              {account.alerts.map((alert, i) => (
-                <SeverityBadge key={i} severity={alert.severity} message={alert.message} />
-              ))}
-            </div>
-          ) : (
-            <span className="flex items-center gap-1 text-caption" style={{ color: "var(--color-success)" }}>
-              <CheckCircle size={12} /> OK
-            </span>
-          )}
+          <AlertBadge alerts={account.alerts} compact={!hasAlerts} />
         </td>
       </tr>
       {isExpanded && (
@@ -141,20 +97,8 @@ function AccountRow({
                 {account.isServiceAccount && <span><strong>Service Account:</strong> Yes</span>}
               </div>
               {account.alerts.length > 0 && (
-                <div className="mt-2 space-y-1">
-                  <div className="text-caption font-medium text-[var(--color-text-primary)]">
-                    Alerts:
-                  </div>
-                  {account.alerts.map((alert, i) => (
-                    <div
-                      key={i}
-                      className="flex items-start gap-2 text-caption"
-                      style={{ color: severityColor(alert.severity) }}
-                    >
-                      <SeverityBadge severity={alert.severity} message="" />
-                      <span>{alert.message}</span>
-                    </div>
-                  ))}
+                <div className="mt-2">
+                  <AlertBadge alerts={account.alerts} />
                 </div>
               )}
             </div>
@@ -382,13 +326,8 @@ export function SecurityDashboard() {
                 )}
               </div>
               {report.domainFindings.alerts.length > 0 && (
-                <div className="mt-3 space-y-1">
-                  {report.domainFindings.alerts.map((alert, i) => (
-                    <div key={i} className="flex items-center gap-2 text-caption">
-                      <SeverityBadge severity={alert.severity} message={alert.message} />
-                      <span style={{ color: severityColor(alert.severity) }}>{alert.message}</span>
-                    </div>
-                  ))}
+                <div className="mt-3">
+                  <AlertBadge alerts={report.domainFindings.alerts} />
                 </div>
               )}
             </div>
