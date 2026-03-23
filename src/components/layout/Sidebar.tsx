@@ -146,7 +146,7 @@ const MODULES: SidebarModule[] = [
   },
   {
     id: "security-dashboard",
-    label: "Security Dashboard",
+    label: "Privileged Accounts",
     icon: "shield",
     group: "Security",
     requiredLevel: "DomainAdmin",
