@@ -73,28 +73,22 @@ pub async fn get_privileged_accounts_report(
         }
     }
 
-    // Resolve Protected Users group by RID for membership check
+    // Resolve Protected Users group by RID for membership check (recursive)
     let protected_users_members = match provider.resolve_group_by_rid(RID_PROTECTED_USERS).await {
         Ok(Some(pu_group)) => {
-            let mut dns = std::collections::HashSet::new();
-            if let Ok(members) = provider
-                .get_group_members(&pu_group.distinguished_name, 1000)
-                .await
-            {
-                for m in members {
-                    dns.insert(m.distinguished_name);
-                }
-            }
-            dns
+            let members = get_recursive_members(&provider, &pu_group.distinguished_name).await;
+            members
+                .into_iter()
+                .map(|m| m.distinguished_name)
+                .collect::<std::collections::HashSet<_>>()
         }
         _ => std::collections::HashSet::new(),
     };
 
     for (group_dn, group_name) in &resolved_groups {
-        let members = provider
-            .get_group_members(group_dn, 1000)
-            .await
-            .unwrap_or_default();
+        // Use LDAP_MATCHING_RULE_IN_CHAIN to get all members recursively
+        // (including members of nested groups)
+        let members = get_recursive_members(&provider, group_dn).await;
 
         for member in members {
             // Skip if we already processed this account (may be in multiple groups)
@@ -366,6 +360,61 @@ fn functional_level_label(value: &str) -> String {
         "6" => "Windows Server 2012 R2".to_string(),
         "7" => "Windows Server 2016".to_string(),
         _ => format!("Level {}", value),
+    }
+}
+
+/// Gets all user members of a group recursively (up to 3 levels deep).
+///
+/// Uses `get_group_members` and recurses into nested groups to collect
+/// all user accounts. This ensures full attribute resolution (sAMAccountName,
+/// displayName, etc.) since `get_group_members` returns properly populated
+/// `DirectoryEntry` objects.
+async fn get_recursive_members(
+    provider: &Arc<dyn DirectoryProvider>,
+    group_dn: &str,
+) -> Vec<crate::models::DirectoryEntry> {
+    let mut all_users = Vec::new();
+    let mut visited_groups = std::collections::HashSet::new();
+    collect_members_recursive(provider, group_dn, &mut all_users, &mut visited_groups, 0).await;
+    all_users
+}
+
+/// Recursive helper with depth limit and visited tracking to prevent cycles.
+async fn collect_members_recursive(
+    provider: &Arc<dyn DirectoryProvider>,
+    group_dn: &str,
+    users: &mut Vec<crate::models::DirectoryEntry>,
+    visited: &mut std::collections::HashSet<String>,
+    depth: usize,
+) {
+    const MAX_DEPTH: usize = 5;
+    if depth >= MAX_DEPTH || !visited.insert(group_dn.to_string()) {
+        return;
+    }
+
+    let members = provider
+        .get_group_members(group_dn, 1000)
+        .await
+        .unwrap_or_default();
+
+    for member in members {
+        match member.object_class.as_deref() {
+            Some("group") => {
+                // Recurse into nested group
+                Box::pin(collect_members_recursive(
+                    provider,
+                    &member.distinguished_name,
+                    users,
+                    visited,
+                    depth + 1,
+                ))
+                .await;
+            }
+            _ => {
+                // User or unknown - include it
+                users.push(member);
+            }
+        }
     }
 }
 
@@ -1187,11 +1236,8 @@ pub async fn build_escalation_graph(
                 });
             }
 
-            // Get members of this privileged group
-            let members = provider
-                .get_group_members(&group.distinguished_name, 500)
-                .await
-                .unwrap_or_default();
+            // Get members of this privileged group (recursive via matching rule)
+            let members = get_recursive_members(&provider, &group.distinguished_name).await;
 
             for member in members {
                 let member_type = match member.object_class.as_deref() {
