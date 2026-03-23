@@ -42,30 +42,44 @@ const sampleTopology: TopologyData = {
     {
       name: "Default-First-Site",
       location: null,
+      subnets: ["10.0.0.0/24"],
       dcs: [
         {
           hostname: "DC1.example.com",
           siteName: "Default-First-Site",
           isGc: true,
           isPdc: true,
+          ipAddress: "10.0.0.1",
+          osVersion: "Windows Server 2022",
+          fsmoRoles: ["PDC", "RID"],
+          isOnline: true,
         },
         {
           hostname: "DC2.example.com",
           siteName: "Default-First-Site",
           isGc: false,
           isPdc: false,
+          ipAddress: "10.0.0.2",
+          osVersion: "Windows Server 2022",
+          fsmoRoles: [],
+          isOnline: true,
         },
       ],
     },
     {
       name: "Branch-Office",
       location: "Paris",
+      subnets: ["10.0.1.0/24"],
       dcs: [
         {
           hostname: "DC3.example.com",
           siteName: "Branch-Office",
           isGc: true,
           isPdc: false,
+          ipAddress: "10.0.1.1",
+          osVersion: "Windows Server 2019",
+          fsmoRoles: ["Infrastructure"],
+          isOnline: false,
         },
       ],
     },
@@ -121,7 +135,8 @@ describe("TopologyView", () => {
     render(<TopologyView />);
 
     await waitFor(() => {
-      expect(screen.getByText("2 sites, 3 DCs")).toBeInTheDocument();
+      expect(screen.getByText("Default-First-Site")).toBeInTheDocument();
+      expect(screen.getByText("Branch-Office")).toBeInTheDocument();
     });
   });
 
@@ -173,12 +188,12 @@ describe("TopologyView", () => {
     });
   });
 
-  it("shows export PNG button when data is loaded", async () => {
+  it("shows replication links when present", async () => {
     mockInvoke.mockResolvedValueOnce(sampleTopology);
     render(<TopologyView />);
 
     await waitFor(() => {
-      expect(screen.getByTestId("export-png")).toBeInTheDocument();
+      expect(screen.getByText("Replication Links")).toBeInTheDocument();
     });
   });
 });

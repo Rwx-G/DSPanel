@@ -74,7 +74,34 @@ pub async fn get_topology(provider: Arc<dyn DirectoryProvider>) -> Result<Topolo
         &fsmo_roles,
     )?;
 
-    // 8. Probe online status for each DC
+    // 8. Resolve missing IPs via AD DNS
+    if let Some(ref fallback_ip_str) = resolve_fallback_ip() {
+        if let Ok(dns_ip) = fallback_ip_str.parse::<std::net::IpAddr>() {
+            let ns = hickory_resolver::config::NameServerConfigGroup::from_ips_clear(
+                &[dns_ip],
+                53,
+                true,
+            );
+            let config = hickory_resolver::config::ResolverConfig::from_parts(None, vec![], ns);
+            let resolver =
+                hickory_resolver::TokioResolver::builder_with_config(config, Default::default())
+                    .build();
+
+            for site in &mut topology.sites {
+                for dc in &mut site.dcs {
+                    if dc.ip_address.is_none() {
+                        if let Ok(lookup) = resolver.lookup_ip(dc.hostname.as_str()).await {
+                            if let Some(addr) = lookup.iter().next() {
+                                dc.ip_address = Some(addr.to_string());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 9. Probe online status for each DC
     let fallback_ip = resolve_fallback_ip();
     for site in &mut topology.sites {
         for dc in &mut site.dcs {
@@ -144,8 +171,21 @@ fn assemble_topology(
                         format!("{} ({})", os, ver)
                     }
                 });
-            let spns = c.get_attribute_values("servicePrincipalName");
-            let has_gc = spns.iter().any(|s| s.to_lowercase().starts_with("gc/"));
+            // Collect SPNs from exact key and range-suffixed keys
+            let mut spns_all: Vec<&str> = c
+                .get_attribute_values("servicePrincipalName")
+                .iter()
+                .map(|s| s.as_str())
+                .collect();
+            for (key, values) in &c.attributes {
+                if key
+                    .to_lowercase()
+                    .starts_with("serviceprincipalname;range=")
+                {
+                    spns_all.extend(values.iter().map(|s| s.as_str()));
+                }
+            }
+            let has_gc = spns_all.iter().any(|s| s.to_lowercase().starts_with("gc/"));
             Some((hostname, (ip, os, has_gc)))
         })
         .collect();
@@ -159,13 +199,38 @@ fn assemble_topology(
             .push(role.to_string());
     }
 
+    // Extract domain name from base DN for FQDN fallback
+    let domain_suffix: String = _base_dn
+        .split(',')
+        .filter_map(|p| {
+            p.trim()
+                .strip_prefix("DC=")
+                .or_else(|| p.trim().strip_prefix("dc="))
+        })
+        .collect::<Vec<&str>>()
+        .join(".");
+
     // Group DCs by site
     let mut site_dcs: HashMap<String, Vec<TopologyDcNode>> = HashMap::new();
     for server in server_entries {
+        // dNSHostName may be empty on newly promoted DCs - fall back to CN + domain
         let hostname = server
             .get_attribute("dNSHostName")
-            .unwrap_or_default()
-            .to_string();
+            .filter(|h| !h.is_empty())
+            .map(|h| h.to_string())
+            .unwrap_or_else(|| {
+                let cn = server
+                    .distinguished_name
+                    .split(',')
+                    .next()
+                    .and_then(|p| p.strip_prefix("CN=").or_else(|| p.strip_prefix("cn=")))
+                    .unwrap_or("");
+                if cn.is_empty() || domain_suffix.is_empty() {
+                    String::new()
+                } else {
+                    format!("{}.{}", cn, domain_suffix)
+                }
+            });
         if hostname.is_empty() {
             continue;
         }
@@ -173,7 +238,7 @@ fn assemble_topology(
         let site_name = extract_site_from_server_dn(&server.distinguished_name);
 
         // Lookup enriched info from computer object
-        let (mut ip_address, os_version, is_gc_from_spn) = dc_info
+        let (ip_address, os_version, is_gc_from_spn) = dc_info
             .get(&hostname.to_lowercase())
             .cloned()
             .unwrap_or((None, None, false));
@@ -186,10 +251,7 @@ fn assemble_topology(
                 .map(|opts| opts & 1 != 0)
                 .unwrap_or(false);
 
-        // Fallback: use the LDAP server IP if this is the DC we're connected to
-        if ip_address.is_none() {
-            ip_address = resolve_fallback_ip();
-        }
+        // IP resolution is done after assembly in get_topology()
 
         let ntds_dn = format!("CN=NTDS Settings,{}", server.distinguished_name).to_lowercase();
         let roles = fsmo_map.get(&ntds_dn).cloned().unwrap_or_default();
@@ -313,7 +375,18 @@ fn assemble_topology(
                 .unwrap_or(180);
 
             // siteList attribute contains DNs of connected sites
-            let site_dns = entry.get_attribute_values("siteList");
+            // Check both exact key and range-suffixed keys (ldap3 range retrieval)
+            let mut site_dns_owned: Vec<String> = entry
+                .get_attribute_values("siteList")
+                .iter()
+                .map(|s| s.to_string())
+                .collect();
+            for (key, values) in &entry.attributes {
+                if key.to_lowercase().starts_with("sitelist;range=") {
+                    site_dns_owned.extend(values.iter().cloned());
+                }
+            }
+            let site_dns = &site_dns_owned;
             let sites: Vec<String> = site_dns
                 .iter()
                 .filter_map(|dn| {
