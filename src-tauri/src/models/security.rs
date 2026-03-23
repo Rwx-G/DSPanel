@@ -43,7 +43,53 @@ pub struct PrivilegedAccountInfo {
     pub enabled: bool,
     /// Whether the password is set to never expire.
     pub password_never_expires: bool,
+    /// Whether the account has an SPN set (Kerberoastable).
+    pub kerberoastable: bool,
+    /// Whether Kerberos pre-authentication is not required (AS-REP Roastable).
+    pub asrep_roastable: bool,
+    /// Whether reversible encryption is enabled.
+    pub reversible_encryption: bool,
+    /// Whether DES-only Kerberos encryption is set.
+    pub des_only: bool,
+    /// Whether constrained delegation with protocol transition is enabled.
+    pub constrained_delegation_transition: bool,
+    /// Whether the account has SIDHistory attribute set.
+    pub has_sid_history: bool,
+    /// Whether this appears to be a service account (has SPN + password never expires).
+    pub is_service_account: bool,
+    /// Whether the account is in the Protected Users group.
+    pub in_protected_users: bool,
+    /// Whether adminCount=1 but account is not actually in any admin group (orphaned).
+    pub admin_count_orphaned: bool,
     /// Computed security alerts for this account.
+    pub alerts: Vec<SecurityAlert>,
+}
+
+/// Domain-level security findings not tied to individual accounts.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DomainSecurityFindings {
+    /// KRBTGT password age in days (null if not accessible).
+    pub krbtgt_password_age_days: Option<i64>,
+    /// LAPS coverage percentage (computers with LAPS / total computers).
+    pub laps_coverage_percent: Option<f64>,
+    /// Number of computers with LAPS deployed.
+    pub laps_deployed_count: usize,
+    /// Total computer count.
+    pub total_computer_count: usize,
+    /// Number of Fine-Grained Password Policies (PSOs) found.
+    pub pso_count: usize,
+    /// Domain functional level string.
+    pub domain_functional_level: Option<String>,
+    /// Forest functional level string.
+    pub forest_functional_level: Option<String>,
+    /// Whether LDAP signing is enforced.
+    pub ldap_signing_enforced: Option<bool>,
+    /// Whether the AD Recycle Bin is enabled.
+    pub recycle_bin_enabled: Option<bool>,
+    /// Number of accounts with RBCD configured.
+    pub rbcd_configured_count: usize,
+    /// Alerts generated from domain-level findings.
     pub alerts: Vec<SecurityAlert>,
 }
 
@@ -63,6 +109,8 @@ pub struct AlertSummary {
 pub struct PrivilegedAccountsReport {
     /// All privileged accounts with their alerts.
     pub accounts: Vec<PrivilegedAccountInfo>,
+    /// Domain-level security findings.
+    pub domain_findings: DomainSecurityFindings,
     /// Summary of alert counts.
     pub summary: AlertSummary,
     /// Timestamp of when this scan was performed (ISO 8601).
@@ -155,6 +203,8 @@ pub enum AttackType {
     DCSync,
     DCShadow,
     AbnormalKerberos,
+    PasswordSpray,
+    PrivGroupChange,
 }
 
 /// A detected attack alert.
@@ -296,6 +346,15 @@ mod tests {
             password_expiry_date: Some("2026-06-01T00:00:00Z".to_string()),
             enabled: true,
             password_never_expires: false,
+            kerberoastable: true,
+            asrep_roastable: false,
+            reversible_encryption: false,
+            des_only: false,
+            constrained_delegation_transition: false,
+            has_sid_history: false,
+            is_service_account: true,
+            in_protected_users: false,
+            admin_count_orphaned: false,
             alerts: vec![],
         };
         let json = serde_json::to_string(&account).unwrap();
@@ -303,12 +362,28 @@ mod tests {
         assert!(json.contains("privilegedGroups"));
         assert!(json.contains("passwordAgeDays"));
         assert!(json.contains("passwordNeverExpires"));
+        assert!(json.contains("kerberoastable"));
+        assert!(json.contains("asrepRoastable"));
+        assert!(json.contains("isServiceAccount"));
     }
 
     #[test]
     fn test_privileged_accounts_report_serialization() {
         let report = PrivilegedAccountsReport {
             accounts: vec![],
+            domain_findings: DomainSecurityFindings {
+                krbtgt_password_age_days: Some(365),
+                laps_coverage_percent: Some(80.0),
+                laps_deployed_count: 40,
+                total_computer_count: 50,
+                pso_count: 2,
+                domain_functional_level: Some("Windows Server 2016".to_string()),
+                forest_functional_level: Some("Windows Server 2016".to_string()),
+                ldap_signing_enforced: Some(true),
+                recycle_bin_enabled: Some(true),
+                rbcd_configured_count: 0,
+                alerts: vec![],
+            },
             summary: AlertSummary {
                 critical: 2,
                 high: 1,

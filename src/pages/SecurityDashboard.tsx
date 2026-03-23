@@ -129,9 +129,16 @@ function AccountRow({
               <div className="text-caption text-[var(--color-text-secondary)]">
                 <strong>DN:</strong> {account.distinguishedName}
               </div>
-              <div className="text-caption text-[var(--color-text-secondary)]">
-                <strong>Password Never Expires:</strong>{" "}
-                {account.passwordNeverExpires ? "Yes" : "No"}
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-caption text-[var(--color-text-secondary)]">
+                <span><strong>Pwd Never Expires:</strong> {account.passwordNeverExpires ? "Yes" : "No"}</span>
+                <span><strong>Kerberoastable:</strong> {account.kerberoastable ? "Yes" : "No"}</span>
+                <span><strong>AS-REP Roastable:</strong> {account.asrepRoastable ? "Yes" : "No"}</span>
+                <span><strong>Protected Users:</strong> {account.inProtectedUsers ? "Yes" : "No"}</span>
+                {account.reversibleEncryption && <span><strong>Reversible Encryption:</strong> Yes</span>}
+                {account.desOnly && <span><strong>DES Only:</strong> Yes</span>}
+                {account.constrainedDelegationTransition && <span><strong>Constrained Deleg+Transition:</strong> Yes</span>}
+                {account.hasSidHistory && <span><strong>SIDHistory:</strong> Present</span>}
+                {account.isServiceAccount && <span><strong>Service Account:</strong> Yes</span>}
               </div>
               {account.alerts.length > 0 && (
                 <div className="mt-2 space-y-1">
@@ -296,6 +303,7 @@ export function SecurityDashboard() {
             description="No members were found in the default privileged groups."
           />
         ) : (
+          <>
           <div className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)]">
             <table className="w-full text-caption" data-testid="privileged-accounts-table">
               <thead>
@@ -324,6 +332,68 @@ export function SecurityDashboard() {
               Last scanned: {new Date(report.scannedAt).toLocaleString()}
             </div>
           </div>
+
+          {/* Domain-level findings */}
+          {report.domainFindings && (
+            <div className="mt-4 rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-4" data-testid="domain-findings">
+              <h3 className="mb-3 text-body font-semibold text-[var(--color-text-primary)]">
+                Domain Security Findings
+              </h3>
+              <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-caption">
+                {report.domainFindings.krbtgtPasswordAgeDays != null && (
+                  <div className="text-[var(--color-text-secondary)]">
+                    <strong>KRBTGT Password Age:</strong>{" "}
+                    <span style={{ color: report.domainFindings.krbtgtPasswordAgeDays > 180 ? "var(--color-error)" : "var(--color-success)" }}>
+                      {report.domainFindings.krbtgtPasswordAgeDays} days
+                    </span>
+                  </div>
+                )}
+                {report.domainFindings.lapsCoveragePercent != null && (
+                  <div className="text-[var(--color-text-secondary)]">
+                    <strong>LAPS Coverage:</strong>{" "}
+                    <span style={{ color: report.domainFindings.lapsCoveragePercent < 80 ? "var(--color-warning)" : "var(--color-success)" }}>
+                      {report.domainFindings.lapsCoveragePercent.toFixed(0)}% ({report.domainFindings.lapsDeployedCount}/{report.domainFindings.totalComputerCount})
+                    </span>
+                  </div>
+                )}
+                {report.domainFindings.domainFunctionalLevel && (
+                  <div className="text-[var(--color-text-secondary)]">
+                    <strong>Domain Level:</strong> {report.domainFindings.domainFunctionalLevel}
+                  </div>
+                )}
+                {report.domainFindings.psoCount > 0 && (
+                  <div className="text-[var(--color-text-secondary)]">
+                    <strong>Password Policies (PSO):</strong> {report.domainFindings.psoCount}
+                  </div>
+                )}
+                {report.domainFindings.rbcdConfiguredCount > 0 && (
+                  <div className="text-[var(--color-text-secondary)]">
+                    <strong>RBCD Configured:</strong>{" "}
+                    <span style={{ color: "var(--color-warning)" }}>{report.domainFindings.rbcdConfiguredCount} object(s)</span>
+                  </div>
+                )}
+                {report.domainFindings.recycleBinEnabled != null && (
+                  <div className="text-[var(--color-text-secondary)]">
+                    <strong>Recycle Bin:</strong>{" "}
+                    <span style={{ color: report.domainFindings.recycleBinEnabled ? "var(--color-success)" : "var(--color-warning)" }}>
+                      {report.domainFindings.recycleBinEnabled ? "Enabled" : "Disabled"}
+                    </span>
+                  </div>
+                )}
+              </div>
+              {report.domainFindings.alerts.length > 0 && (
+                <div className="mt-3 space-y-1">
+                  {report.domainFindings.alerts.map((alert, i) => (
+                    <div key={i} className="flex items-center gap-2 text-caption">
+                      <SeverityBadge severity={alert.severity} message={alert.message} />
+                      <span style={{ color: severityColor(alert.severity) }}>{alert.message}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          </>
         )}
       </div>
     </div>

@@ -50,6 +50,10 @@ function attackTypeLabel(type: AttackType): string {
       return "DCShadow";
     case "AbnormalKerberos":
       return "Abnormal Kerberos";
+    case "PasswordSpray":
+      return "Password Spray";
+    case "PrivGroupChange":
+      return "Priv Group Change";
   }
 }
 

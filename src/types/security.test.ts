@@ -34,6 +34,15 @@ describe("Security types", () => {
       passwordExpiryDate: null,
       enabled: true,
       passwordNeverExpires: false,
+      kerberoastable: false,
+      asrepRoastable: false,
+      reversibleEncryption: false,
+      desOnly: false,
+      constrainedDelegationTransition: false,
+      hasSidHistory: false,
+      isServiceAccount: false,
+      inProtectedUsers: true,
+      adminCountOrphaned: false,
       alerts: [],
     };
     expect(account.samAccountName).toBe("admin");
@@ -55,6 +64,13 @@ describe("Security types", () => {
   it("PrivilegedAccountsReport structure is correct", () => {
     const report: PrivilegedAccountsReport = {
       accounts: [],
+      domainFindings: {
+        krbtgtPasswordAgeDays: null, lapsCoveragePercent: null,
+        lapsDeployedCount: 0, totalComputerCount: 0, psoCount: 0,
+        domainFunctionalLevel: null, forestFunctionalLevel: null,
+        ldapSigningEnforced: null, recycleBinEnabled: null, rbcdConfiguredCount: 0,
+        alerts: [],
+      },
       summary: { critical: 0, high: 0, medium: 0, info: 0 },
       scannedAt: "2026-03-23T10:00:00Z",
     };

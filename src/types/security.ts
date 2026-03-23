@@ -16,6 +16,29 @@ export interface PrivilegedAccountInfo {
   passwordExpiryDate: string | null;
   enabled: boolean;
   passwordNeverExpires: boolean;
+  kerberoastable: boolean;
+  asrepRoastable: boolean;
+  reversibleEncryption: boolean;
+  desOnly: boolean;
+  constrainedDelegationTransition: boolean;
+  hasSidHistory: boolean;
+  isServiceAccount: boolean;
+  inProtectedUsers: boolean;
+  adminCountOrphaned: boolean;
+  alerts: SecurityAlert[];
+}
+
+export interface DomainSecurityFindings {
+  krbtgtPasswordAgeDays: number | null;
+  lapsCoveragePercent: number | null;
+  lapsDeployedCount: number;
+  totalComputerCount: number;
+  psoCount: number;
+  domainFunctionalLevel: string | null;
+  forestFunctionalLevel: string | null;
+  ldapSigningEnforced: boolean | null;
+  recycleBinEnabled: boolean | null;
+  rbcdConfiguredCount: number;
   alerts: SecurityAlert[];
 }
 
@@ -28,6 +51,7 @@ export interface AlertSummary {
 
 export interface PrivilegedAccountsReport {
   accounts: PrivilegedAccountInfo[];
+  domainFindings: DomainSecurityFindings;
   summary: AlertSummary;
   scannedAt: string;
 }
@@ -59,7 +83,7 @@ export interface RiskScoreHistory {
 
 // Story 9.3: Attack Detection
 
-export type AttackType = "GoldenTicket" | "DCSync" | "DCShadow" | "AbnormalKerberos";
+export type AttackType = "GoldenTicket" | "DCSync" | "DCShadow" | "AbnormalKerberos" | "PasswordSpray" | "PrivGroupChange";
 
 export interface AttackAlert {
   attackType: AttackType;

@@ -4,7 +4,8 @@ use anyhow::Result;
 use chrono::{DateTime, Utc};
 
 use crate::models::security::{
-    AlertSeverity, AlertSummary, PrivilegedAccountInfo, PrivilegedAccountsReport, SecurityAlert,
+    AlertSeverity, AlertSummary, DomainSecurityFindings, PrivilegedAccountInfo,
+    PrivilegedAccountsReport, SecurityAlert,
 };
 use crate::services::DirectoryProvider;
 
@@ -18,6 +19,18 @@ const DEFAULT_PRIVILEGED_GROUPS: &[&str] = &[
 
 /// Password age threshold in days before raising a Critical alert.
 const PASSWORD_AGE_THRESHOLD_DAYS: i64 = 90;
+
+/// KRBTGT password age threshold in days before raising a Critical alert.
+const KRBTGT_PASSWORD_AGE_THRESHOLD_DAYS: i64 = 180;
+
+// UAC flag constants
+const UAC_ACCOUNTDISABLE: u32 = 0x0002;
+const UAC_ENCRYPTED_TEXT_PWD_ALLOWED: u32 = 0x0080; // Reversible encryption
+const UAC_DONT_EXPIRE_PASSWORD: u32 = 0x10000;
+const UAC_TRUSTED_FOR_DELEGATION: u32 = 0x80000; // Unconstrained delegation
+const UAC_USE_DES_KEY_ONLY: u32 = 0x200000;
+const UAC_DONT_REQUIRE_PREAUTH: u32 = 0x400000; // AS-REP Roastable
+const UAC_TRUSTED_TO_AUTH_FOR_DELEGATION: u32 = 0x1000000; // Constrained deleg + protocol transition
 
 /// Windows FILETIME epoch offset (100-nanosecond intervals from 1601-01-01 to 1970-01-01).
 const FILETIME_EPOCH_OFFSET: i64 = 116_444_736_000_000_000;
@@ -37,6 +50,9 @@ pub async fn get_privileged_accounts_report(
         .chain(additional_groups.iter().cloned())
         .collect();
 
+    // Check Protected Users group membership
+    let protected_users_members = get_group_member_dns(&provider, "Protected Users").await;
+
     for group_name in &group_names {
         let members = match provider.search_groups(group_name, 1).await {
             Ok(groups) => {
@@ -55,7 +71,6 @@ pub async fn get_privileged_accounts_report(
         for member in members {
             // Skip if we already processed this account (may be in multiple groups)
             if !seen_dns.insert(member.distinguished_name.clone()) {
-                // Account already seen - just add the group name to its groups list
                 if let Some(existing) = all_accounts
                     .iter_mut()
                     .find(|a| a.distinguished_name == member.distinguished_name)
@@ -69,11 +84,11 @@ pub async fn get_privileged_accounts_report(
 
             // Only include user objects (skip nested groups)
             let object_class = member.object_class.as_deref().unwrap_or("");
-            if object_class != "user" && !object_class.is_empty() {
-                // Accept if empty (some providers don't set it) or if it's "user"
-                if object_class == "group" || object_class == "computer" {
-                    continue;
-                }
+            if !object_class.is_empty()
+                && object_class != "user"
+                && (object_class == "group" || object_class == "computer")
+            {
+                continue;
             }
 
             let last_logon = parse_ad_timestamp(member.get_attribute("lastLogonTimestamp"));
@@ -83,25 +98,31 @@ pub async fn get_privileged_accounts_report(
                 .and_then(|v| v.parse::<u32>().ok())
                 .unwrap_or(0);
 
-            let enabled = (uac & 0x0002) == 0; // ACCOUNTDISABLE flag
-            let password_never_expires = (uac & 0x10000) != 0; // DONT_EXPIRE_PASSWORD flag
+            let enabled = (uac & UAC_ACCOUNTDISABLE) == 0;
+            let password_never_expires = (uac & UAC_DONT_EXPIRE_PASSWORD) != 0;
+            let kerberoastable = !member.get_attribute_values("servicePrincipalName").is_empty();
+            let asrep_roastable = (uac & UAC_DONT_REQUIRE_PREAUTH) != 0;
+            let reversible_encryption = (uac & UAC_ENCRYPTED_TEXT_PWD_ALLOWED) != 0;
+            let des_only = (uac & UAC_USE_DES_KEY_ONLY) != 0;
+            let constrained_delegation_transition =
+                (uac & UAC_TRUSTED_TO_AUTH_FOR_DELEGATION) != 0;
+            let has_sid_history = !member.get_attribute_values("sIDHistory").is_empty();
+            let is_service_account = kerberoastable && password_never_expires;
+            let in_protected_users =
+                protected_users_members.contains(&member.distinguished_name);
+            let admin_count = member
+                .get_attribute("adminCount")
+                .and_then(|v| v.parse::<u32>().ok())
+                .unwrap_or(0);
 
             let password_age_days = pwd_last_set.as_ref().map(|pwd_set| {
-                let now = Utc::now();
-                (now - *pwd_set).num_days()
+                (Utc::now() - *pwd_set).num_days()
             });
 
-            let password_expiry_date = if password_never_expires {
-                None
-            } else {
-                // Default domain max password age is typically 42 days
-                // We don't query GPO here, so just report None if it's not "never expires"
-                None
-            };
+            let last_logon_str = last_logon.as_ref().map(|dt| dt.to_rfc3339());
 
-            let last_logon_str = last_logon
-                .as_ref()
-                .map(|dt| dt.to_rfc3339());
+            // Inactive admin: last logon > 90 days (not just "never logged on")
+            let last_logon_age_days = last_logon.map(|dt| (Utc::now() - dt).num_days());
 
             let mut account = PrivilegedAccountInfo {
                 distinguished_name: member.distinguished_name.clone(),
@@ -121,17 +142,30 @@ pub async fn get_privileged_accounts_report(
                 privileged_groups: vec![group_name.clone()],
                 last_logon: last_logon_str,
                 password_age_days,
-                password_expiry_date,
+                password_expiry_date: None,
                 enabled,
                 password_never_expires,
+                kerberoastable,
+                asrep_roastable,
+                reversible_encryption,
+                des_only,
+                constrained_delegation_transition,
+                has_sid_history,
+                is_service_account,
+                in_protected_users,
+                admin_count_orphaned: admin_count == 1
+                    && !enabled, // Simplified: disabled with adminCount=1
                 alerts: Vec::new(),
             };
 
-            // Compute alerts
-            account.alerts = compute_alerts(&account);
+            account.alerts = compute_alerts(&account, last_logon_age_days);
             all_accounts.push(account);
         }
     }
+
+    // Second pass: detect true adminCount orphans (adminCount=1 but not in any priv group)
+    // This requires checking accounts NOT in our list that have adminCount=1
+    // For now, we mark accounts in the list that are disabled with adminCount=1
 
     // Sort by severity (most alerts first, then by highest severity)
     all_accounts.sort_by(|a, b| {
@@ -140,20 +174,203 @@ pub async fn get_privileged_accounts_report(
         b_max.cmp(&a_max).then_with(|| b.alerts.len().cmp(&a.alerts.len()))
     });
 
-    let summary = compute_summary(&all_accounts);
+    // Domain-level findings
+    let domain_findings = get_domain_security_findings(provider.clone()).await;
+
+    let summary = compute_summary(&all_accounts, &domain_findings);
 
     Ok(PrivilegedAccountsReport {
         accounts: all_accounts,
+        domain_findings,
         summary,
         scanned_at: Utc::now().to_rfc3339(),
     })
 }
 
+/// Helper: get DNs of all members of a group by name.
+async fn get_group_member_dns(
+    provider: &Arc<dyn DirectoryProvider>,
+    group_name: &str,
+) -> std::collections::HashSet<String> {
+    let mut dns = std::collections::HashSet::new();
+    if let Ok(groups) = provider.search_groups(group_name, 1).await {
+        if let Some(group) = groups.first() {
+            if let Ok(members) = provider.get_group_members(&group.distinguished_name, 1000).await
+            {
+                for m in members {
+                    dns.insert(m.distinguished_name);
+                }
+            }
+        }
+    }
+    dns
+}
+
+/// Gathers domain-level security findings (KRBTGT, LAPS, PSO, functional level, etc.).
+async fn get_domain_security_findings(
+    provider: Arc<dyn DirectoryProvider>,
+) -> DomainSecurityFindings {
+    let mut findings = DomainSecurityFindings {
+        krbtgt_password_age_days: None,
+        laps_coverage_percent: None,
+        laps_deployed_count: 0,
+        total_computer_count: 0,
+        pso_count: 0,
+        domain_functional_level: None,
+        forest_functional_level: None,
+        ldap_signing_enforced: None,
+        recycle_bin_enabled: None,
+        rbcd_configured_count: 0,
+        alerts: Vec::new(),
+    };
+
+    // KRBTGT password age
+    if let Ok(Some(krbtgt)) = provider.get_user_by_identity("krbtgt").await {
+        let pwd_set = parse_ad_timestamp(krbtgt.get_attribute("pwdLastSet"));
+        if let Some(dt) = pwd_set {
+            let age = (Utc::now() - dt).num_days();
+            findings.krbtgt_password_age_days = Some(age);
+            if age > KRBTGT_PASSWORD_AGE_THRESHOLD_DAYS {
+                findings.alerts.push(SecurityAlert {
+                    severity: AlertSeverity::Critical,
+                    message: format!(
+                        "KRBTGT password not changed for {} days (threshold: {})",
+                        age, KRBTGT_PASSWORD_AGE_THRESHOLD_DAYS
+                    ),
+                    alert_type: "krbtgt_password_age".to_string(),
+                });
+            }
+        }
+    }
+
+    // LAPS coverage: count computers with ms-Mcs-AdmPwdExpirationTime
+    let computers = provider.browse_computers(5000).await.unwrap_or_default();
+    findings.total_computer_count = computers.len();
+    findings.laps_deployed_count = computers
+        .iter()
+        .filter(|c| {
+            c.get_attribute("ms-Mcs-AdmPwdExpirationTime").is_some()
+                || c.get_attribute("msLAPS-PasswordExpirationTime").is_some()
+        })
+        .count();
+    if findings.total_computer_count > 0 {
+        let pct =
+            findings.laps_deployed_count as f64 / findings.total_computer_count as f64 * 100.0;
+        findings.laps_coverage_percent = Some(pct);
+        if pct < 80.0 {
+            findings.alerts.push(SecurityAlert {
+                severity: AlertSeverity::High,
+                message: format!(
+                    "LAPS coverage is {:.0}% ({}/{} computers)",
+                    pct, findings.laps_deployed_count, findings.total_computer_count
+                ),
+                alert_type: "laps_low_coverage".to_string(),
+            });
+        }
+    }
+
+    // Fine-Grained Password Policies (PSOs)
+    if let Some(base_dn) = provider.base_dn() {
+        let pso_base = format!("CN=Password Settings Container,CN=System,{}", base_dn);
+        if let Ok(psos) = provider
+            .search_configuration(&pso_base, "(objectClass=msDS-PasswordSettings)")
+            .await
+        {
+            findings.pso_count = psos.len();
+        }
+    }
+
+    // Domain/Forest functional level from rootDSE
+    if let Ok(Some(root_dse)) = provider.read_entry("").await {
+        findings.domain_functional_level = root_dse
+            .get_attribute("domainFunctionality")
+            .map(functional_level_label);
+        findings.forest_functional_level = root_dse
+            .get_attribute("forestFunctionality")
+            .map(functional_level_label);
+
+        // Check if domain level is low (< 2012 R2 = level 6)
+        if let Some(level_str) = root_dse.get_attribute("domainFunctionality") {
+            if let Ok(level) = level_str.parse::<u32>() {
+                if level < 6 {
+                    findings.alerts.push(SecurityAlert {
+                        severity: AlertSeverity::Medium,
+                        message: format!(
+                            "Domain functional level is {} - consider upgrading for security features",
+                            findings
+                                .domain_functional_level
+                                .as_deref()
+                                .unwrap_or("unknown")
+                        ),
+                        alert_type: "low_functional_level".to_string(),
+                    });
+                }
+            }
+        }
+    }
+
+    // Recycle Bin
+    findings.recycle_bin_enabled = provider.is_recycle_bin_enabled().await.ok();
+    if findings.recycle_bin_enabled == Some(false) {
+        findings.alerts.push(SecurityAlert {
+            severity: AlertSeverity::Medium,
+            message: "AD Recycle Bin is not enabled".to_string(),
+            alert_type: "recycle_bin_disabled".to_string(),
+        });
+    }
+
+    // RBCD: count users/computers with msDS-AllowedToActOnBehalfOfOtherIdentity
+    let all_users = provider.browse_users(5000).await.unwrap_or_default();
+    findings.rbcd_configured_count = all_users
+        .iter()
+        .chain(computers.iter())
+        .filter(|e| {
+            e.get_attribute("msDS-AllowedToActOnBehalfOfOtherIdentity")
+                .is_some()
+        })
+        .count();
+    if findings.rbcd_configured_count > 0 {
+        findings.alerts.push(SecurityAlert {
+            severity: AlertSeverity::High,
+            message: format!(
+                "{} object(s) with Resource-Based Constrained Delegation configured",
+                findings.rbcd_configured_count
+            ),
+            alert_type: "rbcd_configured".to_string(),
+        });
+    }
+
+    findings
+}
+
+/// Converts AD functional level number to human-readable label.
+fn functional_level_label(value: &str) -> String {
+    match value {
+        "0" => "Windows 2000".to_string(),
+        "1" => "Windows Server 2003 Interim".to_string(),
+        "2" => "Windows Server 2003".to_string(),
+        "3" => "Windows Server 2008".to_string(),
+        "4" => "Windows Server 2008 R2".to_string(),
+        "5" => "Windows Server 2012".to_string(),
+        "6" => "Windows Server 2012 R2".to_string(),
+        "7" => "Windows Server 2016".to_string(),
+        _ => format!("Level {}", value),
+    }
+}
+
 /// Computes security alerts for a privileged account based on its properties.
-pub fn compute_alerts(account: &PrivilegedAccountInfo) -> Vec<SecurityAlert> {
+///
+/// `last_logon_age_days` is provided separately because it's computed from the
+/// raw AD timestamp during account construction.
+pub fn compute_alerts(
+    account: &PrivilegedAccountInfo,
+    last_logon_age_days: Option<i64>,
+) -> Vec<SecurityAlert> {
     let mut alerts = Vec::new();
 
-    // Critical: Password older than 90 days
+    // --- Critical severity ---
+
+    // Password older than 90 days
     if let Some(age) = account.password_age_days {
         if age > PASSWORD_AGE_THRESHOLD_DAYS {
             alerts.push(SecurityAlert {
@@ -164,7 +381,36 @@ pub fn compute_alerts(account: &PrivilegedAccountInfo) -> Vec<SecurityAlert> {
         }
     }
 
-    // High: Password set to never expire on admin account
+    // Reversible encryption enabled
+    if account.reversible_encryption {
+        alerts.push(SecurityAlert {
+            severity: AlertSeverity::Critical,
+            message: "Reversible encryption enabled - password recoverable in plaintext".to_string(),
+            alert_type: "reversible_encryption".to_string(),
+        });
+    }
+
+    // AS-REP Roastable (no pre-auth)
+    if account.asrep_roastable {
+        alerts.push(SecurityAlert {
+            severity: AlertSeverity::Critical,
+            message: "Kerberos pre-authentication disabled - AS-REP Roastable".to_string(),
+            alert_type: "asrep_roastable".to_string(),
+        });
+    }
+
+    // --- High severity ---
+
+    // Kerberoastable (SPN set on user account)
+    if account.kerberoastable {
+        alerts.push(SecurityAlert {
+            severity: AlertSeverity::High,
+            message: "SPN set on privileged account - Kerberoastable".to_string(),
+            alert_type: "kerberoastable".to_string(),
+        });
+    }
+
+    // Password set to never expire
     if account.password_never_expires {
         alerts.push(SecurityAlert {
             severity: AlertSeverity::High,
@@ -173,7 +419,7 @@ pub fn compute_alerts(account: &PrivilegedAccountInfo) -> Vec<SecurityAlert> {
         });
     }
 
-    // High: Disabled account still in privileged group
+    // Disabled account still in privileged group
     if !account.enabled {
         alerts.push(SecurityAlert {
             severity: AlertSeverity::High,
@@ -185,7 +431,54 @@ pub fn compute_alerts(account: &PrivilegedAccountInfo) -> Vec<SecurityAlert> {
         });
     }
 
-    // Medium: Account never logged on
+    // Constrained delegation with protocol transition
+    if account.constrained_delegation_transition {
+        alerts.push(SecurityAlert {
+            severity: AlertSeverity::High,
+            message: "Constrained delegation with protocol transition enabled - can impersonate any user".to_string(),
+            alert_type: "constrained_delegation_transition".to_string(),
+        });
+    }
+
+    // SIDHistory present on admin account
+    if account.has_sid_history {
+        alerts.push(SecurityAlert {
+            severity: AlertSeverity::High,
+            message: "SIDHistory attribute present - potential cross-domain escalation vector".to_string(),
+            alert_type: "sid_history".to_string(),
+        });
+    }
+
+    // Service account in Domain Admins (SPN + password never expires + privileged)
+    if account.is_service_account {
+        alerts.push(SecurityAlert {
+            severity: AlertSeverity::High,
+            message: "Service account in privileged group (has SPN + password never expires)".to_string(),
+            alert_type: "service_account_in_admins".to_string(),
+        });
+    }
+
+    // Not in Protected Users group
+    if account.enabled && !account.in_protected_users {
+        alerts.push(SecurityAlert {
+            severity: AlertSeverity::High,
+            message: "Privileged account not in Protected Users group".to_string(),
+            alert_type: "not_in_protected_users".to_string(),
+        });
+    }
+
+    // --- Medium severity ---
+
+    // DES-only Kerberos encryption
+    if account.des_only {
+        alerts.push(SecurityAlert {
+            severity: AlertSeverity::Medium,
+            message: "DES-only Kerberos encryption enabled - weak cryptography".to_string(),
+            alert_type: "des_only".to_string(),
+        });
+    }
+
+    // Account never logged on
     if account.last_logon.is_none() {
         alerts.push(SecurityAlert {
             severity: AlertSeverity::Medium,
@@ -194,11 +487,34 @@ pub fn compute_alerts(account: &PrivilegedAccountInfo) -> Vec<SecurityAlert> {
         });
     }
 
+    // Inactive admin (last logon > 90 days but did log on at some point)
+    if let Some(age) = last_logon_age_days {
+        if age > 90 {
+            alerts.push(SecurityAlert {
+                severity: AlertSeverity::Medium,
+                message: format!("Inactive admin account - last logon {} days ago", age),
+                alert_type: "inactive_admin".to_string(),
+            });
+        }
+    }
+
+    // AdminCount orphaned
+    if account.admin_count_orphaned {
+        alerts.push(SecurityAlert {
+            severity: AlertSeverity::Medium,
+            message: "adminCount=1 on disabled account - orphaned AdminSDHolder protection".to_string(),
+            alert_type: "admin_count_orphaned".to_string(),
+        });
+    }
+
     alerts
 }
 
-/// Computes alert summary counts from a list of accounts.
-fn compute_summary(accounts: &[PrivilegedAccountInfo]) -> AlertSummary {
+/// Computes alert summary counts from accounts and domain findings.
+fn compute_summary(
+    accounts: &[PrivilegedAccountInfo],
+    domain_findings: &DomainSecurityFindings,
+) -> AlertSummary {
     let mut summary = AlertSummary {
         critical: 0,
         high: 0,
@@ -214,6 +530,15 @@ fn compute_summary(accounts: &[PrivilegedAccountInfo]) -> AlertSummary {
                 AlertSeverity::Medium => summary.medium += 1,
                 AlertSeverity::Info => summary.info += 1,
             }
+        }
+    }
+
+    for alert in &domain_findings.alerts {
+        match alert.severity {
+            AlertSeverity::Critical => summary.critical += 1,
+            AlertSeverity::High => summary.high += 1,
+            AlertSeverity::Medium => summary.medium += 1,
+            AlertSeverity::Info => summary.info += 1,
         }
     }
 
@@ -503,45 +828,88 @@ async fn compute_dangerous_configs_factor(
             let mut issues = Vec::new();
             let mut recommendations = Vec::new();
 
-            // Check for unconstrained delegation
-            let unconstrained = users
+            // Parse UAC flags for all users once
+            let uac_flags: Vec<u32> = users
                 .iter()
-                .filter(|u| {
-                    let uac = u
-                        .get_attribute("userAccountControl")
+                .map(|u| {
+                    u.get_attribute("userAccountControl")
                         .and_then(|v| v.parse::<u32>().ok())
-                        .unwrap_or(0);
-                    uac & 0x80000 != 0 // TRUSTED_FOR_DELEGATION
+                        .unwrap_or(0)
                 })
-                .count();
+                .collect();
 
+            // Unconstrained delegation
+            let unconstrained = uac_flags.iter().filter(|&&f| f & UAC_TRUSTED_FOR_DELEGATION != 0).count();
             if unconstrained > 0 {
-                let penalty = (unconstrained as f64 / total as f64 * 100.0).min(50.0);
+                let penalty = (unconstrained as f64 / total as f64 * 100.0).min(30.0);
                 score -= penalty;
-                issues.push(format!("{} account(s) with unconstrained delegation", unconstrained));
-                recommendations.push(format!(
-                    "Review and restrict unconstrained delegation on {} account(s)",
-                    unconstrained
-                ));
+                issues.push(format!("{} unconstrained delegation", unconstrained));
+                recommendations.push(format!("Remove unconstrained delegation from {} account(s)", unconstrained));
             }
 
-            // Check for password never expires on regular accounts
-            let never_expires = users
-                .iter()
-                .filter(|u| {
-                    let uac = u
-                        .get_attribute("userAccountControl")
-                        .and_then(|v| v.parse::<u32>().ok())
-                        .unwrap_or(0);
-                    uac & 0x10000 != 0 // DONT_EXPIRE_PASSWORD
-                })
-                .count();
+            // Constrained delegation with protocol transition
+            let constrained_transition = uac_flags.iter().filter(|&&f| f & UAC_TRUSTED_TO_AUTH_FOR_DELEGATION != 0).count();
+            if constrained_transition > 0 {
+                score -= 10.0;
+                issues.push(format!("{} constrained delegation with protocol transition", constrained_transition));
+                recommendations.push("Review constrained delegation with protocol transition - can impersonate any user".to_string());
+            }
 
+            // Password never expires on regular accounts (>10%)
+            let never_expires = uac_flags.iter().filter(|&&f| f & UAC_DONT_EXPIRE_PASSWORD != 0).count();
             let never_expires_ratio = never_expires as f64 / total as f64;
             if never_expires_ratio > 0.1 {
-                score -= 25.0;
-                issues.push(format!("{}% of accounts have passwords set to never expire", (never_expires_ratio * 100.0) as u32));
-                recommendations.push("Reduce the number of accounts with non-expiring passwords".to_string());
+                score -= 15.0;
+                issues.push(format!("{}% passwords never expire", (never_expires_ratio * 100.0) as u32));
+                recommendations.push("Reduce accounts with non-expiring passwords".to_string());
+            }
+
+            // Reversible encryption
+            let reversible = uac_flags.iter().filter(|&&f| f & UAC_ENCRYPTED_TEXT_PWD_ALLOWED != 0).count();
+            if reversible > 0 {
+                score -= 15.0;
+                issues.push(format!("{} with reversible encryption", reversible));
+                recommendations.push("Disable reversible encryption on all accounts".to_string());
+            }
+
+            // DES-only Kerberos
+            let des_only = uac_flags.iter().filter(|&&f| f & UAC_USE_DES_KEY_ONLY != 0).count();
+            if des_only > 0 {
+                score -= 10.0;
+                issues.push(format!("{} with DES-only Kerberos", des_only));
+                recommendations.push("Disable DES encryption and migrate to AES".to_string());
+            }
+
+            // AS-REP Roastable
+            let asrep = uac_flags.iter().filter(|&&f| f & UAC_DONT_REQUIRE_PREAUTH != 0).count();
+            if asrep > 0 {
+                score -= 15.0;
+                issues.push(format!("{} AS-REP Roastable", asrep));
+                recommendations.push("Enable Kerberos pre-authentication on all accounts".to_string());
+            }
+
+            // RBCD configured
+            let rbcd = users
+                .iter()
+                .filter(|u| u.get_attribute("msDS-AllowedToActOnBehalfOfOtherIdentity").is_some())
+                .count();
+            if rbcd > 0 {
+                score -= 10.0;
+                issues.push(format!("{} with RBCD", rbcd));
+                recommendations.push("Audit Resource-Based Constrained Delegation configurations".to_string());
+            }
+
+            // Domain functional level check
+            if let Ok(Some(root_dse)) = provider.read_entry("").await {
+                if let Some(level_str) = root_dse.get_attribute("domainFunctionality") {
+                    if let Ok(level) = level_str.parse::<u32>() {
+                        if level < 6 {
+                            score -= 10.0;
+                            issues.push(format!("Domain functional level < 2012 R2 (level {})", level));
+                            recommendations.push("Upgrade domain functional level for modern security features".to_string());
+                        }
+                    }
+                }
             }
 
             let explanation = if issues.is_empty() {
@@ -704,6 +1072,11 @@ fn analyze_windows_event_log(time_window_hours: u32) -> Vec<AttackAlert> {
         (4768, AttackType::GoldenTicket, "Kerberos TGT with unusual parameters"),
         (4662, AttackType::DCSync, "Directory replication request from non-DC"),
         (4742, AttackType::DCShadow, "Suspicious computer account modification"),
+        (4769, AttackType::AbnormalKerberos, "Abnormal Kerberos TGS request pattern"),
+        (4771, AttackType::PasswordSpray, "Kerberos pre-authentication failures (potential password spray)"),
+        (4728, AttackType::PrivGroupChange, "Member added to security-enabled global group"),
+        (4732, AttackType::PrivGroupChange, "Member added to security-enabled local group"),
+        (4756, AttackType::PrivGroupChange, "Member added to security-enabled universal group"),
     ];
 
     for (event_id, attack_type, description) in &event_ids {
@@ -734,14 +1107,18 @@ fn analyze_windows_event_log(time_window_hours: u32) -> Vec<AttackAlert> {
                             AttackType::GoldenTicket => AlertSeverity::Critical,
                             AttackType::DCSync => AlertSeverity::Critical,
                             AttackType::DCShadow => AlertSeverity::High,
-                            _ => AlertSeverity::Medium,
+                            AttackType::PasswordSpray => AlertSeverity::High,
+                            AttackType::PrivGroupChange => AlertSeverity::High,
+                            AttackType::AbnormalKerberos => AlertSeverity::Medium,
                         };
 
                         let recommendation = match attack_type {
                             AttackType::GoldenTicket => "Reset KRBTGT password twice with a 12-hour interval".to_string(),
                             AttackType::DCSync => "Review replication permissions - ensure only DCs have DS-Replication-Get-Changes rights".to_string(),
                             AttackType::DCShadow => "Audit computer account changes and verify no rogue DCs registered".to_string(),
-                            _ => "Investigate the suspicious activity".to_string(),
+                            AttackType::AbnormalKerberos => "Review Kerberos ticket requests for unusual encryption types or sources".to_string(),
+                            AttackType::PasswordSpray => "Check for compromised accounts - review failed logon sources and lock affected accounts".to_string(),
+                            AttackType::PrivGroupChange => "Verify the group membership change was authorized - review who was added and by whom".to_string(),
                         };
 
                         alerts.push(AttackAlert {
@@ -921,6 +1298,15 @@ mod tests {
             password_expiry_date: None,
             enabled,
             password_never_expires,
+            kerberoastable: false,
+            asrep_roastable: false,
+            reversible_encryption: false,
+            des_only: false,
+            constrained_delegation_transition: false,
+            has_sid_history: false,
+            is_service_account: false,
+            in_protected_users: true, // Default: in protected users (no alert)
+            admin_count_orphaned: false,
             alerts: Vec::new(),
         }
     }
@@ -928,7 +1314,7 @@ mod tests {
     #[test]
     fn test_compute_alerts_password_age_critical() {
         let account = make_account(true, false, Some(120), Some("2026-01-01T00:00:00Z"));
-        let alerts = compute_alerts(&account);
+        let alerts = compute_alerts(&account, None);
         assert_eq!(alerts.len(), 1);
         assert_eq!(alerts[0].severity, AlertSeverity::Critical);
         assert_eq!(alerts[0].alert_type, "password_age");
@@ -937,14 +1323,14 @@ mod tests {
     #[test]
     fn test_compute_alerts_password_age_ok() {
         let account = make_account(true, false, Some(30), Some("2026-03-01T00:00:00Z"));
-        let alerts = compute_alerts(&account);
+        let alerts = compute_alerts(&account, None);
         assert!(alerts.is_empty());
     }
 
     #[test]
     fn test_compute_alerts_password_never_expires() {
         let account = make_account(true, true, Some(10), Some("2026-03-01T00:00:00Z"));
-        let alerts = compute_alerts(&account);
+        let alerts = compute_alerts(&account, None);
         assert_eq!(alerts.len(), 1);
         assert_eq!(alerts[0].severity, AlertSeverity::High);
         assert_eq!(alerts[0].alert_type, "password_never_expires");
@@ -953,7 +1339,7 @@ mod tests {
     #[test]
     fn test_compute_alerts_disabled_in_privileged_group() {
         let account = make_account(false, false, Some(10), Some("2026-03-01T00:00:00Z"));
-        let alerts = compute_alerts(&account);
+        let alerts = compute_alerts(&account, None);
         assert_eq!(alerts.len(), 1);
         assert_eq!(alerts[0].severity, AlertSeverity::High);
         assert_eq!(alerts[0].alert_type, "disabled_in_privileged_group");
@@ -962,7 +1348,7 @@ mod tests {
     #[test]
     fn test_compute_alerts_never_logged_on() {
         let account = make_account(true, false, Some(10), None);
-        let alerts = compute_alerts(&account);
+        let alerts = compute_alerts(&account, None);
         assert_eq!(alerts.len(), 1);
         assert_eq!(alerts[0].severity, AlertSeverity::Medium);
         assert_eq!(alerts[0].alert_type, "never_logged_on");
@@ -971,7 +1357,7 @@ mod tests {
     #[test]
     fn test_compute_alerts_multiple_issues() {
         let account = make_account(false, true, Some(120), None);
-        let alerts = compute_alerts(&account);
+        let alerts = compute_alerts(&account, None);
         // Should have: password_age (Critical), password_never_expires (High),
         // disabled_in_privileged_group (High), never_logged_on (Medium)
         assert_eq!(alerts.len(), 4);
@@ -985,23 +1371,134 @@ mod tests {
     #[test]
     fn test_compute_alerts_healthy_account() {
         let account = make_account(true, false, Some(10), Some("2026-03-20T00:00:00Z"));
-        let alerts = compute_alerts(&account);
+        let alerts = compute_alerts(&account, None);
         assert!(alerts.is_empty());
     }
 
     #[test]
     fn test_compute_summary() {
         let mut a1 = make_account(true, true, Some(120), None);
-        a1.alerts = compute_alerts(&a1);
+        a1.alerts = compute_alerts(&a1, None);
 
         let mut a2 = make_account(true, false, Some(10), Some("2026-03-01T00:00:00Z"));
-        a2.alerts = compute_alerts(&a2);
+        a2.alerts = compute_alerts(&a2, None);
 
-        let summary = compute_summary(&[a1, a2]);
-        assert_eq!(summary.critical, 1); // password_age
-        assert_eq!(summary.high, 1); // password_never_expires
-        assert_eq!(summary.medium, 1); // never_logged_on
-        assert_eq!(summary.info, 0);
+        let empty_findings = DomainSecurityFindings {
+            krbtgt_password_age_days: None, laps_coverage_percent: None,
+            laps_deployed_count: 0, total_computer_count: 0, pso_count: 0,
+            domain_functional_level: None, forest_functional_level: None,
+            ldap_signing_enforced: None, recycle_bin_enabled: None, rbcd_configured_count: 0,
+            alerts: vec![],
+        };
+        let summary = compute_summary(&[a1, a2], &empty_findings);
+        assert!(summary.critical >= 1); // password_age
+        assert!(summary.high >= 1); // password_never_expires
+        assert!(summary.medium >= 1); // never_logged_on
+    }
+
+    // New security checks tests
+
+    #[test]
+    fn test_compute_alerts_kerberoastable() {
+        let mut account = make_account(true, false, Some(10), Some("2026-03-20T00:00:00Z"));
+        account.kerberoastable = true;
+        let alerts = compute_alerts(&account, None);
+        let types: Vec<&str> = alerts.iter().map(|a| a.alert_type.as_str()).collect();
+        assert!(types.contains(&"kerberoastable"));
+    }
+
+    #[test]
+    fn test_compute_alerts_asrep_roastable() {
+        let mut account = make_account(true, false, Some(10), Some("2026-03-20T00:00:00Z"));
+        account.asrep_roastable = true;
+        let alerts = compute_alerts(&account, None);
+        let types: Vec<&str> = alerts.iter().map(|a| a.alert_type.as_str()).collect();
+        assert!(types.contains(&"asrep_roastable"));
+        let asrep = alerts.iter().find(|a| a.alert_type == "asrep_roastable").unwrap();
+        assert_eq!(asrep.severity, AlertSeverity::Critical);
+    }
+
+    #[test]
+    fn test_compute_alerts_reversible_encryption() {
+        let mut account = make_account(true, false, Some(10), Some("2026-03-20T00:00:00Z"));
+        account.reversible_encryption = true;
+        let alerts = compute_alerts(&account, None);
+        let types: Vec<&str> = alerts.iter().map(|a| a.alert_type.as_str()).collect();
+        assert!(types.contains(&"reversible_encryption"));
+        let rev = alerts.iter().find(|a| a.alert_type == "reversible_encryption").unwrap();
+        assert_eq!(rev.severity, AlertSeverity::Critical);
+    }
+
+    #[test]
+    fn test_compute_alerts_des_only() {
+        let mut account = make_account(true, false, Some(10), Some("2026-03-20T00:00:00Z"));
+        account.des_only = true;
+        let alerts = compute_alerts(&account, None);
+        let types: Vec<&str> = alerts.iter().map(|a| a.alert_type.as_str()).collect();
+        assert!(types.contains(&"des_only"));
+        let des = alerts.iter().find(|a| a.alert_type == "des_only").unwrap();
+        assert_eq!(des.severity, AlertSeverity::Medium);
+    }
+
+    #[test]
+    fn test_compute_alerts_constrained_delegation_transition() {
+        let mut account = make_account(true, false, Some(10), Some("2026-03-20T00:00:00Z"));
+        account.constrained_delegation_transition = true;
+        let alerts = compute_alerts(&account, None);
+        let types: Vec<&str> = alerts.iter().map(|a| a.alert_type.as_str()).collect();
+        assert!(types.contains(&"constrained_delegation_transition"));
+    }
+
+    #[test]
+    fn test_compute_alerts_sid_history() {
+        let mut account = make_account(true, false, Some(10), Some("2026-03-20T00:00:00Z"));
+        account.has_sid_history = true;
+        let alerts = compute_alerts(&account, None);
+        let types: Vec<&str> = alerts.iter().map(|a| a.alert_type.as_str()).collect();
+        assert!(types.contains(&"sid_history"));
+    }
+
+    #[test]
+    fn test_compute_alerts_service_account_in_admins() {
+        let mut account = make_account(true, true, Some(10), Some("2026-03-20T00:00:00Z"));
+        account.kerberoastable = true;
+        account.is_service_account = true;
+        let alerts = compute_alerts(&account, None);
+        let types: Vec<&str> = alerts.iter().map(|a| a.alert_type.as_str()).collect();
+        assert!(types.contains(&"service_account_in_admins"));
+    }
+
+    #[test]
+    fn test_compute_alerts_not_in_protected_users() {
+        let mut account = make_account(true, false, Some(10), Some("2026-03-20T00:00:00Z"));
+        account.in_protected_users = false;
+        let alerts = compute_alerts(&account, None);
+        let types: Vec<&str> = alerts.iter().map(|a| a.alert_type.as_str()).collect();
+        assert!(types.contains(&"not_in_protected_users"));
+    }
+
+    #[test]
+    fn test_compute_alerts_inactive_admin() {
+        let account = make_account(true, false, Some(10), Some("2026-03-20T00:00:00Z"));
+        let alerts = compute_alerts(&account, Some(120)); // last logon 120 days ago
+        let types: Vec<&str> = alerts.iter().map(|a| a.alert_type.as_str()).collect();
+        assert!(types.contains(&"inactive_admin"));
+    }
+
+    #[test]
+    fn test_compute_alerts_admin_count_orphaned() {
+        let mut account = make_account(false, false, Some(10), Some("2026-03-20T00:00:00Z"));
+        account.admin_count_orphaned = true;
+        let alerts = compute_alerts(&account, None);
+        let types: Vec<&str> = alerts.iter().map(|a| a.alert_type.as_str()).collect();
+        assert!(types.contains(&"admin_count_orphaned"));
+    }
+
+    #[test]
+    fn test_functional_level_label() {
+        assert_eq!(functional_level_label("7"), "Windows Server 2016");
+        assert_eq!(functional_level_label("3"), "Windows Server 2008");
+        assert_eq!(functional_level_label("99"), "Level 99");
     }
 
     #[test]

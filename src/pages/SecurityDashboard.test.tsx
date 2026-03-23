@@ -26,6 +26,15 @@ const mockReport: PrivilegedAccountsReport = {
       passwordExpiryDate: null,
       enabled: true,
       passwordNeverExpires: true,
+      kerberoastable: true,
+      asrepRoastable: false,
+      reversibleEncryption: false,
+      desOnly: false,
+      constrainedDelegationTransition: false,
+      hasSidHistory: false,
+      isServiceAccount: true,
+      inProtectedUsers: false,
+      adminCountOrphaned: false,
       alerts: [
         {
           severity: "Critical",
@@ -49,6 +58,15 @@ const mockReport: PrivilegedAccountsReport = {
       passwordExpiryDate: null,
       enabled: true,
       passwordNeverExpires: false,
+      kerberoastable: false,
+      asrepRoastable: false,
+      reversibleEncryption: false,
+      desOnly: false,
+      constrainedDelegationTransition: false,
+      hasSidHistory: false,
+      isServiceAccount: false,
+      inProtectedUsers: true,
+      adminCountOrphaned: false,
       alerts: [
         {
           severity: "Medium",
@@ -58,6 +76,25 @@ const mockReport: PrivilegedAccountsReport = {
       ],
     },
   ],
+  domainFindings: {
+    krbtgtPasswordAgeDays: 365,
+    lapsCoveragePercent: 60,
+    lapsDeployedCount: 30,
+    totalComputerCount: 50,
+    psoCount: 1,
+    domainFunctionalLevel: "Windows Server 2016",
+    forestFunctionalLevel: "Windows Server 2016",
+    ldapSigningEnforced: null,
+    recycleBinEnabled: true,
+    rbcdConfiguredCount: 2,
+    alerts: [
+      {
+        severity: "Critical",
+        message: "KRBTGT password not changed for 365 days",
+        alertType: "krbtgt_password_age",
+      },
+    ],
+  },
   summary: {
     critical: 1,
     high: 1,
@@ -114,6 +151,13 @@ describe("SecurityDashboard", () => {
   it("shows empty state when no accounts", async () => {
     mockInvoke.mockResolvedValue({
       accounts: [],
+      domainFindings: {
+        krbtgtPasswordAgeDays: null, lapsCoveragePercent: null,
+        lapsDeployedCount: 0, totalComputerCount: 0, psoCount: 0,
+        domainFunctionalLevel: null, forestFunctionalLevel: null,
+        ldapSigningEnforced: null, recycleBinEnabled: null, rbcdConfiguredCount: 0,
+        alerts: [],
+      },
       summary: { critical: 0, high: 0, medium: 0, info: 0 },
       scannedAt: "2026-03-23T10:00:00Z",
     });
