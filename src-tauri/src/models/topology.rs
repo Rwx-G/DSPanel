@@ -23,6 +23,8 @@ pub struct SiteNode {
     pub location: Option<String>,
     /// Domain controllers registered in this site.
     pub dcs: Vec<TopologyDcNode>,
+    /// Subnets associated with this site.
+    pub subnets: Vec<String>,
 }
 
 /// A domain controller within a site.
@@ -37,6 +39,14 @@ pub struct TopologyDcNode {
     pub is_gc: bool,
     /// Whether this DC holds the PDC Emulator FSMO role.
     pub is_pdc: bool,
+    /// IP address of the DC (resolved or from LDAP).
+    pub ip_address: Option<String>,
+    /// Operating system version (from AD computer object).
+    pub os_version: Option<String>,
+    /// FSMO roles held by this DC.
+    pub fsmo_roles: Vec<String>,
+    /// Whether the DC is reachable (LDAP port 389 responds).
+    pub is_online: bool,
 }
 
 /// A replication connection between two domain controllers.

@@ -6,6 +6,7 @@ use anyhow::Result;
 use crate::models::topology::{
     SiteNode, TopologyData, TopologyDcNode, TopologyReplicationLink, TopologySiteLink,
 };
+use crate::services::dc_health::{discover_fsmo_roles, resolve_fallback_ip};
 use crate::services::DirectoryProvider;
 
 /// Queries the AD Configuration partition and assembles a complete topology
@@ -42,26 +43,74 @@ pub async fn get_topology(provider: Arc<dyn DirectoryProvider>) -> Result<Topolo
         .search_configuration(&site_link_dn, "(objectClass=siteLink)")
         .await?;
 
+    // 5. Query subnets
+    let subnets_dn = format!("CN=Subnets,CN=Sites,CN=Configuration,{}", base_dn);
+    let subnet_entries = provider
+        .search_configuration(&subnets_dn, "(objectClass=subnet)")
+        .await
+        .unwrap_or_default();
+
+    // 6. Query DC computer objects for OS version and IP
+    let dc_computer_entries = provider
+        .search_configuration(
+            &base_dn,
+            "(&(objectClass=computer)(userAccountControl:1.2.840.113556.1.4.803:=8192))",
+        )
+        .await
+        .unwrap_or_default();
+
+    // 7. Query FSMO role holders
+    let fsmo_roles = discover_fsmo_roles(&*provider, &base_dn).await;
+
     // Assemble topology from raw entries
-    assemble_topology(
+    let mut topology = assemble_topology(
         &base_dn,
         &site_entries,
         &server_entries,
         &connection_entries,
         &site_link_entries,
-    )
+        &subnet_entries,
+        &dc_computer_entries,
+        &fsmo_roles,
+    )?;
+
+    // 8. Probe online status for each DC
+    let fallback_ip = resolve_fallback_ip();
+    for site in &mut topology.sites {
+        for dc in &mut site.dcs {
+            let host = dc
+                .ip_address
+                .as_deref()
+                .or(fallback_ip.as_deref())
+                .unwrap_or(&dc.hostname);
+            let addr = format!("{}:389", host);
+            dc.is_online = tokio::time::timeout(
+                std::time::Duration::from_secs(3),
+                tokio::net::TcpStream::connect(&addr),
+            )
+            .await
+            .map(|r| r.is_ok())
+            .unwrap_or(false);
+        }
+    }
+
+    Ok(topology)
 }
 
 /// Assembles a `TopologyData` structure from raw directory entries.
 ///
 /// Separated from the provider calls to allow unit testing of the
 /// assembly logic with mock data.
+#[allow(clippy::too_many_arguments)]
 fn assemble_topology(
     _base_dn: &str,
     site_entries: &[crate::models::DirectoryEntry],
     server_entries: &[crate::models::DirectoryEntry],
     connection_entries: &[crate::models::DirectoryEntry],
     site_link_entries: &[crate::models::DirectoryEntry],
+    subnet_entries: &[crate::models::DirectoryEntry],
+    dc_computer_entries: &[crate::models::DirectoryEntry],
+    fsmo_roles: &[(&str, String)],
 ) -> Result<TopologyData> {
     // Build server DN -> hostname map for resolving replication links
     let server_map: HashMap<String, String> = server_entries
@@ -73,14 +122,42 @@ fn assemble_topology(
         })
         .collect();
 
-    // Detect PDC Emulator: check if any server has the fSMORoleOwner attribute
-    // pointing to itself (simplified heuristic - in production this is resolved
-    // from the domain head object, but the topology service receives server
-    // entries that may carry this attribute).
-    let pdc_hostname: Option<String> = server_entries
+    // PDC is determined from FSMO roles (passed in from discover_fsmo_roles)
+
+    // Build computer info lookup: hostname -> (IP, OS, is_gc)
+    let dc_info: HashMap<String, (Option<String>, Option<String>, bool)> = dc_computer_entries
         .iter()
-        .find(|s| s.get_attribute("fSMORoleOwner").is_some())
-        .and_then(|s| s.get_attribute("dNSHostName").map(|h| h.to_string()));
+        .filter_map(|c| {
+            let hostname = c.get_attribute("dNSHostName")?.to_lowercase();
+            let ip = c
+                .get_attribute("IPv4Address")
+                .or_else(|| c.get_attribute("ipHostNumber"))
+                .map(|s| s.to_string());
+            let os = c
+                .get_attribute("operatingSystem")
+                .map(|s| s.to_string())
+                .map(|os| {
+                    let ver = c.get_attribute("operatingSystemVersion").unwrap_or("");
+                    if ver.is_empty() {
+                        os
+                    } else {
+                        format!("{} ({})", os, ver)
+                    }
+                });
+            let spns = c.get_attribute_values("servicePrincipalName");
+            let has_gc = spns.iter().any(|s| s.to_lowercase().starts_with("gc/"));
+            Some((hostname, (ip, os, has_gc)))
+        })
+        .collect();
+
+    // Build FSMO role lookup: NTDS Settings DN -> Vec<role>
+    let mut fsmo_map: HashMap<String, Vec<String>> = HashMap::new();
+    for (role, owner_dn) in fsmo_roles {
+        fsmo_map
+            .entry(owner_dn.to_lowercase())
+            .or_default()
+            .push(role.to_string());
+    }
 
     // Group DCs by site
     let mut site_dcs: HashMap<String, Vec<TopologyDcNode>> = HashMap::new();
@@ -95,16 +172,28 @@ fn assemble_topology(
 
         let site_name = extract_site_from_server_dn(&server.distinguished_name);
 
-        let is_gc = server
-            .get_attribute("options")
-            .and_then(|v| v.parse::<u32>().ok())
-            .map(|opts| opts & 1 != 0)
-            .unwrap_or(false);
+        // Lookup enriched info from computer object
+        let (mut ip_address, os_version, is_gc_from_spn) = dc_info
+            .get(&hostname.to_lowercase())
+            .cloned()
+            .unwrap_or((None, None, false));
 
-        let is_pdc = pdc_hostname
-            .as_ref()
-            .map(|pdc| pdc == &hostname)
-            .unwrap_or(false);
+        // GC: prefer SPN-based detection, fall back to server options bit
+        let is_gc = is_gc_from_spn
+            || server
+                .get_attribute("options")
+                .and_then(|v| v.parse::<u32>().ok())
+                .map(|opts| opts & 1 != 0)
+                .unwrap_or(false);
+
+        // Fallback: use the LDAP server IP if this is the DC we're connected to
+        if ip_address.is_none() {
+            ip_address = resolve_fallback_ip();
+        }
+
+        let ntds_dn = format!("CN=NTDS Settings,{}", server.distinguished_name).to_lowercase();
+        let roles = fsmo_map.get(&ntds_dn).cloned().unwrap_or_default();
+        let is_pdc = roles.iter().any(|r| r == "PDC");
 
         site_dcs
             .entry(site_name.clone())
@@ -114,7 +203,25 @@ fn assemble_topology(
                 site_name,
                 is_gc,
                 is_pdc,
+                ip_address,
+                os_version,
+                fsmo_roles: roles,
+                is_online: false, // Updated after assembly by probing LDAP port
             });
+    }
+
+    // Build subnet-to-site mapping
+    let mut site_subnets: HashMap<String, Vec<String>> = HashMap::new();
+    for subnet in subnet_entries {
+        let subnet_name = extract_cn_from_dn(&subnet.distinguished_name);
+        // siteObject attribute contains the DN of the associated site
+        let site_name = subnet
+            .get_attribute("siteObject")
+            .map(extract_cn_from_dn)
+            .unwrap_or_default();
+        if !site_name.is_empty() && !subnet_name.is_empty() {
+            site_subnets.entry(site_name).or_default().push(subnet_name);
+        }
     }
 
     // Assemble site nodes
@@ -124,11 +231,13 @@ fn assemble_topology(
             let name = extract_cn_from_dn(&entry.distinguished_name);
             let location = entry.get_attribute("location").map(|s| s.to_string());
             let dcs = site_dcs.remove(&name).unwrap_or_default();
+            let subnets = site_subnets.remove(&name).unwrap_or_default();
 
             SiteNode {
                 name,
                 location,
                 dcs,
+                subnets,
             }
         })
         .collect();
@@ -395,7 +504,17 @@ mod tests {
             ],
         )];
 
-        let result = assemble_topology("DC=example,DC=com", &sites, &servers, &[], &[]).unwrap();
+        let result = assemble_topology(
+            "DC=example,DC=com",
+            &sites,
+            &servers,
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
+        )
+        .unwrap();
 
         assert_eq!(result.sites.len(), 1);
         assert_eq!(result.sites[0].name, "HQ-Site");
@@ -427,7 +546,17 @@ mod tests {
             ),
         ];
 
-        let result = assemble_topology("DC=example,DC=com", &sites, &servers, &[], &[]).unwrap();
+        let result = assemble_topology(
+            "DC=example,DC=com",
+            &sites,
+            &servers,
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
+        )
+        .unwrap();
 
         assert!(result.sites[0].dcs[0].is_pdc);
         assert!(!result.sites[0].dcs[1].is_pdc);
@@ -454,8 +583,17 @@ mod tests {
             ],
         )];
 
-        let result =
-            assemble_topology("DC=example,DC=com", &[], &servers, &connections, &[]).unwrap();
+        let result = assemble_topology(
+            "DC=example,DC=com",
+            &[],
+            &servers,
+            &connections,
+            &[],
+            &[],
+            &[],
+            &[],
+        )
+        .unwrap();
 
         assert_eq!(result.replication_links.len(), 1);
         assert_eq!(result.replication_links[0].source_dc, "DC1.example.com");
@@ -475,7 +613,17 @@ mod tests {
             ],
         )];
 
-        let result = assemble_topology("DC=example,DC=com", &[], &[], &connections, &[]).unwrap();
+        let result = assemble_topology(
+            "DC=example,DC=com",
+            &[],
+            &[],
+            &connections,
+            &[],
+            &[],
+            &[],
+            &[],
+        )
+        .unwrap();
 
         assert_eq!(result.replication_links[0].status, "Failed");
         assert_eq!(result.replication_links[0].error_count, 3);
@@ -491,7 +639,17 @@ mod tests {
             vec![("fromServer", vec!["CN=NTDS Settings,CN=DC1,CN=Servers,CN=Site1,CN=Sites,CN=Configuration,DC=example,DC=com"])],
         )];
 
-        let result = assemble_topology("DC=example,DC=com", &[], &[], &connections, &[]).unwrap();
+        let result = assemble_topology(
+            "DC=example,DC=com",
+            &[],
+            &[],
+            &connections,
+            &[],
+            &[],
+            &[],
+            &[],
+        )
+        .unwrap();
 
         assert_eq!(result.replication_links[0].status, "Unknown");
     }
@@ -510,8 +668,17 @@ mod tests {
             ],
         )];
 
-        let result =
-            assemble_topology("DC=example,DC=com", &[], &[], &[], &site_link_entries).unwrap();
+        let result = assemble_topology(
+            "DC=example,DC=com",
+            &[],
+            &[],
+            &[],
+            &site_link_entries,
+            &[],
+            &[],
+            &[],
+        )
+        .unwrap();
 
         assert_eq!(result.site_links.len(), 1);
         assert_eq!(result.site_links[0].name, "DEFAULTIPSITELINK");
@@ -527,8 +694,17 @@ mod tests {
             vec![],
         )];
 
-        let result =
-            assemble_topology("DC=example,DC=com", &[], &[], &[], &site_link_entries).unwrap();
+        let result = assemble_topology(
+            "DC=example,DC=com",
+            &[],
+            &[],
+            &[],
+            &site_link_entries,
+            &[],
+            &[],
+            &[],
+        )
+        .unwrap();
 
         assert_eq!(result.site_links[0].cost, 100);
         assert_eq!(result.site_links[0].repl_interval, 180);
@@ -537,7 +713,8 @@ mod tests {
 
     #[test]
     fn test_assemble_empty_topology() {
-        let result = assemble_topology("DC=example,DC=com", &[], &[], &[], &[]).unwrap();
+        let result =
+            assemble_topology("DC=example,DC=com", &[], &[], &[], &[], &[], &[], &[]).unwrap();
 
         assert!(result.sites.is_empty());
         assert!(result.replication_links.is_empty());
@@ -556,7 +733,17 @@ mod tests {
             vec![], // No dNSHostName
         )];
 
-        let result = assemble_topology("DC=example,DC=com", &sites, &servers, &[], &[]).unwrap();
+        let result = assemble_topology(
+            "DC=example,DC=com",
+            &sites,
+            &servers,
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
+        )
+        .unwrap();
 
         assert!(result.sites[0].dcs.is_empty());
     }

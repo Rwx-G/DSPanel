@@ -3,6 +3,10 @@ export interface TopologyDcNode {
   siteName: string;
   isGc: boolean;
   isPdc: boolean;
+  ipAddress: string | null;
+  osVersion: string | null;
+  fsmoRoles: string[];
+  isOnline: boolean;
 }
 
 export interface TopologyReplicationLink {
@@ -24,6 +28,7 @@ export interface SiteNode {
   name: string;
   location: string | null;
   dcs: TopologyDcNode[];
+  subnets: string[];
 }
 
 export interface TopologyData {
