@@ -34,7 +34,7 @@ mod platform {
 
             let encrypted =
                 std::slice::from_raw_parts(output.pbData, output.cbData as usize).to_vec();
-            let _ = LocalFree(HLOCAL(output.pbData as *mut _));
+            let _ = LocalFree(Some(HLOCAL(output.pbData as *mut _)));
             Ok(encrypted)
         }
     }
@@ -61,7 +61,7 @@ mod platform {
 
             let decrypted =
                 std::slice::from_raw_parts(output.pbData, output.cbData as usize).to_vec();
-            let _ = LocalFree(HLOCAL(output.pbData as *mut _));
+            let _ = LocalFree(Some(HLOCAL(output.pbData as *mut _)));
             Ok(decrypted)
         }
     }

@@ -95,7 +95,7 @@ pub fn parse_replication_metadata(raw_xml: &str) -> Vec<AttributeMetadata> {
             }
             Ok(Event::Text(e)) => {
                 if in_entry && !current_tag.is_empty() {
-                    let text = e.unescape().unwrap_or_default().trim().to_string();
+                    let text = String::from_utf8_lossy(&e).trim().to_string();
                     match current_tag.as_str() {
                         "pszAttributeName" => attr_name = text,
                         "dwVersion" => version = text.parse().unwrap_or(0),
@@ -184,7 +184,7 @@ pub fn parse_replication_value_metadata(raw_xml: &str) -> Vec<ValueMetadata> {
             }
             Ok(Event::Text(e)) => {
                 if in_entry && !current_tag.is_empty() {
-                    let text = e.unescape().unwrap_or_default().trim().to_string();
+                    let text = String::from_utf8_lossy(&e).trim().to_string();
                     match current_tag.as_str() {
                         "pszAttributeName" => attr_name = text,
                         "pszObjectDn" => object_dn = text,

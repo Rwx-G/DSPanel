@@ -188,7 +188,7 @@ impl ObjectSnapshotService {
     pub fn count(&self) -> usize {
         let conn = self.conn.lock().expect("lock poisoned");
         conn.query_row("SELECT COUNT(*) FROM object_snapshots", [], |row| {
-            row.get::<_, usize>(0)
+            row.get::<_, i64>(0).map(|n| n as usize)
         })
         .unwrap_or(0)
     }

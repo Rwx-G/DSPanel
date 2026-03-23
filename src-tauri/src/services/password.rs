@@ -1,6 +1,5 @@
 use anyhow::{Context, Result};
-use rand::rngs::OsRng;
-use rand::Rng;
+use rand::RngExt;
 use serde::{Deserialize, Serialize};
 use sha1::{Digest, Sha1};
 
@@ -50,7 +49,7 @@ pub struct HibpResult {
 pub fn generate_password(options: &PasswordOptions) -> Result<String> {
     let mut pool: Vec<u8> = Vec::new();
     let mut required: Vec<u8> = Vec::new();
-    let mut rng = OsRng;
+    let mut rng = rand::rng();
 
     let is_ambiguous = |c: u8| -> bool { AMBIGUOUS.contains(&c) };
     let filter = |chars: &[u8], exclude: bool| -> Vec<u8> {
@@ -68,28 +67,28 @@ pub fn generate_password(options: &PasswordOptions) -> Result<String> {
     if options.include_uppercase {
         let chars = filter(UPPERCASE, options.exclude_ambiguous);
         if !chars.is_empty() {
-            required.push(chars[rng.gen_range(0..chars.len())]);
+            required.push(chars[rng.random_range(0..chars.len())]);
             pool.extend_from_slice(&chars);
         }
     }
     if options.include_lowercase {
         let chars = filter(LOWERCASE, options.exclude_ambiguous);
         if !chars.is_empty() {
-            required.push(chars[rng.gen_range(0..chars.len())]);
+            required.push(chars[rng.random_range(0..chars.len())]);
             pool.extend_from_slice(&chars);
         }
     }
     if options.include_digits {
         let chars = filter(DIGITS, options.exclude_ambiguous);
         if !chars.is_empty() {
-            required.push(chars[rng.gen_range(0..chars.len())]);
+            required.push(chars[rng.random_range(0..chars.len())]);
             pool.extend_from_slice(&chars);
         }
     }
     if options.include_special {
         let chars = filter(SPECIAL, options.exclude_ambiguous);
         if !chars.is_empty() {
-            required.push(chars[rng.gen_range(0..chars.len())]);
+            required.push(chars[rng.random_range(0..chars.len())]);
             pool.extend_from_slice(&chars);
         }
     }
@@ -102,12 +101,12 @@ pub fn generate_password(options: &PasswordOptions) -> Result<String> {
     let mut password: Vec<u8> = required;
 
     while password.len() < length {
-        password.push(pool[rng.gen_range(0..pool.len())]);
+        password.push(pool[rng.random_range(0..pool.len())]);
     }
 
     // Shuffle to randomize positions of required characters
     for i in (1..password.len()).rev() {
-        let j = rng.gen_range(0..=i);
+        let j = rng.random_range(0..=i);
         password.swap(i, j);
     }
 

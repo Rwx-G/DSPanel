@@ -1,7 +1,6 @@
 use anyhow::{Context, Result};
 use hmac::{Hmac, Mac};
-use rand::rngs::OsRng;
-use rand::Rng;
+use rand::RngExt;
 use serde::{Deserialize, Serialize};
 use sha1::Sha1;
 use std::fs;
@@ -206,8 +205,8 @@ impl MfaService {
     /// Generates a new TOTP secret and backup codes.
     /// Persists the secret to local storage for durability.
     pub fn setup(&self, username: &str) -> Result<MfaSetupResult> {
-        let mut rng = OsRng;
-        let secret: Vec<u8> = (0..20).map(|_| rng.gen()).collect();
+        let mut rng = rand::rng();
+        let secret: Vec<u8> = (0..20).map(|_| rng.random()).collect();
         let secret_b32 = base32::encode(base32::Alphabet::Rfc4648 { padding: false }, &secret);
 
         let qr_uri = format!(
@@ -217,7 +216,7 @@ impl MfaService {
 
         let backup_codes: Vec<String> = (0..10)
             .map(|_| {
-                let code: u32 = rng.gen_range(10000000..99999999);
+                let code: u32 = rng.random_range(10000000..99999999);
                 format!("{}", code)
             })
             .collect();

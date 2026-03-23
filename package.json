@@ -19,35 +19,35 @@
     "build-storybook": "storybook build"
   },
   "dependencies": {
-    "@tailwindcss/vite": "^4.2.1",
-    "@tanstack/react-virtual": "^3.13.22",
+    "@tanstack/react-virtual": "^3.13.23",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-opener": "^2",
-    "lucide-react": "^0.577.0",
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0",
-    "tailwindcss": "^4.2.1"
+    "lucide-react": "^1.0.1",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "tailwindcss": "^4.2.2"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@storybook/addon-a11y": "^10.2.19",
-    "@storybook/addon-docs": "^10.2.19",
-    "@storybook/react-vite": "^10.2.19",
+    "@storybook/addon-a11y": "^10.3.3",
+    "@storybook/addon-docs": "^10.3.3",
+    "@storybook/react-vite": "^10.3.3",
+    "@tailwindcss/vite": "^4.2.2",
     "@tauri-apps/cli": "^2",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
-    "@vitejs/plugin-react": "^4.6.0",
-    "@vitest/coverage-v8": "^4.1.0",
-    "eslint": "^10.0.3",
-    "jsdom": "^28.1.0",
+    "@vitejs/plugin-react": "^5.2.0",
+    "@vitest/coverage-v8": "^4.1.1",
+    "eslint": "^10.1.0",
+    "jsdom": "^29.0.1",
     "prettier": "^3.8.1",
-    "storybook": "^10.2.19",
-    "typescript": "~5.8.3",
-    "typescript-eslint": "^8.57.0",
-    "vite": "^7.0.4",
-    "vitest": "^4.1.0"
+    "storybook": "^10.3.3",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.57.1",
+    "vite": "^7.3.1",
+    "vitest": "^4.1.1"
   }
 }
