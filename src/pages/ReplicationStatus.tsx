@@ -60,36 +60,46 @@ function StatusIcon({
   }
 }
 
+/** Parses AD generalized time (20260323120000.0Z) or ISO 8601 to Date. */
+function parseAdTime(value: string): Date | null {
+  // Try ISO 8601 first
+  const d = new Date(value);
+  if (!isNaN(d.getTime())) return d;
+  // AD generalized time: 20260323120000.0Z
+  const clean = value.replace(/\.0Z$/, "");
+  if (clean.length >= 14) {
+    const iso = `${clean.slice(0, 4)}-${clean.slice(4, 6)}-${clean.slice(6, 8)}T${clean.slice(8, 10)}:${clean.slice(10, 12)}:${clean.slice(12, 14)}Z`;
+    const parsed = new Date(iso);
+    if (!isNaN(parsed.getTime())) return parsed;
+  }
+  return null;
+}
+
 function formatLatency(lastSyncTime: string | null): string {
   if (!lastSyncTime) return "N/A";
-  try {
-    const syncDate = new Date(lastSyncTime);
-    const elapsed = Date.now() - syncDate.getTime();
-    if (elapsed < 0) return "just now";
-    const seconds = Math.floor(elapsed / 1000);
-    if (seconds < 60) return `${seconds}s ago`;
-    const minutes = Math.floor(seconds / 60);
-    if (minutes < 60) return `${minutes}m ago`;
-    const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `${hours}h ago`;
-    const days = Math.floor(hours / 24);
-    return `${days}d ago`;
-  } catch {
-    return "N/A";
-  }
+  const syncDate = parseAdTime(lastSyncTime);
+  if (!syncDate) return "N/A";
+  const elapsed = Date.now() - syncDate.getTime();
+  if (elapsed < 0) return "just now";
+  const seconds = Math.floor(elapsed / 1000);
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
 }
 
 function latencyColor(lastSyncTime: string | null): string {
   if (!lastSyncTime) return "var(--color-text-secondary)";
-  try {
-    const elapsed = Date.now() - new Date(lastSyncTime).getTime();
-    const minutes = elapsed / 60_000;
-    if (minutes < 15) return "var(--color-success)";
-    if (minutes < 60) return "var(--color-warning)";
-    return "var(--color-error)";
-  } catch {
-    return "var(--color-text-secondary)";
-  }
+  const syncDate = parseAdTime(lastSyncTime);
+  if (!syncDate) return "var(--color-text-secondary)";
+  const elapsed = Date.now() - syncDate.getTime();
+  const minutes = elapsed / 60_000;
+  if (minutes < 15) return "var(--color-success)";
+  if (minutes < 60) return "var(--color-warning)";
+  return "var(--color-error)";
 }
 
 export function ReplicationStatus() {
@@ -319,7 +329,7 @@ export function ReplicationStatus() {
                       </td>
                       <td className="px-3 py-2">
                         <button
-                          className="btn btn-sm flex items-center gap-1"
+                          className="btn btn-sm flex items-center gap-1 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2.5 py-1 text-caption font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors"
                           onClick={() => handleForceReplication(p)}
                           disabled={forcingReplication === forceKey}
                           title="Force replication"

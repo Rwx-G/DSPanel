@@ -164,12 +164,18 @@ function DcHealthCard({
           className="border-t border-[var(--color-border-default)] px-4 py-3"
           data-testid={`dc-detail-${result.dc.hostname}`}
         >
-          <table className="w-full text-caption">
+          <table className="w-full text-caption" style={{ tableLayout: "fixed" }}>
+            <colgroup>
+              <col style={{ width: "120px" }} />
+              <col style={{ width: "60px" }} />
+              <col />
+              <col style={{ width: "280px" }} />
+            </colgroup>
             <thead>
               <tr className="text-left text-[var(--color-text-secondary)]">
-                <th className="pb-2 pr-6 font-medium">Check</th>
-                <th className="pb-2 pr-6 font-medium">Status</th>
-                <th className="pb-2 pr-6 font-medium">Details</th>
+                <th className="pb-2 font-medium">Check</th>
+                <th className="pb-2 font-medium">Status</th>
+                <th className="pb-2 font-medium">Details</th>
                 <th className="pb-2 font-medium">Value</th>
               </tr>
             </thead>
@@ -191,19 +197,21 @@ function DcHealthCard({
 function CheckRow({ check }: { check: DcHealthCheck }) {
   return (
     <tr className="border-t border-[var(--color-border-subtle)]">
-      <td className="py-2 pr-6">
+      <td className="py-2 pr-4">
         <div className="flex items-center gap-2 text-[var(--color-text-primary)]">
           {checkIcon(check.name)}
           {check.name}
         </div>
       </td>
-      <td className="py-2 pr-6">
-        <StatusIcon level={check.status} size={14} />
+      <td className="py-2 pr-4 text-center">
+        <span className="flex items-center justify-center">
+          <StatusIcon level={check.status} size={14} />
+        </span>
       </td>
-      <td className="py-2 pr-6 text-[var(--color-text-secondary)]">
+      <td className="truncate py-2 pr-4 text-[var(--color-text-secondary)]" title={check.message}>
         {check.message}
       </td>
-      <td className="py-2 font-mono text-[var(--color-text-secondary)]">
+      <td className="truncate py-2 font-mono text-[var(--color-text-secondary)]" title={check.value ?? "-"}>
         {check.value ?? "-"}
       </td>
     </tr>
