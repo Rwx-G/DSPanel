@@ -181,24 +181,24 @@ export function SecurityDashboard() {
         <div className="flex items-center gap-3">
           {/* Summary badges */}
           {report && (
-            <div className="flex items-center gap-2 text-caption">
+            <div className="flex items-center gap-1.5 text-caption">
               {report.summary.critical > 0 && (
-                <span className="flex items-center gap-1" style={{ color: "var(--color-error)" }}>
+                <span className="flex items-center gap-1 rounded-full bg-[var(--color-error-bg)] px-2 py-0.5 font-medium" style={{ color: "var(--color-error)" }}>
                   <AlertCircle size={12} /> {report.summary.critical} Critical
                 </span>
               )}
               {report.summary.high > 0 && (
-                <span className="flex items-center gap-1" style={{ color: "var(--color-warning)" }}>
+                <span className="flex items-center gap-1 rounded-full bg-[var(--color-warning-bg)] px-2 py-0.5 font-medium" style={{ color: "var(--color-warning)" }}>
                   <AlertTriangle size={12} /> {report.summary.high} High
                 </span>
               )}
               {report.summary.medium > 0 && (
-                <span className="flex items-center gap-1" style={{ color: "var(--color-text-secondary)" }}>
+                <span className="flex items-center gap-1 rounded-full bg-[var(--color-info-bg)] px-2 py-0.5 font-medium" style={{ color: "var(--color-info)" }}>
                   <AlertTriangle size={12} /> {report.summary.medium} Medium
                 </span>
               )}
-              <span className="text-[var(--color-text-secondary)]">
-                {report.accounts.length} accounts
+              <span className="ml-1 text-[var(--color-text-secondary)]">
+                · {report.accounts.length} accounts
               </span>
             </div>
           )}

@@ -113,7 +113,9 @@ pub async fn get_privileged_accounts_report(
                 continue;
             }
 
-            let last_logon = parse_ad_timestamp(member.get_attribute("lastLogonTimestamp"));
+            // Prefer lastLogonTimestamp (replicated) over lastLogon (per-DC)
+            let last_logon = parse_ad_timestamp(member.get_attribute("lastLogonTimestamp"))
+                .or_else(|| parse_ad_timestamp(member.get_attribute("lastLogon")));
             let pwd_last_set = parse_ad_timestamp(member.get_attribute("pwdLastSet"));
             let uac = member
                 .get_attribute("userAccountControl")
@@ -846,7 +848,8 @@ async fn compute_stale_accounts_factor(
             let stale_count = users
                 .iter()
                 .filter(|u| {
-                    let last_logon = parse_ad_timestamp(u.get_attribute("lastLogonTimestamp"));
+                    let last_logon = parse_ad_timestamp(u.get_attribute("lastLogonTimestamp"))
+                        .or_else(|| parse_ad_timestamp(u.get_attribute("lastLogon")));
                     match last_logon {
                         Some(dt) => (now - dt).num_days() > 90,
                         None => true, // Never logged on = stale

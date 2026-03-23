@@ -27,10 +27,15 @@ const USER_ATTRS: &[&str] = &[
     "accountExpires",
     "pwdLastSet",
     "lastLogon",
+    "lastLogonTimestamp",
     "badPwdCount",
     "whenCreated",
     "whenChanged",
     "memberOf",
+    "servicePrincipalName",
+    "sIDHistory",
+    "adminCount",
+    "msDS-AllowedToActOnBehalfOfOtherIdentity",
 ];
 
 /// LDAP attributes to retrieve for computer searches.

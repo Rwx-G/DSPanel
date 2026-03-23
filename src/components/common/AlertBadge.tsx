@@ -4,17 +4,17 @@ import { CheckCircle, AlertTriangle, AlertCircle, Info } from "lucide-react";
 import type { AlertSeverity, SecurityAlert } from "@/types/security";
 
 const SEVERITY_STYLES: Record<AlertSeverity, string> = {
-  Critical: "bg-[var(--color-error)]/10 text-[var(--color-error)]",
-  High: "bg-[var(--color-warning)]/10 text-[var(--color-warning)]",
-  Medium: "bg-[var(--color-caution,var(--color-warning))]/10 text-[var(--color-caution,var(--color-warning))]",
-  Info: "bg-[var(--color-info)]/10 text-[var(--color-info)]",
+  Critical: "bg-[var(--color-error-bg)] text-[var(--color-error)]",
+  High: "bg-[var(--color-warning-bg)] text-[var(--color-warning)]",
+  Medium: "bg-[var(--color-info-bg)] text-[var(--color-info)]",
+  Info: "bg-[var(--color-surface-hover)] text-[var(--color-text-secondary)]",
 };
 
 const SEVERITY_TEXT_COLOR: Record<AlertSeverity, string> = {
   Critical: "text-[var(--color-error)]",
   High: "text-[var(--color-warning)]",
-  Medium: "text-[var(--color-caution,var(--color-warning))]",
-  Info: "text-[var(--color-info)]",
+  Medium: "text-[var(--color-info)]",
+  Info: "text-[var(--color-text-secondary)]",
 };
 
 const SEVERITY_ICON: Record<AlertSeverity, typeof Info> = {
