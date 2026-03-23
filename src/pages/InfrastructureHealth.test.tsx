@@ -202,8 +202,8 @@ describe("InfrastructureHealth", () => {
       expect(screen.getByText("DC1.example.com")).toBeInTheDocument();
     });
 
-    // Default interval is 60s, advance time
-    vi.advanceTimersByTime(60_000);
+    // Default interval is 5 min (300s), advance time
+    vi.advanceTimersByTime(300_000);
 
     await waitFor(() => {
       expect(mockInvoke).toHaveBeenCalledTimes(2);

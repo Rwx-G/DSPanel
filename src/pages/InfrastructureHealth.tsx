@@ -25,9 +25,9 @@ import {
 import { extractErrorMessage } from "@/utils/errorMapping";
 
 const REFRESH_INTERVALS = [
-  { label: "30s", value: 30 },
-  { label: "60s", value: 60 },
-  { label: "120s", value: 120 },
+  { label: "1 min", value: 60 },
+  { label: "5 min", value: 300 },
+  { label: "15 min", value: 900 },
   { label: "Off", value: 0 },
 ];
 
@@ -214,7 +214,7 @@ export function InfrastructureHealth() {
   const [results, setResults] = useState<DcHealthResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [refreshInterval, setRefreshInterval] = useState(60);
+  const [refreshInterval, setRefreshInterval] = useState(300);
   const [collapsedDcs, setCollapsedDcs] = useState<Set<string>>(new Set());
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
