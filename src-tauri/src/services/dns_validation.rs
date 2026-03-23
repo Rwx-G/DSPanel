@@ -13,7 +13,13 @@ use crate::services::dc_health::{discover_domain_controllers, resolve_fallback_i
 use crate::services::DirectoryProvider;
 
 /// SRV record prefixes to validate for AD DNS.
-const SRV_RECORD_PREFIXES: &[&str] = &["_ldap._tcp", "_kerberos._tcp", "_gc._tcp", "_kpasswd._tcp"];
+const SRV_RECORD_PREFIXES: &[&str] = &[
+    "_ldap._tcp",
+    "_kerberos._tcp",
+    "_gc._tcp",
+    "_kpasswd._tcp",
+    "_ldap._tcp.dc._msdcs",
+];
 
 /// Default Kerberos clock skew threshold in seconds.
 pub const DEFAULT_THRESHOLD_SECONDS: u32 = 300;
@@ -336,7 +342,7 @@ mod tests {
 
     #[test]
     fn test_srv_record_prefixes_count() {
-        assert_eq!(SRV_RECORD_PREFIXES.len(), 4);
+        assert_eq!(SRV_RECORD_PREFIXES.len(), 5);
     }
 
     #[test]
@@ -345,6 +351,7 @@ mod tests {
         assert!(SRV_RECORD_PREFIXES.contains(&"_kerberos._tcp"));
         assert!(SRV_RECORD_PREFIXES.contains(&"_gc._tcp"));
         assert!(SRV_RECORD_PREFIXES.contains(&"_kpasswd._tcp"));
+        assert!(SRV_RECORD_PREFIXES.contains(&"_ldap._tcp.dc._msdcs"));
     }
 
     // -----------------------------------------------------------------------
