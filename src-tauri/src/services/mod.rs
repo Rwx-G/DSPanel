@@ -22,6 +22,7 @@ pub mod preset;
 pub mod replication;
 pub mod replication_status;
 pub mod resilience;
+pub mod security;
 pub mod resilient_directory;
 pub mod snapshot;
 pub mod topology;

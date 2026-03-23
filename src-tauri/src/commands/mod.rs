@@ -2,12 +2,14 @@ mod account;
 mod directory;
 mod group;
 mod infrastructure;
+mod security;
 mod storage;
 
 pub use account::*;
 pub use directory::*;
 pub use group::*;
 pub use infrastructure::*;
+pub use security::*;
 pub use storage::*;
 
 use tauri::State;
