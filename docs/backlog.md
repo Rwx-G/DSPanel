@@ -18,6 +18,12 @@ Items deferred from QA reviews. None are blocking - all stories are PASS.
 | Epic 8 QA | LDAP msDS-ReplNeighbor for richer replication status data | `replication_status.rs`, Story 8.2 |
 | Epic 8 QA | Service list filtering (auto-start only) for workstation monitoring | `WorkstationMonitoringPanel.tsx`, Story 8.4 |
 | Epic 8 QA | Group DC cards by site in health dashboard for multi-site environments | `InfrastructureHealth.tsx`, Story 8.1 |
+| Epic 9 QA | Add PDF export for privileged accounts report | `SecurityDashboard.tsx`, Story 9.1 |
+| Epic 9 QA | Add weight configuration UI in settings for risk score factors | `RiskScore.tsx`, Story 9.2 |
+| Epic 9 QA | Add per-attack-type threshold configuration | `AttackDetection.tsx`, Story 9.3 |
+| Epic 9 QA | Add Abnormal Kerberos (event 4769) detection | `services/security.rs`, Story 9.3 |
+| Epic 9 QA | Add ownership/delegation edge discovery from nTSecurityDescriptor | `services/security.rs`, Story 9.4 |
+| Epic 9 QA | Consider canvas-based graph visualization for escalation paths | `EscalationPaths.tsx`, Story 9.4 |
 | Epic 6 QA | Interactive Browser auth (device code flow) as alternative to client secret for Graph API | `graph_exchange.rs`, Epic 12 (Story 12.2) |
 | Epic 7 QA | Export snapshot history (CSV/JSON) | `SnapshotHistory.tsx`, Story 7.5 |
 | Epic 7 QA | Server-side pagination for large Recycle Bin contents | `ldap_directory.rs`, Story 7.2 |

@@ -7,6 +7,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-03-23
+
+Epic 9 - Security, Risk Scoring and Attack Detection. Security dashboard
+for DomainAdmin users: privileged account monitoring, domain-wide risk
+scoring, AD attack detection, and privilege escalation path analysis.
+
+### Added
+
+#### Privileged Accounts Dashboard (9.1)
+- Security Dashboard page listing members of Domain Admins, Enterprise Admins, Schema Admins, and Administrators
+- Configurable additional privileged groups via AppSettings
+- Per-account details: last logon, password age, password expiry, enabled status
+- Alert detection: password > 90 days (Critical), password never expires (High), disabled in privileged group (High), never logged on (Medium)
+- Alert severity badges with color coding (Critical/High/Medium/Info)
+- Expandable account rows with DN and alert details
+- CSV export of privileged accounts with alert data
+- DomainAdmin permission gating
+
+#### Domain Risk Score (9.2)
+- Risk Score page with SVG semi-circle gauge visualization (0-100)
+- Color zones: red (0-40 Poor), orange (41-70 Fair), green (71-100 Good)
+- 4 weighted risk factors: privileged account hygiene (30%), password policy strength (25%), stale account ratio (25%), dangerous configurations (20%)
+- Factor breakdown panel with score bars, weight, explanation, and recommendations
+- SQLite-backed daily score history with upsert
+- 30-day trend sparkline visualization
+- Configurable factor weights with defaults summing to 100%
+
+#### AD Attack Detection (9.3)
+- Attack Detection page analyzing Windows Security event logs
+- Detection for Golden Ticket (event 4768), DCSync (event 4662), DCShadow (event 4742)
+- Configurable time window: 1h, 6h, 12h, 24h (default), 48h, 72h
+- Alert cards with attack type badge, severity, timestamp, source, and description
+- Expandable detail with recommended response actions per alert type
+- Graceful empty report on non-Windows platforms
+- PowerShell-based event log queries with -NoProfile -NonInteractive
+
+#### Privilege Escalation Path Visualization (9.4)
+- Escalation Paths page with critical path analysis
+- Graph builder querying group memberships via DirectoryProvider
+- BFS path-finding algorithm for shortest paths to privileged groups
+- Critical path highlighting with hop count badges
+- Graph stats panel: node/edge counts by type, color legend
+- List-based visualization (no external graph library required)
+
+### Changed
+- Added "Security" group to sidebar navigation with 4 new modules
+- Added `privileged_groups` field to AppSettings for configurable group monitoring
+- Added `Shield`, `Gauge`, `Radar`, `Route` icons to sidebar icon map
+- Extended `SidebarModule.group` type to include "Security"
+
+### Security
+- All security endpoints require DomainAdmin permission level
+- PowerShell event log queries use -NoProfile and -NonInteractive flags
+- All operations are read-only against Active Directory
+- No sensitive data (passwords, tokens) exposed in responses
+
 ## [0.8.0] - 2026-03-23
 
 Epic 8 - Infrastructure Health and Monitoring. Centralized view of AD
