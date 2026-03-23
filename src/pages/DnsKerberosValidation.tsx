@@ -16,6 +16,7 @@ import {
   type DnsRecordStatus,
   type ClockSkewStatus,
 } from "@/types/dns-validation";
+import { extractErrorMessage } from "@/utils/errorMapping";
 
 function dnsStatusColor(status: DnsRecordStatus): string {
   switch (status) {
@@ -104,11 +105,7 @@ export function DnsKerberosValidation() {
       );
       setReport(data);
     } catch (e: unknown) {
-      const msg =
-        typeof e === "string"
-          ? e
-          : (e as { message?: string })?.message ?? "Validation failed";
-      setError(msg);
+      setError(extractErrorMessage(e));
     } finally {
       setLoading(false);
     }

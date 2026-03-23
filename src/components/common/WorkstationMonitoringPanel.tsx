@@ -13,6 +13,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { type SystemMetrics } from "@/types/system-metrics";
+import { extractErrorMessage } from "@/utils/errorMapping";
 
 interface WorkstationMonitoringPanelProps {
   hostname: string;
@@ -71,11 +72,7 @@ export function WorkstationMonitoringPanel({
       }
       setMetrics(data);
     } catch (e: unknown) {
-      const msg =
-        typeof e === "string"
-          ? e
-          : (e as { message?: string })?.message ??
-            "Failed to fetch metrics";
+      const msg = extractErrorMessage(e);
       setError(msg);
     } finally {
       setLoading(false);

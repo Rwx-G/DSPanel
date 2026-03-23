@@ -22,6 +22,7 @@ import {
   type DcHealthCheck,
   type DcHealthLevel,
 } from "@/types/dc-health";
+import { extractErrorMessage } from "@/utils/errorMapping";
 
 const REFRESH_INTERVALS = [
   { label: "30s", value: 30 },
@@ -223,11 +224,7 @@ export function InfrastructureHealth() {
       const data = await invoke<DcHealthResult[]>("get_dc_health");
       setResults(data);
     } catch (e: unknown) {
-      const msg =
-        typeof e === "string"
-          ? e
-          : (e as { message?: string })?.message ?? "Failed to fetch DC health";
-      setError(msg);
+      setError(extractErrorMessage(e));
     } finally {
       setLoading(false);
     }

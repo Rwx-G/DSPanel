@@ -12,6 +12,7 @@ import {
   Maximize,
 } from "lucide-react";
 import { type TopologyData, type SiteNode } from "@/types/topology";
+import { extractErrorMessage } from "@/utils/errorMapping";
 
 // Layout constants
 const SITE_PADDING = 20;
@@ -260,11 +261,7 @@ export function TopologyView() {
       const result = await invoke<TopologyData>("get_topology");
       setData(result);
     } catch (e: unknown) {
-      const msg =
-        typeof e === "string"
-          ? e
-          : (e as { message?: string })?.message ?? "Failed to load topology";
-      setError(msg);
+      setError(extractErrorMessage(e));
     } finally {
       setLoading(false);
     }

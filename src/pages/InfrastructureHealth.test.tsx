@@ -15,6 +15,8 @@ const healthyDc: DcHealthResult = {
     siteName: "Default-First-Site",
     isGlobalCatalog: true,
     serverDn: "CN=DC1,CN=Servers,CN=Default-First-Site,CN=Sites,CN=Configuration,DC=example,DC=com",
+    fsmoRoles: ["PDC", "RID"],
+    functionalLevel: "Windows Server 2016",
   },
   overallStatus: "Healthy",
   checks: [
@@ -33,6 +35,8 @@ const warningDc: DcHealthResult = {
     siteName: "Branch-Office",
     isGlobalCatalog: false,
     serverDn: "CN=DC2,CN=Servers,CN=Branch-Office,CN=Sites,CN=Configuration,DC=example,DC=com",
+    fsmoRoles: [],
+    functionalLevel: "Windows Server 2016",
   },
   overallStatus: "Warning",
   checks: [
@@ -51,6 +55,8 @@ const criticalDc: DcHealthResult = {
     siteName: "Default-First-Site",
     isGlobalCatalog: false,
     serverDn: "CN=DC3,CN=Servers,CN=Default-First-Site,CN=Sites,CN=Configuration,DC=example,DC=com",
+    fsmoRoles: [],
+    functionalLevel: null,
   },
   overallStatus: "Critical",
   checks: [
@@ -113,8 +119,8 @@ describe("InfrastructureHealth", () => {
     render(<InfrastructureHealth />);
 
     await waitFor(() => {
-      expect(screen.getByText("Site: Default-First-Site")).toBeInTheDocument();
-      expect(screen.getByText("Site: Branch-Office")).toBeInTheDocument();
+      expect(screen.getByText(/Site: Default-First-Site/)).toBeInTheDocument();
+      expect(screen.getByText(/Site: Branch-Office/)).toBeInTheDocument();
     });
   });
 

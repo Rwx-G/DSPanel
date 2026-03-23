@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { EmptyState } from "@/components/common/EmptyState";
+import { extractErrorMessage } from "@/utils/errorMapping";
 import { useDialog } from "@/contexts/DialogContext";
 import { useNotifications } from "@/contexts/NotificationContext";
 import {
@@ -112,12 +113,7 @@ export function ReplicationStatus() {
         await invoke<ReplicationPartnership[]>("get_replication_status");
       setPartnerships(data);
     } catch (e: unknown) {
-      const msg =
-        typeof e === "string"
-          ? e
-          : (e as { message?: string })?.message ??
-            "Failed to fetch replication status";
-      setError(msg);
+      setError(extractErrorMessage(e));
     } finally {
       setLoading(false);
     }
@@ -158,11 +154,7 @@ export function ReplicationStatus() {
       notify("success", result);
       fetchPartnerships();
     } catch (e: unknown) {
-      const msg =
-        typeof e === "string"
-          ? e
-          : (e as { message?: string })?.message ?? "Force replication failed";
-      notify("error", msg);
+      notify("error", extractErrorMessage(e));
     } finally {
       setForcingReplication(null);
     }
