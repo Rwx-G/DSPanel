@@ -14,7 +14,7 @@ pub async fn get_system_metrics(hostname: &str) -> Result<SystemMetrics, String>
     #[cfg(not(target_os = "windows"))]
     {
         let _ = hostname;
-        return Ok(SystemMetrics {
+        Ok(SystemMetrics {
             cpu_usage_percent: 0.0,
             total_memory_mb: 0,
             used_memory_mb: 0,
@@ -23,7 +23,7 @@ pub async fn get_system_metrics(hostname: &str) -> Result<SystemMetrics, String>
             sessions: vec![],
             timestamp,
             error_message: Some("Workstation monitoring requires Windows".to_string()),
-        });
+        })
     }
 
     #[cfg(target_os = "windows")]
@@ -164,11 +164,13 @@ async fn query_sessions(hostname: &str) -> Result<Vec<SessionInfo>, String> {
 }
 
 // ---------------------------------------------------------------------------
-// Parse functions - testable independently from PowerShell execution
+// Parse functions - testable independently from PowerShell execution.
+// On non-Windows platforms these are only used by tests.
 // ---------------------------------------------------------------------------
 
 /// Parses CPU usage from PowerShell JSON output.
 /// Expects a plain number (e.g., `42` or `42.5`).
+#[allow(dead_code)]
 pub(crate) fn parse_cpu(output: &str) -> Result<f64, String> {
     let trimmed = output.trim();
     if trimmed.is_empty() {
@@ -182,6 +184,7 @@ pub(crate) fn parse_cpu(output: &str) -> Result<f64, String> {
 /// Parses memory info from PowerShell JSON output.
 /// Expects: `{"TotalVisibleMemorySize":..., "FreePhysicalMemory":...}`
 /// Values are in kilobytes; returns (total_mb, used_mb).
+#[allow(dead_code)]
 pub(crate) fn parse_memory(output: &str) -> Result<(u64, u64), String> {
     let trimmed = output.trim();
     if trimmed.is_empty() {
@@ -210,6 +213,7 @@ pub(crate) fn parse_memory(output: &str) -> Result<(u64, u64), String> {
 /// Parses disk info from PowerShell JSON output.
 /// Expects an array of `{"DeviceID":"C:", "Size":..., "FreeSpace":...}`.
 /// A single object (not wrapped in an array) is also accepted.
+#[allow(dead_code)]
 pub(crate) fn parse_disks(output: &str) -> Result<Vec<DiskInfo>, String> {
     let trimmed = output.trim();
     if trimmed.is_empty() {
@@ -258,6 +262,7 @@ pub(crate) fn parse_disks(output: &str) -> Result<Vec<DiskInfo>, String> {
 /// Parses service info from PowerShell JSON output.
 /// Expects an array of `{"Name":"...", "DisplayName":"...", "State":"...", "StartMode":"..."}`.
 /// A single object is also accepted.
+#[allow(dead_code)]
 pub(crate) fn parse_services(output: &str) -> Result<Vec<ServiceInfo>, String> {
     let trimmed = output.trim();
     if trimmed.is_empty() {
@@ -310,6 +315,7 @@ pub(crate) fn parse_services(output: &str) -> Result<Vec<ServiceInfo>, String> {
 /// Parses session info from PowerShell JSON output.
 /// Expects an array of `{"Username":"...", "LogonTime":"..."}`.
 /// A single object is also accepted.
+#[allow(dead_code)]
 pub(crate) fn parse_sessions(output: &str) -> Result<Vec<SessionInfo>, String> {
     let trimmed = output.trim();
     if trimmed.is_empty() {

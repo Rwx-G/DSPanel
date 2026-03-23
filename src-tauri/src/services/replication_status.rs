@@ -228,7 +228,7 @@ mod tests {
 
     #[test]
     fn test_partnership_sorting() {
-        let mut partnerships = vec![
+        let mut partnerships = [
             ReplicationPartnership {
                 source_dc: "DC1".to_string(),
                 target_dc: "DC2".to_string(),
@@ -251,7 +251,7 @@ mod tests {
             },
         ];
 
-        partnerships.sort_by(|a, b| {
+        partnerships.sort_by(|a: &ReplicationPartnership, b: &ReplicationPartnership| {
             let status_ord = |s: &ReplicationStatus| match s {
                 ReplicationStatus::Failed => 0,
                 ReplicationStatus::Warning => 1,
