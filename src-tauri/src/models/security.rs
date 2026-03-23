@@ -121,6 +121,34 @@ pub struct PrivilegedAccountsReport {
 // Domain Risk Score models (Story 9.2)
 // ---------------------------------------------------------------------------
 
+/// Complexity of a remediation action.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum RemediationComplexity {
+    Easy,
+    Medium,
+    Hard,
+}
+
+/// An individual security finding within a risk factor.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RiskFinding {
+    /// Machine-readable identifier (e.g., "GPO-001").
+    pub id: String,
+    /// Human-readable description.
+    pub description: String,
+    /// Severity of this finding.
+    pub severity: AlertSeverity,
+    /// Points deducted from the factor score.
+    pub points_deducted: f64,
+    /// Recommended remediation action.
+    pub remediation: String,
+    /// Remediation complexity.
+    pub complexity: RemediationComplexity,
+    /// CIS Benchmark or MITRE ATT&CK reference, if applicable.
+    pub framework_ref: Option<String>,
+}
+
 /// A single risk factor contributing to the domain risk score.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -137,6 +165,10 @@ pub struct RiskFactor {
     pub explanation: String,
     /// Actionable recommendations if score is below threshold.
     pub recommendations: Vec<String>,
+    /// Individual findings that contributed to the score.
+    pub findings: Vec<RiskFinding>,
+    /// How many points the total score would gain if all findings in this factor were fixed.
+    pub impact_if_fixed: f64,
 }
 
 /// Color zone for the risk gauge.
@@ -185,17 +217,23 @@ pub struct RiskWeights {
     pub kerberos_security: f64,
     pub dangerous_configs: f64,
     pub infrastructure_hardening: f64,
+    pub gpo_security: f64,
+    pub trust_security: f64,
+    pub certificate_security: f64,
 }
 
 impl Default for RiskWeights {
     fn default() -> Self {
         Self {
-            privileged_hygiene: 20.0,
-            password_policy: 15.0,
-            stale_accounts: 15.0,
+            privileged_hygiene: 15.0,
+            password_policy: 10.0,
+            stale_accounts: 10.0,
             kerberos_security: 20.0,
-            dangerous_configs: 15.0,
-            infrastructure_hardening: 15.0,
+            dangerous_configs: 10.0,
+            infrastructure_hardening: 10.0,
+            gpo_security: 10.0,
+            trust_security: 10.0,
+            certificate_security: 5.0,
         }
     }
 }
@@ -435,6 +473,8 @@ mod tests {
                 weight: 30.0,
                 explanation: "Most accounts are well-maintained".to_string(),
                 recommendations: vec![],
+                findings: vec![],
+                impact_if_fixed: 0.0,
             }],
             computed_at: "2026-03-23T10:00:00Z".to_string(),
         };
@@ -452,8 +492,35 @@ mod tests {
             + weights.stale_accounts
             + weights.kerberos_security
             + weights.dangerous_configs
-            + weights.infrastructure_hardening;
+            + weights.infrastructure_hardening
+            + weights.gpo_security
+            + weights.trust_security
+            + weights.certificate_security;
         assert!((total - 100.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_risk_finding_serialization() {
+        let finding = RiskFinding {
+            id: "GPO-001".to_string(),
+            description: "GPP passwords may exist".to_string(),
+            severity: AlertSeverity::High,
+            points_deducted: 15.0,
+            remediation: "Audit SYSVOL for cpassword entries".to_string(),
+            complexity: RemediationComplexity::Easy,
+            framework_ref: Some("MITRE T1552.006".to_string()),
+        };
+        let json = serde_json::to_string(&finding).unwrap();
+        assert!(json.contains("pointsDeducted"));
+        assert!(json.contains("frameworkRef"));
+        assert!(json.contains("GPO-001"));
+    }
+
+    #[test]
+    fn test_remediation_complexity_serialization() {
+        let easy = RemediationComplexity::Easy;
+        let json = serde_json::to_string(&easy).unwrap();
+        assert_eq!(json, "\"Easy\"");
     }
 
     #[test]

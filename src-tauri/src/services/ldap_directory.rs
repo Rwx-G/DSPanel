@@ -2641,10 +2641,7 @@ impl DirectoryProvider for LdapDirectoryProvider {
 
         // Search all security groups and match by objectSid RID.
         // We search both the domain partition and the Builtin container.
-        let search_bases = vec![
-            base_dn.clone(),
-            format!("CN=Builtin,{}", base_dn),
-        ];
+        let search_bases = vec![base_dn.clone(), format!("CN=Builtin,{}", base_dn)];
 
         for search_base in search_bases {
             let sb = search_base.clone();

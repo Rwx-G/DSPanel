@@ -30,10 +30,7 @@ pub(crate) async fn get_privileged_accounts_inner(
 
     // Load additional configured groups from settings
     let settings = state.app_settings.get();
-    let additional_groups = settings
-        .privileged_groups
-        .clone()
-        .unwrap_or_default();
+    let additional_groups = settings.privileged_groups.clone().unwrap_or_default();
 
     crate::services::security::get_privileged_accounts_report(provider, &additional_groups)
         .await
@@ -57,9 +54,7 @@ pub async fn get_privileged_accounts(
 // ---------------------------------------------------------------------------
 
 /// Computes the domain risk score. Requires DomainAdmin.
-pub(crate) async fn get_risk_score_inner(
-    state: &AppState,
-) -> Result<RiskScoreResult, AppError> {
+pub(crate) async fn get_risk_score_inner(state: &AppState) -> Result<RiskScoreResult, AppError> {
     if !state
         .permission_service
         .has_permission(PermissionLevel::DomainAdmin)
@@ -103,9 +98,7 @@ pub(crate) fn get_risk_score_history_inner(
 
 /// Computes and returns the domain risk score.
 #[tauri::command]
-pub async fn get_risk_score(
-    state: State<'_, AppState>,
-) -> Result<RiskScoreResult, AppError> {
+pub async fn get_risk_score(state: State<'_, AppState>) -> Result<RiskScoreResult, AppError> {
     get_risk_score_inner(&state).await
 }
 
@@ -236,7 +229,7 @@ mod tests {
         assert!(result.is_ok());
         let score = result.unwrap();
         assert!(score.total_score >= 0.0 && score.total_score <= 100.0);
-        assert_eq!(score.factors.len(), 6);
+        assert_eq!(score.factors.len(), 9);
     }
 
     #[test]

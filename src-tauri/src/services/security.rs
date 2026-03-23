@@ -124,24 +124,24 @@ pub async fn get_privileged_accounts_report(
 
             let enabled = (uac & UAC_ACCOUNTDISABLE) == 0;
             let password_never_expires = (uac & UAC_DONT_EXPIRE_PASSWORD) != 0;
-            let kerberoastable = !member.get_attribute_values("servicePrincipalName").is_empty();
+            let kerberoastable = !member
+                .get_attribute_values("servicePrincipalName")
+                .is_empty();
             let asrep_roastable = (uac & UAC_DONT_REQUIRE_PREAUTH) != 0;
             let reversible_encryption = (uac & UAC_ENCRYPTED_TEXT_PWD_ALLOWED) != 0;
             let des_only = (uac & UAC_USE_DES_KEY_ONLY) != 0;
-            let constrained_delegation_transition =
-                (uac & UAC_TRUSTED_TO_AUTH_FOR_DELEGATION) != 0;
+            let constrained_delegation_transition = (uac & UAC_TRUSTED_TO_AUTH_FOR_DELEGATION) != 0;
             let has_sid_history = !member.get_attribute_values("sIDHistory").is_empty();
             let is_service_account = kerberoastable && password_never_expires;
-            let in_protected_users =
-                protected_users_members.contains(&member.distinguished_name);
+            let in_protected_users = protected_users_members.contains(&member.distinguished_name);
             let admin_count = member
                 .get_attribute("adminCount")
                 .and_then(|v| v.parse::<u32>().ok())
                 .unwrap_or(0);
 
-            let password_age_days = pwd_last_set.as_ref().map(|pwd_set| {
-                (Utc::now() - *pwd_set).num_days()
-            });
+            let password_age_days = pwd_last_set
+                .as_ref()
+                .map(|pwd_set| (Utc::now() - *pwd_set).num_days());
 
             let last_logon_str = last_logon.as_ref().map(|dt| dt.to_rfc3339());
 
@@ -154,15 +154,12 @@ pub async fn get_privileged_accounts_report(
                     .sam_account_name
                     .clone()
                     .unwrap_or_else(|| "unknown".to_string()),
-                display_name: member
-                    .display_name
-                    .clone()
-                    .unwrap_or_else(|| {
-                        member
-                            .sam_account_name
-                            .clone()
-                            .unwrap_or_else(|| "unknown".to_string())
-                    }),
+                display_name: member.display_name.clone().unwrap_or_else(|| {
+                    member
+                        .sam_account_name
+                        .clone()
+                        .unwrap_or_else(|| "unknown".to_string())
+                }),
                 privileged_groups: vec![group_name.clone()],
                 last_logon: last_logon_str,
                 password_age_days,
@@ -177,8 +174,7 @@ pub async fn get_privileged_accounts_report(
                 has_sid_history,
                 is_service_account,
                 in_protected_users,
-                admin_count_orphaned: admin_count == 1
-                    && !enabled, // Simplified: disabled with adminCount=1
+                admin_count_orphaned: admin_count == 1 && !enabled, // Simplified: disabled with adminCount=1
                 alerts: Vec::new(),
             };
 
@@ -195,7 +191,9 @@ pub async fn get_privileged_accounts_report(
     all_accounts.sort_by(|a, b| {
         let a_max = a.alerts.iter().map(|al| &al.severity).max();
         let b_max = b.alerts.iter().map(|al| &al.severity).max();
-        b_max.cmp(&a_max).then_with(|| b.alerts.len().cmp(&a.alerts.len()))
+        b_max
+            .cmp(&a_max)
+            .then_with(|| b.alerts.len().cmp(&a.alerts.len()))
     });
 
     // Domain-level findings
@@ -210,8 +208,6 @@ pub async fn get_privileged_accounts_report(
         scanned_at: Utc::now().to_rfc3339(),
     })
 }
-
-
 
 /// Gathers domain-level security findings (KRBTGT, LAPS, PSO, functional level, etc.).
 async fn get_domain_security_findings(
@@ -437,7 +433,10 @@ pub fn compute_alerts(
         if age > PASSWORD_AGE_THRESHOLD_DAYS {
             alerts.push(SecurityAlert {
                 severity: AlertSeverity::Critical,
-                message: format!("Password not changed for {} days (threshold: {})", age, PASSWORD_AGE_THRESHOLD_DAYS),
+                message: format!(
+                    "Password not changed for {} days (threshold: {})",
+                    age, PASSWORD_AGE_THRESHOLD_DAYS
+                ),
                 alert_type: "password_age".to_string(),
             });
         }
@@ -447,7 +446,8 @@ pub fn compute_alerts(
     if account.reversible_encryption {
         alerts.push(SecurityAlert {
             severity: AlertSeverity::Critical,
-            message: "Reversible encryption enabled - password recoverable in plaintext".to_string(),
+            message: "Reversible encryption enabled - password recoverable in plaintext"
+                .to_string(),
             alert_type: "reversible_encryption".to_string(),
         });
     }
@@ -497,7 +497,9 @@ pub fn compute_alerts(
     if account.constrained_delegation_transition {
         alerts.push(SecurityAlert {
             severity: AlertSeverity::High,
-            message: "Constrained delegation with protocol transition enabled - can impersonate any user".to_string(),
+            message:
+                "Constrained delegation with protocol transition enabled - can impersonate any user"
+                    .to_string(),
             alert_type: "constrained_delegation_transition".to_string(),
         });
     }
@@ -506,7 +508,8 @@ pub fn compute_alerts(
     if account.has_sid_history {
         alerts.push(SecurityAlert {
             severity: AlertSeverity::High,
-            message: "SIDHistory attribute present - potential cross-domain escalation vector".to_string(),
+            message: "SIDHistory attribute present - potential cross-domain escalation vector"
+                .to_string(),
             alert_type: "sid_history".to_string(),
         });
     }
@@ -515,7 +518,8 @@ pub fn compute_alerts(
     if account.is_service_account {
         alerts.push(SecurityAlert {
             severity: AlertSeverity::High,
-            message: "Service account in privileged group (has SPN + password never expires)".to_string(),
+            message: "Service account in privileged group (has SPN + password never expires)"
+                .to_string(),
             alert_type: "service_account_in_admins".to_string(),
         });
     }
@@ -564,7 +568,8 @@ pub fn compute_alerts(
     if account.admin_count_orphaned {
         alerts.push(SecurityAlert {
             severity: AlertSeverity::Medium,
-            message: "adminCount=1 on disabled account - orphaned AdminSDHolder protection".to_string(),
+            message: "adminCount=1 on disabled account - orphaned AdminSDHolder protection"
+                .to_string(),
             alert_type: "admin_count_orphaned".to_string(),
         });
     }
@@ -637,11 +642,48 @@ fn parse_ad_timestamp(value: Option<&str>) -> Option<DateTime<Utc>> {
 // ---------------------------------------------------------------------------
 
 use crate::models::security::{
-    RiskFactor, RiskScoreHistory, RiskScoreResult, RiskWeights, RiskZone,
+    RemediationComplexity, RiskFactor, RiskFinding, RiskScoreHistory, RiskScoreResult, RiskWeights,
+    RiskZone,
 };
 use rusqlite::Connection;
 use std::path::PathBuf;
 use std::sync::Mutex;
+
+/// Helper struct to bundle factor computation results.
+struct FactorResult {
+    score: f64,
+    explanation: String,
+    recommendations: Vec<String>,
+    findings: Vec<RiskFinding>,
+}
+
+/// Derives severity from points deducted.
+fn severity_from_points(points: f64) -> AlertSeverity {
+    if points >= 20.0 {
+        AlertSeverity::Critical
+    } else if points >= 10.0 {
+        AlertSeverity::High
+    } else if points >= 5.0 {
+        AlertSeverity::Medium
+    } else {
+        AlertSeverity::Info
+    }
+}
+
+/// Builds a `RiskFactor` from a `FactorResult`.
+fn build_risk_factor(id: &str, name: &str, weight: f64, result: FactorResult) -> RiskFactor {
+    let impact_if_fixed: f64 = result.findings.iter().map(|f| f.points_deducted).sum();
+    RiskFactor {
+        id: id.to_string(),
+        name: name.to_string(),
+        score: result.score,
+        weight,
+        explanation: result.explanation,
+        recommendations: result.recommendations,
+        findings: result.findings,
+        impact_if_fixed,
+    }
+}
 
 /// Computes the domain risk score based on data from the directory provider.
 pub async fn compute_risk_score(
@@ -653,88 +695,101 @@ pub async fn compute_risk_score(
     // Collect domain findings once for reuse across factors
     let domain_findings = get_domain_security_findings(provider.clone()).await;
 
-    // Factor 1: Privileged Account Hygiene (enriched with kerberoastable, protected users)
-    let priv_score = compute_privileged_hygiene_factor(provider.clone()).await;
-    factors.push(RiskFactor {
-        id: "privileged_hygiene".to_string(),
-        name: "Privileged Account Hygiene".to_string(),
-        score: priv_score.0,
-        weight: weights.privileged_hygiene,
-        explanation: priv_score.1,
-        recommendations: priv_score.2,
-    });
+    // Factor 1: Privileged Account Hygiene
+    let priv_result = compute_privileged_hygiene_factor(provider.clone()).await;
+    factors.push(build_risk_factor(
+        "privileged_hygiene",
+        "Privileged Account Hygiene",
+        weights.privileged_hygiene,
+        priv_result,
+    ));
 
     // Factor 2: Password Policy Strength
-    let pwd_score = compute_password_policy_factor(provider.clone()).await;
-    factors.push(RiskFactor {
-        id: "password_policy".to_string(),
-        name: "Password Policy Strength".to_string(),
-        score: pwd_score.0,
-        weight: weights.password_policy,
-        explanation: pwd_score.1,
-        recommendations: pwd_score.2,
-    });
+    let pwd_result = compute_password_policy_factor(provider.clone()).await;
+    factors.push(build_risk_factor(
+        "password_policy",
+        "Password Policy Strength",
+        weights.password_policy,
+        pwd_result,
+    ));
 
     // Factor 3: Stale Account Ratio
-    let stale_score = compute_stale_accounts_factor(provider.clone()).await;
-    factors.push(RiskFactor {
-        id: "stale_accounts".to_string(),
-        name: "Stale Account Ratio".to_string(),
-        score: stale_score.0,
-        weight: weights.stale_accounts,
-        explanation: stale_score.1,
-        recommendations: stale_score.2,
-    });
+    let stale_result = compute_stale_accounts_factor(provider.clone()).await;
+    factors.push(build_risk_factor(
+        "stale_accounts",
+        "Stale Account Ratio",
+        weights.stale_accounts,
+        stale_result,
+    ));
 
-    // Factor 4: Kerberos Security (NEW - uses domain findings)
-    let kerb_score = compute_kerberos_security_factor(provider.clone(), &domain_findings).await;
-    factors.push(RiskFactor {
-        id: "kerberos_security".to_string(),
-        name: "Kerberos Security".to_string(),
-        score: kerb_score.0,
-        weight: weights.kerberos_security,
-        explanation: kerb_score.1,
-        recommendations: kerb_score.2,
-    });
+    // Factor 4: Kerberos Security
+    let kerb_result = compute_kerberos_security_factor(provider.clone(), &domain_findings).await;
+    factors.push(build_risk_factor(
+        "kerberos_security",
+        "Kerberos Security",
+        weights.kerberos_security,
+        kerb_result,
+    ));
 
     // Factor 5: Dangerous Configurations
-    let danger_score = compute_dangerous_configs_factor(provider.clone()).await;
-    factors.push(RiskFactor {
-        id: "dangerous_configs".to_string(),
-        name: "Dangerous Configurations".to_string(),
-        score: danger_score.0,
-        weight: weights.dangerous_configs,
-        explanation: danger_score.1,
-        recommendations: danger_score.2,
-    });
+    let danger_result = compute_dangerous_configs_factor(provider.clone()).await;
+    factors.push(build_risk_factor(
+        "dangerous_configs",
+        "Dangerous Configurations",
+        weights.dangerous_configs,
+        danger_result,
+    ));
 
-    // Factor 6: Infrastructure Hardening (NEW - uses domain findings)
-    let infra_score = compute_infrastructure_hardening_factor(&domain_findings);
-    factors.push(RiskFactor {
-        id: "infrastructure_hardening".to_string(),
-        name: "Infrastructure Hardening".to_string(),
-        score: infra_score.0,
-        weight: weights.infrastructure_hardening,
-        explanation: infra_score.1,
-        recommendations: infra_score.2,
-    });
+    // Factor 6: Infrastructure Hardening
+    let infra_result = compute_infrastructure_hardening_factor(&domain_findings);
+    factors.push(build_risk_factor(
+        "infrastructure_hardening",
+        "Infrastructure Hardening",
+        weights.infrastructure_hardening,
+        infra_result,
+    ));
+
+    // Factor 7: GPO Security
+    let gpo_result = compute_gpo_security_factor(provider.clone()).await;
+    factors.push(build_risk_factor(
+        "gpo_security",
+        "GPO Security",
+        weights.gpo_security,
+        gpo_result,
+    ));
+
+    // Factor 8: Trust Security
+    let trust_result = compute_trust_security_factor(provider.clone()).await;
+    factors.push(build_risk_factor(
+        "trust_security",
+        "Trust Security",
+        weights.trust_security,
+        trust_result,
+    ));
+
+    // Factor 9: Certificate Security (AD CS)
+    let cert_result = compute_certificate_security_factor(provider.clone()).await;
+    factors.push(build_risk_factor(
+        "certificate_security",
+        "Certificate Security",
+        weights.certificate_security,
+        cert_result,
+    ));
 
     // Compute weighted total
     let total_weight: f64 = factors.iter().map(|f| f.weight).sum();
     let total_score = if total_weight > 0.0 {
-        factors
-            .iter()
-            .map(|f| f.score * f.weight)
-            .sum::<f64>()
-            / total_weight
+        factors.iter().map(|f| f.score * f.weight).sum::<f64>() / total_weight
     } else {
         0.0
     };
 
     // Worst factor (PingCastle-style "weakest link" indicator)
-    let worst = factors
-        .iter()
-        .min_by(|a, b| a.score.partial_cmp(&b.score).unwrap_or(std::cmp::Ordering::Equal));
+    let worst = factors.iter().min_by(|a, b| {
+        a.score
+            .partial_cmp(&b.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     let (worst_factor_name, worst_factor_score) = worst
         .map(|f| (f.name.clone(), f.score))
         .unwrap_or_else(|| ("None".to_string(), 100.0));
@@ -756,52 +811,101 @@ pub async fn compute_risk_score(
 }
 
 /// Scores privileged account hygiene (0-100).
-async fn compute_privileged_hygiene_factor(
-    provider: Arc<dyn DirectoryProvider>,
-) -> (f64, String, Vec<String>) {
+async fn compute_privileged_hygiene_factor(provider: Arc<dyn DirectoryProvider>) -> FactorResult {
     let report = get_privileged_accounts_report(provider, &[]).await;
     match report {
         Ok(report) if !report.accounts.is_empty() => {
             let total = report.accounts.len() as f64;
-            let with_alerts = report.accounts.iter().filter(|a| !a.alerts.is_empty()).count() as f64;
+            let with_alerts = report
+                .accounts
+                .iter()
+                .filter(|a| !a.alerts.is_empty())
+                .count() as f64;
             let score = ((total - with_alerts) / total * 100.0).clamp(0.0, 100.0);
 
             let mut recommendations = Vec::new();
+            let mut findings = Vec::new();
+
             if report.summary.critical > 0 {
+                let points = (report.summary.critical as f64 * 5.0).min(30.0);
                 recommendations.push(format!(
                     "Address {} critical alert(s) on privileged accounts",
                     report.summary.critical
                 ));
+                findings.push(RiskFinding {
+                    id: "PRIV-001".to_string(),
+                    description: format!(
+                        "{} critical alert(s) on privileged accounts",
+                        report.summary.critical
+                    ),
+                    severity: severity_from_points(points),
+                    points_deducted: points,
+                    remediation: "Address critical alerts on privileged accounts".to_string(),
+                    complexity: RemediationComplexity::Medium,
+                    framework_ref: Some("CIS 5.1".to_string()),
+                });
             }
             if report.summary.high > 0 {
+                let points = (report.summary.high as f64 * 3.0).min(20.0);
                 recommendations.push(format!(
                     "Review {} high-severity alert(s) on privileged accounts",
                     report.summary.high
                 ));
+                findings.push(RiskFinding {
+                    id: "PRIV-002".to_string(),
+                    description: format!(
+                        "{} high-severity alert(s) on privileged accounts",
+                        report.summary.high
+                    ),
+                    severity: severity_from_points(points),
+                    points_deducted: points,
+                    remediation: "Review high-severity alerts on privileged accounts".to_string(),
+                    complexity: RemediationComplexity::Medium,
+                    framework_ref: Some("CIS 5.2".to_string()),
+                });
             }
 
-            (
+            FactorResult {
                 score,
-                format!("{}/{} privileged accounts have security alerts", with_alerts as usize, total as usize),
+                explanation: format!(
+                    "{}/{} privileged accounts have security alerts",
+                    with_alerts as usize, total as usize
+                ),
                 recommendations,
-            )
+                findings,
+            }
         }
-        Ok(_) => (100.0, "No privileged accounts found to assess".to_string(), vec![]),
-        Err(_) => (50.0, "Could not assess privileged accounts".to_string(), vec!["Ensure directory connectivity to scan privileged groups".to_string()]),
+        Ok(_) => FactorResult {
+            score: 100.0,
+            explanation: "No privileged accounts found to assess".to_string(),
+            recommendations: vec![],
+            findings: vec![],
+        },
+        Err(_) => FactorResult {
+            score: 50.0,
+            explanation: "Could not assess privileged accounts".to_string(),
+            recommendations: vec![
+                "Ensure directory connectivity to scan privileged groups".to_string()
+            ],
+            findings: vec![],
+        },
     }
 }
 
 /// Scores password policy strength (0-100).
-async fn compute_password_policy_factor(
-    provider: Arc<dyn DirectoryProvider>,
-) -> (f64, String, Vec<String>) {
+async fn compute_password_policy_factor(provider: Arc<dyn DirectoryProvider>) -> FactorResult {
     // Read the default domain password policy from rootDSE
     let entry = provider.read_entry("").await;
     match entry {
         Ok(Some(root_dse)) => {
             let base_dn = root_dse.get_attribute("defaultNamingContext").unwrap_or("");
             if base_dn.is_empty() {
-                return (50.0, "Could not determine domain base DN".to_string(), vec![]);
+                return FactorResult {
+                    score: 50.0,
+                    explanation: "Could not determine domain base DN".to_string(),
+                    recommendations: vec![],
+                    findings: vec![],
+                };
             }
 
             // Read domain object for password policy attributes
@@ -811,6 +915,7 @@ async fn compute_password_policy_factor(
                     let mut score = 100.0_f64;
                     let mut issues = Vec::new();
                     let mut recommendations = Vec::new();
+                    let mut findings = Vec::new();
 
                     // Check minPwdLength
                     let min_length = domain_entry
@@ -819,8 +924,27 @@ async fn compute_password_policy_factor(
                         .unwrap_or(0);
                     if min_length < 12 {
                         score -= 25.0;
-                        issues.push(format!("Minimum password length is {} (should be 12+)", min_length));
-                        recommendations.push("Increase minimum password length to 12 or more characters".to_string());
+                        issues.push(format!(
+                            "Minimum password length is {} (should be 12+)",
+                            min_length
+                        ));
+                        recommendations.push(
+                            "Increase minimum password length to 12 or more characters".to_string(),
+                        );
+                        findings.push(RiskFinding {
+                            id: "PWD-001".to_string(),
+                            description: format!(
+                                "Minimum password length is {} (should be 12+)",
+                                min_length
+                            ),
+                            severity: severity_from_points(25.0),
+                            points_deducted: 25.0,
+                            remediation:
+                                "Increase minimum password length to 12 or more characters"
+                                    .to_string(),
+                            complexity: RemediationComplexity::Easy,
+                            framework_ref: Some("CIS 1.1.4".to_string()),
+                        });
                     }
 
                     // Check lockoutThreshold
@@ -831,7 +955,18 @@ async fn compute_password_policy_factor(
                     if lockout == 0 {
                         score -= 25.0;
                         issues.push("Account lockout is disabled".to_string());
-                        recommendations.push("Enable account lockout after 5-10 failed attempts".to_string());
+                        recommendations
+                            .push("Enable account lockout after 5-10 failed attempts".to_string());
+                        findings.push(RiskFinding {
+                            id: "PWD-002".to_string(),
+                            description: "Account lockout is disabled".to_string(),
+                            severity: severity_from_points(25.0),
+                            points_deducted: 25.0,
+                            remediation: "Enable account lockout after 5-10 failed attempts"
+                                .to_string(),
+                            complexity: RemediationComplexity::Easy,
+                            framework_ref: Some("CIS 1.2.1".to_string()),
+                        });
                     }
 
                     // Check pwdProperties for complexity
@@ -843,6 +978,15 @@ async fn compute_password_policy_factor(
                         score -= 25.0;
                         issues.push("Password complexity requirement is disabled".to_string());
                         recommendations.push("Enable password complexity requirements".to_string());
+                        findings.push(RiskFinding {
+                            id: "PWD-003".to_string(),
+                            description: "Password complexity requirement is disabled".to_string(),
+                            severity: severity_from_points(25.0),
+                            points_deducted: 25.0,
+                            remediation: "Enable password complexity requirements".to_string(),
+                            complexity: RemediationComplexity::Easy,
+                            framework_ref: Some("CIS 1.1.5".to_string()),
+                        });
                     }
 
                     // Check maxPwdAge (negative 100ns intervals)
@@ -853,7 +997,17 @@ async fn compute_password_policy_factor(
                     if max_age == 0 {
                         score -= 25.0;
                         issues.push("Password expiration is disabled".to_string());
-                        recommendations.push("Set maximum password age to 90 days or less".to_string());
+                        recommendations
+                            .push("Set maximum password age to 90 days or less".to_string());
+                        findings.push(RiskFinding {
+                            id: "PWD-004".to_string(),
+                            description: "Password expiration is disabled".to_string(),
+                            severity: severity_from_points(25.0),
+                            points_deducted: 25.0,
+                            remediation: "Set maximum password age to 90 days or less".to_string(),
+                            complexity: RemediationComplexity::Easy,
+                            framework_ref: Some("CIS 1.1.2".to_string()),
+                        });
                     }
 
                     let explanation = if issues.is_empty() {
@@ -862,19 +1016,32 @@ async fn compute_password_policy_factor(
                         format!("Issues found: {}", issues.join("; "))
                     };
 
-                    (score.clamp(0.0, 100.0), explanation, recommendations)
+                    FactorResult {
+                        score: score.clamp(0.0, 100.0),
+                        explanation,
+                        recommendations,
+                        findings,
+                    }
                 }
-                _ => (50.0, "Could not read domain password policy".to_string(), vec![]),
+                _ => FactorResult {
+                    score: 50.0,
+                    explanation: "Could not read domain password policy".to_string(),
+                    recommendations: vec![],
+                    findings: vec![],
+                },
             }
         }
-        _ => (50.0, "Could not connect to directory to assess password policy".to_string(), vec![]),
+        _ => FactorResult {
+            score: 50.0,
+            explanation: "Could not connect to directory to assess password policy".to_string(),
+            recommendations: vec![],
+            findings: vec![],
+        },
     }
 }
 
 /// Scores stale account ratio (0-100).
-async fn compute_stale_accounts_factor(
-    provider: Arc<dyn DirectoryProvider>,
-) -> (f64, String, Vec<String>) {
+async fn compute_stale_accounts_factor(provider: Arc<dyn DirectoryProvider>) -> FactorResult {
     let users = provider.browse_users(5000).await;
     match users {
         Ok(users) if !users.is_empty() => {
@@ -896,28 +1063,57 @@ async fn compute_stale_accounts_factor(
             let score = ((1.0 - ratio) * 100.0).clamp(0.0, 100.0);
 
             let mut recommendations = Vec::new();
+            let mut findings = Vec::new();
             if stale_count > 0 {
+                let points = (ratio * 100.0).min(100.0);
                 recommendations.push(format!(
                     "Review and disable/remove {} stale account(s) (inactive > 90 days)",
                     stale_count
                 ));
+                findings.push(RiskFinding {
+                    id: "STALE-001".to_string(),
+                    description: format!(
+                        "{}/{} accounts are stale (inactive > 90 days)",
+                        stale_count, total
+                    ),
+                    severity: severity_from_points(points),
+                    points_deducted: points,
+                    remediation: format!(
+                        "Review and disable/remove {} stale account(s)",
+                        stale_count
+                    ),
+                    complexity: RemediationComplexity::Medium,
+                    framework_ref: Some("CIS 5.3".to_string()),
+                });
             }
 
-            (
+            FactorResult {
                 score,
-                format!("{}/{} accounts are stale (inactive > 90 days)", stale_count, total),
+                explanation: format!(
+                    "{}/{} accounts are stale (inactive > 90 days)",
+                    stale_count, total
+                ),
                 recommendations,
-            )
+                findings,
+            }
         }
-        Ok(_) => (100.0, "No user accounts found to assess".to_string(), vec![]),
-        Err(_) => (50.0, "Could not retrieve user accounts".to_string(), vec![]),
+        Ok(_) => FactorResult {
+            score: 100.0,
+            explanation: "No user accounts found to assess".to_string(),
+            recommendations: vec![],
+            findings: vec![],
+        },
+        Err(_) => FactorResult {
+            score: 50.0,
+            explanation: "Could not retrieve user accounts".to_string(),
+            recommendations: vec![],
+            findings: vec![],
+        },
     }
 }
 
 /// Scores dangerous configurations (0-100).
-async fn compute_dangerous_configs_factor(
-    provider: Arc<dyn DirectoryProvider>,
-) -> (f64, String, Vec<String>) {
+async fn compute_dangerous_configs_factor(provider: Arc<dyn DirectoryProvider>) -> FactorResult {
     let users = provider.browse_users(5000).await;
     match users {
         Ok(users) if !users.is_empty() => {
@@ -925,6 +1121,7 @@ async fn compute_dangerous_configs_factor(
             let mut score = 100.0_f64;
             let mut issues = Vec::new();
             let mut recommendations = Vec::new();
+            let mut findings = Vec::new();
 
             // Parse UAC flags for all users once
             let uac_flags: Vec<u32> = users
@@ -937,64 +1134,182 @@ async fn compute_dangerous_configs_factor(
                 .collect();
 
             // Unconstrained delegation
-            let unconstrained = uac_flags.iter().filter(|&&f| f & UAC_TRUSTED_FOR_DELEGATION != 0).count();
+            let unconstrained = uac_flags
+                .iter()
+                .filter(|&&f| f & UAC_TRUSTED_FOR_DELEGATION != 0)
+                .count();
             if unconstrained > 0 {
                 let penalty = (unconstrained as f64 / total as f64 * 100.0).min(30.0);
                 score -= penalty;
                 issues.push(format!("{} unconstrained delegation", unconstrained));
-                recommendations.push(format!("Remove unconstrained delegation from {} account(s)", unconstrained));
+                recommendations.push(format!(
+                    "Remove unconstrained delegation from {} account(s)",
+                    unconstrained
+                ));
+                findings.push(RiskFinding {
+                    id: "CONF-001".to_string(),
+                    description: format!(
+                        "{} account(s) with unconstrained delegation",
+                        unconstrained
+                    ),
+                    severity: severity_from_points(penalty),
+                    points_deducted: penalty,
+                    remediation: format!(
+                        "Remove unconstrained delegation from {} account(s)",
+                        unconstrained
+                    ),
+                    complexity: RemediationComplexity::Medium,
+                    framework_ref: Some("MITRE T1558".to_string()),
+                });
             }
 
             // Constrained delegation with protocol transition
-            let constrained_transition = uac_flags.iter().filter(|&&f| f & UAC_TRUSTED_TO_AUTH_FOR_DELEGATION != 0).count();
+            let constrained_transition = uac_flags
+                .iter()
+                .filter(|&&f| f & UAC_TRUSTED_TO_AUTH_FOR_DELEGATION != 0)
+                .count();
             if constrained_transition > 0 {
                 score -= 10.0;
-                issues.push(format!("{} constrained delegation with protocol transition", constrained_transition));
+                issues.push(format!(
+                    "{} constrained delegation with protocol transition",
+                    constrained_transition
+                ));
                 recommendations.push("Review constrained delegation with protocol transition - can impersonate any user".to_string());
+                findings.push(RiskFinding {
+                    id: "CONF-002".to_string(),
+                    description: format!(
+                        "{} account(s) with constrained delegation + protocol transition",
+                        constrained_transition
+                    ),
+                    severity: severity_from_points(10.0),
+                    points_deducted: 10.0,
+                    remediation: "Review constrained delegation with protocol transition"
+                        .to_string(),
+                    complexity: RemediationComplexity::Medium,
+                    framework_ref: Some("MITRE T1558".to_string()),
+                });
             }
 
             // Password never expires on regular accounts (>10%)
-            let never_expires = uac_flags.iter().filter(|&&f| f & UAC_DONT_EXPIRE_PASSWORD != 0).count();
+            let never_expires = uac_flags
+                .iter()
+                .filter(|&&f| f & UAC_DONT_EXPIRE_PASSWORD != 0)
+                .count();
             let never_expires_ratio = never_expires as f64 / total as f64;
             if never_expires_ratio > 0.1 {
                 score -= 15.0;
-                issues.push(format!("{}% passwords never expire", (never_expires_ratio * 100.0) as u32));
+                issues.push(format!(
+                    "{}% passwords never expire",
+                    (never_expires_ratio * 100.0) as u32
+                ));
                 recommendations.push("Reduce accounts with non-expiring passwords".to_string());
+                findings.push(RiskFinding {
+                    id: "CONF-003".to_string(),
+                    description: format!(
+                        "{}% of accounts have non-expiring passwords",
+                        (never_expires_ratio * 100.0) as u32
+                    ),
+                    severity: severity_from_points(15.0),
+                    points_deducted: 15.0,
+                    remediation: "Reduce accounts with non-expiring passwords".to_string(),
+                    complexity: RemediationComplexity::Medium,
+                    framework_ref: Some("CIS 1.1.2".to_string()),
+                });
             }
 
             // Reversible encryption
-            let reversible = uac_flags.iter().filter(|&&f| f & UAC_ENCRYPTED_TEXT_PWD_ALLOWED != 0).count();
+            let reversible = uac_flags
+                .iter()
+                .filter(|&&f| f & UAC_ENCRYPTED_TEXT_PWD_ALLOWED != 0)
+                .count();
             if reversible > 0 {
                 score -= 15.0;
                 issues.push(format!("{} with reversible encryption", reversible));
                 recommendations.push("Disable reversible encryption on all accounts".to_string());
+                findings.push(RiskFinding {
+                    id: "CONF-004".to_string(),
+                    description: format!(
+                        "{} account(s) with reversible encryption enabled",
+                        reversible
+                    ),
+                    severity: severity_from_points(15.0),
+                    points_deducted: 15.0,
+                    remediation: "Disable reversible encryption on all accounts".to_string(),
+                    complexity: RemediationComplexity::Easy,
+                    framework_ref: Some("CIS 1.1.6".to_string()),
+                });
             }
 
             // DES-only Kerberos
-            let des_only = uac_flags.iter().filter(|&&f| f & UAC_USE_DES_KEY_ONLY != 0).count();
+            let des_only = uac_flags
+                .iter()
+                .filter(|&&f| f & UAC_USE_DES_KEY_ONLY != 0)
+                .count();
             if des_only > 0 {
                 score -= 10.0;
                 issues.push(format!("{} with DES-only Kerberos", des_only));
                 recommendations.push("Disable DES encryption and migrate to AES".to_string());
+                findings.push(RiskFinding {
+                    id: "CONF-005".to_string(),
+                    description: format!(
+                        "{} account(s) with DES-only Kerberos encryption",
+                        des_only
+                    ),
+                    severity: severity_from_points(10.0),
+                    points_deducted: 10.0,
+                    remediation: "Disable DES encryption and migrate to AES".to_string(),
+                    complexity: RemediationComplexity::Easy,
+                    framework_ref: Some("CIS 18.3.5".to_string()),
+                });
             }
 
             // AS-REP Roastable
-            let asrep = uac_flags.iter().filter(|&&f| f & UAC_DONT_REQUIRE_PREAUTH != 0).count();
+            let asrep = uac_flags
+                .iter()
+                .filter(|&&f| f & UAC_DONT_REQUIRE_PREAUTH != 0)
+                .count();
             if asrep > 0 {
                 score -= 15.0;
                 issues.push(format!("{} AS-REP Roastable", asrep));
-                recommendations.push("Enable Kerberos pre-authentication on all accounts".to_string());
+                recommendations
+                    .push("Enable Kerberos pre-authentication on all accounts".to_string());
+                findings.push(RiskFinding {
+                    id: "CONF-006".to_string(),
+                    description: format!("{} account(s) with Kerberos pre-authentication disabled (AS-REP Roastable)", asrep),
+                    severity: severity_from_points(15.0),
+                    points_deducted: 15.0,
+                    remediation: "Enable Kerberos pre-authentication on all accounts".to_string(),
+                    complexity: RemediationComplexity::Easy,
+                    framework_ref: Some("MITRE T1558.004".to_string()),
+                });
             }
 
             // RBCD configured
             let rbcd = users
                 .iter()
-                .filter(|u| u.get_attribute("msDS-AllowedToActOnBehalfOfOtherIdentity").is_some())
+                .filter(|u| {
+                    u.get_attribute("msDS-AllowedToActOnBehalfOfOtherIdentity")
+                        .is_some()
+                })
                 .count();
             if rbcd > 0 {
                 score -= 10.0;
                 issues.push(format!("{} with RBCD", rbcd));
-                recommendations.push("Audit Resource-Based Constrained Delegation configurations".to_string());
+                recommendations
+                    .push("Audit Resource-Based Constrained Delegation configurations".to_string());
+                findings.push(RiskFinding {
+                    id: "CONF-007".to_string(),
+                    description: format!(
+                        "{} object(s) with Resource-Based Constrained Delegation",
+                        rbcd
+                    ),
+                    severity: severity_from_points(10.0),
+                    points_deducted: 10.0,
+                    remediation: "Audit Resource-Based Constrained Delegation configurations"
+                        .to_string(),
+                    complexity: RemediationComplexity::Medium,
+                    framework_ref: Some("MITRE T1558".to_string()),
+                });
             }
 
             // Domain functional level check
@@ -1003,11 +1318,58 @@ async fn compute_dangerous_configs_factor(
                     if let Ok(level) = level_str.parse::<u32>() {
                         if level < 6 {
                             score -= 10.0;
-                            issues.push(format!("Domain functional level < 2012 R2 (level {})", level));
-                            recommendations.push("Upgrade domain functional level for modern security features".to_string());
+                            issues.push(format!(
+                                "Domain functional level < 2012 R2 (level {})",
+                                level
+                            ));
+                            recommendations.push(
+                                "Upgrade domain functional level for modern security features"
+                                    .to_string(),
+                            );
+                            findings.push(RiskFinding {
+                                id: "CONF-008".to_string(),
+                                description: format!(
+                                    "Domain functional level < 2012 R2 (level {})",
+                                    level
+                                ),
+                                severity: severity_from_points(10.0),
+                                points_deducted: 10.0,
+                                remediation:
+                                    "Upgrade domain functional level for modern security features"
+                                        .to_string(),
+                                complexity: RemediationComplexity::Hard,
+                                framework_ref: Some("CIS 18.1".to_string()),
+                            });
                         }
                     }
                 }
+            }
+
+            // Count orphaned adminCount accounts (adminCount=1 not in admin groups)
+            let orphaned_admin_count = users
+                .iter()
+                .filter(|u| {
+                    u.get_attribute("adminCount")
+                        .and_then(|v| v.parse::<u32>().ok())
+                        .unwrap_or(0)
+                        == 1
+                })
+                .count();
+            // This is informational - the real check is in privileged hygiene
+            if orphaned_admin_count > 10 {
+                findings.push(RiskFinding {
+                    id: "CONF-009".to_string(),
+                    description: format!(
+                        "{} accounts with adminCount=1 - review for orphaned AdminSDHolder",
+                        orphaned_admin_count
+                    ),
+                    severity: AlertSeverity::Info,
+                    points_deducted: 0.0,
+                    remediation: "Audit accounts with adminCount=1 and clear orphaned entries"
+                        .to_string(),
+                    complexity: RemediationComplexity::Medium,
+                    framework_ref: None,
+                });
             }
 
             let explanation = if issues.is_empty() {
@@ -1016,10 +1378,25 @@ async fn compute_dangerous_configs_factor(
                 format!("Issues: {}", issues.join("; "))
             };
 
-            (score.clamp(0.0, 100.0), explanation, recommendations)
+            FactorResult {
+                score: score.clamp(0.0, 100.0),
+                explanation,
+                recommendations,
+                findings,
+            }
         }
-        Ok(_) => (100.0, "No user accounts found to assess".to_string(), vec![]),
-        Err(_) => (50.0, "Could not retrieve user accounts for configuration audit".to_string(), vec![]),
+        Ok(_) => FactorResult {
+            score: 100.0,
+            explanation: "No user accounts found to assess".to_string(),
+            recommendations: vec![],
+            findings: vec![],
+        },
+        Err(_) => FactorResult {
+            score: 50.0,
+            explanation: "Could not retrieve user accounts for configuration audit".to_string(),
+            recommendations: vec![],
+            findings: vec![],
+        },
     }
 }
 
@@ -1030,10 +1407,11 @@ async fn compute_dangerous_configs_factor(
 async fn compute_kerberos_security_factor(
     provider: Arc<dyn DirectoryProvider>,
     domain_findings: &DomainSecurityFindings,
-) -> (f64, String, Vec<String>) {
+) -> FactorResult {
     let mut score = 100.0_f64;
     let mut issues = Vec::new();
     let mut recommendations = Vec::new();
+    let mut findings = Vec::new();
 
     // KRBTGT password age (from domain findings)
     if let Some(age) = domain_findings.krbtgt_password_age_days {
@@ -1041,9 +1419,33 @@ async fn compute_kerberos_security_factor(
             score -= 30.0;
             issues.push(format!("KRBTGT password {} days old", age));
             recommendations.push("Reset KRBTGT password twice with 12-hour interval".to_string());
+            findings.push(RiskFinding {
+                id: "KERB-001".to_string(),
+                description: format!(
+                    "KRBTGT password {} days old (threshold: {})",
+                    age, KRBTGT_PASSWORD_AGE_THRESHOLD_DAYS
+                ),
+                severity: severity_from_points(30.0),
+                points_deducted: 30.0,
+                remediation: "Reset KRBTGT password twice with 12-hour interval".to_string(),
+                complexity: RemediationComplexity::Medium,
+                framework_ref: Some("MITRE T1558.001".to_string()),
+            });
         } else if age > 90 {
             score -= 10.0;
-            issues.push(format!("KRBTGT password {} days old (consider resetting)", age));
+            issues.push(format!(
+                "KRBTGT password {} days old (consider resetting)",
+                age
+            ));
+            findings.push(RiskFinding {
+                id: "KERB-002".to_string(),
+                description: format!("KRBTGT password {} days old - consider resetting", age),
+                severity: severity_from_points(10.0),
+                points_deducted: 10.0,
+                remediation: "Reset KRBTGT password proactively".to_string(),
+                complexity: RemediationComplexity::Medium,
+                framework_ref: Some("MITRE T1558.001".to_string()),
+            });
         }
     }
 
@@ -1057,8 +1459,24 @@ async fn compute_kerberos_security_factor(
         if kerberoastable > 0 {
             let penalty = (kerberoastable as f64 / total * 30.0).min(25.0);
             score -= penalty;
-            issues.push(format!("{}/{} privileged accounts Kerberoastable", kerberoastable, total as usize));
-            recommendations.push("Remove SPNs from privileged user accounts or use gMSA".to_string());
+            issues.push(format!(
+                "{}/{} privileged accounts Kerberoastable",
+                kerberoastable, total as usize
+            ));
+            recommendations
+                .push("Remove SPNs from privileged user accounts or use gMSA".to_string());
+            findings.push(RiskFinding {
+                id: "KERB-003".to_string(),
+                description: format!(
+                    "{}/{} privileged accounts are Kerberoastable",
+                    kerberoastable, total as usize
+                ),
+                severity: severity_from_points(penalty),
+                points_deducted: penalty,
+                remediation: "Remove SPNs from privileged user accounts or use gMSA".to_string(),
+                complexity: RemediationComplexity::Medium,
+                framework_ref: Some("MITRE T1558.003".to_string()),
+            });
         }
 
         // AS-REP Roastable (proportional)
@@ -1068,17 +1486,47 @@ async fn compute_kerberos_security_factor(
             score -= penalty;
             issues.push(format!("{} AS-REP Roastable account(s)", asrep));
             recommendations.push("Enable Kerberos pre-authentication on all accounts".to_string());
+            findings.push(RiskFinding {
+                id: "KERB-004".to_string(),
+                description: format!("{} privileged account(s) AS-REP Roastable", asrep),
+                severity: severity_from_points(penalty),
+                points_deducted: penalty,
+                remediation: "Enable Kerberos pre-authentication on all accounts".to_string(),
+                complexity: RemediationComplexity::Easy,
+                framework_ref: Some("MITRE T1558.004".to_string()),
+            });
         }
 
         // Protected Users adoption (proportional)
         let enabled_accounts: Vec<_> = report.accounts.iter().filter(|a| a.enabled).collect();
-        let not_protected = enabled_accounts.iter().filter(|a| !a.in_protected_users).count();
+        let not_protected = enabled_accounts
+            .iter()
+            .filter(|a| !a.in_protected_users)
+            .count();
         if !enabled_accounts.is_empty() && not_protected > 0 {
             let ratio = not_protected as f64 / enabled_accounts.len() as f64;
             let penalty = (ratio * 20.0).min(20.0);
             score -= penalty;
-            issues.push(format!("{}/{} enabled admins not in Protected Users", not_protected, enabled_accounts.len()));
-            recommendations.push("Add all privileged accounts to the Protected Users group".to_string());
+            issues.push(format!(
+                "{}/{} enabled admins not in Protected Users",
+                not_protected,
+                enabled_accounts.len()
+            ));
+            recommendations
+                .push("Add all privileged accounts to the Protected Users group".to_string());
+            findings.push(RiskFinding {
+                id: "KERB-005".to_string(),
+                description: format!(
+                    "{}/{} enabled admins not in Protected Users group",
+                    not_protected,
+                    enabled_accounts.len()
+                ),
+                severity: severity_from_points(penalty),
+                points_deducted: penalty,
+                remediation: "Add all privileged accounts to the Protected Users group".to_string(),
+                complexity: RemediationComplexity::Easy,
+                framework_ref: Some("CIS 5.4".to_string()),
+            });
         }
     }
 
@@ -1088,7 +1536,12 @@ async fn compute_kerberos_security_factor(
         format!("Issues: {}", issues.join("; "))
     };
 
-    (score.clamp(0.0, 100.0), explanation, recommendations)
+    FactorResult {
+        score: score.clamp(0.0, 100.0),
+        explanation,
+        recommendations,
+        findings,
+    }
 }
 
 /// Scores infrastructure hardening posture (0-100).
@@ -1097,10 +1550,11 @@ async fn compute_kerberos_security_factor(
 /// domain functional level, LDAP signing.
 fn compute_infrastructure_hardening_factor(
     domain_findings: &DomainSecurityFindings,
-) -> (f64, String, Vec<String>) {
+) -> FactorResult {
     let mut score = 100.0_f64;
     let mut issues = Vec::new();
     let mut recommendations = Vec::new();
+    let mut findings = Vec::new();
 
     // LAPS coverage (proportional)
     if let Some(pct) = domain_findings.laps_coverage_percent {
@@ -1108,15 +1562,42 @@ fn compute_infrastructure_hardening_factor(
             score -= 30.0;
             issues.push(format!("LAPS coverage {:.0}%", pct));
             recommendations.push("Deploy LAPS to all workstations and servers".to_string());
+            findings.push(RiskFinding {
+                id: "INFRA-001".to_string(),
+                description: format!("LAPS coverage is {:.0}% (target: 80%+)", pct),
+                severity: severity_from_points(30.0),
+                points_deducted: 30.0,
+                remediation: "Deploy LAPS to all workstations and servers".to_string(),
+                complexity: RemediationComplexity::Medium,
+                framework_ref: Some("CIS 18.2.1".to_string()),
+            });
         } else if pct < 80.0 {
             score -= 15.0;
             issues.push(format!("LAPS coverage {:.0}% (target: 80%+)", pct));
             recommendations.push("Extend LAPS deployment to remaining computers".to_string());
+            findings.push(RiskFinding {
+                id: "INFRA-001".to_string(),
+                description: format!("LAPS coverage is {:.0}% (target: 80%+)", pct),
+                severity: severity_from_points(15.0),
+                points_deducted: 15.0,
+                remediation: "Extend LAPS deployment to remaining computers".to_string(),
+                complexity: RemediationComplexity::Medium,
+                framework_ref: Some("CIS 18.2.1".to_string()),
+            });
         }
     } else if domain_findings.total_computer_count > 0 {
         score -= 30.0;
         issues.push("LAPS not deployed".to_string());
         recommendations.push("Deploy LAPS for local admin password management".to_string());
+        findings.push(RiskFinding {
+            id: "INFRA-001".to_string(),
+            description: "LAPS is not deployed on any computer".to_string(),
+            severity: severity_from_points(30.0),
+            points_deducted: 30.0,
+            remediation: "Deploy LAPS for local admin password management".to_string(),
+            complexity: RemediationComplexity::Medium,
+            framework_ref: Some("CIS 18.2.1".to_string()),
+        });
     }
 
     // Recycle Bin
@@ -1124,13 +1605,34 @@ fn compute_infrastructure_hardening_factor(
         score -= 15.0;
         issues.push("AD Recycle Bin disabled".to_string());
         recommendations.push("Enable AD Recycle Bin for object recovery capability".to_string());
+        findings.push(RiskFinding {
+            id: "INFRA-002".to_string(),
+            description: "AD Recycle Bin is not enabled".to_string(),
+            severity: severity_from_points(15.0),
+            points_deducted: 15.0,
+            remediation: "Enable AD Recycle Bin for object recovery capability".to_string(),
+            complexity: RemediationComplexity::Easy,
+            framework_ref: Some("CIS 18.8.1".to_string()),
+        });
     }
 
     // Fine-Grained Password Policies
     if domain_findings.pso_count == 0 {
         score -= 10.0;
         issues.push("No Fine-Grained Password Policies".to_string());
-        recommendations.push("Create PSOs for privileged accounts with stronger password requirements".to_string());
+        recommendations.push(
+            "Create PSOs for privileged accounts with stronger password requirements".to_string(),
+        );
+        findings.push(RiskFinding {
+            id: "INFRA-003".to_string(),
+            description: "No Fine-Grained Password Policies (PSOs) configured".to_string(),
+            severity: severity_from_points(10.0),
+            points_deducted: 10.0,
+            remediation: "Create PSOs for privileged accounts with stronger password requirements"
+                .to_string(),
+            complexity: RemediationComplexity::Easy,
+            framework_ref: Some("CIS 1.1.7".to_string()),
+        });
     }
 
     // Domain functional level
@@ -1138,10 +1640,32 @@ fn compute_infrastructure_hardening_factor(
         if level.contains("2008") || level.contains("2003") || level.contains("2000") {
             score -= 20.0;
             issues.push(format!("Domain functional level: {}", level));
-            recommendations.push("Upgrade domain functional level to Windows Server 2016+".to_string());
+            recommendations
+                .push("Upgrade domain functional level to Windows Server 2016+".to_string());
+            findings.push(RiskFinding {
+                id: "INFRA-004".to_string(),
+                description: format!("Domain functional level is {} - outdated", level),
+                severity: severity_from_points(20.0),
+                points_deducted: 20.0,
+                remediation: "Upgrade domain functional level to Windows Server 2016+".to_string(),
+                complexity: RemediationComplexity::Hard,
+                framework_ref: Some("CIS 18.1".to_string()),
+            });
         } else if level.contains("2012") && !level.contains("R2") {
             score -= 10.0;
-            issues.push(format!("Domain functional level: {} (consider upgrading)", level));
+            issues.push(format!(
+                "Domain functional level: {} (consider upgrading)",
+                level
+            ));
+            findings.push(RiskFinding {
+                id: "INFRA-004".to_string(),
+                description: format!("Domain functional level is {} - consider upgrading", level),
+                severity: severity_from_points(10.0),
+                points_deducted: 10.0,
+                remediation: "Upgrade domain functional level to Windows Server 2016+".to_string(),
+                complexity: RemediationComplexity::Hard,
+                framework_ref: Some("CIS 18.1".to_string()),
+            });
         }
     }
 
@@ -1149,8 +1673,24 @@ fn compute_infrastructure_hardening_factor(
     if domain_findings.rbcd_configured_count > 0 {
         let penalty = (domain_findings.rbcd_configured_count as f64 * 5.0).min(15.0);
         score -= penalty;
-        issues.push(format!("{} RBCD delegation(s)", domain_findings.rbcd_configured_count));
-        recommendations.push("Audit Resource-Based Constrained Delegation configurations".to_string());
+        issues.push(format!(
+            "{} RBCD delegation(s)",
+            domain_findings.rbcd_configured_count
+        ));
+        recommendations
+            .push("Audit Resource-Based Constrained Delegation configurations".to_string());
+        findings.push(RiskFinding {
+            id: "INFRA-005".to_string(),
+            description: format!(
+                "{} object(s) with RBCD configured",
+                domain_findings.rbcd_configured_count
+            ),
+            severity: severity_from_points(penalty),
+            points_deducted: penalty,
+            remediation: "Audit Resource-Based Constrained Delegation configurations".to_string(),
+            complexity: RemediationComplexity::Medium,
+            framework_ref: Some("MITRE T1558".to_string()),
+        });
     }
 
     let explanation = if issues.is_empty() {
@@ -1159,7 +1699,525 @@ fn compute_infrastructure_hardening_factor(
         format!("Issues: {}", issues.join("; "))
     };
 
-    (score.clamp(0.0, 100.0), explanation, recommendations)
+    FactorResult {
+        score: score.clamp(0.0, 100.0),
+        explanation,
+        recommendations,
+        findings,
+    }
+}
+
+/// Scores GPO security posture (0-100).
+///
+/// Evaluates: GPP password risks, domain behavior version, GPO count/editors.
+async fn compute_gpo_security_factor(provider: Arc<dyn DirectoryProvider>) -> FactorResult {
+    let base_dn = match provider.base_dn() {
+        Some(dn) => dn,
+        None => {
+            return FactorResult {
+                score: 50.0,
+                explanation: "Could not determine domain base DN for GPO analysis".to_string(),
+                recommendations: vec![],
+                findings: vec![],
+            };
+        }
+    };
+
+    let mut score = 100.0_f64;
+    let mut issues = Vec::new();
+    let mut recommendations = Vec::new();
+    let mut findings = Vec::new();
+
+    // Check GPO count - GPOs with potential GPP password risks
+    let gpo_base = format!("CN=Policies,CN=System,{}", base_dn);
+    let gpo_count = match provider
+        .search_configuration(&gpo_base, "(objectClass=groupPolicyContainer)")
+        .await
+    {
+        Ok(gpos) => gpos.len(),
+        Err(_) => 0,
+    };
+
+    if gpo_count > 0 {
+        // Flag GPP password risk - we cannot read SYSVOL via LDAP but GPOs exist
+        score -= 15.0;
+        issues.push(format!(
+            "{} GPO(s) found - audit SYSVOL for cpassword entries",
+            gpo_count
+        ));
+        recommendations.push(
+            "Audit SYSVOL for Group Policy Preferences with embedded passwords (cpassword)"
+                .to_string(),
+        );
+        findings.push(RiskFinding {
+            id: "GPO-001".to_string(),
+            description: format!("{} GPO(s) exist - SYSVOL should be audited for GPP passwords (cpassword)", gpo_count),
+            severity: severity_from_points(15.0),
+            points_deducted: 15.0,
+            remediation: "Run Get-GPPPassword or similar tool to scan SYSVOL for cpassword entries and remediate".to_string(),
+            complexity: RemediationComplexity::Easy,
+            framework_ref: Some("MITRE T1552.006".to_string()),
+        });
+
+        // Flag if many GPOs exist (potential for excessive editors)
+        if gpo_count > 50 {
+            score -= 10.0;
+            issues.push(format!(
+                "{} GPOs is a large number - review delegation",
+                gpo_count
+            ));
+            recommendations
+                .push("Review GPO edit permissions and consolidate where possible".to_string());
+            findings.push(RiskFinding {
+                id: "GPO-003".to_string(),
+                description: format!(
+                    "{} GPOs in the domain - large GPO count increases attack surface",
+                    gpo_count
+                ),
+                severity: severity_from_points(10.0),
+                points_deducted: 10.0,
+                remediation: "Review GPO edit permissions and consolidate where possible"
+                    .to_string(),
+                complexity: RemediationComplexity::Medium,
+                framework_ref: Some("CIS 18.9.25.1".to_string()),
+            });
+        }
+    }
+
+    // Check domain behavior version for advanced audit support
+    if let Ok(Some(root_dse)) = provider.read_entry("").await {
+        if let Some(level_str) = root_dse.get_attribute("domainFunctionality") {
+            if let Ok(level) = level_str.parse::<u32>() {
+                if level < 3 {
+                    score -= 20.0;
+                    issues.push(format!(
+                        "Domain functional level {} - pre-2008, no advanced audit",
+                        level
+                    ));
+                    recommendations.push("Upgrade domain to at least Windows Server 2008 functional level for advanced audit policy support".to_string());
+                    findings.push(RiskFinding {
+                        id: "GPO-002".to_string(),
+                        description: format!(
+                            "Domain functional level {} does not support advanced audit policies",
+                            level
+                        ),
+                        severity: severity_from_points(20.0),
+                        points_deducted: 20.0,
+                        remediation:
+                            "Upgrade domain to at least Windows Server 2008 functional level"
+                                .to_string(),
+                        complexity: RemediationComplexity::Hard,
+                        framework_ref: Some("CIS 1.1.6".to_string()),
+                    });
+                }
+            }
+        }
+    }
+
+    // Note: reversible encryption check is already covered in dangerous_configs factor
+    // (CONF-004), so we reference it here as informational only.
+    if !findings.is_empty() {
+        findings.push(RiskFinding {
+            id: "GPO-004".to_string(),
+            description: "Reversible encryption in GPO settings is checked in the Dangerous Configurations factor".to_string(),
+            severity: AlertSeverity::Info,
+            points_deducted: 0.0,
+            remediation: "See Dangerous Configurations factor for reversible encryption findings".to_string(),
+            complexity: RemediationComplexity::Easy,
+            framework_ref: Some("CIS 1.1.6".to_string()),
+        });
+    }
+
+    let explanation = if issues.is_empty() {
+        "GPO security posture is acceptable".to_string()
+    } else {
+        format!("Issues: {}", issues.join("; "))
+    };
+
+    FactorResult {
+        score: score.clamp(0.0, 100.0),
+        explanation,
+        recommendations,
+        findings,
+    }
+}
+
+/// Scores trust security posture (0-100).
+///
+/// Evaluates: external/forest trusts, SID filtering, selective authentication,
+/// bidirectional trust risks.
+async fn compute_trust_security_factor(provider: Arc<dyn DirectoryProvider>) -> FactorResult {
+    let base_dn = match provider.base_dn() {
+        Some(dn) => dn,
+        None => {
+            return FactorResult {
+                score: 50.0,
+                explanation: "Could not determine domain base DN for trust analysis".to_string(),
+                recommendations: vec![],
+                findings: vec![],
+            };
+        }
+    };
+
+    let system_base = format!("CN=System,{}", base_dn);
+    let trusts = match provider
+        .search_configuration(&system_base, "(objectClass=trustedDomain)")
+        .await
+    {
+        Ok(t) => t,
+        Err(_) => {
+            return FactorResult {
+                score: 100.0,
+                explanation: "Could not query trust objects (may not have permissions)".to_string(),
+                recommendations: vec![],
+                findings: vec![],
+            };
+        }
+    };
+
+    if trusts.is_empty() {
+        return FactorResult {
+            score: 100.0,
+            explanation: "No external trusts configured".to_string(),
+            recommendations: vec![],
+            findings: vec![],
+        };
+    }
+
+    let mut score = 100.0_f64;
+    let mut issues = Vec::new();
+    let mut recommendations = Vec::new();
+    let mut findings = Vec::new();
+
+    for trust in &trusts {
+        let trust_name = trust
+            .get_attribute("name")
+            .or_else(|| trust.get_attribute("cn"))
+            .unwrap_or("unknown");
+
+        let trust_direction = trust
+            .get_attribute("trustDirection")
+            .and_then(|v| v.parse::<u32>().ok())
+            .unwrap_or(0);
+
+        let trust_attributes = trust
+            .get_attribute("trustAttributes")
+            .and_then(|v| v.parse::<u32>().ok())
+            .unwrap_or(0);
+
+        let direction_label = match trust_direction {
+            1 => "inbound",
+            2 => "outbound",
+            3 => "bidirectional",
+            _ => "unknown",
+        };
+
+        // Bidirectional trusts are more risky
+        if trust_direction == 3 {
+            score -= 10.0;
+            issues.push(format!("Bidirectional trust with {}", trust_name));
+            recommendations.push(format!(
+                "Consider restricting trust with {} to one-way if possible",
+                trust_name
+            ));
+            findings.push(RiskFinding {
+                id: "TRUST-004".to_string(),
+                description: format!(
+                    "Bidirectional trust with {} increases attack surface",
+                    trust_name
+                ),
+                severity: severity_from_points(10.0),
+                points_deducted: 10.0,
+                remediation: format!(
+                    "Consider restricting trust with {} to one-way if possible",
+                    trust_name
+                ),
+                complexity: RemediationComplexity::Hard,
+                framework_ref: Some("MITRE T1482".to_string()),
+            });
+        }
+
+        // SID filtering: TRUST_ATTRIBUTE_QUARANTINED_DOMAIN (0x4) means SID filtering is ON
+        let sid_filtering_enabled = (trust_attributes & 0x4) != 0;
+        if !sid_filtering_enabled {
+            score -= 20.0;
+            issues.push(format!(
+                "SID filtering disabled on {} trust ({})",
+                direction_label, trust_name
+            ));
+            recommendations.push(format!(
+                "Enable SID filtering (quarantine) on trust with {}",
+                trust_name
+            ));
+            findings.push(RiskFinding {
+                id: "TRUST-002".to_string(),
+                description: format!(
+                    "SID filtering is disabled on {} trust with {} - allows SID injection attacks",
+                    direction_label, trust_name
+                ),
+                severity: severity_from_points(20.0),
+                points_deducted: 20.0,
+                remediation: format!(
+                    "Enable SID filtering on trust with {}: netdom trust /quarantine:yes",
+                    trust_name
+                ),
+                complexity: RemediationComplexity::Medium,
+                framework_ref: Some("CIS 2.2.1".to_string()),
+            });
+        }
+
+        // Selective authentication: TRUST_ATTRIBUTE_CROSS_ORGANIZATION (0x20)
+        let selective_auth = (trust_attributes & 0x20) != 0;
+        if !selective_auth {
+            score -= 15.0;
+            issues.push(format!(
+                "Selective authentication not used on trust with {}",
+                trust_name
+            ));
+            recommendations.push(format!(
+                "Enable selective authentication on trust with {}",
+                trust_name
+            ));
+            findings.push(RiskFinding {
+                id: "TRUST-003".to_string(),
+                description: format!("Selective authentication is not enabled on trust with {} - allows broad access", trust_name),
+                severity: severity_from_points(15.0),
+                points_deducted: 15.0,
+                remediation: format!("Enable selective authentication on trust with {}", trust_name),
+                complexity: RemediationComplexity::Medium,
+                framework_ref: Some("CIS 2.2.1".to_string()),
+            });
+        }
+
+        // Record the trust existence as informational
+        findings.push(RiskFinding {
+            id: "TRUST-001".to_string(),
+            description: format!(
+                "External trust detected: {} ({})",
+                trust_name, direction_label
+            ),
+            severity: AlertSeverity::Info,
+            points_deducted: 0.0,
+            remediation: "Review trust necessity and security configuration periodically"
+                .to_string(),
+            complexity: RemediationComplexity::Easy,
+            framework_ref: Some("MITRE T1482".to_string()),
+        });
+    }
+
+    let explanation = if issues.is_empty() {
+        format!(
+            "{} trust(s) configured with acceptable security",
+            trusts.len()
+        )
+    } else {
+        format!(
+            "{} trust(s) found - Issues: {}",
+            trusts.len(),
+            issues.join("; ")
+        )
+    };
+
+    FactorResult {
+        score: score.clamp(0.0, 100.0),
+        explanation,
+        recommendations,
+        findings,
+    }
+}
+
+/// Scores AD CS certificate security posture (0-100).
+///
+/// Evaluates: CA presence, certificate templates, enrollment services,
+/// ESC1/ESC2 vulnerabilities (enrollee-supplies-subject, no manager approval).
+async fn compute_certificate_security_factor(provider: Arc<dyn DirectoryProvider>) -> FactorResult {
+    let base_dn = match provider.base_dn() {
+        Some(dn) => dn,
+        None => {
+            return FactorResult {
+                score: 50.0,
+                explanation: "Could not determine domain base DN for certificate analysis"
+                    .to_string(),
+                recommendations: vec![],
+                findings: vec![],
+            };
+        }
+    };
+
+    let pki_base = format!(
+        "CN=Public Key Services,CN=Services,CN=Configuration,{}",
+        base_dn
+    );
+
+    // Check if CA exists
+    let ca_base = format!("CN=Certification Authorities,{}", pki_base);
+    let cas = match provider
+        .search_configuration(&ca_base, "(objectClass=certificationAuthority)")
+        .await
+    {
+        Ok(cas) => cas,
+        Err(_) => {
+            return FactorResult {
+                score: 100.0,
+                explanation: "No AD CS infrastructure detected".to_string(),
+                recommendations: vec![],
+                findings: vec![],
+            };
+        }
+    };
+
+    if cas.is_empty() {
+        return FactorResult {
+            score: 100.0,
+            explanation: "No AD CS infrastructure detected".to_string(),
+            recommendations: vec![],
+            findings: vec![],
+        };
+    }
+
+    let mut score = 100.0_f64;
+    let mut issues = Vec::new();
+    let mut recommendations = Vec::new();
+    let mut findings = Vec::new();
+
+    // Note CA count
+    findings.push(RiskFinding {
+        id: "CERT-001".to_string(),
+        description: format!("{} Certification Authority(ies) detected", cas.len()),
+        severity: AlertSeverity::Info,
+        points_deducted: 0.0,
+        remediation: "Ensure CA infrastructure is monitored and audited regularly".to_string(),
+        complexity: RemediationComplexity::Easy,
+        framework_ref: Some("MITRE T1649".to_string()),
+    });
+
+    // Check enrollment services
+    let enrollment_base = format!("CN=Enrollment Services,{}", pki_base);
+    let enrollment_services = provider
+        .search_configuration(&enrollment_base, "(objectClass=pKIEnrollmentService)")
+        .await
+        .unwrap_or_default();
+
+    if !enrollment_services.is_empty() {
+        findings.push(RiskFinding {
+            id: "CERT-002".to_string(),
+            description: format!("{} enrollment service(s) active", enrollment_services.len()),
+            severity: AlertSeverity::Info,
+            points_deducted: 0.0,
+            remediation: "Review enrollment service access controls".to_string(),
+            complexity: RemediationComplexity::Easy,
+            framework_ref: Some("MITRE T1649".to_string()),
+        });
+    }
+
+    // Check certificate templates for ESC1/ESC2 vulnerabilities
+    let template_base = format!("CN=Certificate Templates,{}", pki_base);
+    let templates = provider
+        .search_configuration(&template_base, "(objectClass=pKICertificateTemplate)")
+        .await
+        .unwrap_or_default();
+
+    let mut esc1_count = 0;
+    let mut esc_combined_count = 0;
+
+    for template in &templates {
+        let template_name = template
+            .get_attribute("name")
+            .or_else(|| template.get_attribute("cn"))
+            .unwrap_or("unknown");
+
+        // Check msPKI-Certificate-Name-Flag for CT_FLAG_ENROLLEE_SUPPLIES_SUBJECT (0x1)
+        let name_flag = template
+            .get_attribute("msPKI-Certificate-Name-Flag")
+            .and_then(|v| v.parse::<u32>().ok())
+            .unwrap_or(0);
+        let enrollee_supplies_subject = (name_flag & 0x1) != 0;
+
+        // Check msPKI-Enrollment-Flag for CT_FLAG_PEND_ALL_REQUESTS (0x2)
+        let enrollment_flag = template
+            .get_attribute("msPKI-Enrollment-Flag")
+            .and_then(|v| v.parse::<u32>().ok())
+            .unwrap_or(0);
+        let manager_approval_required = (enrollment_flag & 0x2) != 0;
+
+        if enrollee_supplies_subject {
+            esc1_count += 1;
+            score -= 25.0;
+            issues.push(format!(
+                "Template '{}' allows enrollee-supplies-subject (ESC1)",
+                template_name
+            ));
+            recommendations.push(format!(
+                "Remove CT_FLAG_ENROLLEE_SUPPLIES_SUBJECT from template '{}'",
+                template_name
+            ));
+            findings.push(RiskFinding {
+                id: "CERT-003".to_string(),
+                description: format!("Template '{}' allows enrollee to supply subject (ESC1 vulnerability)", template_name),
+                severity: severity_from_points(25.0),
+                points_deducted: 25.0,
+                remediation: format!("Remove CT_FLAG_ENROLLEE_SUPPLIES_SUBJECT from template '{}' or restrict enrollment permissions", template_name),
+                complexity: RemediationComplexity::Medium,
+                framework_ref: Some("ESC1".to_string()),
+            });
+
+            // Combined ESC1 + no manager approval = critical
+            if !manager_approval_required {
+                esc_combined_count += 1;
+                score -= 15.0;
+                issues.push(format!(
+                    "Template '{}' has ESC1 + no manager approval required",
+                    template_name
+                ));
+                findings.push(RiskFinding {
+                    id: "CERT-004".to_string(),
+                    description: format!("Template '{}' allows enrollee-supplies-subject with no manager approval - critical ESC1 vector", template_name),
+                    severity: severity_from_points(15.0),
+                    points_deducted: 15.0,
+                    remediation: format!("Enable CT_FLAG_PEND_ALL_REQUESTS on template '{}' or remove enrollee-supplies-subject", template_name),
+                    complexity: RemediationComplexity::Medium,
+                    framework_ref: Some("ESC2".to_string()),
+                });
+            }
+        }
+    }
+
+    if !templates.is_empty() && esc1_count == 0 {
+        findings.push(RiskFinding {
+            id: "CERT-005".to_string(),
+            description: format!(
+                "{} certificate template(s) reviewed - no ESC1 vulnerabilities found",
+                templates.len()
+            ),
+            severity: AlertSeverity::Info,
+            points_deducted: 0.0,
+            remediation: "Continue monitoring certificate template configurations".to_string(),
+            complexity: RemediationComplexity::Easy,
+            framework_ref: Some("MITRE T1649".to_string()),
+        });
+    }
+
+    let explanation = if issues.is_empty() {
+        format!(
+            "AD CS deployed ({} CA(s), {} template(s)) with acceptable security",
+            cas.len(),
+            templates.len()
+        )
+    } else {
+        format!(
+            "AD CS issues: {} ESC1 template(s), {} without manager approval - {}",
+            esc1_count,
+            esc_combined_count,
+            issues.join("; ")
+        )
+    };
+
+    FactorResult {
+        score: score.clamp(0.0, 100.0),
+        explanation,
+        recommendations,
+        findings,
+    }
 }
 
 /// Service for storing and retrieving risk score history.
@@ -1180,7 +2238,8 @@ impl RiskScoreStore {
             if let Some(parent) = path.parent() {
                 let _ = std::fs::create_dir_all(parent);
             }
-            Connection::open(&path).unwrap_or_else(|_| Connection::open_in_memory().expect("in-memory SQLite"))
+            Connection::open(&path)
+                .unwrap_or_else(|_| Connection::open_in_memory().expect("in-memory SQLite"))
         } else {
             Connection::open_in_memory().expect("in-memory SQLite")
         };
@@ -1215,22 +2274,25 @@ impl RiskScoreStore {
                 date TEXT NOT NULL UNIQUE,
                 total_score REAL NOT NULL,
                 factors_json TEXT NOT NULL
-            )"
-        ).expect("risk_scores schema creation");
+            )",
+        )
+        .expect("risk_scores schema creation");
     }
 
     /// Stores a risk score for today (upserts by date).
     pub fn store_score(&self, result: &RiskScoreResult) {
         let conn = self.conn.lock().expect("lock poisoned");
         let date = Utc::now().format("%Y-%m-%d").to_string();
-        let factors_json = serde_json::to_string(&result.factors).unwrap_or_else(|_| "[]".to_string());
+        let factors_json =
+            serde_json::to_string(&result.factors).unwrap_or_else(|_| "[]".to_string());
 
         conn.execute(
             "INSERT INTO risk_scores (date, total_score, factors_json)
              VALUES (?1, ?2, ?3)
              ON CONFLICT(date) DO UPDATE SET total_score = ?2, factors_json = ?3",
             rusqlite::params![date, result.total_score, factors_json],
-        ).unwrap_or_else(|e| {
+        )
+        .unwrap_or_else(|e| {
             tracing::warn!("Failed to store risk score: {}", e);
             0
         });
@@ -1239,9 +2301,9 @@ impl RiskScoreStore {
     /// Retrieves the last N days of risk score history.
     pub fn get_history(&self, days: u32) -> Vec<RiskScoreHistory> {
         let conn = self.conn.lock().expect("lock poisoned");
-        let mut stmt = match conn.prepare(
-            "SELECT date, total_score FROM risk_scores ORDER BY date DESC LIMIT ?1",
-        ) {
+        let mut stmt = match conn
+            .prepare("SELECT date, total_score FROM risk_scores ORDER BY date DESC LIMIT ?1")
+        {
             Ok(s) => s,
             Err(e) => {
                 tracing::warn!("Failed to prepare risk score query: {}", e);
@@ -1306,14 +2368,46 @@ fn analyze_windows_event_log(time_window_hours: u32) -> Vec<AttackAlert> {
     // Event 4662: Directory service access (DCSync)
     // Event 4742: Computer account changed (DCShadow)
     let event_ids = [
-        (4768, AttackType::GoldenTicket, "Kerberos TGT with unusual parameters"),
-        (4662, AttackType::DCSync, "Directory replication request from non-DC"),
-        (4742, AttackType::DCShadow, "Suspicious computer account modification"),
-        (4769, AttackType::AbnormalKerberos, "Abnormal Kerberos TGS request pattern"),
-        (4771, AttackType::PasswordSpray, "Kerberos pre-authentication failures (potential password spray)"),
-        (4728, AttackType::PrivGroupChange, "Member added to security-enabled global group"),
-        (4732, AttackType::PrivGroupChange, "Member added to security-enabled local group"),
-        (4756, AttackType::PrivGroupChange, "Member added to security-enabled universal group"),
+        (
+            4768,
+            AttackType::GoldenTicket,
+            "Kerberos TGT with unusual parameters",
+        ),
+        (
+            4662,
+            AttackType::DCSync,
+            "Directory replication request from non-DC",
+        ),
+        (
+            4742,
+            AttackType::DCShadow,
+            "Suspicious computer account modification",
+        ),
+        (
+            4769,
+            AttackType::AbnormalKerberos,
+            "Abnormal Kerberos TGS request pattern",
+        ),
+        (
+            4771,
+            AttackType::PasswordSpray,
+            "Kerberos pre-authentication failures (potential password spray)",
+        ),
+        (
+            4728,
+            AttackType::PrivGroupChange,
+            "Member added to security-enabled global group",
+        ),
+        (
+            4732,
+            AttackType::PrivGroupChange,
+            "Member added to security-enabled local group",
+        ),
+        (
+            4756,
+            AttackType::PrivGroupChange,
+            "Member added to security-enabled universal group",
+        ),
     ];
 
     for (event_id, attack_type, description) in &event_ids {
@@ -1363,7 +2457,10 @@ fn analyze_windows_event_log(time_window_hours: u32) -> Vec<AttackAlert> {
                             severity,
                             timestamp: Utc::now().to_rfc3339(),
                             source: "Local Security Event Log".to_string(),
-                            description: format!("{} - {} event(s) detected in last {} hours", description, event_count, time_window_hours),
+                            description: format!(
+                                "{} - {} event(s) detected in last {} hours",
+                                description, event_count, time_window_hours
+                            ),
                             recommendation,
                             event_id: Some(*event_id),
                         });
@@ -1620,10 +2717,16 @@ mod tests {
         a2.alerts = compute_alerts(&a2, None);
 
         let empty_findings = DomainSecurityFindings {
-            krbtgt_password_age_days: None, laps_coverage_percent: None,
-            laps_deployed_count: 0, total_computer_count: 0, pso_count: 0,
-            domain_functional_level: None, forest_functional_level: None,
-            ldap_signing_enforced: None, recycle_bin_enabled: None, rbcd_configured_count: 0,
+            krbtgt_password_age_days: None,
+            laps_coverage_percent: None,
+            laps_deployed_count: 0,
+            total_computer_count: 0,
+            pso_count: 0,
+            domain_functional_level: None,
+            forest_functional_level: None,
+            ldap_signing_enforced: None,
+            recycle_bin_enabled: None,
+            rbcd_configured_count: 0,
             alerts: vec![],
         };
         let summary = compute_summary(&[a1, a2], &empty_findings);
@@ -1650,7 +2753,10 @@ mod tests {
         let alerts = compute_alerts(&account, None);
         let types: Vec<&str> = alerts.iter().map(|a| a.alert_type.as_str()).collect();
         assert!(types.contains(&"asrep_roastable"));
-        let asrep = alerts.iter().find(|a| a.alert_type == "asrep_roastable").unwrap();
+        let asrep = alerts
+            .iter()
+            .find(|a| a.alert_type == "asrep_roastable")
+            .unwrap();
         assert_eq!(asrep.severity, AlertSeverity::Critical);
     }
 
@@ -1661,7 +2767,10 @@ mod tests {
         let alerts = compute_alerts(&account, None);
         let types: Vec<&str> = alerts.iter().map(|a| a.alert_type.as_str()).collect();
         assert!(types.contains(&"reversible_encryption"));
-        let rev = alerts.iter().find(|a| a.alert_type == "reversible_encryption").unwrap();
+        let rev = alerts
+            .iter()
+            .find(|a| a.alert_type == "reversible_encryption")
+            .unwrap();
         assert_eq!(rev.severity, AlertSeverity::Critical);
     }
 
@@ -1919,5 +3028,127 @@ mod tests {
         // No edges connecting them
         let paths = find_critical_paths(&nodes, &[]);
         assert!(paths.is_empty());
+    }
+
+    // New factor function tests
+
+    #[tokio::test]
+    async fn test_compute_gpo_security_factor_no_gpos() {
+        let provider = Arc::new(crate::services::directory::tests::MockDirectoryProvider::new());
+        let result = compute_gpo_security_factor(provider).await;
+        // No GPOs returned by mock = score starts at 100, minus 0 GPO penalties
+        // Domain functional level check may add info findings
+        assert!(result.score >= 0.0 && result.score <= 100.0);
+    }
+
+    #[tokio::test]
+    async fn test_compute_trust_security_factor_no_trusts() {
+        let provider = Arc::new(crate::services::directory::tests::MockDirectoryProvider::new());
+        let result = compute_trust_security_factor(provider).await;
+        assert!((result.score - 100.0).abs() < f64::EPSILON);
+        assert!(
+            result.explanation.contains("No external trusts")
+                || result.explanation.contains("Could not query")
+        );
+        assert!(result.findings.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_compute_trust_security_factor_with_trusts() {
+        use std::collections::HashMap;
+        let mut attrs = HashMap::new();
+        attrs.insert("name".to_string(), vec!["PARTNER.COM".to_string()]);
+        attrs.insert("trustDirection".to_string(), vec!["3".to_string()]); // bidirectional
+        attrs.insert("trustAttributes".to_string(), vec!["0".to_string()]); // no SID filtering, no selective auth
+        let trust_entry = crate::models::DirectoryEntry {
+            distinguished_name: "CN=PARTNER.COM,CN=System,DC=example,DC=com".to_string(),
+            sam_account_name: None,
+            display_name: None,
+            object_class: Some("trustedDomain".to_string()),
+            attributes: attrs,
+        };
+
+        let provider = Arc::new(
+            crate::services::directory::tests::MockDirectoryProvider::new()
+                .with_configuration_entries(vec![trust_entry]),
+        );
+        let result = compute_trust_security_factor(provider).await;
+        // Bidirectional (-10) + no SID filtering (-20) + no selective auth (-15) = 55
+        assert!(result.score <= 60.0);
+        assert!(!result.findings.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_compute_certificate_security_factor_no_ca() {
+        let provider = Arc::new(crate::services::directory::tests::MockDirectoryProvider::new());
+        let result = compute_certificate_security_factor(provider).await;
+        assert!((result.score - 100.0).abs() < f64::EPSILON);
+        assert!(result.explanation.contains("No AD CS"));
+        assert!(result.findings.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_compute_certificate_security_factor_with_ca() {
+        use std::collections::HashMap;
+        let mut ca_attrs = HashMap::new();
+        ca_attrs.insert("name".to_string(), vec!["RootCA".to_string()]);
+        let ca_entry = crate::models::DirectoryEntry {
+            distinguished_name: "CN=RootCA,CN=Certification Authorities,CN=Public Key Services,CN=Services,CN=Configuration,DC=example,DC=com".to_string(),
+            sam_account_name: None,
+            display_name: None,
+            object_class: Some("certificationAuthority".to_string()),
+            attributes: ca_attrs,
+        };
+
+        let provider = Arc::new(
+            crate::services::directory::tests::MockDirectoryProvider::new()
+                .with_configuration_entries(vec![ca_entry]),
+        );
+        let result = compute_certificate_security_factor(provider).await;
+        // CA exists, no vulnerable templates found in mock
+        assert!(result.score >= 0.0 && result.score <= 100.0);
+    }
+
+    #[test]
+    fn test_severity_from_points() {
+        assert_eq!(severity_from_points(25.0), AlertSeverity::Critical);
+        assert_eq!(severity_from_points(20.0), AlertSeverity::Critical);
+        assert_eq!(severity_from_points(15.0), AlertSeverity::High);
+        assert_eq!(severity_from_points(10.0), AlertSeverity::High);
+        assert_eq!(severity_from_points(5.0), AlertSeverity::Medium);
+        assert_eq!(severity_from_points(3.0), AlertSeverity::Info);
+        assert_eq!(severity_from_points(0.0), AlertSeverity::Info);
+    }
+
+    #[test]
+    fn test_build_risk_factor_impact_calculation() {
+        let result = FactorResult {
+            score: 60.0,
+            explanation: "Test".to_string(),
+            recommendations: vec![],
+            findings: vec![
+                RiskFinding {
+                    id: "TEST-001".to_string(),
+                    description: "Issue 1".to_string(),
+                    severity: AlertSeverity::High,
+                    points_deducted: 25.0,
+                    remediation: "Fix it".to_string(),
+                    complexity: RemediationComplexity::Easy,
+                    framework_ref: None,
+                },
+                RiskFinding {
+                    id: "TEST-002".to_string(),
+                    description: "Issue 2".to_string(),
+                    severity: AlertSeverity::Medium,
+                    points_deducted: 15.0,
+                    remediation: "Fix that".to_string(),
+                    complexity: RemediationComplexity::Medium,
+                    framework_ref: None,
+                },
+            ],
+        };
+        let factor = build_risk_factor("test", "Test Factor", 10.0, result);
+        assert!((factor.impact_if_fixed - 40.0).abs() < f64::EPSILON);
+        assert_eq!(factor.findings.len(), 2);
     }
 }

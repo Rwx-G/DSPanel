@@ -23,6 +23,8 @@ const mockResult: RiskScoreResult = {
       weight: 30,
       explanation: "Password policies meet best practices.",
       recommendations: [],
+      findings: [],
+      impactIfFixed: 0,
     },
     {
       id: "privileged-accounts",
@@ -34,6 +36,27 @@ const mockResult: RiskScoreResult = {
         "Rotate passwords for privileged accounts older than 90 days",
         "Remove unused admin accounts",
       ],
+      findings: [
+        {
+          id: "finding-stale-pw",
+          description: "3 admin accounts have passwords older than 180 days",
+          severity: "High",
+          pointsDeducted: 15,
+          remediation: "Force password reset for these accounts",
+          complexity: "Easy",
+          frameworkRef: "CIS 5.2.1",
+        },
+        {
+          id: "finding-no-mfa",
+          description: "Domain Admins group has no MFA requirement",
+          severity: "Critical",
+          pointsDeducted: 20,
+          remediation: "Enable MFA for all Domain Admin accounts",
+          complexity: "Medium",
+          frameworkRef: null,
+        },
+      ],
+      impactIfFixed: 12,
     },
     {
       id: "replication",
@@ -42,6 +65,8 @@ const mockResult: RiskScoreResult = {
       weight: 20,
       explanation: "All domain controllers replicate correctly.",
       recommendations: [],
+      findings: [],
+      impactIfFixed: 0,
     },
     {
       id: "kerberos",
@@ -50,6 +75,8 @@ const mockResult: RiskScoreResult = {
       weight: 25,
       explanation: "Some service accounts use weak encryption types.",
       recommendations: ["Migrate SPNs to AES-256 encryption"],
+      findings: [],
+      impactIfFixed: 0,
     },
   ],
   computedAt: "2026-03-23T10:00:00Z",
@@ -75,6 +102,9 @@ function setupMocks(
     if (cmd === "get_risk_score_history") {
       if (historyResult instanceof Error) return Promise.reject(historyResult.message);
       return Promise.resolve(historyResult);
+    }
+    if (cmd === "save_file_dialog") {
+      return Promise.resolve(null);
     }
     return Promise.reject("Unknown command");
   });
@@ -283,5 +313,117 @@ describe("RiskScoreDashboard", () => {
     });
 
     expect(screen.getByText("2026-03-21")).toBeInTheDocument();
+  });
+
+  // Radar chart tests
+  it("renders radar chart with correct number of labels", async () => {
+    setupMocks();
+    render(<RiskScoreDashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("radar-chart")).toBeInTheDocument();
+    });
+
+    const labels = screen.getAllByTestId("radar-label");
+    expect(labels).toHaveLength(4);
+  });
+
+  it("renders radar score polygon", async () => {
+    setupMocks();
+    render(<RiskScoreDashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("radar-score-polygon")).toBeInTheDocument();
+    });
+  });
+
+  // Export button tests
+  it("renders export button when data is loaded", async () => {
+    setupMocks();
+    render(<RiskScoreDashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("export-button")).toBeInTheDocument();
+    });
+
+    expect(screen.getByTestId("export-button")).toHaveTextContent("Export Report");
+  });
+
+  it("calls save_file_dialog on export click", async () => {
+    setupMocks();
+    render(<RiskScoreDashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("export-button")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId("export-button"));
+
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith(
+        "save_file_dialog",
+        expect.objectContaining({
+          defaultName: "risk-score-report.html",
+          filterName: "HTML files",
+          filterExtensions: ["html"],
+        }),
+      );
+    });
+  });
+
+  // Findings tests
+  it("shows findings toggle for factors with findings", async () => {
+    setupMocks();
+    render(<RiskScoreDashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("findings-toggle-privileged-accounts")).toBeInTheDocument();
+    });
+
+    expect(screen.getByTestId("findings-toggle-privileged-accounts")).toHaveTextContent(
+      "Findings (2)",
+    );
+  });
+
+  it("expands findings section on toggle click", async () => {
+    setupMocks();
+    render(<RiskScoreDashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("findings-toggle-privileged-accounts")).toBeInTheDocument();
+    });
+
+    // Findings list should not be visible yet
+    expect(screen.queryByTestId("findings-list-privileged-accounts")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("findings-toggle-privileged-accounts"));
+
+    expect(screen.getByTestId("findings-list-privileged-accounts")).toBeInTheDocument();
+    expect(screen.getByTestId("finding-finding-stale-pw")).toBeInTheDocument();
+    expect(screen.getByTestId("finding-finding-no-mfa")).toBeInTheDocument();
+  });
+
+  it("shows impact-if-fixed for factors with findings", async () => {
+    setupMocks();
+    render(<RiskScoreDashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("impact-if-fixed-privileged-accounts")).toBeInTheDocument();
+    });
+
+    expect(screen.getByTestId("impact-if-fixed-privileged-accounts")).toHaveTextContent(
+      "Potential gain: +12 points",
+    );
+  });
+
+  it("does not show findings section for factors without findings", async () => {
+    setupMocks();
+    render(<RiskScoreDashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("factor-card-password-policy")).toBeInTheDocument();
+    });
+
+    expect(screen.queryByTestId("findings-toggle-password-policy")).not.toBeInTheDocument();
   });
 });

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- GPO Security risk factor: detects GPP password risks, domain behavior version, excessive GPO count
+- Trust Security risk factor: evaluates external/forest trusts, SID filtering, selective authentication, bidirectional trust risks
+- Certificate Security (AD CS) risk factor: detects ESC1/ESC2 vulnerabilities in certificate templates, enrollment services
+- `RiskFinding` model for granular per-finding details within each risk factor (id, severity, points, remediation, complexity, framework reference)
+- `RemediationComplexity` enum (Easy/Medium/Hard) for remediation guidance
+- `impact_if_fixed` field on `RiskFactor` for prioritizing remediation efforts
+- Individual `RiskFinding` entries on all existing risk factors (privileged hygiene, password policy, stale accounts, Kerberos, dangerous configs, infrastructure hardening)
+- Orphaned adminCount detection in dangerous configurations factor
+
 ## [0.9.0] - 2026-03-23
 
 Epic 9 - Security, Risk Scoring and Attack Detection. Security dashboard

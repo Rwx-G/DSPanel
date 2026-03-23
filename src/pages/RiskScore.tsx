@@ -9,12 +9,17 @@ import {
   AlertCircle,
   TrendingUp,
   Info,
+  Download,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import {
   type RiskScoreResult,
   type RiskScoreHistory,
   type RiskZone,
   type RiskFactor,
+  type RiskFinding,
+  type AlertSeverity,
 } from "@/types/security";
 import { extractErrorMessage } from "@/utils/errorMapping";
 
@@ -37,6 +42,30 @@ function zoneLabel(zone: RiskZone): string {
       return "Fair";
     case "Red":
       return "Poor";
+  }
+}
+
+function severityColor(severity: AlertSeverity): string {
+  switch (severity) {
+    case "Critical":
+      return "var(--color-error)";
+    case "High":
+      return "var(--color-warning)";
+    case "Medium":
+      return "var(--color-caution, var(--color-warning))";
+    case "Info":
+      return "var(--color-info, var(--color-text-secondary))";
+  }
+}
+
+function complexityColor(complexity: "Easy" | "Medium" | "Hard"): string {
+  switch (complexity) {
+    case "Easy":
+      return "var(--color-success)";
+    case "Medium":
+      return "var(--color-warning)";
+    case "Hard":
+      return "var(--color-error)";
   }
 }
 
@@ -165,6 +194,138 @@ function ScoreGauge({ score, zone }: { score: number; zone: RiskZone }) {
   );
 }
 
+/** Radar/spider chart SVG showing factor scores on a web diagram. */
+function RadarChart({ factors }: { factors: RiskFactor[] }) {
+  const size = 240;
+  const cx = size / 2;
+  const cy = size / 2;
+  const radius = 90;
+  const labelOffset = 18;
+  const n = factors.length;
+
+  if (n < 3) return null;
+
+  // Compute vertex angle for index i (starting from top, going clockwise)
+  function angleFor(i: number): number {
+    return (2 * Math.PI * i) / n - Math.PI / 2;
+  }
+
+  // Point at given radius fraction for index i
+  function pointAt(i: number, fraction: number): { x: number; y: number } {
+    const angle = angleFor(i);
+    return {
+      x: cx + radius * fraction * Math.cos(angle),
+      y: cy + radius * fraction * Math.sin(angle),
+    };
+  }
+
+  // Build polygon points string for a given set of fractions (0-1)
+  function polygonPoints(fractions: number[]): string {
+    return fractions
+      .map((f, i) => {
+        const p = pointAt(i, f);
+        return `${p.x},${p.y}`;
+      })
+      .join(" ");
+  }
+
+  // Reference circles at 33%, 66%, 100%
+  const refLevels = [0.33, 0.66, 1];
+
+  // Score fractions (0-1)
+  const scoreFractions = factors.map((f) => Math.max(0, Math.min(1, f.score / 100)));
+
+  // Abbreviate factor name (first 10 chars + ellipsis if longer)
+  function abbreviate(name: string): string {
+    return name.length > 12 ? name.slice(0, 10) + "..." : name;
+  }
+
+  return (
+    <div className="flex flex-col items-center" data-testid="radar-chart">
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        {/* Reference polygons (concentric) */}
+        {refLevels.map((level) => (
+          <polygon
+            key={level}
+            points={polygonPoints(Array(n).fill(level))}
+            fill="none"
+            stroke="var(--color-border-default)"
+            strokeWidth={1}
+            strokeDasharray="3 3"
+            opacity={0.5}
+          />
+        ))}
+
+        {/* Axis lines from center to each vertex */}
+        {factors.map((_, i) => {
+          const p = pointAt(i, 1);
+          return (
+            <line
+              key={`axis-${i}`}
+              x1={cx}
+              y1={cy}
+              x2={p.x}
+              y2={p.y}
+              stroke="var(--color-border-default)"
+              strokeWidth={1}
+              opacity={0.4}
+            />
+          );
+        })}
+
+        {/* Score polygon - filled */}
+        <polygon
+          points={polygonPoints(scoreFractions)}
+          fill="var(--color-primary)"
+          fillOpacity={0.2}
+          stroke="var(--color-primary)"
+          strokeWidth={2}
+          data-testid="radar-score-polygon"
+        />
+
+        {/* Score dots at each vertex */}
+        {scoreFractions.map((f, i) => {
+          const p = pointAt(i, f);
+          return (
+            <circle
+              key={`dot-${i}`}
+              cx={p.x}
+              cy={p.y}
+              r={3}
+              fill="var(--color-primary)"
+            />
+          );
+        })}
+
+        {/* Axis labels */}
+        {factors.map((f, i) => {
+          const angle = angleFor(i);
+          const lx = cx + (radius + labelOffset) * Math.cos(angle);
+          const ly = cy + (radius + labelOffset) * Math.sin(angle);
+          let textAnchor: "start" | "middle" | "end" = "middle";
+          if (Math.cos(angle) > 0.3) textAnchor = "start";
+          else if (Math.cos(angle) < -0.3) textAnchor = "end";
+
+          return (
+            <text
+              key={`label-${i}`}
+              x={lx}
+              y={ly}
+              textAnchor={textAnchor}
+              dominantBaseline="central"
+              fontSize={10}
+              fill="var(--color-text-secondary)"
+              data-testid="radar-label"
+            >
+              {abbreviate(f.name)}
+            </text>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
 /** Score bar showing a factor's score as a horizontal bar. */
 function ScoreBar({ score }: { score: number }) {
   const color =
@@ -188,9 +349,57 @@ function ScoreBar({ score }: { score: number }) {
   );
 }
 
+/** Single finding row inside a FactorCard. */
+function FindingRow({ finding }: { finding: RiskFinding }) {
+  return (
+    <div
+      className="flex flex-col gap-1 py-1.5 border-b border-[var(--color-border-default)] last:border-b-0"
+      data-testid={`finding-${finding.id}`}
+    >
+      <div className="flex items-center gap-2">
+        {/* Severity badge */}
+        <span
+          className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium"
+          style={{
+            color: severityColor(finding.severity),
+            backgroundColor: `color-mix(in srgb, ${severityColor(finding.severity)} 12%, transparent)`,
+          }}
+        >
+          {finding.severity}
+        </span>
+        <span className="text-[11px] text-[var(--color-text-primary)] flex-1">
+          {finding.description}
+        </span>
+        {/* Complexity badge */}
+        <span
+          className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium"
+          style={{
+            color: complexityColor(finding.complexity),
+            backgroundColor: `color-mix(in srgb, ${complexityColor(finding.complexity)} 12%, transparent)`,
+          }}
+          data-testid="finding-complexity"
+        >
+          {finding.complexity}
+        </span>
+      </div>
+      <div className="text-[10px] text-[var(--color-text-secondary)] pl-1">
+        {finding.remediation}
+      </div>
+      {finding.frameworkRef && (
+        <div className="text-[10px] text-[var(--color-text-secondary)] pl-1 italic">
+          Ref: {finding.frameworkRef}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** Factor breakdown card. */
 function FactorCard({ factor }: { factor: RiskFactor }) {
+  const [findingsOpen, setFindingsOpen] = useState(false);
   const showRecommendations = factor.score < 70 && factor.recommendations.length > 0;
+  const findings = factor.findings ?? [];
+  const impactIfFixed = factor.impactIfFixed ?? 0;
 
   return (
     <div
@@ -224,6 +433,37 @@ function FactorCard({ factor }: { factor: RiskFactor }) {
               <li key={i}>{rec}</li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {findings.length > 0 && (
+        <div className="mt-2 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-base)] p-2">
+          <button
+            className="flex items-center gap-1 text-[11px] font-medium text-[var(--color-text-primary)] w-full text-left"
+            onClick={() => setFindingsOpen(!findingsOpen)}
+            data-testid={`findings-toggle-${factor.id}`}
+          >
+            {findingsOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+            Findings ({findings.length})
+          </button>
+
+          {findingsOpen && (
+            <div className="mt-1.5" data-testid={`findings-list-${factor.id}`}>
+              {findings.map((finding) => (
+                <FindingRow key={finding.id} finding={finding} />
+              ))}
+            </div>
+          )}
+
+          {impactIfFixed > 0 && (
+            <div
+              className="mt-1.5 text-[11px] font-medium"
+              style={{ color: "var(--color-success)" }}
+              data-testid={`impact-if-fixed-${factor.id}`}
+            >
+              Potential gain: +{impactIfFixed} points
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -273,6 +513,160 @@ function TrendSparkline({ history }: { history: RiskScoreHistory[] }) {
   );
 }
 
+/** Generate a self-contained HTML report document. */
+function generateReportHtml(result: RiskScoreResult): string {
+  const severityHtmlColor: Record<string, string> = {
+    Critical: "#ef4444",
+    High: "#f59e0b",
+    Medium: "#3b82f6",
+    Info: "#6b7280",
+  };
+
+  const zoneHtmlColor: Record<string, string> = {
+    Green: "#22c55e",
+    Orange: "#f59e0b",
+    Red: "#ef4444",
+  };
+
+  // Collect all findings grouped by severity
+  const allFindings: { factor: string; finding: RiskFinding }[] = [];
+  for (const factor of result.factors) {
+    for (const finding of factor.findings ?? []) {
+      allFindings.push({ factor: factor.name, finding });
+    }
+  }
+
+  const severityOrder = ["Critical", "High", "Medium", "Info"];
+  allFindings.sort(
+    (a, b) =>
+      severityOrder.indexOf(a.finding.severity) - severityOrder.indexOf(b.finding.severity),
+  );
+
+  // Collect all recommendations sorted by impact
+  const allRecommendations: { factor: string; rec: string; impact: number }[] = [];
+  for (const factor of result.factors) {
+    const impact = factor.impactIfFixed ?? 0;
+    for (const rec of factor.recommendations) {
+      allRecommendations.push({ factor: factor.name, rec, impact });
+    }
+  }
+  allRecommendations.sort((a, b) => b.impact - a.impact);
+
+  const factorRowsHtml = result.factors
+    .map(
+      (f) => `
+      <tr>
+        <td>${f.name}</td>
+        <td style="text-align:center">${Math.round(f.score)}/100</td>
+        <td style="text-align:center">${f.weight}%</td>
+        <td>${f.explanation}</td>
+      </tr>`,
+    )
+    .join("");
+
+  const findingsHtml =
+    allFindings.length > 0
+      ? `
+    <h2>Findings</h2>
+    <table>
+      <thead>
+        <tr><th>Severity</th><th>Factor</th><th>Description</th><th>Remediation</th><th>Complexity</th><th>Ref</th></tr>
+      </thead>
+      <tbody>
+        ${allFindings
+          .map(
+            ({ factor, finding }) => `
+          <tr>
+            <td><span style="color:${severityHtmlColor[finding.severity] ?? "#6b7280"};font-weight:600">${finding.severity}</span></td>
+            <td>${factor}</td>
+            <td>${finding.description}</td>
+            <td>${finding.remediation}</td>
+            <td>${finding.complexity}</td>
+            <td>${finding.frameworkRef ?? "-"}</td>
+          </tr>`,
+          )
+          .join("")}
+      </tbody>
+    </table>`
+      : "";
+
+  const recommendationsHtml =
+    allRecommendations.length > 0
+      ? `
+    <h2>Recommendations</h2>
+    <table>
+      <thead>
+        <tr><th>Factor</th><th>Recommendation</th><th>Impact</th></tr>
+      </thead>
+      <tbody>
+        ${allRecommendations
+          .map(
+            (r) => `
+          <tr>
+            <td>${r.factor}</td>
+            <td>${r.rec}</td>
+            <td>${r.impact > 0 ? `+${r.impact} pts` : "-"}</td>
+          </tr>`,
+          )
+          .join("")}
+      </tbody>
+    </table>`
+      : "";
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>DSPanel - Domain Risk Score Report</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; margin: 2rem; color: #1f2937; }
+    h1 { font-size: 1.5rem; margin-bottom: 0.25rem; }
+    h2 { font-size: 1.15rem; margin-top: 2rem; border-bottom: 1px solid #e5e7eb; padding-bottom: 0.25rem; }
+    .meta { color: #6b7280; font-size: 0.85rem; margin-bottom: 1.5rem; }
+    .score-badge { display: inline-block; font-size: 2rem; font-weight: 700; padding: 0.25rem 1rem; border-radius: 0.5rem; }
+    table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; font-size: 0.85rem; }
+    th, td { border: 1px solid #d1d5db; padding: 0.4rem 0.6rem; text-align: left; }
+    th { background: #f3f4f6; font-weight: 600; }
+    tr:nth-child(even) { background: #f9fafb; }
+  </style>
+</head>
+<body>
+  <h1>DSPanel - Domain Risk Score Report</h1>
+  <div class="meta">
+    Generated: ${new Date().toLocaleString()} | Computed: ${new Date(result.computedAt).toLocaleString()}
+  </div>
+  <div>
+    <span class="score-badge" style="color:${zoneHtmlColor[result.zone] ?? "#6b7280"};background:${zoneHtmlColor[result.zone] ?? "#6b7280"}15">
+      ${Math.round(result.totalScore)}/100 - ${result.zone === "Green" ? "Good" : result.zone === "Orange" ? "Fair" : "Poor"}
+    </span>
+  </div>
+
+  <h2>Factor Breakdown</h2>
+  <table>
+    <thead>
+      <tr><th>Factor</th><th>Score</th><th>Weight</th><th>Explanation</th></tr>
+    </thead>
+    <tbody>
+      ${factorRowsHtml}
+    </tbody>
+  </table>
+
+  ${findingsHtml}
+  ${recommendationsHtml}
+</body>
+</html>`;
+}
+
+async function exportReport(result: RiskScoreResult) {
+  const html = generateReportHtml(result);
+  await invoke("save_file_dialog", {
+    content: html,
+    defaultName: "risk-score-report.html",
+    filterName: "HTML files",
+    filterExtensions: ["html"],
+  });
+}
+
 export function RiskScoreDashboard() {
   const [result, setResult] = useState<RiskScoreResult | null>(null);
   const [history, setHistory] = useState<RiskScoreHistory[]>([]);
@@ -318,6 +712,16 @@ export function RiskScoreDashboard() {
               {Math.round(result.totalScore)}/100 - {zoneLabel(result.zone)}
             </span>
           )}
+          {result && (
+            <button
+              className="btn btn-sm rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2.5 py-1 text-caption font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors flex items-center gap-1"
+              onClick={() => exportReport(result)}
+              data-testid="export-button"
+            >
+              <Download size={12} />
+              Export Report
+            </button>
+          )}
           <button
             className="btn btn-sm rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2.5 py-1 text-caption font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors flex items-center gap-1"
             onClick={fetchData}
@@ -358,7 +762,7 @@ export function RiskScoreDashboard() {
 
         {result && (
           <div className="space-y-6">
-            {/* Top section: Gauge + Trend */}
+            {/* Top section: Gauge + Radar */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Gauge */}
               <div className="flex flex-col items-center justify-center rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-6">
@@ -381,16 +785,27 @@ export function RiskScoreDashboard() {
                 </span>
               </div>
 
-              {/* Trend */}
-              <div className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-4">
-                {history.length > 0 ? (
-                  <TrendSparkline history={history} />
+              {/* Radar Chart */}
+              <div className="flex flex-col items-center justify-center rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-4">
+                {result.factors.length >= 3 ? (
+                  <RadarChart factors={result.factors} />
                 ) : (
                   <div className="flex items-center justify-center h-full text-caption text-[var(--color-text-secondary)]">
-                    No trend data available
+                    Not enough factors for radar chart
                   </div>
                 )}
               </div>
+            </div>
+
+            {/* Trend - full width */}
+            <div className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-4">
+              {history.length > 0 ? (
+                <TrendSparkline history={history} />
+              ) : (
+                <div className="flex items-center justify-center h-full py-4 text-caption text-[var(--color-text-secondary)]">
+                  No trend data available
+                </div>
+              )}
             </div>
 
             {/* Factor breakdown */}

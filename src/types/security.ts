@@ -58,6 +58,18 @@ export interface PrivilegedAccountsReport {
 
 // Story 9.2: Domain Risk Score
 
+export interface RiskFinding {
+  id: string;
+  description: string;
+  severity: AlertSeverity;
+  pointsDeducted: number;
+  remediation: string;
+  complexity: "Easy" | "Medium" | "Hard";
+  frameworkRef: string | null;
+}
+
+export type RemediationComplexity = "Easy" | "Medium" | "Hard";
+
 export interface RiskFactor {
   id: string;
   name: string;
@@ -65,6 +77,8 @@ export interface RiskFactor {
   weight: number;
   explanation: string;
   recommendations: string[];
+  findings: RiskFinding[];
+  impactIfFixed: number;
 }
 
 export type RiskZone = "Red" | "Orange" | "Green";
