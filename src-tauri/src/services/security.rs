@@ -9,14 +9,6 @@ use crate::models::security::{
 };
 use crate::services::DirectoryProvider;
 
-/// Well-known privileged group names queried by default.
-const DEFAULT_PRIVILEGED_GROUPS: &[&str] = &[
-    "Domain Admins",
-    "Enterprise Admins",
-    "Schema Admins",
-    "Administrators",
-];
-
 /// Password age threshold in days before raising a Critical alert.
 const PASSWORD_AGE_THRESHOLD_DAYS: i64 = 90;
 
@@ -35,6 +27,17 @@ const UAC_TRUSTED_TO_AUTH_FOR_DELEGATION: u32 = 0x1000000; // Constrained deleg 
 /// Windows FILETIME epoch offset (100-nanosecond intervals from 1601-01-01 to 1970-01-01).
 const FILETIME_EPOCH_OFFSET: i64 = 116_444_736_000_000_000;
 
+/// Well-known RIDs for privileged groups (language-independent).
+const PRIVILEGED_GROUP_RIDS: &[(u32, &str)] = &[
+    (512, "Domain Admins"),
+    (519, "Enterprise Admins"),
+    (518, "Schema Admins"),
+    (544, "Administrators"),
+];
+
+/// RID for the Protected Users group.
+const RID_PROTECTED_USERS: u32 = 525;
+
 /// Scans all default privileged groups and returns a full report with alerts.
 pub async fn get_privileged_accounts_report(
     provider: Arc<dyn DirectoryProvider>,
@@ -43,30 +46,55 @@ pub async fn get_privileged_accounts_report(
     let mut all_accounts: Vec<PrivilegedAccountInfo> = Vec::new();
     let mut seen_dns = std::collections::HashSet::new();
 
-    // Combine default groups with any additional configured groups
-    let group_names: Vec<String> = DEFAULT_PRIVILEGED_GROUPS
-        .iter()
-        .map(|s| s.to_string())
-        .chain(additional_groups.iter().cloned())
-        .collect();
+    // Resolve privileged groups by well-known RID (language-independent)
+    let mut resolved_groups: Vec<(String, String)> = Vec::new(); // (dn, display_name)
+    for (rid, fallback_name) in PRIVILEGED_GROUP_RIDS {
+        if let Ok(Some(group)) = provider.resolve_group_by_rid(*rid).await {
+            let name = group
+                .display_name
+                .clone()
+                .or_else(|| group.sam_account_name.clone())
+                .unwrap_or_else(|| fallback_name.to_string());
+            resolved_groups.push((group.distinguished_name, name));
+        }
+    }
 
-    // Check Protected Users group membership
-    let protected_users_members = get_group_member_dns(&provider, "Protected Users").await;
+    // Also resolve additional groups configured by name (these are user-specified)
+    for group_name in additional_groups {
+        if let Ok(groups) = provider.search_groups(group_name, 1).await {
+            if let Some(group) = groups.first() {
+                let name = group
+                    .display_name
+                    .clone()
+                    .or_else(|| group.sam_account_name.clone())
+                    .unwrap_or_else(|| group_name.clone());
+                resolved_groups.push((group.distinguished_name.clone(), name));
+            }
+        }
+    }
 
-    for group_name in &group_names {
-        let members = match provider.search_groups(group_name, 1).await {
-            Ok(groups) => {
-                if let Some(group) = groups.first() {
-                    provider
-                        .get_group_members(&group.distinguished_name, 1000)
-                        .await
-                        .unwrap_or_default()
-                } else {
-                    Vec::new()
+    // Resolve Protected Users group by RID for membership check
+    let protected_users_members = match provider.resolve_group_by_rid(RID_PROTECTED_USERS).await {
+        Ok(Some(pu_group)) => {
+            let mut dns = std::collections::HashSet::new();
+            if let Ok(members) = provider
+                .get_group_members(&pu_group.distinguished_name, 1000)
+                .await
+            {
+                for m in members {
+                    dns.insert(m.distinguished_name);
                 }
             }
-            Err(_) => Vec::new(),
-        };
+            dns
+        }
+        _ => std::collections::HashSet::new(),
+    };
+
+    for (group_dn, group_name) in &resolved_groups {
+        let members = provider
+            .get_group_members(group_dn, 1000)
+            .await
+            .unwrap_or_default();
 
         for member in members {
             // Skip if we already processed this account (may be in multiple groups)
@@ -187,24 +215,7 @@ pub async fn get_privileged_accounts_report(
     })
 }
 
-/// Helper: get DNs of all members of a group by name.
-async fn get_group_member_dns(
-    provider: &Arc<dyn DirectoryProvider>,
-    group_name: &str,
-) -> std::collections::HashSet<String> {
-    let mut dns = std::collections::HashSet::new();
-    if let Ok(groups) = provider.search_groups(group_name, 1).await {
-        if let Some(group) = groups.first() {
-            if let Ok(members) = provider.get_group_members(&group.distinguished_name, 1000).await
-            {
-                for m in members {
-                    dns.insert(m.distinguished_name);
-                }
-            }
-        }
-    }
-    dns
-}
+
 
 /// Gathers domain-level security findings (KRBTGT, LAPS, PSO, functional level, etc.).
 async fn get_domain_security_findings(
@@ -1155,12 +1166,14 @@ pub async fn build_escalation_graph(
     let mut edges: Vec<GraphEdge> = Vec::new();
     let mut node_dns = std::collections::HashSet::new();
 
-    let privileged_group_names = DEFAULT_PRIVILEGED_GROUPS;
+    // Resolve privileged groups by RID (language-independent)
+    for (rid, fallback_name) in PRIVILEGED_GROUP_RIDS {
+        let group = match provider.resolve_group_by_rid(*rid).await {
+            Ok(Some(g)) => g,
+            _ => continue,
+        };
 
-    // Add privileged groups as nodes
-    for group_name in privileged_group_names {
-        let groups = provider.search_groups(group_name, 1).await.unwrap_or_default();
-        for group in groups {
+        {
             if node_dns.insert(group.distinguished_name.clone()) {
                 nodes.push(GraphNode {
                     dn: group.distinguished_name.clone(),
@@ -1168,7 +1181,7 @@ pub async fn build_escalation_graph(
                         .display_name
                         .clone()
                         .or_else(|| group.sam_account_name.clone())
-                        .unwrap_or_else(|| group_name.to_string()),
+                        .unwrap_or_else(|| fallback_name.to_string()),
                     node_type: NodeType::Group,
                     is_privileged: true,
                 });

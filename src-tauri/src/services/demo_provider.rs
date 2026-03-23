@@ -1435,6 +1435,10 @@ impl DirectoryProvider for DemoDirectoryProvider {
     async fn read_entry(&self, _dn: &str) -> Result<Option<DirectoryEntry>> {
         Ok(None)
     }
+
+    async fn resolve_group_by_rid(&self, _rid: u32) -> Result<Option<DirectoryEntry>> {
+        Ok(None)
+    }
 }
 
 fn sample_ou_tree() -> Vec<OUNode> {
