@@ -8,7 +8,10 @@ import { NotificationProvider } from "@/contexts/NotificationContext";
 const mockInvoke = vi.fn();
 
 vi.mock("@tauri-apps/api/core", () => ({
-  invoke: (...args: unknown[]) => mockInvoke(...args),
+  invoke: (...args: unknown[]) => {
+    if (args[0] === "get_platform") return Promise.resolve("windows");
+    return mockInvoke(...args);
+  },
 }));
 
 function Wrapper({ children }: { children: React.ReactNode }) {

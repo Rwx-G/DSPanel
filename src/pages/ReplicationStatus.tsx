@@ -112,9 +112,14 @@ export function ReplicationStatus() {
   const [forcingReplication, setForcingReplication] = useState<string | null>(
     null,
   );
+  const [platform, setPlatform] = useState<string>("unknown");
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const { showConfirmation } = useDialog();
   const { notify } = useNotifications();
+
+  useEffect(() => {
+    invoke<string>("get_platform").then(setPlatform).catch(() => {});
+  }, []);
 
   const fetchPartnerships = useCallback(async () => {
     try {
@@ -271,7 +276,9 @@ export function ReplicationStatus() {
                   <th className="px-3 py-2 font-medium">Naming Context</th>
                   <th className="px-3 py-2 font-medium">Last Sync</th>
                   <th className="px-3 py-2 font-medium">Errors</th>
-                  <th className="px-3 py-2 font-medium">Actions</th>
+                  {platform === "windows" && (
+                    <th className="px-3 py-2 font-medium">Actions</th>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -327,6 +334,7 @@ export function ReplicationStatus() {
                           </span>
                         )}
                       </td>
+                      {platform === "windows" && (
                       <td className="px-3 py-2">
                         <button
                           className="btn btn-sm flex items-center gap-1 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2.5 py-1 text-caption font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors"
@@ -341,6 +349,7 @@ export function ReplicationStatus() {
                             : "Sync"}
                         </button>
                       </td>
+                      )}
                     </tr>
                   );
                 })}
