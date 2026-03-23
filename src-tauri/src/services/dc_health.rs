@@ -27,12 +27,37 @@ pub async fn discover_domain_controllers(
         .search_configuration(&sites_dn, "(objectClass=server)")
         .await?;
 
+    // Extract domain name from base DN for FQDN construction fallback
+    let domain_suffix = base_dn
+        .split(',')
+        .filter_map(|p| {
+            p.trim()
+                .strip_prefix("DC=")
+                .or_else(|| p.trim().strip_prefix("dc="))
+        })
+        .collect::<Vec<&str>>()
+        .join(".");
+
     let mut dcs = Vec::new();
     for entry in &entries {
+        // dNSHostName may be empty on newly promoted DCs - fall back to CN + domain
         let hostname = entry
             .get_attribute("dNSHostName")
-            .unwrap_or_default()
-            .to_string();
+            .filter(|h| !h.is_empty())
+            .map(|h| h.to_string())
+            .unwrap_or_else(|| {
+                let cn = entry
+                    .distinguished_name
+                    .split(',')
+                    .next()
+                    .and_then(|p| p.strip_prefix("CN=").or_else(|| p.strip_prefix("cn=")))
+                    .unwrap_or("");
+                if cn.is_empty() || domain_suffix.is_empty() {
+                    String::new()
+                } else {
+                    format!("{}.{}", cn, domain_suffix)
+                }
+            });
         if hostname.is_empty() {
             continue;
         }
@@ -332,9 +357,23 @@ async fn check_ad_services(provider: &dyn DirectoryProvider, dc_hostname: &str) 
         .await
         .unwrap_or_default();
 
+    // ldap3 may return attribute keys with range suffix (e.g. "servicePrincipalName;range=0-9").
+    // Collect SPNs from both the exact key and any range-suffixed keys.
     let spns: Vec<String> = entries
         .first()
-        .map(|e| e.get_attribute_values("servicePrincipalName").to_vec())
+        .map(|e| {
+            let mut all_spns = e.get_attribute_values("servicePrincipalName").to_vec();
+            // Also check for range-suffixed keys
+            for (key, values) in &e.attributes {
+                if key
+                    .to_lowercase()
+                    .starts_with("serviceprincipalname;range=")
+                {
+                    all_spns.extend(values.iter().cloned());
+                }
+            }
+            all_spns
+        })
         .unwrap_or_default();
 
     if spns.is_empty() {
@@ -376,6 +415,19 @@ async fn check_ad_services(provider: &dyn DirectoryProvider, dc_hostname: &str) 
             name: "Services".to_string(),
             status: DcHealthLevel::Healthy,
             message: format!("All services registered: {}", found.join(", ")),
+            value: Some(format!("{}/{}", found.len(), total)),
+        }
+    } else if found.len() >= 3 && found.contains(&"Host") {
+        // LDAP may return a subset of SPNs due to replication delay or range limits.
+        // Core SPNs present but some missing - flag as warning for investigation.
+        DcHealthCheck {
+            name: "Services".to_string(),
+            status: DcHealthLevel::Warning,
+            message: format!(
+                "Partial SPNs: {}. Missing: {}",
+                found.join(", "),
+                missing.join(", ")
+            ),
             value: Some(format!("{}/{}", found.len(), total)),
         }
     } else {

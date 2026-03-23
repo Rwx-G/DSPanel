@@ -2551,7 +2551,27 @@ impl DirectoryProvider for LdapDirectoryProvider {
                         &base,
                         ldap3::Scope::Subtree,
                         &filt,
-                        vec!["*", "dNSHostName", "options"],
+                        vec![
+                            "*",
+                            "dNSHostName",
+                            "options",
+                            "servicePrincipalName",
+                            "operatingSystem",
+                            "operatingSystemVersion",
+                            "userAccountControl",
+                            "pwdLastSet",
+                            "fSMORoleOwner",
+                            "siteList",
+                            "siteObject",
+                            "msDFSR-Flags",
+                            "msDFSR-Enabled",
+                            "msDFSR-ComputerReference",
+                            "fromServer",
+                            "cost",
+                            "replInterval",
+                            "location",
+                            "currentTime",
+                        ],
                     )
                     .await
                     .context("Configuration search failed")?
