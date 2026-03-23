@@ -205,10 +205,10 @@ describe("RiskScoreDashboard", () => {
     render(<RiskScoreDashboard />);
 
     await waitFor(() => {
-      expect(screen.getByText("Password Policy")).toBeInTheDocument();
+      expect(screen.getByTestId("factor-card-password-policy")).toBeInTheDocument();
     });
 
-    expect(screen.getByText("Privileged Accounts")).toBeInTheDocument();
+    expect(screen.getByTestId("factor-card-privileged-accounts")).toBeInTheDocument();
     expect(
       screen.getByText("Several privileged accounts have stale passwords."),
     ).toBeInTheDocument();
@@ -251,7 +251,7 @@ describe("RiskScoreDashboard", () => {
     });
 
     const bars = screen.getAllByTestId("trend-bar");
-    expect(bars).toHaveLength(5);
+    expect(bars).toHaveLength(30);
   });
 
   it("shows error state on failure", async () => {
@@ -308,11 +308,18 @@ describe("RiskScoreDashboard", () => {
     setupMocks();
     render(<RiskScoreDashboard />);
 
+    // Trend now always shows 30 days from today
+    const today = new Date();
+    const todayStr = today.toISOString().slice(0, 10);
+    const startDate = new Date(today);
+    startDate.setDate(startDate.getDate() - 29);
+    const startStr = startDate.toISOString().slice(0, 10);
+
     await waitFor(() => {
-      expect(screen.getByText("2026-02-21")).toBeInTheDocument();
+      expect(screen.getByText(startStr)).toBeInTheDocument();
     });
 
-    expect(screen.getByText("2026-03-21")).toBeInTheDocument();
+    expect(screen.getByText(todayStr)).toBeInTheDocument();
   });
 
   // Radar chart tests

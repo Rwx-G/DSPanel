@@ -17,6 +17,7 @@ const KRBTGT_PASSWORD_AGE_THRESHOLD_DAYS: i64 = 180;
 
 // UAC flag constants
 const UAC_ACCOUNTDISABLE: u32 = 0x0002;
+const UAC_PASSWD_NOTREQD: u32 = 0x0020;
 const UAC_ENCRYPTED_TEXT_PWD_ALLOWED: u32 = 0x0080; // Reversible encryption
 const UAC_DONT_EXPIRE_PASSWORD: u32 = 0x10000;
 const UAC_TRUSTED_FOR_DELEGATION: u32 = 0x80000; // Unconstrained delegation
@@ -672,7 +673,9 @@ fn severity_from_points(points: f64) -> AlertSeverity {
 
 /// Builds a `RiskFactor` from a `FactorResult`.
 fn build_risk_factor(id: &str, name: &str, weight: f64, result: FactorResult) -> RiskFactor {
-    let impact_if_fixed: f64 = result.findings.iter().map(|f| f.points_deducted).sum();
+    let raw_impact: f64 = result.findings.iter().map(|f| f.points_deducted).sum();
+    // Cap at the actual deficit - can't gain more than what's missing
+    let impact_if_fixed = raw_impact.min(100.0 - result.score);
     RiskFactor {
         id: id.to_string(),
         name: name.to_string(),
@@ -741,7 +744,8 @@ pub async fn compute_risk_score(
     ));
 
     // Factor 6: Infrastructure Hardening
-    let infra_result = compute_infrastructure_hardening_factor(&domain_findings);
+    let infra_result =
+        compute_infrastructure_hardening_factor(provider.clone(), &domain_findings).await;
     factors.push(build_risk_factor(
         "infrastructure_hardening",
         "Infrastructure Hardening",
@@ -812,7 +816,7 @@ pub async fn compute_risk_score(
 
 /// Scores privileged account hygiene (0-100).
 async fn compute_privileged_hygiene_factor(provider: Arc<dyn DirectoryProvider>) -> FactorResult {
-    let report = get_privileged_accounts_report(provider, &[]).await;
+    let report = get_privileged_accounts_report(provider.clone(), &[]).await;
     match report {
         Ok(report) if !report.accounts.is_empty() => {
             let total = report.accounts.len() as f64;
@@ -821,7 +825,7 @@ async fn compute_privileged_hygiene_factor(provider: Arc<dyn DirectoryProvider>)
                 .iter()
                 .filter(|a| !a.alerts.is_empty())
                 .count() as f64;
-            let score = ((total - with_alerts) / total * 100.0).clamp(0.0, 100.0);
+            let mut score = ((total - with_alerts) / total * 100.0).clamp(0.0, 100.0);
 
             let mut recommendations = Vec::new();
             let mut findings = Vec::new();
@@ -865,8 +869,161 @@ async fn compute_privileged_hygiene_factor(provider: Arc<dyn DirectoryProvider>)
                 });
             }
 
+            // Inactive accounts in admin groups (enabled but last logon > 90 days)
+            let now = Utc::now();
+            let inactive_admins = report
+                .accounts
+                .iter()
+                .filter(|a| {
+                    a.enabled
+                        && a.last_logon
+                            .as_ref()
+                            .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
+                            .map(|dt| (now - dt.with_timezone(&Utc)).num_days() > 90)
+                            .unwrap_or(true)
+                })
+                .count();
+            if inactive_admins > 0 {
+                let penalty = (inactive_admins as f64 * 5.0).min(20.0);
+                score -= penalty;
+                recommendations.push(format!(
+                    "Disable or remove {} inactive admin account(s)",
+                    inactive_admins
+                ));
+                findings.push(RiskFinding {
+                    id: "PRIV-INACTIVE-ADMIN".to_string(),
+                    description: format!(
+                        "{} enabled admin account(s) have not logged on in 90+ days",
+                        inactive_admins
+                    ),
+                    severity: AlertSeverity::High,
+                    points_deducted: penalty,
+                    remediation: format!(
+                        "Disable {} inactive admin account(s) or remove from privileged groups",
+                        inactive_admins
+                    ),
+                    complexity: RemediationComplexity::Easy,
+                    framework_ref: Some("CIS 5.1.1".to_string()),
+                });
+            }
+
+            // Computer accounts in admin groups
+            // Re-scan group members to find computer objects
+            let mut computer_in_admin = 0_usize;
+            for (rid, _) in PRIVILEGED_GROUP_RIDS {
+                if let Ok(Some(group)) = provider.resolve_group_by_rid(*rid).await {
+                    let members = provider
+                        .get_group_members(&group.distinguished_name, 1000)
+                        .await
+                        .unwrap_or_default();
+                    computer_in_admin += members
+                        .iter()
+                        .filter(|m| m.object_class.as_deref() == Some("computer"))
+                        .count();
+                }
+            }
+            if computer_in_admin > 0 {
+                let penalty = 20.0;
+                score -= penalty;
+                recommendations.push(format!(
+                    "Remove {} computer account(s) from privileged groups",
+                    computer_in_admin
+                ));
+                findings.push(RiskFinding {
+                    id: "PRIV-COMPUTER-IN-ADMIN".to_string(),
+                    description: format!(
+                        "{} computer account(s) found in privileged groups",
+                        computer_in_admin
+                    ),
+                    severity: AlertSeverity::Critical,
+                    points_deducted: penalty,
+                    remediation: "Remove computer accounts from all privileged groups".to_string(),
+                    complexity: RemediationComplexity::Easy,
+                    framework_ref: Some("MITRE T1078.002".to_string()),
+                });
+            }
+
+            // Excessive admin count
+            let total_priv = report.accounts.len();
+            if total_priv > 20 {
+                let penalty = 15.0;
+                score -= penalty;
+                recommendations.push(format!(
+                    "Reduce privileged accounts from {} to fewer than 10",
+                    total_priv
+                ));
+                findings.push(RiskFinding {
+                    id: "PRIV-EXCESSIVE".to_string(),
+                    description: format!(
+                        "{} privileged accounts detected - best practice is fewer than 10",
+                        total_priv
+                    ),
+                    severity: AlertSeverity::High,
+                    points_deducted: penalty,
+                    remediation:
+                        "Reduce the number of privileged accounts to minimize attack surface"
+                            .to_string(),
+                    complexity: RemediationComplexity::Medium,
+                    framework_ref: Some("CIS 5.1.2".to_string()),
+                });
+            } else if total_priv > 10 {
+                let penalty = 5.0;
+                score -= penalty;
+                recommendations.push(format!(
+                    "Consider reducing privileged accounts from {} to fewer than 10",
+                    total_priv
+                ));
+                findings.push(RiskFinding {
+                    id: "PRIV-EXCESSIVE".to_string(),
+                    description: format!(
+                        "{} privileged accounts detected - consider reducing",
+                        total_priv
+                    ),
+                    severity: AlertSeverity::Medium,
+                    points_deducted: penalty,
+                    remediation:
+                        "Reduce the number of privileged accounts to minimize attack surface"
+                            .to_string(),
+                    complexity: RemediationComplexity::Medium,
+                    framework_ref: Some("CIS 5.1.2".to_string()),
+                });
+            }
+
+            // Empty admin groups
+            let mut empty_groups = Vec::new();
+            for (rid, fallback_name) in PRIVILEGED_GROUP_RIDS {
+                if let Ok(Some(group)) = provider.resolve_group_by_rid(*rid).await {
+                    let members = provider
+                        .get_group_members(&group.distinguished_name, 1)
+                        .await
+                        .unwrap_or_default();
+                    if members.is_empty() {
+                        let name = group
+                            .display_name
+                            .clone()
+                            .or_else(|| group.sam_account_name.clone())
+                            .unwrap_or_else(|| fallback_name.to_string());
+                        empty_groups.push(name);
+                    }
+                }
+            }
+            if !empty_groups.is_empty() {
+                findings.push(RiskFinding {
+                    id: "PRIV-EMPTY-GROUP".to_string(),
+                    description: format!(
+                        "Privileged group(s) with no members: {}",
+                        empty_groups.join(", ")
+                    ),
+                    severity: AlertSeverity::Info,
+                    points_deducted: 0.0,
+                    remediation: "Verify empty privileged groups are intentional".to_string(),
+                    complexity: RemediationComplexity::Easy,
+                    framework_ref: Some("CIS 5.1".to_string()),
+                });
+            }
+
             FactorResult {
-                score,
+                score: score.clamp(0.0, 100.0),
                 explanation: format!(
                     "{}/{} privileged accounts have security alerts",
                     with_alerts as usize, total as usize
@@ -1060,7 +1217,7 @@ async fn compute_stale_accounts_factor(provider: Arc<dyn DirectoryProvider>) -> 
                 .count();
 
             let ratio = stale_count as f64 / total as f64;
-            let score = ((1.0 - ratio) * 100.0).clamp(0.0, 100.0);
+            let mut score = ((1.0 - ratio) * 100.0).clamp(0.0, 100.0);
 
             let mut recommendations = Vec::new();
             let mut findings = Vec::new();
@@ -1087,8 +1244,47 @@ async fn compute_stale_accounts_factor(provider: Arc<dyn DirectoryProvider>) -> 
                 });
             }
 
+            // Stale machine accounts (password > 90 days)
+            let computers = provider.browse_computers(5000).await.unwrap_or_default();
+            let total_machines = computers.len();
+            if total_machines > 0 {
+                let stale_machines = computers
+                    .iter()
+                    .filter(|c| {
+                        let pwd_set = parse_ad_timestamp(c.get_attribute("pwdLastSet"));
+                        match pwd_set {
+                            Some(dt) => (now - dt).num_days() > 90,
+                            None => true,
+                        }
+                    })
+                    .count();
+                if stale_machines > 0 {
+                    let penalty = (stale_machines as f64 / total_machines as f64 * 15.0).min(15.0);
+                    score -= penalty;
+                    recommendations.push(format!(
+                        "Review {} stale machine account(s) with passwords older than 90 days",
+                        stale_machines
+                    ));
+                    findings.push(RiskFinding {
+                        id: "STALE-MACHINE".to_string(),
+                        description: format!(
+                            "{}/{} machine accounts have passwords older than 90 days",
+                            stale_machines, total_machines
+                        ),
+                        severity: AlertSeverity::Medium,
+                        points_deducted: penalty,
+                        remediation: format!(
+                            "Review and remove {} stale machine account(s)",
+                            stale_machines
+                        ),
+                        complexity: RemediationComplexity::Medium,
+                        framework_ref: Some("CIS 5.5".to_string()),
+                    });
+                }
+            }
+
             FactorResult {
-                score,
+                score: score.clamp(0.0, 100.0),
                 explanation: format!(
                     "{}/{} accounts are stale (inactive > 90 days)",
                     stale_count, total
@@ -1368,7 +1564,181 @@ async fn compute_dangerous_configs_factor(provider: Arc<dyn DirectoryProvider>) 
                     remediation: "Audit accounts with adminCount=1 and clear orphaned entries"
                         .to_string(),
                     complexity: RemediationComplexity::Medium,
-                    framework_ref: None,
+                    framework_ref: Some("MITRE T1078.002".to_string()),
+                });
+            }
+
+            // PASSWORD_NOT_REQUIRED flag (UAC 0x0020 = PASSWD_NOTREQD)
+            let passwd_notreqd = uac_flags
+                .iter()
+                .filter(|&&f| f & UAC_PASSWD_NOTREQD != 0)
+                .count();
+            if passwd_notreqd > 0 {
+                let penalty = (passwd_notreqd as f64 / total as f64 * 20.0).min(20.0);
+                score -= penalty;
+                issues.push(format!("{} with PASSWD_NOTREQD", passwd_notreqd));
+                recommendations.push(
+                    "Clear PASSWD_NOTREQD flag and set passwords on all accounts".to_string(),
+                );
+                findings.push(RiskFinding {
+                    id: "CONF-PASSWD-NOTREQD".to_string(),
+                    description: format!(
+                        "{} account(s) have PASSWD_NOTREQD flag - can have empty passwords",
+                        passwd_notreqd
+                    ),
+                    // Always at least High - empty passwords are a serious risk regardless of count
+                    severity: AlertSeverity::High,
+                    points_deducted: penalty,
+                    remediation:
+                        "Clear PASSWD_NOTREQD flag and set passwords on all affected accounts"
+                            .to_string(),
+                    complexity: RemediationComplexity::Easy,
+                    framework_ref: Some("CIS 1.1.1".to_string()),
+                });
+            }
+
+            // Accounts with SIDHistory
+            let sid_history_count = users
+                .iter()
+                .filter(|u| !u.get_attribute_values("sIDHistory").is_empty())
+                .count();
+            if sid_history_count > 0 {
+                let penalty = (sid_history_count as f64 * 5.0).min(20.0);
+                score -= penalty;
+                issues.push(format!("{} with SIDHistory", sid_history_count));
+                recommendations.push(
+                    "Remove SIDHistory from accounts after migration is complete".to_string(),
+                );
+                findings.push(RiskFinding {
+                    id: "CONF-SIDHISTORY".to_string(),
+                    description: format!(
+                        "{} account(s) have SIDHistory attribute - potential cross-domain escalation",
+                        sid_history_count
+                    ),
+                    severity: severity_from_points(penalty),
+                    points_deducted: penalty,
+                    remediation:
+                        "Remove SIDHistory from accounts after domain migration is complete"
+                            .to_string(),
+                    complexity: RemediationComplexity::Medium,
+                    framework_ref: Some("MITRE T1134.005".to_string()),
+                });
+            }
+
+            // Delegation to DC services (msDS-AllowedToDelegateTo targeting DC)
+            let base_domain = provider.base_dn().unwrap_or_default().to_lowercase();
+            let deleg_to_dc_count = users
+                .iter()
+                .filter(|u| {
+                    let targets = u.get_attribute_values("msDS-AllowedToDelegateTo");
+                    !targets.is_empty()
+                        && targets
+                            .iter()
+                            .any(|t| t.to_lowercase().contains(&base_domain))
+                })
+                .count();
+            if deleg_to_dc_count > 0 {
+                let penalty = 20.0;
+                score -= penalty;
+                issues.push(format!(
+                    "{} with delegation to DC services",
+                    deleg_to_dc_count
+                ));
+                recommendations
+                    .push("Remove delegation targeting domain controller services".to_string());
+                findings.push(RiskFinding {
+                    id: "CONF-DELEG-DC".to_string(),
+                    description: format!(
+                        "{} account(s) have constrained delegation targeting DC services",
+                        deleg_to_dc_count
+                    ),
+                    severity: AlertSeverity::Critical,
+                    points_deducted: penalty,
+                    remediation:
+                        "Remove msDS-AllowedToDelegateTo entries targeting domain controllers"
+                            .to_string(),
+                    complexity: RemediationComplexity::Hard,
+                    framework_ref: Some("MITRE T1134.001".to_string()),
+                });
+            }
+
+            // Protocol transition to sensitive services (CIFS, LDAP, HTTP)
+            let sensitive_services = ["cifs/", "ldap/", "http/"];
+            let deleg_sensitive_count = users
+                .iter()
+                .zip(uac_flags.iter())
+                .filter(|(u, f)| {
+                    **f & UAC_TRUSTED_TO_AUTH_FOR_DELEGATION != 0 && {
+                        let targets = u.get_attribute_values("msDS-AllowedToDelegateTo");
+                        targets.iter().any(|t| {
+                            let lower = t.to_lowercase();
+                            sensitive_services.iter().any(|svc| lower.starts_with(svc))
+                        })
+                    }
+                })
+                .count();
+            if deleg_sensitive_count > 0 {
+                let penalty = 15.0;
+                score -= penalty;
+                issues.push(format!(
+                    "{} with protocol transition to sensitive services",
+                    deleg_sensitive_count
+                ));
+                recommendations.push(
+                    "Review protocol transition delegation to CIFS/LDAP/HTTP services".to_string(),
+                );
+                findings.push(RiskFinding {
+                    id: "CONF-DELEG-SENSITIVE".to_string(),
+                    description: format!(
+                        "{} account(s) with protocol transition targeting CIFS/LDAP/HTTP services",
+                        deleg_sensitive_count
+                    ),
+                    severity: AlertSeverity::High,
+                    points_deducted: penalty,
+                    remediation:
+                        "Review and restrict protocol transition delegation to sensitive services"
+                            .to_string(),
+                    complexity: RemediationComplexity::Hard,
+                    framework_ref: Some("MITRE T1134.001".to_string()),
+                });
+            }
+
+            // Unconstrained delegation on non-DC computers
+            let computers = provider.browse_computers(5000).await.unwrap_or_default();
+            let uncons_computer_count = computers
+                .iter()
+                .filter(|c| {
+                    let c_uac = c
+                        .get_attribute("userAccountControl")
+                        .and_then(|v| v.parse::<u32>().ok())
+                        .unwrap_or(0);
+                    // TRUSTED_FOR_DELEGATION but not a DC (DCs typically have SERVER_TRUST_ACCOUNT 0x2000)
+                    c_uac & UAC_TRUSTED_FOR_DELEGATION != 0 && c_uac & 0x2000 == 0
+                })
+                .count();
+            if uncons_computer_count > 0 {
+                let penalty = 20.0;
+                score -= penalty;
+                issues.push(format!(
+                    "{} non-DC computers with unconstrained delegation",
+                    uncons_computer_count
+                ));
+                recommendations.push(
+                    "Remove unconstrained delegation from non-DC computer accounts".to_string(),
+                );
+                findings.push(RiskFinding {
+                    id: "CONF-UNCONS-COMPUTER".to_string(),
+                    description: format!(
+                        "{} non-DC computer(s) with unconstrained delegation - can capture TGTs",
+                        uncons_computer_count
+                    ),
+                    severity: AlertSeverity::Critical,
+                    points_deducted: penalty,
+                    remediation:
+                        "Remove unconstrained delegation from all non-DC computer accounts"
+                            .to_string(),
+                    complexity: RemediationComplexity::Medium,
+                    framework_ref: Some("MITRE T1134.001".to_string()),
                 });
             }
 
@@ -1450,7 +1820,7 @@ async fn compute_kerberos_security_factor(
     }
 
     // Check privileged accounts for Kerberos weaknesses
-    let report = get_privileged_accounts_report(provider, &[]).await;
+    let report = get_privileged_accounts_report(provider.clone(), &[]).await;
     if let Ok(report) = report {
         let total = report.accounts.len().max(1) as f64;
 
@@ -1530,6 +1900,95 @@ async fn compute_kerberos_security_factor(
         }
     }
 
+    // AES enforcement checks require browsing users for msDS-SupportedEncryptionTypes
+    let all_users = provider.browse_users(5000).await.unwrap_or_default();
+
+    // AES not enforced on admin accounts (check msDS-SupportedEncryptionTypes)
+    // Accounts with adminCount=1 that don't have AES bits set (0x8=AES128, 0x10=AES256)
+    let admin_users: Vec<_> = all_users
+        .iter()
+        .filter(|u| {
+            u.get_attribute("adminCount")
+                .and_then(|v| v.parse::<u32>().ok())
+                .unwrap_or(0)
+                == 1
+        })
+        .collect();
+    let total_admins = admin_users.len().max(1);
+    let rc4_admins = admin_users
+        .iter()
+        .filter(|u| {
+            let enc_types = u
+                .get_attribute("msDS-SupportedEncryptionTypes")
+                .and_then(|v| v.parse::<u32>().ok())
+                .unwrap_or(0);
+            // If not set (0) or missing AES bits (0x8 | 0x10 = 0x18), RC4 is still usable
+            enc_types == 0 || (enc_types & 0x18) == 0
+        })
+        .count();
+    if rc4_admins > 0 {
+        let penalty = (rc4_admins as f64 / total_admins as f64 * 15.0).min(15.0);
+        score -= penalty;
+        issues.push(format!("{} admin(s) without AES enforcement", rc4_admins));
+        recommendations.push(
+            "Configure msDS-SupportedEncryptionTypes for AES on all admin accounts".to_string(),
+        );
+        findings.push(RiskFinding {
+            id: "KERB-RC4-ADMIN".to_string(),
+            description: format!(
+                "{}/{} admin account(s) lack AES encryption enforcement - RC4 still usable",
+                rc4_admins, total_admins
+            ),
+            severity: AlertSeverity::Medium,
+            points_deducted: penalty,
+            remediation:
+                "Set msDS-SupportedEncryptionTypes to include AES128/AES256 on admin accounts"
+                    .to_string(),
+            complexity: RemediationComplexity::Easy,
+            framework_ref: Some("CIS 18.3.6".to_string()),
+        });
+    }
+
+    // Kerberoastable accounts with weak encryption (SPN set, no AES)
+    let spn_users: Vec<_> = all_users
+        .iter()
+        .filter(|u| !u.get_attribute_values("servicePrincipalName").is_empty())
+        .collect();
+    let total_spn = spn_users.len().max(1);
+    let weak_spn = spn_users
+        .iter()
+        .filter(|u| {
+            let enc_types = u
+                .get_attribute("msDS-SupportedEncryptionTypes")
+                .and_then(|v| v.parse::<u32>().ok())
+                .unwrap_or(0);
+            enc_types == 0 || (enc_types & 0x18) == 0
+        })
+        .count();
+    if weak_spn > 0 {
+        let penalty = (weak_spn as f64 / total_spn as f64 * 15.0).min(15.0);
+        score -= penalty;
+        issues.push(format!(
+            "{} Kerberoastable account(s) with weak encryption",
+            weak_spn
+        ));
+        recommendations.push("Enable AES encryption on all service accounts with SPNs".to_string());
+        findings.push(RiskFinding {
+            id: "KERB-WEAK-SPN".to_string(),
+            description: format!(
+                "{}/{} Kerberoastable account(s) lack AES encryption - vulnerable to offline cracking",
+                weak_spn, total_spn
+            ),
+            severity: AlertSeverity::High,
+            points_deducted: penalty,
+            remediation:
+                "Set msDS-SupportedEncryptionTypes to include AES on all service accounts"
+                    .to_string(),
+            complexity: RemediationComplexity::Easy,
+            framework_ref: Some("MITRE T1558.003".to_string()),
+        });
+    }
+
     let explanation = if issues.is_empty() {
         "Kerberos configuration meets security best practices".to_string()
     } else {
@@ -1547,8 +2006,9 @@ async fn compute_kerberos_security_factor(
 /// Scores infrastructure hardening posture (0-100).
 ///
 /// Evaluates: LAPS coverage, Recycle Bin, Fine-Grained Password Policies,
-/// domain functional level, LDAP signing.
-fn compute_infrastructure_hardening_factor(
+/// domain functional level, LDAP signing, DNS zones, AdminSDHolder.
+async fn compute_infrastructure_hardening_factor(
+    provider: Arc<dyn DirectoryProvider>,
     domain_findings: &DomainSecurityFindings,
 ) -> FactorResult {
     let mut score = 100.0_f64;
@@ -1691,6 +2151,56 @@ fn compute_infrastructure_hardening_factor(
             complexity: RemediationComplexity::Medium,
             framework_ref: Some("MITRE T1558".to_string()),
         });
+    }
+
+    // DNS zone inventory (ADIDNS)
+    if let Some(base_dn) = provider.base_dn() {
+        let dns_base = format!("CN=MicrosoftDNS,DC=DomainDnsZones,{}", base_dn);
+        if let Ok(zones) = provider
+            .search_configuration(&dns_base, "(objectClass=dnsZone)")
+            .await
+        {
+            let zone_count = zones.len();
+            if zone_count > 0 {
+                let zone_names: Vec<String> = zones
+                    .iter()
+                    .filter_map(|z| {
+                        z.get_attribute("name")
+                            .or_else(|| z.get_attribute("dc"))
+                            .map(|s| s.to_string())
+                    })
+                    .collect();
+                findings.push(RiskFinding {
+                    id: "INFRA-DNS-ZONES".to_string(),
+                    description: format!(
+                        "{} AD-integrated DNS zone(s) detected: {}",
+                        zone_count,
+                        zone_names.join(", ")
+                    ),
+                    severity: AlertSeverity::Info,
+                    points_deducted: 0.0,
+                    remediation: "Review DNS zones for proper security configuration".to_string(),
+                    complexity: RemediationComplexity::Easy,
+                    framework_ref: Some("CIS 9.1".to_string()),
+                });
+            }
+        }
+
+        // AdminSDHolder verification
+        let adminsdholder_dn = format!("CN=AdminSDHolder,CN=System,{}", base_dn);
+        if let Ok(Some(_)) = provider.read_entry(&adminsdholder_dn).await {
+            findings.push(RiskFinding {
+                id: "INFRA-ADMINSDHOLDER".to_string(),
+                description: "AdminSDHolder object exists - SDProp is active".to_string(),
+                severity: AlertSeverity::Info,
+                points_deducted: 0.0,
+                remediation:
+                    "Periodically audit AdminSDHolder ACL to ensure it has not been weakened"
+                        .to_string(),
+                complexity: RemediationComplexity::Medium,
+                framework_ref: Some("MITRE T1078".to_string()),
+            });
+        }
     }
 
     let explanation = if issues.is_empty() {
@@ -2108,6 +2618,73 @@ async fn compute_certificate_security_factor(provider: Arc<dyn DirectoryProvider
             complexity: RemediationComplexity::Easy,
             framework_ref: Some("MITRE T1649".to_string()),
         });
+
+        // ESC6: Check EDITF_ATTRIBUTESUBJECTALTNAME2 on CA enrollment services
+        for es in &enrollment_services {
+            let es_name = es
+                .get_attribute("name")
+                .or_else(|| es.get_attribute("cn"))
+                .unwrap_or("unknown");
+            let flags = es
+                .get_attribute("flags")
+                .and_then(|v| v.parse::<u32>().ok())
+                .unwrap_or(0);
+            if flags & 0x0004_0000 != 0 {
+                let penalty = 25.0;
+                score -= penalty;
+                issues.push(format!(
+                    "ESC6: EDITF_ATTRIBUTESUBJECTALTNAME2 on {}",
+                    es_name
+                ));
+                recommendations.push(format!(
+                    "Disable EDITF_ATTRIBUTESUBJECTALTNAME2 on CA '{}'",
+                    es_name
+                ));
+                findings.push(RiskFinding {
+                    id: "CERT-ESC6".to_string(),
+                    description: format!(
+                        "CA '{}' has EDITF_ATTRIBUTESUBJECTALTNAME2 enabled - allows arbitrary SANs in certificate requests",
+                        es_name
+                    ),
+                    severity: AlertSeverity::Critical,
+                    points_deducted: penalty,
+                    remediation: format!(
+                        "Run: certutil -config \"{}\" -setreg policy\\EditFlags -EDITF_ATTRIBUTESUBJECTALTNAME2",
+                        es_name
+                    ),
+                    complexity: RemediationComplexity::Medium,
+                    framework_ref: Some("MITRE T1649 / ESC6".to_string()),
+                });
+            }
+
+            // ESC8: Check for HTTP enrollment endpoints (not HTTPS)
+            let enrollment_servers = es.get_attribute_values("msPKI-Enrollment-Servers");
+            let has_http = enrollment_servers.iter().any(|s| s.contains("http://"));
+            if has_http {
+                let penalty = 15.0;
+                score -= penalty;
+                issues.push(format!("ESC8: HTTP enrollment on {}", es_name));
+                recommendations.push(format!(
+                    "Configure HTTPS-only enrollment on CA '{}'",
+                    es_name
+                ));
+                findings.push(RiskFinding {
+                    id: "CERT-ESC8".to_string(),
+                    description: format!(
+                        "CA '{}' has HTTP (non-TLS) enrollment endpoints - vulnerable to NTLM relay",
+                        es_name
+                    ),
+                    severity: AlertSeverity::High,
+                    points_deducted: penalty,
+                    remediation: format!(
+                        "Disable HTTP enrollment on CA '{}' and require HTTPS",
+                        es_name
+                    ),
+                    complexity: RemediationComplexity::Medium,
+                    framework_ref: Some("MITRE T1649 / ESC8".to_string()),
+                });
+            }
+        }
     }
 
     // Check certificate templates for ESC1/ESC2 vulnerabilities
@@ -2119,6 +2696,11 @@ async fn compute_certificate_security_factor(provider: Arc<dyn DirectoryProvider
 
     let mut esc1_count = 0;
     let mut esc_combined_count = 0;
+    let mut esc1_templates: Vec<String> = Vec::new();
+    let mut esc3_count = 0;
+    let mut esc3_templates: Vec<String> = Vec::new();
+    let mut legacy_v1_count = 0;
+    let mut legacy_v1_templates: Vec<String> = Vec::new();
 
     for template in &templates {
         let template_name = template
@@ -2142,44 +2724,133 @@ async fn compute_certificate_security_factor(provider: Arc<dyn DirectoryProvider
 
         if enrollee_supplies_subject {
             esc1_count += 1;
-            score -= 25.0;
-            issues.push(format!(
-                "Template '{}' allows enrollee-supplies-subject (ESC1)",
-                template_name
-            ));
-            recommendations.push(format!(
-                "Remove CT_FLAG_ENROLLEE_SUPPLIES_SUBJECT from template '{}'",
-                template_name
-            ));
-            findings.push(RiskFinding {
-                id: "CERT-003".to_string(),
-                description: format!("Template '{}' allows enrollee to supply subject (ESC1 vulnerability)", template_name),
-                severity: severity_from_points(25.0),
-                points_deducted: 25.0,
-                remediation: format!("Remove CT_FLAG_ENROLLEE_SUPPLIES_SUBJECT from template '{}' or restrict enrollment permissions", template_name),
-                complexity: RemediationComplexity::Medium,
-                framework_ref: Some("ESC1".to_string()),
-            });
+            esc1_templates.push(template_name.to_string());
 
-            // Combined ESC1 + no manager approval = critical
             if !manager_approval_required {
                 esc_combined_count += 1;
-                score -= 15.0;
-                issues.push(format!(
-                    "Template '{}' has ESC1 + no manager approval required",
-                    template_name
-                ));
-                findings.push(RiskFinding {
-                    id: "CERT-004".to_string(),
-                    description: format!("Template '{}' allows enrollee-supplies-subject with no manager approval - critical ESC1 vector", template_name),
-                    severity: severity_from_points(15.0),
-                    points_deducted: 15.0,
-                    remediation: format!("Enable CT_FLAG_PEND_ALL_REQUESTS on template '{}' or remove enrollee-supplies-subject", template_name),
-                    complexity: RemediationComplexity::Medium,
-                    framework_ref: Some("ESC2".to_string()),
-                });
             }
         }
+
+        // ESC3: Certificate Request Agent OID (1.3.6.1.4.1.311.20.2.1)
+        let cert_app_policy = template.get_attribute_values("msPKI-Certificate-Application-Policy");
+        let eku = template.get_attribute_values("pKIExtendedKeyUsage");
+        let has_request_agent = cert_app_policy
+            .iter()
+            .chain(eku.iter())
+            .any(|v| v.contains("1.3.6.1.4.1.311.20.2.1"));
+        if has_request_agent {
+            esc3_count += 1;
+            esc3_templates.push(template_name.to_string());
+        }
+
+        // Schema V1 templates (legacy with weaker security defaults)
+        let schema_version = template
+            .get_attribute("msPKI-Template-Schema-Version")
+            .and_then(|v| v.parse::<u32>().ok())
+            .unwrap_or(0);
+        if schema_version == 1 {
+            legacy_v1_count += 1;
+            legacy_v1_templates.push(template_name.to_string());
+        }
+    }
+
+    // Group ESC1 findings into a single finding (not one per template)
+    if esc1_count > 0 {
+        let penalty = (esc1_count as f64 * 5.0).min(40.0);
+        score -= penalty;
+        let template_list = esc1_templates.join(", ");
+        issues.push(format!("{} ESC1 template(s)", esc1_count));
+        recommendations.push(format!(
+            "Remove CT_FLAG_ENROLLEE_SUPPLIES_SUBJECT from: {}",
+            template_list
+        ));
+        findings.push(RiskFinding {
+            id: "CERT-003".to_string(),
+            description: format!(
+                "{} template(s) allow enrollee to supply subject (ESC1): {}",
+                esc1_count, template_list
+            ),
+            severity: AlertSeverity::Critical,
+            points_deducted: penalty,
+            remediation: format!(
+                "Remove CT_FLAG_ENROLLEE_SUPPLIES_SUBJECT from: {}",
+                template_list
+            ),
+            complexity: RemediationComplexity::Medium,
+            framework_ref: Some("MITRE T1649 / ESC1".to_string()),
+        });
+    }
+
+    if esc_combined_count > 0 {
+        let penalty = (esc_combined_count as f64 * 3.0).min(30.0);
+        score -= penalty;
+        issues.push(format!("{} without manager approval", esc_combined_count));
+        findings.push(RiskFinding {
+            id: "CERT-004".to_string(),
+            description: format!(
+                "{} ESC1 template(s) also lack manager approval (ESC2 vector)",
+                esc_combined_count
+            ),
+            severity: AlertSeverity::High,
+            points_deducted: penalty,
+            remediation: "Enable CT_FLAG_PEND_ALL_REQUESTS on ESC1 templates or remove enrollee-supplies-subject".to_string(),
+            complexity: RemediationComplexity::Medium,
+            framework_ref: Some("MITRE T1649 / ESC2".to_string()),
+        });
+    }
+
+    // ESC3: Certificate Request Agent templates
+    if esc3_count > 0 {
+        let penalty = (esc3_count as f64 * 15.0).min(30.0);
+        score -= penalty;
+        let template_list = esc3_templates.join(", ");
+        issues.push(format!("{} ESC3 template(s)", esc3_count));
+        recommendations.push(format!(
+            "Remove Certificate Request Agent EKU from: {}",
+            template_list
+        ));
+        findings.push(RiskFinding {
+            id: "CERT-ESC3".to_string(),
+            description: format!(
+                "{} template(s) have Certificate Request Agent EKU (ESC3): {}",
+                esc3_count, template_list
+            ),
+            severity: AlertSeverity::High,
+            points_deducted: penalty,
+            remediation: format!(
+                "Remove Certificate Request Agent EKU (OID 1.3.6.1.4.1.311.20.2.1) from: {}",
+                template_list
+            ),
+            complexity: RemediationComplexity::Medium,
+            framework_ref: Some("MITRE T1649 / ESC3".to_string()),
+        });
+    }
+
+    // Schema V1 legacy templates
+    if legacy_v1_count > 0 {
+        let penalty = (legacy_v1_count as f64 * 5.0).min(15.0);
+        score -= penalty;
+        let template_list = legacy_v1_templates.join(", ");
+        issues.push(format!("{} legacy V1 template(s)", legacy_v1_count));
+        recommendations.push(format!(
+            "Upgrade schema V1 templates to V2+: {}",
+            template_list
+        ));
+        findings.push(RiskFinding {
+            id: "CERT-LEGACY".to_string(),
+            description: format!(
+                "{} template(s) use schema V1 (weaker security defaults): {}",
+                legacy_v1_count, template_list
+            ),
+            severity: AlertSeverity::Medium,
+            points_deducted: penalty,
+            remediation: format!(
+                "Upgrade schema V1 certificate templates to V2 or higher: {}",
+                template_list
+            ),
+            complexity: RemediationComplexity::Medium,
+            framework_ref: Some("CIS 18.6".to_string()),
+        });
     }
 
     if !templates.is_empty() && esc1_count == 0 {
@@ -3150,5 +3821,372 @@ mod tests {
         let factor = build_risk_factor("test", "Test Factor", 10.0, result);
         assert!((factor.impact_if_fixed - 40.0).abs() < f64::EPSILON);
         assert_eq!(factor.findings.len(), 2);
+    }
+
+    // --- New security checks tests ---
+
+    #[tokio::test]
+    async fn test_certificate_esc3_detection() {
+        use std::collections::HashMap;
+        let mut ca_attrs = HashMap::new();
+        ca_attrs.insert("name".to_string(), vec!["RootCA".to_string()]);
+        let ca_entry = crate::models::DirectoryEntry {
+            distinguished_name: "CN=RootCA,CN=Certification Authorities,CN=Public Key Services,CN=Services,CN=Configuration,DC=example,DC=com".to_string(),
+            sam_account_name: None,
+            display_name: None,
+            object_class: Some("certificationAuthority".to_string()),
+            attributes: ca_attrs,
+        };
+
+        // Template with Certificate Request Agent EKU (ESC3)
+        let mut tpl_attrs = HashMap::new();
+        tpl_attrs.insert("name".to_string(), vec!["VulnTemplate".to_string()]);
+        tpl_attrs.insert(
+            "pKIExtendedKeyUsage".to_string(),
+            vec!["1.3.6.1.4.1.311.20.2.1".to_string()],
+        );
+        tpl_attrs.insert(
+            "msPKI-Certificate-Name-Flag".to_string(),
+            vec!["0".to_string()],
+        );
+        tpl_attrs.insert("msPKI-Enrollment-Flag".to_string(), vec!["0".to_string()]);
+        tpl_attrs.insert(
+            "msPKI-Template-Schema-Version".to_string(),
+            vec!["2".to_string()],
+        );
+        let tpl_entry = crate::models::DirectoryEntry {
+            distinguished_name: "CN=VulnTemplate,CN=Certificate Templates,CN=Public Key Services,CN=Services,CN=Configuration,DC=example,DC=com".to_string(),
+            sam_account_name: None,
+            display_name: None,
+            object_class: Some("pKICertificateTemplate".to_string()),
+            attributes: tpl_attrs,
+        };
+
+        let provider = Arc::new(
+            crate::services::directory::tests::MockDirectoryProvider::new()
+                .with_configuration_entries(vec![ca_entry, tpl_entry]),
+        );
+        let result = compute_certificate_security_factor(provider).await;
+        let finding_ids: Vec<&str> = result.findings.iter().map(|f| f.id.as_str()).collect();
+        assert!(
+            finding_ids.contains(&"CERT-ESC3"),
+            "Expected CERT-ESC3 finding, got: {:?}",
+            finding_ids
+        );
+    }
+
+    #[tokio::test]
+    async fn test_certificate_legacy_v1_detection() {
+        use std::collections::HashMap;
+        let mut ca_attrs = HashMap::new();
+        ca_attrs.insert("name".to_string(), vec!["RootCA".to_string()]);
+        let ca_entry = crate::models::DirectoryEntry {
+            distinguished_name: "CN=RootCA,CN=Certification Authorities,CN=Public Key Services,CN=Services,CN=Configuration,DC=example,DC=com".to_string(),
+            sam_account_name: None,
+            display_name: None,
+            object_class: Some("certificationAuthority".to_string()),
+            attributes: ca_attrs,
+        };
+
+        // Schema V1 template
+        let mut tpl_attrs = HashMap::new();
+        tpl_attrs.insert("name".to_string(), vec!["LegacyTemplate".to_string()]);
+        tpl_attrs.insert(
+            "msPKI-Template-Schema-Version".to_string(),
+            vec!["1".to_string()],
+        );
+        tpl_attrs.insert(
+            "msPKI-Certificate-Name-Flag".to_string(),
+            vec!["0".to_string()],
+        );
+        tpl_attrs.insert("msPKI-Enrollment-Flag".to_string(), vec!["0".to_string()]);
+        let tpl_entry = crate::models::DirectoryEntry {
+            distinguished_name: "CN=LegacyTemplate,CN=Certificate Templates,CN=Public Key Services,CN=Services,CN=Configuration,DC=example,DC=com".to_string(),
+            sam_account_name: None,
+            display_name: None,
+            object_class: Some("pKICertificateTemplate".to_string()),
+            attributes: tpl_attrs,
+        };
+
+        let provider = Arc::new(
+            crate::services::directory::tests::MockDirectoryProvider::new()
+                .with_configuration_entries(vec![ca_entry, tpl_entry]),
+        );
+        let result = compute_certificate_security_factor(provider).await;
+        let finding_ids: Vec<&str> = result.findings.iter().map(|f| f.id.as_str()).collect();
+        assert!(
+            finding_ids.contains(&"CERT-LEGACY"),
+            "Expected CERT-LEGACY finding, got: {:?}",
+            finding_ids
+        );
+    }
+
+    #[tokio::test]
+    async fn test_dangerous_configs_passwd_notreqd() {
+        use std::collections::HashMap;
+        // User with PASSWD_NOTREQD flag (0x0020 = 32)
+        let mut attrs = HashMap::new();
+        attrs.insert(
+            "userAccountControl".to_string(),
+            vec!["544".to_string()], // 512 (NORMAL_ACCOUNT) + 32 (PASSWD_NOTREQD)
+        );
+        let user = crate::models::DirectoryEntry {
+            distinguished_name: "CN=NoPass,OU=Users,DC=example,DC=com".to_string(),
+            sam_account_name: Some("nopass".to_string()),
+            display_name: Some("No Pass".to_string()),
+            object_class: Some("user".to_string()),
+            attributes: attrs,
+        };
+
+        let provider = Arc::new(
+            crate::services::directory::tests::MockDirectoryProvider::new().with_users(vec![user]),
+        );
+        let result = compute_dangerous_configs_factor(provider).await;
+        let finding_ids: Vec<&str> = result.findings.iter().map(|f| f.id.as_str()).collect();
+        assert!(
+            finding_ids.contains(&"CONF-PASSWD-NOTREQD"),
+            "Expected CONF-PASSWD-NOTREQD finding, got: {:?}",
+            finding_ids
+        );
+    }
+
+    #[tokio::test]
+    async fn test_dangerous_configs_sidhistory() {
+        use std::collections::HashMap;
+        let mut attrs = HashMap::new();
+        attrs.insert("userAccountControl".to_string(), vec!["512".to_string()]);
+        attrs.insert(
+            "sIDHistory".to_string(),
+            vec!["S-1-5-21-123456789-1234567890-1234567890-1001".to_string()],
+        );
+        let user = crate::models::DirectoryEntry {
+            distinguished_name: "CN=MigratedUser,OU=Users,DC=example,DC=com".to_string(),
+            sam_account_name: Some("migrated".to_string()),
+            display_name: Some("Migrated User".to_string()),
+            object_class: Some("user".to_string()),
+            attributes: attrs,
+        };
+
+        let provider = Arc::new(
+            crate::services::directory::tests::MockDirectoryProvider::new().with_users(vec![user]),
+        );
+        let result = compute_dangerous_configs_factor(provider).await;
+        let finding_ids: Vec<&str> = result.findings.iter().map(|f| f.id.as_str()).collect();
+        assert!(
+            finding_ids.contains(&"CONF-SIDHISTORY"),
+            "Expected CONF-SIDHISTORY finding, got: {:?}",
+            finding_ids
+        );
+    }
+
+    #[tokio::test]
+    async fn test_dangerous_configs_deleg_sensitive() {
+        use std::collections::HashMap;
+        // User with protocol transition + delegation to CIFS service
+        let mut attrs = HashMap::new();
+        attrs.insert(
+            "userAccountControl".to_string(),
+            vec![format!("{}", 0x1000000 | 512)], // TRUSTED_TO_AUTH_FOR_DELEGATION + NORMAL
+        );
+        attrs.insert(
+            "msDS-AllowedToDelegateTo".to_string(),
+            vec!["cifs/server.example.com".to_string()],
+        );
+        let user = crate::models::DirectoryEntry {
+            distinguished_name: "CN=DelegUser,OU=Users,DC=example,DC=com".to_string(),
+            sam_account_name: Some("deleguser".to_string()),
+            display_name: Some("Deleg User".to_string()),
+            object_class: Some("user".to_string()),
+            attributes: attrs,
+        };
+
+        let provider = Arc::new(
+            crate::services::directory::tests::MockDirectoryProvider::new().with_users(vec![user]),
+        );
+        let result = compute_dangerous_configs_factor(provider).await;
+        let finding_ids: Vec<&str> = result.findings.iter().map(|f| f.id.as_str()).collect();
+        assert!(
+            finding_ids.contains(&"CONF-DELEG-SENSITIVE"),
+            "Expected CONF-DELEG-SENSITIVE finding, got: {:?}",
+            finding_ids
+        );
+    }
+
+    #[tokio::test]
+    async fn test_dangerous_configs_unconstrained_computer() {
+        use std::collections::HashMap;
+        // Computer with TRUSTED_FOR_DELEGATION but not a DC (no SERVER_TRUST_ACCOUNT)
+        let mut attrs = HashMap::new();
+        attrs.insert(
+            "userAccountControl".to_string(),
+            vec![format!("{}", 0x80000 | 0x1000)], // TRUSTED_FOR_DELEGATION + WORKSTATION_TRUST_ACCOUNT
+        );
+        let computer = crate::models::DirectoryEntry {
+            distinguished_name: "CN=WORKSTATION1,OU=Computers,DC=example,DC=com".to_string(),
+            sam_account_name: Some("WORKSTATION1$".to_string()),
+            display_name: None,
+            object_class: Some("computer".to_string()),
+            attributes: attrs,
+        };
+
+        // Need at least one user for the function to proceed past the match guard
+        let mut user_attrs = HashMap::new();
+        user_attrs.insert("userAccountControl".to_string(), vec!["512".to_string()]);
+        let dummy_user = crate::models::DirectoryEntry {
+            distinguished_name: "CN=User1,OU=Users,DC=example,DC=com".to_string(),
+            sam_account_name: Some("user1".to_string()),
+            display_name: Some("User 1".to_string()),
+            object_class: Some("user".to_string()),
+            attributes: user_attrs,
+        };
+
+        let provider = Arc::new(
+            crate::services::directory::tests::MockDirectoryProvider::new()
+                .with_users(vec![dummy_user])
+                .with_computers(vec![computer]),
+        );
+        let result = compute_dangerous_configs_factor(provider).await;
+        let finding_ids: Vec<&str> = result.findings.iter().map(|f| f.id.as_str()).collect();
+        assert!(
+            finding_ids.contains(&"CONF-UNCONS-COMPUTER"),
+            "Expected CONF-UNCONS-COMPUTER finding, got: {:?}",
+            finding_ids
+        );
+    }
+
+    #[tokio::test]
+    async fn test_stale_machine_accounts() {
+        use std::collections::HashMap;
+        // User with recent logon (not stale)
+        let mut user_attrs = HashMap::new();
+        let recent_filetime =
+            (Utc::now().timestamp() * 10_000_000 + FILETIME_EPOCH_OFFSET).to_string();
+        user_attrs.insert(
+            "lastLogonTimestamp".to_string(),
+            vec![recent_filetime.clone()],
+        );
+        user_attrs.insert("userAccountControl".to_string(), vec!["512".to_string()]);
+        let user = crate::models::DirectoryEntry {
+            distinguished_name: "CN=User1,OU=Users,DC=example,DC=com".to_string(),
+            sam_account_name: Some("user1".to_string()),
+            display_name: Some("User 1".to_string()),
+            object_class: Some("user".to_string()),
+            attributes: user_attrs,
+        };
+
+        // Computer with old password (stale)
+        let mut comp_attrs = HashMap::new();
+        let old_filetime = ((Utc::now().timestamp() - 100 * 86400) * 10_000_000
+            + FILETIME_EPOCH_OFFSET)
+            .to_string();
+        comp_attrs.insert("pwdLastSet".to_string(), vec![old_filetime]);
+        comp_attrs.insert("userAccountControl".to_string(), vec!["4096".to_string()]);
+        let computer = crate::models::DirectoryEntry {
+            distinguished_name: "CN=OLDPC,OU=Computers,DC=example,DC=com".to_string(),
+            sam_account_name: Some("OLDPC$".to_string()),
+            display_name: None,
+            object_class: Some("computer".to_string()),
+            attributes: comp_attrs,
+        };
+
+        let provider = Arc::new(
+            crate::services::directory::tests::MockDirectoryProvider::new()
+                .with_users(vec![user])
+                .with_computers(vec![computer]),
+        );
+        let result = compute_stale_accounts_factor(provider).await;
+        let finding_ids: Vec<&str> = result.findings.iter().map(|f| f.id.as_str()).collect();
+        assert!(
+            finding_ids.contains(&"STALE-MACHINE"),
+            "Expected STALE-MACHINE finding, got: {:?}",
+            finding_ids
+        );
+    }
+
+    #[tokio::test]
+    async fn test_kerberos_weak_spn_encryption() {
+        use std::collections::HashMap;
+        // User with SPN but no AES encryption type set
+        let mut attrs = HashMap::new();
+        attrs.insert(
+            "servicePrincipalName".to_string(),
+            vec!["MSSQLSvc/server.example.com:1433".to_string()],
+        );
+        attrs.insert("userAccountControl".to_string(), vec!["512".to_string()]);
+        // msDS-SupportedEncryptionTypes not set (defaults to 0 = RC4 only)
+        let user = crate::models::DirectoryEntry {
+            distinguished_name: "CN=SvcAcct,OU=Users,DC=example,DC=com".to_string(),
+            sam_account_name: Some("svcacct".to_string()),
+            display_name: Some("Service Account".to_string()),
+            object_class: Some("user".to_string()),
+            attributes: attrs,
+        };
+
+        let empty_findings = DomainSecurityFindings {
+            krbtgt_password_age_days: Some(30),
+            laps_coverage_percent: None,
+            laps_deployed_count: 0,
+            total_computer_count: 0,
+            pso_count: 0,
+            domain_functional_level: None,
+            forest_functional_level: None,
+            ldap_signing_enforced: None,
+            recycle_bin_enabled: None,
+            rbcd_configured_count: 0,
+            alerts: vec![],
+        };
+
+        let provider = Arc::new(
+            crate::services::directory::tests::MockDirectoryProvider::new().with_users(vec![user]),
+        );
+        let result = compute_kerberos_security_factor(provider, &empty_findings).await;
+        let finding_ids: Vec<&str> = result.findings.iter().map(|f| f.id.as_str()).collect();
+        assert!(
+            finding_ids.contains(&"KERB-WEAK-SPN"),
+            "Expected KERB-WEAK-SPN finding, got: {:?}",
+            finding_ids
+        );
+    }
+
+    #[tokio::test]
+    async fn test_kerberos_rc4_admin() {
+        use std::collections::HashMap;
+        // Admin account (adminCount=1) without AES encryption
+        let mut attrs = HashMap::new();
+        attrs.insert("userAccountControl".to_string(), vec!["512".to_string()]);
+        attrs.insert("adminCount".to_string(), vec!["1".to_string()]);
+        // No msDS-SupportedEncryptionTypes = defaults to RC4
+        let user = crate::models::DirectoryEntry {
+            distinguished_name: "CN=Admin,OU=Users,DC=example,DC=com".to_string(),
+            sam_account_name: Some("admin".to_string()),
+            display_name: Some("Admin".to_string()),
+            object_class: Some("user".to_string()),
+            attributes: attrs,
+        };
+
+        let empty_findings = DomainSecurityFindings {
+            krbtgt_password_age_days: Some(30),
+            laps_coverage_percent: None,
+            laps_deployed_count: 0,
+            total_computer_count: 0,
+            pso_count: 0,
+            domain_functional_level: None,
+            forest_functional_level: None,
+            ldap_signing_enforced: None,
+            recycle_bin_enabled: None,
+            rbcd_configured_count: 0,
+            alerts: vec![],
+        };
+
+        let provider = Arc::new(
+            crate::services::directory::tests::MockDirectoryProvider::new().with_users(vec![user]),
+        );
+        let result = compute_kerberos_security_factor(provider, &empty_findings).await;
+        let finding_ids: Vec<&str> = result.findings.iter().map(|f| f.id.as_str()).collect();
+        assert!(
+            finding_ids.contains(&"KERB-RC4-ADMIN"),
+            "Expected KERB-RC4-ADMIN finding, got: {:?}",
+            finding_ids
+        );
     }
 }

@@ -196,11 +196,11 @@ function ScoreGauge({ score, zone }: { score: number; zone: RiskZone }) {
 
 /** Radar/spider chart SVG showing factor scores on a web diagram. */
 function RadarChart({ factors }: { factors: RiskFactor[] }) {
-  const size = 240;
+  const size = 380;
   const cx = size / 2;
   const cy = size / 2;
   const radius = 90;
-  const labelOffset = 18;
+  const labelOffset = 24;
   const n = factors.length;
 
   if (n < 3) return null;
@@ -236,8 +236,15 @@ function RadarChart({ factors }: { factors: RiskFactor[] }) {
   const scoreFractions = factors.map((f) => Math.max(0, Math.min(1, f.score / 100)));
 
   // Abbreviate factor name (first 10 chars + ellipsis if longer)
+  // Show up to two words for the radar label
   function abbreviate(name: string): string {
-    return name.length > 12 ? name.slice(0, 10) + "..." : name;
+    const words = name.split(" ");
+    if (name.length <= 18) return name;
+    if (words.length >= 2) {
+      const twoWords = words[0] + " " + words[1];
+      if (twoWords.length <= 18) return twoWords;
+    }
+    return words[0];
   }
 
   return (
@@ -249,10 +256,10 @@ function RadarChart({ factors }: { factors: RiskFactor[] }) {
             key={level}
             points={polygonPoints(Array(n).fill(level))}
             fill="none"
-            stroke="var(--color-border-default)"
-            strokeWidth={1}
-            strokeDasharray="3 3"
-            opacity={0.5}
+            stroke="var(--color-text-secondary)"
+            strokeWidth={0.5}
+            strokeDasharray="none"
+            opacity={0.6}
           />
         ))}
 
@@ -266,9 +273,9 @@ function RadarChart({ factors }: { factors: RiskFactor[] }) {
               y1={cy}
               x2={p.x}
               y2={p.y}
-              stroke="var(--color-border-default)"
-              strokeWidth={1}
-              opacity={0.4}
+              stroke="var(--color-text-secondary)"
+              strokeWidth={0.5}
+              opacity={0.5}
             />
           );
         })}
@@ -461,7 +468,7 @@ function FactorCard({ factor }: { factor: RiskFactor }) {
               style={{ color: "var(--color-success)" }}
               data-testid={`impact-if-fixed-${factor.id}`}
             >
-              Potential gain: +{impactIfFixed} points
+              Potential gain: +{Math.round(impactIfFixed)} points
             </div>
           )}
         </div>
@@ -472,10 +479,20 @@ function FactorCard({ factor }: { factor: RiskFactor }) {
 
 /** Sparkline using div bars for 30-day history. */
 function TrendSparkline({ history }: { history: RiskScoreHistory[] }) {
-  if (history.length === 0) return null;
-
   const maxScore = 100;
-  const barHeight = 48;
+  const barHeight = 64;
+  const totalDays = 30;
+
+  // Build a 30-day grid: map history entries by date, fill gaps with null
+  const historyMap = new Map(history.map((h) => [h.date, h.totalScore]));
+  const today = new Date();
+  const days: { date: string; score: number | null }[] = [];
+  for (let i = totalDays - 1; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const dateStr = d.toISOString().slice(0, 10);
+    days.push({ date: dateStr, score: historyMap.get(dateStr) ?? null });
+  }
 
   return (
     <div data-testid="trend-sparkline">
@@ -486,28 +503,43 @@ function TrendSparkline({ history }: { history: RiskScoreHistory[] }) {
         </span>
       </div>
       <div className="flex items-end gap-px" style={{ height: barHeight }}>
-        {history.map((entry, i) => {
-          const height = Math.max(2, (entry.totalScore / maxScore) * barHeight);
+        {days.map((day, i) => {
+          if (day.score == null) {
+            return (
+              <div
+                key={i}
+                className="flex-1 rounded-t-sm"
+                style={{ height: 2, backgroundColor: "var(--color-border-default)", minWidth: 4 }}
+                title={`${day.date}: no data`}
+                data-testid="trend-bar"
+              />
+            );
+          }
+          const height = Math.max(14, (day.score / maxScore) * barHeight);
           const color =
-            entry.totalScore >= 71
+            day.score >= 71
               ? "var(--color-success)"
-              : entry.totalScore >= 41
+              : day.score >= 41
                 ? "var(--color-warning)"
                 : "var(--color-error)";
           return (
             <div
               key={i}
-              className="flex-1 rounded-t-sm transition-all"
+              className="flex-1 rounded-t-sm transition-all flex items-end justify-center"
               style={{ height, backgroundColor: color, minWidth: 4 }}
-              title={`${entry.date}: ${Math.round(entry.totalScore)}`}
+              title={`${day.date}: ${Math.round(day.score)}`}
               data-testid="trend-bar"
-            />
+            >
+              <span className="text-[8px] font-medium leading-none pb-0.5" style={{ color: "white" }}>
+                {Math.round(day.score)}
+              </span>
+            </div>
           );
         })}
       </div>
       <div className="flex justify-between mt-1 text-[10px] text-[var(--color-text-secondary)]">
-        <span>{history[0]?.date}</span>
-        <span>{history[history.length - 1]?.date}</span>
+        <span>{days[0]?.date}</span>
+        <span>{days[days.length - 1]?.date}</span>
       </div>
     </div>
   );
@@ -542,12 +574,14 @@ function generateReportHtml(result: RiskScoreResult): string {
       severityOrder.indexOf(a.finding.severity) - severityOrder.indexOf(b.finding.severity),
   );
 
-  // Collect all recommendations sorted by impact
+  // Collect all recommendations sorted by impact (show impact only on first rec per factor)
   const allRecommendations: { factor: string; rec: string; impact: number }[] = [];
   for (const factor of result.factors) {
     const impact = factor.impactIfFixed ?? 0;
+    let first = true;
     for (const rec of factor.recommendations) {
-      allRecommendations.push({ factor: factor.name, rec, impact });
+      allRecommendations.push({ factor: factor.name, rec, impact: first ? impact : 0 });
+      first = false;
     }
   }
   allRecommendations.sort((a, b) => b.impact - a.impact);
@@ -605,7 +639,7 @@ function generateReportHtml(result: RiskScoreResult): string {
           <tr>
             <td>${r.factor}</td>
             <td>${r.rec}</td>
-            <td>${r.impact > 0 ? `+${r.impact} pts` : "-"}</td>
+            <td>${r.impact > 0 ? `+${Math.round(r.impact)} pts` : "-"}</td>
           </tr>`,
           )
           .join("")}
@@ -799,13 +833,7 @@ export function RiskScoreDashboard() {
 
             {/* Trend - full width */}
             <div className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-4">
-              {history.length > 0 ? (
-                <TrendSparkline history={history} />
-              ) : (
-                <div className="flex items-center justify-center h-full py-4 text-caption text-[var(--color-text-secondary)]">
-                  No trend data available
-                </div>
-              )}
+              <TrendSparkline history={history} />
             </div>
 
             {/* Factor breakdown */}

@@ -41,3 +41,4 @@ storybook-static/
 # Claude Code
 .claude/memory/
 coverage/
+risk-score-report.html
