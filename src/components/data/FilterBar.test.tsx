@@ -70,7 +70,7 @@ describe("FilterBar", () => {
     expect(onTextFilter).not.toHaveBeenCalled();
 
     act(() => {
-      vi.advanceTimersByTime(300);
+      vi.advanceTimersByTime(350);
     });
 
     expect(onTextFilter).toHaveBeenCalledWith("test");

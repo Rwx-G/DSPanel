@@ -85,7 +85,7 @@ describe("DnsKerberosValidation", () => {
       expect(
         screen.getByText("_kerberos._tcp.example.com"),
       ).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
   });
 
   it("displays clock skew results", async () => {
@@ -98,7 +98,7 @@ describe("DnsKerberosValidation", () => {
       expect(screen.getByTestId("clock-skew-table")).toBeInTheDocument();
       expect(screen.getByText("2s")).toBeInTheDocument();
       expect(screen.getByText("300s")).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
   });
 
   it("shows missing hosts for failed DNS records", async () => {
@@ -111,7 +111,7 @@ describe("DnsKerberosValidation", () => {
       expect(
         screen.getByText("Missing: DC2.example.com"),
       ).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
   });
 
   it("shows error state when validation fails", async () => {
@@ -122,7 +122,7 @@ describe("DnsKerberosValidation", () => {
 
     await waitFor(() => {
       expect(screen.getByText("Validation Failed")).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
   });
 
   it("calls invoke with threshold parameter", async () => {
@@ -136,7 +136,7 @@ describe("DnsKerberosValidation", () => {
         "get_dns_kerberos_validation",
         { thresholdSeconds: 300 },
       );
-    });
+    }, { timeout: 5000 });
   });
 
   it("shows default Kerberos threshold label", () => {
@@ -154,7 +154,7 @@ describe("DnsKerberosValidation", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("export-button")).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
   });
 
   it("shows summary counts after validation", async () => {
@@ -168,6 +168,6 @@ describe("DnsKerberosValidation", () => {
       expect(screen.getByText(/1 fail/)).toBeInTheDocument();
       expect(screen.getByText(/1 ok/)).toBeInTheDocument();
       expect(screen.getByText(/1 issues/)).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
   });
 });

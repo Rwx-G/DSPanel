@@ -2678,6 +2678,7 @@ fn build_ou_tree(flat_ous: &[(String, String)], base_dn: &str) -> Vec<OUNode> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serial_test::serial;
 
     #[test]
     fn test_validate_search_input_trims_whitespace() {
@@ -2810,6 +2811,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_ldap_provider_new_without_domain() {
         // Temporarily unset USERDNSDOMAIN for this test
         let original = std::env::var("USERDNSDOMAIN").ok();
@@ -2826,6 +2828,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_new_defaults_to_gssapi_auth_mode() {
         let original = std::env::var("USERDNSDOMAIN").ok();
         std::env::remove_var("USERDNSDOMAIN");
@@ -3038,6 +3041,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_search_users_returns_empty_when_not_domain_joined() {
         let original = std::env::var("USERDNSDOMAIN").ok();
         std::env::remove_var("USERDNSDOMAIN");
@@ -3052,6 +3056,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_search_computers_returns_empty_when_not_domain_joined() {
         let original = std::env::var("USERDNSDOMAIN").ok();
         std::env::remove_var("USERDNSDOMAIN");
@@ -3066,6 +3071,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_search_groups_returns_empty_when_not_domain_joined() {
         let original = std::env::var("USERDNSDOMAIN").ok();
         std::env::remove_var("USERDNSDOMAIN");
@@ -3080,6 +3086,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_test_connection_returns_false_when_not_domain_joined() {
         let original = std::env::var("USERDNSDOMAIN").ok();
         std::env::remove_var("USERDNSDOMAIN");

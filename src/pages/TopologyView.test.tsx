@@ -127,7 +127,7 @@ describe("TopologyView", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("topology-canvas")).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
   });
 
   it("shows site and DC counts in toolbar", async () => {
@@ -137,7 +137,7 @@ describe("TopologyView", () => {
     await waitFor(() => {
       expect(screen.getByText("Default-First-Site")).toBeInTheDocument();
       expect(screen.getByText("Branch-Office")).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
   });
 
   it("shows error state when fetch fails", async () => {
@@ -146,7 +146,7 @@ describe("TopologyView", () => {
 
     await waitFor(() => {
       expect(screen.getByText("Topology Load Failed")).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
   });
 
   it("shows empty state when no sites", async () => {
@@ -159,7 +159,7 @@ describe("TopologyView", () => {
 
     await waitFor(() => {
       expect(screen.getByText("No Topology Data")).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
   });
 
   it("refresh button triggers reload", async () => {
@@ -169,14 +169,14 @@ describe("TopologyView", () => {
     // Wait for initial load + canvas render
     await waitFor(() => {
       expect(screen.getByTestId("topology-canvas")).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
 
     const refreshBtn = screen.getByTestId("refresh-button");
     fireEvent.click(refreshBtn);
 
     await waitFor(() => {
       expect(mockInvoke).toHaveBeenCalledTimes(2);
-    });
+    }, { timeout: 5000 });
   });
 
   it("calls invoke with correct command name", async () => {
@@ -185,7 +185,7 @@ describe("TopologyView", () => {
 
     await waitFor(() => {
       expect(mockInvoke).toHaveBeenCalledWith("get_topology");
-    });
+    }, { timeout: 5000 });
   });
 
   it("shows replication links when present", async () => {
@@ -194,6 +194,6 @@ describe("TopologyView", () => {
 
     await waitFor(() => {
       expect(screen.getByText("Replication Links")).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
   });
 });

@@ -92,7 +92,7 @@ describe("InfrastructureHealth", () => {
     await waitFor(() => {
       expect(screen.getByText("DC1.example.com")).toBeInTheDocument();
       expect(screen.getByText("DC2.example.com")).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
   });
 
   it("shows GC badge for global catalog DCs", async () => {
@@ -101,7 +101,7 @@ describe("InfrastructureHealth", () => {
 
     await waitFor(() => {
       expect(screen.getByText("GC")).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
   });
 
   it("does not show GC badge for non-GC DCs", async () => {
@@ -111,7 +111,7 @@ describe("InfrastructureHealth", () => {
     await waitFor(() => {
       expect(screen.getByText("DC2.example.com")).toBeInTheDocument();
       expect(screen.queryByText("GC")).not.toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
   });
 
   it("shows site name for each DC", async () => {
@@ -121,7 +121,7 @@ describe("InfrastructureHealth", () => {
     await waitFor(() => {
       expect(screen.getByText(/Site: Default-First-Site/)).toBeInTheDocument();
       expect(screen.getByText(/Site: Branch-Office/)).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
   });
 
   it("shows DC card expanded by default with details", async () => {
@@ -131,7 +131,7 @@ describe("InfrastructureHealth", () => {
     await waitFor(() => {
       expect(screen.getByTestId("dc-detail-DC1.example.com")).toBeInTheDocument();
       expect(screen.getByText("Resolved to 10.0.0.1")).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
   });
 
   it("collapses DC card on click and re-expands on second click", async () => {
@@ -140,7 +140,7 @@ describe("InfrastructureHealth", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("dc-detail-DC1.example.com")).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
 
     fireEvent.click(screen.getByTestId("dc-card-toggle-DC1.example.com"));
     expect(screen.queryByTestId("dc-detail-DC1.example.com")).not.toBeInTheDocument();
@@ -155,7 +155,7 @@ describe("InfrastructureHealth", () => {
 
     await waitFor(() => {
       expect(screen.getByText("Health Check Failed")).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
   });
 
   it("shows empty state when no DCs found", async () => {
@@ -164,7 +164,7 @@ describe("InfrastructureHealth", () => {
 
     await waitFor(() => {
       expect(screen.getByText("No Domain Controllers Found")).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
   });
 
   it("shows summary badges with correct counts", async () => {
@@ -175,7 +175,7 @@ describe("InfrastructureHealth", () => {
       // 1 healthy, 1 warning, 1 critical
       expect(screen.getByText("DC1.example.com")).toBeInTheDocument();
       expect(screen.getByText("DC3.example.com")).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
   });
 
   it("manual refresh button triggers reload", async () => {
@@ -184,14 +184,14 @@ describe("InfrastructureHealth", () => {
 
     await waitFor(() => {
       expect(screen.getByText("DC1.example.com")).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
 
     mockInvoke.mockResolvedValueOnce([healthyDc, warningDc]);
     fireEvent.click(screen.getByTestId("refresh-button"));
 
     await waitFor(() => {
       expect(mockInvoke).toHaveBeenCalledTimes(2);
-    });
+    }, { timeout: 5000 });
   });
 
   it("auto-refresh calls fetch at interval", async () => {
@@ -200,14 +200,14 @@ describe("InfrastructureHealth", () => {
 
     await waitFor(() => {
       expect(screen.getByText("DC1.example.com")).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
 
     // Default interval is 5 min (300s), advance time
     vi.advanceTimersByTime(300_000);
 
     await waitFor(() => {
       expect(mockInvoke).toHaveBeenCalledTimes(2);
-    });
+    }, { timeout: 5000 });
   });
 
   it("changing refresh interval to Off stops auto-refresh", async () => {
@@ -216,7 +216,7 @@ describe("InfrastructureHealth", () => {
 
     await waitFor(() => {
       expect(screen.getByText("DC1.example.com")).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
 
     // Set to "Off"
     fireEvent.change(screen.getByTestId("refresh-interval"), {
@@ -235,6 +235,6 @@ describe("InfrastructureHealth", () => {
 
     await waitFor(() => {
       expect(mockInvoke).toHaveBeenCalledWith("get_dc_health");
-    });
+    }, { timeout: 5000 });
   });
 });

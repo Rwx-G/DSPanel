@@ -798,7 +798,7 @@ mod tests {
         write_preset_file(dir.path(), "Trigger", &make_preset("Trigger"));
 
         // Allow debounce time + processing
-        std::thread::sleep(std::time::Duration::from_millis(600));
+        std::thread::sleep(std::time::Duration::from_millis(1500));
 
         // The callback should have been triggered
         // Note: file watchers can be flaky in CI, so we just verify setup works

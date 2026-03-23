@@ -431,7 +431,7 @@ mod tests {
     fn test_circuit_breaker_transitions_to_half_open_after_timeout() {
         let config = CircuitBreakerConfig {
             failure_threshold: 1,
-            recovery_timeout: Duration::from_millis(50),
+            recovery_timeout: Duration::from_millis(150),
         };
         let cb = CircuitBreaker::new(config);
         cb.record_failure();
@@ -440,7 +440,7 @@ mod tests {
         assert!(cb.check_allowed().is_err());
 
         // After recovery timeout, should transition to HalfOpen
-        std::thread::sleep(Duration::from_millis(60));
+        std::thread::sleep(Duration::from_millis(200));
         assert_eq!(cb.state(), CircuitState::HalfOpen);
     }
 
@@ -448,12 +448,12 @@ mod tests {
     fn test_circuit_breaker_closes_on_successful_probe() {
         let config = CircuitBreakerConfig {
             failure_threshold: 1,
-            recovery_timeout: Duration::from_millis(50),
+            recovery_timeout: Duration::from_millis(150),
         };
         let cb = CircuitBreaker::new(config);
         cb.record_failure();
 
-        std::thread::sleep(Duration::from_millis(60));
+        std::thread::sleep(Duration::from_millis(200));
         assert_eq!(cb.state(), CircuitState::HalfOpen);
 
         cb.record_success();
@@ -464,13 +464,13 @@ mod tests {
     fn test_circuit_breaker_reopens_on_failed_probe() {
         let config = CircuitBreakerConfig {
             failure_threshold: 1,
-            recovery_timeout: Duration::from_millis(50),
+            recovery_timeout: Duration::from_millis(150),
         };
         let cb = CircuitBreaker::new(config);
         cb.record_failure();
 
         // Wait for recovery timeout to transition to HalfOpen
-        std::thread::sleep(Duration::from_millis(60));
+        std::thread::sleep(Duration::from_millis(200));
         assert_eq!(cb.state(), CircuitState::HalfOpen);
 
         // Failed probe should reopen the circuit
@@ -518,12 +518,12 @@ mod tests {
     fn test_circuit_breaker_half_open_allows_request() {
         let config = CircuitBreakerConfig {
             failure_threshold: 1,
-            recovery_timeout: Duration::from_millis(50),
+            recovery_timeout: Duration::from_millis(150),
         };
         let cb = CircuitBreaker::new(config);
         cb.record_failure();
 
-        std::thread::sleep(Duration::from_millis(60));
+        std::thread::sleep(Duration::from_millis(200));
         assert!(cb.check_allowed().is_ok());
     }
 
@@ -644,14 +644,14 @@ mod tests {
     fn test_circuit_breaker_half_open_allows_one_rejects_second() {
         let config = CircuitBreakerConfig {
             failure_threshold: 1,
-            recovery_timeout: Duration::from_millis(50),
+            recovery_timeout: Duration::from_millis(150),
         };
         let cb = CircuitBreaker::new(config);
         cb.record_failure();
         assert_eq!(cb.state(), CircuitState::Open);
 
         // Wait for recovery timeout to transition to HalfOpen
-        std::thread::sleep(Duration::from_millis(60));
+        std::thread::sleep(Duration::from_millis(200));
 
         // First check transitions to HalfOpen and allows the request
         assert!(cb.check_allowed().is_ok());

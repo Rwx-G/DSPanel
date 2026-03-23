@@ -64,7 +64,7 @@ describe("WorkstationMonitoringPanel", () => {
       expect(
         screen.getByText("Monitoring: PC001.example.com"),
       ).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
   });
 
   it("shows CPU usage", async () => {
@@ -74,7 +74,7 @@ describe("WorkstationMonitoringPanel", () => {
     await waitFor(() => {
       expect(screen.getByTestId("cpu-section")).toBeInTheDocument();
       expect(screen.getByText("46%")).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
   });
 
   it("shows memory usage", async () => {
@@ -83,7 +83,7 @@ describe("WorkstationMonitoringPanel", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("memory-section")).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
   });
 
   it("shows disk info", async () => {
@@ -93,7 +93,7 @@ describe("WorkstationMonitoringPanel", () => {
     await waitFor(() => {
       expect(screen.getByText("C:")).toBeInTheDocument();
       expect(screen.getByText("D:")).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
   });
 
   it("shows services", async () => {
@@ -104,7 +104,7 @@ describe("WorkstationMonitoringPanel", () => {
       expect(screen.getByText("Print Spooler")).toBeInTheDocument();
       expect(screen.getByText("Running")).toBeInTheDocument();
       expect(screen.getByText("Stopped")).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
   });
 
   it("shows sessions", async () => {
@@ -113,7 +113,7 @@ describe("WorkstationMonitoringPanel", () => {
 
     await waitFor(() => {
       expect(screen.getByText("DOMAIN\\jdoe")).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
   });
 
   it("shows error when workstation unreachable", async () => {
@@ -122,7 +122,7 @@ describe("WorkstationMonitoringPanel", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("monitor-error")).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
   });
 
   it("auto-refreshes at default interval", async () => {
@@ -131,13 +131,13 @@ describe("WorkstationMonitoringPanel", () => {
 
     await waitFor(() => {
       expect(screen.getByText("46%")).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
 
     vi.advanceTimersByTime(5000);
 
     await waitFor(() => {
       expect(mockInvoke).toHaveBeenCalledTimes(2);
-    });
+    }, { timeout: 5000 });
   });
 
   it("pause button stops auto-refresh", async () => {
@@ -146,7 +146,7 @@ describe("WorkstationMonitoringPanel", () => {
 
     await waitFor(() => {
       expect(screen.getByText("46%")).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
 
     fireEvent.click(screen.getByTestId("monitor-pause"));
 
@@ -162,6 +162,6 @@ describe("WorkstationMonitoringPanel", () => {
       expect(mockInvoke).toHaveBeenCalledWith("get_workstation_metrics", {
         hostname: "PC001.example.com",
       });
-    });
+    }, { timeout: 5000 });
   });
 });

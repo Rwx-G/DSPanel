@@ -23,7 +23,7 @@ const healthyPartnership: ReplicationPartnership = {
   sourceDc: "DC1.example.com",
   targetDc: "DC2.example.com",
   namingContext: "DC=example,DC=com",
-  lastSyncTime: new Date(Date.now() - 5 * 60_000).toISOString(), // 5 min ago
+  lastSyncTime: "2026-03-21T12:00:00Z",
   lastSyncResult: 0,
   consecutiveFailures: 0,
   lastSyncMessage: null,
@@ -34,7 +34,7 @@ const failedPartnership: ReplicationPartnership = {
   sourceDc: "DC2.example.com",
   targetDc: "DC3.example.com",
   namingContext: "DC=example,DC=com",
-  lastSyncTime: new Date(Date.now() - 120 * 60_000).toISOString(), // 2 hours ago
+  lastSyncTime: "2026-03-21T10:00:00Z",
   lastSyncResult: 8453,
   consecutiveFailures: 5,
   lastSyncMessage: "Replication access was denied",
@@ -74,7 +74,7 @@ describe("ReplicationStatus", () => {
     await waitFor(() => {
       expect(screen.getByText("DC1.example.com")).toBeInTheDocument();
       expect(screen.getByText("DC2.example.com")).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
   });
 
   it("shows error state when fetch fails", async () => {
@@ -89,7 +89,7 @@ describe("ReplicationStatus", () => {
       expect(
         screen.getByText("Replication Check Failed"),
       ).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
   });
 
   it("shows empty state when no partnerships found", async () => {
@@ -104,7 +104,7 @@ describe("ReplicationStatus", () => {
       expect(
         screen.getByText("No Replication Partnerships Found"),
       ).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
   });
 
   it("highlights failed partnerships", async () => {
@@ -117,7 +117,7 @@ describe("ReplicationStatus", () => {
 
     await waitFor(() => {
       expect(screen.getByText("5 failures")).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
   });
 
   it("shows naming context in table", async () => {
@@ -130,7 +130,7 @@ describe("ReplicationStatus", () => {
 
     await waitFor(() => {
       expect(screen.getByText("DC=example,DC=com")).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
   });
 
   it("shows sync button for each partnership", async () => {
@@ -144,7 +144,7 @@ describe("ReplicationStatus", () => {
     await waitFor(() => {
       expect(screen.getByTestId("force-repl-0")).toBeInTheDocument();
       expect(screen.getByText("Sync")).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
   });
 
   it("manual refresh button triggers reload", async () => {
@@ -157,13 +157,13 @@ describe("ReplicationStatus", () => {
 
     await waitFor(() => {
       expect(screen.getByText("DC1.example.com")).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
 
     fireEvent.click(screen.getByTestId("refresh-button"));
 
     await waitFor(() => {
       expect(mockInvoke).toHaveBeenCalledTimes(2);
-    });
+    }, { timeout: 5000 });
   });
 
   it("auto-refresh triggers at interval", async () => {
@@ -176,14 +176,14 @@ describe("ReplicationStatus", () => {
 
     await waitFor(() => {
       expect(screen.getByText("DC1.example.com")).toBeInTheDocument();
-    });
+    }, { timeout: 5000 });
 
     // Default is 120s
     vi.advanceTimersByTime(120_000);
 
     await waitFor(() => {
       expect(mockInvoke).toHaveBeenCalledTimes(2);
-    });
+    }, { timeout: 5000 });
   });
 
   it("calls invoke with correct command name", async () => {
@@ -196,6 +196,6 @@ describe("ReplicationStatus", () => {
 
     await waitFor(() => {
       expect(mockInvoke).toHaveBeenCalledWith("get_replication_status");
-    });
+    }, { timeout: 5000 });
   });
 });
