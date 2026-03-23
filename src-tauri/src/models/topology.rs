@@ -90,11 +90,16 @@ mod tests {
             sites: vec![SiteNode {
                 name: "Default-First-Site-Name".to_string(),
                 location: Some("HQ".to_string()),
+                subnets: vec!["10.0.0.0/24".to_string()],
                 dcs: vec![TopologyDcNode {
                     hostname: "DC1.example.com".to_string(),
                     site_name: "Default-First-Site-Name".to_string(),
                     is_gc: true,
                     is_pdc: true,
+                    ip_address: Some("10.0.0.1".to_string()),
+                    os_version: Some("Windows Server 2022".to_string()),
+                    fsmo_roles: vec!["PDC".to_string()],
+                    is_online: true,
                 }],
             }],
             replication_links: vec![TopologyReplicationLink {
@@ -142,6 +147,10 @@ mod tests {
             site_name: "Site1".to_string(),
             is_gc: true,
             is_pdc: false,
+            ip_address: None,
+            os_version: None,
+            fsmo_roles: vec![],
+            is_online: false,
         };
 
         let json = serde_json::to_string(&dc).unwrap();
@@ -170,6 +179,7 @@ mod tests {
         let site = SiteNode {
             name: "RemoteSite".to_string(),
             location: None,
+            subnets: vec![],
             dcs: vec![],
         };
 

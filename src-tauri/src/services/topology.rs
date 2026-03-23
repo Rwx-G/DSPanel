@@ -619,6 +619,10 @@ mod tests {
             ),
         ];
 
+        let fsmo_roles: Vec<(&str, String)> = vec![
+            ("PDC", "cn=ntds settings,cn=dc1,cn=servers,cn=site1,cn=sites,cn=configuration,dc=example,dc=com".to_string()),
+        ];
+
         let result = assemble_topology(
             "DC=example,DC=com",
             &sites,
@@ -627,7 +631,7 @@ mod tests {
             &[],
             &[],
             &[],
-            &[],
+            &fsmo_roles,
         )
         .unwrap();
 
@@ -795,7 +799,7 @@ mod tests {
     }
 
     #[test]
-    fn test_assemble_server_without_hostname_skipped() {
+    fn test_assemble_server_without_hostname_uses_cn_fallback() {
         let sites = vec![make_entry(
             "CN=Site1,CN=Sites,CN=Configuration,DC=example,DC=com",
             vec![],
@@ -803,7 +807,7 @@ mod tests {
 
         let servers = vec![make_entry(
             "CN=DC1,CN=Servers,CN=Site1,CN=Sites,CN=Configuration,DC=example,DC=com",
-            vec![], // No dNSHostName
+            vec![], // No dNSHostName - falls back to CN + domain
         )];
 
         let result = assemble_topology(
@@ -818,7 +822,8 @@ mod tests {
         )
         .unwrap();
 
-        assert!(result.sites[0].dcs.is_empty());
+        assert_eq!(result.sites[0].dcs.len(), 1);
+        assert_eq!(result.sites[0].dcs[0].hostname, "DC1.example.com");
     }
 
     // -----------------------------------------------------------------------
