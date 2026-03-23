@@ -1,0 +1,48 @@
+schema: 1
+story: "8.1"
+story_title: "Domain Controller Health Checks"
+gate: PASS
+status_reason: "All 7 acceptance criteria met. DC health dashboard with status cards, color coding, auto-refresh, detail drill-down, and DomainAdmin gating. 34 tests (20 Rust + 14 frontend)."
+reviewer: "Quinn (Test Architect)"
+updated: "2026-03-21T22:30:00Z"
+
+waiver: { active: false }
+
+top_issues: []
+
+quality_score: 97
+expires: "2026-04-04T00:00:00Z"
+
+evidence:
+  tests_reviewed: 34
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7]
+    ac_gaps: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "DomainAdmin permission enforced on backend command and frontend sidebar entry."
+  performance:
+    status: PASS
+    notes: "Health checks run concurrently per DC. 5s timeout on WMI queries prevents hanging."
+  reliability:
+    status: PASS
+    notes: "Each check is independent - partial failure returns partial results. Non-Windows platforms degrade gracefully."
+  maintainability:
+    status: PASS
+    notes: "Clean separation: models (dc_health.rs), service (dc_health.rs), commands. Follows existing trait pattern with search_configuration."
+
+history:
+  - at: "2026-03-21T22:30:00Z"
+    gate: PASS
+    note: "Initial review - all ACs met, comprehensive test coverage, clean architecture"
+
+recommendations:
+  immediate: []
+  future:
+    - action: "Consider grouping DC cards by site in the UI for large multi-site environments"
+      refs: ["src/pages/InfrastructureHealth.tsx"]
+    - action: "Add LDAP RootDSE bind for more accurate LDAP ping instead of TCP connect"
+      refs: ["src-tauri/src/services/dc_health.rs"]

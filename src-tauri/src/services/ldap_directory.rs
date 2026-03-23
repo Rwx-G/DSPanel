@@ -2533,6 +2533,101 @@ impl DirectoryProvider for LdapDirectoryProvider {
         })
         .await
     }
+
+    async fn search_configuration(
+        &self,
+        search_base: &str,
+        filter: &str,
+    ) -> Result<Vec<DirectoryEntry>> {
+        let base_owned = search_base.to_string();
+        let filter_owned = filter.to_string();
+
+        self.with_connection(|mut ldap| {
+            let base = base_owned.clone();
+            let filt = filter_owned.clone();
+            async move {
+                let (rs, _) = ldap
+                    .search(
+                        &base,
+                        ldap3::Scope::Subtree,
+                        &filt,
+                        vec![
+                            "*",
+                            "dNSHostName",
+                            "options",
+                            "servicePrincipalName",
+                            "operatingSystem",
+                            "operatingSystemVersion",
+                            "userAccountControl",
+                            "pwdLastSet",
+                            "fSMORoleOwner",
+                            "siteList",
+                            "siteObject",
+                            "msDFSR-Flags",
+                            "msDFSR-Enabled",
+                            "msDFSR-ComputerReference",
+                            "fromServer",
+                            "cost",
+                            "replInterval",
+                            "location",
+                            "currentTime",
+                        ],
+                    )
+                    .await
+                    .context("Configuration search failed")?
+                    .success()
+                    .context("Configuration search returned error")?;
+
+                let entries: Vec<DirectoryEntry> = rs
+                    .into_iter()
+                    .map(|re| {
+                        let se = ldap3::SearchEntry::construct(re);
+                        let mut entry = DirectoryEntry::new(se.dn);
+                        for (key, values) in se.attrs {
+                            entry.attributes.insert(key, values);
+                        }
+                        entry
+                    })
+                    .collect();
+
+                Ok(entries)
+            }
+        })
+        .await
+    }
+
+    async fn read_entry(&self, dn: &str) -> Result<Option<DirectoryEntry>> {
+        let dn_owned = dn.to_string();
+
+        self.with_connection(|mut ldap| {
+            let dn = dn_owned.clone();
+            async move {
+                let (rs, _) = ldap
+                    .search(
+                        &dn,
+                        ldap3::Scope::Base,
+                        "(objectClass=*)",
+                        vec!["*", "currentTime", "fSMORoleOwner", "msDS-Behavior-Version"],
+                    )
+                    .await
+                    .context("Base scope read failed")?
+                    .success()
+                    .context("Base scope read returned error")?;
+
+                let entry = rs.into_iter().next().map(|re| {
+                    let se = ldap3::SearchEntry::construct(re);
+                    let mut entry = DirectoryEntry::new(se.dn);
+                    for (key, values) in se.attrs {
+                        entry.attributes.insert(key, values);
+                    }
+                    entry
+                });
+
+                Ok(entry)
+            }
+        })
+        .await
+    }
 }
 
 /// Builds a hierarchical OU tree from a flat list of (DN, name) pairs.
@@ -2583,6 +2678,7 @@ fn build_ou_tree(flat_ous: &[(String, String)], base_dn: &str) -> Vec<OUNode> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serial_test::serial;
 
     #[test]
     fn test_validate_search_input_trims_whitespace() {
@@ -2715,6 +2811,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_ldap_provider_new_without_domain() {
         // Temporarily unset USERDNSDOMAIN for this test
         let original = std::env::var("USERDNSDOMAIN").ok();
@@ -2731,6 +2828,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_new_defaults_to_gssapi_auth_mode() {
         let original = std::env::var("USERDNSDOMAIN").ok();
         std::env::remove_var("USERDNSDOMAIN");
@@ -2943,6 +3041,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_search_users_returns_empty_when_not_domain_joined() {
         let original = std::env::var("USERDNSDOMAIN").ok();
         std::env::remove_var("USERDNSDOMAIN");
@@ -2957,6 +3056,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_search_computers_returns_empty_when_not_domain_joined() {
         let original = std::env::var("USERDNSDOMAIN").ok();
         std::env::remove_var("USERDNSDOMAIN");
@@ -2971,6 +3071,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_search_groups_returns_empty_when_not_domain_joined() {
         let original = std::env::var("USERDNSDOMAIN").ok();
         std::env::remove_var("USERDNSDOMAIN");
@@ -2985,6 +3086,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_test_connection_returns_false_when_not_domain_joined() {
         let original = std::env::var("USERDNSDOMAIN").ok();
         std::env::remove_var("USERDNSDOMAIN");

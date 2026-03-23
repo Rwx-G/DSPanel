@@ -14,6 +14,10 @@ import {
   Trash2,
   Contact,
   Printer,
+  Activity,
+  GitBranch,
+  Globe,
+  Network,
   type LucideIcon,
 } from "lucide-react";
 import { useNavigation } from "@/contexts/NavigationContext";
@@ -34,6 +38,10 @@ const ICON_MAP: Record<string, LucideIcon> = {
   "recycle-bin": Trash2,
   contact: Contact,
   printer: Printer,
+  activity: Activity,
+  "git-branch": GitBranch,
+  globe: Globe,
+  network: Network,
 };
 
 const MODULES: SidebarModule[] = [
@@ -98,6 +106,34 @@ const MODULES: SidebarModule[] = [
     label: "Recycle Bin",
     icon: "recycle-bin",
     group: "Directory",
+    requiredLevel: "DomainAdmin",
+  },
+  {
+    id: "infrastructure-health",
+    label: "Infrastructure Health",
+    icon: "activity",
+    group: "Infrastructure",
+    requiredLevel: "DomainAdmin",
+  },
+  {
+    id: "replication-status",
+    label: "Replication Status",
+    icon: "git-branch",
+    group: "Infrastructure",
+    requiredLevel: "DomainAdmin",
+  },
+  {
+    id: "dns-kerberos",
+    label: "DNS & Kerberos",
+    icon: "globe",
+    group: "Infrastructure",
+    requiredLevel: "DomainAdmin",
+  },
+  {
+    id: "topology",
+    label: "AD Topology",
+    icon: "network",
+    group: "Infrastructure",
     requiredLevel: "DomainAdmin",
   },
   {

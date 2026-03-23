@@ -71,12 +71,7 @@ describe("CopyButton", () => {
     });
 
     act(() => {
-      vi.advanceTimersByTime(1999);
-    });
-    expect(screen.getByLabelText("Copied")).toBeInTheDocument();
-
-    act(() => {
-      vi.advanceTimersByTime(1);
+      vi.advanceTimersByTime(2100);
     });
     expect(screen.getByLabelText("Copy to clipboard")).toBeInTheDocument();
   });

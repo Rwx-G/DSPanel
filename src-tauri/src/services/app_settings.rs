@@ -6,9 +6,8 @@ use serde::{Deserialize, Serialize};
 /// Application-wide settings persisted to %LOCALAPPDATA%/DSPanel/app-settings.json
 /// (or platform equivalent).
 ///
-/// The `graph_client_secret` field is deprecated in the JSON file. Secrets are
-/// now stored in the OS credential store. The field is kept for deserialization
-/// only (backwards-compatible migration) and is never written back to JSON.
+/// Graph client secret is stored in the OS credential store (keyring),
+/// not in this settings file.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct AppSettings {
@@ -21,10 +20,6 @@ pub struct AppSettings {
     /// Microsoft Graph API - Application (client) ID.
     #[serde(default)]
     pub graph_client_id: Option<String>,
-    /// Deprecated: client secret is now in the OS credential store.
-    /// Kept for deserialization during migration only.
-    #[serde(default, skip_serializing)]
-    pub graph_client_secret: Option<String>,
 }
 
 /// Service for managing persisted application settings.
@@ -87,17 +82,11 @@ impl AppSettingsService {
     fn read_from_disk() -> Option<AppSettings> {
         let path = Self::settings_path()?;
         let json = std::fs::read_to_string(path).ok()?;
-        let mut settings: AppSettings = serde_json::from_str(&json).ok()?;
-        // Decrypt legacy DPAPI-protected secrets for migration
-        if let Some(ref secret) = settings.graph_client_secret {
-            settings.graph_client_secret = Some(Self::decrypt_legacy_secret(secret));
-        }
-        Some(settings)
+        serde_json::from_str(&json).ok()
     }
 
     fn write_to_disk(settings: &AppSettings) {
         if let Some(path) = Self::settings_path() {
-            // graph_client_secret has skip_serializing, so it won't be written
             match serde_json::to_string_pretty(settings) {
                 Ok(json) => {
                     if let Err(e) = std::fs::write(&path, json) {
@@ -108,31 +97,6 @@ impl AppSettingsService {
                     tracing::warn!(error = %e, "Failed to serialize app settings");
                 }
             }
-        }
-    }
-
-    /// Decrypts a legacy DPAPI-protected secret during migration.
-    /// Handles `DPAPI:<base64>` (encrypted) and plain strings.
-    fn decrypt_legacy_secret(value: &str) -> String {
-        if let Some(b64) = value.strip_prefix("DPAPI:") {
-            use base64::Engine;
-            match base64::engine::general_purpose::STANDARD.decode(b64) {
-                Ok(encrypted) => match super::dpapi::unprotect(&encrypted) {
-                    Ok(decrypted) => {
-                        return String::from_utf8(decrypted).unwrap_or_else(|_| value.to_string());
-                    }
-                    Err(e) => {
-                        tracing::warn!(error = %e, "DPAPI decryption failed during migration");
-                    }
-                },
-                Err(e) => {
-                    tracing::warn!(error = %e, "Base64 decode of DPAPI blob failed during migration");
-                }
-            }
-            value.to_string()
-        } else {
-            // Plain text (legacy) - return as-is for migration
-            value.to_string()
         }
     }
 }
@@ -196,32 +160,18 @@ mod tests {
         let settings = AppSettings::default();
         assert!(settings.graph_tenant_id.is_none());
         assert!(settings.graph_client_id.is_none());
-        assert!(settings.graph_client_secret.is_none());
     }
 
     #[test]
-    fn test_serde_graph_fields_secret_not_serialized() {
+    fn test_serde_graph_fields() {
         let settings = AppSettings {
             disabled_ou: None,
             graph_tenant_id: Some("tenant-123".to_string()),
             graph_client_id: Some("client-456".to_string()),
-            graph_client_secret: Some("secret".to_string()),
         };
         let json = serde_json::to_string(&settings).unwrap();
-        // Secret must NOT appear in serialized output (skip_serializing)
-        assert!(!json.contains("secret"));
-        assert!(!json.contains("graphClientSecret"));
-        // But tenant and client ID are preserved
         assert!(json.contains("tenant-123"));
         assert!(json.contains("client-456"));
-    }
-
-    #[test]
-    fn test_serde_graph_secret_deserialized_for_migration() {
-        // Old JSON files may still contain the secret - we must read it for migration
-        let json = r#"{"graphTenantId":"t","graphClientId":"c","graphClientSecret":"old-secret"}"#;
-        let settings: AppSettings = serde_json::from_str(json).unwrap();
-        assert_eq!(settings.graph_client_secret.as_deref(), Some("old-secret"));
     }
 
     #[test]
@@ -236,12 +186,5 @@ mod tests {
     fn test_load_does_not_panic_when_no_file() {
         let svc = AppSettingsService::new();
         svc.load();
-    }
-
-    #[test]
-    fn test_decrypt_legacy_plain_secret() {
-        let plain = "old-plaintext-secret";
-        let result = AppSettingsService::decrypt_legacy_secret(plain);
-        assert_eq!(result, plain);
     }
 }

@@ -144,32 +144,6 @@ pub fn run() {
             state.app_settings.load();
             state.preset_service.load_persisted();
 
-            // Migrate: move client secret from JSON to credential store (one-time)
-            {
-                let settings = state.app_settings.get();
-                if let Some(ref secret) = settings.graph_client_secret {
-                    if !secret.is_empty() {
-                        match state.credential_store.store("graph_client_secret", secret) {
-                            Ok(()) => {
-                                // Clear secret from JSON file
-                                let mut clean = settings.clone();
-                                clean.graph_client_secret = None;
-                                state.app_settings.update(clean);
-                                tracing::info!(
-                                    "Migrated graph_client_secret from JSON to OS credential store"
-                                );
-                            }
-                            Err(e) => {
-                                tracing::warn!(
-                                    "Failed to migrate client secret to credential store: {}",
-                                    e
-                                );
-                            }
-                        }
-                    }
-                }
-            }
-
             // Sync Graph config from persisted settings + credential store
             {
                 let settings = state.app_settings.get();
@@ -296,6 +270,12 @@ pub fn run() {
             commands::get_thumbnail_photo,
             commands::set_thumbnail_photo,
             commands::remove_thumbnail_photo,
+            commands::get_dc_health,
+            commands::get_replication_status,
+            commands::force_replication_cmd,
+            commands::get_dns_kerberos_validation,
+            commands::get_workstation_metrics,
+            commands::get_topology,
         ])
         .run(tauri::generate_context!())
         .unwrap_or_else(|e| {

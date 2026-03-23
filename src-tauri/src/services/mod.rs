@@ -3,9 +3,11 @@ pub mod audit;
 pub mod comparison;
 pub mod credential_store;
 pub mod dacl;
+pub mod dc_health;
 #[cfg(feature = "demo")]
 pub mod demo_provider;
 pub mod directory;
+pub mod dns_validation;
 pub mod dpapi;
 pub mod graph_exchange;
 pub mod health;
@@ -18,9 +20,12 @@ pub mod password;
 pub mod permissions;
 pub mod preset;
 pub mod replication;
+pub mod replication_status;
 pub mod resilience;
 pub mod resilient_directory;
 pub mod snapshot;
+pub mod topology;
+pub mod workstation_monitor;
 
 pub use app_settings::AppSettingsService;
 pub use audit::AuditService;

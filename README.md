@@ -8,7 +8,7 @@
   <img src="https://img.shields.io/badge/Rust-2021-orange.svg" alt="Rust">
   <img src="https://img.shields.io/badge/Tauri-v2-blue.svg" alt="Tauri">
   <img src="https://img.shields.io/badge/Platform-Windows%20|%20macOS%20|%20Linux-0078D6.svg" alt="Platform">
-  <img src="https://img.shields.io/badge/Status-v0.7.0-brightgreen.svg" alt="Status">
+  <img src="https://img.shields.io/badge/Status-v0.8.0-brightgreen.svg" alt="Status">
 </p>
 
 ---
@@ -32,10 +32,10 @@ DSPanel is an open source cross-platform desktop application (Rust/Tauri v2) tha
 - **Object Snapshots** - SQLite-backed attribute snapshots before every write, with diff viewer and restore
 - **Exchange Diagnostics** - Read-only mailbox info for on-prem (LDAP) and Online (Graph)
 - **Audit Trail** - Full internal action logging for compliance
-- **Infrastructure Health** - DC health, replication status, DNS checks, AD topology map
-- **Security Dashboard** - Domain risk score, privileged accounts monitoring, AD attack detection
-- **Reports & Export** - CSV/PDF export, scheduled reports, compliance templates (GDPR, HIPAA, SOX)
-- **Extensibility** - External script execution, webhooks, GPO viewer, automation triggers
+- **Infrastructure Health** - 7 cross-platform DC health checks (DNS, LDAP, SPNs, replication, SYSVOL/DFSR, clock skew, machine account), FSMO roles, functional level
+- **Replication Monitoring** - Partnership table with latency, error tracking, and force-replication via repadmin
+- **DNS & Kerberos Validation** - SRV record validation via AD DNS (cross-platform, hickory-resolver), clock skew detection
+- **AD Topology** - Site/DC/replication/site-link overview with per-DC details (IP, OS, roles, online status, subnets)
 
 ### Adaptive Permissions
 
@@ -166,7 +166,7 @@ user's domain. For environments requiring explicit credentials or custom servers
 | `DSPANEL_LDAP_USE_TLS` | Enable LDAPS (implicit TLS on port 636). Set to `true` or `1`. | `false` |
 | `DSPANEL_LDAP_STARTTLS` | Enable StartTLS (upgrade plaintext on port 389). Set to `true` or `1`. Mutually exclusive with LDAPS - if both set, LDAPS wins. | `false` |
 | `DSPANEL_LDAP_CA_CERT` | Path to a custom CA certificate file (PEM or DER). Added as trusted root alongside the system store. | System store only |
-| `DSPANEL_LDAP_TLS_SKIP_VERIFY` | Skip TLS certificate verification (lab/self-signed certs). Set to `true` or `1`. | `false` |
+| `DSPANEL_LDAP_TLS_SKIP_VERIFY` | **Development only.** Skip TLS certificate verification. Disables hostname and chain validation, making the connection vulnerable to MITM attacks. Never use in production - use `DSPANEL_LDAP_CA_CERT` instead. | `false` |
 
 All three credential variables (`SERVER`, `BIND_DN`, `BIND_PASSWORD`) must be set
 together. If only some are set, DSPanel falls back to GSSAPI with a warning.
@@ -189,7 +189,7 @@ DSPANEL_LDAP_STARTTLS=true
 # Internal PKI with custom CA certificate
 DSPANEL_LDAP_CA_CERT=/etc/ssl/certs/corp-ca.pem
 
-# Lab with self-signed certificate (skip all verification)
+# Lab/dev only - skip TLS verification (INSECURE, vulnerable to MITM)
 DSPANEL_LDAP_TLS_SKIP_VERIFY=true
 ```
 
@@ -207,7 +207,7 @@ Epic 12).
 | `User.Read.All` | Application | Read user profiles, proxy addresses |
 | `Reports.Read.All` | Application | Read mailbox usage reports (real quota) |
 
-The client secret is encrypted at rest using DPAPI (Windows) or base64 (other platforms).
+The client secret is stored securely in the OS credential store (Windows Credential Manager, macOS Keychain, Linux Secret Service via keyring crate).
 
 ## Project Structure
 

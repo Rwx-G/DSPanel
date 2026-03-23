@@ -7,6 +7,83 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-03-23
+
+Epic 8 - Infrastructure Health and Monitoring. Centralized view of AD
+infrastructure health for DomainAdmin users: DC status, replication
+monitoring, DNS/Kerberos validation, remote workstation metrics, and
+visual topology mapping.
+
+### Added
+
+#### Domain Controller Health Checks (8.1)
+- Infrastructure Health page with DC status cards and 7 cross-platform checks (no PowerShell dependency)
+- DNS resolution with fallback IP from LDAP server when hostname unresolvable
+- LDAP ping with response time thresholds (< 100ms / 100-500ms / > 500ms)
+- AD service detection via SPN validation (Host, DNS, GC, LDAP, Kerberos, Replication)
+- Replication health via NTDS Connection objects
+- SYSVOL health via DFSR member validation (migration state, enabled status) + SMB port probe
+- Clock skew detection via rootDSE currentTime (Kerberos 5-minute threshold)
+- Machine account health (userAccountControl flags + password age)
+- FSMO roles display (PDC, RID, Infrastructure, Schema, Naming) per DC
+- Domain functional level display from rootDSE
+- Color-coded status: green (healthy), yellow (warning), red (critical)
+- Auto-refresh with configurable interval (1min/5min default/15min/Off)
+- Cards expanded by default with fixed-width columns
+- DomainAdmin permission gating
+
+#### AD Replication Status (8.2)
+- Replication Status page with partnership table sorted by status (failed first)
+- Failed replications highlighted with red background and error count
+- Latency display with AD generalized time parsing and color coding
+- Force Replication button with confirmation dialog (via repadmin)
+- Auto-refresh with configurable interval (60s/120s/300s/Off)
+
+#### DNS and Kerberos Validation (8.3)
+- DNS & Kerberos validation page with auto-run on page load
+- DNS SRV record validation via hickory-resolver targeting the DC's DNS server directly (cross-platform, works without domain-joined machine)
+- SRV records checked: _ldap._tcp, _kerberos._tcp, _gc._tcp, _kpasswd._tcp
+- Expected vs actual host comparison with missing/extra host detection
+- Kerberos clock skew detection between DCs via rootDSE currentTime (fixed 5-minute default threshold)
+- CSV export of validation results
+
+#### Remote Workstation Monitoring (8.4)
+- WorkstationMonitoringPanel component for computer detail views
+- CPU and RAM usage with progress bars and color-coded thresholds
+- Disk space bars per volume with used/total display
+- Running services list with state indicators
+- Active sessions list with usernames
+- 5-second auto-refresh with pause/resume toggle
+- Graceful degradation when workstation unreachable or WMI access denied
+
+#### AD Topology Visualization (8.5)
+- AD Topology page with structured card view (sites, DCs, replication links, site links)
+- Per-DC details: hostname, IP (resolved via AD DNS), OS version, FSMO roles, GC/PDC badges, online/offline status
+- Per-site details: subnets, DC count, location
+- Replication links section with status indicators (healthy/warning/failed)
+- Site links section with cost and replication interval
+- Summary footer with counts (sites, DCs, replication links, site links)
+
+### Changed
+- Added Infrastructure group to sidebar navigation
+- Added search_configuration and read_entry methods to DirectoryProvider trait
+- Added hickory-resolver dependency for cross-platform DNS SRV resolution
+
+### Fixed
+- Enabled Content Security Policy in Tauri configuration
+- Added circuit breaker to Graph API service (3 failures -> 60s open)
+- Added server-side photo size validation (100KB max before LDAP write)
+- Removed dead legacy graph client secret migration code
+- Split commands/mod.rs (6860 lines) into 6 focused submodules
+- Fixed backend error JSON display in frontend (use extractErrorMessage utility)
+- Handle missing dNSHostName on newly promoted DCs (fallback to CN + domain)
+- Handle ldap3 range-suffixed attribute keys for multi-valued attributes
+
+### Security
+- CSP enabled: default-src 'self', script-src 'self' 'wasm-unsafe-eval', style-src 'self' 'unsafe-inline', img-src 'self' data: blob:
+- Graph API circuit breaker prevents cascade failures
+- TLS_SKIP_VERIFY documented as dev-only with MITM warning
+
 ## [0.7.0] - 2026-03-21
 
 Epic 7 - Administration and Object Management. Administrative tools for

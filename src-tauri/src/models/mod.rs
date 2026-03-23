@@ -1,12 +1,17 @@
 pub mod contact;
+pub mod dc_health;
 pub mod deleted_object;
 pub mod directory_entry;
+pub mod dns_validation;
 pub mod exchange_mailbox;
 pub mod exchange_online;
 pub mod object_snapshot;
 pub mod ou_node;
 pub mod preset;
 pub mod printer;
+pub mod replication_status;
+pub mod system_metrics;
+pub mod topology;
 
 pub use contact::ContactInfo;
 pub use deleted_object::DeletedObject;

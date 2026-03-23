@@ -24,6 +24,10 @@ import { Offboarding } from "@/pages/Offboarding";
 import { RecycleBin } from "@/pages/RecycleBin";
 import { ContactLookup } from "@/pages/ContactLookup";
 import { PrinterLookup } from "@/pages/PrinterLookup";
+import { InfrastructureHealth } from "@/pages/InfrastructureHealth";
+import { ReplicationStatus } from "@/pages/ReplicationStatus";
+import { DnsKerberosValidation } from "@/pages/DnsKerberosValidation";
+import { TopologyView } from "@/pages/TopologyView";
 
 const APP_VERSION = __APP_VERSION__;
 
@@ -163,6 +167,10 @@ const MODULE_COMPONENTS: Record<
   "recycle-bin": RecycleBin,
   contacts: ContactLookup,
   printers: PrinterLookup,
+  "infrastructure-health": InfrastructureHealth,
+  "replication-status": ReplicationStatus,
+  "dns-kerberos": DnsKerberosValidation,
+  topology: TopologyView,
 };
 
 function ModuleRouter({ status }: { status: AppStatus }) {

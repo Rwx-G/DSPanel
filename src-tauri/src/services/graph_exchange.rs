@@ -30,13 +30,83 @@ impl GraphConfig {
     }
 }
 
+/// Simple circuit breaker for Graph API calls.
+///
+/// Opens after `failure_threshold` consecutive failures and stays open
+/// for `recovery_timeout`, rejecting calls immediately during that window.
+struct GraphCircuitBreaker {
+    failure_count: u32,
+    last_failure: Option<std::time::Instant>,
+    state: GraphCircuitState,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum GraphCircuitState {
+    Closed,
+    Open,
+}
+
+const GRAPH_CB_FAILURE_THRESHOLD: u32 = 3;
+const GRAPH_CB_RECOVERY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
+
+impl GraphCircuitBreaker {
+    fn new() -> Self {
+        Self {
+            failure_count: 0,
+            last_failure: None,
+            state: GraphCircuitState::Closed,
+        }
+    }
+
+    fn is_allowed(&mut self) -> bool {
+        match self.state {
+            GraphCircuitState::Closed => true,
+            GraphCircuitState::Open => {
+                if let Some(last) = self.last_failure {
+                    if last.elapsed() >= GRAPH_CB_RECOVERY_TIMEOUT {
+                        tracing::info!("Graph circuit breaker: half-open, allowing probe");
+                        self.state = GraphCircuitState::Closed;
+                        self.failure_count = 0;
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    true
+                }
+            }
+        }
+    }
+
+    fn record_success(&mut self) {
+        self.failure_count = 0;
+        self.state = GraphCircuitState::Closed;
+    }
+
+    fn record_failure(&mut self) {
+        self.failure_count += 1;
+        self.last_failure = Some(std::time::Instant::now());
+        if self.failure_count >= GRAPH_CB_FAILURE_THRESHOLD {
+            self.state = GraphCircuitState::Open;
+            tracing::warn!(
+                failures = self.failure_count,
+                "Graph circuit breaker OPEN - rejecting calls for {}s",
+                GRAPH_CB_RECOVERY_TIMEOUT.as_secs()
+            );
+        }
+    }
+}
+
 /// Service for fetching Exchange Online data via Microsoft Graph API.
 ///
 /// Uses OAuth2 client credentials flow with the configured tenant and app.
 /// Requires `Mail.Read`, `User.Read.All`, and `Reports.Read.All` application permissions.
+/// Includes a circuit breaker that opens after 3 consecutive failures and
+/// recovers after 60 seconds.
 pub struct GraphExchangeService {
     config: RwLock<GraphConfig>,
     token_cache: RwLock<Option<CachedToken>>,
+    circuit_breaker: RwLock<GraphCircuitBreaker>,
     graph_base_url: String,
     auth_base_url: String,
 }
@@ -58,6 +128,7 @@ impl GraphExchangeService {
         Self {
             config: RwLock::new(GraphConfig::default()),
             token_cache: RwLock::new(None),
+            circuit_breaker: RwLock::new(GraphCircuitBreaker::new()),
             graph_base_url: "https://graph.microsoft.com".to_string(),
             auth_base_url: "https://login.microsoftonline.com".to_string(),
         }
@@ -70,6 +141,7 @@ impl GraphExchangeService {
         Self {
             config: RwLock::new(GraphConfig::default()),
             token_cache: RwLock::new(None),
+            circuit_breaker: RwLock::new(GraphCircuitBreaker::new()),
             graph_base_url: graph_base_url.to_string(),
             auth_base_url: auth_base_url.to_string(),
         }
@@ -154,18 +226,65 @@ impl GraphExchangeService {
         Ok(access_token)
     }
 
+    /// Checks the circuit breaker and returns an error if open.
+    fn check_circuit_breaker(&self) -> Result<()> {
+        let mut cb = self.circuit_breaker.write().expect("lock poisoned");
+        if !cb.is_allowed() {
+            anyhow::bail!("Graph API circuit breaker is open - service temporarily unavailable")
+        }
+        Ok(())
+    }
+
+    /// Records a success in the circuit breaker.
+    fn cb_success(&self) {
+        self.circuit_breaker
+            .write()
+            .expect("lock poisoned")
+            .record_success();
+    }
+
+    /// Records a failure in the circuit breaker.
+    fn cb_failure(&self) {
+        self.circuit_breaker
+            .write()
+            .expect("lock poisoned")
+            .record_failure();
+    }
+
     /// Tests the Graph API connection by fetching the organization endpoint.
     pub async fn test_connection(&self, http_client: &reqwest::Client) -> Result<bool> {
-        let token = self.acquire_token(http_client).await?;
+        self.check_circuit_breaker()?;
 
-        let response = http_client
+        let token = match self.acquire_token(http_client).await {
+            Ok(t) => t,
+            Err(e) => {
+                self.cb_failure();
+                return Err(e);
+            }
+        };
+
+        let result = http_client
             .get(format!("{}/v1.0/organization", self.graph_base_url))
             .bearer_auth(&token)
             .send()
             .await
-            .context("Failed to reach Graph API")?;
+            .context("Failed to reach Graph API");
 
-        Ok(response.status().is_success())
+        match result {
+            Ok(response) => {
+                let success = response.status().is_success();
+                if success {
+                    self.cb_success();
+                } else {
+                    self.cb_failure();
+                }
+                Ok(success)
+            }
+            Err(e) => {
+                self.cb_failure();
+                Err(e)
+            }
+        }
     }
 
     /// Fetches mailbox quota from the usage report CSV.
@@ -207,7 +326,15 @@ impl GraphExchangeService {
             return Ok(None);
         }
 
-        let token = self.acquire_token(http_client).await?;
+        self.check_circuit_breaker()?;
+
+        let token = match self.acquire_token(http_client).await {
+            Ok(t) => t,
+            Err(e) => {
+                self.cb_failure();
+                return Err(e);
+            }
+        };
 
         // Fetch user profile (aliases, mail)
         let user_url = format!(
@@ -219,13 +346,18 @@ impl GraphExchangeService {
             .bearer_auth(&token)
             .send()
             .await
-            .context("Failed to fetch user profile from Graph")?;
+            .map_err(|e| {
+                self.cb_failure();
+                anyhow::anyhow!("Failed to fetch user profile from Graph: {}", e)
+            })?;
 
         if user_response.status() == reqwest::StatusCode::NOT_FOUND {
+            self.cb_success();
             return Ok(None);
         }
 
         if !user_response.status().is_success() {
+            self.cb_failure();
             let status = user_response.status();
             let body = user_response.text().await.unwrap_or_default();
             anyhow::bail!("Graph user query failed ({}): {}", status, body);
@@ -322,6 +454,8 @@ impl GraphExchangeService {
             }
             _ => Vec::new(),
         };
+
+        self.cb_success();
 
         Ok(Some(ExchangeOnlineInfo {
             primary_smtp_address: primary_smtp,
