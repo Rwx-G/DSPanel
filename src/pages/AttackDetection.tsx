@@ -54,6 +54,22 @@ function attackTypeLabel(type: AttackType): string {
       return "Password Spray";
     case "PrivGroupChange":
       return "Priv Group Change";
+    case "Kerberoasting":
+      return "Kerberoasting";
+    case "AsrepRoasting":
+      return "AS-REP Roasting";
+    case "BruteForce":
+      return "Brute Force";
+    case "PassTheHash":
+      return "Pass-the-Hash";
+    case "ShadowCredentials":
+      return "Shadow Credentials";
+    case "RbcdAbuse":
+      return "RBCD Abuse";
+    case "AdminSdHolderTamper":
+      return "AdminSDHolder Tamper";
+    case "SuspiciousAccountActivity":
+      return "Suspicious Account";
   }
 }
 
@@ -114,6 +130,14 @@ function AlertCard({
             {alert.eventId != null && (
               <span className="text-[10px] font-mono text-[var(--color-text-secondary)]">
                 Event {alert.eventId}
+              </span>
+            )}
+            {alert.mitreRef != null && (
+              <span
+                className="inline-flex items-center rounded bg-[var(--color-surface-hover)] px-1 py-0.5 text-[10px] font-mono text-[var(--color-text-secondary)]"
+                data-testid="mitre-ref-badge"
+              >
+                MITRE {alert.mitreRef}
               </span>
             )}
           </div>

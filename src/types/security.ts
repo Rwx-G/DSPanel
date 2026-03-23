@@ -99,7 +99,21 @@ export interface RiskScoreHistory {
 
 // Story 9.3: Attack Detection
 
-export type AttackType = "GoldenTicket" | "DCSync" | "DCShadow" | "AbnormalKerberos" | "PasswordSpray" | "PrivGroupChange";
+export type AttackType =
+  | "GoldenTicket"
+  | "DCSync"
+  | "DCShadow"
+  | "AbnormalKerberos"
+  | "PasswordSpray"
+  | "PrivGroupChange"
+  | "Kerberoasting"
+  | "AsrepRoasting"
+  | "BruteForce"
+  | "PassTheHash"
+  | "ShadowCredentials"
+  | "RbcdAbuse"
+  | "AdminSdHolderTamper"
+  | "SuspiciousAccountActivity";
 
 export interface AttackAlert {
   attackType: AttackType;
@@ -109,12 +123,20 @@ export interface AttackAlert {
   description: string;
   recommendation: string;
   eventId: number | null;
+  mitreRef: string | null;
 }
 
 export interface AttackDetectionReport {
   alerts: AttackAlert[];
   timeWindowHours: number;
   scannedAt: string;
+}
+
+export interface AttackDetectionConfig {
+  bruteForceThreshold: number;
+  kerberoastingThreshold: number;
+  excludedIps: string[];
+  excludedAccounts: string[];
 }
 
 // Story 9.4: Escalation Paths

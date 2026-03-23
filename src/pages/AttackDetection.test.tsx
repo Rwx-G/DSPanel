@@ -17,27 +17,58 @@ const mockReport: AttackDetectionReport = {
       severity: "Critical",
       timestamp: "2026-03-23T09:15:00Z",
       source: "DC01.example.com",
-      description: "Suspicious TGT with abnormally long lifetime detected",
-      recommendation: "Rotate the KRBTGT account password twice and investigate the source host.",
-      eventId: 4769,
+      description: "TGT request with RC4-HMAC encryption for account 'admin'",
+      recommendation:
+        "Reset KRBTGT password twice with 12-hour interval. Investigate the source for compromise.",
+      eventId: 4768,
+      mitreRef: "T1558.001",
     },
     {
       attackType: "DCSync",
-      severity: "High",
+      severity: "Critical",
       timestamp: "2026-03-23T08:30:00Z",
       source: "WORKSTATION-42",
-      description: "Non-DC host requested directory replication",
-      recommendation: "Review replication permissions and check the source machine for compromise.",
+      description:
+        "Directory replication requested by non-DC account 'hacker' - possible DCSync attack",
+      recommendation:
+        "Review replication permissions. Remove DS-Replication-Get-Changes rights from non-DC accounts. Investigate source IP.",
       eventId: 4662,
+      mitreRef: "T1003.006",
     },
     {
-      attackType: "AbnormalKerberos",
-      severity: "Medium",
+      attackType: "Kerberoasting",
+      severity: "High",
+      timestamp: "2026-03-23T07:45:00Z",
+      source: "10.0.0.50",
+      description:
+        "User 'attacker' requested 5 TGS tickets with RC4-HMAC for services: svc_sql, svc_web",
+      recommendation:
+        "Review service accounts with SPNs. Rotate passwords to 25+ char random. Enable AES encryption. Consider gMSA.",
+      eventId: 4769,
+      mitreRef: "T1558.003",
+    },
+    {
+      attackType: "BruteForce",
+      severity: "High",
       timestamp: "2026-03-23T07:00:00Z",
+      source: "192.168.1.100",
+      description:
+        "15 failed logons from IP 192.168.1.100 (12 wrong password, 3 unknown user)",
+      recommendation:
+        "Investigate source IP. Consider blocking at firewall. Review affected accounts for compromise.",
+      eventId: 4625,
+      mitreRef: "T1110.001",
+    },
+    {
+      attackType: "SuspiciousAccountActivity",
+      severity: "Medium",
+      timestamp: "2026-03-23T06:30:00Z",
       source: "SRV-APP01",
-      description: "Kerberos ticket request with unusual encryption type",
-      recommendation: "Verify the application configuration and check for downgrade attacks.",
-      eventId: null,
+      description: "New account 'backdoor' created by 'admin'",
+      recommendation:
+        "Verify account creation was authorized. Review the account's group memberships and permissions.",
+      eventId: 4720,
+      mitreRef: "T1136.001",
     },
   ],
   timeWindowHours: 24,
@@ -74,12 +105,19 @@ describe("AttackDetection", () => {
       expect(screen.getByTestId("attack-detection")).toBeInTheDocument();
     });
 
-    expect(screen.getByText("Suspicious TGT with abnormally long lifetime detected")).toBeInTheDocument();
-    expect(screen.getByText("Non-DC host requested directory replication")).toBeInTheDocument();
-    expect(screen.getByText("Kerberos ticket request with unusual encryption type")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "TGT request with RC4-HMAC encryption for account 'admin'",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Directory replication requested by non-DC account 'hacker' - possible DCSync attack",
+      ),
+    ).toBeInTheDocument();
   });
 
-  it("displays attack type badges", async () => {
+  it("displays attack type badges including new types", async () => {
     mockInvoke.mockResolvedValue(mockReport);
     render(<AttackDetection />);
 
@@ -87,7 +125,9 @@ describe("AttackDetection", () => {
       expect(screen.getByText("Golden Ticket")).toBeInTheDocument();
     });
     expect(screen.getByText("DCSync")).toBeInTheDocument();
-    expect(screen.getByText("Abnormal Kerberos")).toBeInTheDocument();
+    expect(screen.getByText("Kerberoasting")).toBeInTheDocument();
+    expect(screen.getByText("Brute Force")).toBeInTheDocument();
+    expect(screen.getByText("Suspicious Account")).toBeInTheDocument();
   });
 
   it("displays severity summary badges", async () => {
@@ -98,9 +138,24 @@ describe("AttackDetection", () => {
       expect(screen.getByTestId("alert-summary")).toBeInTheDocument();
     });
 
-    expect(screen.getByText("1 Critical")).toBeInTheDocument();
-    expect(screen.getByText("1 High")).toBeInTheDocument();
+    expect(screen.getByText("2 Critical")).toBeInTheDocument();
+    expect(screen.getByText("2 High")).toBeInTheDocument();
     expect(screen.getByText("1 Medium")).toBeInTheDocument();
+  });
+
+  it("displays MITRE ATT&CK reference badges", async () => {
+    mockInvoke.mockResolvedValue(mockReport);
+    render(<AttackDetection />);
+
+    await waitFor(() => {
+      expect(screen.getAllByTestId("mitre-ref-badge").length).toBeGreaterThan(
+        0,
+      );
+    });
+
+    expect(screen.getByText("MITRE T1558.001")).toBeInTheDocument();
+    expect(screen.getByText("MITRE T1003.006")).toBeInTheDocument();
+    expect(screen.getByText("MITRE T1558.003")).toBeInTheDocument();
   });
 
   it("shows empty state when no alerts", async () => {
@@ -112,10 +167,14 @@ describe("AttackDetection", () => {
     render(<AttackDetection />);
 
     await waitFor(() => {
-      expect(screen.getByText("No Attack Indicators Found")).toBeInTheDocument();
+      expect(
+        screen.getByText("No Attack Indicators Found"),
+      ).toBeInTheDocument();
     });
     expect(
-      screen.getByText("No suspicious activity detected in the last 24 hours."),
+      screen.getByText(
+        "No suspicious activity detected in the last 24 hours.",
+      ),
     ).toBeInTheDocument();
   });
 
@@ -133,14 +192,18 @@ describe("AttackDetection", () => {
     render(<AttackDetection />);
 
     await waitFor(() => {
-      expect(screen.getAllByTestId("alert-card-toggle").length).toBeGreaterThan(0);
+      expect(
+        screen.getAllByTestId("alert-card-toggle").length,
+      ).toBeGreaterThan(0);
     });
 
     fireEvent.click(screen.getAllByTestId("alert-card-toggle")[0]);
 
     await waitFor(() => {
       expect(
-        screen.getByText("Rotate the KRBTGT account password twice and investigate the source host."),
+        screen.getByText(
+          "Reset KRBTGT password twice with 12-hour interval. Investigate the source for compromise.",
+        ),
       ).toBeInTheDocument();
     });
   });
@@ -187,7 +250,36 @@ describe("AttackDetection", () => {
     await waitFor(() => {
       expect(screen.getByText("Source: DC01.example.com")).toBeInTheDocument();
     });
-    expect(screen.getByText("Event 4769")).toBeInTheDocument();
+    expect(screen.getByText("Event 4768")).toBeInTheDocument();
     expect(screen.getByText("Source: WORKSTATION-42")).toBeInTheDocument();
+  });
+
+  it("handles alerts with null mitreRef", async () => {
+    const reportWithNullMitre: AttackDetectionReport = {
+      alerts: [
+        {
+          attackType: "PrivGroupChange",
+          severity: "High",
+          timestamp: "2026-03-23T09:00:00Z",
+          source: "DC01",
+          description: "Member added to security group",
+          recommendation: "Verify the change.",
+          eventId: 4728,
+          mitreRef: null,
+        },
+      ],
+      timeWindowHours: 24,
+      scannedAt: "2026-03-23T10:00:00Z",
+    };
+    mockInvoke.mockResolvedValue(reportWithNullMitre);
+    render(<AttackDetection />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Member added to security group"),
+      ).toBeInTheDocument();
+    });
+    // No MITRE badge should be rendered
+    expect(screen.queryByTestId("mitre-ref-badge")).not.toBeInTheDocument();
   });
 });

@@ -251,6 +251,14 @@ pub enum AttackType {
     AbnormalKerberos,
     PasswordSpray,
     PrivGroupChange,
+    Kerberoasting,
+    AsrepRoasting,
+    BruteForce,
+    PassTheHash,
+    ShadowCredentials,
+    RbcdAbuse,
+    AdminSdHolderTamper,
+    SuspiciousAccountActivity,
 }
 
 /// A detected attack alert.
@@ -271,6 +279,33 @@ pub struct AttackAlert {
     pub recommendation: String,
     /// Related Windows event ID.
     pub event_id: Option<u32>,
+    /// MITRE ATT&CK technique reference.
+    pub mitre_ref: Option<String>,
+}
+
+/// Configurable thresholds for attack detection.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AttackDetectionConfig {
+    /// Minimum failed logins from same IP to trigger brute force alert.
+    pub brute_force_threshold: u32,
+    /// Minimum TGS requests with RC4 to trigger Kerberoasting alert.
+    pub kerberoasting_threshold: u32,
+    /// IPs to exclude from alerts (known DCs).
+    pub excluded_ips: Vec<String>,
+    /// Accounts to exclude from alerts (known service accounts).
+    pub excluded_accounts: Vec<String>,
+}
+
+impl Default for AttackDetectionConfig {
+    fn default() -> Self {
+        Self {
+            brute_force_threshold: 10,
+            kerberoasting_threshold: 3,
+            excluded_ips: Vec::new(),
+            excluded_accounts: Vec::new(),
+        }
+    }
 }
 
 /// Result of an attack detection scan.
@@ -533,11 +568,42 @@ mod tests {
             description: "TGT with abnormal lifetime detected".to_string(),
             recommendation: "Reset KRBTGT password twice".to_string(),
             event_id: Some(4768),
+            mitre_ref: Some("T1558.001".to_string()),
         };
         let json = serde_json::to_string(&alert).unwrap();
         assert!(json.contains("attackType"));
         assert!(json.contains("GoldenTicket"));
         assert!(json.contains("eventId"));
+        assert!(json.contains("mitreRef"));
+        assert!(json.contains("T1558.001"));
+    }
+
+    #[test]
+    fn test_attack_detection_config_default() {
+        let config = AttackDetectionConfig::default();
+        assert_eq!(config.brute_force_threshold, 10);
+        assert_eq!(config.kerberoasting_threshold, 3);
+        assert!(config.excluded_ips.is_empty());
+        assert!(config.excluded_accounts.is_empty());
+    }
+
+    #[test]
+    fn test_attack_type_new_variants_serialization() {
+        let types = vec![
+            AttackType::Kerberoasting,
+            AttackType::AsrepRoasting,
+            AttackType::BruteForce,
+            AttackType::PassTheHash,
+            AttackType::ShadowCredentials,
+            AttackType::RbcdAbuse,
+            AttackType::AdminSdHolderTamper,
+            AttackType::SuspiciousAccountActivity,
+        ];
+        for attack_type in types {
+            let json = serde_json::to_string(&attack_type).unwrap();
+            let deserialized: AttackType = serde_json::from_str(&json).unwrap();
+            assert_eq!(deserialized, attack_type);
+        }
     }
 
     #[test]

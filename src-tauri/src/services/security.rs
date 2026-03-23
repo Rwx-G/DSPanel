@@ -3003,7 +3003,38 @@ impl RiskScoreStore {
 // Attack Detection (Story 9.3)
 // ---------------------------------------------------------------------------
 
-use crate::models::security::{AttackAlert, AttackDetectionReport, AttackType};
+use crate::models::security::{
+    AttackAlert, AttackDetectionConfig, AttackDetectionReport, AttackType,
+};
+
+/// A parsed Windows Security event record with structured fields.
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct EventRecord {
+    pub time_created: Option<String>,
+    pub id: Option<u32>,
+    pub ip_address: Option<String>,
+    pub target_user_name: Option<String>,
+    pub ticket_encryption_type: Option<String>,
+    pub service_name: Option<String>,
+    pub status: Option<String>,
+    pub sub_status: Option<String>,
+    pub logon_type: Option<String>,
+    pub authentication_package_name: Option<String>,
+    pub key_length: Option<String>,
+    pub object_type: Option<String>,
+    pub access_mask: Option<String>,
+    pub subject_user_name: Option<String>,
+    pub attribute_ldap_display_name: Option<String>,
+    pub object_dn: Option<String>,
+}
+
+/// DS-Replication-Get-Changes GUID.
+const GUID_DS_REPL_GET_CHANGES: &str = "1131f6aa-9c07-11d1-f79f-00c04fc2dcd2";
+/// DS-Replication-Get-Changes-All GUID.
+const GUID_DS_REPL_GET_CHANGES_ALL: &str = "1131f6ad-9c07-11d1-f79f-00c04fc2dcd2";
+/// DS-Replication-Get-Changes-In-Filtered-Set GUID.
+const GUID_DS_REPL_GET_CHANGES_FILTERED: &str = "89e95b76-444d-4c62-991a-0facbeda640c";
 
 /// Performs on-demand attack detection by analyzing Windows Security event logs.
 ///
@@ -3013,11 +3044,15 @@ pub async fn detect_attacks(
     _provider: Arc<dyn DirectoryProvider>,
     time_window_hours: u32,
 ) -> Result<AttackDetectionReport> {
+    let config = AttackDetectionConfig::default();
+
     #[cfg(target_os = "windows")]
-    let alerts = analyze_windows_event_log(time_window_hours);
+    let alerts = analyze_windows_event_log(time_window_hours, &config);
 
     #[cfg(not(target_os = "windows"))]
     let alerts: Vec<AttackAlert> = Vec::new();
+
+    let _ = &config; // suppress unused warning on non-Windows
 
     Ok(AttackDetectionReport {
         alerts,
@@ -3026,122 +3061,795 @@ pub async fn detect_attacks(
     })
 }
 
-/// Analyzes Windows Security event log for attack indicators.
+/// Runs a PowerShell query for a batch of event IDs and returns parsed event records.
 #[cfg(target_os = "windows")]
-fn analyze_windows_event_log(time_window_hours: u32) -> Vec<AttackAlert> {
+fn query_events(event_ids: &[u32], time_window_hours: u32) -> Vec<EventRecord> {
     use std::process::Command;
 
+    let ids_str = event_ids
+        .iter()
+        .map(|id| id.to_string())
+        .collect::<Vec<_>>()
+        .join(",");
+
+    let query = format!(
+        r#"Get-WinEvent -FilterHashtable @{{LogName='Security';Id={ids};StartTime=(Get-Date).AddHours(-{hours})}} -MaxEvents 200 -ErrorAction SilentlyContinue | ForEach-Object {{
+    $xml = [xml]$_.ToXml()
+    $data = @{{}}
+    $xml.Event.EventData.Data | ForEach-Object {{ $data[$_.Name] = $_.'#text' }}
+    [PSCustomObject]@{{
+        TimeCreated = $_.TimeCreated.ToString('o')
+        Id = $_.Id
+        IpAddress = $data['IpAddress']
+        TargetUserName = $data['TargetUserName']
+        TicketEncryptionType = $data['TicketEncryptionType']
+        ServiceName = $data['ServiceName']
+        Status = $data['Status']
+        SubStatus = $data['SubStatus']
+        LogonType = $data['LogonType']
+        AuthenticationPackageName = $data['AuthenticationPackageName']
+        KeyLength = $data['KeyLength']
+        ObjectType = $data['ObjectType']
+        AccessMask = $data['AccessMask']
+        SubjectUserName = $data['SubjectUserName']
+        AttributeLDAPDisplayName = $data['AttributeLDAPDisplayName']
+        ObjectDN = $data['ObjectDN']
+    }}
+}} | ConvertTo-Json -Compress"#,
+        ids = ids_str,
+        hours = time_window_hours,
+    );
+
+    let output = Command::new("powershell")
+        .args(["-NoProfile", "-NonInteractive", "-Command", &query])
+        .output();
+
+    let output = match output {
+        Ok(o) if o.status.success() => o,
+        _ => return Vec::new(),
+    };
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let trimmed = stdout.trim();
+    if trimmed.is_empty() || trimmed == "null" {
+        return Vec::new();
+    }
+
+    // PowerShell returns a single object (not array) when there's exactly one result.
+    if trimmed.starts_with('[') {
+        serde_json::from_str::<Vec<EventRecord>>(trimmed).unwrap_or_default()
+    } else {
+        serde_json::from_str::<EventRecord>(trimmed)
+            .map(|r| vec![r])
+            .unwrap_or_default()
+    }
+}
+
+/// Analyzes Windows Security event log for attack indicators using structured parsing.
+#[cfg(target_os = "windows")]
+fn analyze_windows_event_log(
+    time_window_hours: u32,
+    config: &AttackDetectionConfig,
+) -> Vec<AttackAlert> {
     let mut alerts = Vec::new();
 
-    // Query for suspicious event IDs using PowerShell
-    // Event 4768: Kerberos TGT request (Golden Ticket indicators)
-    // Event 4769: Kerberos TGS request (abnormal Kerberos)
-    // Event 4662: Directory service access (DCSync)
-    // Event 4742: Computer account changed (DCShadow)
-    let event_ids = [
-        (
-            4768,
-            AttackType::GoldenTicket,
-            "Kerberos TGT with unusual parameters",
-        ),
-        (
-            4662,
-            AttackType::DCSync,
-            "Directory replication request from non-DC",
-        ),
-        (
-            4742,
-            AttackType::DCShadow,
-            "Suspicious computer account modification",
-        ),
-        (
-            4769,
-            AttackType::AbnormalKerberos,
-            "Abnormal Kerberos TGS request pattern",
-        ),
-        (
-            4771,
-            AttackType::PasswordSpray,
-            "Kerberos pre-authentication failures (potential password spray)",
-        ),
-        (
-            4728,
-            AttackType::PrivGroupChange,
-            "Member added to security-enabled global group",
-        ),
-        (
-            4732,
-            AttackType::PrivGroupChange,
-            "Member added to security-enabled local group",
-        ),
-        (
-            4756,
-            AttackType::PrivGroupChange,
-            "Member added to security-enabled universal group",
-        ),
+    // Batch 1: Kerberos events (4768, 4769, 4771)
+    let kerberos_events = query_events(&[4768, 4769, 4771], time_window_hours);
+    let events_4768: Vec<&EventRecord> =
+        kerberos_events.iter().filter(|e| e.id == Some(4768)).collect();
+    let events_4769: Vec<&EventRecord> =
+        kerberos_events.iter().filter(|e| e.id == Some(4769)).collect();
+    let events_4771: Vec<&EventRecord> =
+        kerberos_events.iter().filter(|e| e.id == Some(4771)).collect();
+
+    // Batch 2: Logon events (4624, 4625)
+    let logon_events = query_events(&[4624, 4625], time_window_hours);
+    let events_4624: Vec<&EventRecord> =
+        logon_events.iter().filter(|e| e.id == Some(4624)).collect();
+    let events_4625: Vec<&EventRecord> =
+        logon_events.iter().filter(|e| e.id == Some(4625)).collect();
+
+    // Batch 3: Directory access (4662)
+    let dir_events_raw = query_events(&[4662], time_window_hours);
+    let dir_events: Vec<&EventRecord> = dir_events_raw.iter().collect();
+
+    // Batch 4: Group/computer changes (4728, 4732, 4742, 4756)
+    let group_events = query_events(&[4728, 4732, 4742, 4756], time_window_hours);
+    let events_4742: Vec<&EventRecord> =
+        group_events.iter().filter(|e| e.id == Some(4742)).collect();
+    let events_group_change: Vec<&EventRecord> = group_events
+        .iter()
+        .filter(|e| matches!(e.id, Some(4728) | Some(4732) | Some(4756)))
+        .collect();
+
+    // Batch 5: Directory changes (5136)
+    let dir_change_events_raw = query_events(&[5136], time_window_hours);
+    let dir_change_events: Vec<&EventRecord> = dir_change_events_raw.iter().collect();
+
+    // Batch 6: Account management (4720, 4738)
+    let acct_events_raw = query_events(&[4720, 4738], time_window_hours);
+    let acct_events: Vec<&EventRecord> = acct_events_raw.iter().collect();
+
+    // Run detection functions
+    alerts.extend(detect_golden_ticket(&events_4768, config));
+    alerts.extend(detect_dcsync(&dir_events, config));
+    alerts.extend(detect_kerberoasting(&events_4769, config));
+    alerts.extend(detect_asrep_roasting(&events_4768, config));
+    alerts.extend(detect_brute_force(&events_4625, config));
+    alerts.extend(detect_pass_the_hash(&events_4624, config));
+    alerts.extend(detect_password_spray(&events_4771, config));
+    alerts.extend(detect_shadow_credentials(&dir_change_events, config));
+    alerts.extend(detect_rbcd_abuse(&dir_change_events, config));
+    alerts.extend(detect_adminsd_holder_tamper(&dir_change_events, config));
+    alerts.extend(detect_suspicious_account_activity(&acct_events, config));
+    alerts.extend(detect_dcshadow(&events_4742, config));
+    alerts.extend(detect_priv_group_change(&events_group_change, config));
+
+    // Sort by severity (Critical first)
+    alerts.sort_by(|a, b| b.severity.cmp(&a.severity));
+    alerts
+}
+
+// ---------------------------------------------------------------------------
+// Detection functions - pure logic operating on EventRecord slices
+// ---------------------------------------------------------------------------
+
+/// Golden Ticket detection (Event 4768).
+/// Flags TGT requests using RC4-HMAC encryption (0x17), which is unusual in modern AD.
+pub fn detect_golden_ticket(
+    events: &[&EventRecord],
+    config: &AttackDetectionConfig,
+) -> Vec<AttackAlert> {
+    let mut alerts = Vec::new();
+    for event in events {
+        let enc_type = event.ticket_encryption_type.as_deref().unwrap_or("");
+        let target = event.target_user_name.as_deref().unwrap_or("");
+
+        // RC4-HMAC TGT requests excluding krbtgt itself
+        if enc_type == "0x17" && !target.eq_ignore_ascii_case("krbtgt") {
+            if is_excluded_account(target, config) {
+                continue;
+            }
+            alerts.push(AttackAlert {
+                attack_type: AttackType::GoldenTicket,
+                severity: AlertSeverity::Critical,
+                timestamp: event
+                    .time_created
+                    .clone()
+                    .unwrap_or_else(|| Utc::now().to_rfc3339()),
+                source: event.ip_address.clone().unwrap_or_else(|| "Unknown".to_string()),
+                description: format!(
+                    "TGT request with RC4-HMAC encryption for account '{}' - possible Golden Ticket usage",
+                    target
+                ),
+                recommendation: "Reset KRBTGT password twice with 12-hour interval. Investigate the source for compromise.".to_string(),
+                event_id: Some(4768),
+                mitre_ref: Some("T1558.001".to_string()),
+            });
+        }
+    }
+    alerts
+}
+
+/// DCSync detection (Event 4662).
+/// Flags replication permission usage by non-machine accounts.
+pub fn detect_dcsync(
+    events: &[&EventRecord],
+    config: &AttackDetectionConfig,
+) -> Vec<AttackAlert> {
+    let repl_guids = [
+        GUID_DS_REPL_GET_CHANGES,
+        GUID_DS_REPL_GET_CHANGES_ALL,
+        GUID_DS_REPL_GET_CHANGES_FILTERED,
     ];
 
-    for (event_id, attack_type, description) in &event_ids {
-        let query = format!(
-            "Get-WinEvent -FilterHashtable @{{LogName='Security';Id={};StartTime=(Get-Date).AddHours(-{})}} -MaxEvents 50 -ErrorAction SilentlyContinue | Select-Object TimeCreated,Message | ConvertTo-Json -Compress",
-            event_id, time_window_hours
-        );
+    let mut alerts = Vec::new();
+    for event in events {
+        if event.id != Some(4662) {
+            continue;
+        }
+        let access_mask = event.access_mask.as_deref().unwrap_or("");
+        let object_type = event.object_type.as_deref().unwrap_or("").to_lowercase();
+        let subject = event.subject_user_name.as_deref().unwrap_or("");
+        let ip = event.ip_address.as_deref().unwrap_or("");
 
-        let output = Command::new("powershell")
-            .args(["-NoProfile", "-NonInteractive", "-Command", &query])
-            .output();
+        // Must have replication access mask and matching GUID
+        let has_repl_access = access_mask.contains("0x100");
+        let has_repl_guid = repl_guids.iter().any(|guid| object_type.contains(guid));
 
-        if let Ok(output) = output {
-            if output.status.success() {
-                let stdout = String::from_utf8_lossy(&output.stdout);
-                if !stdout.trim().is_empty() && stdout.trim() != "null" {
-                    // Parse event count to determine if suspicious activity exists
-                    let event_count = if stdout.trim().starts_with('[') {
-                        stdout.matches("TimeCreated").count()
-                    } else if stdout.contains("TimeCreated") {
-                        1
-                    } else {
-                        0
-                    };
-
-                    if event_count > 0 {
-                        let severity = match attack_type {
-                            AttackType::GoldenTicket => AlertSeverity::Critical,
-                            AttackType::DCSync => AlertSeverity::Critical,
-                            AttackType::DCShadow => AlertSeverity::High,
-                            AttackType::PasswordSpray => AlertSeverity::High,
-                            AttackType::PrivGroupChange => AlertSeverity::High,
-                            AttackType::AbnormalKerberos => AlertSeverity::Medium,
-                        };
-
-                        let recommendation = match attack_type {
-                            AttackType::GoldenTicket => "Reset KRBTGT password twice with a 12-hour interval".to_string(),
-                            AttackType::DCSync => "Review replication permissions - ensure only DCs have DS-Replication-Get-Changes rights".to_string(),
-                            AttackType::DCShadow => "Audit computer account changes and verify no rogue DCs registered".to_string(),
-                            AttackType::AbnormalKerberos => "Review Kerberos ticket requests for unusual encryption types or sources".to_string(),
-                            AttackType::PasswordSpray => "Check for compromised accounts - review failed logon sources and lock affected accounts".to_string(),
-                            AttackType::PrivGroupChange => "Verify the group membership change was authorized - review who was added and by whom".to_string(),
-                        };
-
-                        alerts.push(AttackAlert {
-                            attack_type: attack_type.clone(),
-                            severity,
-                            timestamp: Utc::now().to_rfc3339(),
-                            source: "Local Security Event Log".to_string(),
-                            description: format!(
-                                "{} - {} event(s) detected in last {} hours",
-                                description, event_count, time_window_hours
-                            ),
-                            recommendation,
-                            event_id: Some(*event_id),
-                        });
-                    }
-                }
+        if has_repl_access && has_repl_guid {
+            // Exclude machine accounts (ending with $) - these are DCs
+            if subject.ends_with('$') {
+                continue;
             }
+            if is_excluded_ip(ip, config) || is_excluded_account(subject, config) {
+                continue;
+            }
+            alerts.push(AttackAlert {
+                attack_type: AttackType::DCSync,
+                severity: AlertSeverity::Critical,
+                timestamp: event
+                    .time_created
+                    .clone()
+                    .unwrap_or_else(|| Utc::now().to_rfc3339()),
+                source: event.ip_address.clone().unwrap_or_else(|| "Unknown".to_string()),
+                description: format!(
+                    "Directory replication requested by non-DC account '{}' - possible DCSync attack",
+                    subject
+                ),
+                recommendation: "Review replication permissions. Remove DS-Replication-Get-Changes rights from non-DC accounts. Investigate source IP.".to_string(),
+                event_id: Some(4662),
+                mitre_ref: Some("T1003.006".to_string()),
+            });
+        }
+    }
+    alerts
+}
+
+/// Kerberoasting detection (Event 4769).
+/// Flags multiple TGS requests with RC4-HMAC from the same user targeting service accounts.
+pub fn detect_kerberoasting(
+    events: &[&EventRecord],
+    config: &AttackDetectionConfig,
+) -> Vec<AttackAlert> {
+    use std::collections::HashMap;
+
+    let mut per_user: HashMap<String, Vec<&EventRecord>> = HashMap::new();
+
+    for event in events {
+        let enc_type = event.ticket_encryption_type.as_deref().unwrap_or("");
+        let service = event.service_name.as_deref().unwrap_or("");
+        let subject = event.subject_user_name.as_deref().unwrap_or("");
+
+        // RC4-HMAC TGS requests for non-machine, non-krbtgt services
+        if enc_type == "0x17"
+            && !service.ends_with('$')
+            && !service.eq_ignore_ascii_case("krbtgt")
+            && !subject.is_empty()
+        {
+            per_user
+                .entry(subject.to_string())
+                .or_default()
+                .push(event);
         }
     }
 
+    let mut alerts = Vec::new();
+    for (user, user_events) in &per_user {
+        if user_events.len() >= config.kerberoasting_threshold as usize {
+            if is_excluded_account(user, config) {
+                continue;
+            }
+            let services: Vec<String> = user_events
+                .iter()
+                .filter_map(|e| e.service_name.clone())
+                .collect::<std::collections::HashSet<_>>()
+                .into_iter()
+                .take(5)
+                .collect();
+            alerts.push(AttackAlert {
+                attack_type: AttackType::Kerberoasting,
+                severity: AlertSeverity::High,
+                timestamp: user_events
+                    .first()
+                    .and_then(|e| e.time_created.clone())
+                    .unwrap_or_else(|| Utc::now().to_rfc3339()),
+                source: user_events
+                    .first()
+                    .and_then(|e| e.ip_address.clone())
+                    .unwrap_or_else(|| "Unknown".to_string()),
+                description: format!(
+                    "User '{}' requested {} TGS tickets with RC4-HMAC for services: {} - possible Kerberoasting",
+                    user,
+                    user_events.len(),
+                    services.join(", ")
+                ),
+                recommendation: "Review service accounts with SPNs. Rotate passwords to 25+ char random. Enable AES encryption. Consider gMSA.".to_string(),
+                event_id: Some(4769),
+                mitre_ref: Some("T1558.003".to_string()),
+            });
+        }
+    }
     alerts
+}
+
+/// AS-REP Roasting detection (Event 4768).
+/// Flags multiple RC4-HMAC TGT requests from the same IP targeting different accounts.
+pub fn detect_asrep_roasting(
+    events: &[&EventRecord],
+    config: &AttackDetectionConfig,
+) -> Vec<AttackAlert> {
+    use std::collections::{HashMap, HashSet};
+
+    let mut per_ip: HashMap<String, HashSet<String>> = HashMap::new();
+
+    for event in events {
+        let enc_type = event.ticket_encryption_type.as_deref().unwrap_or("");
+        let target = event.target_user_name.as_deref().unwrap_or("");
+        let ip = event.ip_address.as_deref().unwrap_or("");
+
+        if enc_type == "0x17" && !ip.is_empty() && !target.is_empty() {
+            per_ip
+                .entry(ip.to_string())
+                .or_default()
+                .insert(target.to_string());
+        }
+    }
+
+    let mut alerts = Vec::new();
+    for (ip, targets) in &per_ip {
+        if targets.len() >= 3 {
+            if is_excluded_ip(ip, config) {
+                continue;
+            }
+            let sample: Vec<&String> = targets.iter().take(5).collect();
+            alerts.push(AttackAlert {
+                attack_type: AttackType::AsrepRoasting,
+                severity: AlertSeverity::High,
+                timestamp: Utc::now().to_rfc3339(),
+                source: ip.clone(),
+                description: format!(
+                    "IP {} requested RC4-HMAC TGTs for {} different accounts ({}) - possible AS-REP Roasting",
+                    ip,
+                    targets.len(),
+                    sample.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", ")
+                ),
+                recommendation: "Enable Kerberos pre-authentication on all affected accounts. Review why it was disabled.".to_string(),
+                event_id: Some(4768),
+                mitre_ref: Some("T1558.004".to_string()),
+            });
+        }
+    }
+    alerts
+}
+
+/// Brute Force detection (Event 4625).
+/// Flags excessive failed logons from the same IP.
+pub fn detect_brute_force(
+    events: &[&EventRecord],
+    config: &AttackDetectionConfig,
+) -> Vec<AttackAlert> {
+    use std::collections::HashMap;
+
+    let mut per_ip: HashMap<String, Vec<&EventRecord>> = HashMap::new();
+
+    for event in events {
+        let ip = event.ip_address.as_deref().unwrap_or("");
+        if !ip.is_empty() && ip != "-" {
+            per_ip.entry(ip.to_string()).or_default().push(event);
+        }
+    }
+
+    let mut alerts = Vec::new();
+    for (ip, ip_events) in &per_ip {
+        if ip_events.len() >= config.brute_force_threshold as usize {
+            if is_excluded_ip(ip, config) {
+                continue;
+            }
+            // Collect sub-status detail
+            let wrong_pwd_count = ip_events
+                .iter()
+                .filter(|e| {
+                    e.sub_status
+                        .as_deref()
+                        .map(|s| s.eq_ignore_ascii_case("0xC000006A"))
+                        .unwrap_or(false)
+                })
+                .count();
+            let unknown_user_count = ip_events
+                .iter()
+                .filter(|e| {
+                    e.sub_status
+                        .as_deref()
+                        .map(|s| s.eq_ignore_ascii_case("0xC0000064"))
+                        .unwrap_or(false)
+                })
+                .count();
+
+            let detail = format!(
+                "{} failed logons from IP {} ({} wrong password, {} unknown user)",
+                ip_events.len(),
+                ip,
+                wrong_pwd_count,
+                unknown_user_count
+            );
+
+            alerts.push(AttackAlert {
+                attack_type: AttackType::BruteForce,
+                severity: AlertSeverity::High,
+                timestamp: ip_events
+                    .first()
+                    .and_then(|e| e.time_created.clone())
+                    .unwrap_or_else(|| Utc::now().to_rfc3339()),
+                source: ip.clone(),
+                description: format!("{} - possible brute force attack", detail),
+                recommendation: "Investigate source IP. Consider blocking at firewall. Review affected accounts for compromise.".to_string(),
+                event_id: Some(4625),
+                mitre_ref: Some("T1110.001".to_string()),
+            });
+        }
+    }
+    alerts
+}
+
+/// Pass-the-Hash detection (Event 4624).
+/// Flags NTLM network logons with zero key length.
+pub fn detect_pass_the_hash(
+    events: &[&EventRecord],
+    config: &AttackDetectionConfig,
+) -> Vec<AttackAlert> {
+    let mut alerts = Vec::new();
+    for event in events {
+        let logon_type = event.logon_type.as_deref().unwrap_or("");
+        let auth_pkg = event
+            .authentication_package_name
+            .as_deref()
+            .unwrap_or("")
+            .to_lowercase();
+        let key_len = event.key_length.as_deref().unwrap_or("");
+        let ip = event.ip_address.as_deref().unwrap_or("");
+        let target = event.target_user_name.as_deref().unwrap_or("");
+
+        if logon_type == "3"
+            && (auth_pkg == "ntlm" || auth_pkg.contains("ntlmssp"))
+            && (key_len == "0" || key_len.is_empty())
+        {
+            if is_excluded_ip(ip, config) || is_excluded_account(target, config) {
+                continue;
+            }
+            // Skip machine accounts
+            if target.ends_with('$') {
+                continue;
+            }
+            alerts.push(AttackAlert {
+                attack_type: AttackType::PassTheHash,
+                severity: AlertSeverity::Critical,
+                timestamp: event
+                    .time_created
+                    .clone()
+                    .unwrap_or_else(|| Utc::now().to_rfc3339()),
+                source: event.ip_address.clone().unwrap_or_else(|| "Unknown".to_string()),
+                description: format!(
+                    "NTLM network logon with zero key length for '{}' from {} - possible Pass-the-Hash",
+                    target, ip
+                ),
+                recommendation: "Investigate source host for compromise. Enable Protected Users for admin accounts. Enforce Kerberos-only auth.".to_string(),
+                event_id: Some(4624),
+                mitre_ref: Some("T1550.002".to_string()),
+            });
+        }
+    }
+    alerts
+}
+
+/// Password Spray detection (Event 4771).
+/// Flags Kerberos pre-auth failures targeting many different users.
+pub fn detect_password_spray(
+    events: &[&EventRecord],
+    config: &AttackDetectionConfig,
+) -> Vec<AttackAlert> {
+    use std::collections::{HashMap, HashSet};
+
+    let mut per_ip: HashMap<String, HashSet<String>> = HashMap::new();
+
+    for event in events {
+        let ip = event.ip_address.as_deref().unwrap_or("");
+        let target = event.target_user_name.as_deref().unwrap_or("");
+        if !ip.is_empty() && !target.is_empty() {
+            per_ip
+                .entry(ip.to_string())
+                .or_default()
+                .insert(target.to_string());
+        }
+    }
+
+    let mut alerts = Vec::new();
+    for (ip, users) in &per_ip {
+        if users.len() >= 5 {
+            // 5+ different users from same IP = spray
+            if is_excluded_ip(ip, config) {
+                continue;
+            }
+            alerts.push(AttackAlert {
+                attack_type: AttackType::PasswordSpray,
+                severity: AlertSeverity::High,
+                timestamp: Utc::now().to_rfc3339(),
+                source: ip.clone(),
+                description: format!(
+                    "Kerberos pre-authentication failures for {} different accounts from IP {} - possible password spray",
+                    users.len(),
+                    ip
+                ),
+                recommendation: "Check for compromised accounts. Review failed logon sources and consider blocking at firewall.".to_string(),
+                event_id: Some(4771),
+                mitre_ref: Some("T1110.003".to_string()),
+            });
+        }
+    }
+    alerts
+}
+
+/// Shadow Credentials detection (Event 5136).
+/// Flags modifications to msDS-KeyCredentialLink attribute.
+pub fn detect_shadow_credentials(
+    events: &[&EventRecord],
+    config: &AttackDetectionConfig,
+) -> Vec<AttackAlert> {
+    let mut alerts = Vec::new();
+    for event in events {
+        if event.id != Some(5136) {
+            continue;
+        }
+        let attr = event
+            .attribute_ldap_display_name
+            .as_deref()
+            .unwrap_or("");
+        if attr == "msDS-KeyCredentialLink" {
+            let subject = event.subject_user_name.as_deref().unwrap_or("Unknown");
+            let object_dn = event.object_dn.as_deref().unwrap_or("Unknown");
+            if is_excluded_account(subject, config) {
+                continue;
+            }
+            alerts.push(AttackAlert {
+                attack_type: AttackType::ShadowCredentials,
+                severity: AlertSeverity::Critical,
+                timestamp: event
+                    .time_created
+                    .clone()
+                    .unwrap_or_else(|| Utc::now().to_rfc3339()),
+                source: subject.to_string(),
+                description: format!(
+                    "msDS-KeyCredentialLink modified on '{}' by '{}' - possible Shadow Credentials attack",
+                    object_dn, subject
+                ),
+                recommendation: "Remove unauthorized msDS-KeyCredentialLink values. Investigate who made the change.".to_string(),
+                event_id: Some(5136),
+                mitre_ref: Some("T1556.006".to_string()),
+            });
+        }
+    }
+    alerts
+}
+
+/// RBCD Abuse detection (Event 5136).
+/// Flags modifications to msDS-AllowedToActOnBehalfOfOtherIdentity attribute.
+pub fn detect_rbcd_abuse(
+    events: &[&EventRecord],
+    config: &AttackDetectionConfig,
+) -> Vec<AttackAlert> {
+    let mut alerts = Vec::new();
+    for event in events {
+        if event.id != Some(5136) {
+            continue;
+        }
+        let attr = event
+            .attribute_ldap_display_name
+            .as_deref()
+            .unwrap_or("");
+        if attr == "msDS-AllowedToActOnBehalfOfOtherIdentity" {
+            let subject = event.subject_user_name.as_deref().unwrap_or("Unknown");
+            let object_dn = event.object_dn.as_deref().unwrap_or("Unknown");
+            if is_excluded_account(subject, config) {
+                continue;
+            }
+            alerts.push(AttackAlert {
+                attack_type: AttackType::RbcdAbuse,
+                severity: AlertSeverity::High,
+                timestamp: event
+                    .time_created
+                    .clone()
+                    .unwrap_or_else(|| Utc::now().to_rfc3339()),
+                source: subject.to_string(),
+                description: format!(
+                    "RBCD attribute modified on '{}' by '{}' - possible Resource-Based Constrained Delegation abuse",
+                    object_dn, subject
+                ),
+                recommendation: "Remove unauthorized msDS-AllowedToActOnBehalfOfOtherIdentity values. Audit delegation configurations.".to_string(),
+                event_id: Some(5136),
+                mitre_ref: Some("T1134.001".to_string()),
+            });
+        }
+    }
+    alerts
+}
+
+/// AdminSDHolder Tampering detection (Event 5136).
+/// Flags modifications to the AdminSDHolder container.
+pub fn detect_adminsd_holder_tamper(
+    events: &[&EventRecord],
+    config: &AttackDetectionConfig,
+) -> Vec<AttackAlert> {
+    let mut alerts = Vec::new();
+    for event in events {
+        if event.id != Some(5136) {
+            continue;
+        }
+        let object_dn = event.object_dn.as_deref().unwrap_or("").to_lowercase();
+        if object_dn.contains("cn=adminsdholder,cn=system") {
+            let subject = event.subject_user_name.as_deref().unwrap_or("Unknown");
+            if is_excluded_account(subject, config) {
+                continue;
+            }
+            alerts.push(AttackAlert {
+                attack_type: AttackType::AdminSdHolderTamper,
+                severity: AlertSeverity::Critical,
+                timestamp: event
+                    .time_created
+                    .clone()
+                    .unwrap_or_else(|| Utc::now().to_rfc3339()),
+                source: subject.to_string(),
+                description: format!(
+                    "AdminSDHolder container modified by '{}' - possible privilege persistence attempt",
+                    subject
+                ),
+                recommendation: "Restore AdminSDHolder ACL from a known good backup. Investigate the modification source.".to_string(),
+                event_id: Some(5136),
+                mitre_ref: Some("T1222.001".to_string()),
+            });
+        }
+    }
+    alerts
+}
+
+/// Suspicious Account Activity detection (Events 4720, 4738).
+/// Flags account creation and sensitive UAC flag changes.
+pub fn detect_suspicious_account_activity(
+    events: &[&EventRecord],
+    config: &AttackDetectionConfig,
+) -> Vec<AttackAlert> {
+    let mut alerts = Vec::new();
+    for event in events {
+        let subject = event.subject_user_name.as_deref().unwrap_or("Unknown");
+        let target = event.target_user_name.as_deref().unwrap_or("Unknown");
+        if is_excluded_account(subject, config) {
+            continue;
+        }
+
+        match event.id {
+            Some(4720) => {
+                alerts.push(AttackAlert {
+                    attack_type: AttackType::SuspiciousAccountActivity,
+                    severity: AlertSeverity::Medium,
+                    timestamp: event
+                        .time_created
+                        .clone()
+                        .unwrap_or_else(|| Utc::now().to_rfc3339()),
+                    source: subject.to_string(),
+                    description: format!(
+                        "New account '{}' created by '{}'",
+                        target, subject
+                    ),
+                    recommendation: "Verify account creation was authorized. Review the account's group memberships and permissions.".to_string(),
+                    event_id: Some(4720),
+                    mitre_ref: Some("T1136.001".to_string()),
+                });
+            }
+            Some(4738) => {
+                alerts.push(AttackAlert {
+                    attack_type: AttackType::SuspiciousAccountActivity,
+                    severity: AlertSeverity::Medium,
+                    timestamp: event
+                        .time_created
+                        .clone()
+                        .unwrap_or_else(|| Utc::now().to_rfc3339()),
+                    source: subject.to_string(),
+                    description: format!(
+                        "Account '{}' modified by '{}' - UAC flags may have changed",
+                        target, subject
+                    ),
+                    recommendation: "Review UAC flag changes. Check for DONT_REQUIRE_PREAUTH, TRUSTED_FOR_DELEGATION or other sensitive flags.".to_string(),
+                    event_id: Some(4738),
+                    mitre_ref: Some("T1098".to_string()),
+                });
+            }
+            _ => {}
+        }
+    }
+    alerts
+}
+
+/// DCShadow detection (Event 4742).
+/// Flags suspicious SPN changes on computer accounts that may indicate rogue DC registration.
+pub fn detect_dcshadow(
+    events: &[&EventRecord],
+    config: &AttackDetectionConfig,
+) -> Vec<AttackAlert> {
+    let mut alerts = Vec::new();
+    for event in events {
+        let subject = event.subject_user_name.as_deref().unwrap_or("Unknown");
+        let target = event.target_user_name.as_deref().unwrap_or("Unknown");
+        let service_name = event.service_name.as_deref().unwrap_or("");
+        if is_excluded_account(subject, config) {
+            continue;
+        }
+
+        // Flag if SPN modification involves GC/ or replication-related service names
+        let suspicious = service_name.to_lowercase().contains("gc/")
+            || service_name.to_lowercase().contains("e3514235-4b06-11d1-ab04-00c04fc2dcd2");
+
+        if suspicious {
+            alerts.push(AttackAlert {
+                attack_type: AttackType::DCShadow,
+                severity: AlertSeverity::High,
+                timestamp: event
+                    .time_created
+                    .clone()
+                    .unwrap_or_else(|| Utc::now().to_rfc3339()),
+                source: subject.to_string(),
+                description: format!(
+                    "Computer account '{}' SPN modified by '{}' with replication-related values - possible DCShadow",
+                    target, subject
+                ),
+                recommendation: "Audit computer account changes and verify no rogue DCs are registered. Check SPN values.".to_string(),
+                event_id: Some(4742),
+                mitre_ref: Some("T1207".to_string()),
+            });
+        }
+    }
+    alerts
+}
+
+/// Privileged Group Change detection (Events 4728, 4732, 4756).
+/// Flags membership additions to security-enabled groups.
+pub fn detect_priv_group_change(
+    events: &[&EventRecord],
+    config: &AttackDetectionConfig,
+) -> Vec<AttackAlert> {
+    let mut alerts = Vec::new();
+    for event in events {
+        let subject = event.subject_user_name.as_deref().unwrap_or("Unknown");
+        let target = event.target_user_name.as_deref().unwrap_or("Unknown");
+        if is_excluded_account(subject, config) {
+            continue;
+        }
+
+        let event_id = event.id.unwrap_or(0);
+        let group_type = match event_id {
+            4728 => "global",
+            4732 => "local",
+            4756 => "universal",
+            _ => continue,
+        };
+
+        alerts.push(AttackAlert {
+            attack_type: AttackType::PrivGroupChange,
+            severity: AlertSeverity::High,
+            timestamp: event
+                .time_created
+                .clone()
+                .unwrap_or_else(|| Utc::now().to_rfc3339()),
+            source: subject.to_string(),
+            description: format!(
+                "Member '{}' added to security-enabled {} group by '{}'",
+                target, group_type, subject
+            ),
+            recommendation: "Verify the group membership change was authorized. Review who was added and by whom.".to_string(),
+            event_id: Some(event_id),
+            mitre_ref: Some("T1098.001".to_string()),
+        });
+    }
+    alerts
+}
+
+// ---------------------------------------------------------------------------
+// Helper functions for exclusion checks
+// ---------------------------------------------------------------------------
+
+fn is_excluded_ip(ip: &str, config: &AttackDetectionConfig) -> bool {
+    if ip.is_empty() || ip == "-" {
+        return false;
+    }
+    config.excluded_ips.iter().any(|excluded| excluded == ip)
+}
+
+fn is_excluded_account(account: &str, config: &AttackDetectionConfig) -> bool {
+    if account.is_empty() {
+        return false;
+    }
+    config
+        .excluded_accounts
+        .iter()
+        .any(|excluded| excluded.eq_ignore_ascii_case(account))
 }
 
 // ---------------------------------------------------------------------------
@@ -4188,5 +4896,397 @@ mod tests {
             "Expected KERB-RC4-ADMIN finding, got: {:?}",
             finding_ids
         );
+    }
+
+    // -----------------------------------------------------------------------
+    // Attack Detection tests
+    // -----------------------------------------------------------------------
+
+    fn make_event(id: u32) -> EventRecord {
+        EventRecord {
+            time_created: Some("2026-03-23T10:00:00Z".to_string()),
+            id: Some(id),
+            ip_address: None,
+            target_user_name: None,
+            ticket_encryption_type: None,
+            service_name: None,
+            status: None,
+            sub_status: None,
+            logon_type: None,
+            authentication_package_name: None,
+            key_length: None,
+            object_type: None,
+            access_mask: None,
+            subject_user_name: None,
+            attribute_ldap_display_name: None,
+            object_dn: None,
+        }
+    }
+
+    fn default_config() -> AttackDetectionConfig {
+        AttackDetectionConfig::default()
+    }
+
+    #[test]
+    fn test_detect_golden_ticket_rc4() {
+        let mut event = make_event(4768);
+        event.ticket_encryption_type = Some("0x17".to_string());
+        event.target_user_name = Some("admin".to_string());
+        event.ip_address = Some("10.0.0.1".to_string());
+
+        let events: Vec<&EventRecord> = vec![&event];
+        let alerts = detect_golden_ticket(&events, &default_config());
+        assert_eq!(alerts.len(), 1);
+        assert_eq!(alerts[0].attack_type, AttackType::GoldenTicket);
+        assert_eq!(alerts[0].severity, AlertSeverity::Critical);
+        assert_eq!(alerts[0].mitre_ref.as_deref(), Some("T1558.001"));
+    }
+
+    #[test]
+    fn test_detect_golden_ticket_excludes_krbtgt() {
+        let mut event = make_event(4768);
+        event.ticket_encryption_type = Some("0x17".to_string());
+        event.target_user_name = Some("krbtgt".to_string());
+
+        let events: Vec<&EventRecord> = vec![&event];
+        let alerts = detect_golden_ticket(&events, &default_config());
+        assert!(alerts.is_empty());
+    }
+
+    #[test]
+    fn test_detect_golden_ticket_aes_no_alert() {
+        let mut event = make_event(4768);
+        event.ticket_encryption_type = Some("0x12".to_string());
+        event.target_user_name = Some("admin".to_string());
+
+        let events: Vec<&EventRecord> = vec![&event];
+        let alerts = detect_golden_ticket(&events, &default_config());
+        assert!(alerts.is_empty());
+    }
+
+    #[test]
+    fn test_detect_dcsync_replication_by_user() {
+        let mut event = make_event(4662);
+        event.access_mask = Some("0x100".to_string());
+        event.object_type = Some(GUID_DS_REPL_GET_CHANGES_ALL.to_string());
+        event.subject_user_name = Some("attacker".to_string());
+        event.ip_address = Some("10.0.0.50".to_string());
+
+        let events: Vec<&EventRecord> = vec![&event];
+        let alerts = detect_dcsync(&events, &default_config());
+        assert_eq!(alerts.len(), 1);
+        assert_eq!(alerts[0].attack_type, AttackType::DCSync);
+        assert_eq!(alerts[0].mitre_ref.as_deref(), Some("T1003.006"));
+    }
+
+    #[test]
+    fn test_detect_dcsync_excludes_machine_accounts() {
+        let mut event = make_event(4662);
+        event.access_mask = Some("0x100".to_string());
+        event.object_type = Some(GUID_DS_REPL_GET_CHANGES.to_string());
+        event.subject_user_name = Some("DC01$".to_string());
+
+        let events: Vec<&EventRecord> = vec![&event];
+        let alerts = detect_dcsync(&events, &default_config());
+        assert!(alerts.is_empty());
+    }
+
+    #[test]
+    fn test_detect_dcsync_excluded_ip() {
+        let mut event = make_event(4662);
+        event.access_mask = Some("0x100".to_string());
+        event.object_type = Some(GUID_DS_REPL_GET_CHANGES_ALL.to_string());
+        event.subject_user_name = Some("attacker".to_string());
+        event.ip_address = Some("10.0.0.1".to_string());
+
+        let mut config = default_config();
+        config.excluded_ips = vec!["10.0.0.1".to_string()];
+        let events: Vec<&EventRecord> = vec![&event];
+        let alerts = detect_dcsync(&events, &config);
+        assert!(alerts.is_empty());
+    }
+
+    #[test]
+    fn test_detect_kerberoasting_threshold() {
+        let config = default_config(); // threshold = 3
+        let mut events_owned = Vec::new();
+        for i in 0..3 {
+            let mut event = make_event(4769);
+            event.ticket_encryption_type = Some("0x17".to_string());
+            event.service_name = Some(format!("svc_{}", i));
+            event.subject_user_name = Some("attacker".to_string());
+            event.ip_address = Some("10.0.0.50".to_string());
+            events_owned.push(event);
+        }
+        let events: Vec<&EventRecord> = events_owned.iter().collect();
+        let alerts = detect_kerberoasting(&events, &config);
+        assert_eq!(alerts.len(), 1);
+        assert_eq!(alerts[0].attack_type, AttackType::Kerberoasting);
+        assert_eq!(alerts[0].mitre_ref.as_deref(), Some("T1558.003"));
+    }
+
+    #[test]
+    fn test_detect_kerberoasting_below_threshold() {
+        let config = default_config(); // threshold = 3
+        let mut events_owned = Vec::new();
+        for i in 0..2 {
+            let mut event = make_event(4769);
+            event.ticket_encryption_type = Some("0x17".to_string());
+            event.service_name = Some(format!("svc_{}", i));
+            event.subject_user_name = Some("user".to_string());
+            events_owned.push(event);
+        }
+        let events: Vec<&EventRecord> = events_owned.iter().collect();
+        let alerts = detect_kerberoasting(&events, &config);
+        assert!(alerts.is_empty());
+    }
+
+    #[test]
+    fn test_detect_kerberoasting_excludes_machine_accounts() {
+        let config = default_config();
+        let mut events_owned = Vec::new();
+        for i in 0..3 {
+            let mut event = make_event(4769);
+            event.ticket_encryption_type = Some("0x17".to_string());
+            event.service_name = Some(format!("SVC{}$", i)); // machine account
+            event.subject_user_name = Some("attacker".to_string());
+            events_owned.push(event);
+        }
+        let events: Vec<&EventRecord> = events_owned.iter().collect();
+        let alerts = detect_kerberoasting(&events, &config);
+        assert!(alerts.is_empty());
+    }
+
+    #[test]
+    fn test_detect_asrep_roasting() {
+        let config = default_config();
+        let mut events_owned = Vec::new();
+        for i in 0..3 {
+            let mut event = make_event(4768);
+            event.ticket_encryption_type = Some("0x17".to_string());
+            event.target_user_name = Some(format!("user{}", i));
+            event.ip_address = Some("10.0.0.99".to_string());
+            events_owned.push(event);
+        }
+        let events: Vec<&EventRecord> = events_owned.iter().collect();
+        let alerts = detect_asrep_roasting(&events, &config);
+        assert_eq!(alerts.len(), 1);
+        assert_eq!(alerts[0].attack_type, AttackType::AsrepRoasting);
+        assert_eq!(alerts[0].mitre_ref.as_deref(), Some("T1558.004"));
+    }
+
+    #[test]
+    fn test_detect_brute_force() {
+        let mut config = default_config();
+        config.brute_force_threshold = 3;
+
+        let mut events_owned = Vec::new();
+        for _ in 0..5 {
+            let mut event = make_event(4625);
+            event.ip_address = Some("192.168.1.100".to_string());
+            event.sub_status = Some("0xC000006A".to_string());
+            events_owned.push(event);
+        }
+        let events: Vec<&EventRecord> = events_owned.iter().collect();
+        let alerts = detect_brute_force(&events, &config);
+        assert_eq!(alerts.len(), 1);
+        assert_eq!(alerts[0].attack_type, AttackType::BruteForce);
+        assert_eq!(alerts[0].mitre_ref.as_deref(), Some("T1110.001"));
+        assert!(alerts[0].description.contains("5 failed logons"));
+    }
+
+    #[test]
+    fn test_detect_brute_force_below_threshold() {
+        let config = default_config(); // threshold = 10
+        let mut events_owned = Vec::new();
+        for _ in 0..5 {
+            let mut event = make_event(4625);
+            event.ip_address = Some("192.168.1.100".to_string());
+            events_owned.push(event);
+        }
+        let events: Vec<&EventRecord> = events_owned.iter().collect();
+        let alerts = detect_brute_force(&events, &config);
+        assert!(alerts.is_empty());
+    }
+
+    #[test]
+    fn test_detect_pass_the_hash() {
+        let config = default_config();
+        let mut event = make_event(4624);
+        event.logon_type = Some("3".to_string());
+        event.authentication_package_name = Some("NTLM".to_string());
+        event.key_length = Some("0".to_string());
+        event.ip_address = Some("10.0.0.5".to_string());
+        event.target_user_name = Some("admin".to_string());
+
+        let events: Vec<&EventRecord> = vec![&event];
+        let alerts = detect_pass_the_hash(&events, &config);
+        assert_eq!(alerts.len(), 1);
+        assert_eq!(alerts[0].attack_type, AttackType::PassTheHash);
+        assert_eq!(alerts[0].severity, AlertSeverity::Critical);
+        assert_eq!(alerts[0].mitre_ref.as_deref(), Some("T1550.002"));
+    }
+
+    #[test]
+    fn test_detect_pass_the_hash_excludes_machine_accounts() {
+        let config = default_config();
+        let mut event = make_event(4624);
+        event.logon_type = Some("3".to_string());
+        event.authentication_package_name = Some("NTLM".to_string());
+        event.key_length = Some("0".to_string());
+        event.target_user_name = Some("DC01$".to_string());
+
+        let events: Vec<&EventRecord> = vec![&event];
+        let alerts = detect_pass_the_hash(&events, &config);
+        assert!(alerts.is_empty());
+    }
+
+    #[test]
+    fn test_detect_password_spray() {
+        let config = default_config();
+        let mut events_owned = Vec::new();
+        for i in 0..6 {
+            let mut event = make_event(4771);
+            event.ip_address = Some("10.0.0.42".to_string());
+            event.target_user_name = Some(format!("user{}", i));
+            events_owned.push(event);
+        }
+        let events: Vec<&EventRecord> = events_owned.iter().collect();
+        let alerts = detect_password_spray(&events, &config);
+        assert_eq!(alerts.len(), 1);
+        assert_eq!(alerts[0].attack_type, AttackType::PasswordSpray);
+        assert_eq!(alerts[0].mitre_ref.as_deref(), Some("T1110.003"));
+    }
+
+    #[test]
+    fn test_detect_shadow_credentials() {
+        let config = default_config();
+        let mut event = make_event(5136);
+        event.attribute_ldap_display_name = Some("msDS-KeyCredentialLink".to_string());
+        event.subject_user_name = Some("attacker".to_string());
+        event.object_dn = Some("CN=victim,OU=Users,DC=test".to_string());
+
+        let events: Vec<&EventRecord> = vec![&event];
+        let alerts = detect_shadow_credentials(&events, &config);
+        assert_eq!(alerts.len(), 1);
+        assert_eq!(alerts[0].attack_type, AttackType::ShadowCredentials);
+        assert_eq!(alerts[0].severity, AlertSeverity::Critical);
+        assert_eq!(alerts[0].mitre_ref.as_deref(), Some("T1556.006"));
+    }
+
+    #[test]
+    fn test_detect_rbcd_abuse() {
+        let config = default_config();
+        let mut event = make_event(5136);
+        event.attribute_ldap_display_name =
+            Some("msDS-AllowedToActOnBehalfOfOtherIdentity".to_string());
+        event.subject_user_name = Some("attacker".to_string());
+        event.object_dn = Some("CN=server,OU=Servers,DC=test".to_string());
+
+        let events: Vec<&EventRecord> = vec![&event];
+        let alerts = detect_rbcd_abuse(&events, &config);
+        assert_eq!(alerts.len(), 1);
+        assert_eq!(alerts[0].attack_type, AttackType::RbcdAbuse);
+        assert_eq!(alerts[0].mitre_ref.as_deref(), Some("T1134.001"));
+    }
+
+    #[test]
+    fn test_detect_adminsd_holder_tamper() {
+        let config = default_config();
+        let mut event = make_event(5136);
+        event.object_dn = Some("CN=AdminSDHolder,CN=System,DC=test,DC=com".to_string());
+        event.subject_user_name = Some("attacker".to_string());
+
+        let events: Vec<&EventRecord> = vec![&event];
+        let alerts = detect_adminsd_holder_tamper(&events, &config);
+        assert_eq!(alerts.len(), 1);
+        assert_eq!(alerts[0].attack_type, AttackType::AdminSdHolderTamper);
+        assert_eq!(alerts[0].severity, AlertSeverity::Critical);
+        assert_eq!(alerts[0].mitre_ref.as_deref(), Some("T1222.001"));
+    }
+
+    #[test]
+    fn test_detect_suspicious_account_creation() {
+        let config = default_config();
+        let mut event = make_event(4720);
+        event.subject_user_name = Some("admin".to_string());
+        event.target_user_name = Some("newuser".to_string());
+
+        let events: Vec<&EventRecord> = vec![&event];
+        let alerts = detect_suspicious_account_activity(&events, &config);
+        assert_eq!(alerts.len(), 1);
+        assert_eq!(
+            alerts[0].attack_type,
+            AttackType::SuspiciousAccountActivity
+        );
+        assert_eq!(alerts[0].severity, AlertSeverity::Medium);
+        assert_eq!(alerts[0].mitre_ref.as_deref(), Some("T1136.001"));
+    }
+
+    #[test]
+    fn test_detect_suspicious_account_modification() {
+        let config = default_config();
+        let mut event = make_event(4738);
+        event.subject_user_name = Some("admin".to_string());
+        event.target_user_name = Some("target".to_string());
+
+        let events: Vec<&EventRecord> = vec![&event];
+        let alerts = detect_suspicious_account_activity(&events, &config);
+        assert_eq!(alerts.len(), 1);
+        assert_eq!(alerts[0].mitre_ref.as_deref(), Some("T1098"));
+    }
+
+    #[test]
+    fn test_detect_priv_group_change() {
+        let config = default_config();
+        let mut event = make_event(4728);
+        event.subject_user_name = Some("admin".to_string());
+        event.target_user_name = Some("newmember".to_string());
+
+        let events: Vec<&EventRecord> = vec![&event];
+        let alerts = detect_priv_group_change(&events, &config);
+        assert_eq!(alerts.len(), 1);
+        assert_eq!(alerts[0].attack_type, AttackType::PrivGroupChange);
+        assert!(alerts[0].description.contains("global"));
+    }
+
+    #[test]
+    fn test_excluded_account_filtering() {
+        let mut config = default_config();
+        config.excluded_accounts = vec!["svc_backup".to_string()];
+
+        let mut event = make_event(4768);
+        event.ticket_encryption_type = Some("0x17".to_string());
+        event.target_user_name = Some("svc_backup".to_string());
+
+        let events: Vec<&EventRecord> = vec![&event];
+        let alerts = detect_golden_ticket(&events, &config);
+        assert!(alerts.is_empty());
+    }
+
+    #[test]
+    fn test_event_record_deserialization() {
+        let json = r#"{
+            "TimeCreated": "2026-03-23T10:00:00+00:00",
+            "Id": 4662,
+            "IpAddress": "10.0.0.1",
+            "TargetUserName": "admin",
+            "TicketEncryptionType": null,
+            "ServiceName": null,
+            "Status": null,
+            "SubStatus": null,
+            "LogonType": null,
+            "AuthenticationPackageName": null,
+            "KeyLength": null,
+            "ObjectType": "1131f6ad-9c07-11d1-f79f-00c04fc2dcd2",
+            "AccessMask": "0x100",
+            "SubjectUserName": "attacker",
+            "AttributeLDAPDisplayName": null,
+            "ObjectDN": null
+        }"#;
+        let record: EventRecord = serde_json::from_str(json).unwrap();
+        assert_eq!(record.id, Some(4662));
+        assert_eq!(record.ip_address.as_deref(), Some("10.0.0.1"));
+        assert_eq!(record.subject_user_name.as_deref(), Some("attacker"));
     }
 }

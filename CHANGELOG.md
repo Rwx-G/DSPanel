@@ -8,6 +8,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- New attack types: Kerberoasting, AS-REP Roasting, Brute Force, Pass-the-Hash, Shadow Credentials, RBCD Abuse, AdminSDHolder Tampering, Suspicious Account Activity
+- MITRE ATT&CK technique references on all attack alerts
+- `AttackDetectionConfig` for configurable detection thresholds and exclusion lists
+- Structured XML parsing of Windows Security event log records for accurate attack detection
+
+### Changed
+- Rewritten attack detection engine: batched PowerShell queries (6 batches instead of 8 individual), structured event parsing, per-attack-type detection functions with false-positive filtering
+- DCSync detection now filters by replication GUIDs and excludes machine accounts (DCs)
+- Golden Ticket detection now checks for RC4-HMAC encryption type instead of just event count
+- Password Spray detection now counts distinct targeted users per source IP
+- DCShadow detection now checks for replication-related SPN modifications
+- All detection functions are pure Rust functions testable without PowerShell
+
+### Fixed
+- False positives in DCSync detection from legitimate DC replication
+- False positives in Golden Ticket detection from normal Kerberos TGT requests
 - GPO Security risk factor: detects GPP password risks, domain behavior version, excessive GPO count
 - Trust Security risk factor: evaluates external/forest trusts, SID filtering, selective authentication, bidirectional trust risks
 - Certificate Security (AD CS) risk factor: detects ESC1/ESC2 vulnerabilities in certificate templates, enrollment services

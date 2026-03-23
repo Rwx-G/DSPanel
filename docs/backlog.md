@@ -20,7 +20,7 @@ Items deferred from QA reviews. None are blocking - all stories are PASS.
 | Epic 8 QA | Group DC cards by site in health dashboard for multi-site environments | `InfrastructureHealth.tsx`, Story 8.1 |
 | Epic 9 QA | Add PDF export for privileged accounts report | `SecurityDashboard.tsx`, Story 9.1 |
 | Epic 9 QA | Add weight configuration UI in settings for risk score factors | `RiskScore.tsx`, Story 9.2 |
-| Epic 9 QA | Add per-attack-type threshold configuration | `AttackDetection.tsx`, Story 9.3 |
+| Epic 9 QA | Add UI for attack detection thresholds and exclusion lists (AttackDetectionConfig exists in backend) | `AttackDetection.tsx`, Story 9.3 |
 | Epic 9 QA | Parse nTSecurityDescriptor for ownership/WriteDACL edges in escalation graph | `services/security.rs`, Story 9.4 |
 | Epic 9 QA | Consider canvas-based graph visualization for escalation paths | `EscalationPaths.tsx`, Story 9.4 |
 | Epic 6 QA | Interactive Browser auth (device code flow) as alternative to client secret for Graph API | `graph_exchange.rs`, Epic 12 (Story 12.2) |
