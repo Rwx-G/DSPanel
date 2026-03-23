@@ -1,12 +1,15 @@
+use std::net::IpAddr;
 use std::sync::Arc;
 
 use anyhow::Result;
+use hickory_resolver::config::{NameServerConfigGroup, ResolverConfig, ResolverOpts};
+use hickory_resolver::TokioResolver;
 
 use crate::models::dns_validation::{
     compare_dns_hosts, evaluate_clock_skew, ClockSkewResult, ClockSkewStatus, DnsKerberosReport,
     DnsValidationResult,
 };
-use crate::services::dc_health::discover_domain_controllers;
+use crate::services::dc_health::{discover_domain_controllers, resolve_fallback_ip};
 use crate::services::DirectoryProvider;
 
 /// SRV record prefixes to validate for AD DNS.
@@ -31,17 +34,57 @@ fn base_dn_to_domain(base_dn: &str) -> String {
         .join(".")
 }
 
-/// Resolves a DNS SRV record and returns the hostnames found.
+/// Creates a DNS resolver targeting the AD DC's DNS server.
 ///
-/// Uses `tokio::net::lookup_host` to resolve the SRV record target.
-/// Returns a list of unique hostnames (lowercased).
-async fn resolve_srv_hosts(srv_name: &str) -> Vec<String> {
-    // SRV records are typically queried on port 0 for lookup_host
-    let lookup_target = format!("{}:0", srv_name);
-    let result = tokio::net::lookup_host(&lookup_target).await;
-    match result {
-        Ok(addrs) => {
-            let mut hosts: Vec<String> = addrs.map(|addr| addr.ip().to_string()).collect();
+/// Uses the LDAP server IP (from `DSPANEL_LDAP_SERVER`) as the DNS server.
+/// Falls back to the system resolver if no LDAP server is configured.
+fn create_ad_resolver() -> TokioResolver {
+    if let Some(dc_ip_str) = resolve_fallback_ip() {
+        if let Ok(ip) = dc_ip_str.parse::<IpAddr>() {
+            let ns_group = NameServerConfigGroup::from_ips_clear(&[ip], 53, true);
+            let config = ResolverConfig::from_parts(None, vec![], ns_group);
+            let mut opts = ResolverOpts::default();
+            opts.timeout = std::time::Duration::from_secs(5);
+            opts.attempts = 2;
+            tracing::info!(dns_server = %ip, "Using AD DC as DNS server for SRV lookups");
+            return TokioResolver::builder_with_config(config, Default::default())
+                .with_options(opts)
+                .build();
+        }
+    }
+
+    tracing::info!("No LDAP server configured, using system DNS resolver");
+    TokioResolver::builder_tokio()
+        .map(|b| b.build())
+        .unwrap_or_else(|_| {
+            TokioResolver::builder_with_config(ResolverConfig::default(), Default::default())
+                .build()
+        })
+}
+
+/// Resolves a DNS SRV record and returns the target hostnames.
+///
+/// Queries the AD DC's DNS server directly (via `hickory-resolver`)
+/// for proper SRV record resolution, even when the client machine
+/// does not use AD DNS as its system resolver.
+async fn resolve_srv_hosts(srv_name: &str, resolver: &TokioResolver) -> Vec<String> {
+    // Append trailing dot for FQDN
+    let fqdn = if srv_name.ends_with('.') {
+        srv_name.to_string()
+    } else {
+        format!("{}.", srv_name)
+    };
+
+    match resolver.srv_lookup(&fqdn).await {
+        Ok(lookup) => {
+            let mut hosts: Vec<String> = lookup
+                .iter()
+                .map(|srv| {
+                    let target = srv.target().to_string();
+                    // Remove trailing dot from FQDN
+                    target.trim_end_matches('.').to_lowercase()
+                })
+                .collect();
             hosts.sort();
             hosts.dedup();
             hosts
@@ -68,10 +111,12 @@ pub async fn validate_dns_records(
     let dcs = discover_domain_controllers(provider).await?;
     let expected_hosts: Vec<String> = dcs.iter().map(|dc| dc.hostname.clone()).collect();
 
+    let resolver = create_ad_resolver();
+
     let mut results = Vec::new();
     for prefix in SRV_RECORD_PREFIXES {
         let record_name = format!("{}.{}", prefix, domain);
-        let actual_hosts = resolve_srv_hosts(&record_name).await;
+        let actual_hosts = resolve_srv_hosts(&record_name, &resolver).await;
         let result = compare_dns_hosts(&record_name, &expected_hosts, &actual_hosts);
         results.push(result);
     }
@@ -102,16 +147,16 @@ pub async fn check_clock_skew(
     let mut results = Vec::new();
 
     for dc in &dcs {
-        // Query RootDSE for currentTime - use empty base and objectClass=* filter
-        let rootdse_entries = provider.search_configuration("", "(objectClass=*)").await;
+        // Read RootDSE (Base scope on empty DN) for currentTime
+        let rootdse = provider.read_entry("").await;
 
         let local_now = chrono::Utc::now();
 
-        match rootdse_entries {
-            Ok(entries) => {
-                let current_time_str = entries
-                    .iter()
-                    .find_map(|e| e.get_attribute("currentTime").map(|s| s.to_string()));
+        match rootdse {
+            Ok(entry_opt) => {
+                let current_time_str = entry_opt
+                    .as_ref()
+                    .and_then(|e| e.get_attribute("currentTime").map(|s| s.to_string()));
 
                 match current_time_str {
                     Some(dc_time_str) => {

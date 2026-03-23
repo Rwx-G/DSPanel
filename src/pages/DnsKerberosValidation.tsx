@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { EmptyState } from "@/components/common/EmptyState";
@@ -47,20 +47,21 @@ function DnsStatusIcon({
   status: DnsRecordStatus;
   size?: number;
 }) {
-  switch (status) {
-    case "Pass":
-      return (
-        <CheckCircle size={size} style={{ color: dnsStatusColor(status) }} />
-      );
-    case "Warning":
-      return (
-        <AlertTriangle size={size} style={{ color: dnsStatusColor(status) }} />
-      );
-    case "Fail":
-      return (
-        <AlertCircle size={size} style={{ color: dnsStatusColor(status) }} />
-      );
-  }
+  const icon = (() => {
+    switch (status) {
+      case "Pass":
+        return <CheckCircle size={size} />;
+      case "Warning":
+        return <AlertTriangle size={size} />;
+      case "Fail":
+        return <AlertCircle size={size} />;
+    }
+  })();
+  return (
+    <span className="flex items-center justify-center" style={{ color: dnsStatusColor(status) }}>
+      {icon}
+    </span>
+  );
 }
 
 function ClockStatusIcon({
@@ -70,38 +71,34 @@ function ClockStatusIcon({
   status: ClockSkewStatus;
   size?: number;
 }) {
-  switch (status) {
-    case "Ok":
-      return (
-        <CheckCircle size={size} style={{ color: clockStatusColor(status) }} />
-      );
-    case "Warning":
-      return (
-        <AlertTriangle
-          size={size}
-          style={{ color: clockStatusColor(status) }}
-        />
-      );
-    case "Critical":
-      return (
-        <AlertCircle size={size} style={{ color: clockStatusColor(status) }} />
-      );
-  }
+  const icon = (() => {
+    switch (status) {
+      case "Ok":
+        return <CheckCircle size={size} />;
+      case "Warning":
+        return <AlertTriangle size={size} />;
+      case "Critical":
+        return <AlertCircle size={size} />;
+    }
+  })();
+  return (
+    <span className="flex items-center justify-center" style={{ color: clockStatusColor(status) }}>
+      {icon}
+    </span>
+  );
 }
 
 export function DnsKerberosValidation() {
   const [report, setReport] = useState<DnsKerberosReport | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [threshold, setThreshold] = useState(300);
-
   const runValidation = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const data = await invoke<DnsKerberosReport>(
         "get_dns_kerberos_validation",
-        { thresholdSeconds: threshold },
+        { thresholdSeconds: 300 },
       );
       setReport(data);
     } catch (e: unknown) {
@@ -109,7 +106,12 @@ export function DnsKerberosValidation() {
     } finally {
       setLoading(false);
     }
-  }, [threshold]);
+  }, []);
+
+  // Run validation on mount
+  useEffect(() => {
+    runValidation();
+  }, [runValidation]);
 
   const exportCsv = useCallback(() => {
     if (!report) return;
@@ -160,21 +162,9 @@ export function DnsKerberosValidation() {
           DNS & Kerberos Validation
         </h2>
         <div className="flex items-center gap-3">
-          {/* Clock skew threshold */}
-          <label className="flex items-center gap-1.5 text-caption text-[var(--color-text-secondary)]">
-            Skew threshold:
-            <select
-              className="rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2 py-1 text-caption text-[var(--color-text-primary)]"
-              value={threshold}
-              onChange={(e) => setThreshold(Number(e.target.value))}
-              data-testid="threshold-select"
-            >
-              <option value={60}>1 min</option>
-              <option value={120}>2 min</option>
-              <option value={300}>5 min</option>
-              <option value={600}>10 min</option>
-            </select>
-          </label>
+          <span className="text-caption text-[var(--color-text-secondary)]">
+            Default Kerberos threshold: 5 min
+          </span>
 
           {report && (
             <button
@@ -242,7 +232,7 @@ export function DnsKerberosValidation() {
 
             {/* DNS Results */}
             <section>
-              <h3 className="mb-2 text-body font-semibold text-[var(--color-text-primary)]">
+              <h3 className="mb-3 text-body font-semibold text-[var(--color-text-primary)]">
                 DNS SRV Records
               </h3>
               <div className="overflow-x-auto rounded-lg border border-[var(--color-border-default)]">
@@ -252,45 +242,39 @@ export function DnsKerberosValidation() {
                 >
                   <thead>
                     <tr className="border-b border-[var(--color-border-default)] bg-[var(--color-surface-card)] text-left text-[var(--color-text-secondary)]">
-                      <th className="px-3 py-2 font-medium">Status</th>
-                      <th className="px-3 py-2 font-medium">Record</th>
-                      <th className="px-3 py-2 font-medium">Expected</th>
-                      <th className="px-3 py-2 font-medium">Actual</th>
-                      <th className="px-3 py-2 font-medium">Issues</th>
+                      <th className="w-16 px-3 py-2.5 text-center font-medium">Status</th>
+                      <th className="px-4 py-2.5 font-medium">Record</th>
+                      <th className="px-4 py-2.5 font-medium">Expected</th>
+                      <th className="px-4 py-2.5 font-medium">Actual</th>
+                      <th className="px-4 py-2.5 font-medium">Issues</th>
                     </tr>
                   </thead>
                   <tbody>
                     {report.dnsResults.map((dns) => (
                       <tr
                         key={dns.recordName}
-                        className="border-b border-[var(--color-border-subtle)]"
+                        className="border-b border-[var(--color-border-subtle)] transition-colors hover:bg-[var(--color-surface-hover)]"
                       >
-                        <td className="px-3 py-2">
+                        <td className="w-16 px-3 py-2.5 text-center">
                           <DnsStatusIcon status={dns.status} />
                         </td>
-                        <td className="px-3 py-2 font-mono text-[var(--color-text-primary)]">
+                        <td className="px-4 py-2.5 font-mono text-[var(--color-text-primary)]">
                           {dns.recordName}
                         </td>
-                        <td className="px-3 py-2 text-[var(--color-text-secondary)]">
+                        <td className="px-4 py-2.5 text-[var(--color-text-secondary)]">
                           {dns.expectedHosts.join(", ") || "-"}
                         </td>
-                        <td className="px-3 py-2 text-[var(--color-text-secondary)]">
+                        <td className="px-4 py-2.5 text-[var(--color-text-secondary)]">
                           {dns.actualHosts.join(", ") || "-"}
                         </td>
-                        <td className="px-3 py-2">
+                        <td className="px-4 py-2.5">
                           {dns.missingHosts.length > 0 && (
-                            <span
-                              className="text-caption"
-                              style={{ color: "var(--color-error)" }}
-                            >
+                            <span style={{ color: "var(--color-error)" }}>
                               Missing: {dns.missingHosts.join(", ")}
                             </span>
                           )}
                           {dns.extraHosts.length > 0 && (
-                            <span
-                              className="text-caption"
-                              style={{ color: "var(--color-warning)" }}
-                            >
+                            <span style={{ color: "var(--color-warning)" }}>
                               Extra: {dns.extraHosts.join(", ")}
                             </span>
                           )}
@@ -310,7 +294,7 @@ export function DnsKerberosValidation() {
 
             {/* Clock Skew Results */}
             <section>
-              <h3 className="mb-2 text-body font-semibold text-[var(--color-text-primary)]">
+              <h3 className="mb-3 text-body font-semibold text-[var(--color-text-primary)]">
                 Kerberos Clock Skew
               </h3>
               <div className="overflow-x-auto rounded-lg border border-[var(--color-border-default)]">
@@ -320,28 +304,33 @@ export function DnsKerberosValidation() {
                 >
                   <thead>
                     <tr className="border-b border-[var(--color-border-default)] bg-[var(--color-surface-card)] text-left text-[var(--color-text-secondary)]">
-                      <th className="px-3 py-2 font-medium">Status</th>
-                      <th className="px-3 py-2 font-medium">Domain Controller</th>
-                      <th className="px-3 py-2 font-medium">DC Time</th>
-                      <th className="px-3 py-2 font-medium">Skew</th>
+                      <th className="w-16 px-3 py-2.5 text-center font-medium">Status</th>
+                      <th className="px-4 py-2.5 font-medium">Domain Controller</th>
+                      <th className="px-4 py-2.5 font-medium">DC Time</th>
+                      <th className="w-24 px-4 py-2.5 font-medium">Skew</th>
                     </tr>
                   </thead>
                   <tbody>
                     {report.clockSkewResults.map((skew) => (
                       <tr
                         key={skew.dcHostname}
-                        className="border-b border-[var(--color-border-subtle)]"
+                        className="border-b border-[var(--color-border-subtle)] transition-colors hover:bg-[var(--color-surface-hover)]"
                       >
-                        <td className="px-3 py-2">
+                        <td className="w-16 px-3 py-2.5 text-center">
                           <ClockStatusIcon status={skew.status} />
                         </td>
-                        <td className="px-3 py-2 font-mono text-[var(--color-text-primary)]">
+                        <td className="px-4 py-2.5 font-mono text-[var(--color-text-primary)]">
                           {skew.dcHostname}
                         </td>
-                        <td className="px-3 py-2 text-[var(--color-text-secondary)]">
-                          {new Date(skew.dcTime).toLocaleTimeString()}
+                        <td className="px-4 py-2.5 text-[var(--color-text-secondary)]">
+                          {(() => {
+                            const d = new Date(skew.dcTime);
+                            return isNaN(d.getTime())
+                              ? skew.dcTime
+                              : d.toLocaleTimeString();
+                          })()}
                         </td>
-                        <td className="px-3 py-2">
+                        <td className="w-24 px-4 py-2.5">
                           <span
                             className="font-medium"
                             style={{ color: clockStatusColor(skew.status) }}

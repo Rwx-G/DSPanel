@@ -86,7 +86,7 @@ pub async fn discover_domain_controllers(
 
 /// Discovers FSMO role holders by reading `fSMORoleOwner` from the 5 well-known objects.
 /// Returns a list of (role_name, owner_ntds_settings_dn).
-async fn discover_fsmo_roles(
+pub async fn discover_fsmo_roles(
     provider: &dyn DirectoryProvider,
     base_dn: &str,
 ) -> Vec<(&'static str, String)> {
@@ -802,7 +802,7 @@ async fn check_machine_account(
 /// Resolves the fallback IP from the LDAP server environment variable.
 ///
 /// Strips protocol prefixes and port suffixes to get the raw host/IP.
-fn resolve_fallback_ip() -> Option<String> {
+pub fn resolve_fallback_ip() -> Option<String> {
     let server = std::env::var("DSPANEL_LDAP_SERVER").ok()?;
     let host = server
         .strip_prefix("ldaps://")

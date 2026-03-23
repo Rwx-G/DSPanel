@@ -52,25 +52,24 @@ describe("DnsKerberosValidation", () => {
     vi.clearAllMocks();
   });
 
-  it("shows initial empty state with run button", () => {
-    render(<DnsKerberosValidation />);
-    expect(screen.getByText("Run Validation")).toBeInTheDocument();
-    expect(
-      screen.getByText("Click 'Run Validation' to check DNS SRV records and Kerberos clock skew."),
-    ).toBeInTheDocument();
-  });
-
-  it("shows loading state when running validation", async () => {
+  it("runs validation automatically on mount", () => {
     mockInvoke.mockReturnValue(new Promise(() => {}));
     render(<DnsKerberosValidation />);
+    expect(
+      screen.getByText("Running DNS and Kerberos validation..."),
+    ).toBeInTheDocument();
+    expect(mockInvoke).toHaveBeenCalledWith(
+      "get_dns_kerberos_validation",
+      { thresholdSeconds: 300 },
+    );
+  });
 
-    fireEvent.click(screen.getByTestId("run-button"));
-
-    await waitFor(() => {
-      expect(
-        screen.getByText("Running DNS and Kerberos validation..."),
-      ).toBeInTheDocument();
-    });
+  it("shows loading state during validation", () => {
+    mockInvoke.mockReturnValue(new Promise(() => {}));
+    render(<DnsKerberosValidation />);
+    expect(
+      screen.getByText("Running DNS and Kerberos validation..."),
+    ).toBeInTheDocument();
   });
 
   it("displays DNS results after validation", async () => {
@@ -140,22 +139,11 @@ describe("DnsKerberosValidation", () => {
     });
   });
 
-  it("changes threshold and passes new value", async () => {
-    mockInvoke.mockResolvedValue(sampleReport);
+  it("shows default Kerberos threshold label", () => {
     render(<DnsKerberosValidation />);
-
-    fireEvent.change(screen.getByTestId("threshold-select"), {
-      target: { value: "60" },
-    });
-
-    fireEvent.click(screen.getByTestId("run-button"));
-
-    await waitFor(() => {
-      expect(mockInvoke).toHaveBeenCalledWith(
-        "get_dns_kerberos_validation",
-        { thresholdSeconds: 60 },
-      );
-    });
+    expect(
+      screen.getByText("Default Kerberos threshold: 5 min"),
+    ).toBeInTheDocument();
   });
 
   it("shows export button after results are loaded", async () => {
