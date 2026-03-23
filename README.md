@@ -32,10 +32,10 @@ DSPanel is an open source cross-platform desktop application (Rust/Tauri v2) tha
 - **Object Snapshots** - SQLite-backed attribute snapshots before every write, with diff viewer and restore
 - **Exchange Diagnostics** - Read-only mailbox info for on-prem (LDAP) and Online (Graph)
 - **Audit Trail** - Full internal action logging for compliance
-- **Infrastructure Health** - DC health, replication status, DNS checks, AD topology map
-- **Security Dashboard** - Domain risk score, privileged accounts monitoring, AD attack detection
-- **Reports & Export** - CSV/PDF export, scheduled reports, compliance templates (GDPR, HIPAA, SOX)
-- **Extensibility** - External script execution, webhooks, GPO viewer, automation triggers
+- **Infrastructure Health** - 7 cross-platform DC health checks (DNS, LDAP, SPNs, replication, SYSVOL/DFSR, clock skew, machine account), FSMO roles, functional level
+- **Replication Monitoring** - Partnership table with latency, error tracking, and force-replication via repadmin
+- **DNS & Kerberos Validation** - SRV record validation via AD DNS (cross-platform, hickory-resolver), clock skew detection
+- **AD Topology** - Site/DC/replication/site-link overview with per-DC details (IP, OS, roles, online status, subnets)
 
 ### Adaptive Permissions
 
@@ -207,7 +207,7 @@ Epic 12).
 | `User.Read.All` | Application | Read user profiles, proxy addresses |
 | `Reports.Read.All` | Application | Read mailbox usage reports (real quota) |
 
-The client secret is encrypted at rest using DPAPI (Windows) or base64 (other platforms).
+The client secret is stored securely in the OS credential store (Windows Credential Manager, macOS Keychain, Linux Secret Service via keyring crate).
 
 ## Project Structure
 
