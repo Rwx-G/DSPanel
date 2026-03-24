@@ -230,23 +230,7 @@ pub fn export_to_pdf(
         let header_text = truncate_for_col(&col.header, col_width, header_size);
         current_layer.use_text(&header_text, header_size, Mm(x + 1.0), Mm(y), &font_bold);
     }
-    y -= header_row_height;
-
-    // Draw header line
-    let points = vec![
-        (Point::new(Mm(margin), Mm(y)), false),
-        (Point::new(Mm(page_width_mm - margin), Mm(y)), false),
-    ];
-    let line = Line {
-        points,
-        is_closed: false,
-        has_fill: false,
-        has_stroke: true,
-        is_clipping_path: false,
-    };
-    current_layer.set_outline_thickness(0.5);
-    current_layer.add_shape(line);
-    y -= 1.5;
+    y -= header_row_height + 1.0;
 
     // Data rows
     let mut page_num = 1;

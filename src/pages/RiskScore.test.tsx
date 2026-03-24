@@ -345,18 +345,18 @@ describe("RiskScoreDashboard", () => {
   });
 
   // Export button tests
-  it("renders export button when data is loaded", async () => {
+  it("renders export toolbar when data is loaded", async () => {
     setupMocks();
     render(<RiskScoreDashboard />);
 
     await waitFor(() => {
-      expect(screen.getByTestId("export-button")).toBeInTheDocument();
+      expect(screen.getByTestId("export-toolbar")).toBeInTheDocument();
     });
 
-    expect(screen.getByTestId("export-button")).toHaveTextContent("Export Report");
+    expect(screen.getByTestId("export-button")).toHaveTextContent("Export");
   });
 
-  it("calls save_file_dialog on export click", async () => {
+  it("export toolbar has format options", async () => {
     setupMocks();
     render(<RiskScoreDashboard />);
 
@@ -367,14 +367,10 @@ describe("RiskScoreDashboard", () => {
     fireEvent.click(screen.getByTestId("export-button"));
 
     await waitFor(() => {
-      expect(mockInvoke).toHaveBeenCalledWith(
-        "save_file_dialog",
-        expect.objectContaining({
-          defaultName: "risk-score-report.html",
-          filterName: "HTML files",
-          filterExtensions: ["html"],
-        }),
-      );
+      expect(screen.getByTestId("export-csv")).toBeInTheDocument();
+      expect(screen.getByTestId("export-pdf")).toBeInTheDocument();
+      expect(screen.getByTestId("export-xlsx")).toBeInTheDocument();
+      expect(screen.getByTestId("export-html")).toBeInTheDocument();
     });
   });
 

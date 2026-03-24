@@ -195,12 +195,12 @@ describe("SecurityDashboard", () => {
     expect(mockInvoke).toHaveBeenCalledTimes(2);
   });
 
-  it("has CSV export button", async () => {
+  it("has export toolbar", async () => {
     mockInvoke.mockResolvedValue(mockReport);
     render(<SecurityDashboard />);
 
     await waitFor(() => {
-      expect(screen.getByTestId("export-csv-button")).toBeInTheDocument();
+      expect(screen.getByTestId("export-toolbar")).toBeInTheDocument();
     });
   });
 

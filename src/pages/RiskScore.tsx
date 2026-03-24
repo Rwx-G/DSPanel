@@ -9,10 +9,10 @@ import {
   AlertCircle,
   TrendingUp,
   Info,
-  Download,
   ChevronDown,
   ChevronRight,
 } from "lucide-react";
+import { ExportToolbar } from "@/components/common/ExportToolbar";
 import {
   type RiskScoreResult,
   type RiskScoreHistory,
@@ -752,16 +752,31 @@ export function RiskScoreDashboard() {
               {Math.round(result.totalScore)}/100 - {zoneLabel(result.zone)}
             </span>
           )}
-          {result && (
-            <button
-              className="btn btn-sm rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2.5 py-1 text-caption font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors flex items-center gap-1"
-              onClick={() => exportReport(result)}
-              data-testid="export-button"
-            >
-              <Download size={12} />
-              Export Report
-            </button>
-          )}
+          <ExportToolbar<{ factor: string; finding: string; severity: string; points: string; remediation: string; complexity: string; ref: string }>
+            columns={[
+              { key: "factor", header: "Factor" },
+              { key: "finding", header: "Finding" },
+              { key: "severity", header: "Severity" },
+              { key: "points", header: "Points Deducted" },
+              { key: "remediation", header: "Remediation" },
+              { key: "complexity", header: "Complexity" },
+              { key: "ref", header: "Framework Ref" },
+            ]}
+            data={result?.factors.flatMap((f) =>
+              f.findings.map((fi) => ({
+                factor: f.name,
+                finding: fi.description,
+                severity: fi.severity,
+                points: String(fi.pointsDeducted),
+                remediation: fi.remediation,
+                complexity: fi.complexity,
+                ref: fi.frameworkRef ?? "",
+              })),
+            ) ?? []}
+            rowMapper={(r) => [r.factor, r.finding, r.severity, r.points, r.remediation, r.complexity, r.ref]}
+            title={`Domain Risk Score - ${result ? Math.round(result.totalScore) : 0}/100`}
+            filenameBase="risk-score"
+          />
           <button
             className="btn btn-sm rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2.5 py-1 text-caption font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors flex items-center gap-1"
             onClick={fetchData}

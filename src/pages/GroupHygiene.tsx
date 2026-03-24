@@ -579,25 +579,23 @@ export function GroupHygiene() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {scanned && (
-            <ExportToolbar<{ category: string; name: string; scope: string; detail: string }>
-              columns={[
-                { key: "category", header: "Category" },
-                { key: "name", header: "Group Name" },
-                { key: "scope", header: "Scope" },
-                { key: "detail", header: "Detail" },
-              ]}
-              data={[
-                ...emptyGroups.map((g) => ({ category: "Empty", name: g.displayName || g.samAccountName, scope: g.scope, detail: "No members" })),
-                ...singleMemberGroups.map((g) => ({ category: "Single Member", name: g.displayName || g.samAccountName, scope: g.scope, detail: "1 member" })),
-                ...staleGroups.map((g) => ({ category: "Stale", name: g.displayName || g.samAccountName, scope: g.scope, detail: `Last modified: ${formatWhenChanged(g)}` })),
-                ...undescribedGroups.map((g) => ({ category: "No Description", name: g.displayName || g.samAccountName, scope: g.scope, detail: "" })),
-              ]}
-              rowMapper={(row) => [row.category, row.name, row.scope, row.detail]}
-              title="Group Hygiene Report"
-              filenameBase="group-hygiene"
-            />
-          )}
+          <ExportToolbar<{ category: string; name: string; scope: string; detail: string }>
+            columns={[
+              { key: "category", header: "Category" },
+              { key: "name", header: "Group Name" },
+              { key: "scope", header: "Scope" },
+              { key: "detail", header: "Detail" },
+            ]}
+            data={[
+              ...emptyGroups.map((g) => ({ category: "Empty", name: g.displayName || g.samAccountName, scope: g.scope, detail: "No members" })),
+              ...singleMemberGroups.map((g) => ({ category: "Single Member", name: g.displayName || g.samAccountName, scope: g.scope, detail: "1 member" })),
+              ...staleGroups.map((g) => ({ category: "Stale", name: g.displayName || g.samAccountName, scope: g.scope, detail: `Last modified: ${formatWhenChanged(g)}` })),
+              ...undescribedGroups.map((g) => ({ category: "No Description", name: g.displayName || g.samAccountName, scope: g.scope, detail: "" })),
+            ]}
+            rowMapper={(row) => [row.category, row.name, row.scope, row.detail]}
+            title="Group Hygiene Report"
+            filenameBase="group-hygiene"
+          />
           <button
             className="btn btn-primary btn-sm flex items-center gap-1.5"
             onClick={handleScan}

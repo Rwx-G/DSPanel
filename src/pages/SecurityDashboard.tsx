@@ -17,8 +17,8 @@ import {
   type PrivilegedAccountInfo,
 } from "@/types/security";
 import { extractErrorMessage } from "@/utils/errorMapping";
-import { exportTableToCsv } from "@/utils/csvExport";
 import { SecurityDisclaimer } from "@/components/common/SecurityDisclaimer";
+import { ExportToolbar } from "@/components/common/ExportToolbar";
 
 function AccountRow({
   account,
@@ -299,25 +299,28 @@ export function SecurityDashboard() {
             </div>
           )}
 
-          {/* Export buttons */}
-          <button
-            className="btn btn-sm rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2.5 py-1 text-caption font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors flex items-center gap-1"
-            onClick={handleExportCsv}
-            disabled={!report || report.accounts.length === 0}
-            data-testid="export-csv-button"
-          >
-            <Download size={14} />
-            CSV
-          </button>
-          <button
-            className="btn btn-sm rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2.5 py-1 text-caption font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors flex items-center gap-1"
-            onClick={handleExportReport}
-            disabled={!report || report.accounts.length === 0}
-            data-testid="export-report-button"
-          >
-            <Download size={14} />
-            Report
-          </button>
+          {/* Export */}
+          <ExportToolbar<PrivilegedAccountInfo>
+            columns={[
+              { key: "samAccountName", header: "Username" },
+              { key: "displayName", header: "Display Name" },
+              { key: "groups", header: "Groups" },
+              { key: "lastLogon", header: "Last Logon" },
+              { key: "passwordAge", header: "Password Age" },
+              { key: "enabled", header: "Enabled" },
+            ]}
+            data={report?.accounts ?? []}
+            rowMapper={(a) => [
+              a.samAccountName,
+              a.displayName ?? "",
+              a.groups.join(", "),
+              a.lastLogon ?? "Never",
+              a.passwordAgeDays != null ? `${a.passwordAgeDays}d` : "-",
+              String(a.enabled),
+            ]}
+            title="Privileged Accounts Report"
+            filenameBase="privileged-accounts"
+          />
 
           {/* Manual refresh */}
           <button

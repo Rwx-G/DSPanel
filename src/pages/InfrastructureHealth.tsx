@@ -17,6 +17,7 @@ import {
   AlertTriangle,
   HelpCircle,
 } from "lucide-react";
+import { ExportToolbar } from "@/components/common/ExportToolbar";
 import {
   type DcHealthResult,
   type DcHealthCheck,
@@ -321,6 +322,30 @@ export function InfrastructureHealth() {
               </option>
             ))}
           </select>
+
+          <ExportToolbar<{ dc: string; site: string; status: string; check: string; checkStatus: string; message: string }>
+            columns={[
+              { key: "dc", header: "DC" },
+              { key: "site", header: "Site" },
+              { key: "status", header: "Overall" },
+              { key: "check", header: "Check" },
+              { key: "checkStatus", header: "Check Status" },
+              { key: "message", header: "Message" },
+            ]}
+            data={results.flatMap((r) =>
+              r.checks.map((c) => ({
+                dc: r.dc.hostname,
+                site: r.dc.siteName,
+                status: r.overallStatus,
+                check: c.name,
+                checkStatus: c.status,
+                message: c.message,
+              })),
+            )}
+            rowMapper={(r) => [r.dc, r.site, r.status, r.check, r.checkStatus, r.message]}
+            title="Infrastructure Health Report"
+            filenameBase="dc-health"
+          />
 
           {/* Manual refresh */}
           <button
