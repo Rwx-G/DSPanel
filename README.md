@@ -8,7 +8,7 @@
   <img src="https://img.shields.io/badge/Rust-2021-orange.svg" alt="Rust">
   <img src="https://img.shields.io/badge/Tauri-v2-blue.svg" alt="Tauri">
   <img src="https://img.shields.io/badge/Platform-Windows%20|%20macOS%20|%20Linux-0078D6.svg" alt="Platform">
-  <img src="https://img.shields.io/badge/Status-v0.9.0-brightgreen.svg" alt="Status">
+  <img src="https://img.shields.io/badge/Status-v0.10.0-brightgreen.svg" alt="Status">
 </p>
 
 ---
