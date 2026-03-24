@@ -206,6 +206,7 @@ pub fn run() {
             commands::mfa_requires,
             commands::compare_users,
             commands::save_file_dialog,
+            commands::export_table,
             commands::add_user_to_group,
             commands::get_replication_metadata,
             commands::compute_attribute_diff,
