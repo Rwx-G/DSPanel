@@ -767,7 +767,7 @@ export function RiskScoreDashboard() {
                 factor: f.name,
                 finding: fi.description,
                 severity: fi.severity,
-                points: String(fi.pointsDeducted),
+                points: String(Math.round(fi.pointsDeducted * 100) / 100),
                 remediation: fi.remediation,
                 complexity: fi.complexity,
                 ref: fi.frameworkRef ?? "",
