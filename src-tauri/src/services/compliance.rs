@@ -314,7 +314,9 @@ pub async fn generate_report(
     template: &ComplianceTemplate,
 ) -> Result<ComplianceReport, AppError> {
     let timestamp = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
-    let generator = std::env::var("USERNAME").unwrap_or_else(|_| "DSPanel".to_string());
+    let generator = provider
+        .authenticated_user()
+        .unwrap_or_else(|| std::env::var("USERNAME").unwrap_or_else(|_| "DSPanel".to_string()));
 
     let mut sections = Vec::new();
 
