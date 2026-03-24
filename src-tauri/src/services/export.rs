@@ -236,6 +236,10 @@ pub fn export_to_pdf(
     let mut page_num = 1;
     for row in rows {
         if y < margin + 10.0 {
+            // Footer on current page before creating new one
+            let footer = format!("Page {page_num}");
+            current_layer.use_text(&footer, 7.0, Mm(page_width_mm / 2.0 - 5.0), Mm(5.0), &font_regular);
+
             // New page
             page_num += 1;
             let (new_page, new_layer) = doc.add_page(
@@ -256,6 +260,10 @@ pub fn export_to_pdf(
         }
         y -= row_height;
     }
+
+    // Footer on last page
+    let footer = format!("Page {page_num}");
+    current_layer.use_text(&footer, 7.0, Mm(page_width_mm / 2.0 - 5.0), Mm(5.0), &font_regular);
 
     let mut output = Vec::new();
     doc.save(&mut std::io::BufWriter::new(&mut output))
