@@ -49,6 +49,12 @@ pub struct CleanupRule {
     pub action: CleanupAction,
     /// Target OU for Move action (required when action = Move).
     pub target_ou: Option<String>,
+    /// SAM account name patterns to exclude (e.g., "svc_*", "admin*"). Case-insensitive glob matching.
+    #[serde(default)]
+    pub exclude_patterns: Option<Vec<String>>,
+    /// OUs to exclude - any account whose DN contains one of these is skipped.
+    #[serde(default)]
+    pub exclude_ous: Option<Vec<String>>,
 }
 
 /// A single match from dry-run evaluation.
@@ -98,12 +104,7 @@ pub struct CleanupDryRunResult {
 // ---------------------------------------------------------------------------
 
 /// Well-known accounts that must never be cleaned up.
-const PROTECTED_SAMS: &[&str] = &[
-    "administrator",
-    "guest",
-    "krbtgt",
-    "defaultaccount",
-];
+const PROTECTED_SAMS: &[&str] = &["administrator", "guest", "krbtgt", "defaultaccount"];
 
 fn is_protected(entry: &DirectoryEntry) -> bool {
     let sam = entry
@@ -112,6 +113,67 @@ fn is_protected(entry: &DirectoryEntry) -> bool {
         .unwrap_or("")
         .to_lowercase();
     PROTECTED_SAMS.contains(&sam.as_str())
+}
+
+/// Checks if an entry should be excluded based on rule exclusion patterns.
+fn is_excluded(entry: &DirectoryEntry, rule: &CleanupRule) -> bool {
+    let sam = entry
+        .sam_account_name
+        .as_deref()
+        .unwrap_or("")
+        .to_lowercase();
+    let dn = entry.distinguished_name.to_lowercase();
+
+    // Check SAM name patterns (glob: * matches any chars)
+    if let Some(patterns) = &rule.exclude_patterns {
+        for pattern in patterns {
+            let p = pattern.to_lowercase();
+            if glob_match(&p, &sam) {
+                return true;
+            }
+        }
+    }
+
+    // Check OU exclusions (DN contains the OU string)
+    if let Some(ous) = &rule.exclude_ous {
+        for ou in ous {
+            if dn.contains(&ou.to_lowercase()) {
+                return true;
+            }
+        }
+    }
+
+    false
+}
+
+/// Simple glob matching: * matches any sequence of characters.
+fn glob_match(pattern: &str, text: &str) -> bool {
+    if pattern == "*" {
+        return true;
+    }
+    if !pattern.contains('*') {
+        return pattern == text;
+    }
+    let parts: Vec<&str> = pattern.split('*').collect();
+    let mut pos = 0;
+    for (i, part) in parts.iter().enumerate() {
+        if part.is_empty() {
+            continue;
+        }
+        if let Some(found) = text[pos..].find(part) {
+            if i == 0 && found != 0 {
+                return false; // First part must match at start
+            }
+            pos += found + part.len();
+        } else {
+            return false;
+        }
+    }
+    // If pattern ends with *, any trailing text is fine
+    if !pattern.ends_with('*') {
+        return pos == text.len();
+    }
+    true
 }
 
 // ---------------------------------------------------------------------------
@@ -136,20 +198,16 @@ pub async fn evaluate_rule(
     let mut matches = Vec::new();
 
     for user in &users {
-        if is_protected(user) {
+        if is_protected(user) || is_excluded(user, rule) {
             continue;
         }
 
         let matched = match rule.condition {
-            CleanupCondition::InactiveDays => {
-                evaluate_inactive_days(user, threshold_secs, now)
-            }
+            CleanupCondition::InactiveDays => evaluate_inactive_days(user, threshold_secs, now),
             CleanupCondition::NeverLoggedOnCreatedDays => {
                 evaluate_never_logged_on(user, threshold_secs, now)
             }
-            CleanupCondition::DisabledDays => {
-                evaluate_disabled_days(user, threshold_secs, now)
-            }
+            CleanupCondition::DisabledDays => evaluate_disabled_days(user, threshold_secs, now),
         };
 
         if let Some(state_desc) = matched {
@@ -159,11 +217,7 @@ pub async fn evaluate_rule(
                 .or(user.sam_account_name.as_deref())
                 .unwrap_or("Unknown")
                 .to_string();
-            let sam = user
-                .sam_account_name
-                .as_deref()
-                .unwrap_or("")
-                .to_string();
+            let sam = user.sam_account_name.as_deref().unwrap_or("").to_string();
 
             let proposed = match &rule.action {
                 CleanupAction::Disable => "Disable account".to_string(),
@@ -287,34 +341,32 @@ pub async fn execute_cleanup(
         }
 
         let result = match &m.action {
-            CleanupAction::Disable => {
-                match provider.disable_account(&m.dn).await {
-                    Ok(()) => {
-                        audit.log_success(
-                            "CleanupDisable",
-                            &m.dn,
-                            &format!("Disabled by cleanup rule: {}", m.current_state),
-                        );
-                        CleanupExecutionResult {
-                            dn: m.dn.clone(),
-                            display_name: m.display_name.clone(),
-                            action: CleanupAction::Disable,
-                            success: true,
-                            error: None,
-                        }
-                    }
-                    Err(e) => {
-                        audit.log_failure("CleanupDisableFailed", &m.dn, &e.to_string());
-                        CleanupExecutionResult {
-                            dn: m.dn.clone(),
-                            display_name: m.display_name.clone(),
-                            action: CleanupAction::Disable,
-                            success: false,
-                            error: Some(e.to_string()),
-                        }
+            CleanupAction::Disable => match provider.disable_account(&m.dn).await {
+                Ok(()) => {
+                    audit.log_success(
+                        "CleanupDisable",
+                        &m.dn,
+                        &format!("Disabled by cleanup rule: {}", m.current_state),
+                    );
+                    CleanupExecutionResult {
+                        dn: m.dn.clone(),
+                        display_name: m.display_name.clone(),
+                        action: CleanupAction::Disable,
+                        success: true,
+                        error: None,
                     }
                 }
-            }
+                Err(e) => {
+                    audit.log_failure("CleanupDisableFailed", &m.dn, &e.to_string());
+                    CleanupExecutionResult {
+                        dn: m.dn.clone(),
+                        display_name: m.display_name.clone(),
+                        action: CleanupAction::Disable,
+                        success: false,
+                        error: Some(e.to_string()),
+                    }
+                }
+            },
             CleanupAction::Move => {
                 let target = m.target_ou.as_deref().unwrap_or("");
                 if target.is_empty() {
@@ -355,34 +407,32 @@ pub async fn execute_cleanup(
                     }
                 }
             }
-            CleanupAction::Delete => {
-                match provider.delete_object(&m.dn).await {
-                    Ok(()) => {
-                        audit.log_success(
-                            "CleanupDelete",
-                            &m.dn,
-                            &format!("Deleted by cleanup rule: {}", m.current_state),
-                        );
-                        CleanupExecutionResult {
-                            dn: m.dn.clone(),
-                            display_name: m.display_name.clone(),
-                            action: CleanupAction::Delete,
-                            success: true,
-                            error: None,
-                        }
-                    }
-                    Err(e) => {
-                        audit.log_failure("CleanupDeleteFailed", &m.dn, &e.to_string());
-                        CleanupExecutionResult {
-                            dn: m.dn.clone(),
-                            display_name: m.display_name.clone(),
-                            action: CleanupAction::Delete,
-                            success: false,
-                            error: Some(e.to_string()),
-                        }
+            CleanupAction::Delete => match provider.delete_object(&m.dn).await {
+                Ok(()) => {
+                    audit.log_success(
+                        "CleanupDelete",
+                        &m.dn,
+                        &format!("Deleted by cleanup rule: {}", m.current_state),
+                    );
+                    CleanupExecutionResult {
+                        dn: m.dn.clone(),
+                        display_name: m.display_name.clone(),
+                        action: CleanupAction::Delete,
+                        success: true,
+                        error: None,
                     }
                 }
-            }
+                Err(e) => {
+                    audit.log_failure("CleanupDeleteFailed", &m.dn, &e.to_string());
+                    CleanupExecutionResult {
+                        dn: m.dn.clone(),
+                        display_name: m.display_name.clone(),
+                        action: CleanupAction::Delete,
+                        success: false,
+                        error: Some(e.to_string()),
+                    }
+                }
+            },
         };
 
         results.push(result);
@@ -424,20 +474,13 @@ fn parse_ad_generalized_time(value: &str) -> Option<chrono::DateTime<Utc>> {
 mod tests {
     use super::*;
 
-    fn make_user(
-        dn: &str,
-        sam: &str,
-        display: &str,
-        attrs: Vec<(&str, &str)>,
-    ) -> DirectoryEntry {
+    fn make_user(dn: &str, sam: &str, display: &str, attrs: Vec<(&str, &str)>) -> DirectoryEntry {
         let mut entry = DirectoryEntry::new(dn.to_string());
         entry.sam_account_name = Some(sam.to_string());
         entry.display_name = Some(display.to_string());
         entry.object_class = Some("user".to_string());
         for (k, v) in attrs {
-            entry
-                .attributes
-                .insert(k.to_string(), vec![v.to_string()]);
+            entry.attributes.insert(k.to_string(), vec![v.to_string()]);
         }
         entry
     }
@@ -454,20 +497,10 @@ mod tests {
         );
         assert!(is_protected(&admin));
 
-        let krbtgt = make_user(
-            "CN=krbtgt,DC=test,DC=com",
-            "krbtgt",
-            "krbtgt",
-            vec![],
-        );
+        let krbtgt = make_user("CN=krbtgt,DC=test,DC=com", "krbtgt", "krbtgt", vec![]);
         assert!(is_protected(&krbtgt));
 
-        let guest = make_user(
-            "CN=Guest,DC=test,DC=com",
-            "Guest",
-            "Guest",
-            vec![],
-        );
+        let guest = make_user("CN=Guest,DC=test,DC=com", "Guest", "Guest", vec![]);
         assert!(is_protected(&guest));
     }
 
@@ -510,7 +543,10 @@ mod tests {
         let ts = parse_ad_generalized_time("20240315143022.0Z");
         assert!(ts.is_some());
         let dt = ts.unwrap();
-        assert_eq!(dt.format("%Y-%m-%d %H:%M:%S").to_string(), "2024-03-15 14:30:22");
+        assert_eq!(
+            dt.format("%Y-%m-%d %H:%M:%S").to_string(),
+            "2024-03-15 14:30:22"
+        );
     }
 
     #[test]
@@ -525,8 +561,7 @@ mod tests {
         let now = Utc::now();
         // lastLogonTimestamp = 200 days ago
         let days_ago = now - chrono::Duration::days(200);
-        let ticks =
-            (days_ago.timestamp() + 11_644_473_600) * 10_000_000;
+        let ticks = (days_ago.timestamp() + 11_644_473_600) * 10_000_000;
 
         let user = make_user(
             "CN=Old,DC=test,DC=com",
@@ -544,8 +579,7 @@ mod tests {
     fn inactive_days_skips_recent_logon() {
         let now = Utc::now();
         let days_ago = now - chrono::Duration::days(10);
-        let ticks =
-            (days_ago.timestamp() + 11_644_473_600) * 10_000_000;
+        let ticks = (days_ago.timestamp() + 11_644_473_600) * 10_000_000;
 
         let user = make_user(
             "CN=Active,DC=test,DC=com",
@@ -643,6 +677,8 @@ mod tests {
             threshold_days: 180,
             action: CleanupAction::Disable,
             target_ou: None,
+            exclude_patterns: Some(vec!["svc_*".to_string()]),
+            exclude_ous: None,
         };
 
         let json = serde_json::to_string(&rule).unwrap();
@@ -670,5 +706,96 @@ mod tests {
         assert!(json.contains("\"selected\":true"));
         let loaded: CleanupMatch = serde_json::from_str(&json).unwrap();
         assert_eq!(loaded.dn, "CN=Test,DC=com");
+    }
+
+    // -- Glob matching tests --
+
+    #[test]
+    fn glob_match_exact() {
+        assert!(glob_match("admin", "admin"));
+        assert!(!glob_match("admin", "administrator"));
+    }
+
+    #[test]
+    fn glob_match_wildcard_suffix() {
+        assert!(glob_match("svc_*", "svc_sql"));
+        assert!(glob_match("svc_*", "svc_"));
+        assert!(!glob_match("svc_*", "admin"));
+    }
+
+    #[test]
+    fn glob_match_wildcard_prefix() {
+        assert!(glob_match("*admin", "domainadmin"));
+        assert!(glob_match("*admin", "admin"));
+        assert!(!glob_match("*admin", "administrator"));
+    }
+
+    #[test]
+    fn glob_match_wildcard_middle() {
+        assert!(glob_match("svc_*_prod", "svc_sql_prod"));
+        assert!(!glob_match("svc_*_prod", "svc_sql_dev"));
+    }
+
+    #[test]
+    fn glob_match_star_only() {
+        assert!(glob_match("*", "anything"));
+    }
+
+    // -- Exclusion tests --
+
+    #[test]
+    fn exclude_by_sam_pattern() {
+        let rule = CleanupRule {
+            name: "test".to_string(),
+            condition: CleanupCondition::InactiveDays,
+            threshold_days: 90,
+            action: CleanupAction::Disable,
+            target_ou: None,
+            exclude_patterns: Some(vec!["svc_*".to_string()]),
+            exclude_ous: None,
+        };
+        let svc = make_user("CN=svc_sql,DC=test", "svc_sql", "SQL Service", vec![]);
+        assert!(is_excluded(&svc, &rule));
+
+        let normal = make_user("CN=john,DC=test", "john", "John", vec![]);
+        assert!(!is_excluded(&normal, &rule));
+    }
+
+    #[test]
+    fn exclude_by_ou() {
+        let rule = CleanupRule {
+            name: "test".to_string(),
+            condition: CleanupCondition::InactiveDays,
+            threshold_days: 90,
+            action: CleanupAction::Disable,
+            target_ou: None,
+            exclude_patterns: None,
+            exclude_ous: Some(vec!["OU=ServiceAccounts".to_string()]),
+        };
+        let svc = make_user(
+            "CN=svc_sql,OU=ServiceAccounts,DC=test,DC=com",
+            "svc_sql",
+            "SQL Service",
+            vec![],
+        );
+        assert!(is_excluded(&svc, &rule));
+
+        let normal = make_user("CN=john,OU=Users,DC=test,DC=com", "john", "John", vec![]);
+        assert!(!is_excluded(&normal, &rule));
+    }
+
+    #[test]
+    fn exclude_is_case_insensitive() {
+        let rule = CleanupRule {
+            name: "test".to_string(),
+            condition: CleanupCondition::InactiveDays,
+            threshold_days: 90,
+            action: CleanupAction::Disable,
+            target_ou: None,
+            exclude_patterns: Some(vec!["SVC_*".to_string()]),
+            exclude_ous: None,
+        };
+        let svc = make_user("CN=svc_SQL,DC=test", "svc_SQL", "SQL", vec![]);
+        assert!(is_excluded(&svc, &rule));
     }
 }

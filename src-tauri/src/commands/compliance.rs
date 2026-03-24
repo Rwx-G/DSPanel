@@ -8,7 +8,10 @@ use crate::state::AppState;
 /// Returns the list of supported frameworks.
 #[tauri::command]
 pub fn get_compliance_frameworks() -> Vec<String> {
-    compliance::FRAMEWORKS.iter().map(|s| s.to_string()).collect()
+    compliance::FRAMEWORKS
+        .iter()
+        .map(|s| s.to_string())
+        .collect()
 }
 
 /// Runs all compliance checks once and returns results with per-framework scores.

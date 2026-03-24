@@ -8,7 +8,6 @@ import {
   ShieldAlert,
   AlertCircle,
   AlertTriangle,
-  Download,
   ChevronDown,
   ChevronRight,
 } from "lucide-react";
@@ -144,123 +143,6 @@ export function SecurityDashboard() {
     });
   };
 
-  const handleExportCsv = async () => {
-    if (!report) return;
-
-    const columns = [
-      { key: "samAccountName" as const, header: "Username" },
-      { key: "displayName" as const, header: "Display Name" },
-      { key: "privilegedGroups" as const, header: "Groups" },
-      { key: "lastLogon" as const, header: "Last Logon" },
-      { key: "passwordAgeDays" as const, header: "Password Age (days)" },
-      { key: "enabled" as const, header: "Enabled" },
-      { key: "passwordNeverExpires" as const, header: "Password Never Expires" },
-      { key: "alerts" as const, header: "Alerts" },
-    ];
-
-    const exportData = report.accounts.map((a) => ({
-      samAccountName: a.samAccountName,
-      displayName: a.displayName,
-      privilegedGroups: a.privilegedGroups.join("; "),
-      lastLogon: a.lastLogon ?? "Never",
-      passwordAgeDays: a.passwordAgeDays != null ? String(a.passwordAgeDays) : "-",
-      enabled: a.enabled ? "Yes" : "No",
-      passwordNeverExpires: a.passwordNeverExpires ? "Yes" : "No",
-      alerts: a.alerts.map((al) => `[${al.severity}] ${al.message}`).join("; "),
-    }));
-
-    await exportTableToCsv(columns, exportData, "privileged-accounts.csv");
-  };
-
-  const handleExportReport = async () => {
-    if (!report) return;
-
-    const severityHtmlColor: Record<string, string> = {
-      Critical: "#ef4444", High: "#f59e0b", Medium: "#3b82f6", Info: "#6b7280",
-    };
-
-    const accountRows = report.accounts.map((a) => `
-      <tr>
-        <td>${a.samAccountName}</td>
-        <td>${a.displayName}</td>
-        <td>${a.privilegedGroups.join(", ")}</td>
-        <td>${a.lastLogon ? new Date(a.lastLogon).toLocaleDateString() : "Never"}</td>
-        <td style="text-align:center">${a.passwordAgeDays ?? "-"}</td>
-        <td style="text-align:center">${a.enabled ? "Yes" : "No"}</td>
-        <td>${a.alerts.length === 0 ? '<span style="color:#22c55e">OK</span>' : a.alerts.map((al) =>
-          `<span style="color:${severityHtmlColor[al.severity]};font-weight:600">${al.severity}</span> ${al.message}`
-        ).join("<br>")}</td>
-      </tr>`).join("");
-
-    const domainSection = report.domainFindings ? `
-      <h2>Domain Security Findings</h2>
-      <table>
-        <tbody>
-          ${report.domainFindings.krbtgtPasswordAgeDays != null ? `<tr><td>KRBTGT Password Age</td><td>${report.domainFindings.krbtgtPasswordAgeDays} days</td></tr>` : ""}
-          ${report.domainFindings.lapsCoveragePercent != null ? `<tr><td>LAPS Coverage</td><td>${report.domainFindings.lapsCoveragePercent.toFixed(0)}% (${report.domainFindings.lapsDeployedCount}/${report.domainFindings.totalComputerCount})</td></tr>` : ""}
-          ${report.domainFindings.domainFunctionalLevel ? `<tr><td>Domain Level</td><td>${report.domainFindings.domainFunctionalLevel}</td></tr>` : ""}
-          ${report.domainFindings.recycleBinEnabled != null ? `<tr><td>Recycle Bin</td><td>${report.domainFindings.recycleBinEnabled ? "Enabled" : "Disabled"}</td></tr>` : ""}
-          ${report.domainFindings.psoCount > 0 ? `<tr><td>Password Policies (PSO)</td><td>${report.domainFindings.psoCount}</td></tr>` : ""}
-          ${report.domainFindings.rbcdConfiguredCount > 0 ? `<tr><td>RBCD Configured</td><td>${report.domainFindings.rbcdConfiguredCount} object(s)</td></tr>` : ""}
-        </tbody>
-      </table>
-      ${report.domainFindings.alerts.length > 0 ? `
-        <h3>Domain Alerts</h3>
-        <ul>${report.domainFindings.alerts.map((al) =>
-          `<li><span style="color:${severityHtmlColor[al.severity]};font-weight:600">${al.severity}</span> ${al.message}</li>`
-        ).join("")}</ul>` : ""}` : "";
-
-    const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>DSPanel - Privileged Accounts Report</title>
-  <style>
-    body { font-family: system-ui, -apple-system, sans-serif; margin: 2rem; color: #1f2937; }
-    h1 { font-size: 1.5rem; margin-bottom: 0.25rem; }
-    h2 { font-size: 1.15rem; margin-top: 2rem; border-bottom: 1px solid #e5e7eb; padding-bottom: 0.25rem; }
-    h3 { font-size: 1rem; margin-top: 1rem; }
-    .meta { color: #6b7280; font-size: 0.85rem; margin-bottom: 1.5rem; }
-    .summary { display: flex; gap: 1rem; margin-bottom: 1rem; }
-    .badge { padding: 0.25rem 0.75rem; border-radius: 1rem; font-weight: 600; font-size: 0.85rem; }
-    table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; font-size: 0.85rem; }
-    th, td { border: 1px solid #d1d5db; padding: 0.4rem 0.6rem; text-align: left; }
-    th { background: #f3f4f6; font-weight: 600; }
-    tr:nth-child(even) { background: #f9fafb; }
-    ul { font-size: 0.85rem; }
-  </style>
-</head>
-<body>
-  <h1>DSPanel - Privileged Accounts Report</h1>
-  <div class="meta">Generated: ${new Date().toLocaleString()} | Scanned: ${new Date(report.scannedAt).toLocaleString()}</div>
-
-  <div class="summary">
-    ${report.summary.critical > 0 ? `<span class="badge" style="color:#ef4444;background:#ef444415">${report.summary.critical} Critical</span>` : ""}
-    ${report.summary.high > 0 ? `<span class="badge" style="color:#f59e0b;background:#f59e0b15">${report.summary.high} High</span>` : ""}
-    ${report.summary.medium > 0 ? `<span class="badge" style="color:#3b82f6;background:#3b82f615">${report.summary.medium} Medium</span>` : ""}
-    <span style="color:#6b7280">${report.accounts.length} accounts</span>
-  </div>
-
-  <h2>Privileged Accounts</h2>
-  <table>
-    <thead>
-      <tr><th>Username</th><th>Display Name</th><th>Groups</th><th>Last Logon</th><th>Pwd Age</th><th>Enabled</th><th>Alerts</th></tr>
-    </thead>
-    <tbody>${accountRows}</tbody>
-  </table>
-
-  ${domainSection}
-</body>
-</html>`;
-
-    await invoke("save_file_dialog", {
-      content: html,
-      defaultName: "privileged-accounts-report.html",
-      filterName: "HTML files",
-      filterExtensions: ["html"],
-    });
-  };
-
   return (
     <div className="flex h-full flex-col" data-testid="security-dashboard">
       {/* Toolbar */}
@@ -313,7 +195,7 @@ export function SecurityDashboard() {
             rowMapper={(a) => [
               a.samAccountName,
               a.displayName ?? "",
-              a.groups.join(", "),
+              a.privilegedGroups.join(", "),
               a.lastLogon ?? "Never",
               a.passwordAgeDays != null ? `${a.passwordAgeDays}d` : "-",
               String(a.enabled),

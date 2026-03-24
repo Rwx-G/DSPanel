@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { EmptyState } from "@/components/common/EmptyState";
 import { ExportToolbar } from "@/components/common/ExportToolbar";
+import { SecurityDisclaimer } from "@/components/common/SecurityDisclaimer";
 import { extractErrorMessage } from "@/utils/errorMapping";
 import {
   Plus,
@@ -28,6 +29,8 @@ interface CleanupRule {
   thresholdDays: number;
   action: CleanupAction;
   targetOu: string | null;
+  excludePatterns: string[] | null;
+  excludeOus: string[] | null;
 }
 
 interface CleanupMatch {
@@ -77,6 +80,8 @@ const DEFAULT_RULE: CleanupRule = {
   thresholdDays: 180,
   action: "disable",
   targetOu: null,
+  excludePatterns: null,
+  excludeOus: null,
 };
 
 // ---------------------------------------------------------------------------
@@ -182,6 +187,48 @@ function RuleEditor({
           />
         </div>
       )}
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-caption font-medium text-[var(--color-text-secondary)] mb-1">
+            Exclude SAM patterns (comma-separated, e.g., svc_*, admin*)
+          </label>
+          <input
+            className="w-full rounded border border-[var(--color-border-default)] bg-[var(--color-surface-default)] px-2 py-1.5 text-caption text-[var(--color-text-primary)]"
+            value={rule.excludePatterns?.join(", ") ?? ""}
+            onChange={(e) => {
+              const val = e.target.value.trim();
+              onChange({
+                ...rule,
+                excludePatterns: val
+                  ? val.split(",").map((s) => s.trim()).filter(Boolean)
+                  : null,
+              });
+            }}
+            placeholder="svc_*, test*, shared*"
+            data-testid="rule-exclude-patterns"
+          />
+        </div>
+        <div>
+          <label className="block text-caption font-medium text-[var(--color-text-secondary)] mb-1">
+            Exclude OUs (comma-separated)
+          </label>
+          <input
+            className="w-full rounded border border-[var(--color-border-default)] bg-[var(--color-surface-default)] px-2 py-1.5 text-caption text-[var(--color-text-primary)]"
+            value={rule.excludeOus?.join(", ") ?? ""}
+            onChange={(e) => {
+              const val = e.target.value.trim();
+              onChange({
+                ...rule,
+                excludeOus: val
+                  ? val.split(",").map((s) => s.trim()).filter(Boolean)
+                  : null,
+              });
+            }}
+            placeholder="OU=ServiceAccounts, OU=Admin"
+            data-testid="rule-exclude-ous"
+          />
+        </div>
+      </div>
       <div className="flex justify-end gap-2">
         <button
           className="btn btn-sm rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2.5 py-1 text-caption font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors"
@@ -327,6 +374,12 @@ export function AutomatedCleanup() {
         <h2 className="flex items-center gap-1.5 text-body font-semibold text-[var(--color-text-primary)]">
           <ShieldAlert size={16} />
           Automated Cleanup
+          <SecurityDisclaimer
+            coverage="~40%"
+            checks="3 condition types (inactive >X days, never logged on + created >Y days, disabled >Z days), 3 actions (disable, move to OU, delete). Mandatory dry-run with selectable matches, double confirmation for deletes. Protected account exclusion (Administrator, krbtgt, Guest). Service account exclusion by SAM pattern (glob) and OU. All actions audit-logged."
+            limitations="On-demand execution only - no scheduled runs. Does not detect shared/generic accounts, orphaned SIDs, or stale computer accounts. No approval workflow (single admin decision). Cannot evaluate service account dependencies before disabling."
+            tools="ManageEngine ADManager Plus (automated lifecycle policies, scheduled cleanup, approval workflows), Quest Active Roles (policy-based deprovisioning with HR integration), or BeyondTrust Privileged Access Management for enterprise account lifecycle management."
+          />
         </h2>
         <button
           className="btn btn-sm btn-primary flex items-center gap-1"
@@ -379,6 +432,16 @@ export function AutomatedCleanup() {
                   <div className="text-[11px] text-[var(--color-text-secondary)]">
                     {CONDITION_LABELS[rule.condition]} ({rule.thresholdDays}d) - {ACTION_LABELS[rule.action]}
                     {rule.action === "move" && rule.targetOu && ` to ${rule.targetOu}`}
+                    {rule.excludePatterns && rule.excludePatterns.length > 0 && (
+                      <span className="ml-2 text-[var(--color-text-disabled)]">
+                        Excl: {rule.excludePatterns.join(", ")}
+                      </span>
+                    )}
+                    {rule.excludeOus && rule.excludeOus.length > 0 && (
+                      <span className="ml-2 text-[var(--color-text-disabled)]">
+                        Excl OUs: {rule.excludeOus.join(", ")}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -417,7 +480,7 @@ export function AutomatedCleanup() {
         {/* Dry-run loading */}
         {dryRunLoading && (
           <div className="flex items-center justify-center py-8">
-            <LoadingSpinner size="md" />
+            <LoadingSpinner />
           </div>
         )}
 

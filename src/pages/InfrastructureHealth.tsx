@@ -335,7 +335,7 @@ export function InfrastructureHealth() {
             data={(() => {
               let lastDc = "";
               return results.flatMap((r) =>
-                r.checks.map((c, i) => {
+                r.checks.map((c) => {
                   const isFirst = r.dc.hostname !== lastDc;
                   if (isFirst) lastDc = r.dc.hostname;
                   return {

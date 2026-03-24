@@ -114,10 +114,7 @@ pub fn export_to_html(
     let mut html = String::with_capacity(4096 + rows.len() * 256);
 
     html.push_str("<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\">\n");
-    html.push_str(&format!(
-        "<title>{}</title>\n",
-        html_escape(title)
-    ));
+    html.push_str(&format!("<title>{}</title>\n", html_escape(title)));
     html.push_str("<style>\n");
     html.push_str(
         "body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;\
@@ -238,14 +235,20 @@ pub fn export_to_pdf(
         if y < margin + 10.0 {
             // Footer on current page before creating new one
             let footer = format!("Page {page_num}");
-            current_layer.use_text(&footer, 7.0, Mm(page_width_mm / 2.0 - 5.0), Mm(5.0), &font_regular);
+            current_layer.use_text(
+                &footer,
+                7.0,
+                Mm(page_width_mm / 2.0 - 5.0),
+                Mm(5.0),
+                &font_regular,
+            );
 
             // New page
             page_num += 1;
             let (new_page, new_layer) = doc.add_page(
                 Mm(page_width_mm),
                 Mm(page_height_mm),
-                &format!("Page {page_num}"),
+                format!("Page {page_num}"),
             );
             current_page = doc.get_page(new_page);
             current_layer = current_page.get_layer(new_layer);
@@ -263,7 +266,13 @@ pub fn export_to_pdf(
 
     // Footer on last page
     let footer = format!("Page {page_num}");
-    current_layer.use_text(&footer, 7.0, Mm(page_width_mm / 2.0 - 5.0), Mm(5.0), &font_regular);
+    current_layer.use_text(
+        &footer,
+        7.0,
+        Mm(page_width_mm / 2.0 - 5.0),
+        Mm(5.0),
+        &font_regular,
+    );
 
     let mut output = Vec::new();
     doc.save(&mut std::io::BufWriter::new(&mut output))
@@ -359,7 +368,7 @@ pub fn export_to_xlsx(
             .map(|r| r.get(col_idx).map(|s| s.len()).unwrap_or(0))
             .max()
             .unwrap_or(0);
-        let width = (header_len.max(max_data_len) as f64 * 1.2).min(50.0).max(8.0);
+        let width = (header_len.max(max_data_len) as f64 * 1.2).clamp(8.0, 50.0);
         worksheet
             .set_column_width(col_idx as u16, width)
             .map_err(|e| AppError::Internal(format!("XLSX column width error: {e}")))?;

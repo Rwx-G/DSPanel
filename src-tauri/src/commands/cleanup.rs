@@ -14,11 +14,7 @@ use crate::state::AppState;
 /// Returns all configured cleanup rules.
 #[tauri::command]
 pub fn get_cleanup_rules(state: State<'_, AppState>) -> Vec<CleanupRule> {
-    state
-        .app_settings
-        .get()
-        .cleanup_rules
-        .unwrap_or_default()
+    state.app_settings.get().cleanup_rules.unwrap_or_default()
 }
 
 /// Saves cleanup rules to app settings. Requires DomainAdmin.

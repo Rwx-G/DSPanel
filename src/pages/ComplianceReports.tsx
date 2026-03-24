@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { EmptyState } from "@/components/common/EmptyState";
 import { ExportToolbar } from "@/components/common/ExportToolbar";
+import { SecurityDisclaimer } from "@/components/common/SecurityDisclaimer";
 import { extractErrorMessage } from "@/utils/errorMapping";
 import {
   Play,
@@ -271,6 +272,12 @@ export function ComplianceReports() {
         <h2 className="flex items-center gap-1.5 text-body font-semibold text-[var(--color-text-primary)]">
           <Shield size={16} />
           Compliance Reports
+          <SecurityDisclaimer
+            coverage="~15-20%"
+            checks="7 checks across 9 frameworks (GDPR, HIPAA, SOX, PCI-DSS v4.0, ISO 27001, NIST 800-53, CIS v8, NIS2, ANSSI). Checks: privileged accounts (adminCount), inactive accounts (>90d), PASSWD_NOTREQD flag, reversible encryption, stale passwords (>90d), password never expires, disabled accounts. Compliance score 0-100 with per-framework breakdown. Per-framework HTML report export with control references and PowerShell remediation."
+            limitations="Point-in-time snapshot only - no change history or continuous monitoring. Does not assess GPO settings, file server permissions, audit log configuration, or network segmentation. No shared/generic account detection, separation of duties analysis, or access recertification workflows. Cannot read domain password policy (complexity, lockout thresholds)."
+            tools="Netwrix Auditor (change auditing, 30+ controls/framework), ManageEngine ADAudit Plus (200+ reports, real-time alerts), Microsoft Compliance Manager (shared controls, improvement actions), Qualys Policy Compliance (CIS benchmarks), or SolarWinds ARM (access rights visualization) for comprehensive compliance management."
+          />
         </h2>
         <div className="flex items-center gap-2">
           {scan && (
@@ -309,7 +316,7 @@ export function ComplianceReports() {
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {loading && (
           <div className="flex items-center justify-center py-8">
-            <LoadingSpinner size="md" />
+            <LoadingSpinner />
           </div>
         )}
 

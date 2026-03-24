@@ -113,33 +113,6 @@ export function DnsKerberosValidation() {
     runValidation();
   }, [runValidation]);
 
-  const exportCsv = useCallback(() => {
-    if (!report) return;
-
-    const lines = ["Type,Record/DC,Status,Details"];
-
-    for (const dns of report.dnsResults) {
-      const details = `Expected: ${dns.expectedHosts.join(";")} | Actual: ${dns.actualHosts.join(";")}`;
-      lines.push(
-        `DNS,"${dns.recordName}",${dns.status},"${details.replace(/"/g, '""')}"`,
-      );
-    }
-
-    for (const skew of report.clockSkewResults) {
-      lines.push(
-        `Clock Skew,"${skew.dcHostname}",${skew.status},"${skew.skewSeconds}s offset"`,
-      );
-    }
-
-    const blob = new Blob([lines.join("\n")], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `dns-kerberos-validation-${new Date().toISOString().slice(0, 10)}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
-  }, [report]);
-
   const dnsPassCount =
     report?.dnsResults.filter((r) => r.status === "Pass").length ?? 0;
   const dnsFailCount =

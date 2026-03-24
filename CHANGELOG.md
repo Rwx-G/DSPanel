@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- PDF export: page numbers in footer ("Page 1", "Page 2", etc.)
+- Cleanup rules: exclusion patterns for service accounts by SAM name (glob: svc_*, admin*) and by OU
+- Compliance: 5 new frameworks (ISO 27001, NIST 800-53, CIS v8, NIS2, ANSSI) - total 9
+- Compliance: 3 new checks (PASSWD_NOTREQD, reversible encryption, stale passwords >90d)
+- Compliance: compliance score (0-100) with per-framework breakdown
+- Compliance: severity badges (Critical/High/Medium/Low) per check
+- Compliance: PowerShell remediation commands in all reports
+- Compliance: per-framework HTML report export for auditors
+
+### Changed
+
+- Compliance: refactored from template-per-framework (Model A) to check-first with multi-framework mapping (Model B)
+- Compliance: corrected control references (GDPR Art.25->32, SOX Section 302->ITGC APD, PCI-DSS v3.2.1->v4.0)
+- Compliance: single scan runs 7 checks once, computes 9 framework scores simultaneously
+- Export: replaced single-format buttons with ExportToolbar on SecurityDashboard, RiskScore, DnsKerberos
+- Export: added ExportToolbar to UserComparison, GroupDetail, InfrastructureHealth
+- GroupHygiene: export includes all 7 categories, button visible from start
+
+### Fixed
+
+- Compliance: use authenticated LDAP user instead of OS username for report generator
+- Compliance: format raw AD timestamps to human-readable dates
+- Compliance: friendly column headers instead of raw attribute names
+- RiskScore: round pointsDeducted to 2 decimals in export
+- InfrastructureHealth: group export rows by DC (empty DC column for subsequent checks)
+- UserComparison: show user names in export title and category column
+
+## [0.10.0] - 2026-03-24
+
 Epic 10 - Reports, Export and Compliance. Multi-format export from any
 table view, automated stale account cleanup, and compliance report
 templates with framework control mapping.
