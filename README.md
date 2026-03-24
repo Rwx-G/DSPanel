@@ -86,6 +86,16 @@ assignment (optional - probe-based detection works without them):
 - Network access to an Active Directory domain
 - (Optional) Azure AD App Registration for Entra ID / Exchange Online features
 
+### Event Log Permissions
+
+The **Attack Detection** feature reads the Windows Security Event Log on the
+target DC. If the account running DSPanel is not a member of the
+**Event Log Readers** group on that DC, the Security log is silently
+inaccessible and all checks will display **N/A** with a warning banner.
+
+To grant access, add the DSPanel user to the built-in **Event Log Readers**
+group on each monitored DC (or via Group Policy).
+
 ## Installation
 
 ### Portable (Windows)

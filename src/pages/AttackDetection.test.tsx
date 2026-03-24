@@ -73,6 +73,7 @@ const mockReport: AttackDetectionReport = {
   ],
   timeWindowHours: 24,
   scannedAt: "2026-03-23T10:00:00Z",
+  eventLogAccessible: true,
 };
 
 describe("AttackDetection", () => {
@@ -164,6 +165,7 @@ describe("AttackDetection", () => {
       alerts: [],
       timeWindowHours: 24,
       scannedAt: "2026-03-23T10:00:00Z",
+      eventLogAccessible: true,
     });
     render(<AttackDetection />);
 
@@ -268,6 +270,7 @@ describe("AttackDetection", () => {
       ],
       timeWindowHours: 24,
       scannedAt: "2026-03-23T10:00:00Z",
+      eventLogAccessible: true,
     };
     mockInvoke.mockResolvedValue(reportWithNullMitre);
     render(<AttackDetection />);
@@ -279,5 +282,41 @@ describe("AttackDetection", () => {
     });
     // No MITRE badge should be rendered
     expect(screen.queryByTestId("mitre-ref-badge")).not.toBeInTheDocument();
+  });
+
+  it("shows warning banner when event log is not accessible", async () => {
+    const inaccessibleReport: AttackDetectionReport = {
+      alerts: [],
+      timeWindowHours: 24,
+      scannedAt: "2026-03-23T10:00:00Z",
+      eventLogAccessible: false,
+    };
+    mockInvoke.mockResolvedValue(inaccessibleReport);
+    render(<AttackDetection />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("event-log-warning")).toBeInTheDocument();
+    });
+    expect(screen.getByText(/Cannot read Security Event Log/)).toBeInTheDocument();
+    // All checks should show N/A instead of Clear
+    const naLabels = screen.getAllByText("N/A");
+    expect(naLabels.length).toBeGreaterThan(0);
+  });
+
+  it("shows Clear badges when event log is accessible and no alerts", async () => {
+    const clearReport: AttackDetectionReport = {
+      alerts: [],
+      timeWindowHours: 24,
+      scannedAt: "2026-03-23T10:00:00Z",
+      eventLogAccessible: true,
+    };
+    mockInvoke.mockResolvedValue(clearReport);
+    render(<AttackDetection />);
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("event-log-warning")).not.toBeInTheDocument();
+    });
+    const clearLabels = screen.getAllByText("Clear");
+    expect(clearLabels.length).toBeGreaterThan(0);
   });
 });

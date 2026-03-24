@@ -325,6 +325,19 @@ export function AttackDetection() {
           />
         ) : (
           <div className="space-y-4">
+            {/* Event log access warning */}
+            {report && !report.eventLogAccessible && (
+              <div
+                className="flex items-center gap-2 rounded-lg border border-[var(--color-warning)] bg-[var(--color-warning)]/10 px-3 py-2 text-caption text-[var(--color-warning)]"
+                data-testid="event-log-warning"
+              >
+                <AlertTriangle size={14} className="shrink-0" />
+                <span>
+                  Cannot read Security Event Log - results may be incomplete. Ensure DSPanel runs
+                  with <strong>Event Log Readers</strong> membership on the target DC.
+                </span>
+              </div>
+            )}
             {/* Checks grid - always shown */}
             <div className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)]" data-testid="checks-grid">
               <table className="w-full text-caption">
@@ -374,6 +387,11 @@ export function AttackDetection() {
                               {highestSeverity === "Critical" && <AlertCircle size={10} />}
                               {(highestSeverity === "High" || highestSeverity === "Medium") && <AlertTriangle size={10} />}
                               {alertsForType.length} alert{alertsForType.length > 1 ? "s" : ""}
+                            </span>
+                          ) : report && !report.eventLogAccessible ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-warning)]/10 px-2 py-0.5 text-[11px] font-medium text-[var(--color-warning)]">
+                              <AlertTriangle size={10} />
+                              N/A
                             </span>
                           ) : (
                             <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-success)]/10 px-2 py-0.5 text-[11px] font-medium text-[var(--color-success)]">

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Attack Detection: detect when Security Event Log is inaccessible (missing Event Log Readers membership) and display a warning banner with N/A badges instead of false "Clear" results
+
 ## [0.9.0] - 2026-03-24
 
 Epic 9 - Security, Risk Scoring and Attack Detection. Security monitoring

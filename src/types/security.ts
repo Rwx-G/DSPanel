@@ -130,6 +130,8 @@ export interface AttackDetectionReport {
   alerts: AttackAlert[];
   timeWindowHours: number;
   scannedAt: string;
+  /** Whether the Security event log was accessible. False means results are unreliable. */
+  eventLogAccessible: boolean;
 }
 
 export interface AttackDetectionConfig {

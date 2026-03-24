@@ -318,6 +318,9 @@ pub struct AttackDetectionReport {
     pub time_window_hours: u32,
     /// Timestamp of the scan (ISO 8601).
     pub scanned_at: String,
+    /// Whether the Security event log was accessible.
+    /// `false` means the process lacks Event Log Readers membership and results are unreliable.
+    pub event_log_accessible: bool,
 }
 
 // ---------------------------------------------------------------------------
