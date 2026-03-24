@@ -520,9 +520,9 @@ export function UserComparison() {
                 { key: "dn", header: "Distinguished Name" },
               ]}
               data={filteredGroups}
-              rowMapper={(g) => [g.name, g.category === "shared" ? "Shared" : g.category === "onlyA" ? "Only User A" : "Only User B", g.dn]}
-              title="User Comparison - Group Memberships"
-              filenameBase="user-comparison-groups"
+              rowMapper={(g) => [g.name, g.category === "shared" ? "Shared" : g.category === "onlyA" ? `Only ${userAName}` : `Only ${userBName}`, g.dn]}
+              title={`User Comparison - ${userAName} vs ${userBName}`}
+              filenameBase={`comparison_${userA?.samAccountName ?? "a"}_${userB?.samAccountName ?? "b"}`}
             />
           </div>
 
