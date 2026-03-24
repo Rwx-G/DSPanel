@@ -105,6 +105,11 @@ pub fn builtin_templates() -> Vec<ComplianceTemplate> {
         hipaa_template(),
         sox_template(),
         pci_dss_template(),
+        iso27001_template(),
+        nist_800_53_template(),
+        cis_controls_template(),
+        nis2_template(),
+        anssi_template(),
     ]
 }
 
@@ -474,6 +479,468 @@ fn pci_dss_template() -> ComplianceTemplate {
                  Get-ADUser -Filter {PasswordNeverExpires -eq $true} | Set-ADUser -PasswordNeverExpires $false\n\n\
                  [High - Req. 7.2.1] Review all privileged accounts quarterly; document business justification.\n\n\
                  [Medium - Req. 8.3.9] Force password change for accounts with passwords older than 90 days.",
+            ),
+        ],
+    }
+}
+
+fn iso27001_template() -> ComplianceTemplate {
+    ComplianceTemplate {
+        name: "ISO 27001 Access Control Audit".to_string(),
+        standard: "ISO 27001".to_string(),
+        version: "1.0".to_string(),
+        description: "Audit of AD access controls against ISO/IEC 27001:2022 Annex A controls".to_string(),
+        introduction: Some(
+            "This report evaluates Active Directory configuration against ISO/IEC 27001:2022 \
+             information security controls. It covers access control (A.8), identity management \
+             (A.5.16), authentication (A.8.5), and access rights review (A.5.18). These controls \
+             are foundational for any ISMS certification audit."
+                .to_string(),
+        ),
+        builtin: true,
+        sections: vec![
+            query_section(
+                "Privileged Access Inventory",
+                "ISO 27001 A.8.2 - Privileged access rights",
+                "Lists all accounts with administrative privileges. A.8.2 requires that privileged \
+                 access rights are restricted and managed. Each privileged account must be justified, \
+                 approved, and periodically reviewed.",
+                "High",
+                "privilegedAccounts",
+                &["sAMAccountName", "displayName", "lastLogonTimestamp", "pwdLastSet", "whenCreated"],
+            ),
+            query_section(
+                "Inactive User Accounts",
+                "ISO 27001 A.5.18 - Access rights review",
+                "Identifies accounts inactive for more than 90 days. A.5.18 requires periodic review \
+                 of access rights. Inactive accounts indicate that access rights have not been revoked \
+                 when no longer needed, a common finding in ISO 27001 audits.",
+                "High",
+                "inactiveAccounts",
+                &["sAMAccountName", "displayName", "lastLogonTimestamp"],
+            ),
+            query_section(
+                "Weak Authentication - No Password Required",
+                "ISO 27001 A.8.5 - Secure authentication",
+                "Detects accounts with PASSWD_NOTREQD flag. A.8.5 requires secure authentication \
+                 mechanisms. Accounts that can operate without a password represent a fundamental \
+                 authentication control failure.",
+                "Critical",
+                "passwordNotRequired",
+                &["sAMAccountName", "displayName", "userAccountControl"],
+            ),
+            query_section(
+                "Reversible Password Encryption",
+                "ISO 27001 A.8.24 - Use of cryptography",
+                "Detects accounts with reversible password encryption. A.8.24 requires appropriate \
+                 use of cryptography. Storing passwords in a reversible format violates this control.",
+                "Critical",
+                "reversibleEncryption",
+                &["sAMAccountName", "displayName", "userAccountControl"],
+            ),
+            query_section(
+                "Password Rotation Compliance",
+                "ISO 27001 A.5.17 - Authentication information",
+                "Identifies accounts with passwords older than 90 days. A.5.17 requires management \
+                 of authentication information including periodic changes. Stale passwords increase \
+                 the risk of credential compromise.",
+                "Medium",
+                "passwordExpired",
+                &["sAMAccountName", "displayName", "pwdLastSet"],
+            ),
+            query_section(
+                "Disabled Accounts Lifecycle",
+                "ISO 27001 A.5.18 - Access rights review",
+                "Lists disabled accounts to verify proper lifecycle management. A.5.18 requires that \
+                 access rights are removed or adjusted on change of role or termination. Lingering \
+                 disabled accounts suggest incomplete deprovisioning.",
+                "Low",
+                "disabledAccounts",
+                &["sAMAccountName", "displayName", "whenChanged"],
+            ),
+            static_section(
+                "Remediation Steps",
+                "ISO 27001 A.8 - Technological controls",
+                "[Critical] Clear PASSWD_NOTREQD and reversible encryption flags:\n\
+                 Get-ADUser -Filter {PasswordNotRequired -eq $true} | Set-ADUser -PasswordNotRequired $false\n\
+                 Get-ADUser -Filter {AllowReversiblePasswordEncryption -eq $true} | Set-ADUser -AllowReversiblePasswordEncryption $false\n\n\
+                 [High] Implement quarterly access rights review (A.5.18) with documented sign-off.\n\n\
+                 [High] Disable inactive accounts within 90 days:\n\
+                 Search-ADAccount -AccountInactive -TimeSpan 90 | Disable-ADAccount\n\n\
+                 [Medium] Enforce 90-day password rotation policy.\n\n\
+                 [Low] Archive and delete disabled accounts older than retention period.",
+            ),
+        ],
+    }
+}
+
+fn nist_800_53_template() -> ComplianceTemplate {
+    ComplianceTemplate {
+        name: "NIST 800-53 Access Control Assessment".to_string(),
+        standard: "NIST 800-53".to_string(),
+        version: "1.0".to_string(),
+        description: "Assessment of AD controls against NIST SP 800-53 Rev. 5 AC and IA families".to_string(),
+        introduction: Some(
+            "This report assesses Active Directory controls against NIST SP 800-53 Revision 5, \
+             focusing on the Access Control (AC) and Identification and Authentication (IA) control \
+             families. These controls are mandatory for U.S. federal information systems and widely \
+             adopted as best practice by private sector organizations."
+                .to_string(),
+        ),
+        builtin: true,
+        sections: vec![
+            query_section(
+                "Privileged Account Management",
+                "NIST AC-6 - Least privilege",
+                "Lists all accounts with administrative privileges. AC-6 requires the principle of \
+                 least privilege: authorize only the minimum access necessary. Each privileged account \
+                 should be individually authorized and documented.",
+                "High",
+                "privilegedAccounts",
+                &["sAMAccountName", "displayName", "lastLogonTimestamp", "pwdLastSet", "whenCreated"],
+            ),
+            query_section(
+                "Inactive Account Detection",
+                "NIST AC-2(3) - Account management: disable accounts",
+                "Identifies accounts inactive for more than 90 days. AC-2(3) requires automatic \
+                 disabling of inactive accounts after a defined period. FedRAMP typically sets this \
+                 at 90 days for unprivileged and 35 days for privileged accounts.",
+                "High",
+                "inactiveAccounts",
+                &["sAMAccountName", "displayName", "lastLogonTimestamp"],
+            ),
+            query_section(
+                "Password-Not-Required Accounts",
+                "NIST IA-5 - Authenticator management",
+                "Detects accounts with the PASSWD_NOTREQD flag. IA-5 requires that authenticators \
+                 have sufficient strength. An account that does not require a password has no \
+                 authenticator strength at all.",
+                "Critical",
+                "passwordNotRequired",
+                &["sAMAccountName", "displayName", "userAccountControl"],
+            ),
+            query_section(
+                "Reversible Encryption Detection",
+                "NIST IA-5(1)(h) - Password-based authentication",
+                "Detects accounts with reversible password encryption. IA-5(1)(h) requires passwords \
+                 to be stored using approved one-way hashing. Reversible encryption violates this \
+                 requirement and allows password recovery.",
+                "Critical",
+                "reversibleEncryption",
+                &["sAMAccountName", "displayName", "userAccountControl"],
+            ),
+            query_section(
+                "Password Age Compliance",
+                "NIST IA-5(1)(d) - Minimum/maximum lifetime restrictions",
+                "Identifies accounts with passwords older than 90 days. While NIST SP 800-63B \
+                 recommends against mandatory rotation for user passwords, IA-5(1)(d) still requires \
+                 maximum lifetime restrictions as determined by the organization's policy.",
+                "Medium",
+                "passwordExpired",
+                &["sAMAccountName", "displayName", "pwdLastSet"],
+            ),
+            query_section(
+                "Password Never Expires",
+                "NIST AC-2(1) - Automated account management",
+                "Identifies accounts with non-expiring passwords. AC-2(1) requires automated \
+                 mechanisms to support account management. Non-expiring passwords bypass automated \
+                 rotation controls.",
+                "Medium",
+                "passwordNeverExpires",
+                &["sAMAccountName", "displayName", "userAccountControl"],
+            ),
+            static_section(
+                "Remediation Steps",
+                "NIST AC-2 / IA-5 - Account management and authentication",
+                "[Critical] Remove PASSWD_NOTREQD flag:\n\
+                 Get-ADUser -Filter {PasswordNotRequired -eq $true} | Set-ADUser -PasswordNotRequired $false\n\n\
+                 [Critical] Remove reversible encryption:\n\
+                 Get-ADUser -Filter {AllowReversiblePasswordEncryption -eq $true} | Set-ADUser -AllowReversiblePasswordEncryption $false\n\n\
+                 [High] Disable inactive accounts (AC-2(3)):\n\
+                 Search-ADAccount -AccountInactive -TimeSpan 90 | Disable-ADAccount\n\n\
+                 [High] Document justification for every privileged account (AC-6).\n\n\
+                 [Medium] Review and enforce password policy per organizational NIST implementation.\n\n\
+                 [Medium] Implement automated account management per AC-2(1).",
+            ),
+        ],
+    }
+}
+
+fn cis_controls_template() -> ComplianceTemplate {
+    ComplianceTemplate {
+        name: "CIS Controls v8 Assessment".to_string(),
+        standard: "CIS v8".to_string(),
+        version: "1.0".to_string(),
+        description: "Assessment of AD security against CIS Critical Security Controls v8".to_string(),
+        introduction: Some(
+            "This report evaluates Active Directory configuration against the CIS Critical Security \
+             Controls Version 8. It focuses on Control 5 (Account Management), Control 6 (Access \
+             Control Management), and related safeguards. CIS Controls are prioritized, actionable \
+             security best practices adopted worldwide."
+                .to_string(),
+        ),
+        builtin: true,
+        sections: vec![
+            query_section(
+                "Administrative Account Inventory",
+                "CIS v8 5.1 - Establish and maintain an inventory of accounts",
+                "Lists all privileged accounts. Safeguard 5.1 requires maintaining an inventory of \
+                 all accounts, with special attention to administrative and service accounts. This \
+                 inventory must be reviewed at minimum quarterly.",
+                "High",
+                "privilegedAccounts",
+                &["sAMAccountName", "displayName", "lastLogonTimestamp", "pwdLastSet"],
+            ),
+            query_section(
+                "Inactive Account Removal",
+                "CIS v8 5.3 - Disable dormant accounts",
+                "Identifies accounts inactive for more than 90 days. Safeguard 5.3 explicitly \
+                 requires disabling dormant accounts after 45 days of inactivity (IG1). This is \
+                 one of the most impactful CIS safeguards for reducing attack surface.",
+                "High",
+                "inactiveAccounts",
+                &["sAMAccountName", "displayName", "lastLogonTimestamp"],
+            ),
+            query_section(
+                "Disabled Accounts Review",
+                "CIS v8 5.3 - Disable dormant accounts",
+                "Lists currently disabled accounts for lifecycle review. Disabled accounts should \
+                 be deleted after a retention period to prevent reactivation attacks.",
+                "Low",
+                "disabledAccounts",
+                &["sAMAccountName", "displayName", "whenChanged"],
+            ),
+            query_section(
+                "Weak Authentication - No Password Required",
+                "CIS v8 5.2 - Use unique passwords",
+                "Detects accounts with PASSWD_NOTREQD flag. Safeguard 5.2 requires unique passwords \
+                 for all accounts. An account that allows no password is a critical violation.",
+                "Critical",
+                "passwordNotRequired",
+                &["sAMAccountName", "displayName", "userAccountControl"],
+            ),
+            query_section(
+                "Reversible Encryption",
+                "CIS v8 3.11 - Encrypt sensitive data at rest",
+                "Detects accounts with reversible password encryption. Safeguard 3.11 requires \
+                 encryption of sensitive data. Reversible password encryption effectively stores \
+                 credentials in recoverable form.",
+                "Critical",
+                "reversibleEncryption",
+                &["sAMAccountName", "displayName", "userAccountControl"],
+            ),
+            query_section(
+                "Password Freshness",
+                "CIS v8 5.2 - Use unique passwords",
+                "Identifies accounts with passwords older than 90 days. While CIS aligns with \
+                 NIST guidance on not forcing arbitrary rotation, stale passwords on privileged \
+                 accounts remain a significant risk indicator.",
+                "Medium",
+                "passwordExpired",
+                &["sAMAccountName", "displayName", "pwdLastSet"],
+            ),
+            static_section(
+                "Remediation Steps",
+                "CIS v8 5 / 6 - Account and Access Control Management",
+                "[Critical] Clear PASSWD_NOTREQD flag (CIS 5.2):\n\
+                 Get-ADUser -Filter {PasswordNotRequired -eq $true} | Set-ADUser -PasswordNotRequired $false\n\n\
+                 [Critical] Clear reversible encryption (CIS 3.11):\n\
+                 Get-ADUser -Filter {AllowReversiblePasswordEncryption -eq $true} | Set-ADUser -AllowReversiblePasswordEncryption $false\n\n\
+                 [High] Disable dormant accounts within 45 days (CIS 5.3 IG1):\n\
+                 Search-ADAccount -AccountInactive -TimeSpan 45 | Disable-ADAccount\n\n\
+                 [High] Maintain quarterly privileged account inventory review (CIS 5.1).\n\n\
+                 [Medium] Implement centralized authentication (CIS 6.7) for all admin access.\n\n\
+                 [Medium] Restrict admin privileges to dedicated admin accounts (CIS 5.4).",
+            ),
+        ],
+    }
+}
+
+fn nis2_template() -> ComplianceTemplate {
+    ComplianceTemplate {
+        name: "NIS2 Directive - Access Security".to_string(),
+        standard: "NIS2".to_string(),
+        version: "1.0".to_string(),
+        description: "Assessment of AD controls under EU NIS2 Directive (2022/2555) requirements".to_string(),
+        introduction: Some(
+            "This report evaluates Active Directory security against the EU Network and Information \
+             Security Directive 2 (NIS2 - Directive 2022/2555). NIS2 requires essential and important \
+             entities to implement appropriate cybersecurity risk management measures, including \
+             access control policies, authentication security, and account hygiene. Enforcement \
+             began October 2024 with significant penalties for non-compliance."
+                .to_string(),
+        ),
+        builtin: true,
+        sections: vec![
+            query_section(
+                "Privileged Access Management",
+                "NIS2 Art. 21(2)(i) - Access control policies",
+                "Lists all accounts with administrative privileges. Art. 21(2)(i) requires \
+                 access control policies and asset management. Privileged accounts must be \
+                 inventoried, justified, and subject to enhanced monitoring.",
+                "High",
+                "privilegedAccounts",
+                &["sAMAccountName", "displayName", "lastLogonTimestamp", "pwdLastSet"],
+            ),
+            query_section(
+                "Inactive Account Hygiene",
+                "NIS2 Art. 21(2)(i) - Access control",
+                "Identifies accounts inactive for more than 90 days. Under NIS2, entities must \
+                 maintain effective access control. Dormant accounts represent unmanaged access \
+                 paths that increase attack surface.",
+                "High",
+                "inactiveAccounts",
+                &["sAMAccountName", "displayName", "lastLogonTimestamp"],
+            ),
+            query_section(
+                "Accounts Without Password Requirement",
+                "NIS2 Art. 21(2)(j) - Multi-factor authentication",
+                "Detects accounts with PASSWD_NOTREQD flag. Art. 21(2)(j) requires use of \
+                 multi-factor authentication or continuous authentication solutions. An account \
+                 requiring no password is a fundamental violation of authentication security.",
+                "Critical",
+                "passwordNotRequired",
+                &["sAMAccountName", "displayName", "userAccountControl"],
+            ),
+            query_section(
+                "Reversible Password Encryption",
+                "NIS2 Art. 21(2)(h) - Cryptography and encryption",
+                "Detects accounts with reversible password encryption. Art. 21(2)(h) requires \
+                 policies on the use of cryptography and encryption. Reversible password storage \
+                 defeats the purpose of cryptographic protection.",
+                "Critical",
+                "reversibleEncryption",
+                &["sAMAccountName", "displayName", "userAccountControl"],
+            ),
+            query_section(
+                "Password Age Assessment",
+                "NIS2 Art. 21(2)(g) - Basic cyber hygiene practices",
+                "Identifies accounts with passwords older than 90 days. Art. 21(2)(g) explicitly \
+                 requires basic cyber hygiene practices including password management. Stale \
+                 passwords on critical systems increase breach risk.",
+                "Medium",
+                "passwordExpired",
+                &["sAMAccountName", "displayName", "pwdLastSet"],
+            ),
+            static_section(
+                "Remediation Steps",
+                "NIS2 Art. 21 - Cybersecurity risk-management measures",
+                "[Critical] Remove PASSWD_NOTREQD flag:\n\
+                 Get-ADUser -Filter {PasswordNotRequired -eq $true} | Set-ADUser -PasswordNotRequired $false\n\n\
+                 [Critical] Remove reversible encryption:\n\
+                 Get-ADUser -Filter {AllowReversiblePasswordEncryption -eq $true} | Set-ADUser -AllowReversiblePasswordEncryption $false\n\n\
+                 [High] Disable inactive accounts within 90 days.\n\n\
+                 [High] Implement MFA for all administrative access (Art. 21(2)(j)).\n\n\
+                 [Medium] Enforce password rotation policy aligned with ENISA guidelines.\n\n\
+                 [Medium] Document and maintain an incident response plan covering identity compromise (Art. 21(2)(b)).\n\n\
+                 Note: NIS2 penalties can reach 10M EUR or 2% of global annual turnover for essential entities.",
+            ),
+        ],
+    }
+}
+
+fn anssi_template() -> ComplianceTemplate {
+    ComplianceTemplate {
+        name: "ANSSI - Hygiene informatique AD".to_string(),
+        standard: "ANSSI".to_string(),
+        version: "1.0".to_string(),
+        description: "Audit de l'Active Directory selon le guide d'hygiene ANSSI et les recommandations AD".to_string(),
+        introduction: Some(
+            "Ce rapport evalue la configuration Active Directory selon les recommandations de l'ANSSI \
+             (Agence Nationale de la Securite des Systemes d'Information), notamment le guide \
+             d'hygiene informatique (42 mesures) et le guide de securisation de l'Active Directory. \
+             Ces referentiels sont la base des audits de securite en France et sont alignes avec \
+             les exigences NIS2 pour les entites essentielles et importantes."
+                .to_string(),
+        ),
+        builtin: true,
+        sections: vec![
+            query_section(
+                "Inventaire des comptes a privileges",
+                "ANSSI R.27 - Limiter les droits d'administration",
+                "Liste tous les comptes avec privileges administratifs. La mesure R.27 du guide \
+                 d'hygiene recommande de limiter strictement les droits d'administration et de \
+                 maintenir un inventaire a jour. Le guide AD ANSSI recommande des comptes admin \
+                 dedies (tiering model).",
+                "High",
+                "privilegedAccounts",
+                &["sAMAccountName", "displayName", "lastLogonTimestamp", "pwdLastSet", "whenCreated"],
+            ),
+            query_section(
+                "Comptes inactifs",
+                "ANSSI R.30 - Desactiver les comptes inutilises",
+                "Identifie les comptes inactifs depuis plus de 90 jours. La mesure R.30 recommande \
+                 de desactiver les comptes utilisateurs inutilises et de supprimer les comptes \
+                 obsoletes. Les comptes dormants sont un vecteur d'attaque privilegie.",
+                "High",
+                "inactiveAccounts",
+                &["sAMAccountName", "displayName", "lastLogonTimestamp"],
+            ),
+            query_section(
+                "Comptes sans mot de passe requis",
+                "ANSSI R.22 - Mettre en oeuvre une politique de mot de passe",
+                "Detecte les comptes avec le flag PASSWD_NOTREQD. La mesure R.22 impose une \
+                 politique de mots de passe robuste. Un compte pouvant fonctionner sans mot de \
+                 passe est une faille critique.",
+                "Critical",
+                "passwordNotRequired",
+                &["sAMAccountName", "displayName", "userAccountControl"],
+            ),
+            query_section(
+                "Chiffrement reversible des mots de passe",
+                "ANSSI R.22 - Politique de mot de passe",
+                "Detecte les comptes stockant les mots de passe en chiffrement reversible. Le \
+                 guide ANSSI recommande le stockage des mots de passe sous forme de hash \
+                 irreversible uniquement. Le chiffrement reversible permet la recuperation \
+                 en clair.",
+                "Critical",
+                "reversibleEncryption",
+                &["sAMAccountName", "displayName", "userAccountControl"],
+            ),
+            query_section(
+                "Age des mots de passe",
+                "ANSSI R.22 - Politique de mot de passe",
+                "Identifie les comptes dont le mot de passe n'a pas ete change depuis plus de \
+                 90 jours. L'ANSSI recommande un renouvellement periodique des mots de passe, \
+                 en particulier pour les comptes a privileges (tous les 6 mois maximum).",
+                "Medium",
+                "passwordExpired",
+                &["sAMAccountName", "displayName", "pwdLastSet"],
+            ),
+            query_section(
+                "Comptes avec mot de passe permanent",
+                "ANSSI R.22 - Politique de mot de passe",
+                "Identifie les comptes avec le flag 'Password Never Expires'. A l'exception \
+                 des comptes de service documentes, aucun compte ne devrait avoir de mot de \
+                 passe permanent.",
+                "Medium",
+                "passwordNeverExpires",
+                &["sAMAccountName", "displayName", "userAccountControl"],
+            ),
+            query_section(
+                "Comptes desactives",
+                "ANSSI R.30 - Desactiver les comptes inutilises",
+                "Liste les comptes desactives pour verification du cycle de vie. Les comptes \
+                 desactives depuis longtemps doivent etre supprimes apres la periode de \
+                 retention definie par la politique interne.",
+                "Low",
+                "disabledAccounts",
+                &["sAMAccountName", "displayName", "whenChanged"],
+            ),
+            static_section(
+                "Actions de remediation",
+                "ANSSI - Guide d'hygiene informatique",
+                "[Critique] Supprimer le flag PASSWD_NOTREQD :\n\
+                 Get-ADUser -Filter {PasswordNotRequired -eq $true} | Set-ADUser -PasswordNotRequired $false\n\n\
+                 [Critique] Supprimer le chiffrement reversible :\n\
+                 Get-ADUser -Filter {AllowReversiblePasswordEncryption -eq $true} | Set-ADUser -AllowReversiblePasswordEncryption $false\n\n\
+                 [Eleve] Desactiver les comptes inactifs > 90 jours (R.30) :\n\
+                 Search-ADAccount -AccountInactive -TimeSpan 90 | Disable-ADAccount\n\n\
+                 [Eleve] Mettre en place le tiering model pour les comptes admin (guide AD ANSSI).\n\n\
+                 [Eleve] Deployer l'authentification multifacteur pour tous les acces administratifs.\n\n\
+                 [Moyen] Appliquer la politique de rotation des mots de passe (R.22).\n\n\
+                 [Moyen] Supprimer les comptes desactives apres la periode de retention.\n\n\
+                 Reference : https://cyber.gouv.fr/publications/guide-dhygiene-informatique",
             ),
         ],
     }
@@ -975,13 +1442,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn builtin_templates_has_four() {
+    fn builtin_templates_has_nine() {
         let templates = builtin_templates();
-        assert_eq!(templates.len(), 4);
-        assert_eq!(templates[0].standard, "GDPR");
-        assert_eq!(templates[1].standard, "HIPAA");
-        assert_eq!(templates[2].standard, "SOX");
-        assert_eq!(templates[3].standard, "PCI-DSS");
+        assert_eq!(templates.len(), 9);
+        let standards: Vec<&str> = templates.iter().map(|t| t.standard.as_str()).collect();
+        assert!(standards.contains(&"GDPR"));
+        assert!(standards.contains(&"HIPAA"));
+        assert!(standards.contains(&"SOX"));
+        assert!(standards.contains(&"PCI-DSS"));
+        assert!(standards.contains(&"ISO 27001"));
+        assert!(standards.contains(&"NIST 800-53"));
+        assert!(standards.contains(&"CIS v8"));
+        assert!(standards.contains(&"NIS2"));
+        assert!(standards.contains(&"ANSSI"));
     }
 
     #[test]
@@ -1001,7 +1474,7 @@ mod tests {
             let has_recs = t
                 .sections
                 .iter()
-                .any(|s| s.section_type == SectionType::Static && s.title.contains("Remediation"));
+                .any(|s| s.section_type == SectionType::Static && s.title.to_lowercase().contains("remediation"));
             assert!(has_recs, "Template {} missing Remediation section", t.name);
         }
     }

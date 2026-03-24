@@ -74,6 +74,11 @@ const STANDARD_COLORS: Record<string, string> = {
   HIPAA: "#2e7d32",
   SOX: "#e65100",
   "PCI-DSS": "#6a1b9a",
+  "ISO 27001": "#00695c",
+  "NIST 800-53": "#283593",
+  "CIS v8": "#bf360c",
+  NIS2: "#0d47a1",
+  ANSSI: "#c62828",
 };
 
 const QUERY_SCOPES = [
