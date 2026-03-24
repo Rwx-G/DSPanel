@@ -35,6 +35,8 @@ interface ExportToolbarProps<T> {
   title: string;
   /** Base filename without extension (date will be appended). */
   filenameBase: string;
+  /** Override the default disabled logic (disabled when data is empty). */
+  disabled?: boolean;
 }
 
 export function ExportToolbar<T>({
@@ -43,6 +45,7 @@ export function ExportToolbar<T>({
   rowMapper,
   title,
   filenameBase,
+  disabled,
 }: ExportToolbarProps<T>) {
   const [exporting, setExporting] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -96,7 +99,7 @@ export function ExportToolbar<T>({
       <button
         className="btn btn-sm rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2.5 py-1 text-caption font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors flex items-center gap-1"
         onClick={() => setMenuOpen((prev) => !prev)}
-        disabled={exporting || data.length === 0}
+        disabled={exporting || (disabled ?? data.length === 0)}
         data-testid="export-button"
       >
         <Download size={14} />

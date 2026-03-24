@@ -595,6 +595,7 @@ export function GroupHygiene() {
             rowMapper={(row) => [row.category, row.name, row.scope, row.detail]}
             title="Group Hygiene Report"
             filenameBase="group-hygiene"
+            disabled={!scanned}
           />
           <button
             className="btn btn-primary btn-sm flex items-center gap-1.5"
