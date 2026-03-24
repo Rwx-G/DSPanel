@@ -1,5 +1,6 @@
 pub mod app_settings;
 pub mod audit;
+pub mod cleanup;
 pub mod comparison;
 pub mod credential_store;
 pub mod dacl;

@@ -282,6 +282,10 @@ pub fn run() {
             commands::get_risk_score_history,
             commands::detect_ad_attacks,
             commands::get_escalation_paths,
+            commands::get_cleanup_rules,
+            commands::save_cleanup_rules,
+            commands::cleanup_dry_run,
+            commands::cleanup_execute,
         ])
         .run(tauri::generate_context!())
         .unwrap_or_else(|e| {

@@ -24,6 +24,9 @@ pub struct AppSettings {
     /// (Domain Admins, Enterprise Admins, Schema Admins, Administrators).
     #[serde(default)]
     pub privileged_groups: Option<Vec<String>>,
+    /// Cleanup rules for automated stale account management.
+    #[serde(default)]
+    pub cleanup_rules: Option<Vec<super::cleanup::CleanupRule>>,
 }
 
 /// Service for managing persisted application settings.
@@ -173,6 +176,7 @@ mod tests {
             graph_tenant_id: Some("tenant-123".to_string()),
             graph_client_id: Some("client-456".to_string()),
             privileged_groups: None,
+            cleanup_rules: None,
         };
         let json = serde_json::to_string(&settings).unwrap();
         assert!(json.contains("tenant-123"));
