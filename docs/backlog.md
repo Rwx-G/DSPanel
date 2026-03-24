@@ -18,8 +18,6 @@ Items deferred from QA reviews. None are blocking - all stories are PASS.
 | Epic 10 QA | Add print-preview mode for PDF before saving | `src/components/common/ExportToolbar.tsx`, Story 10.1 |
 | Epic 10 QA | Add exclusion patterns for service accounts by naming convention or OU in cleanup rules | `src-tauri/src/services/cleanup.rs`, Story 10.3 |
 | Epic 10 QA | Add scheduled cleanup execution with cron-like rules | `src-tauri/src/services/cleanup.rs`, `src/pages/AutomatedCleanup.tsx`, Story 10.3 |
-| Epic 10 QA | Add PDF export for compliance reports alongside HTML | `src-tauri/src/commands/compliance.rs`, `src-tauri/src/services/compliance.rs`, Story 10.4 |
-| Epic 10 QA | Add template import/export for sharing between DSPanel instances | `src-tauri/src/commands/compliance.rs`, Story 10.4 |
 | Epic 6 QA | Interactive Browser auth (device code flow) as alternative to client secret for Graph API | `graph_exchange.rs`, Epic 12 (Story 12.2) |
 | Epic 9 QA | Add weight configuration UI in settings for risk score factors (backend RiskWeights exists) | Epic 12, `RiskScore.tsx`, Story 9.2 |
 | Epic 9 QA | Add UI for attack detection thresholds and exclusion lists (backend AttackDetectionConfig exists) | Epic 12, `AttackDetection.tsx`, Story 9.3 |
