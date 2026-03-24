@@ -1,103 +1,43 @@
 use tauri::State;
 
 use crate::error::AppError;
-use crate::services::compliance::{
-    self, ComplianceReport, ComplianceTemplate,
-};
+use crate::services::compliance::{self, ComplianceScanResult};
 use crate::services::PermissionLevel;
 use crate::state::AppState;
 
-/// Returns all available compliance templates (built-in + custom).
+/// Returns the list of supported frameworks.
 #[tauri::command]
-pub fn get_compliance_templates(state: State<'_, AppState>) -> Vec<ComplianceTemplate> {
-    let mut templates = compliance::builtin_templates();
-
-    // Load custom templates from app settings
-    let settings = state.app_settings.get();
-    if let Some(custom) = settings.compliance_templates {
-        templates.extend(custom);
-    }
-
-    templates
+pub fn get_compliance_frameworks() -> Vec<String> {
+    compliance::FRAMEWORKS.iter().map(|s| s.to_string()).collect()
 }
 
-/// Saves a custom compliance template. Requires DomainAdmin.
+/// Runs all compliance checks once and returns results with per-framework scores.
+/// Requires DomainAdmin.
 #[tauri::command]
-pub fn save_custom_template(
+pub async fn run_compliance_scan(
     state: State<'_, AppState>,
-    template: ComplianceTemplate,
-) -> Result<(), AppError> {
+) -> Result<ComplianceScanResult, AppError> {
     if !state
         .permission_service
         .has_permission(PermissionLevel::DomainAdmin)
     {
         return Err(AppError::PermissionDenied(
-            "Custom templates require DomainAdmin permission".to_string(),
-        ));
-    }
-
-    let mut settings = state.app_settings.get();
-    let mut customs = settings.compliance_templates.unwrap_or_default();
-    // Replace if same name exists, otherwise add
-    if let Some(pos) = customs.iter().position(|t| t.name == template.name) {
-        customs[pos] = template;
-    } else {
-        customs.push(template);
-    }
-    settings.compliance_templates = Some(customs);
-    state.app_settings.update(settings);
-    Ok(())
-}
-
-/// Deletes a custom compliance template by name. Requires DomainAdmin.
-#[tauri::command]
-pub fn delete_custom_template(
-    state: State<'_, AppState>,
-    name: String,
-) -> Result<(), AppError> {
-    if !state
-        .permission_service
-        .has_permission(PermissionLevel::DomainAdmin)
-    {
-        return Err(AppError::PermissionDenied(
-            "Custom templates require DomainAdmin permission".to_string(),
-        ));
-    }
-
-    let mut settings = state.app_settings.get();
-    let mut customs = settings.compliance_templates.unwrap_or_default();
-    customs.retain(|t| t.name != name);
-    settings.compliance_templates = Some(customs);
-    state.app_settings.update(settings);
-    Ok(())
-}
-
-/// Generates a compliance report from a template. Requires DomainAdmin.
-#[tauri::command]
-pub async fn generate_compliance_report(
-    state: State<'_, AppState>,
-    template: ComplianceTemplate,
-) -> Result<ComplianceReport, AppError> {
-    if !state
-        .permission_service
-        .has_permission(PermissionLevel::DomainAdmin)
-    {
-        return Err(AppError::PermissionDenied(
-            "Report generation requires DomainAdmin permission".to_string(),
+            "Compliance scan requires DomainAdmin permission".to_string(),
         ));
     }
 
     let provider = state.directory_provider.clone();
-    compliance::generate_report(provider, &template).await
+    compliance::run_compliance_scan(provider).await
 }
 
-/// Exports a compliance report as HTML and opens a save dialog.
+/// Exports a compliance report for a specific framework as HTML via save dialog.
 #[tauri::command]
-pub async fn export_compliance_report_html(
-    report: ComplianceReport,
+pub async fn export_compliance_framework_report(
+    scan: ComplianceScanResult,
+    framework: String,
     default_name: String,
 ) -> Result<Option<String>, AppError> {
-    let html = compliance::report_to_html(&report);
+    let html = compliance::export_framework_report(&scan, &framework);
 
     let dialog = rfd::AsyncFileDialog::new()
         .set_file_name(&default_name)

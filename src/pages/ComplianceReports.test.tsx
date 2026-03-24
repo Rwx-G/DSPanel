@@ -9,66 +9,56 @@ vi.mock("@tauri-apps/api/core", () => ({
 import { invoke } from "@tauri-apps/api/core";
 const mockInvoke = vi.mocked(invoke);
 
-const mockTemplates = [
-  {
-    name: "GDPR Access Review",
-    standard: "GDPR",
-    version: "1.0",
-    description: "Review of AD access controls for GDPR compliance",
-    builtin: true,
-    sections: [
-      {
-        title: "Privileged Access Summary",
-        controlReference: "GDPR Art. 25",
-        type: "query",
-        queryScope: "privilegedAccounts",
-        queryAttributes: ["sAMAccountName"],
-        content: null,
-      },
-      {
-        title: "Recommendations",
-        controlReference: "GDPR Art. 32",
-        type: "static",
-        queryScope: null,
-        queryAttributes: null,
-        content: "Review quarterly.",
-      },
-    ],
-  },
-  {
-    name: "PCI-DSS Auth Audit",
-    standard: "PCI-DSS",
-    version: "1.0",
-    description: "PCI-DSS compliance audit",
-    builtin: true,
-    sections: [],
-  },
-];
-
-const mockReport = {
-  templateName: "GDPR Access Review",
-  standard: "GDPR",
-  version: "1.0",
-  generatedAt: "2026-03-24 12:00:00",
+const mockScan = {
+  scannedAt: "2026-03-24 12:00:00",
   generator: "testadmin",
-  sections: [
+  totalAccountsScanned: 2500,
+  globalScore: 55,
+  totalFindings: 150,
+  frameworkScores: [
+    { standard: "GDPR", score: 55, totalChecks: 5, checksWithFindings: 3, controlRefs: ["Art. 32"] },
+    { standard: "HIPAA", score: 65, totalChecks: 5, checksWithFindings: 2, controlRefs: ["164.312"] },
+    { standard: "PCI-DSS v4.0", score: 40, totalChecks: 6, checksWithFindings: 4, controlRefs: ["Req. 7"] },
+  ],
+  checks: [
     {
-      title: "Privileged Access Summary",
-      controlReference: "GDPR Art. 25",
-      sectionType: "query",
-      headers: ["sAMAccountName"],
-      rows: [["admin"], ["svc_sql"]],
-      content: null,
-      findingCount: 2,
+      checkId: "privileged_accounts",
+      title: "Privileged Accounts",
+      description: "Accounts with admin privileges.",
+      severity: "High",
+      findingCount: 12,
+      headers: ["Username", "Display Name"],
+      rows: [["admin", "Administrator"], ["svc_sql", "SQL Service"]],
+      frameworks: [
+        { standard: "GDPR", controlRef: "Art. 32(2)" },
+        { standard: "HIPAA", controlRef: "164.312(a)(1)" },
+      ],
+      remediation: "Review all privileged accounts quarterly.",
     },
     {
-      title: "Recommendations",
-      controlReference: "GDPR Art. 32",
-      sectionType: "static",
-      headers: null,
-      rows: null,
-      content: "Review quarterly.",
-      findingCount: null,
+      checkId: "password_not_required",
+      title: "Password Not Required",
+      description: "Accounts with PASSWD_NOTREQD flag.",
+      severity: "Critical",
+      findingCount: 2,
+      headers: ["Username"],
+      rows: [["testuser1"], ["testuser2"]],
+      frameworks: [
+        { standard: "GDPR", controlRef: "Art. 32(1)(b)" },
+        { standard: "PCI-DSS v4.0", controlRef: "Req. 8.3.1" },
+      ],
+      remediation: "Get-ADUser -Filter {PasswordNotRequired -eq $true} | Set-ADUser -PasswordNotRequired $false",
+    },
+    {
+      checkId: "reversible_encryption",
+      title: "Reversible Encryption",
+      description: "Accounts with reversible encryption.",
+      severity: "Critical",
+      findingCount: 0,
+      headers: ["Username"],
+      rows: [],
+      frameworks: [{ standard: "GDPR", controlRef: "Art. 32(1)(a)" }],
+      remediation: "No action needed.",
     },
   ],
 };
@@ -77,118 +67,130 @@ describe("ComplianceReports", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockInvoke.mockImplementation((cmd) => {
-      if (cmd === "get_compliance_templates") return Promise.resolve(mockTemplates);
-      if (cmd === "generate_compliance_report") return Promise.resolve(mockReport);
-      if (cmd === "export_compliance_report_html") return Promise.resolve("/tmp/report.html");
-      if (cmd === "save_custom_template") return Promise.resolve(null);
-      if (cmd === "delete_custom_template") return Promise.resolve(null);
+      if (cmd === "run_compliance_scan") return Promise.resolve(mockScan);
+      if (cmd === "export_compliance_framework_report") return Promise.resolve("/tmp/report.html");
+      if (cmd === "export_table") return Promise.resolve(null);
       return Promise.resolve(null);
     });
   });
 
-  it("renders template cards", async () => {
+  it("renders empty state before scan", () => {
     render(<ComplianceReports />);
-    await waitFor(() => {
-      expect(screen.getByTestId("template-grid")).toBeInTheDocument();
-    });
-    expect(screen.getByText("GDPR Access Review")).toBeInTheDocument();
-    expect(screen.getByText("PCI-DSS Auth Audit")).toBeInTheDocument();
+    expect(screen.getByText(/Run a compliance scan/)).toBeInTheDocument();
   });
 
-  it("shows standard badges on cards", async () => {
+  it("shows scan button", () => {
     render(<ComplianceReports />);
-    await waitFor(() => {
-      expect(screen.getByText("GDPR")).toBeInTheDocument();
-      expect(screen.getByText("PCI-DSS")).toBeInTheDocument();
-    });
+    expect(screen.getByTestId("scan-button")).toBeInTheDocument();
   });
 
-  it("shows control references on card", async () => {
+  it("runs scan and shows global score", async () => {
     render(<ComplianceReports />);
+    fireEvent.click(screen.getByTestId("scan-button"));
+
     await waitFor(() => {
-      expect(screen.getByText("GDPR Art. 25")).toBeInTheDocument();
+      expect(screen.getByText("55/100")).toBeInTheDocument();
     });
+    expect(screen.getByText("Global Compliance Score")).toBeInTheDocument();
   });
 
-  it("generates report on button click", async () => {
+  it("shows framework score cards", async () => {
     render(<ComplianceReports />);
-    await waitFor(() => {
-      expect(screen.getByTestId("generate-GDPR")).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByTestId("generate-GDPR"));
+    fireEvent.click(screen.getByTestId("scan-button"));
 
     await waitFor(() => {
-      expect(screen.getByTestId("report-viewer")).toBeInTheDocument();
+      expect(screen.getByTestId("framework-grid")).toBeInTheDocument();
     });
-    expect(screen.getByText("Privileged Access Summary")).toBeInTheDocument();
-    expect(screen.getByText("2 items")).toBeInTheDocument();
-    expect(screen.getByText("admin")).toBeInTheDocument();
+    expect(screen.getByText("GDPR")).toBeInTheDocument();
+    expect(screen.getByText("HIPAA")).toBeInTheDocument();
   });
 
-  it("shows export toolbar in report", async () => {
+  it("shows checks list", async () => {
     render(<ComplianceReports />);
-    await waitFor(() => {
-      fireEvent.click(screen.getByTestId("generate-GDPR"));
-    });
+    fireEvent.click(screen.getByTestId("scan-button"));
 
     await waitFor(() => {
-      expect(screen.getByTestId("export-toolbar")).toBeInTheDocument();
+      expect(screen.getByTestId("checks-list")).toBeInTheDocument();
     });
+    expect(screen.getByText("Privileged Accounts")).toBeInTheDocument();
+    expect(screen.getByText("Password Not Required")).toBeInTheDocument();
   });
 
-  it("export toolbar has format options", async () => {
+  it("shows finding count and severity on checks", async () => {
     render(<ComplianceReports />);
+    fireEvent.click(screen.getByTestId("scan-button"));
+
     await waitFor(() => {
-      fireEvent.click(screen.getByTestId("generate-GDPR"));
+      expect(screen.getByText("12")).toBeInTheDocument();
     });
+    expect(screen.getAllByText("Critical").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("High").length).toBeGreaterThan(0);
+  });
+
+  it("shows Clear for checks with zero findings", async () => {
+    render(<ComplianceReports />);
+    fireEvent.click(screen.getByTestId("scan-button"));
 
     await waitFor(() => {
-      expect(screen.getByTestId("export-button")).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByTestId("export-button"));
-
-    await waitFor(() => {
-      expect(screen.getByTestId("export-csv")).toBeInTheDocument();
-      expect(screen.getByTestId("export-xlsx")).toBeInTheDocument();
+      expect(screen.getByText("Clear")).toBeInTheDocument();
     });
   });
 
-  it("shows static content sections", async () => {
+  it("expands check to show details", async () => {
     render(<ComplianceReports />);
-    await waitFor(() => {
-      fireEvent.click(screen.getByTestId("generate-GDPR"));
-    });
+    fireEvent.click(screen.getByTestId("scan-button"));
 
     await waitFor(() => {
-      expect(screen.getByText("Review quarterly.")).toBeInTheDocument();
+      expect(screen.getByTestId("check-privileged_accounts")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText("Privileged Accounts"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Accounts with admin privileges.")).toBeInTheDocument();
+      expect(screen.getByText("Art. 32(2)")).toBeInTheDocument();
+      expect(screen.getByText("admin")).toBeInTheDocument();
     });
   });
 
-  it("shows custom template button", async () => {
+  it("shows framework chips in expanded check", async () => {
     render(<ComplianceReports />);
+    fireEvent.click(screen.getByTestId("scan-button"));
+
     await waitFor(() => {
-      expect(screen.getByTestId("create-custom-btn")).toBeInTheDocument();
+      fireEvent.click(screen.getByText("Privileged Accounts"));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("164.312(a)(1)")).toBeInTheDocument();
     });
   });
 
-  it("opens custom template editor", async () => {
+  it("exports framework report on card click", async () => {
     render(<ComplianceReports />);
-    await waitFor(() => {
-      fireEvent.click(screen.getByTestId("create-custom-btn"));
-    });
+    fireEvent.click(screen.getByTestId("scan-button"));
 
     await waitFor(() => {
-      expect(screen.getByTestId("custom-template-editor")).toBeInTheDocument();
+      expect(screen.getByTestId("export-fw-GDPR")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId("export-fw-GDPR"));
+
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith(
+        "export_compliance_framework_report",
+        expect.objectContaining({ framework: "GDPR" }),
+      );
     });
   });
 
-  it("does not show delete button for builtin templates", async () => {
+  it("shows metadata in global score", async () => {
     render(<ComplianceReports />);
+    fireEvent.click(screen.getByTestId("scan-button"));
+
     await waitFor(() => {
-      expect(screen.getByTestId("template-grid")).toBeInTheDocument();
+      expect(screen.getByText(/2500 accounts scanned/)).toBeInTheDocument();
+      expect(screen.getByText(/150 findings/)).toBeInTheDocument();
     });
-    expect(screen.queryByTestId("delete-template-GDPR Access Review")).not.toBeInTheDocument();
   });
 });
