@@ -22,6 +22,7 @@ import {
   Gauge,
   Radar,
   Route,
+  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 import { useNavigation } from "@/contexts/NavigationContext";
@@ -50,6 +51,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   gauge: Gauge,
   radar: Radar,
   route: Route,
+  sparkles: Sparkles,
 };
 
 const MODULES: SidebarModule[] = [
@@ -113,6 +115,13 @@ const MODULES: SidebarModule[] = [
     id: "recycle-bin",
     label: "Recycle Bin",
     icon: "recycle-bin",
+    group: "Directory",
+    requiredLevel: "DomainAdmin",
+  },
+  {
+    id: "automated-cleanup",
+    label: "Automated Cleanup",
+    icon: "sparkles",
     group: "Directory",
     requiredLevel: "DomainAdmin",
   },

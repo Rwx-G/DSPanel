@@ -32,6 +32,7 @@ import { SecurityDashboard } from "@/pages/SecurityDashboard";
 import { RiskScoreDashboard } from "@/pages/RiskScore";
 import { AttackDetection } from "@/pages/AttackDetection";
 import { EscalationPaths } from "@/pages/EscalationPaths";
+import { AutomatedCleanup } from "@/pages/AutomatedCleanup";
 
 const APP_VERSION = __APP_VERSION__;
 
@@ -179,6 +180,7 @@ const MODULE_COMPONENTS: Record<
   "risk-score": RiskScoreDashboard,
   "attack-detection": AttackDetection,
   "escalation-paths": EscalationPaths,
+  "automated-cleanup": AutomatedCleanup,
 };
 
 function ModuleRouter({ status }: { status: AppStatus }) {
