@@ -591,6 +591,9 @@ export function GroupHygiene() {
               ...singleMemberGroups.map((g) => ({ category: "Single Member", name: g.displayName || g.samAccountName, scope: g.scope, detail: "1 member" })),
               ...staleGroups.map((g) => ({ category: "Stale", name: g.displayName || g.samAccountName, scope: g.scope, detail: `Last modified: ${formatWhenChanged(g)}` })),
               ...undescribedGroups.map((g) => ({ category: "No Description", name: g.displayName || g.samAccountName, scope: g.scope, detail: "" })),
+              ...cycles.map((chain) => ({ category: "Circular Nesting", name: chain.join(" -> "), scope: "-", detail: `${chain.length} groups in cycle` })),
+              ...deeplyNested.map((d) => ({ category: "Excessive Depth", name: d.groupName, scope: "-", detail: `Depth: ${d.depth} levels` })),
+              ...duplicateGroups.map((pair) => ({ category: "Duplicate Members", name: pair.map((g) => g.displayName || g.samAccountName).join(" = "), scope: pair[0]?.scope ?? "-", detail: `${pair.length} groups with identical members` })),
             ]}
             rowMapper={(row) => [row.category, row.name, row.scope, row.detail]}
             title="Group Hygiene Report"
