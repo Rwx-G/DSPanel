@@ -120,14 +120,57 @@ pub async fn get_replication_partnerships(
     Ok(partnerships)
 }
 
+/// Validates that a value looks like a valid DC hostname or DN (no injection).
+///
+/// Allows alphanumeric, dots, hyphens, underscores, equals, commas, and spaces
+/// (for DNs like "DC=example,DC=com"). Rejects shell metacharacters.
+fn validate_repadmin_arg(value: &str) -> Result<()> {
+    if value.is_empty() {
+        anyhow::bail!("Empty argument");
+    }
+    if value.len() > 512 {
+        anyhow::bail!("Argument too long");
+    }
+    if value.chars().any(|c| {
+        c.is_control()
+            || matches!(
+                c,
+                '|' | '&'
+                    | ';'
+                    | '`'
+                    | '$'
+                    | '!'
+                    | '<'
+                    | '>'
+                    | '"'
+                    | '\''
+                    | '\\'
+                    | '/'
+                    | '('
+                    | ')'
+                    | '{'
+                    | '}'
+                    | '['
+                    | ']'
+            )
+    }) {
+        anyhow::bail!("Argument contains invalid characters");
+    }
+    Ok(())
+}
+
 /// Triggers a force replication using repadmin command (Windows-only).
 ///
-/// Returns Ok(true) if successful, Ok(false) if the command was not available.
+/// Validates all arguments before passing to repadmin to prevent injection.
 pub async fn force_replication(
     source_dc: &str,
     target_dc: &str,
     naming_context: &str,
 ) -> Result<String> {
+    validate_repadmin_arg(source_dc)?;
+    validate_repadmin_arg(target_dc)?;
+    validate_repadmin_arg(naming_context)?;
+
     #[cfg(target_os = "windows")]
     {
         force_replication_windows(source_dc, target_dc, naming_context).await

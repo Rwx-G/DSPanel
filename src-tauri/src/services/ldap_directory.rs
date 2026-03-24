@@ -27,10 +27,15 @@ const USER_ATTRS: &[&str] = &[
     "accountExpires",
     "pwdLastSet",
     "lastLogon",
+    "lastLogonTimestamp",
     "badPwdCount",
     "whenCreated",
     "whenChanged",
     "memberOf",
+    "servicePrincipalName",
+    "sIDHistory",
+    "adminCount",
+    "msDS-AllowedToActOnBehalfOfOtherIdentity",
 ];
 
 /// LDAP attributes to retrieve for computer searches.
@@ -2627,6 +2632,73 @@ impl DirectoryProvider for LdapDirectoryProvider {
             }
         })
         .await
+    }
+
+    async fn resolve_group_by_rid(&self, rid: u32) -> Result<Option<DirectoryEntry>> {
+        let base_dn = self
+            .base_dn()
+            .ok_or_else(|| anyhow::anyhow!("Not connected - no base DN"))?;
+
+        // Search all security groups and match by objectSid RID.
+        // We search both the domain partition and the Builtin container.
+        let search_bases = vec![base_dn.clone(), format!("CN=Builtin,{}", base_dn)];
+
+        for search_base in search_bases {
+            let sb = search_base.clone();
+            let result: Result<Option<DirectoryEntry>> = self
+                .with_connection(|mut ldap| {
+                    let sb = sb.clone();
+                    async move {
+                        // Search for security groups (groupType bit 0x80000000 = security)
+                        let (rs, _) = ldap
+                            .search(
+                                &sb,
+                                ldap3::Scope::Subtree,
+                                "(&(objectClass=group)(groupType:1.2.840.113556.1.4.803:=-2147483648))",
+                                vec!["objectSid", "sAMAccountName", "distinguishedName", "displayName", "objectClass", "member"],
+                            )
+                            .await
+                            .context("Group search by RID failed")?
+                            .success()
+                            .context("Group search returned error")?;
+
+                        for result_entry in rs {
+                            let se = ldap3::SearchEntry::construct(result_entry);
+                            // Check objectSid binary attribute for matching RID
+                            if let Some(sid_values) = se.bin_attrs.get("objectSid") {
+                                if let Some(sid_bytes) = sid_values.first() {
+                                    let sid_str = sid_bytes_to_string(sid_bytes);
+                                    if let Some(entry_rid) = sid_str.rsplit('-').next().and_then(|s| s.parse::<u32>().ok()) {
+                                        if entry_rid == rid {
+                                            let mut entry = DirectoryEntry::new(se.dn);
+                                            entry.sam_account_name = se.attrs.get("sAMAccountName").and_then(|v| v.first().cloned());
+                                            entry.display_name = se.attrs.get("displayName").and_then(|v| v.first().cloned());
+                                            entry.object_class = Some("group".to_string());
+                                            for (key, values) in se.attrs {
+                                                entry.attributes.insert(key, values);
+                                            }
+                                            return Ok(Some(entry));
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        Ok(None)
+                    }
+                })
+                .await;
+
+            match result {
+                Ok(Some(entry)) => return Ok(Some(entry)),
+                Ok(None) => continue,
+                Err(e) => {
+                    tracing::debug!("Group RID search in {} failed: {}", search_base, e);
+                    continue;
+                }
+            }
+        }
+
+        Ok(None)
     }
 }
 

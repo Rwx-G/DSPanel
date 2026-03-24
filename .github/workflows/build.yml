@@ -90,6 +90,9 @@ jobs:
       - name: Run frontend lint
         run: pnpm lint
 
+      - name: TypeScript type check
+        run: pnpm exec tsc --noEmit
+
       - name: Run frontend tests
         run: pnpm test
 

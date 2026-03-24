@@ -18,6 +18,10 @@ import {
   GitBranch,
   Globe,
   Network,
+  Shield,
+  Gauge,
+  Radar,
+  Route,
   type LucideIcon,
 } from "lucide-react";
 import { useNavigation } from "@/contexts/NavigationContext";
@@ -42,6 +46,10 @@ const ICON_MAP: Record<string, LucideIcon> = {
   "git-branch": GitBranch,
   globe: Globe,
   network: Network,
+  shield: Shield,
+  gauge: Gauge,
+  radar: Radar,
+  route: Route,
 };
 
 const MODULES: SidebarModule[] = [
@@ -134,6 +142,34 @@ const MODULES: SidebarModule[] = [
     label: "AD Topology",
     icon: "network",
     group: "Infrastructure",
+    requiredLevel: "DomainAdmin",
+  },
+  {
+    id: "security-dashboard",
+    label: "Privileged Accounts",
+    icon: "shield",
+    group: "Security",
+    requiredLevel: "DomainAdmin",
+  },
+  {
+    id: "risk-score",
+    label: "Risk Score",
+    icon: "gauge",
+    group: "Security",
+    requiredLevel: "DomainAdmin",
+  },
+  {
+    id: "attack-detection",
+    label: "Attack Detection",
+    icon: "radar",
+    group: "Security",
+    requiredLevel: "DomainAdmin",
+  },
+  {
+    id: "escalation-paths",
+    label: "Escalation Paths",
+    icon: "route",
+    group: "Security",
     requiredLevel: "DomainAdmin",
   },
   {

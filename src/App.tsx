@@ -28,6 +28,10 @@ import { InfrastructureHealth } from "@/pages/InfrastructureHealth";
 import { ReplicationStatus } from "@/pages/ReplicationStatus";
 import { DnsKerberosValidation } from "@/pages/DnsKerberosValidation";
 import { TopologyView } from "@/pages/TopologyView";
+import { SecurityDashboard } from "@/pages/SecurityDashboard";
+import { RiskScoreDashboard } from "@/pages/RiskScore";
+import { AttackDetection } from "@/pages/AttackDetection";
+import { EscalationPaths } from "@/pages/EscalationPaths";
 
 const APP_VERSION = __APP_VERSION__;
 
@@ -171,6 +175,10 @@ const MODULE_COMPONENTS: Record<
   "replication-status": ReplicationStatus,
   "dns-kerberos": DnsKerberosValidation,
   topology: TopologyView,
+  "security-dashboard": SecurityDashboard,
+  "risk-score": RiskScoreDashboard,
+  "attack-detection": AttackDetection,
+  "escalation-paths": EscalationPaths,
 };
 
 function ModuleRouter({ status }: { status: AppStatus }) {

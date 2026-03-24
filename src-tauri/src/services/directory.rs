@@ -283,6 +283,14 @@ pub trait DirectoryProvider: Send + Sync {
     /// like FSMO role holders where Subtree would return too many results.
     /// Returns the entry if found, or None.
     async fn read_entry(&self, dn: &str) -> Result<Option<DirectoryEntry>>;
+
+    /// Resolves a well-known security group by its RID (Relative Identifier).
+    ///
+    /// This is the language-independent way to find groups like Domain Admins
+    /// (RID 512), Enterprise Admins (519), Schema Admins (518), etc.
+    /// Searches security groups and matches the last sub-authority of `objectSid`.
+    /// Returns the group entry if found, or None.
+    async fn resolve_group_by_rid(&self, rid: u32) -> Result<Option<DirectoryEntry>>;
 }
 
 #[allow(clippy::unwrap_used)]
@@ -960,6 +968,12 @@ pub mod tests {
         async fn read_entry(&self, _dn: &str) -> Result<Option<DirectoryEntry>> {
             self.check_failure()?;
             Ok(self.configuration_entries.lock().unwrap().first().cloned())
+        }
+
+        async fn resolve_group_by_rid(&self, _rid: u32) -> Result<Option<DirectoryEntry>> {
+            self.check_failure()?;
+            // Mock returns a matching group from the groups list based on RID
+            Ok(self.groups.lock().unwrap().first().cloned())
         }
     }
 

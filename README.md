@@ -8,7 +8,7 @@
   <img src="https://img.shields.io/badge/Rust-2021-orange.svg" alt="Rust">
   <img src="https://img.shields.io/badge/Tauri-v2-blue.svg" alt="Tauri">
   <img src="https://img.shields.io/badge/Platform-Windows%20|%20macOS%20|%20Linux-0078D6.svg" alt="Platform">
-  <img src="https://img.shields.io/badge/Status-v0.8.0-brightgreen.svg" alt="Status">
+  <img src="https://img.shields.io/badge/Status-v0.9.0-brightgreen.svg" alt="Status">
 </p>
 
 ---
@@ -36,6 +36,10 @@ DSPanel is an open source cross-platform desktop application (Rust/Tauri v2) tha
 - **Replication Monitoring** - Partnership table with latency, error tracking, and force-replication via repadmin
 - **DNS & Kerberos Validation** - SRV record validation via AD DNS (cross-platform, hickory-resolver), clock skew detection
 - **AD Topology** - Site/DC/replication/site-link overview with per-DC details (IP, OS, roles, online status, subnets)
+- **Privileged Accounts** - Audit of admin group members with 12 security checks per account (Kerberoastable, AS-REP Roastable, Protected Users, SIDHistory, delegation, etc.), domain findings (KRBTGT age, LAPS coverage, PSO), CSV/HTML export
+- **Domain Risk Score** - Security posture scoring (0-100) with 9 weighted factors and ~70 checks, SVG gauge + radar chart, per-finding CIS/MITRE references, remediation complexity and impact scoring, 30-day trend, HTML report export
+- **Attack Detection** - On-demand Windows Security Event Log analysis for 14 attack types (Golden Ticket, DCSync, Kerberoasting, Pass-the-Hash, etc.) with structured XML parsing and MITRE ATT&CK mapping
+- **Escalation Paths** - Privilege escalation path analysis with 5 node types, 8 edge types (membership, delegation, RBCD, SIDHistory, ADCS, GPO), and weighted Dijkstra path-finding
 
 ### Adaptive Permissions
 

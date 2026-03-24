@@ -7,6 +7,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-03-24
+
+Epic 9 - Security, Risk Scoring and Attack Detection. Security monitoring
+suite for DomainAdmin users: privileged account audit, domain-wide risk
+scoring (~70 checks, 9 factors), AD attack detection (14 attack types),
+and privilege escalation path analysis (8 edge types, Dijkstra).
+
+### Added
+
+#### Privileged Accounts (9.1)
+- Privileged account audit page with RID-based group resolution (works on all AD locales)
+- Recursive nested group member resolution (handles groups-in-groups up to 5 levels)
+- 12 per-account checks: Kerberoastable, AS-REP Roastable, reversible encryption, DES-only, constrained delegation with protocol transition, SIDHistory, service account in admin group, Protected Users membership, inactive admin, adminCount orphan, password age, password never expires
+- Domain-level findings: KRBTGT password age, LAPS coverage, Fine-Grained Password Policies, domain functional level, RBCD count, Recycle Bin status
+- AlertBadge component with DSPanel tooltip pattern (portal, hover, keyboard accessible)
+- CSV and HTML report export
+- DomainAdmin permission gating
+
+#### Domain Risk Score (9.2)
+- Risk Score page with SVG semi-circle gauge visualization (0-100, red/orange/green zones)
+- 9 weighted risk factors (~70 individual checks): Privileged Hygiene (15%), Password Policy (10%), Stale Accounts (10%), Kerberos Security (20%), Dangerous Configs (10%), Infrastructure Hardening (10%), GPO Security (10%), Trust Security (10%), Certificate Security (5%)
+- Per-finding granularity: severity, remediation complexity (Easy/Medium/Hard), impact score ("Potential gain: +N points"), CIS Benchmark and MITRE ATT&CK references
+- Worst factor badge (PingCastle-style "weakest link" indicator)
+- SVG radar/spider chart showing all factor scores
+- 30-day trend sparkline with score labels, versioned SQLite storage (schema v2)
+- HTML report export with factor table, findings by severity, recommendations by impact
+- SecurityDisclaimer "i" button with coverage estimate vs specialized tools
+
+#### AD Attack Detection (9.3)
+- 14 attack types with structured XML event parsing: Golden Ticket, DCSync, DCShadow, Kerberoasting, AS-REP Roasting, Brute Force, Pass-the-Hash, Password Spray, Shadow Credentials, RBCD Abuse, AdminSDHolder Tampering, Abnormal Kerberos, Privileged Group Changes, Suspicious Account Activity
+- 6 batched PowerShell queries extracting 16 structured fields per event (replaces naive event counting)
+- Per-attack detection logic with false-positive filtering (replication GUIDs for DCSync, RC4 encryption for Golden Ticket/Kerberoasting, threshold-based for brute force)
+- Configurable thresholds and exclusion lists (AttackDetectionConfig)
+- MITRE ATT&CK technique reference on every alert
+- 14-check grid always visible showing Clear/Alert status per check type
+- Configurable time window: 6h to 7 days (default 3 days)
+- All detection functions are pure Rust, testable without PowerShell
+
+#### Privilege Escalation Path Visualization (9.4)
+- 5 node types: User, Group, Computer, GPO, CertTemplate
+- 8 edge types: Membership, Ownership (managedBy), Delegation (constrained to DC services), Unconstrained Delegation (non-DC computers), RBCD, SIDHistory, GPLink, CertESC (ADCS ESC1 templates)
+- Weighted Dijkstra path-finding (SIDHistory=0.5 to GPLink=3.0) replacing simple BFS
+- Risk score per path (lower = more dangerous), edge type labels on each hop
+- Compact horizontal stats bar with node/edge counts
+
+### Changed
+- "Security" group added to sidebar navigation with 4 modules (DomainAdmin only)
+- `privileged_groups` field added to AppSettings for configurable group monitoring
+- `resolve_group_by_rid()` method added to DirectoryProvider trait for locale-independent group resolution
+- `lastLogonTimestamp`, `servicePrincipalName`, `sIDHistory`, `adminCount`, `msDS-AllowedToActOnBehalfOfOtherIdentity` added to LDAP USER_ATTRS
+
+### Security
+- All security endpoints require DomainAdmin permission level
+- PowerShell event log queries use -NoProfile and -NonInteractive flags
+- All operations are read-only against Active Directory
+- No sensitive data (passwords, tokens) exposed in responses
+
 ## [0.8.0] - 2026-03-23
 
 Epic 8 - Infrastructure Health and Monitoring. Centralized view of AD

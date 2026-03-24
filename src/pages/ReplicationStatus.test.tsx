@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { ReplicationStatus } from "./ReplicationStatus";
 import { type ReplicationPartnership } from "@/types/replication-status";
@@ -8,7 +8,10 @@ import { NotificationProvider } from "@/contexts/NotificationContext";
 const mockInvoke = vi.fn();
 
 vi.mock("@tauri-apps/api/core", () => ({
-  invoke: (...args: unknown[]) => mockInvoke(...args),
+  invoke: (...args: unknown[]) => {
+    if (args[0] === "get_platform") return Promise.resolve("windows");
+    return mockInvoke(...args);
+  },
 }));
 
 function Wrapper({ children }: { children: React.ReactNode }) {

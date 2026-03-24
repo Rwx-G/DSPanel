@@ -2,9 +2,14 @@ use crate::models::system_metrics::{DiskInfo, ServiceInfo, SessionInfo, SystemMe
 
 /// Collects system metrics from a remote workstation.
 ///
-/// On Windows, runs PowerShell remoting commands to gather CPU, RAM, disk,
-/// services, and session data. Each metric query is independent - if one
-/// fails, the others still return data.
+/// On Windows, runs PowerShell remoting commands (`Invoke-Command`) to gather
+/// CPU, RAM, disk, services, and session data. Each metric query is independent -
+/// if one fails, the others still return data.
+///
+/// **Authentication**: uses the Windows security context of the DSPanel process
+/// (Kerberos token on domain-joined machines, local account otherwise). The LDAP
+/// bind credentials (`DSPANEL_LDAP_BIND_DN`) are NOT used for WMI/PowerShell
+/// remoting - these are separate authentication mechanisms.
 ///
 /// On non-Windows platforms, returns a `SystemMetrics` with an error message
 /// indicating that workstation monitoring requires Windows.

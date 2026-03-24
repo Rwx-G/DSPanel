@@ -17,6 +17,7 @@ import { type DirectoryComputer } from "@/types/directory";
 import { parseCnFromDn } from "@/utils/dn";
 import { Users, Trash2 } from "lucide-react";
 import { StateInTimeView } from "@/components/comparison/StateInTimeView";
+import { WorkstationMonitoringPanel } from "@/components/common/WorkstationMonitoringPanel";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useDialog } from "@/contexts/DialogContext";
 import { useNotifications } from "@/contexts/NotificationContext";
@@ -30,8 +31,15 @@ export function ComputerDetail({
   onDeleted?: () => void;
 }) {
   const [groupFilterText, setGroupFilterText] = useState("");
+  const [showMonitoring, setShowMonitoring] = useState(false);
+  const [platform, setPlatform] = useState("unknown");
   const { hasPermission } = usePermissions();
   const canDelete = hasPermission("AccountOperator");
+  const canMonitor = hasPermission("HelpDesk");
+
+  useEffect(() => {
+    invoke<string>("get_platform").then(setPlatform).catch(() => {});
+  }, []);
   const { showConfirmation } = useDialog();
   const { notify } = useNotifications();
   const { handleError } = useErrorHandler();
@@ -320,6 +328,22 @@ export function ComputerDetail({
           groupName={groupMembersDialog.name}
           onClose={() => setGroupMembersDialog(null)}
         />
+      )}
+
+      {/* Workstation Monitoring - Windows only, HelpDesk+ */}
+      {canMonitor && platform === "windows" && computer.dnsHostName && (
+        <div className="mt-4">
+          {!showMonitoring ? (
+            <button
+              className="btn btn-sm rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2.5 py-1 text-caption font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors"
+              onClick={() => setShowMonitoring(true)}
+            >
+              Open Workstation Monitoring
+            </button>
+          ) : (
+            <WorkstationMonitoringPanel hostname={computer.dnsHostName} />
+          )}
+        </div>
       )}
     </div>
   );

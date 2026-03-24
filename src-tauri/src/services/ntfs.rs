@@ -294,9 +294,9 @@ fn lookup_account_name(sid: *const std::ffi::c_void) -> Option<String> {
         LookupAccountSidW(
             None,
             psid,
-            windows::core::PWSTR::null(),
+            None,
             &mut name_len,
-            windows::core::PWSTR::null(),
+            None,
             &mut domain_len,
             &mut sid_type,
         )
@@ -313,9 +313,9 @@ fn lookup_account_name(sid: *const std::ffi::c_void) -> Option<String> {
         LookupAccountSidW(
             None,
             psid,
-            windows::core::PWSTR(name_buf.as_mut_ptr()),
+            Some(windows::core::PWSTR(name_buf.as_mut_ptr())),
             &mut name_len,
-            windows::core::PWSTR(domain_buf.as_mut_ptr()),
+            Some(windows::core::PWSTR(domain_buf.as_mut_ptr())),
             &mut domain_len,
             &mut sid_type,
         )

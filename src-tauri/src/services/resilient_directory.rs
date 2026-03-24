@@ -677,6 +677,16 @@ where
         .await
         .map_err(|e| anyhow::anyhow!(e))
     }
+
+    async fn resolve_group_by_rid(&self, rid: u32) -> Result<Option<DirectoryEntry>> {
+        let inner_ref = self.inner.clone();
+        self.execute_with_resilience(move || {
+            let inner = inner_ref.clone();
+            async move { inner.resolve_group_by_rid(rid).await }
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!(e))
+    }
 }
 
 #[allow(clippy::unwrap_used)]

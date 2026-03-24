@@ -20,6 +20,10 @@ pub struct AppSettings {
     /// Microsoft Graph API - Application (client) ID.
     #[serde(default)]
     pub graph_client_id: Option<String>,
+    /// Additional privileged groups to monitor beyond the defaults
+    /// (Domain Admins, Enterprise Admins, Schema Admins, Administrators).
+    #[serde(default)]
+    pub privileged_groups: Option<Vec<String>>,
 }
 
 /// Service for managing persisted application settings.
@@ -168,6 +172,7 @@ mod tests {
             disabled_ou: None,
             graph_tenant_id: Some("tenant-123".to_string()),
             graph_client_id: Some("client-456".to_string()),
+            privileged_groups: None,
         };
         let json = serde_json::to_string(&settings).unwrap();
         assert!(json.contains("tenant-123"));
