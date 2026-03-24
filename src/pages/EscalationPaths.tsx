@@ -9,8 +9,6 @@ import {
   ArrowRight,
   Circle,
   Square,
-  User,
-  Users,
   Monitor,
   FileText,
   Key,
@@ -21,6 +19,7 @@ import {
   type GraphNode,
   type EdgeType,
 } from "@/types/security";
+import { SecurityDisclaimer } from "@/components/common/SecurityDisclaimer";
 import { extractErrorMessage } from "@/utils/errorMapping";
 
 function edgeTypeStyle(edgeType: EdgeType): { style: string; color: string } {
@@ -205,194 +204,30 @@ function GraphLegendStats({ data }: { data: EscalationGraphResult }) {
   ];
 
   return (
-    <div className="space-y-4" data-testid="graph-legend">
-      {/* Node counts */}
-      <div>
-        <h3 className="mb-2 text-caption font-semibold text-[var(--color-text-primary)]">
-          Node Types
-        </h3>
-        <table className="w-full text-caption">
-          <tbody>
-            <tr className="border-b border-[var(--color-border-subtle)]">
-              <td className="py-1.5 pr-2">
-                <span className="flex items-center gap-2 text-[var(--color-text-primary)]">
-                  <User size={14} /> Users
-                </span>
-              </td>
-              <td className="py-1.5 text-right font-medium text-[var(--color-text-primary)]">
-                {userCount}
-              </td>
-            </tr>
-            <tr className="border-b border-[var(--color-border-subtle)]">
-              <td className="py-1.5 pr-2">
-                <span className="flex items-center gap-2 text-[var(--color-text-primary)]">
-                  <Users size={14} /> Groups
-                </span>
-              </td>
-              <td className="py-1.5 text-right font-medium text-[var(--color-text-primary)]">
-                {groupCount}
-              </td>
-            </tr>
-            <tr className="border-b border-[var(--color-border-subtle)]">
-              <td className="py-1.5 pr-2">
-                <span className="flex items-center gap-2" style={{ color: "var(--color-error)" }}>
-                  <Users size={14} /> Privileged Groups
-                </span>
-              </td>
-              <td
-                className="py-1.5 text-right font-medium"
-                style={{ color: "var(--color-error)" }}
-              >
-                {privilegedGroupCount}
-              </td>
-            </tr>
-            {computerCount > 0 && (
-              <tr className="border-b border-[var(--color-border-subtle)]">
-                <td className="py-1.5 pr-2">
-                  <span className="flex items-center gap-2 text-[var(--color-text-primary)]">
-                    <Monitor size={14} /> Computers
-                  </span>
-                </td>
-                <td className="py-1.5 text-right font-medium text-[var(--color-text-primary)]">
-                  {computerCount}
-                </td>
-              </tr>
-            )}
-            {gpoCount > 0 && (
-              <tr className="border-b border-[var(--color-border-subtle)]">
-                <td className="py-1.5 pr-2">
-                  <span className="flex items-center gap-2 text-[var(--color-text-primary)]">
-                    <FileText size={14} /> GPOs
-                  </span>
-                </td>
-                <td className="py-1.5 text-right font-medium text-[var(--color-text-primary)]">
-                  {gpoCount}
-                </td>
-              </tr>
-            )}
-            {certTemplateCount > 0 && (
-              <tr>
-                <td className="py-1.5 pr-2">
-                  <span className="flex items-center gap-2 text-[var(--color-text-primary)]">
-                    <Key size={14} /> Cert Templates
-                  </span>
-                </td>
-                <td className="py-1.5 text-right font-medium text-[var(--color-text-primary)]">
-                  {certTemplateCount}
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+    <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-caption" data-testid="graph-legend">
+      {/* Nodes */}
+      <span className="font-semibold text-[var(--color-text-primary)]">Nodes:</span>
+      <span className="inline-flex items-center gap-1 text-[var(--color-text-secondary)]"><Circle size={10} /> {userCount} users</span>
+      {groupCount > 0 && <span className="inline-flex items-center gap-1 text-[var(--color-text-secondary)]"><Square size={10} /> {groupCount} groups</span>}
+      <span className="inline-flex items-center gap-1" style={{ color: "var(--color-error)" }}><Square size={10} /> {privilegedGroupCount} privileged</span>
+      {computerCount > 0 && <span className="inline-flex items-center gap-1 text-[var(--color-text-secondary)]"><Monitor size={10} /> {computerCount} computers</span>}
+      {gpoCount > 0 && <span className="inline-flex items-center gap-1 text-[var(--color-text-secondary)]"><FileText size={10} /> {gpoCount} GPOs</span>}
+      {certTemplateCount > 0 && <span className="inline-flex items-center gap-1 text-[var(--color-text-secondary)]"><Key size={10} /> {certTemplateCount} cert templates</span>}
 
-      {/* Edge counts */}
-      <div>
-        <h3 className="mb-2 text-caption font-semibold text-[var(--color-text-primary)]">
-          Edge Types
-        </h3>
-        <table className="w-full text-caption">
-          <tbody>
-            {edgeTypeCounts.map((et) => {
-              const count = data.edges.filter((e) => e.edgeType === et.type).length;
-              if (count === 0) return null;
-              return (
-                <tr key={et.type} className="border-b border-[var(--color-border-subtle)]">
-                  <td className="py-1.5 pr-2">
-                    <span className="flex items-center gap-2 text-[var(--color-text-primary)]">
-                      <span
-                        className="inline-block w-4"
-                        style={{ borderTop: `2px ${et.style} ${et.color}` }}
-                      />
-                      {et.label}
-                    </span>
-                  </td>
-                  <td className="py-1.5 text-right font-medium text-[var(--color-text-primary)]">
-                    {count}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+      <span className="text-[var(--color-border-default)]">|</span>
 
-      {/* Color legend */}
-      <div>
-        <h3 className="mb-2 text-caption font-semibold text-[var(--color-text-primary)]">
-          Legend
-        </h3>
-        <div className="space-y-1.5 text-caption">
-          <div className="flex items-center gap-2 text-[var(--color-text-primary)]">
-            <Circle size={12} /> User
-          </div>
-          <div className="flex items-center gap-2 text-[var(--color-text-primary)]">
-            <Square size={12} /> Group
-          </div>
-          <div className="flex items-center gap-2" style={{ color: "var(--color-error)" }}>
-            <Square size={12} /> Privileged
-          </div>
-          <div className="flex items-center gap-2 text-[var(--color-text-primary)]">
-            <Monitor size={12} /> Computer
-          </div>
-          <div className="flex items-center gap-2 text-[var(--color-text-primary)]">
-            <FileText size={12} /> GPO
-          </div>
-          <div className="flex items-center gap-2 text-[var(--color-text-primary)]">
-            <Key size={12} /> Cert Template
-          </div>
-        </div>
-      </div>
-
-      {/* Edges list */}
-      <div>
-        <h3 className="mb-2 text-caption font-semibold text-[var(--color-text-primary)]">
-          All Edges
-        </h3>
-        <div className="max-h-48 overflow-y-auto">
-          <table className="w-full text-caption" data-testid="edges-table">
-            <thead>
-              <tr className="text-left text-[var(--color-text-secondary)]">
-                <th className="pb-1 pr-2 font-medium">Source</th>
-                <th className="pb-1 pr-2 font-medium">Type</th>
-                <th className="pb-1 font-medium">Target</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.edges.map((edge, i) => {
-                const sourceNode = data.nodes.find((n) => n.dn === edge.sourceDn);
-                const targetNode = data.nodes.find((n) => n.dn === edge.targetDn);
-                const es = edgeTypeStyle(edge.edgeType);
-                return (
-                  <tr
-                    key={i}
-                    className="border-t border-[var(--color-border-subtle)]"
-                  >
-                    <td className="py-1 pr-2 text-[var(--color-text-primary)]">
-                      {sourceNode?.displayName ?? edge.sourceDn}
-                    </td>
-                    <td className="py-1 pr-2">
-                      <span
-                        className="inline-block w-4"
-                        style={{
-                          borderTop: `2px ${es.style} ${es.color}`,
-                        }}
-                        title={edge.label ?? edge.edgeType}
-                      />
-                      <span className="ml-1 text-[var(--color-text-secondary)]">
-                        {edge.label ?? edge.edgeType}
-                      </span>
-                    </td>
-                    <td className="py-1 text-[var(--color-text-primary)]">
-                      {targetNode?.displayName ?? edge.targetDn}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      {/* Edges */}
+      <span className="font-semibold text-[var(--color-text-primary)]">Edges:</span>
+      {edgeTypeCounts.map((et) => {
+        const count = data.edges.filter((e) => e.edgeType === et.type).length;
+        if (count === 0) return null;
+        return (
+          <span key={et.type} className="inline-flex items-center gap-1 text-[var(--color-text-secondary)]">
+            <span className="inline-block w-3" style={{ borderTop: `2px ${et.style} ${et.color}` }} />
+            {count} {et.label}
+          </span>
+        );
+      })}
     </div>
   );
 }
@@ -439,8 +274,14 @@ export function EscalationPaths() {
     <div className="flex h-full flex-col" data-testid="escalation-paths">
       {/* Toolbar */}
       <div className="flex items-center justify-between border-b border-[var(--color-border-default)] px-4 py-2">
-        <h2 className="text-body font-semibold text-[var(--color-text-primary)]">
+        <h2 className="flex items-center gap-1.5 text-body font-semibold text-[var(--color-text-primary)]">
           Privilege Escalation Paths
+          <SecurityDisclaimer
+            coverage="~20%"
+            checks="8 edge types via LDAP: group membership (recursive), managedBy ownership, constrained/unconstrained delegation, RBCD, SIDHistory, GPO links, AD CS ESC1 templates. Weighted Dijkstra path-finding."
+            limitations="Does not parse binary ACLs (WriteDACL, GenericAll, ForceChangePassword, WriteOwner), does not collect local admin sessions, no cross-domain/forest trust path analysis."
+            tools="BloodHound CE (~35 edge types with full ACL parsing) or Semperis Forest Druid for comprehensive attack path analysis."
+          />
         </h2>
         <div className="flex items-center gap-3">
           {data && (
@@ -499,8 +340,13 @@ export function EscalationPaths() {
             description="No privilege escalation paths were detected in the directory."
           />
         ) : (
-          <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
-            {/* Critical Paths panel */}
+          <div className="space-y-4">
+            {/* Stats bar */}
+            <div className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-4 py-3">
+              <GraphLegendStats data={data} />
+            </div>
+
+            {/* Paths panel */}
             <div
               className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)]"
               data-testid="critical-paths-panel"
@@ -528,13 +374,7 @@ export function EscalationPaths() {
               )}
             </div>
 
-            {/* Graph Legend & Stats panel */}
-            <div className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-3">
-              <h3 className="mb-3 text-caption font-semibold text-[var(--color-text-primary)]">
-                Graph Legend & Stats
-              </h3>
-              <GraphLegendStats data={data} />
-            </div>
+            {/* Graph Legend & Stats - removed, now shown above */}
           </div>
         )}
       </div>

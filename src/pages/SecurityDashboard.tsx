@@ -18,6 +18,7 @@ import {
 } from "@/types/security";
 import { extractErrorMessage } from "@/utils/errorMapping";
 import { exportTableToCsv } from "@/utils/csvExport";
+import { SecurityDisclaimer } from "@/components/common/SecurityDisclaimer";
 
 function AccountRow({
   account,
@@ -171,12 +172,107 @@ export function SecurityDashboard() {
     await exportTableToCsv(columns, exportData, "privileged-accounts.csv");
   };
 
+  const handleExportReport = async () => {
+    if (!report) return;
+
+    const severityHtmlColor: Record<string, string> = {
+      Critical: "#ef4444", High: "#f59e0b", Medium: "#3b82f6", Info: "#6b7280",
+    };
+
+    const accountRows = report.accounts.map((a) => `
+      <tr>
+        <td>${a.samAccountName}</td>
+        <td>${a.displayName}</td>
+        <td>${a.privilegedGroups.join(", ")}</td>
+        <td>${a.lastLogon ? new Date(a.lastLogon).toLocaleDateString() : "Never"}</td>
+        <td style="text-align:center">${a.passwordAgeDays ?? "-"}</td>
+        <td style="text-align:center">${a.enabled ? "Yes" : "No"}</td>
+        <td>${a.alerts.length === 0 ? '<span style="color:#22c55e">OK</span>' : a.alerts.map((al) =>
+          `<span style="color:${severityHtmlColor[al.severity]};font-weight:600">${al.severity}</span> ${al.message}`
+        ).join("<br>")}</td>
+      </tr>`).join("");
+
+    const domainSection = report.domainFindings ? `
+      <h2>Domain Security Findings</h2>
+      <table>
+        <tbody>
+          ${report.domainFindings.krbtgtPasswordAgeDays != null ? `<tr><td>KRBTGT Password Age</td><td>${report.domainFindings.krbtgtPasswordAgeDays} days</td></tr>` : ""}
+          ${report.domainFindings.lapsCoveragePercent != null ? `<tr><td>LAPS Coverage</td><td>${report.domainFindings.lapsCoveragePercent.toFixed(0)}% (${report.domainFindings.lapsDeployedCount}/${report.domainFindings.totalComputerCount})</td></tr>` : ""}
+          ${report.domainFindings.domainFunctionalLevel ? `<tr><td>Domain Level</td><td>${report.domainFindings.domainFunctionalLevel}</td></tr>` : ""}
+          ${report.domainFindings.recycleBinEnabled != null ? `<tr><td>Recycle Bin</td><td>${report.domainFindings.recycleBinEnabled ? "Enabled" : "Disabled"}</td></tr>` : ""}
+          ${report.domainFindings.psoCount > 0 ? `<tr><td>Password Policies (PSO)</td><td>${report.domainFindings.psoCount}</td></tr>` : ""}
+          ${report.domainFindings.rbcdConfiguredCount > 0 ? `<tr><td>RBCD Configured</td><td>${report.domainFindings.rbcdConfiguredCount} object(s)</td></tr>` : ""}
+        </tbody>
+      </table>
+      ${report.domainFindings.alerts.length > 0 ? `
+        <h3>Domain Alerts</h3>
+        <ul>${report.domainFindings.alerts.map((al) =>
+          `<li><span style="color:${severityHtmlColor[al.severity]};font-weight:600">${al.severity}</span> ${al.message}</li>`
+        ).join("")}</ul>` : ""}` : "";
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>DSPanel - Privileged Accounts Report</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; margin: 2rem; color: #1f2937; }
+    h1 { font-size: 1.5rem; margin-bottom: 0.25rem; }
+    h2 { font-size: 1.15rem; margin-top: 2rem; border-bottom: 1px solid #e5e7eb; padding-bottom: 0.25rem; }
+    h3 { font-size: 1rem; margin-top: 1rem; }
+    .meta { color: #6b7280; font-size: 0.85rem; margin-bottom: 1.5rem; }
+    .summary { display: flex; gap: 1rem; margin-bottom: 1rem; }
+    .badge { padding: 0.25rem 0.75rem; border-radius: 1rem; font-weight: 600; font-size: 0.85rem; }
+    table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; font-size: 0.85rem; }
+    th, td { border: 1px solid #d1d5db; padding: 0.4rem 0.6rem; text-align: left; }
+    th { background: #f3f4f6; font-weight: 600; }
+    tr:nth-child(even) { background: #f9fafb; }
+    ul { font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+  <h1>DSPanel - Privileged Accounts Report</h1>
+  <div class="meta">Generated: ${new Date().toLocaleString()} | Scanned: ${new Date(report.scannedAt).toLocaleString()}</div>
+
+  <div class="summary">
+    ${report.summary.critical > 0 ? `<span class="badge" style="color:#ef4444;background:#ef444415">${report.summary.critical} Critical</span>` : ""}
+    ${report.summary.high > 0 ? `<span class="badge" style="color:#f59e0b;background:#f59e0b15">${report.summary.high} High</span>` : ""}
+    ${report.summary.medium > 0 ? `<span class="badge" style="color:#3b82f6;background:#3b82f615">${report.summary.medium} Medium</span>` : ""}
+    <span style="color:#6b7280">${report.accounts.length} accounts</span>
+  </div>
+
+  <h2>Privileged Accounts</h2>
+  <table>
+    <thead>
+      <tr><th>Username</th><th>Display Name</th><th>Groups</th><th>Last Logon</th><th>Pwd Age</th><th>Enabled</th><th>Alerts</th></tr>
+    </thead>
+    <tbody>${accountRows}</tbody>
+  </table>
+
+  ${domainSection}
+</body>
+</html>`;
+
+    await invoke("save_file_dialog", {
+      content: html,
+      defaultName: "privileged-accounts-report.html",
+      filterName: "HTML files",
+      filterExtensions: ["html"],
+    });
+  };
+
   return (
     <div className="flex h-full flex-col" data-testid="security-dashboard">
       {/* Toolbar */}
       <div className="flex items-center justify-between border-b border-[var(--color-border-default)] px-4 py-2">
-        <h2 className="text-body font-semibold text-[var(--color-text-primary)]">
+        <h2 className="flex items-center gap-1.5 text-body font-semibold text-[var(--color-text-primary)]">
           Privileged Accounts
+          <SecurityDisclaimer
+            coverage="~35%"
+            checks="Members of well-known admin groups (by RID), 12 account-level checks (Kerberoastable, AS-REP, reversible encryption, DES, delegation, SIDHistory, Protected Users, etc.), domain findings (KRBTGT age, LAPS, PSO, functional level, RBCD)."
+            limitations="Only checks default privileged groups and LDAP-accessible attributes. Does not parse ACLs (nTSecurityDescriptor), GPO-applied restrictions, or local admin memberships."
+            tools="PingCastle, Purple Knight (Semperis), or BloodHound for a comprehensive privileged account audit."
+          />
         </h2>
         <div className="flex items-center gap-3">
           {/* Summary badges */}
@@ -203,7 +299,7 @@ export function SecurityDashboard() {
             </div>
           )}
 
-          {/* Export CSV */}
+          {/* Export buttons */}
           <button
             className="btn btn-sm rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2.5 py-1 text-caption font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors flex items-center gap-1"
             onClick={handleExportCsv}
@@ -212,6 +308,15 @@ export function SecurityDashboard() {
           >
             <Download size={14} />
             CSV
+          </button>
+          <button
+            className="btn btn-sm rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2.5 py-1 text-caption font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors flex items-center gap-1"
+            onClick={handleExportReport}
+            disabled={!report || report.accounts.length === 0}
+            data-testid="export-report-button"
+          >
+            <Download size={14} />
+            Report
           </button>
 
           {/* Manual refresh */}

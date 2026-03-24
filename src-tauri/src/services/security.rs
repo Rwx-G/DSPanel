@@ -2937,20 +2937,30 @@ impl RiskScoreStore {
         crate::services::preset::data_dir().map(|d| d.join("risk-scores.db"))
     }
 
+    /// Current scoring model version. Bumped when factors/checks change significantly.
+    /// Scores from different versions are not comparable and are filtered out.
+    const SCHEMA_VERSION: u32 = 2;
+
     fn init_schema(&self) {
         let conn = self.conn.lock().expect("lock poisoned");
+
+        // Drop legacy table and create fresh with versioned schema
+        let _ = conn.execute_batch("DROP TABLE IF EXISTS risk_scores");
+
         conn.execute_batch(
-            "CREATE TABLE IF NOT EXISTS risk_scores (
+            "CREATE TABLE IF NOT EXISTS risk_scores_v2 (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                date TEXT NOT NULL UNIQUE,
+                date TEXT NOT NULL,
                 total_score REAL NOT NULL,
-                factors_json TEXT NOT NULL
+                factors_json TEXT NOT NULL,
+                schema_version INTEGER NOT NULL DEFAULT 2,
+                UNIQUE(date, schema_version)
             )",
         )
-        .expect("risk_scores schema creation");
+        .expect("risk_scores_v2 schema creation");
     }
 
-    /// Stores a risk score for today (upserts by date).
+    /// Stores a risk score for today (upserts by date + version).
     pub fn store_score(&self, result: &RiskScoreResult) {
         let conn = self.conn.lock().expect("lock poisoned");
         let date = Utc::now().format("%Y-%m-%d").to_string();
@@ -2958,10 +2968,10 @@ impl RiskScoreStore {
             serde_json::to_string(&result.factors).unwrap_or_else(|_| "[]".to_string());
 
         conn.execute(
-            "INSERT INTO risk_scores (date, total_score, factors_json)
-             VALUES (?1, ?2, ?3)
-             ON CONFLICT(date) DO UPDATE SET total_score = ?2, factors_json = ?3",
-            rusqlite::params![date, result.total_score, factors_json],
+            "INSERT INTO risk_scores_v2 (date, total_score, factors_json, schema_version)
+             VALUES (?1, ?2, ?3, ?4)
+             ON CONFLICT(date, schema_version) DO UPDATE SET total_score = ?2, factors_json = ?3",
+            rusqlite::params![date, result.total_score, factors_json, Self::SCHEMA_VERSION],
         )
         .unwrap_or_else(|e| {
             tracing::warn!("Failed to store risk score: {}", e);
@@ -2969,12 +2979,12 @@ impl RiskScoreStore {
         });
     }
 
-    /// Retrieves the last N days of risk score history.
+    /// Retrieves the last N days of risk score history (current schema version only).
     pub fn get_history(&self, days: u32) -> Vec<RiskScoreHistory> {
         let conn = self.conn.lock().expect("lock poisoned");
-        let mut stmt = match conn
-            .prepare("SELECT date, total_score FROM risk_scores ORDER BY date DESC LIMIT ?1")
-        {
+        let mut stmt = match conn.prepare(
+            "SELECT date, total_score FROM risk_scores_v2 WHERE schema_version = ?1 ORDER BY date DESC LIMIT ?2",
+        ) {
             Ok(s) => s,
             Err(e) => {
                 tracing::warn!("Failed to prepare risk score query: {}", e);
@@ -2982,7 +2992,7 @@ impl RiskScoreStore {
             }
         };
 
-        let rows = match stmt.query_map(rusqlite::params![days], |row| {
+        let rows = match stmt.query_map(rusqlite::params![Self::SCHEMA_VERSION, days], |row| {
             Ok(RiskScoreHistory {
                 date: row.get(0)?,
                 total_score: row.get(1)?,

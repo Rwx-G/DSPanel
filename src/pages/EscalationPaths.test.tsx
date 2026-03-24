@@ -198,7 +198,7 @@ describe("EscalationPaths", () => {
     });
   });
 
-  it("displays graph legend and stats", async () => {
+  it("displays graph legend stats bar", async () => {
     mockInvoke.mockResolvedValue(mockData);
     render(<EscalationPaths />);
 
@@ -206,12 +206,11 @@ describe("EscalationPaths", () => {
       expect(screen.getByTestId("graph-legend")).toBeInTheDocument();
     });
 
-    expect(screen.getByText("Node Types")).toBeInTheDocument();
-    expect(screen.getByText("Edge Types")).toBeInTheDocument();
-    expect(screen.getByText("Legend")).toBeInTheDocument();
+    expect(screen.getByText("Nodes:")).toBeInTheDocument();
+    expect(screen.getByText("Edges:")).toBeInTheDocument();
   });
 
-  it("shows node type counts in legend including computers", async () => {
+  it("shows node type counts in compact legend", async () => {
     mockInvoke.mockResolvedValue(mockData);
     render(<EscalationPaths />);
 
@@ -219,22 +218,8 @@ describe("EscalationPaths", () => {
       expect(screen.getByTestId("graph-legend")).toBeInTheDocument();
     });
 
-    expect(screen.getByText("Users")).toBeInTheDocument();
-    expect(screen.getByText("Groups")).toBeInTheDocument();
-    expect(screen.getByText("Privileged Groups")).toBeInTheDocument();
-    expect(screen.getByText("Computers")).toBeInTheDocument();
-  });
-
-  it("shows edges table with labels", async () => {
-    mockInvoke.mockResolvedValue(mockData);
-    render(<EscalationPaths />);
-
-    await waitFor(() => {
-      expect(screen.getByTestId("edges-table")).toBeInTheDocument();
-    });
-
-    expect(screen.getAllByText("Member of").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Manages group").length).toBeGreaterThan(0);
+    expect(screen.getByText(/users/)).toBeInTheDocument();
+    expect(screen.getByText(/privileged/)).toBeInTheDocument();
   });
 
   it("shows error state on failure", async () => {

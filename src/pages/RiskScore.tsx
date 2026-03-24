@@ -22,6 +22,7 @@ import {
   type AlertSeverity,
 } from "@/types/security";
 import { extractErrorMessage } from "@/utils/errorMapping";
+import { SecurityDisclaimer } from "@/components/common/SecurityDisclaimer";
 
 function zoneColor(zone: RiskZone): string {
   switch (zone) {
@@ -711,11 +712,10 @@ export function RiskScoreDashboard() {
     try {
       setError(null);
       setLoading(true);
-      const [scoreResult, historyResult] = await Promise.all([
-        invoke<RiskScoreResult>("get_risk_score"),
-        invoke<RiskScoreHistory[]>("get_risk_score_history", { days: 30 }),
-      ]);
+      // Sequential: score first (stores today's entry), then history (reads it back)
+      const scoreResult = await invoke<RiskScoreResult>("get_risk_score");
       setResult(scoreResult);
+      const historyResult = await invoke<RiskScoreHistory[]>("get_risk_score_history", { days: 30 });
       setHistory(historyResult);
     } catch (e: unknown) {
       setError(extractErrorMessage(e));
@@ -732,8 +732,14 @@ export function RiskScoreDashboard() {
     <div className="flex h-full flex-col" data-testid="risk-score-dashboard">
       {/* Toolbar */}
       <div className="flex items-center justify-between border-b border-[var(--color-border-default)] px-4 py-2">
-        <h2 className="text-body font-semibold text-[var(--color-text-primary)]">
+        <h2 className="flex items-center gap-1.5 text-body font-semibold text-[var(--color-text-primary)]">
           Domain Risk Score
+          <SecurityDisclaimer
+            coverage="~40%"
+            checks="9 risk factors, ~70 individual checks: privileged hygiene, password policy, stale accounts, Kerberos security, dangerous configs, infrastructure hardening, GPO security, trust security, AD CS certificates. CIS Benchmark and MITRE ATT&CK mapped."
+            limitations="Does not read GPO settings from SYSVOL, does not parse binary ACLs (nTSecurityDescriptor), does not check Kerberos encryption policies at DC level, no network-level checks (SMB signing, LDAP channel binding)."
+            tools="PingCastle (~150 rules), Purple Knight (~185 indicators), or Tenable Identity Exposure for enterprise-grade scoring."
+          />
         </h2>
         <div className="flex items-center gap-3">
           {result && (

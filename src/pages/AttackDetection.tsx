@@ -16,6 +16,7 @@ import {
   type AttackType,
   type AlertSeverity,
 } from "@/types/security";
+import { SecurityDisclaimer } from "@/components/common/SecurityDisclaimer";
 import { extractErrorMessage } from "@/utils/errorMapping";
 
 const TIME_WINDOWS = [
@@ -254,8 +255,14 @@ export function AttackDetection() {
     <div className="flex h-full flex-col" data-testid="attack-detection">
       {/* Toolbar */}
       <div className="flex items-center justify-between border-b border-[var(--color-border-default)] px-4 py-2">
-        <h2 className="text-body font-semibold text-[var(--color-text-primary)]">
+        <h2 className="flex items-center gap-1.5 text-body font-semibold text-[var(--color-text-primary)]">
           Attack Detection
+          <SecurityDisclaimer
+            coverage="~25%"
+            checks="14 attack types via Windows Security Event Log (XML parsing): Golden Ticket, DCSync, DCShadow, Kerberoasting, AS-REP Roasting, Brute Force, Pass-the-Hash, Password Spray, Shadow Credentials, RBCD Abuse, AdminSDHolder Tampering, and more. MITRE ATT&CK mapped."
+            limitations="On-demand scanning only (not real-time). Reads local DC event log - does not query remote DCs. Requires Windows. Does not detect NTLM relay, Skeleton Key, LSASS dumps, or lateral movement."
+            tools="Microsoft Defender for Identity (real-time, ~30 attack types), CrowdStrike Falcon Identity, or Tenable Identity Exposure for continuous monitoring."
+          />
         </h2>
         <div className="flex items-center gap-3">
           {/* Summary badges */}
