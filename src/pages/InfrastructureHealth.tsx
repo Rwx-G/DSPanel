@@ -332,16 +332,23 @@ export function InfrastructureHealth() {
               { key: "checkStatus", header: "Check Status" },
               { key: "message", header: "Message" },
             ]}
-            data={results.flatMap((r) =>
-              r.checks.map((c) => ({
-                dc: r.dc.hostname,
-                site: r.dc.siteName,
-                status: r.overallStatus,
-                check: c.name,
-                checkStatus: c.status,
-                message: c.message,
-              })),
-            )}
+            data={(() => {
+              let lastDc = "";
+              return results.flatMap((r) =>
+                r.checks.map((c, i) => {
+                  const isFirst = r.dc.hostname !== lastDc;
+                  if (isFirst) lastDc = r.dc.hostname;
+                  return {
+                    dc: isFirst ? r.dc.hostname : "",
+                    site: isFirst ? r.dc.siteName : "",
+                    status: isFirst ? r.overallStatus : "",
+                    check: c.name,
+                    checkStatus: c.status,
+                    message: c.message,
+                  };
+                }),
+              );
+            })()}
             rowMapper={(r) => [r.dc, r.site, r.status, r.check, r.checkStatus, r.message]}
             title="Infrastructure Health Report"
             filenameBase="dc-health"
