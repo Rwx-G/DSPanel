@@ -126,34 +126,32 @@ describe("ComplianceReports", () => {
     expect(screen.getByText("admin")).toBeInTheDocument();
   });
 
-  it("shows export HTML button in report", async () => {
+  it("shows export toolbar in report", async () => {
     render(<ComplianceReports />);
     await waitFor(() => {
       fireEvent.click(screen.getByTestId("generate-GDPR"));
     });
 
     await waitFor(() => {
-      expect(screen.getByTestId("export-report-html")).toBeInTheDocument();
+      expect(screen.getByTestId("export-toolbar")).toBeInTheDocument();
     });
   });
 
-  it("exports HTML report", async () => {
+  it("export toolbar has format options", async () => {
     render(<ComplianceReports />);
     await waitFor(() => {
       fireEvent.click(screen.getByTestId("generate-GDPR"));
     });
 
     await waitFor(() => {
-      fireEvent.click(screen.getByTestId("export-report-html"));
+      expect(screen.getByTestId("export-button")).toBeInTheDocument();
     });
 
+    fireEvent.click(screen.getByTestId("export-button"));
+
     await waitFor(() => {
-      expect(mockInvoke).toHaveBeenCalledWith(
-        "export_compliance_report_html",
-        expect.objectContaining({
-          report: mockReport,
-        }),
-      );
+      expect(screen.getByTestId("export-csv")).toBeInTheDocument();
+      expect(screen.getByTestId("export-xlsx")).toBeInTheDocument();
     });
   });
 

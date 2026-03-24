@@ -332,7 +332,8 @@ pub async fn generate_report(
                         attrs
                             .iter()
                             .map(|attr| {
-                                e.get_attribute(attr).unwrap_or("-").to_string()
+                                let raw = e.get_attribute(attr).unwrap_or("-");
+                                format_ad_attribute(attr, raw)
                             })
                             .collect()
                     })
@@ -567,6 +568,58 @@ pub fn report_to_html(report: &ComplianceReport) -> String {
     html
 }
 
+/// Formats known AD attributes into human-readable strings.
+/// Converts Windows FileTime timestamps and GeneralizedTime to readable dates.
+fn format_ad_attribute(attr_name: &str, value: &str) -> String {
+    if value == "-" || value.is_empty() {
+        return value.to_string();
+    }
+
+    match attr_name {
+        // Windows FileTime attributes (100ns intervals since 1601-01-01)
+        "lastLogonTimestamp" | "pwdLastSet" | "accountExpires" | "lastLogon"
+        | "badPasswordTime" | "lockoutTime" => {
+            if let Ok(ticks) = value.parse::<i64>() {
+                if ticks <= 0 || ticks == 9_223_372_036_854_775_807 {
+                    return "Never".to_string();
+                }
+                let unix_secs = ticks / 10_000_000 - 11_644_473_600;
+                if let Some(dt) = chrono::DateTime::from_timestamp(unix_secs, 0) {
+                    return dt.format("%Y-%m-%d %H:%M").to_string();
+                }
+            }
+            value.to_string()
+        }
+        // GeneralizedTime attributes (yyyyMMddHHmmss.0Z)
+        "whenCreated" | "whenChanged" => {
+            let clean = value.replace(".0Z", "").replace('Z', "");
+            if let Ok(naive) = chrono::NaiveDateTime::parse_from_str(&clean, "%Y%m%d%H%M%S") {
+                return naive.format("%Y-%m-%d %H:%M").to_string();
+            }
+            value.to_string()
+        }
+        // UAC flags - show human-readable
+        "userAccountControl" => {
+            if let Ok(uac) = value.parse::<u32>() {
+                let mut flags = Vec::new();
+                if uac & 0x0002 != 0 { flags.push("Disabled"); }
+                if uac & 0x0010 != 0 { flags.push("Locked"); }
+                if uac & 0x10000 != 0 { flags.push("PwdNeverExpires"); }
+                if uac & 0x0020 != 0 { flags.push("PwdNotRequired"); }
+                if uac & 0x200000 != 0 { flags.push("TrustedForDelegation"); }
+                if flags.is_empty() {
+                    "Normal".to_string()
+                } else {
+                    flags.join(", ")
+                }
+            } else {
+                value.to_string()
+            }
+        }
+        _ => value.to_string(),
+    }
+}
+
 fn html_escape(s: &str) -> String {
     s.replace('&', "&amp;")
         .replace('<', "&lt;")
@@ -706,5 +759,65 @@ mod tests {
         assert!(pci.sections[1].control_reference.contains("Req. 8"));
         assert!(pci.sections[2].control_reference.contains("Req. 8.1.4"));
         assert!(pci.sections[3].control_reference.contains("Req. 10"));
+    }
+
+    // -- format_ad_attribute tests --
+
+    #[test]
+    fn format_filetime_timestamp() {
+        // 2024-01-15 00:00:00 UTC
+        let ticks = (1_705_276_800i64 + 11_644_473_600) * 10_000_000;
+        let result = format_ad_attribute("lastLogonTimestamp", &ticks.to_string());
+        assert_eq!(result, "2024-01-15 00:00");
+    }
+
+    #[test]
+    fn format_filetime_zero_is_never() {
+        assert_eq!(format_ad_attribute("lastLogonTimestamp", "0"), "Never");
+    }
+
+    #[test]
+    fn format_filetime_max_is_never() {
+        assert_eq!(
+            format_ad_attribute("accountExpires", "9223372036854775807"),
+            "Never"
+        );
+    }
+
+    #[test]
+    fn format_generalized_time() {
+        assert_eq!(
+            format_ad_attribute("whenCreated", "20240315143022.0Z"),
+            "2024-03-15 14:30"
+        );
+    }
+
+    #[test]
+    fn format_uac_disabled() {
+        assert_eq!(format_ad_attribute("userAccountControl", "514"), "Disabled");
+    }
+
+    #[test]
+    fn format_uac_pwd_never_expires() {
+        // 512 (normal) | 0x10000 (65536) = 66048
+        assert_eq!(
+            format_ad_attribute("userAccountControl", "66048"),
+            "PwdNeverExpires"
+        );
+    }
+
+    #[test]
+    fn format_uac_normal() {
+        assert_eq!(format_ad_attribute("userAccountControl", "512"), "Normal");
+    }
+
+    #[test]
+    fn format_passthrough_unknown_attr() {
+        assert_eq!(format_ad_attribute("sAMAccountName", "john"), "john");
+    }
+
+    #[test]
+    fn format_dash_passthrough() {
+        assert_eq!(format_ad_attribute("lastLogonTimestamp", "-"), "-");
     }
 }

@@ -7,12 +7,12 @@ import {
   FileText,
   Plus,
   Trash2,
-  Download,
   Play,
   AlertTriangle,
   CheckCircle,
   Shield,
 } from "lucide-react";
+import { ExportToolbar } from "@/components/common/ExportToolbar";
 
 // ---------------------------------------------------------------------------
 // Types (mirror Rust models)
@@ -150,13 +150,26 @@ function TemplateCard({
 
 function ReportViewer({
   report,
-  onExportHtml,
-  exporting,
 }: {
   report: ComplianceReport;
-  onExportHtml: () => void;
-  exporting: boolean;
 }) {
+  // Flatten all query sections into exportable rows
+  const exportRows = report.sections
+    .filter((s) => s.sectionType === "query" && s.headers && s.rows)
+    .flatMap((s) =>
+      (s.rows ?? []).map((row) => ({
+        section: s.title,
+        controlRef: s.controlReference,
+        values: row,
+        headers: s.headers ?? [],
+      })),
+    );
+
+  // Build a unified column set: Section, Control Ref, then union of all headers
+  const allHeaders = Array.from(
+    new Set(report.sections.filter((s) => s.headers).flatMap((s) => s.headers ?? [])),
+  );
+
   const color = STANDARD_COLORS[report.standard] ?? "#546e7a";
   return (
     <div className="space-y-4" data-testid="report-viewer">
@@ -170,15 +183,24 @@ function ReportViewer({
             {report.standard} | Generated: {report.generatedAt} | By: {report.generator}
           </div>
         </div>
-        <button
-          className="btn btn-sm rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2.5 py-1 text-caption font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors flex items-center gap-1"
-          onClick={onExportHtml}
-          disabled={exporting}
-          data-testid="export-report-html"
-        >
-          <Download size={14} />
-          {exporting ? "Exporting..." : "Export HTML"}
-        </button>
+        <ExportToolbar<{ section: string; controlRef: string; values: string[]; headers: string[] }>
+          columns={[
+            { key: "section", header: "Section" },
+            { key: "controlRef", header: "Control Reference" },
+            ...allHeaders.map((h) => ({ key: h, header: h })),
+          ]}
+          data={exportRows}
+          rowMapper={(r) => {
+            const vals: string[] = [r.section, r.controlRef];
+            for (const h of allHeaders) {
+              const idx = r.headers.indexOf(h);
+              vals.push(idx >= 0 ? (r.values[idx] ?? "-") : "-");
+            }
+            return vals;
+          }}
+          title={`${report.standard} Compliance Report - ${report.templateName}`}
+          filenameBase={`${report.standard.toLowerCase()}-compliance-report`}
+        />
       </div>
 
       {/* Sections */}
@@ -260,7 +282,6 @@ export function ComplianceReports() {
   const [generating, setGenerating] = useState<string | null>(null);
   const [report, setReport] = useState<ComplianceReport | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [exporting, setExporting] = useState(false);
   const [showEditor, setShowEditor] = useState(false);
 
   const loadTemplates = useCallback(async () => {
@@ -292,21 +313,6 @@ export function ComplianceReports() {
     }
   };
 
-  const handleExportHtml = async () => {
-    if (!report) return;
-    setExporting(true);
-    try {
-      const date = new Date().toISOString().slice(0, 10);
-      await invoke("export_compliance_report_html", {
-        report,
-        defaultName: `${report.standard.toLowerCase()}-compliance-report_${date}.html`,
-      });
-    } catch (err) {
-      console.error("Export failed:", err);
-    } finally {
-      setExporting(false);
-    }
-  };
 
   const handleDeleteTemplate = async (name: string) => {
     try {
@@ -385,11 +391,7 @@ export function ComplianceReports() {
 
         {/* Report viewer */}
         {report && (
-          <ReportViewer
-            report={report}
-            onExportHtml={handleExportHtml}
-            exporting={exporting}
-          />
+          <ReportViewer report={report} />
         )}
       </div>
     </div>
