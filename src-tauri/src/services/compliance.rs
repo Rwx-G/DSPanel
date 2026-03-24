@@ -325,7 +325,7 @@ pub async fn generate_report(
                 let attrs = section.query_attributes.as_deref().unwrap_or(&[]);
 
                 let entries = execute_query(provider.clone(), scope).await?;
-                let headers: Vec<String> = attrs.to_vec();
+                let headers: Vec<String> = attrs.iter().map(|a| friendly_header(a)).collect();
                 let rows: Vec<Vec<String>> = entries
                     .iter()
                     .map(|e| {
@@ -566,6 +566,24 @@ pub fn report_to_html(report: &ComplianceReport) -> String {
     html.push_str("</div>\n</body>\n</html>");
 
     html
+}
+
+/// Maps AD attribute names to human-readable column headers.
+fn friendly_header(attr: &str) -> String {
+    match attr {
+        "sAMAccountName" => "Username",
+        "displayName" => "Display Name",
+        "lastLogonTimestamp" | "lastLogon" => "Last Logon",
+        "pwdLastSet" => "Password Set",
+        "whenCreated" => "Created",
+        "whenChanged" => "Last Modified",
+        "userAccountControl" => "Account Flags",
+        "memberOf" => "Group Memberships",
+        "accountExpires" => "Account Expires",
+        "distinguishedName" => "DN",
+        other => other,
+    }
+    .to_string()
 }
 
 /// Formats known AD attributes into human-readable strings.
