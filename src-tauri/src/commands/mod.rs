@@ -1,5 +1,6 @@
 mod account;
 mod cleanup;
+mod compliance;
 mod directory;
 mod group;
 mod infrastructure;
@@ -8,6 +9,7 @@ mod storage;
 
 pub use account::*;
 pub use cleanup::*;
+pub use compliance::*;
 pub use directory::*;
 pub use group::*;
 pub use infrastructure::*;

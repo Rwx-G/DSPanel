@@ -286,6 +286,11 @@ pub fn run() {
             commands::save_cleanup_rules,
             commands::cleanup_dry_run,
             commands::cleanup_execute,
+            commands::get_compliance_templates,
+            commands::save_custom_template,
+            commands::delete_custom_template,
+            commands::generate_compliance_report,
+            commands::export_compliance_report_html,
         ])
         .run(tauri::generate_context!())
         .unwrap_or_else(|e| {

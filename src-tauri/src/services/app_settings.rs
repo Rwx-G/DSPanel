@@ -27,6 +27,9 @@ pub struct AppSettings {
     /// Cleanup rules for automated stale account management.
     #[serde(default)]
     pub cleanup_rules: Option<Vec<super::cleanup::CleanupRule>>,
+    /// Custom compliance report templates.
+    #[serde(default)]
+    pub compliance_templates: Option<Vec<super::compliance::ComplianceTemplate>>,
 }
 
 /// Service for managing persisted application settings.
@@ -177,6 +180,7 @@ mod tests {
             graph_client_id: Some("client-456".to_string()),
             privileged_groups: None,
             cleanup_rules: None,
+            compliance_templates: None,
         };
         let json = serde_json::to_string(&settings).unwrap();
         assert!(json.contains("tenant-123"));
