@@ -209,6 +209,11 @@ describe("PresetManagement", () => {
     await waitForEditorReady();
 
     fireEvent.click(screen.getByTestId("preset-new-btn"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("preset-save-btn")).toBeDefined();
+    });
+
     fireEvent.click(screen.getByTestId("preset-save-btn"));
 
     await waitFor(() => {
@@ -320,6 +325,10 @@ describe("PresetManagement", () => {
 
     fireEvent.click(screen.getByTestId("preset-new-btn"));
 
+    await waitFor(() => {
+      expect(screen.getByTestId("preset-editor-form")).toBeDefined();
+    });
+
     const keyInput = screen.getByTestId("attr-key-input") as HTMLInputElement;
     const valInput = screen.getByTestId(
       "attr-value-input",
@@ -366,6 +375,10 @@ describe("PresetManagement", () => {
     await waitForEditorReady();
 
     fireEvent.click(screen.getByTestId("preset-new-btn"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("preset-save-btn")).toBeDefined();
+    });
 
     const nameInput = screen.getByTestId(
       "preset-name-input",
