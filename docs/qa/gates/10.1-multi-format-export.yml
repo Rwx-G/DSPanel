@@ -1,0 +1,48 @@
+schema: 1
+story: "10.1"
+story_title: "Multi-Format Export (CSV, PDF, XLSX, HTML)"
+gate: PASS
+status_reason: "All 8 ACs met. Backend export service supports CSV (BOM, delimiter options), PDF (A4 landscape, Helvetica, pagination), XLSX (auto-filter, bold headers, auto-width, numeric detection), and HTML (self-contained with inline CSS). Frontend ExportToolbar provides dropdown format selection with save dialog via Tauri command. Integrated in UserDetail, ComputerDetail, GroupHygiene, and ReplicationStatus. Comprehensive test coverage (27 Rust + 10 frontend tests)."
+reviewer: "Quinn (Test Architect)"
+updated: "2026-03-24T16:00:00Z"
+
+waiver: { active: false }
+
+top_issues: []
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 37
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7, 8]
+    ac_gaps: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "HTML export escapes all special characters (XSS prevention). No secrets in code. Save dialog via rfd crate."
+  performance:
+    status: PASS
+    notes: "Large dataset tests validate CSV (2000 rows), XLSX (1500 rows), HTML (1000 rows). PDF pagination handles overflow gracefully."
+  reliability:
+    status: PASS
+    notes: "Error handling at every write step. Empty dataset edge cases covered. Sheet name truncation for Excel 31-char limit."
+  maintainability:
+    status: PASS
+    notes: "Clean separation: export service (pure functions), storage command (Tauri bridge), ExportToolbar (reusable component). New deps printpdf 0.3 and rust_xlsxwriter 0.82 are well-maintained crates."
+
+risk_summary:
+  totals: { critical: 0, high: 0, medium: 0, low: 0 }
+  recommendations:
+    must_fix: []
+    monitor: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: "Add PDF page numbers in footer - printpdf built-in fonts do not support page counting easily"
+      refs: ["src-tauri/src/services/export.rs"]
+    - action: "Add print-preview mode for PDF before saving"
+      refs: ["src/components/common/ExportToolbar.tsx"]

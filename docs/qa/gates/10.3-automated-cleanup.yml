@@ -1,0 +1,48 @@
+schema: 1
+story: "10.3"
+story_title: "Automated Cleanup"
+gate: PASS
+status_reason: "All 7 ACs met. Backend supports 3 condition types (InactiveDays, NeverLoggedOnCreatedDays, DisabledDays) and 3 action types (Disable, Move, Delete). Mandatory dry-run before execution. Protected accounts (Administrator, Guest, krbtgt, DefaultAccount) are excluded. AD timestamp parsing for both FileTime and GeneralizedTime formats. Audit logging on every action. DomainAdmin gating on all commands. Frontend provides rule management, dry-run preview, confirmation dialog, and execution results."
+reviewer: "Quinn (Test Architect)"
+updated: "2026-03-24T16:00:00Z"
+
+waiver: { active: false }
+
+top_issues: []
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 27
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7]
+    ac_gaps: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "DomainAdmin permission enforced on all 4 commands. Protected built-in accounts excluded from cleanup. All actions audit-logged with success/failure status. Dry-run mandatory before execution."
+  performance:
+    status: PASS
+    notes: "User browse limited to 10000 accounts. Rule evaluation is synchronous per-user with early exit on non-match."
+  reliability:
+    status: PASS
+    notes: "Graceful handling of missing attributes (lastLogonTimestamp, whenCreated, whenChanged). Invalid timestamps return None. Move action validates target OU before execution."
+  maintainability:
+    status: PASS
+    notes: "Clean model/service/command separation. Each condition evaluator is an independent function. Rules persisted via AppSettings. Serde roundtrip tests for all models."
+
+risk_summary:
+  totals: { critical: 0, high: 0, medium: 0, low: 0 }
+  recommendations:
+    must_fix: []
+    monitor: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: "Add exclusion patterns for service accounts by naming convention or OU"
+      refs: ["src-tauri/src/services/cleanup.rs"]
+    - action: "Add scheduled cleanup execution with cron-like rules"
+      refs: ["src-tauri/src/services/cleanup.rs", "src/pages/AutomatedCleanup.tsx"]
