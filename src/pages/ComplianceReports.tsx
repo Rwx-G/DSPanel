@@ -44,6 +44,7 @@ interface ReportSection {
   title: string;
   controlReference: string;
   introduction: string | null;
+  severity: string | null;
   sectionType: SectionType;
   headers: string[] | null;
   rows: string[][] | null;
@@ -58,6 +59,9 @@ interface ComplianceReport {
   generatedAt: string;
   generator: string;
   introduction: string | null;
+  complianceScore: number;
+  totalAccountsScanned: number;
+  totalFindings: number;
   sections: ReportSection[];
 }
 
@@ -212,14 +216,36 @@ function ReportViewer({
         />
       </div>
 
-      {/* Report introduction */}
-      {report.introduction && (
-        <div className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-default)] p-3">
+      {/* Executive summary with score */}
+      <div className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-4">
+        <div className="flex items-center gap-4 mb-3">
+          <div
+            className="text-[2rem] font-bold"
+            style={{
+              color: report.complianceScore >= 80
+                ? "var(--color-success)"
+                : report.complianceScore >= 50
+                  ? "var(--color-warning)"
+                  : "var(--color-error)",
+            }}
+          >
+            {report.complianceScore}/100
+          </div>
+          <div>
+            <div className="text-caption font-semibold text-[var(--color-text-primary)]">
+              Compliance Score
+            </div>
+            <div className="text-[11px] text-[var(--color-text-secondary)]">
+              {report.totalAccountsScanned} accounts scanned - {report.totalFindings} findings
+            </div>
+          </div>
+        </div>
+        {report.introduction && (
           <p className="text-caption leading-relaxed text-[var(--color-text-secondary)]">
             {report.introduction}
           </p>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Sections */}
       {report.sections.map((section, i) => (
@@ -237,6 +263,20 @@ function ReportViewer({
             >
               {section.controlReference}
             </span>
+            {section.severity && (
+              <span
+                className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold text-white"
+                style={{
+                  backgroundColor:
+                    section.severity === "Critical" ? "var(--color-error)"
+                    : section.severity === "High" ? "#e65100"
+                    : section.severity === "Medium" ? "#f9a825"
+                    : "#546e7a",
+                }}
+              >
+                {section.severity}
+              </span>
+            )}
             {section.findingCount != null && (
               <span className="text-[10px] text-[var(--color-text-secondary)]">
                 {section.findingCount} items

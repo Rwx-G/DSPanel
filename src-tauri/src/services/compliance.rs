@@ -36,6 +36,9 @@ pub struct TemplateSection {
     /// Brief explanation of what this section checks and why it matters.
     #[serde(default)]
     pub introduction: Option<String>,
+    /// Severity if findings are present: Critical, High, Medium, Low.
+    #[serde(default)]
+    pub severity: Option<String>,
     #[serde(rename = "type")]
     pub section_type: SectionType,
     /// Query scope (for query-type sections).
@@ -63,6 +66,12 @@ pub struct ComplianceReport {
     pub generated_at: String,
     pub generator: String,
     pub introduction: Option<String>,
+    /// Overall compliance score (0-100). Higher = more compliant.
+    pub compliance_score: u32,
+    /// Total accounts scanned.
+    pub total_accounts_scanned: usize,
+    /// Total findings across all sections.
+    pub total_findings: usize,
     pub sections: Vec<ReportSection>,
 }
 
@@ -74,6 +83,8 @@ pub struct ReportSection {
     pub control_reference: String,
     /// Brief explanation of what this section checks.
     pub introduction: Option<String>,
+    /// Severity of findings in this section.
+    pub severity: Option<String>,
     pub section_type: SectionType,
     /// Table data: headers + rows (for query sections).
     pub headers: Option<Vec<String>>,
@@ -97,74 +108,121 @@ pub fn builtin_templates() -> Vec<ComplianceTemplate> {
     ]
 }
 
+/// Helper to build a query section.
+fn query_section(
+    title: &str,
+    control_ref: &str,
+    intro: &str,
+    severity: &str,
+    scope: &str,
+    attrs: &[&str],
+) -> TemplateSection {
+    TemplateSection {
+        title: title.to_string(),
+        control_reference: control_ref.to_string(),
+        introduction: Some(intro.to_string()),
+        severity: Some(severity.to_string()),
+        section_type: SectionType::Query,
+        query_scope: Some(scope.to_string()),
+        query_attributes: Some(attrs.iter().map(|s| s.to_string()).collect()),
+        content: None,
+    }
+}
+
+/// Helper to build a static recommendations section.
+fn static_section(title: &str, control_ref: &str, content: &str) -> TemplateSection {
+    TemplateSection {
+        title: title.to_string(),
+        control_reference: control_ref.to_string(),
+        introduction: None,
+        severity: None,
+        section_type: SectionType::Static,
+        query_scope: None,
+        query_attributes: None,
+        content: Some(content.to_string()),
+    }
+}
+
 fn gdpr_template() -> ComplianceTemplate {
     ComplianceTemplate {
         name: "GDPR Access Review".to_string(),
         standard: "GDPR".to_string(),
-        version: "1.0".to_string(),
-        description: "Review of AD access controls for GDPR compliance".to_string(),
+        version: "2.0".to_string(),
+        description: "Review of AD access controls and data minimization for GDPR compliance".to_string(),
         introduction: Some(
-            "This report assesses Active Directory access controls against the General Data \
-             Protection Regulation (GDPR). It examines privileged account usage, identifies \
-             inactive accounts that may retain unnecessary access to personal data, and provides \
-             recommendations to strengthen data protection by design and by default."
+            "This report assesses Active Directory access controls against the General Data Protection \
+             Regulation (GDPR). It examines privileged account usage under Art. 32 (security of processing), \
+             identifies inactive accounts violating Art. 5(1)(e) (storage limitation), detects accounts with \
+             weak authentication configurations, and provides actionable remediation steps to strengthen \
+             data protection by design (Art. 25) and by default."
                 .to_string(),
         ),
         builtin: true,
         sections: vec![
-            TemplateSection {
-                title: "Privileged Access Summary".to_string(),
-                control_reference: "GDPR Art. 25 - Data protection by design".to_string(),
-                introduction: Some(
-                    "Lists all accounts with administrative privileges (adminCount=1). Under GDPR Art. 25, \
-                     organizations must implement appropriate technical measures to ensure that only necessary \
-                     personal data is processed. Excessive privileged accounts increase the risk of unauthorized \
-                     access to personal data."
-                        .to_string(),
-                ),
-                section_type: SectionType::Query,
-                query_scope: Some("privilegedAccounts".to_string()),
-                query_attributes: Some(vec![
-                    "sAMAccountName".to_string(),
-                    "displayName".to_string(),
-                    "lastLogonTimestamp".to_string(),
-                    "pwdLastSet".to_string(),
-                ]),
-                content: None,
-            },
-            TemplateSection {
-                title: "Inactive Accounts".to_string(),
-                control_reference: "GDPR Art. 5 - Data minimization".to_string(),
-                introduction: Some(
-                    "Identifies accounts that have not logged in for more than 90 days. Under GDPR Art. 5, \
-                     personal data should be kept only as long as necessary. Inactive accounts represent \
-                     dormant access paths that could be exploited in a breach."
-                        .to_string(),
-                ),
-                section_type: SectionType::Query,
-                query_scope: Some("inactiveAccounts".to_string()),
-                query_attributes: Some(vec![
-                    "sAMAccountName".to_string(),
-                    "displayName".to_string(),
-                    "lastLogonTimestamp".to_string(),
-                ]),
-                content: None,
-            },
-            TemplateSection {
-                title: "Recommendations".to_string(),
-                control_reference: "GDPR Art. 32 - Security of processing".to_string(),
-                introduction: None,
-                section_type: SectionType::Static,
-                query_scope: None,
-                query_attributes: None,
-                content: Some(
-                    "1. Review all privileged accounts quarterly and remove unnecessary access.\n\
-                     2. Disable or delete inactive accounts older than 90 days.\n\
-                     3. Implement least-privilege access model for data access groups.\n\
-                     4. Enable audit logging for all access to personal data containers."
-                        .to_string(),
-                ),
-            },
+            query_section(
+                "Privileged Access Summary",
+                "GDPR Art. 32(2) - Security of processing",
+                "Lists all accounts with administrative privileges (adminCount=1). Under Art. 32, \
+                 the controller must implement appropriate technical measures to ensure a level of \
+                 security appropriate to the risk. Excessive privileged accounts increase the risk \
+                 of unauthorized access to personal data.",
+                "High",
+                "privilegedAccounts",
+                &["sAMAccountName", "displayName", "lastLogonTimestamp", "pwdLastSet"],
+            ),
+            query_section(
+                "Inactive Accounts",
+                "GDPR Art. 5(1)(e) - Storage limitation",
+                "Identifies accounts that have not logged in for more than 90 days. Art. 5(1)(e) \
+                 requires that personal data is kept only as long as necessary. Inactive accounts \
+                 represent dormant access paths that could be exploited in a breach.",
+                "High",
+                "inactiveAccounts",
+                &["sAMAccountName", "displayName", "lastLogonTimestamp"],
+            ),
+            query_section(
+                "Accounts Without Password Requirement",
+                "GDPR Art. 32(1)(b) - Ongoing confidentiality",
+                "Detects accounts where the PASSWD_NOTREQD flag is set, allowing empty passwords. \
+                 Art. 32(1)(b) requires the ability to ensure the ongoing confidentiality of processing \
+                 systems. Accounts without password requirements are a critical security gap.",
+                "Critical",
+                "passwordNotRequired",
+                &["sAMAccountName", "displayName", "userAccountControl"],
+            ),
+            query_section(
+                "Accounts With Reversible Encryption",
+                "GDPR Art. 32(1)(a) - Encryption",
+                "Detects accounts storing passwords with reversible encryption. Art. 32(1)(a) explicitly \
+                 lists encryption as a security measure. Reversible encryption allows passwords to be \
+                 recovered in clear text, defeating the purpose of hashing.",
+                "Critical",
+                "reversibleEncryption",
+                &["sAMAccountName", "displayName", "userAccountControl"],
+            ),
+            query_section(
+                "Stale Passwords",
+                "GDPR Art. 5(1)(f) - Integrity and confidentiality",
+                "Identifies accounts whose passwords have not been changed in over 90 days. \
+                 Art. 5(1)(f) requires integrity and confidentiality of personal data. Stale passwords \
+                 increase the window for credential compromise.",
+                "Medium",
+                "passwordExpired",
+                &["sAMAccountName", "displayName", "pwdLastSet"],
+            ),
+            static_section(
+                "Remediation Steps",
+                "GDPR Art. 32 - Security of processing",
+                "[Critical] Remove PASSWD_NOTREQD flag and set passwords:\n\
+                 Get-ADUser -Filter {PasswordNotRequired -eq $true} | Set-ADUser -PasswordNotRequired $false\n\n\
+                 [Critical] Remove reversible encryption:\n\
+                 Get-ADUser -Filter {AllowReversiblePasswordEncryption -eq $true} | Set-ADUser -AllowReversiblePasswordEncryption $false\n\n\
+                 [High] Disable inactive accounts older than 90 days:\n\
+                 Search-ADAccount -AccountInactive -TimeSpan 90 | Disable-ADAccount\n\n\
+                 [High] Enforce password expiration:\n\
+                 Get-ADUser -Filter {PasswordNeverExpires -eq $true} | Set-ADUser -PasswordNeverExpires $false\n\n\
+                 [Medium] Review privileged accounts quarterly and document business justification for each.",
+            ),
         ],
     }
 }
@@ -173,235 +231,250 @@ fn hipaa_template() -> ComplianceTemplate {
     ComplianceTemplate {
         name: "HIPAA Access Controls".to_string(),
         standard: "HIPAA".to_string(),
-        version: "1.0".to_string(),
-        description: "Audit of AD access controls for HIPAA compliance".to_string(),
+        version: "2.0".to_string(),
+        description: "Audit of AD access controls for HIPAA Security Rule compliance".to_string(),
         introduction: Some(
-            "This report evaluates Active Directory configuration against the Health Insurance \
-             Portability and Accountability Act (HIPAA) Security Rule. It reviews administrative \
-             access to systems containing electronic Protected Health Information (ePHI), assesses \
-             password policies for authentication strength, and identifies accounts that may not \
-             meet minimum security requirements."
+            "This report evaluates Active Directory configuration against the HIPAA Security Rule \
+             (45 CFR Part 164). It reviews administrative access to systems containing ePHI \
+             (164.312(a)), assesses authentication controls (164.312(d)), identifies accounts with \
+             weak password configurations, and detects reversible encryption that violates \
+             encryption requirements."
                 .to_string(),
         ),
         builtin: true,
         sections: vec![
-            TemplateSection {
-                title: "Administrative Access Audit".to_string(),
-                control_reference: "HIPAA 164.312(a) - Access control".to_string(),
-                introduction: Some(
-                    "Lists all accounts with administrative privileges. HIPAA 164.312(a) requires \
-                     covered entities to implement technical policies and procedures that allow only \
-                     authorized persons to access ePHI. Each privileged account represents a potential \
-                     access path to sensitive health data."
-                        .to_string(),
-                ),
-                section_type: SectionType::Query,
-                query_scope: Some("privilegedAccounts".to_string()),
-                query_attributes: Some(vec![
-                    "sAMAccountName".to_string(),
-                    "displayName".to_string(),
-                    "memberOf".to_string(),
-                ]),
-                content: None,
-            },
-            TemplateSection {
-                title: "Password Policy Assessment".to_string(),
-                control_reference: "HIPAA 164.312(d) - Person or entity authentication".to_string(),
-                introduction: Some(
-                    "Identifies accounts with the 'Password Never Expires' flag set. HIPAA 164.312(d) \
-                     requires procedures to verify that a person seeking access to ePHI is who they \
-                     claim to be. Non-expiring passwords weaken authentication controls and increase \
-                     the window for credential compromise."
-                        .to_string(),
-                ),
-                section_type: SectionType::Query,
-                query_scope: Some("passwordNeverExpires".to_string()),
-                query_attributes: Some(vec![
-                    "sAMAccountName".to_string(),
-                    "displayName".to_string(),
-                    "userAccountControl".to_string(),
-                ]),
-                content: None,
-            },
-            TemplateSection {
-                title: "Recommendations".to_string(),
-                control_reference: "HIPAA 164.312(b) - Audit controls".to_string(),
-                introduction: None,
-                section_type: SectionType::Static,
-                query_scope: None,
-                query_attributes: None,
-                content: Some(
-                    "1. Enforce password rotation for all accounts accessing ePHI.\n\
-                     2. Remove 'Password Never Expires' flag from all non-service accounts.\n\
-                     3. Implement role-based access control for clinical data groups.\n\
-                     4. Review administrative access monthly."
-                        .to_string(),
-                ),
-            },
+            query_section(
+                "Administrative Access Audit",
+                "HIPAA 164.312(a)(1) - Access control",
+                "Lists all accounts with administrative privileges. 164.312(a)(1) requires covered \
+                 entities to implement technical policies that allow only authorized persons to access \
+                 ePHI. Each privileged account represents a potential access path to sensitive health data.",
+                "High",
+                "privilegedAccounts",
+                &["sAMAccountName", "displayName", "lastLogonTimestamp", "pwdLastSet"],
+            ),
+            query_section(
+                "Password Policy Assessment",
+                "HIPAA 164.312(d) - Person or entity authentication",
+                "Identifies accounts with the 'Password Never Expires' flag. 164.312(d) requires \
+                 procedures to verify identity before granting access to ePHI. Non-expiring passwords \
+                 weaken authentication controls and increase the credential compromise window.",
+                "High",
+                "passwordNeverExpires",
+                &["sAMAccountName", "displayName", "userAccountControl"],
+            ),
+            query_section(
+                "Accounts Without Password Requirement",
+                "HIPAA 164.312(d) - Authentication",
+                "Detects accounts where PASSWD_NOTREQD is set, allowing empty passwords. This is \
+                 a direct violation of 164.312(d) authentication requirements and a critical finding \
+                 in any HIPAA audit.",
+                "Critical",
+                "passwordNotRequired",
+                &["sAMAccountName", "displayName", "userAccountControl"],
+            ),
+            query_section(
+                "Reversible Encryption",
+                "HIPAA 164.312(a)(2)(iv) - Encryption and decryption",
+                "Detects accounts storing passwords with reversible encryption. 164.312(a)(2)(iv) \
+                 is an addressable specification requiring encryption of ePHI. Reversible password \
+                 encryption undermines this control.",
+                "Critical",
+                "reversibleEncryption",
+                &["sAMAccountName", "displayName", "userAccountControl"],
+            ),
+            query_section(
+                "Inactive Accounts",
+                "HIPAA 164.308(a)(3)(ii)(C) - Termination procedures",
+                "Identifies accounts inactive for more than 90 days. 164.308(a)(3)(ii)(C) requires \
+                 procedures for terminating access when no longer needed. Inactive accounts may indicate \
+                 incomplete offboarding.",
+                "Medium",
+                "inactiveAccounts",
+                &["sAMAccountName", "displayName", "lastLogonTimestamp"],
+            ),
+            static_section(
+                "Remediation Steps",
+                "HIPAA 164.306(a) - Security standards: general rules",
+                "[Critical] Remove PASSWD_NOTREQD flag:\n\
+                 Get-ADUser -Filter {PasswordNotRequired -eq $true} | Set-ADUser -PasswordNotRequired $false\n\n\
+                 [Critical] Remove reversible encryption:\n\
+                 Get-ADUser -Filter {AllowReversiblePasswordEncryption -eq $true} | Set-ADUser -AllowReversiblePasswordEncryption $false\n\n\
+                 [High] Enforce password rotation for all accounts accessing ePHI:\n\
+                 Get-ADUser -Filter {PasswordNeverExpires -eq $true} | Set-ADUser -PasswordNeverExpires $false\n\n\
+                 [Medium] Disable inactive accounts:\n\
+                 Search-ADAccount -AccountInactive -TimeSpan 90 | Disable-ADAccount\n\n\
+                 [Medium] Review administrative access monthly and document business justification.\n\
+                 Note: addressable specifications (e.g., encryption) require documented rationale if an alternative is implemented.",
+            ),
         ],
     }
 }
 
 fn sox_template() -> ComplianceTemplate {
     ComplianceTemplate {
-        name: "SOX Change Management".to_string(),
+        name: "SOX IT General Controls".to_string(),
         standard: "SOX".to_string(),
-        version: "1.0".to_string(),
-        description: "Audit of AD privileged access and change management for SOX compliance"
-            .to_string(),
+        version: "2.0".to_string(),
+        description: "Audit of AD access controls under SOX ITGC - Access to Programs and Data".to_string(),
         introduction: Some(
-            "This report evaluates Active Directory controls against the Sarbanes-Oxley Act (SOX) \
-             requirements for internal controls over financial reporting. It inventories privileged \
-             accounts that could impact financial systems, reviews disabled accounts for proper \
-             lifecycle management, and assesses change management practices."
+            "This report evaluates Active Directory controls under the Sarbanes-Oxley Act (SOX) \
+             IT General Controls (ITGC) framework, specifically the Access to Programs and Data (APD) \
+             domain. It inventories privileged accounts that could impact financial reporting systems, \
+             reviews account lifecycle management, detects weak authentication configurations, and \
+             identifies potential separation of duties concerns."
                 .to_string(),
         ),
         builtin: true,
         sections: vec![
-            TemplateSection {
-                title: "Privileged Account Inventory".to_string(),
-                control_reference: "SOX Section 404 - Internal controls".to_string(),
-                introduction: Some(
-                    "Inventories all accounts with administrative privileges, including creation date \
-                     and last activity. SOX Section 404 requires management to assess the effectiveness \
-                     of internal controls. Undocumented or stale privileged accounts represent a control \
-                     weakness that auditors will flag."
-                        .to_string(),
-                ),
-                section_type: SectionType::Query,
-                query_scope: Some("privilegedAccounts".to_string()),
-                query_attributes: Some(vec![
-                    "sAMAccountName".to_string(),
-                    "displayName".to_string(),
-                    "whenCreated".to_string(),
-                    "lastLogonTimestamp".to_string(),
-                ]),
-                content: None,
-            },
-            TemplateSection {
-                title: "Disabled Account Review".to_string(),
-                control_reference: "SOX Section 302 - Corporate responsibility".to_string(),
-                introduction: Some(
-                    "Lists all currently disabled accounts and when they were last modified. SOX Section 302 \
-                     requires officers to certify that controls are effective. Disabled accounts that linger \
-                     indefinitely may indicate weak offboarding processes or incomplete access revocation."
-                        .to_string(),
-                ),
-                section_type: SectionType::Query,
-                query_scope: Some("disabledAccounts".to_string()),
-                query_attributes: Some(vec![
-                    "sAMAccountName".to_string(),
-                    "displayName".to_string(),
-                    "whenChanged".to_string(),
-                ]),
-                content: None,
-            },
-            TemplateSection {
-                title: "Recommendations".to_string(),
-                control_reference: "SOX Section 404 - Assessment of internal controls".to_string(),
-                introduction: None,
-                section_type: SectionType::Static,
-                query_scope: None,
-                query_attributes: None,
-                content: Some(
-                    "1. Perform quarterly access reviews for all privileged accounts.\n\
-                     2. Document and approve all changes to administrative group membership.\n\
-                     3. Retain disabled accounts for 90 days before deletion for audit trail.\n\
-                     4. Implement separation of duties for financial system access."
-                        .to_string(),
-                ),
-            },
+            query_section(
+                "Privileged Account Inventory",
+                "SOX ITGC - APD: Provisioning",
+                "Inventories all accounts with administrative privileges, including creation date and \
+                 last activity. Under SOX Section 404 ITGC requirements, management must assess the \
+                 effectiveness of access controls. Undocumented or stale privileged accounts represent \
+                 a control deficiency that external auditors will flag.",
+                "High",
+                "privilegedAccounts",
+                &["sAMAccountName", "displayName", "whenCreated", "lastLogonTimestamp", "pwdLastSet"],
+            ),
+            query_section(
+                "Disabled Account Review",
+                "SOX ITGC - APD: Deprovisioning",
+                "Lists all currently disabled accounts and when they were last modified. Effective \
+                 deprovisioning controls are a core ITGC requirement. Disabled accounts that linger \
+                 indefinitely indicate weak offboarding processes - a significant deficiency if access \
+                 to financial systems is involved.",
+                "Medium",
+                "disabledAccounts",
+                &["sAMAccountName", "displayName", "whenChanged"],
+            ),
+            query_section(
+                "Accounts Without Password Requirement",
+                "SOX ITGC - APD: Authentication",
+                "Detects accounts where PASSWD_NOTREQD is set. Accounts that can have empty passwords \
+                 represent a material weakness in authentication controls. This finding would likely \
+                 escalate to a significant deficiency or material weakness if the account has access \
+                 to financially significant systems.",
+                "Critical",
+                "passwordNotRequired",
+                &["sAMAccountName", "displayName", "userAccountControl"],
+            ),
+            query_section(
+                "Stale Passwords",
+                "SOX ITGC - APD: Periodic review",
+                "Identifies accounts with passwords unchanged for over 90 days. Periodic password \
+                 rotation is a standard ITGC control. Stale passwords on privileged accounts \
+                 represent a control deficiency.",
+                "Medium",
+                "passwordExpired",
+                &["sAMAccountName", "displayName", "pwdLastSet"],
+            ),
+            static_section(
+                "Remediation Steps",
+                "SOX ITGC - Access to Programs and Data",
+                "[Critical] Clear PASSWD_NOTREQD flag on all accounts:\n\
+                 Get-ADUser -Filter {PasswordNotRequired -eq $true} | Set-ADUser -PasswordNotRequired $false\n\n\
+                 [High] Perform quarterly access reviews for all privileged accounts and document approvals.\n\n\
+                 [High] Implement a formal access request/approval workflow with documented evidence.\n\n\
+                 [Medium] Delete or archive disabled accounts older than 90 days after audit retention period.\n\n\
+                 [Medium] Enforce password rotation policy (90-day maximum age).\n\n\
+                 [Medium] Implement separation of duties: ensure no single account can both provision and approve access.",
+            ),
         ],
     }
 }
 
 fn pci_dss_template() -> ComplianceTemplate {
     ComplianceTemplate {
-        name: "PCI-DSS Auth & Access Audit".to_string(),
+        name: "PCI-DSS v4.0 Auth & Access Audit".to_string(),
         standard: "PCI-DSS".to_string(),
-        version: "1.0".to_string(),
-        description: "Audit of authentication settings and access rights for PCI-DSS compliance"
-            .to_string(),
+        version: "2.0".to_string(),
+        description: "Audit of authentication and access controls for PCI-DSS v4.0 compliance".to_string(),
         introduction: Some(
-            "This report assesses Active Directory configuration against the Payment Card Industry \
-             Data Security Standard (PCI-DSS). It evaluates access controls for cardholder data \
-             environments, reviews authentication settings for compliance with password requirements, \
-             identifies inactive accounts that should be removed per Req. 8.1.4, and provides \
-             actionable recommendations for remediation."
+            "This report assesses Active Directory configuration against PCI-DSS v4.0 (effective \
+             March 2024). It evaluates access controls for cardholder data environments (Req. 7), \
+             reviews authentication settings (Req. 8), identifies inactive accounts that must be \
+             removed per Req. 8.2.6, detects critical authentication weaknesses, and provides \
+             specific remediation commands."
                 .to_string(),
         ),
         builtin: true,
         sections: vec![
-            TemplateSection {
-                title: "Privileged Access Review".to_string(),
-                control_reference: "PCI-DSS Req. 7 - Restrict access".to_string(),
-                introduction: Some(
-                    "Lists all accounts with administrative privileges. PCI-DSS Req. 7 mandates that \
-                     access to system components and cardholder data is limited to individuals whose \
-                     job requires it. Each privileged account should have documented business justification."
-                        .to_string(),
-                ),
-                section_type: SectionType::Query,
-                query_scope: Some("privilegedAccounts".to_string()),
-                query_attributes: Some(vec![
-                    "sAMAccountName".to_string(),
-                    "displayName".to_string(),
-                    "lastLogonTimestamp".to_string(),
-                ]),
-                content: None,
-            },
-            TemplateSection {
-                title: "Authentication Controls".to_string(),
-                control_reference: "PCI-DSS Req. 8 - Identify and authenticate".to_string(),
-                introduction: Some(
-                    "Identifies accounts where the 'Password Never Expires' flag is set. PCI-DSS Req. 8 \
-                     requires that passwords are changed at least every 90 days. Accounts with non-expiring \
-                     passwords violate this requirement and should be remediated or documented as exceptions \
-                     with compensating controls."
-                        .to_string(),
-                ),
-                section_type: SectionType::Query,
-                query_scope: Some("passwordNeverExpires".to_string()),
-                query_attributes: Some(vec![
-                    "sAMAccountName".to_string(),
-                    "displayName".to_string(),
-                    "userAccountControl".to_string(),
-                ]),
-                content: None,
-            },
-            TemplateSection {
-                title: "Inactive Account Audit".to_string(),
-                control_reference: "PCI-DSS Req. 8.1.4 - Remove inactive accounts".to_string(),
-                introduction: Some(
-                    "Identifies accounts inactive for more than 90 days. PCI-DSS Req. 8.1.4 explicitly \
-                     requires that inactive accounts be removed or disabled within 90 days. This is one \
-                     of the most commonly cited findings in PCI audits."
-                        .to_string(),
-                ),
-                section_type: SectionType::Query,
-                query_scope: Some("inactiveAccounts".to_string()),
-                query_attributes: Some(vec![
-                    "sAMAccountName".to_string(),
-                    "displayName".to_string(),
-                    "lastLogonTimestamp".to_string(),
-                ]),
-                content: None,
-            },
-            TemplateSection {
-                title: "Recommendations".to_string(),
-                control_reference: "PCI-DSS Req. 10 - Track and monitor access".to_string(),
-                introduction: None,
-                section_type: SectionType::Static,
-                query_scope: None,
-                query_attributes: None,
-                content: Some(
-                    "1. Remove or disable inactive accounts within 90 days (Req. 8.1.4).\n\
-                     2. Enforce unique IDs for all users with system access (Req. 8.1.1).\n\
-                     3. Implement MFA for all administrative access (Req. 8.3).\n\
-                     4. Review access rights at least quarterly (Req. 7.1)."
-                        .to_string(),
-                ),
-            },
+            query_section(
+                "Privileged Access Review",
+                "PCI-DSS v4.0 Req. 7.2.1 - Access control model",
+                "Lists all accounts with administrative privileges. Req. 7.2.1 requires an access \
+                 control model that restricts access based on job classification and function. Each \
+                 privileged account should have documented business justification.",
+                "High",
+                "privilegedAccounts",
+                &["sAMAccountName", "displayName", "lastLogonTimestamp", "pwdLastSet"],
+            ),
+            query_section(
+                "Password Expiration Controls",
+                "PCI-DSS v4.0 Req. 8.3.9 - Password change frequency",
+                "Identifies accounts with the 'Password Never Expires' flag. Req. 8.3.9 requires \
+                 passwords to be changed at least every 90 days (or dynamic analysis via Req. 8.3.10.1). \
+                 Non-expiring passwords directly violate this requirement.",
+                "High",
+                "passwordNeverExpires",
+                &["sAMAccountName", "displayName", "userAccountControl"],
+            ),
+            query_section(
+                "Inactive Account Audit",
+                "PCI-DSS v4.0 Req. 8.2.6 - Inactive accounts",
+                "Identifies accounts inactive for more than 90 days. Req. 8.2.6 explicitly requires \
+                 that inactive accounts be removed or disabled within 90 days. This is one of the \
+                 most commonly cited findings in PCI assessments.",
+                "High",
+                "inactiveAccounts",
+                &["sAMAccountName", "displayName", "lastLogonTimestamp"],
+            ),
+            query_section(
+                "Accounts Without Password Requirement",
+                "PCI-DSS v4.0 Req. 8.3.1 - Authentication factors",
+                "Detects accounts where PASSWD_NOTREQD is set. Req. 8.3.1 requires strong \
+                 authentication for all access to system components. An account with no password \
+                 requirement would result in an automatic FAIL on this requirement.",
+                "Critical",
+                "passwordNotRequired",
+                &["sAMAccountName", "displayName", "userAccountControl"],
+            ),
+            query_section(
+                "Reversible Encryption",
+                "PCI-DSS v4.0 Req. 8.3.2 - Strong cryptography",
+                "Detects accounts storing passwords with reversible encryption. Req. 8.3.2 requires \
+                 strong cryptography to render authentication factors unreadable. Reversible encryption \
+                 allows password recovery in clear text.",
+                "Critical",
+                "reversibleEncryption",
+                &["sAMAccountName", "displayName", "userAccountControl"],
+            ),
+            query_section(
+                "Stale Passwords",
+                "PCI-DSS v4.0 Req. 8.3.9 - Password rotation",
+                "Identifies accounts with passwords unchanged for over 90 days. Req. 8.3.9 mandates \
+                 password changes at minimum every 90 days unless dynamic analysis is implemented \
+                 per Req. 8.3.10.1.",
+                "Medium",
+                "passwordExpired",
+                &["sAMAccountName", "displayName", "pwdLastSet"],
+            ),
+            static_section(
+                "Remediation Steps",
+                "PCI-DSS v4.0 Req. 8 - Identification and authentication",
+                "[Critical - FAIL if not fixed] Remove PASSWD_NOTREQD flag:\n\
+                 Get-ADUser -Filter {PasswordNotRequired -eq $true} | Set-ADUser -PasswordNotRequired $false\n\n\
+                 [Critical - FAIL if not fixed] Remove reversible encryption:\n\
+                 Get-ADUser -Filter {AllowReversiblePasswordEncryption -eq $true} | Set-ADUser -AllowReversiblePasswordEncryption $false\n\n\
+                 [High - Req. 8.2.6] Disable inactive accounts within 90 days:\n\
+                 Search-ADAccount -AccountInactive -TimeSpan 90 | Disable-ADAccount\n\n\
+                 [High - Req. 8.3.9] Enforce password expiration:\n\
+                 Get-ADUser -Filter {PasswordNeverExpires -eq $true} | Set-ADUser -PasswordNeverExpires $false\n\n\
+                 [High - Req. 7.2.1] Review all privileged accounts quarterly; document business justification.\n\n\
+                 [Medium - Req. 8.3.9] Force password change for accounts with passwords older than 90 days.",
+            ),
         ],
     }
 }
@@ -421,6 +494,7 @@ pub async fn generate_report(
         .unwrap_or_else(|| std::env::var("USERNAME").unwrap_or_else(|_| "DSPanel".to_string()));
 
     let mut sections = Vec::new();
+    let mut total_accounts = 0usize;
 
     for section in &template.sections {
         let report_section = match section.section_type {
@@ -444,10 +518,12 @@ pub async fn generate_report(
                     .collect();
 
                 let count = rows.len();
+                total_accounts = total_accounts.max(entries.len());
                 ReportSection {
                     title: section.title.clone(),
                     control_reference: section.control_reference.clone(),
                     introduction: section.introduction.clone(),
+                    severity: if count > 0 { section.severity.clone() } else { None },
                     section_type: SectionType::Query,
                     headers: Some(headers),
                     rows: Some(rows),
@@ -459,6 +535,7 @@ pub async fn generate_report(
                 title: section.title.clone(),
                 control_reference: section.control_reference.clone(),
                 introduction: section.introduction.clone(),
+                severity: None,
                 section_type: SectionType::Static,
                 headers: None,
                 rows: None,
@@ -469,6 +546,27 @@ pub async fn generate_report(
         sections.push(report_section);
     }
 
+    // Compute compliance score: 100 - (critical*25 + high*10 + medium*5), clamped to 0
+    let mut critical_count = 0usize;
+    let mut high_count = 0usize;
+    let mut medium_count = 0usize;
+    let mut total_findings = 0usize;
+    for s in &sections {
+        if let Some(count) = s.finding_count {
+            if count > 0 {
+                total_findings += count;
+                match s.severity.as_deref() {
+                    Some("Critical") => critical_count += 1,
+                    Some("High") => high_count += 1,
+                    Some("Medium") => medium_count += 1,
+                    _ => {}
+                }
+            }
+        }
+    }
+    let penalty = critical_count * 25 + high_count * 10 + medium_count * 5;
+    let compliance_score = 100u32.saturating_sub(penalty as u32);
+
     Ok(ComplianceReport {
         template_name: template.name.clone(),
         standard: template.standard.clone(),
@@ -476,6 +574,9 @@ pub async fn generate_report(
         generated_at: timestamp,
         generator,
         introduction: template.introduction.clone(),
+        compliance_score,
+        total_accounts_scanned: total_accounts,
+        total_findings,
         sections,
     })
 }
@@ -558,6 +659,66 @@ async fn execute_query(
                 })
                 .collect())
         }
+        "passwordNotRequired" => {
+            let entries = provider
+                .browse_users(5000)
+                .await
+                .map_err(|e| AppError::Internal(format!("Query failed: {e}")))?;
+
+            Ok(entries
+                .into_iter()
+                .filter(|e| {
+                    e.get_attribute("userAccountControl")
+                        .and_then(|s| s.parse::<u32>().ok())
+                        .map(|uac| uac & 0x0020 != 0) // PASSWD_NOTREQD
+                        .unwrap_or(false)
+                })
+                .collect())
+        }
+        "reversibleEncryption" => {
+            let entries = provider
+                .browse_users(5000)
+                .await
+                .map_err(|e| AppError::Internal(format!("Query failed: {e}")))?;
+
+            Ok(entries
+                .into_iter()
+                .filter(|e| {
+                    e.get_attribute("userAccountControl")
+                        .and_then(|s| s.parse::<u32>().ok())
+                        .map(|uac| uac & 0x0080 != 0) // ENCRYPTED_TEXT_PWD_ALLOWED
+                        .unwrap_or(false)
+                })
+                .collect())
+        }
+        "passwordExpired" => {
+            let entries = provider
+                .browse_users(5000)
+                .await
+                .map_err(|e| AppError::Internal(format!("Query failed: {e}")))?;
+
+            let now = chrono::Utc::now();
+            let threshold = 90 * 86400i64;
+
+            Ok(entries
+                .into_iter()
+                .filter(|e| {
+                    if let Some(ts_str) = e.get_attribute("pwdLastSet") {
+                        if let Ok(ticks) = ts_str.parse::<i64>() {
+                            if ticks > 0 {
+                                let unix_secs = ticks / 10_000_000 - 11_644_473_600;
+                                if let Some(set_date) =
+                                    chrono::DateTime::from_timestamp(unix_secs, 0)
+                                {
+                                    return (now - set_date).num_seconds() > threshold;
+                                }
+                            }
+                        }
+                    }
+                    false
+                })
+                .collect())
+        }
         _ => Ok(Vec::new()),
     }
 }
@@ -607,15 +768,36 @@ pub fn report_to_html(report: &ComplianceReport) -> String {
 
     html.push_str("<div class=\"content\">\n");
 
+    // Executive summary
+    let score_color = if report.compliance_score >= 80 {
+        "#2e7d32"
+    } else if report.compliance_score >= 50 {
+        "#e65100"
+    } else {
+        "#c62828"
+    };
+    html.push_str("<div class=\"section\">\n<h2>Executive Summary</h2>\n");
+    html.push_str(&format!(
+        "<div style=\"display:flex;align-items:center;gap:1.5rem;margin:1rem 0\">\
+         <div style=\"font-size:2.5rem;font-weight:700;color:{}\">{}/100</div>\
+         <div><div style=\"font-size:0.9rem;font-weight:600\">Compliance Score</div>\
+         <div style=\"font-size:0.8rem;color:#666\">{} accounts scanned - {} findings across {} sections</div>\
+         </div></div>\n",
+        score_color,
+        report.compliance_score,
+        report.total_accounts_scanned,
+        report.total_findings,
+        report.sections.iter().filter(|s| s.finding_count.is_some()).count(),
+    ));
+
     // Report introduction
     if let Some(intro) = &report.introduction {
-        html.push_str("<div class=\"section\">\n");
         html.push_str(&format!(
-            "<p class=\"static-content\">{}</p>\n",
+            "<p style=\"color:#555;font-size:0.85rem;line-height:1.5\">{}</p>\n",
             html_escape(intro)
         ));
-        html.push_str("</div>\n");
     }
+    html.push_str("</div>\n");
 
     // Table of contents
     html.push_str("<div class=\"section\">\n<h2>Table of Contents</h2>\n<ol>\n");
@@ -637,6 +819,20 @@ pub fn report_to_html(report: &ComplianceReport) -> String {
             "<span class=\"control-ref\">{}</span>\n",
             html_escape(&section.control_reference)
         ));
+
+        if let Some(severity) = &section.severity {
+            let sev_color = match severity.as_str() {
+                "Critical" => "#c62828",
+                "High" => "#e65100",
+                "Medium" => "#f9a825",
+                _ => "#546e7a",
+            };
+            html.push_str(&format!(
+                " <span style=\"background:{};color:#fff;padding:2px 8px;border-radius:4px;\
+                 font-size:0.7rem;font-weight:600\">{}</span>\n",
+                sev_color, html_escape(severity)
+            ));
+        }
 
         if let Some(intro) = &section.introduction {
             html.push_str(&format!(
@@ -800,13 +996,13 @@ mod tests {
     }
 
     #[test]
-    fn all_templates_have_recommendations() {
+    fn all_templates_have_remediation() {
         for t in builtin_templates() {
             let has_recs = t
                 .sections
                 .iter()
-                .any(|s| s.section_type == SectionType::Static && s.title.contains("Recommendation"));
-            assert!(has_recs, "Template {} missing Recommendations section", t.name);
+                .any(|s| s.section_type == SectionType::Static && s.title.contains("Remediation"));
+            assert!(has_recs, "Template {} missing Remediation section", t.name);
         }
     }
 
@@ -823,7 +1019,9 @@ mod tests {
     fn report_section_serde() {
         let section = ReportSection {
             title: "Test".to_string(),
-            control_reference: "GDPR Art. 25".to_string(),
+            control_reference: "GDPR Art. 32".to_string(),
+            introduction: None,
+            severity: Some("High".to_string()),
             section_type: SectionType::Query,
             headers: Some(vec!["Name".to_string(), "Email".to_string()]),
             rows: Some(vec![vec!["Alice".to_string(), "a@test.com".to_string()]]),
@@ -831,7 +1029,7 @@ mod tests {
             finding_count: Some(1),
         };
         let json = serde_json::to_string(&section).unwrap();
-        assert!(json.contains("GDPR Art. 25"));
+        assert!(json.contains("GDPR Art. 32"));
         let loaded: ReportSection = serde_json::from_str(&json).unwrap();
         assert_eq!(loaded.finding_count, Some(1));
     }
@@ -844,10 +1042,16 @@ mod tests {
             version: "1.0".to_string(),
             generated_at: "2026-03-24 12:00:00".to_string(),
             generator: "TestUser".to_string(),
+            introduction: Some("Test intro".to_string()),
+            compliance_score: 75,
+            total_accounts_scanned: 100,
+            total_findings: 5,
             sections: vec![
                 ReportSection {
                     title: "Privileged Access".to_string(),
-                    control_reference: "GDPR Art. 25".to_string(),
+                    control_reference: "GDPR Art. 32".to_string(),
+                    introduction: None,
+                    severity: Some("High".to_string()),
                     section_type: SectionType::Query,
                     headers: Some(vec!["Name".to_string()]),
                     rows: Some(vec![vec!["Admin".to_string()]]),
@@ -857,6 +1061,8 @@ mod tests {
                 ReportSection {
                     title: "Recommendations".to_string(),
                     control_reference: "GDPR Art. 32".to_string(),
+                    introduction: None,
+                    severity: None,
                     section_type: SectionType::Static,
                     headers: None,
                     rows: None,
@@ -870,12 +1076,14 @@ mod tests {
         assert!(html.starts_with("<!DOCTYPE html>"));
         assert!(html.contains("Test Report"));
         assert!(html.contains("GDPR Compliance Report"));
-        assert!(html.contains("GDPR Art. 25"));
         assert!(html.contains("GDPR Art. 32"));
         assert!(html.contains("Admin"));
         assert!(html.contains("Review quarterly."));
         assert!(html.contains("Table of Contents"));
         assert!(html.contains("TestUser"));
+        assert!(html.contains("75/100"));
+        assert!(html.contains("Compliance Score"));
+        assert!(html.contains("High"));
     }
 
     #[test]
@@ -886,6 +1094,10 @@ mod tests {
             version: "1.0".to_string(),
             generated_at: "now".to_string(),
             generator: "user".to_string(),
+            introduction: None,
+            compliance_score: 100,
+            total_accounts_scanned: 0,
+            total_findings: 0,
             sections: vec![],
         };
         let html = report_to_html(&report);
@@ -894,13 +1106,14 @@ mod tests {
     }
 
     #[test]
-    fn pci_dss_has_four_sections() {
+    fn pci_dss_has_seven_sections() {
         let pci = pci_dss_template();
-        assert_eq!(pci.sections.len(), 4);
+        assert_eq!(pci.sections.len(), 7);
         assert!(pci.sections[0].control_reference.contains("Req. 7"));
-        assert!(pci.sections[1].control_reference.contains("Req. 8"));
-        assert!(pci.sections[2].control_reference.contains("Req. 8.1.4"));
-        assert!(pci.sections[3].control_reference.contains("Req. 10"));
+        assert!(pci.sections[1].control_reference.contains("Req. 8.3.9"));
+        assert!(pci.sections[2].control_reference.contains("Req. 8.2.6"));
+        assert!(pci.sections[3].control_reference.contains("Req. 8.3.1"));
+        assert!(pci.sections[4].control_reference.contains("Req. 8.3.2"));
     }
 
     // -- format_ad_attribute tests --
