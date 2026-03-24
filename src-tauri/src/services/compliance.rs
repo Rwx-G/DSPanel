@@ -18,6 +18,9 @@ pub struct ComplianceTemplate {
     pub standard: String,
     pub version: String,
     pub description: String,
+    /// Introductory paragraph explaining the purpose and scope of this report.
+    #[serde(default)]
+    pub introduction: Option<String>,
     pub sections: Vec<TemplateSection>,
     /// Whether this is a built-in (read-only) or custom template.
     #[serde(default)]
@@ -30,6 +33,9 @@ pub struct ComplianceTemplate {
 pub struct TemplateSection {
     pub title: String,
     pub control_reference: String,
+    /// Brief explanation of what this section checks and why it matters.
+    #[serde(default)]
+    pub introduction: Option<String>,
     #[serde(rename = "type")]
     pub section_type: SectionType,
     /// Query scope (for query-type sections).
@@ -56,6 +62,7 @@ pub struct ComplianceReport {
     pub version: String,
     pub generated_at: String,
     pub generator: String,
+    pub introduction: Option<String>,
     pub sections: Vec<ReportSection>,
 }
 
@@ -65,6 +72,8 @@ pub struct ComplianceReport {
 pub struct ReportSection {
     pub title: String,
     pub control_reference: String,
+    /// Brief explanation of what this section checks.
+    pub introduction: Option<String>,
     pub section_type: SectionType,
     /// Table data: headers + rows (for query sections).
     pub headers: Option<Vec<String>>,
@@ -94,11 +103,25 @@ fn gdpr_template() -> ComplianceTemplate {
         standard: "GDPR".to_string(),
         version: "1.0".to_string(),
         description: "Review of AD access controls for GDPR compliance".to_string(),
+        introduction: Some(
+            "This report assesses Active Directory access controls against the General Data \
+             Protection Regulation (GDPR). It examines privileged account usage, identifies \
+             inactive accounts that may retain unnecessary access to personal data, and provides \
+             recommendations to strengthen data protection by design and by default."
+                .to_string(),
+        ),
         builtin: true,
         sections: vec![
             TemplateSection {
                 title: "Privileged Access Summary".to_string(),
                 control_reference: "GDPR Art. 25 - Data protection by design".to_string(),
+                introduction: Some(
+                    "Lists all accounts with administrative privileges (adminCount=1). Under GDPR Art. 25, \
+                     organizations must implement appropriate technical measures to ensure that only necessary \
+                     personal data is processed. Excessive privileged accounts increase the risk of unauthorized \
+                     access to personal data."
+                        .to_string(),
+                ),
                 section_type: SectionType::Query,
                 query_scope: Some("privilegedAccounts".to_string()),
                 query_attributes: Some(vec![
@@ -112,6 +135,12 @@ fn gdpr_template() -> ComplianceTemplate {
             TemplateSection {
                 title: "Inactive Accounts".to_string(),
                 control_reference: "GDPR Art. 5 - Data minimization".to_string(),
+                introduction: Some(
+                    "Identifies accounts that have not logged in for more than 90 days. Under GDPR Art. 5, \
+                     personal data should be kept only as long as necessary. Inactive accounts represent \
+                     dormant access paths that could be exploited in a breach."
+                        .to_string(),
+                ),
                 section_type: SectionType::Query,
                 query_scope: Some("inactiveAccounts".to_string()),
                 query_attributes: Some(vec![
@@ -124,6 +153,7 @@ fn gdpr_template() -> ComplianceTemplate {
             TemplateSection {
                 title: "Recommendations".to_string(),
                 control_reference: "GDPR Art. 32 - Security of processing".to_string(),
+                introduction: None,
                 section_type: SectionType::Static,
                 query_scope: None,
                 query_attributes: None,
@@ -145,11 +175,26 @@ fn hipaa_template() -> ComplianceTemplate {
         standard: "HIPAA".to_string(),
         version: "1.0".to_string(),
         description: "Audit of AD access controls for HIPAA compliance".to_string(),
+        introduction: Some(
+            "This report evaluates Active Directory configuration against the Health Insurance \
+             Portability and Accountability Act (HIPAA) Security Rule. It reviews administrative \
+             access to systems containing electronic Protected Health Information (ePHI), assesses \
+             password policies for authentication strength, and identifies accounts that may not \
+             meet minimum security requirements."
+                .to_string(),
+        ),
         builtin: true,
         sections: vec![
             TemplateSection {
                 title: "Administrative Access Audit".to_string(),
                 control_reference: "HIPAA 164.312(a) - Access control".to_string(),
+                introduction: Some(
+                    "Lists all accounts with administrative privileges. HIPAA 164.312(a) requires \
+                     covered entities to implement technical policies and procedures that allow only \
+                     authorized persons to access ePHI. Each privileged account represents a potential \
+                     access path to sensitive health data."
+                        .to_string(),
+                ),
                 section_type: SectionType::Query,
                 query_scope: Some("privilegedAccounts".to_string()),
                 query_attributes: Some(vec![
@@ -162,6 +207,13 @@ fn hipaa_template() -> ComplianceTemplate {
             TemplateSection {
                 title: "Password Policy Assessment".to_string(),
                 control_reference: "HIPAA 164.312(d) - Person or entity authentication".to_string(),
+                introduction: Some(
+                    "Identifies accounts with the 'Password Never Expires' flag set. HIPAA 164.312(d) \
+                     requires procedures to verify that a person seeking access to ePHI is who they \
+                     claim to be. Non-expiring passwords weaken authentication controls and increase \
+                     the window for credential compromise."
+                        .to_string(),
+                ),
                 section_type: SectionType::Query,
                 query_scope: Some("passwordNeverExpires".to_string()),
                 query_attributes: Some(vec![
@@ -174,6 +226,7 @@ fn hipaa_template() -> ComplianceTemplate {
             TemplateSection {
                 title: "Recommendations".to_string(),
                 control_reference: "HIPAA 164.312(b) - Audit controls".to_string(),
+                introduction: None,
                 section_type: SectionType::Static,
                 query_scope: None,
                 query_attributes: None,
@@ -196,11 +249,25 @@ fn sox_template() -> ComplianceTemplate {
         version: "1.0".to_string(),
         description: "Audit of AD privileged access and change management for SOX compliance"
             .to_string(),
+        introduction: Some(
+            "This report evaluates Active Directory controls against the Sarbanes-Oxley Act (SOX) \
+             requirements for internal controls over financial reporting. It inventories privileged \
+             accounts that could impact financial systems, reviews disabled accounts for proper \
+             lifecycle management, and assesses change management practices."
+                .to_string(),
+        ),
         builtin: true,
         sections: vec![
             TemplateSection {
                 title: "Privileged Account Inventory".to_string(),
                 control_reference: "SOX Section 404 - Internal controls".to_string(),
+                introduction: Some(
+                    "Inventories all accounts with administrative privileges, including creation date \
+                     and last activity. SOX Section 404 requires management to assess the effectiveness \
+                     of internal controls. Undocumented or stale privileged accounts represent a control \
+                     weakness that auditors will flag."
+                        .to_string(),
+                ),
                 section_type: SectionType::Query,
                 query_scope: Some("privilegedAccounts".to_string()),
                 query_attributes: Some(vec![
@@ -214,6 +281,12 @@ fn sox_template() -> ComplianceTemplate {
             TemplateSection {
                 title: "Disabled Account Review".to_string(),
                 control_reference: "SOX Section 302 - Corporate responsibility".to_string(),
+                introduction: Some(
+                    "Lists all currently disabled accounts and when they were last modified. SOX Section 302 \
+                     requires officers to certify that controls are effective. Disabled accounts that linger \
+                     indefinitely may indicate weak offboarding processes or incomplete access revocation."
+                        .to_string(),
+                ),
                 section_type: SectionType::Query,
                 query_scope: Some("disabledAccounts".to_string()),
                 query_attributes: Some(vec![
@@ -226,6 +299,7 @@ fn sox_template() -> ComplianceTemplate {
             TemplateSection {
                 title: "Recommendations".to_string(),
                 control_reference: "SOX Section 404 - Assessment of internal controls".to_string(),
+                introduction: None,
                 section_type: SectionType::Static,
                 query_scope: None,
                 query_attributes: None,
@@ -248,11 +322,25 @@ fn pci_dss_template() -> ComplianceTemplate {
         version: "1.0".to_string(),
         description: "Audit of authentication settings and access rights for PCI-DSS compliance"
             .to_string(),
+        introduction: Some(
+            "This report assesses Active Directory configuration against the Payment Card Industry \
+             Data Security Standard (PCI-DSS). It evaluates access controls for cardholder data \
+             environments, reviews authentication settings for compliance with password requirements, \
+             identifies inactive accounts that should be removed per Req. 8.1.4, and provides \
+             actionable recommendations for remediation."
+                .to_string(),
+        ),
         builtin: true,
         sections: vec![
             TemplateSection {
                 title: "Privileged Access Review".to_string(),
                 control_reference: "PCI-DSS Req. 7 - Restrict access".to_string(),
+                introduction: Some(
+                    "Lists all accounts with administrative privileges. PCI-DSS Req. 7 mandates that \
+                     access to system components and cardholder data is limited to individuals whose \
+                     job requires it. Each privileged account should have documented business justification."
+                        .to_string(),
+                ),
                 section_type: SectionType::Query,
                 query_scope: Some("privilegedAccounts".to_string()),
                 query_attributes: Some(vec![
@@ -265,6 +353,13 @@ fn pci_dss_template() -> ComplianceTemplate {
             TemplateSection {
                 title: "Authentication Controls".to_string(),
                 control_reference: "PCI-DSS Req. 8 - Identify and authenticate".to_string(),
+                introduction: Some(
+                    "Identifies accounts where the 'Password Never Expires' flag is set. PCI-DSS Req. 8 \
+                     requires that passwords are changed at least every 90 days. Accounts with non-expiring \
+                     passwords violate this requirement and should be remediated or documented as exceptions \
+                     with compensating controls."
+                        .to_string(),
+                ),
                 section_type: SectionType::Query,
                 query_scope: Some("passwordNeverExpires".to_string()),
                 query_attributes: Some(vec![
@@ -277,6 +372,12 @@ fn pci_dss_template() -> ComplianceTemplate {
             TemplateSection {
                 title: "Inactive Account Audit".to_string(),
                 control_reference: "PCI-DSS Req. 8.1.4 - Remove inactive accounts".to_string(),
+                introduction: Some(
+                    "Identifies accounts inactive for more than 90 days. PCI-DSS Req. 8.1.4 explicitly \
+                     requires that inactive accounts be removed or disabled within 90 days. This is one \
+                     of the most commonly cited findings in PCI audits."
+                        .to_string(),
+                ),
                 section_type: SectionType::Query,
                 query_scope: Some("inactiveAccounts".to_string()),
                 query_attributes: Some(vec![
@@ -289,6 +390,7 @@ fn pci_dss_template() -> ComplianceTemplate {
             TemplateSection {
                 title: "Recommendations".to_string(),
                 control_reference: "PCI-DSS Req. 10 - Track and monitor access".to_string(),
+                introduction: None,
                 section_type: SectionType::Static,
                 query_scope: None,
                 query_attributes: None,
@@ -345,6 +447,7 @@ pub async fn generate_report(
                 ReportSection {
                     title: section.title.clone(),
                     control_reference: section.control_reference.clone(),
+                    introduction: section.introduction.clone(),
                     section_type: SectionType::Query,
                     headers: Some(headers),
                     rows: Some(rows),
@@ -355,6 +458,7 @@ pub async fn generate_report(
             SectionType::Static => ReportSection {
                 title: section.title.clone(),
                 control_reference: section.control_reference.clone(),
+                introduction: section.introduction.clone(),
                 section_type: SectionType::Static,
                 headers: None,
                 rows: None,
@@ -371,6 +475,7 @@ pub async fn generate_report(
         version: template.version.clone(),
         generated_at: timestamp,
         generator,
+        introduction: template.introduction.clone(),
         sections,
     })
 }
@@ -502,6 +607,16 @@ pub fn report_to_html(report: &ComplianceReport) -> String {
 
     html.push_str("<div class=\"content\">\n");
 
+    // Report introduction
+    if let Some(intro) = &report.introduction {
+        html.push_str("<div class=\"section\">\n");
+        html.push_str(&format!(
+            "<p class=\"static-content\">{}</p>\n",
+            html_escape(intro)
+        ));
+        html.push_str("</div>\n");
+    }
+
     // Table of contents
     html.push_str("<div class=\"section\">\n<h2>Table of Contents</h2>\n<ol>\n");
     for (i, section) in report.sections.iter().enumerate() {
@@ -522,6 +637,13 @@ pub fn report_to_html(report: &ComplianceReport) -> String {
             "<span class=\"control-ref\">{}</span>\n",
             html_escape(&section.control_reference)
         ));
+
+        if let Some(intro) = &section.introduction {
+            html.push_str(&format!(
+                "<p style=\"color:#555;font-size:0.85rem;line-height:1.5;margin:0.5rem 0\">{}</p>\n",
+                html_escape(intro)
+            ));
+        }
 
         match section.section_type {
             SectionType::Query => {

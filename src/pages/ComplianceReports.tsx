@@ -23,6 +23,7 @@ type SectionType = "query" | "static";
 interface TemplateSection {
   title: string;
   controlReference: string;
+  introduction: string | null;
   type: SectionType;
   queryScope: string | null;
   queryAttributes: string[] | null;
@@ -34,6 +35,7 @@ interface ComplianceTemplate {
   standard: string;
   version: string;
   description: string;
+  introduction: string | null;
   sections: TemplateSection[];
   builtin: boolean;
 }
@@ -41,6 +43,7 @@ interface ComplianceTemplate {
 interface ReportSection {
   title: string;
   controlReference: string;
+  introduction: string | null;
   sectionType: SectionType;
   headers: string[] | null;
   rows: string[][] | null;
@@ -54,6 +57,7 @@ interface ComplianceReport {
   version: string;
   generatedAt: string;
   generator: string;
+  introduction: string | null;
   sections: ReportSection[];
 }
 
@@ -119,6 +123,11 @@ function TemplateCard({
         )}
       </div>
       <p className="text-[11px] text-[var(--color-text-secondary)]">{template.description}</p>
+      {template.introduction && (
+        <p className="text-[11px] leading-relaxed text-[var(--color-text-secondary)] bg-[var(--color-surface-default)] rounded p-2">
+          {template.introduction}
+        </p>
+      )}
       <div className="flex flex-wrap gap-1">
         {template.sections
           .filter((s) => s.type !== "static")
@@ -203,6 +212,15 @@ function ReportViewer({
         />
       </div>
 
+      {/* Report introduction */}
+      {report.introduction && (
+        <div className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-default)] p-3">
+          <p className="text-caption leading-relaxed text-[var(--color-text-secondary)]">
+            {report.introduction}
+          </p>
+        </div>
+      )}
+
       {/* Sections */}
       {report.sections.map((section, i) => (
         <div
@@ -225,6 +243,12 @@ function ReportViewer({
               </span>
             )}
           </div>
+
+          {section.introduction && (
+            <p className="text-[11px] leading-relaxed text-[var(--color-text-secondary)] mb-2">
+              {section.introduction}
+            </p>
+          )}
 
           {section.sectionType === "query" && section.headers && section.rows && (
             <div className="overflow-x-auto">
