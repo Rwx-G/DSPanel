@@ -678,4 +678,59 @@ mod tests {
     fn html_escape_passthrough_normal_text() {
         assert_eq!(html_escape("Hello World"), "Hello World");
     }
+
+    // -- Large dataset tests --
+
+    #[test]
+    fn csv_export_large_dataset() {
+        let cols = sample_columns();
+        let rows: Vec<ExportRow> = (0..2000)
+            .map(|i| {
+                vec![
+                    format!("User {i}"),
+                    format!("user{i}@example.com"),
+                    format!("{}", 20 + i % 50),
+                ]
+            })
+            .collect();
+        let result = export_to_csv(&cols, &rows, &CsvOptions::default()).unwrap();
+        let content = String::from_utf8(result).unwrap();
+        let line_count = content.lines().count();
+        // 1 header + 2000 data rows
+        assert_eq!(line_count, 2001);
+    }
+
+    #[test]
+    fn xlsx_export_large_dataset() {
+        let cols = sample_columns();
+        let rows: Vec<ExportRow> = (0..1500)
+            .map(|i| {
+                vec![
+                    format!("User {i}"),
+                    format!("user{i}@example.com"),
+                    format!("{}", 20 + i % 50),
+                ]
+            })
+            .collect();
+        let result = export_to_xlsx(&cols, &rows, "LargeSheet").unwrap();
+        assert_eq!(&result[..2], b"PK");
+        assert!(result.len() > 1000);
+    }
+
+    #[test]
+    fn html_export_large_dataset() {
+        let cols = sample_columns();
+        let rows: Vec<ExportRow> = (0..1000)
+            .map(|i| {
+                vec![
+                    format!("User {i}"),
+                    format!("user{i}@example.com"),
+                    format!("{}", 20 + i % 50),
+                ]
+            })
+            .collect();
+        let result = export_to_html(&cols, &rows, "Large Report").unwrap();
+        assert!(result.contains("1000 rows"));
+        assert!(result.contains("User 999"));
+    }
 }
