@@ -3135,12 +3135,18 @@ fn analyze_windows_event_log(
 
     // Batch 1: Kerberos events (4768, 4769, 4771)
     let kerberos_events = query_events(&[4768, 4769, 4771], time_window_hours);
-    let events_4768: Vec<&EventRecord> =
-        kerberos_events.iter().filter(|e| e.id == Some(4768)).collect();
-    let events_4769: Vec<&EventRecord> =
-        kerberos_events.iter().filter(|e| e.id == Some(4769)).collect();
-    let events_4771: Vec<&EventRecord> =
-        kerberos_events.iter().filter(|e| e.id == Some(4771)).collect();
+    let events_4768: Vec<&EventRecord> = kerberos_events
+        .iter()
+        .filter(|e| e.id == Some(4768))
+        .collect();
+    let events_4769: Vec<&EventRecord> = kerberos_events
+        .iter()
+        .filter(|e| e.id == Some(4769))
+        .collect();
+    let events_4771: Vec<&EventRecord> = kerberos_events
+        .iter()
+        .filter(|e| e.id == Some(4771))
+        .collect();
 
     // Batch 2: Logon events (4624, 4625)
     let logon_events = query_events(&[4624, 4625], time_window_hours);
@@ -3233,10 +3239,7 @@ pub fn detect_golden_ticket(
 
 /// DCSync detection (Event 4662).
 /// Flags replication permission usage by non-machine accounts.
-pub fn detect_dcsync(
-    events: &[&EventRecord],
-    config: &AttackDetectionConfig,
-) -> Vec<AttackAlert> {
+pub fn detect_dcsync(events: &[&EventRecord], config: &AttackDetectionConfig) -> Vec<AttackAlert> {
     let repl_guids = [
         GUID_DS_REPL_GET_CHANGES,
         GUID_DS_REPL_GET_CHANGES_ALL,
@@ -3307,10 +3310,7 @@ pub fn detect_kerberoasting(
             && !service.eq_ignore_ascii_case("krbtgt")
             && !subject.is_empty()
         {
-            per_user
-                .entry(subject.to_string())
-                .or_default()
-                .push(event);
+            per_user.entry(subject.to_string()).or_default().push(event);
         }
     }
 
@@ -3580,10 +3580,7 @@ pub fn detect_shadow_credentials(
         if event.id != Some(5136) {
             continue;
         }
-        let attr = event
-            .attribute_ldap_display_name
-            .as_deref()
-            .unwrap_or("");
+        let attr = event.attribute_ldap_display_name.as_deref().unwrap_or("");
         if attr == "msDS-KeyCredentialLink" {
             let subject = event.subject_user_name.as_deref().unwrap_or("Unknown");
             let object_dn = event.object_dn.as_deref().unwrap_or("Unknown");
@@ -3622,10 +3619,7 @@ pub fn detect_rbcd_abuse(
         if event.id != Some(5136) {
             continue;
         }
-        let attr = event
-            .attribute_ldap_display_name
-            .as_deref()
-            .unwrap_or("");
+        let attr = event.attribute_ldap_display_name.as_deref().unwrap_or("");
         if attr == "msDS-AllowedToActOnBehalfOfOtherIdentity" {
             let subject = event.subject_user_name.as_deref().unwrap_or("Unknown");
             let object_dn = event.object_dn.as_deref().unwrap_or("Unknown");
@@ -3765,7 +3759,9 @@ pub fn detect_dcshadow(
 
         // Flag if SPN modification involves GC/ or replication-related service names
         let suspicious = service_name.to_lowercase().contains("gc/")
-            || service_name.to_lowercase().contains("e3514235-4b06-11d1-ab04-00c04fc2dcd2");
+            || service_name
+                .to_lowercase()
+                .contains("e3514235-4b06-11d1-ab04-00c04fc2dcd2");
 
         if suspicious {
             alerts.push(AttackAlert {
@@ -3868,6 +3864,11 @@ pub async fn build_escalation_graph(
     let mut edges: Vec<GraphEdge> = Vec::new();
     let mut node_dns = std::collections::HashSet::new();
 
+    // Track privileged group DNs for later cross-referencing
+    let mut privileged_group_dns: Vec<String> = Vec::new();
+    // Track all member DNs and their entries for delegation/SIDHistory checks
+    let mut member_entries: Vec<crate::models::DirectoryEntry> = Vec::new();
+
     // Resolve privileged groups by RID (language-independent)
     for (rid, fallback_name) in PRIVILEGED_GROUP_RIDS {
         let group = match provider.resolve_group_by_rid(*rid).await {
@@ -3875,52 +3876,306 @@ pub async fn build_escalation_graph(
             _ => continue,
         };
 
-        {
-            if node_dns.insert(group.distinguished_name.clone()) {
+        privileged_group_dns.push(group.distinguished_name.clone());
+
+        if node_dns.insert(group.distinguished_name.clone()) {
+            nodes.push(GraphNode {
+                dn: group.distinguished_name.clone(),
+                display_name: group
+                    .display_name
+                    .clone()
+                    .or_else(|| group.sam_account_name.clone())
+                    .unwrap_or_else(|| fallback_name.to_string()),
+                node_type: NodeType::Group,
+                is_privileged: true,
+            });
+        }
+
+        // Get members of this privileged group (recursive via matching rule)
+        let members = get_recursive_members(&provider, &group.distinguished_name).await;
+
+        for member in members {
+            let member_type = match member.object_class.as_deref() {
+                Some("group") => NodeType::Group,
+                _ => NodeType::User,
+            };
+
+            if node_dns.insert(member.distinguished_name.clone()) {
                 nodes.push(GraphNode {
-                    dn: group.distinguished_name.clone(),
-                    display_name: group
+                    dn: member.distinguished_name.clone(),
+                    display_name: member
                         .display_name
                         .clone()
-                        .or_else(|| group.sam_account_name.clone())
-                        .unwrap_or_else(|| fallback_name.to_string()),
-                    node_type: NodeType::Group,
-                    is_privileged: true,
+                        .or_else(|| member.sam_account_name.clone())
+                        .unwrap_or_else(|| "Unknown".to_string()),
+                    node_type: member_type,
+                    is_privileged: false,
                 });
             }
 
-            // Get members of this privileged group (recursive via matching rule)
-            let members = get_recursive_members(&provider, &group.distinguished_name).await;
+            edges.push(GraphEdge {
+                source_dn: member.distinguished_name.clone(),
+                target_dn: group.distinguished_name.clone(),
+                edge_type: EdgeType::Membership,
+                label: Some("Member of".to_string()),
+            });
 
-            for member in members {
-                let member_type = match member.object_class.as_deref() {
-                    Some("group") => NodeType::Group,
-                    _ => NodeType::User,
-                };
+            member_entries.push(member);
+        }
 
-                if node_dns.insert(member.distinguished_name.clone()) {
-                    nodes.push(GraphNode {
-                        dn: member.distinguished_name.clone(),
-                        display_name: member
-                            .display_name
-                            .clone()
-                            .or_else(|| member.sam_account_name.clone())
-                            .unwrap_or_else(|| "Unknown".to_string()),
-                        node_type: member_type,
-                        is_privileged: false,
+        // D. Ownership (managedBy) edges
+        if let Some(managed_by_vals) = group.attributes.get("managedBy") {
+            if let Some(manager_dn) = managed_by_vals.first() {
+                if !manager_dn.is_empty() && !privileged_group_dns.contains(manager_dn) {
+                    // Add manager node if not already present
+                    if node_dns.insert(manager_dn.clone()) {
+                        let manager_name = manager_dn
+                            .split(',')
+                            .next()
+                            .and_then(|cn| cn.strip_prefix("CN="))
+                            .unwrap_or("Unknown")
+                            .to_string();
+                        nodes.push(GraphNode {
+                            dn: manager_dn.clone(),
+                            display_name: manager_name,
+                            node_type: NodeType::User,
+                            is_privileged: false,
+                        });
+                    }
+                    edges.push(GraphEdge {
+                        source_dn: manager_dn.clone(),
+                        target_dn: group.distinguished_name.clone(),
+                        edge_type: EdgeType::Ownership,
+                        label: Some("Manages group".to_string()),
                     });
                 }
-
-                edges.push(GraphEdge {
-                    source_dn: member.distinguished_name.clone(),
-                    target_dn: group.distinguished_name.clone(),
-                    edge_type: EdgeType::Membership,
-                });
             }
         }
     }
 
-    // Find critical paths using BFS
+    // B. Constrained delegation edges on privileged group members
+    for member in &member_entries {
+        if let Some(deleg_vals) = member.attributes.get("msDS-AllowedToDelegateTo") {
+            for service in deleg_vals {
+                let svc_upper = service.to_uppercase();
+                // Check if delegation target is a DC or privileged service
+                if svc_upper.contains("CIFS/")
+                    || svc_upper.contains("LDAP/")
+                    || svc_upper.contains("HTTP/")
+                {
+                    // Find which privileged group this relates to (use first as target)
+                    if let Some(target_dn) = privileged_group_dns.first() {
+                        edges.push(GraphEdge {
+                            source_dn: member.distinguished_name.clone(),
+                            target_dn: target_dn.clone(),
+                            edge_type: EdgeType::Delegation,
+                            label: Some(format!("Constrained delegation to {}", service)),
+                        });
+                    }
+                }
+            }
+        }
+
+        // E. SIDHistory edges
+        if let Some(sid_history_vals) = member.attributes.get("sIDHistory") {
+            if !sid_history_vals.is_empty() {
+                if let Some(target_dn) = privileged_group_dns.first() {
+                    edges.push(GraphEdge {
+                        source_dn: member.distinguished_name.clone(),
+                        target_dn: target_dn.clone(),
+                        edge_type: EdgeType::SIDHistory,
+                        label: Some("SIDHistory".to_string()),
+                    });
+                }
+            }
+        }
+    }
+
+    // A. Computer nodes with unconstrained delegation
+    if let Ok(computers) = provider.browse_computers(1000).await {
+        for computer in &computers {
+            let uac_val = computer
+                .attributes
+                .get("userAccountControl")
+                .and_then(|v| v.first())
+                .and_then(|s| s.parse::<u32>().ok())
+                .unwrap_or(0);
+
+            // Check TRUSTED_FOR_DELEGATION but not SERVER_TRUST_ACCOUNT (DCs)
+            let is_unconstrained = (uac_val & UAC_TRUSTED_FOR_DELEGATION) != 0;
+            let is_dc = (uac_val & 0x2000) != 0; // SERVER_TRUST_ACCOUNT
+            if is_unconstrained && !is_dc {
+                if node_dns.insert(computer.distinguished_name.clone()) {
+                    nodes.push(GraphNode {
+                        dn: computer.distinguished_name.clone(),
+                        display_name: computer
+                            .display_name
+                            .clone()
+                            .or_else(|| computer.sam_account_name.clone())
+                            .unwrap_or_else(|| "Unknown Computer".to_string()),
+                        node_type: NodeType::Computer,
+                        is_privileged: false,
+                    });
+                }
+                // Unconstrained deleg can impersonate anyone - edge to each privileged group
+                for priv_dn in &privileged_group_dns {
+                    edges.push(GraphEdge {
+                        source_dn: computer.distinguished_name.clone(),
+                        target_dn: priv_dn.clone(),
+                        edge_type: EdgeType::UnconstrainedDeleg,
+                        label: Some("Unconstrained delegation".to_string()),
+                    });
+                }
+            }
+
+            // C. RBCD edges on computers
+            if let Some(rbcd_vals) = computer
+                .attributes
+                .get("msDS-AllowedToActOnBehalfOfOtherIdentity")
+            {
+                if !rbcd_vals.is_empty() && rbcd_vals.iter().any(|v| !v.is_empty()) {
+                    if node_dns.insert(computer.distinguished_name.clone()) {
+                        nodes.push(GraphNode {
+                            dn: computer.distinguished_name.clone(),
+                            display_name: computer
+                                .display_name
+                                .clone()
+                                .or_else(|| computer.sam_account_name.clone())
+                                .unwrap_or_else(|| "Unknown Computer".to_string()),
+                            node_type: NodeType::Computer,
+                            is_privileged: false,
+                        });
+                    }
+                    for priv_dn in &privileged_group_dns {
+                        edges.push(GraphEdge {
+                            source_dn: computer.distinguished_name.clone(),
+                            target_dn: priv_dn.clone(),
+                            edge_type: EdgeType::RBCD,
+                            label: Some("RBCD".to_string()),
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    // F. GPO nodes and GPLink edges
+    if let Some(base_dn) = provider.base_dn() {
+        let gpo_search_base = format!("CN=Policies,CN=System,{}", base_dn);
+        if let Ok(gpos) = provider
+            .search_configuration(&gpo_search_base, "(objectClass=groupPolicyContainer)")
+            .await
+        {
+            for gpo in &gpos {
+                let gpo_dn = &gpo.distinguished_name;
+                let gpo_name = gpo
+                    .display_name
+                    .clone()
+                    .or_else(|| {
+                        gpo.attributes
+                            .get("displayName")
+                            .and_then(|v| v.first().cloned())
+                    })
+                    .unwrap_or_else(|| {
+                        gpo_dn
+                            .split(',')
+                            .next()
+                            .and_then(|cn| cn.strip_prefix("CN="))
+                            .unwrap_or("GPO")
+                            .to_string()
+                    });
+
+                // Check if the domain root links this GPO
+                if let Ok(Some(domain_root)) = provider.read_entry(&base_dn).await {
+                    if let Some(gplink_vals) = domain_root.attributes.get("gPLink") {
+                        let gplink_str = gplink_vals.join("");
+                        if gplink_str.to_uppercase().contains(&gpo_dn.to_uppercase()) {
+                            if node_dns.insert(gpo_dn.clone()) {
+                                nodes.push(GraphNode {
+                                    dn: gpo_dn.clone(),
+                                    display_name: gpo_name.clone(),
+                                    node_type: NodeType::GPO,
+                                    is_privileged: false,
+                                });
+                            }
+                            for priv_dn in &privileged_group_dns {
+                                edges.push(GraphEdge {
+                                    source_dn: gpo_dn.clone(),
+                                    target_dn: priv_dn.clone(),
+                                    edge_type: EdgeType::GPLink,
+                                    label: Some("GPO linked to OU".to_string()),
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // G. ADCS Certificate Template edges
+        let cert_search_base = format!(
+            "CN=Certificate Templates,CN=Public Key Services,CN=Services,CN=Configuration,{}",
+            base_dn
+        );
+        if let Ok(templates) = provider
+            .search_configuration(&cert_search_base, "(objectClass=pKICertificateTemplate)")
+            .await
+        {
+            for template in &templates {
+                // Check for ESC1: msPKI-Certificate-Name-Flag contains CT_FLAG_ENROLLEE_SUPPLIES_SUBJECT (0x1)
+                let name_flag = template
+                    .attributes
+                    .get("msPKI-Certificate-Name-Flag")
+                    .and_then(|v| v.first())
+                    .and_then(|s| s.parse::<u32>().ok())
+                    .unwrap_or(0);
+
+                let enrollee_supplies_subject = (name_flag & 0x1) != 0;
+
+                if enrollee_supplies_subject {
+                    let tmpl_dn = &template.distinguished_name;
+                    let tmpl_name = template
+                        .display_name
+                        .clone()
+                        .or_else(|| {
+                            template
+                                .attributes
+                                .get("displayName")
+                                .and_then(|v| v.first().cloned())
+                        })
+                        .unwrap_or_else(|| {
+                            tmpl_dn
+                                .split(',')
+                                .next()
+                                .and_then(|cn| cn.strip_prefix("CN="))
+                                .unwrap_or("CertTemplate")
+                                .to_string()
+                        });
+
+                    if node_dns.insert(tmpl_dn.clone()) {
+                        nodes.push(GraphNode {
+                            dn: tmpl_dn.clone(),
+                            display_name: tmpl_name,
+                            node_type: NodeType::CertTemplate,
+                            is_privileged: false,
+                        });
+                    }
+
+                    // ESC1 allows impersonating any user - edge to Domain Admins
+                    if let Some(da_dn) = privileged_group_dns.first() {
+                        edges.push(GraphEdge {
+                            source_dn: tmpl_dn.clone(),
+                            target_dn: da_dn.clone(),
+                            edge_type: EdgeType::CertESC,
+                            label: Some("ESC1 - enrollee supplies subject".to_string()),
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    // Find critical paths using weighted Dijkstra
     let critical_paths = find_critical_paths(&nodes, &edges);
 
     Ok(EscalationGraphResult {
@@ -3931,19 +4186,38 @@ pub async fn build_escalation_graph(
     })
 }
 
-/// Finds critical escalation paths (shortest paths to privileged groups) using BFS.
-pub fn find_critical_paths(nodes: &[GraphNode], edges: &[GraphEdge]) -> Vec<EscalationPath> {
-    use std::collections::{HashMap, VecDeque};
+/// Edge weight mapping: lower weight = easier to exploit = more dangerous.
+fn edge_weight(edge_type: &EdgeType) -> f64 {
+    match edge_type {
+        EdgeType::SIDHistory => 0.5,
+        EdgeType::Membership => 1.0,
+        EdgeType::Ownership => 1.5,
+        EdgeType::RBCD => 2.0,
+        EdgeType::Delegation => 2.0,
+        EdgeType::CertESC => 2.0,
+        EdgeType::UnconstrainedDeleg => 2.5,
+        EdgeType::GPLink => 3.0,
+    }
+}
 
-    // Build adjacency list (source -> targets)
-    let mut adj: HashMap<&str, Vec<&str>> = HashMap::new();
+/// Finds critical escalation paths (lowest-cost paths to privileged groups) using Dijkstra.
+pub fn find_critical_paths(nodes: &[GraphNode], edges: &[GraphEdge]) -> Vec<EscalationPath> {
+    use std::cmp::Ordering;
+    use std::collections::{BinaryHeap, HashMap, HashSet};
+
+    type AdjEntry<'a> = (&'a str, &'a EdgeType, Option<&'a str>);
+
+    // Build adjacency list: source -> Vec<(target, edge_type, label)>
+    let mut adj: HashMap<&str, Vec<AdjEntry<'_>>> = HashMap::new();
     for edge in edges {
-        adj.entry(edge.source_dn.as_str())
-            .or_default()
-            .push(edge.target_dn.as_str());
+        adj.entry(edge.source_dn.as_str()).or_default().push((
+            edge.target_dn.as_str(),
+            &edge.edge_type,
+            edge.label.as_deref(),
+        ));
     }
 
-    let privileged_dns: std::collections::HashSet<&str> = nodes
+    let privileged_dns: HashSet<&str> = nodes
         .iter()
         .filter(|n| n.is_privileged)
         .map(|n| n.dn.as_str())
@@ -3951,41 +4225,101 @@ pub fn find_critical_paths(nodes: &[GraphNode], edges: &[GraphEdge]) -> Vec<Esca
 
     let non_privileged: Vec<&GraphNode> = nodes.iter().filter(|n| !n.is_privileged).collect();
 
+    // State for Dijkstra priority queue
+    #[derive(PartialEq)]
+    struct State<'a> {
+        cost: f64,
+        node: &'a str,
+        path: Vec<&'a str>,
+        edge_labels: Vec<String>,
+    }
+
+    impl<'a> Eq for State<'a> {}
+
+    impl<'a> PartialOrd for State<'a> {
+        fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+            Some(self.cmp(other))
+        }
+    }
+
+    impl<'a> Ord for State<'a> {
+        fn cmp(&self, other: &Self) -> Ordering {
+            // Min-heap: reverse ordering so lowest cost comes first
+            other
+                .cost
+                .partial_cmp(&self.cost)
+                .unwrap_or(Ordering::Equal)
+        }
+    }
+
     let mut paths = Vec::new();
 
     for start_node in non_privileged {
-        // BFS from this node to any privileged node
-        let mut visited = std::collections::HashSet::new();
-        let mut queue: VecDeque<Vec<&str>> = VecDeque::new();
-        queue.push_back(vec![start_node.dn.as_str()]);
-        visited.insert(start_node.dn.as_str());
+        let mut dist: HashMap<&str, f64> = HashMap::new();
+        let mut heap = BinaryHeap::new();
 
-        while let Some(path) = queue.pop_front() {
-            let current = *path.last().expect("path is non-empty");
+        dist.insert(start_node.dn.as_str(), 0.0);
+        heap.push(State {
+            cost: 0.0,
+            node: start_node.dn.as_str(),
+            path: vec![start_node.dn.as_str()],
+            edge_labels: Vec::new(),
+        });
 
-            if privileged_dns.contains(current) && path.len() > 1 {
+        while let Some(State {
+            cost,
+            node,
+            path,
+            edge_labels,
+        }) = heap.pop()
+        {
+            // Skip if we already found a cheaper path to this node
+            if let Some(&best) = dist.get(node) {
+                if cost > best && path.len() > 1 {
+                    continue;
+                }
+            }
+
+            // Check if we reached a privileged node
+            if privileged_dns.contains(node) && path.len() > 1 {
                 paths.push(EscalationPath {
                     nodes: path.iter().map(|s| s.to_string()).collect(),
                     hop_count: path.len() - 1,
                     is_critical: true,
+                    risk_score: cost,
+                    edge_types: edge_labels,
                 });
-                break; // Only shortest path per source
+                break; // Best path per source (Dijkstra guarantees optimality)
             }
 
-            if let Some(neighbors) = adj.get(current) {
-                for &next in neighbors {
-                    if visited.insert(next) {
+            if let Some(neighbors) = adj.get(node) {
+                for &(next, etype, label) in neighbors {
+                    let next_cost = cost + edge_weight(etype);
+                    let current_best = dist.get(next).copied().unwrap_or(f64::INFINITY);
+                    if next_cost < current_best {
+                        dist.insert(next, next_cost);
                         let mut new_path = path.clone();
                         new_path.push(next);
-                        queue.push_back(new_path);
+                        let mut new_labels = edge_labels.clone();
+                        new_labels.push(label.unwrap_or(&format!("{:?}", etype)).to_string());
+                        heap.push(State {
+                            cost: next_cost,
+                            node: next,
+                            path: new_path,
+                            edge_labels: new_labels,
+                        });
                     }
                 }
             }
         }
     }
 
-    // Sort by hop count (shortest first)
-    paths.sort_by_key(|p| p.hop_count);
+    // Sort by risk_score ascending (most dangerous first)
+    paths.sort_by(|a, b| {
+        a.risk_score
+            .partial_cmp(&b.risk_score)
+            .unwrap_or(Ordering::Equal)
+    });
     paths
 }
 
@@ -4338,12 +4672,15 @@ mod tests {
             source_dn: "CN=User1,DC=test".to_string(),
             target_dn: "CN=Domain Admins,DC=test".to_string(),
             edge_type: EdgeType::Membership,
+            label: Some("Member of".to_string()),
         }];
 
         let paths = find_critical_paths(&nodes, &edges);
         assert_eq!(paths.len(), 1);
         assert_eq!(paths[0].hop_count, 1);
         assert!(paths[0].is_critical);
+        assert!((paths[0].risk_score - 1.0).abs() < f64::EPSILON);
+        assert_eq!(paths[0].edge_types, vec!["Member of"]);
     }
 
     #[test]
@@ -4373,19 +4710,24 @@ mod tests {
                 source_dn: "CN=User1,DC=test".to_string(),
                 target_dn: "CN=GroupA,DC=test".to_string(),
                 edge_type: EdgeType::Membership,
+                label: Some("Member of".to_string()),
             },
             GraphEdge {
                 source_dn: "CN=GroupA,DC=test".to_string(),
                 target_dn: "CN=Domain Admins,DC=test".to_string(),
                 edge_type: EdgeType::Membership,
+                label: Some("Member of".to_string()),
             },
         ];
 
         let paths = find_critical_paths(&nodes, &edges);
-        // User1 -> GroupA -> Domain Admins (2 hops)
-        // GroupA -> Domain Admins (1 hop)
+        // GroupA -> Domain Admins (1 hop, score 1.0)
+        // User1 -> GroupA -> Domain Admins (2 hops, score 2.0)
         assert_eq!(paths.len(), 2);
-        assert_eq!(paths[0].hop_count, 1); // Shortest first
+        assert_eq!(paths[0].hop_count, 1); // Lowest score first
+        assert!((paths[0].risk_score - 1.0).abs() < f64::EPSILON);
+        assert!((paths[1].risk_score - 2.0).abs() < f64::EPSILON);
+        assert_eq!(paths[1].edge_types.len(), 2);
     }
 
     #[test]
@@ -4407,6 +4749,64 @@ mod tests {
         // No edges connecting them
         let paths = find_critical_paths(&nodes, &[]);
         assert!(paths.is_empty());
+    }
+
+    #[test]
+    fn test_find_critical_paths_weighted_ordering() {
+        let nodes = vec![
+            GraphNode {
+                dn: "CN=User1,DC=test".to_string(),
+                display_name: "User 1".to_string(),
+                node_type: NodeType::User,
+                is_privileged: false,
+            },
+            GraphNode {
+                dn: "CN=Comp1,DC=test".to_string(),
+                display_name: "Comp 1".to_string(),
+                node_type: NodeType::Computer,
+                is_privileged: false,
+            },
+            GraphNode {
+                dn: "CN=Domain Admins,DC=test".to_string(),
+                display_name: "Domain Admins".to_string(),
+                node_type: NodeType::Group,
+                is_privileged: true,
+            },
+        ];
+        let edges = vec![
+            // User1 via SIDHistory (weight 0.5) - should be first
+            GraphEdge {
+                source_dn: "CN=User1,DC=test".to_string(),
+                target_dn: "CN=Domain Admins,DC=test".to_string(),
+                edge_type: EdgeType::SIDHistory,
+                label: Some("SIDHistory".to_string()),
+            },
+            // Comp1 via GPLink (weight 3.0) - should be second
+            GraphEdge {
+                source_dn: "CN=Comp1,DC=test".to_string(),
+                target_dn: "CN=Domain Admins,DC=test".to_string(),
+                edge_type: EdgeType::GPLink,
+                label: Some("GPO linked to OU".to_string()),
+            },
+        ];
+
+        let paths = find_critical_paths(&nodes, &edges);
+        assert_eq!(paths.len(), 2);
+        // SIDHistory path should come first (lower score = more dangerous)
+        assert!((paths[0].risk_score - 0.5).abs() < f64::EPSILON);
+        assert!((paths[1].risk_score - 3.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_edge_weight_values() {
+        assert!((edge_weight(&EdgeType::SIDHistory) - 0.5).abs() < f64::EPSILON);
+        assert!((edge_weight(&EdgeType::Membership) - 1.0).abs() < f64::EPSILON);
+        assert!((edge_weight(&EdgeType::Ownership) - 1.5).abs() < f64::EPSILON);
+        assert!((edge_weight(&EdgeType::RBCD) - 2.0).abs() < f64::EPSILON);
+        assert!((edge_weight(&EdgeType::Delegation) - 2.0).abs() < f64::EPSILON);
+        assert!((edge_weight(&EdgeType::CertESC) - 2.0).abs() < f64::EPSILON);
+        assert!((edge_weight(&EdgeType::UnconstrainedDeleg) - 2.5).abs() < f64::EPSILON);
+        assert!((edge_weight(&EdgeType::GPLink) - 3.0).abs() < f64::EPSILON);
     }
 
     // New factor function tests
@@ -5215,10 +5615,7 @@ mod tests {
         let events: Vec<&EventRecord> = vec![&event];
         let alerts = detect_suspicious_account_activity(&events, &config);
         assert_eq!(alerts.len(), 1);
-        assert_eq!(
-            alerts[0].attack_type,
-            AttackType::SuspiciousAccountActivity
-        );
+        assert_eq!(alerts[0].attack_type, AttackType::SuspiciousAccountActivity);
         assert_eq!(alerts[0].severity, AlertSeverity::Medium);
         assert_eq!(alerts[0].mitre_ref.as_deref(), Some("T1136.001"));
     }

@@ -329,14 +329,22 @@ pub struct AttackDetectionReport {
 pub enum NodeType {
     User,
     Group,
+    Computer,
+    GPO,
+    CertTemplate,
 }
 
 /// Type of edge in the escalation graph.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum EdgeType {
     Membership,
     Ownership,
     Delegation,
+    UnconstrainedDeleg,
+    RBCD,
+    SIDHistory,
+    GPLink,
+    CertESC,
 }
 
 /// A node in the privilege escalation graph.
@@ -363,6 +371,8 @@ pub struct GraphEdge {
     pub target_dn: String,
     /// Type of relationship.
     pub edge_type: EdgeType,
+    /// Human-readable description of the edge.
+    pub label: Option<String>,
 }
 
 /// A privilege escalation path (sequence of edges from source to target).
@@ -375,6 +385,10 @@ pub struct EscalationPath {
     pub hop_count: usize,
     /// Whether this path reaches Domain Admins.
     pub is_critical: bool,
+    /// Weighted path score (lower = more dangerous / easier to exploit).
+    pub risk_score: f64,
+    /// Edge type labels for each hop in the path.
+    pub edge_types: Vec<String>,
 }
 
 /// Full escalation graph result.
@@ -619,6 +633,7 @@ mod tests {
                 source_dn: "CN=User1,DC=example,DC=com".to_string(),
                 target_dn: "CN=Domain Admins,DC=example,DC=com".to_string(),
                 edge_type: EdgeType::Membership,
+                label: Some("Member of".to_string()),
             }],
             critical_paths: vec![EscalationPath {
                 nodes: vec![
@@ -627,6 +642,8 @@ mod tests {
                 ],
                 hop_count: 1,
                 is_critical: true,
+                risk_score: 1.0,
+                edge_types: vec!["Membership".to_string()],
             }],
             computed_at: "2026-03-23T10:00:00Z".to_string(),
         };

@@ -19,12 +19,12 @@ import {
 import { extractErrorMessage } from "@/utils/errorMapping";
 
 const TIME_WINDOWS = [
-  { label: "1h", value: 1 },
   { label: "6h", value: 6 },
   { label: "12h", value: 12 },
   { label: "24h", value: 24 },
   { label: "48h", value: 48 },
-  { label: "72h", value: 72 },
+  { label: "3d", value: 72 },
+  { label: "7d", value: 168 },
 ];
 
 function severityColor(severity: AlertSeverity): string {
@@ -178,7 +178,7 @@ export function AttackDetection() {
   const [report, setReport] = useState<AttackDetectionReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [timeWindowHours, setTimeWindowHours] = useState(24);
+  const [timeWindowHours, setTimeWindowHours] = useState(72);
   const [expandedAlerts, setExpandedAlerts] = useState<Set<string>>(new Set());
 
   const fetchReport = useCallback(
@@ -231,6 +231,24 @@ export function AttackDetection() {
   const criticalCount = report?.alerts.filter((a) => a.severity === "Critical").length ?? 0;
   const highCount = report?.alerts.filter((a) => a.severity === "High").length ?? 0;
   const mediumCount = report?.alerts.filter((a) => a.severity === "Medium").length ?? 0;
+
+  // All checks performed with their metadata
+  const allChecks: { type: AttackType; eventIds: string; mitre: string }[] = [
+    { type: "GoldenTicket", eventIds: "4768", mitre: "T1558.001" },
+    { type: "DCSync", eventIds: "4662", mitre: "T1003.006" },
+    { type: "DCShadow", eventIds: "4742", mitre: "T1207" },
+    { type: "Kerberoasting", eventIds: "4769", mitre: "T1558.003" },
+    { type: "AsrepRoasting", eventIds: "4768", mitre: "T1558.004" },
+    { type: "PasswordSpray", eventIds: "4771", mitre: "T1110.003" },
+    { type: "BruteForce", eventIds: "4625", mitre: "T1110.001" },
+    { type: "PassTheHash", eventIds: "4624", mitre: "T1550.002" },
+    { type: "AbnormalKerberos", eventIds: "4769", mitre: "T1558" },
+    { type: "PrivGroupChange", eventIds: "4728/4732/4756", mitre: "T1098.001" },
+    { type: "ShadowCredentials", eventIds: "5136", mitre: "T1556.006" },
+    { type: "RbcdAbuse", eventIds: "5136", mitre: "T1134.001" },
+    { type: "AdminSdHolderTamper", eventIds: "5136", mitre: "T1222.001" },
+    { type: "SuspiciousAccountActivity", eventIds: "4720/4738", mitre: "T1136/T1098" },
+  ];
 
   return (
     <div className="flex h-full flex-col" data-testid="attack-detection">
@@ -298,28 +316,99 @@ export function AttackDetection() {
             title="Detection Failed"
             description={error}
           />
-        ) : !report || report.alerts.length === 0 ? (
-          <EmptyState
-            icon={<ShieldCheck size={40} />}
-            title="No Attack Indicators Found"
-            description={`No suspicious activity detected in the last ${timeWindowHours} hours.`}
-          />
         ) : (
-          <div className="flex flex-col gap-3">
-            {report.alerts.map((alert, index) => {
-              const key = alertKey(alert, index);
-              return (
-                <AlertCard
-                  key={key}
-                  alert={alert}
-                  isExpanded={expandedAlerts.has(key)}
-                  onToggle={() => handleToggleAlert(key)}
-                />
-              );
-            })}
-            <div className="text-[10px] text-[var(--color-text-secondary)]">
-              Last scanned: {new Date(report.scannedAt).toLocaleString()}
+          <div className="space-y-4">
+            {/* Checks grid - always shown */}
+            <div className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)]" data-testid="checks-grid">
+              <table className="w-full text-caption">
+                <thead>
+                  <tr className="border-b border-[var(--color-border-default)] text-left text-[var(--color-text-secondary)]">
+                    <th className="px-3 py-2 font-medium">Check</th>
+                    <th className="px-3 py-2 font-medium">Event IDs</th>
+                    <th className="px-3 py-2 font-medium">MITRE</th>
+                    <th className="px-3 py-2 text-center font-medium">Result</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {allChecks.map((check) => {
+                    const alertsForType = report?.alerts.filter((a) => a.attackType === check.type) ?? [];
+                    const hasAlerts = alertsForType.length > 0;
+                    const highestSeverity = hasAlerts
+                      ? alertsForType.reduce((max, a) => {
+                          const order = ["Info", "Medium", "High", "Critical"];
+                          return order.indexOf(a.severity) > order.indexOf(max) ? a.severity : max;
+                        }, alertsForType[0].severity)
+                      : null;
+
+                    return (
+                      <tr
+                        key={check.type}
+                        className="border-t border-[var(--color-border-subtle)]"
+                        data-testid={`check-row-${check.type}`}
+                      >
+                        <td className="px-3 py-2 font-medium text-[var(--color-text-primary)]">
+                          {attackTypeLabel(check.type)}
+                        </td>
+                        <td className="px-3 py-2 font-mono text-[10px] text-[var(--color-text-secondary)]">
+                          {check.eventIds}
+                        </td>
+                        <td className="px-3 py-2 font-mono text-[10px] text-[var(--color-text-secondary)]">
+                          {check.mitre}
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          {hasAlerts ? (
+                            <span
+                              className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium"
+                              style={{
+                                color: severityColor(highestSeverity as AlertSeverity),
+                                backgroundColor: `color-mix(in srgb, ${severityColor(highestSeverity as AlertSeverity)} 12%, transparent)`,
+                              }}
+                            >
+                              {highestSeverity === "Critical" && <AlertCircle size={10} />}
+                              {(highestSeverity === "High" || highestSeverity === "Medium") && <AlertTriangle size={10} />}
+                              {alertsForType.length} alert{alertsForType.length > 1 ? "s" : ""}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-success)]/10 px-2 py-0.5 text-[11px] font-medium text-[var(--color-success)]">
+                              <ShieldCheck size={10} />
+                              Clear
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
+
+            {/* Alert details - only if alerts exist */}
+            {report && report.alerts.length > 0 && (
+              <>
+                <h3 className="text-caption font-semibold text-[var(--color-text-primary)]">
+                  Alert Details ({report.alerts.length})
+                </h3>
+                <div className="flex flex-col gap-3">
+                  {report.alerts.map((alert, index) => {
+                    const key = alertKey(alert, index);
+                    return (
+                      <AlertCard
+                        key={key}
+                        alert={alert}
+                        isExpanded={expandedAlerts.has(key)}
+                        onToggle={() => handleToggleAlert(key)}
+                      />
+                    );
+                  })}
+                </div>
+              </>
+            )}
+
+            {report && (
+              <div className="text-[10px] text-[var(--color-text-secondary)]">
+                Last scanned: {new Date(report.scannedAt).toLocaleString()} - Window: {report.timeWindowHours}h
+              </div>
+            )}
           </div>
         )}
       </div>

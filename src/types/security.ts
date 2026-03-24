@@ -141,8 +141,16 @@ export interface AttackDetectionConfig {
 
 // Story 9.4: Escalation Paths
 
-export type NodeType = "User" | "Group";
-export type EdgeType = "Membership" | "Ownership" | "Delegation";
+export type NodeType = "User" | "Group" | "Computer" | "GPO" | "CertTemplate";
+export type EdgeType =
+  | "Membership"
+  | "Ownership"
+  | "Delegation"
+  | "UnconstrainedDeleg"
+  | "RBCD"
+  | "SIDHistory"
+  | "GPLink"
+  | "CertESC";
 
 export interface GraphNode {
   dn: string;
@@ -155,12 +163,15 @@ export interface GraphEdge {
   sourceDn: string;
   targetDn: string;
   edgeType: EdgeType;
+  label: string | null;
 }
 
 export interface EscalationPath {
   nodes: string[];
   hopCount: number;
   isCritical: boolean;
+  riskScore: number;
+  edgeTypes: string[];
 }
 
 export interface EscalationGraphResult {

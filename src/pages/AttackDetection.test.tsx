@@ -92,7 +92,7 @@ describe("AttackDetection", () => {
 
     await waitFor(() => {
       expect(mockInvoke).toHaveBeenCalledWith("detect_ad_attacks", {
-        timeWindowHours: 24,
+        timeWindowHours: 72,
       });
     });
   });
@@ -122,12 +122,13 @@ describe("AttackDetection", () => {
     render(<AttackDetection />);
 
     await waitFor(() => {
-      expect(screen.getByText("Golden Ticket")).toBeInTheDocument();
+      // Check names appear in both the checks grid and alert cards
+      expect(screen.getAllByText("Golden Ticket").length).toBeGreaterThan(0);
     });
-    expect(screen.getByText("DCSync")).toBeInTheDocument();
-    expect(screen.getByText("Kerberoasting")).toBeInTheDocument();
-    expect(screen.getByText("Brute Force")).toBeInTheDocument();
-    expect(screen.getByText("Suspicious Account")).toBeInTheDocument();
+    expect(screen.getAllByText("DCSync").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Kerberoasting").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Brute Force").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Suspicious Account").length).toBeGreaterThan(0);
   });
 
   it("displays severity summary badges", async () => {
@@ -158,7 +159,7 @@ describe("AttackDetection", () => {
     expect(screen.getByText("MITRE T1558.003")).toBeInTheDocument();
   });
 
-  it("shows empty state when no alerts", async () => {
+  it("shows all checks as clear when no alerts", async () => {
     mockInvoke.mockResolvedValue({
       alerts: [],
       timeWindowHours: 24,
@@ -167,15 +168,12 @@ describe("AttackDetection", () => {
     render(<AttackDetection />);
 
     await waitFor(() => {
-      expect(
-        screen.getByText("No Attack Indicators Found"),
-      ).toBeInTheDocument();
+      expect(screen.getByTestId("checks-grid")).toBeInTheDocument();
     });
-    expect(
-      screen.getByText(
-        "No suspicious activity detected in the last 24 hours.",
-      ),
-    ).toBeInTheDocument();
+
+    // All 14 checks should show "Clear"
+    const clearBadges = screen.getAllByText("Clear");
+    expect(clearBadges.length).toBe(14);
   });
 
   it("shows error state on failure", async () => {

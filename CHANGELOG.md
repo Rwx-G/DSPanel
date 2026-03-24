@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Escalation graph: Computer, GPO, CertTemplate node types and UnconstrainedDeleg, RBCD, SIDHistory, GPLink, CertESC edge types
+- Escalation graph: weighted Dijkstra path-finding with per-edge risk scores (lower = more dangerous)
+- Escalation graph: edge labels, risk score display, and color-coded risk badges in the UI
+- Escalation graph: detection of unconstrained delegation, constrained delegation, RBCD, SIDHistory, managedBy ownership, GPO links, and ADCS ESC1 certificate templates
 - New attack types: Kerberoasting, AS-REP Roasting, Brute Force, Pass-the-Hash, Shadow Credentials, RBCD Abuse, AdminSDHolder Tampering, Suspicious Account Activity
 - MITRE ATT&CK technique references on all attack alerts
 - `AttackDetectionConfig` for configurable detection thresholds and exclusion lists

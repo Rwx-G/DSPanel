@@ -36,22 +36,37 @@ const mockData: EscalationGraphResult = {
       nodeType: "Group",
       isPrivileged: true,
     },
+    {
+      dn: "CN=SRV01,OU=Servers,DC=example,DC=com",
+      displayName: "SRV01",
+      nodeType: "Computer",
+      isPrivileged: false,
+    },
   ],
   edges: [
     {
       sourceDn: "CN=JDoe,OU=Users,DC=example,DC=com",
       targetDn: "CN=HelpDesk,OU=Groups,DC=example,DC=com",
       edgeType: "Membership",
+      label: "Member of",
     },
     {
       sourceDn: "CN=HelpDesk,OU=Groups,DC=example,DC=com",
       targetDn: "CN=ServerOps,OU=Groups,DC=example,DC=com",
       edgeType: "Ownership",
+      label: "Manages group",
     },
     {
       sourceDn: "CN=ServerOps,OU=Groups,DC=example,DC=com",
       targetDn: "CN=Domain Admins,OU=Groups,DC=example,DC=com",
       edgeType: "Delegation",
+      label: "Constrained delegation to CIFS/DC1",
+    },
+    {
+      sourceDn: "CN=SRV01,OU=Servers,DC=example,DC=com",
+      targetDn: "CN=Domain Admins,OU=Groups,DC=example,DC=com",
+      edgeType: "UnconstrainedDeleg",
+      label: "Unconstrained delegation",
     },
   ],
   criticalPaths: [
@@ -64,6 +79,8 @@ const mockData: EscalationGraphResult = {
       ],
       hopCount: 3,
       isCritical: true,
+      riskScore: 4.5,
+      edgeTypes: ["Member of", "Manages group", "Constrained delegation to CIFS/DC1"],
     },
     {
       nodes: [
@@ -72,6 +89,18 @@ const mockData: EscalationGraphResult = {
       ],
       hopCount: 1,
       isCritical: false,
+      riskScore: 1.0,
+      edgeTypes: ["Member of"],
+    },
+    {
+      nodes: [
+        "CN=SRV01,OU=Servers,DC=example,DC=com",
+        "CN=Domain Admins,OU=Groups,DC=example,DC=com",
+      ],
+      hopCount: 1,
+      isCritical: true,
+      riskScore: 2.5,
+      edgeTypes: ["Unconstrained delegation"],
     },
   ],
   computedAt: "2026-03-23T10:00:00Z",
@@ -117,9 +146,9 @@ describe("EscalationPaths", () => {
       expect(screen.getByTestId("summary")).toBeInTheDocument();
     });
 
-    expect(screen.getByText("4 nodes")).toBeInTheDocument();
-    expect(screen.getByText("3 edges")).toBeInTheDocument();
-    expect(screen.getByText(/1 critical path/)).toBeInTheDocument();
+    expect(screen.getByText("5 nodes")).toBeInTheDocument();
+    expect(screen.getByText("4 edges")).toBeInTheDocument();
+    expect(screen.getByText(/2 critical path/)).toBeInTheDocument();
   });
 
   it("displays hop count badges", async () => {
@@ -131,9 +160,33 @@ describe("EscalationPaths", () => {
     });
 
     const hopBadges = screen.getAllByTestId("hop-count");
-    expect(hopBadges).toHaveLength(2);
-    expect(hopBadges[0]).toHaveTextContent("3 hops");
-    expect(hopBadges[1]).toHaveTextContent("1 hop");
+    expect(hopBadges).toHaveLength(3);
+  });
+
+  it("displays risk score badges", async () => {
+    mockInvoke.mockResolvedValue(mockData);
+    render(<EscalationPaths />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("critical-paths-panel")).toBeInTheDocument();
+    });
+
+    const riskBadges = screen.getAllByTestId("risk-score");
+    expect(riskBadges).toHaveLength(3);
+    // Check that risk scores are displayed
+    expect(riskBadges[0]).toHaveTextContent("risk");
+  });
+
+  it("shows edge type labels between nodes in paths", async () => {
+    mockInvoke.mockResolvedValue(mockData);
+    render(<EscalationPaths />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("critical-paths-panel")).toBeInTheDocument();
+    });
+
+    // Edge labels should appear in the path display
+    expect(screen.getAllByText(/\[Member of\]/).length).toBeGreaterThan(0);
   });
 
   it("marks critical paths with CRITICAL label", async () => {
@@ -141,7 +194,7 @@ describe("EscalationPaths", () => {
     render(<EscalationPaths />);
 
     await waitFor(() => {
-      expect(screen.getByText("CRITICAL")).toBeInTheDocument();
+      expect(screen.getAllByText("CRITICAL").length).toBeGreaterThan(0);
     });
   });
 
@@ -158,7 +211,7 @@ describe("EscalationPaths", () => {
     expect(screen.getByText("Legend")).toBeInTheDocument();
   });
 
-  it("shows node type counts in legend", async () => {
+  it("shows node type counts in legend including computers", async () => {
     mockInvoke.mockResolvedValue(mockData);
     render(<EscalationPaths />);
 
@@ -166,13 +219,13 @@ describe("EscalationPaths", () => {
       expect(screen.getByTestId("graph-legend")).toBeInTheDocument();
     });
 
-    // 1 user, 2 non-privileged groups, 1 privileged group
     expect(screen.getByText("Users")).toBeInTheDocument();
     expect(screen.getByText("Groups")).toBeInTheDocument();
     expect(screen.getByText("Privileged Groups")).toBeInTheDocument();
+    expect(screen.getByText("Computers")).toBeInTheDocument();
   });
 
-  it("shows edges table", async () => {
+  it("shows edges table with labels", async () => {
     mockInvoke.mockResolvedValue(mockData);
     render(<EscalationPaths />);
 
@@ -180,9 +233,8 @@ describe("EscalationPaths", () => {
       expect(screen.getByTestId("edges-table")).toBeInTheDocument();
     });
 
-    expect(screen.getAllByText("Membership").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Ownership").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Delegation").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Member of").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Manages group").length).toBeGreaterThan(0);
   });
 
   it("shows error state on failure", async () => {
@@ -220,7 +272,7 @@ describe("EscalationPaths", () => {
     expect(mockInvoke).toHaveBeenCalledTimes(2);
   });
 
-  it("sorts paths with critical first, then by hop count", async () => {
+  it("sorts paths with critical first, then by risk score", async () => {
     mockInvoke.mockResolvedValue(mockData);
     render(<EscalationPaths />);
 
@@ -228,9 +280,12 @@ describe("EscalationPaths", () => {
       expect(screen.getByTestId("critical-paths-panel")).toBeInTheDocument();
     });
 
-    const hopBadges = screen.getAllByTestId("hop-count");
-    // Critical path (3 hops) should come before non-critical (1 hop)
-    expect(hopBadges[0]).toHaveTextContent("3 hops");
-    expect(hopBadges[1]).toHaveTextContent("1 hop");
+    const riskBadges = screen.getAllByTestId("risk-score");
+    // Critical paths should come first (sorted by risk score ascending)
+    // SRV01 path (2.5 risk, critical) before JDoe path (4.5 risk, critical)
+    // then non-critical JDoe-HelpDesk (1.0 risk)
+    expect(riskBadges[0]).toHaveTextContent("2.5");
+    expect(riskBadges[1]).toHaveTextContent("4.5");
+    expect(riskBadges[2]).toHaveTextContent("1.0");
   });
 });

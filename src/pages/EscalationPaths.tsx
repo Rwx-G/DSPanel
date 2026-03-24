@@ -11,6 +11,9 @@ import {
   Square,
   User,
   Users,
+  Monitor,
+  FileText,
+  Key,
 } from "lucide-react";
 import {
   type EscalationGraphResult,
@@ -20,14 +23,51 @@ import {
 } from "@/types/security";
 import { extractErrorMessage } from "@/utils/errorMapping";
 
-function edgeTypeLabel(edgeType: EdgeType): string {
+function edgeTypeStyle(edgeType: EdgeType): { style: string; color: string } {
   switch (edgeType) {
     case "Membership":
-      return "solid";
+      return { style: "solid", color: "var(--color-text-primary)" };
     case "Ownership":
-      return "dashed";
+      return { style: "dashed", color: "var(--color-text-primary)" };
     case "Delegation":
-      return "dotted";
+      return { style: "dashed", color: "var(--color-text-primary)" };
+    case "RBCD":
+      return { style: "dotted", color: "var(--color-text-primary)" };
+    case "SIDHistory":
+      return { style: "solid", color: "var(--color-error)" };
+    case "GPLink":
+      return { style: "solid", color: "var(--color-info)" };
+    case "CertESC":
+      return { style: "solid", color: "#9333ea" };
+    case "UnconstrainedDeleg":
+      return { style: "dashed", color: "var(--color-warning)" };
+  }
+}
+
+function riskScoreColor(score: number): string {
+  if (score < 3) return "var(--color-error)";
+  if (score <= 5) return "var(--color-warning)";
+  return "var(--color-info)";
+}
+
+function riskScoreLabel(score: number): string {
+  if (score < 3) return "Critical";
+  if (score <= 5) return "High";
+  return "Medium";
+}
+
+function nodeIcon(nodeType: string) {
+  switch (nodeType) {
+    case "User":
+      return <Circle size={10} />;
+    case "Computer":
+      return <Monitor size={10} />;
+    case "GPO":
+      return <FileText size={10} />;
+    case "CertTemplate":
+      return <Key size={10} />;
+    default:
+      return <Square size={10} />;
   }
 }
 
@@ -44,7 +84,7 @@ function NodeBadge({ node }: { node: GraphNode }) {
       style={{ color, backgroundColor: bgColor }}
       title={node.dn}
     >
-      {node.nodeType === "User" ? <Circle size={10} /> : <Square size={10} />}
+      {nodeIcon(node.nodeType)}
       {node.displayName}
     </span>
   );
@@ -84,8 +124,22 @@ function PathRow({
         {path.hopCount} hop{path.hopCount !== 1 ? "s" : ""}
       </span>
 
+      {/* Risk score badge */}
+      <span
+        className="mr-1 inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-bold"
+        style={{
+          color: riskScoreColor(path.riskScore),
+          backgroundColor: `color-mix(in srgb, ${riskScoreColor(path.riskScore)} 12%, transparent)`,
+        }}
+        data-testid="risk-score"
+        title={`Risk: ${riskScoreLabel(path.riskScore)}`}
+      >
+        {path.riskScore.toFixed(1)} risk
+      </span>
+
       {path.nodes.map((dn, i) => {
         const node = nodeMap.get(dn);
+        const edgeLabel = i < path.edgeTypes.length ? path.edgeTypes[i] : null;
         return (
           <span key={dn} className="inline-flex items-center gap-1">
             {node ? (
@@ -96,10 +150,15 @@ function PathRow({
               </span>
             )}
             {i < path.nodes.length - 1 && (
-              <ArrowRight
-                size={12}
-                className="shrink-0 text-[var(--color-text-secondary)]"
-              />
+              <span className="inline-flex items-center gap-0.5">
+                <span className="text-[9px] text-[var(--color-text-secondary)]">
+                  {edgeLabel ? `[${edgeLabel}]` : ""}
+                </span>
+                <ArrowRight
+                  size={12}
+                  className="shrink-0 text-[var(--color-text-secondary)]"
+                />
+              </span>
             )}
           </span>
         );
@@ -126,16 +185,24 @@ function GraphLegendStats({ data }: { data: EscalationGraphResult }) {
   const privilegedGroupCount = data.nodes.filter(
     (n) => n.nodeType === "Group" && n.isPrivileged,
   ).length;
+  const computerCount = data.nodes.filter(
+    (n) => n.nodeType === "Computer",
+  ).length;
+  const gpoCount = data.nodes.filter((n) => n.nodeType === "GPO").length;
+  const certTemplateCount = data.nodes.filter(
+    (n) => n.nodeType === "CertTemplate",
+  ).length;
 
-  const membershipCount = data.edges.filter(
-    (e) => e.edgeType === "Membership",
-  ).length;
-  const ownershipCount = data.edges.filter(
-    (e) => e.edgeType === "Ownership",
-  ).length;
-  const delegationCount = data.edges.filter(
-    (e) => e.edgeType === "Delegation",
-  ).length;
+  const edgeTypeCounts: { type: EdgeType; label: string; style: string; color: string }[] = [
+    { type: "Membership", label: "Membership", ...edgeTypeStyle("Membership") },
+    { type: "Ownership", label: "Ownership", ...edgeTypeStyle("Ownership") },
+    { type: "Delegation", label: "Delegation", ...edgeTypeStyle("Delegation") },
+    { type: "UnconstrainedDeleg", label: "Unconstrained Deleg", ...edgeTypeStyle("UnconstrainedDeleg") },
+    { type: "RBCD", label: "RBCD", ...edgeTypeStyle("RBCD") },
+    { type: "SIDHistory", label: "SIDHistory", ...edgeTypeStyle("SIDHistory") },
+    { type: "GPLink", label: "GPLink", ...edgeTypeStyle("GPLink") },
+    { type: "CertESC", label: "CertESC", ...edgeTypeStyle("CertESC") },
+  ];
 
   return (
     <div className="space-y-4" data-testid="graph-legend">
@@ -166,7 +233,7 @@ function GraphLegendStats({ data }: { data: EscalationGraphResult }) {
                 {groupCount}
               </td>
             </tr>
-            <tr>
+            <tr className="border-b border-[var(--color-border-subtle)]">
               <td className="py-1.5 pr-2">
                 <span className="flex items-center gap-2" style={{ color: "var(--color-error)" }}>
                   <Users size={14} /> Privileged Groups
@@ -179,6 +246,42 @@ function GraphLegendStats({ data }: { data: EscalationGraphResult }) {
                 {privilegedGroupCount}
               </td>
             </tr>
+            {computerCount > 0 && (
+              <tr className="border-b border-[var(--color-border-subtle)]">
+                <td className="py-1.5 pr-2">
+                  <span className="flex items-center gap-2 text-[var(--color-text-primary)]">
+                    <Monitor size={14} /> Computers
+                  </span>
+                </td>
+                <td className="py-1.5 text-right font-medium text-[var(--color-text-primary)]">
+                  {computerCount}
+                </td>
+              </tr>
+            )}
+            {gpoCount > 0 && (
+              <tr className="border-b border-[var(--color-border-subtle)]">
+                <td className="py-1.5 pr-2">
+                  <span className="flex items-center gap-2 text-[var(--color-text-primary)]">
+                    <FileText size={14} /> GPOs
+                  </span>
+                </td>
+                <td className="py-1.5 text-right font-medium text-[var(--color-text-primary)]">
+                  {gpoCount}
+                </td>
+              </tr>
+            )}
+            {certTemplateCount > 0 && (
+              <tr>
+                <td className="py-1.5 pr-2">
+                  <span className="flex items-center gap-2 text-[var(--color-text-primary)]">
+                    <Key size={14} /> Cert Templates
+                  </span>
+                </td>
+                <td className="py-1.5 text-right font-medium text-[var(--color-text-primary)]">
+                  {certTemplateCount}
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
@@ -190,48 +293,26 @@ function GraphLegendStats({ data }: { data: EscalationGraphResult }) {
         </h3>
         <table className="w-full text-caption">
           <tbody>
-            <tr className="border-b border-[var(--color-border-subtle)]">
-              <td className="py-1.5 pr-2">
-                <span className="flex items-center gap-2 text-[var(--color-text-primary)]">
-                  <span
-                    className="inline-block w-4"
-                    style={{ borderTop: "2px solid var(--color-text-primary)" }}
-                  />
-                  Membership
-                </span>
-              </td>
-              <td className="py-1.5 text-right font-medium text-[var(--color-text-primary)]">
-                {membershipCount}
-              </td>
-            </tr>
-            <tr className="border-b border-[var(--color-border-subtle)]">
-              <td className="py-1.5 pr-2">
-                <span className="flex items-center gap-2 text-[var(--color-text-primary)]">
-                  <span
-                    className="inline-block w-4"
-                    style={{ borderTop: "2px dashed var(--color-text-primary)" }}
-                  />
-                  Ownership
-                </span>
-              </td>
-              <td className="py-1.5 text-right font-medium text-[var(--color-text-primary)]">
-                {ownershipCount}
-              </td>
-            </tr>
-            <tr>
-              <td className="py-1.5 pr-2">
-                <span className="flex items-center gap-2 text-[var(--color-text-primary)]">
-                  <span
-                    className="inline-block w-4"
-                    style={{ borderTop: "2px dotted var(--color-text-primary)" }}
-                  />
-                  Delegation
-                </span>
-              </td>
-              <td className="py-1.5 text-right font-medium text-[var(--color-text-primary)]">
-                {delegationCount}
-              </td>
-            </tr>
+            {edgeTypeCounts.map((et) => {
+              const count = data.edges.filter((e) => e.edgeType === et.type).length;
+              if (count === 0) return null;
+              return (
+                <tr key={et.type} className="border-b border-[var(--color-border-subtle)]">
+                  <td className="py-1.5 pr-2">
+                    <span className="flex items-center gap-2 text-[var(--color-text-primary)]">
+                      <span
+                        className="inline-block w-4"
+                        style={{ borderTop: `2px ${et.style} ${et.color}` }}
+                      />
+                      {et.label}
+                    </span>
+                  </td>
+                  <td className="py-1.5 text-right font-medium text-[var(--color-text-primary)]">
+                    {count}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -250,6 +331,15 @@ function GraphLegendStats({ data }: { data: EscalationGraphResult }) {
           </div>
           <div className="flex items-center gap-2" style={{ color: "var(--color-error)" }}>
             <Square size={12} /> Privileged
+          </div>
+          <div className="flex items-center gap-2 text-[var(--color-text-primary)]">
+            <Monitor size={12} /> Computer
+          </div>
+          <div className="flex items-center gap-2 text-[var(--color-text-primary)]">
+            <FileText size={12} /> GPO
+          </div>
+          <div className="flex items-center gap-2 text-[var(--color-text-primary)]">
+            <Key size={12} /> Cert Template
           </div>
         </div>
       </div>
@@ -272,6 +362,7 @@ function GraphLegendStats({ data }: { data: EscalationGraphResult }) {
               {data.edges.map((edge, i) => {
                 const sourceNode = data.nodes.find((n) => n.dn === edge.sourceDn);
                 const targetNode = data.nodes.find((n) => n.dn === edge.targetDn);
+                const es = edgeTypeStyle(edge.edgeType);
                 return (
                   <tr
                     key={i}
@@ -284,12 +375,12 @@ function GraphLegendStats({ data }: { data: EscalationGraphResult }) {
                       <span
                         className="inline-block w-4"
                         style={{
-                          borderTop: `2px ${edgeTypeLabel(edge.edgeType)} var(--color-text-secondary)`,
+                          borderTop: `2px ${es.style} ${es.color}`,
                         }}
-                        title={edge.edgeType}
+                        title={edge.label ?? edge.edgeType}
                       />
                       <span className="ml-1 text-[var(--color-text-secondary)]">
-                        {edge.edgeType}
+                        {edge.label ?? edge.edgeType}
                       </span>
                     </td>
                     <td className="py-1 text-[var(--color-text-primary)]">
@@ -336,9 +427,9 @@ export function EscalationPaths() {
 
   const sortedPaths = data
     ? [...data.criticalPaths].sort((a, b) => {
-        // Critical first, then by hop count ascending
+        // Critical first, then by risk score ascending (most dangerous first)
         if (a.isCritical !== b.isCritical) return a.isCritical ? -1 : 1;
-        return a.hopCount - b.hopCount;
+        return a.riskScore - b.riskScore;
       })
     : [];
 
