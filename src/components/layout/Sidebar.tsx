@@ -182,6 +182,13 @@ const MODULES: SidebarModule[] = [
     requiredLevel: "DomainAdmin",
   },
   {
+    id: "compliance-reports",
+    label: "Compliance Reports",
+    icon: "shield",
+    group: "Security",
+    requiredLevel: "DomainAdmin",
+  },
+  {
     id: "ntfs-analyzer",
     label: "NTFS Analyzer",
     icon: "folder-search",
