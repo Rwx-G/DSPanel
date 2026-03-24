@@ -7,85 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-- Escalation graph: Computer, GPO, CertTemplate node types and UnconstrainedDeleg, RBCD, SIDHistory, GPLink, CertESC edge types
-- Escalation graph: weighted Dijkstra path-finding with per-edge risk scores (lower = more dangerous)
-- Escalation graph: edge labels, risk score display, and color-coded risk badges in the UI
-- Escalation graph: detection of unconstrained delegation, constrained delegation, RBCD, SIDHistory, managedBy ownership, GPO links, and ADCS ESC1 certificate templates
-- New attack types: Kerberoasting, AS-REP Roasting, Brute Force, Pass-the-Hash, Shadow Credentials, RBCD Abuse, AdminSDHolder Tampering, Suspicious Account Activity
-- MITRE ATT&CK technique references on all attack alerts
-- `AttackDetectionConfig` for configurable detection thresholds and exclusion lists
-- Structured XML parsing of Windows Security event log records for accurate attack detection
+## [0.9.0] - 2026-03-24
 
-### Changed
-- Rewritten attack detection engine: batched PowerShell queries (6 batches instead of 8 individual), structured event parsing, per-attack-type detection functions with false-positive filtering
-- DCSync detection now filters by replication GUIDs and excludes machine accounts (DCs)
-- Golden Ticket detection now checks for RC4-HMAC encryption type instead of just event count
-- Password Spray detection now counts distinct targeted users per source IP
-- DCShadow detection now checks for replication-related SPN modifications
-- All detection functions are pure Rust functions testable without PowerShell
-
-### Fixed
-- False positives in DCSync detection from legitimate DC replication
-- False positives in Golden Ticket detection from normal Kerberos TGT requests
-- GPO Security risk factor: detects GPP password risks, domain behavior version, excessive GPO count
-- Trust Security risk factor: evaluates external/forest trusts, SID filtering, selective authentication, bidirectional trust risks
-- Certificate Security (AD CS) risk factor: detects ESC1/ESC2 vulnerabilities in certificate templates, enrollment services
-- `RiskFinding` model for granular per-finding details within each risk factor (id, severity, points, remediation, complexity, framework reference)
-- `RemediationComplexity` enum (Easy/Medium/Hard) for remediation guidance
-- `impact_if_fixed` field on `RiskFactor` for prioritizing remediation efforts
-- Individual `RiskFinding` entries on all existing risk factors (privileged hygiene, password policy, stale accounts, Kerberos, dangerous configs, infrastructure hardening)
-- Orphaned adminCount detection in dangerous configurations factor
-
-## [0.9.0] - 2026-03-23
-
-Epic 9 - Security, Risk Scoring and Attack Detection. Security dashboard
-for DomainAdmin users: privileged account monitoring, domain-wide risk
-scoring, AD attack detection, and privilege escalation path analysis.
+Epic 9 - Security, Risk Scoring and Attack Detection. Security monitoring
+suite for DomainAdmin users: privileged account audit, domain-wide risk
+scoring (~70 checks, 9 factors), AD attack detection (14 attack types),
+and privilege escalation path analysis (8 edge types, Dijkstra).
 
 ### Added
 
-#### Privileged Accounts Dashboard (9.1)
-- Security Dashboard page listing members of Domain Admins, Enterprise Admins, Schema Admins, and Administrators
-- Configurable additional privileged groups via AppSettings
-- Per-account details: last logon, password age, password expiry, enabled status
-- Alert detection: password > 90 days (Critical), password never expires (High), disabled in privileged group (High), never logged on (Medium)
-- Alert severity badges with color coding (Critical/High/Medium/Info)
-- Expandable account rows with DN and alert details
-- CSV export of privileged accounts with alert data
+#### Privileged Accounts (9.1)
+- Privileged account audit page with RID-based group resolution (works on all AD locales)
+- Recursive nested group member resolution (handles groups-in-groups up to 5 levels)
+- 12 per-account checks: Kerberoastable, AS-REP Roastable, reversible encryption, DES-only, constrained delegation with protocol transition, SIDHistory, service account in admin group, Protected Users membership, inactive admin, adminCount orphan, password age, password never expires
+- Domain-level findings: KRBTGT password age, LAPS coverage, Fine-Grained Password Policies, domain functional level, RBCD count, Recycle Bin status
+- AlertBadge component with DSPanel tooltip pattern (portal, hover, keyboard accessible)
+- CSV and HTML report export
 - DomainAdmin permission gating
 
 #### Domain Risk Score (9.2)
-- Risk Score page with SVG semi-circle gauge visualization (0-100)
-- Color zones: red (0-40 Poor), orange (41-70 Fair), green (71-100 Good)
-- 4 weighted risk factors: privileged account hygiene (30%), password policy strength (25%), stale account ratio (25%), dangerous configurations (20%)
-- Factor breakdown panel with score bars, weight, explanation, and recommendations
-- SQLite-backed daily score history with upsert
-- 30-day trend sparkline visualization
-- Configurable factor weights with defaults summing to 100%
+- Risk Score page with SVG semi-circle gauge visualization (0-100, red/orange/green zones)
+- 9 weighted risk factors (~70 individual checks): Privileged Hygiene (15%), Password Policy (10%), Stale Accounts (10%), Kerberos Security (20%), Dangerous Configs (10%), Infrastructure Hardening (10%), GPO Security (10%), Trust Security (10%), Certificate Security (5%)
+- Per-finding granularity: severity, remediation complexity (Easy/Medium/Hard), impact score ("Potential gain: +N points"), CIS Benchmark and MITRE ATT&CK references
+- Worst factor badge (PingCastle-style "weakest link" indicator)
+- SVG radar/spider chart showing all factor scores
+- 30-day trend sparkline with score labels, versioned SQLite storage (schema v2)
+- HTML report export with factor table, findings by severity, recommendations by impact
+- SecurityDisclaimer "i" button with coverage estimate vs specialized tools
 
 #### AD Attack Detection (9.3)
-- Attack Detection page analyzing Windows Security event logs
-- Detection for Golden Ticket (event 4768), DCSync (event 4662), DCShadow (event 4742)
-- Configurable time window: 1h, 6h, 12h, 24h (default), 48h, 72h
-- Alert cards with attack type badge, severity, timestamp, source, and description
-- Expandable detail with recommended response actions per alert type
-- Graceful empty report on non-Windows platforms
-- PowerShell-based event log queries with -NoProfile -NonInteractive
+- 14 attack types with structured XML event parsing: Golden Ticket, DCSync, DCShadow, Kerberoasting, AS-REP Roasting, Brute Force, Pass-the-Hash, Password Spray, Shadow Credentials, RBCD Abuse, AdminSDHolder Tampering, Abnormal Kerberos, Privileged Group Changes, Suspicious Account Activity
+- 6 batched PowerShell queries extracting 16 structured fields per event (replaces naive event counting)
+- Per-attack detection logic with false-positive filtering (replication GUIDs for DCSync, RC4 encryption for Golden Ticket/Kerberoasting, threshold-based for brute force)
+- Configurable thresholds and exclusion lists (AttackDetectionConfig)
+- MITRE ATT&CK technique reference on every alert
+- 14-check grid always visible showing Clear/Alert status per check type
+- Configurable time window: 6h to 7 days (default 3 days)
+- All detection functions are pure Rust, testable without PowerShell
 
 #### Privilege Escalation Path Visualization (9.4)
-- Escalation Paths page with critical path analysis
-- Graph builder querying group memberships via DirectoryProvider
-- BFS path-finding algorithm for shortest paths to privileged groups
-- Critical path highlighting with hop count badges
-- Graph stats panel: node/edge counts by type, color legend
-- List-based visualization (no external graph library required)
+- 5 node types: User, Group, Computer, GPO, CertTemplate
+- 8 edge types: Membership, Ownership (managedBy), Delegation (constrained to DC services), Unconstrained Delegation (non-DC computers), RBCD, SIDHistory, GPLink, CertESC (ADCS ESC1 templates)
+- Weighted Dijkstra path-finding (SIDHistory=0.5 to GPLink=3.0) replacing simple BFS
+- Risk score per path (lower = more dangerous), edge type labels on each hop
+- Compact horizontal stats bar with node/edge counts
 
 ### Changed
-- Added "Security" group to sidebar navigation with 4 new modules
-- Added `privileged_groups` field to AppSettings for configurable group monitoring
-- Added `Shield`, `Gauge`, `Radar`, `Route` icons to sidebar icon map
-- Extended `SidebarModule.group` type to include "Security"
+- "Security" group added to sidebar navigation with 4 modules (DomainAdmin only)
+- `privileged_groups` field added to AppSettings for configurable group monitoring
+- `resolve_group_by_rid()` method added to DirectoryProvider trait for locale-independent group resolution
+- `lastLogonTimestamp`, `servicePrincipalName`, `sIDHistory`, `adminCount`, `msDS-AllowedToActOnBehalfOfOtherIdentity` added to LDAP USER_ATTRS
 
 ### Security
 - All security endpoints require DomainAdmin permission level
