@@ -9,6 +9,7 @@ import {
   FileText,
   Palette,
 } from "lucide-react";
+import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { GraphSettings } from "@/components/common/GraphSettings";
 import { PresetSettings } from "@/components/common/PresetSettings";
 import { PermissionMappingSettings } from "@/components/common/PermissionMappingSettings";
@@ -146,22 +147,7 @@ export function Settings() {
   }, [updateNested]);
 
   if (loading) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <div
-          className="flex flex-col items-center justify-center gap-2"
-          data-testid="loading-spinner"
-        >
-          <div
-            className="animate-spin rounded-full border-2 border-[var(--color-border-default)] border-t-[var(--color-primary)]"
-            role="status"
-            aria-label="Loading"
-            style={{ width: 24, height: 24 }}
-          />
-          <p className="text-caption text-[var(--color-text-secondary)]">Loading settings...</p>
-        </div>
-      </div>
-    );
+    return <LoadingSpinner message="Loading settings..." />;
   }
 
   return (

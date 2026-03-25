@@ -372,7 +372,7 @@ describe("UserActions", () => {
     expect(screen.getByTestId("disable-btn")).toBeDisabled();
   });
 
-  it("disables action buttons and shows permission title for ReadOnly user", () => {
+  it("disables action buttons and shows permission tooltip for ReadOnly user", () => {
     mockPermissionLevel = "ReadOnly";
 
     render(
@@ -392,9 +392,9 @@ describe("UserActions", () => {
     expect(unlockBtn).toBeDisabled();
     expect(enableBtn).toBeDisabled();
 
-    expect(resetBtn).toHaveAttribute("title", "Requires HelpDesk permission");
-    expect(unlockBtn).toHaveAttribute("title", "Requires HelpDesk permission");
-    expect(enableBtn).toHaveAttribute("title", "Requires HelpDesk permission");
+    // Custom tooltips are rendered as sibling spans (not native title attributes)
+    const tooltips = screen.getAllByText("Requires HelpDesk permission");
+    expect(tooltips.length).toBeGreaterThanOrEqual(3);
   });
 
   it("shows parsed JSON error message when error is backend JSON", async () => {

@@ -1197,9 +1197,7 @@ pub(crate) fn skip_update_version_inner(state: &AppState, version: &str) {
 
 /// Checks GitHub for a newer version.
 #[tauri::command]
-pub async fn check_for_update(
-    state: State<'_, AppState>,
-) -> Result<Option<UpdateInfo>, AppError> {
+pub async fn check_for_update(state: State<'_, AppState>) -> Result<Option<UpdateInfo>, AppError> {
     Ok(check_for_update_inner(&state).await)
 }
 

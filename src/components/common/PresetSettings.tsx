@@ -76,11 +76,13 @@ export function PresetSettings({ onSaved }: PresetSettingsProps = {}) {
             }
           }}
           disabled={loading}
-          className="btn btn-sm btn-outline"
-          title="Browse for folder"
+          className="group relative btn btn-sm btn-outline"
           data-testid="preset-path-browse"
         >
           <FolderOpen size={14} />
+          <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-md bg-[var(--color-surface-elevated)] px-2.5 py-1.5 text-caption font-medium text-[var(--color-text-primary)] opacity-0 shadow-md transition-opacity duration-150 group-hover:opacity-100">
+            Browse for folder
+          </span>
         </button>
         <button
           onClick={handleTest}
