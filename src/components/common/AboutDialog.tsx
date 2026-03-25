@@ -15,7 +15,7 @@ export function AboutDialog({ version, onClose }: AboutDialogProps) {
       data-testid="about-dialog-overlay"
     >
       <div
-        className="w-96 rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-primary)] shadow-xl"
+        className="w-96 rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] shadow-xl"
         data-testid="about-dialog"
       >
         <div className="flex items-center justify-between border-b border-[var(--color-border-default)] px-4 py-3">
@@ -24,7 +24,7 @@ export function AboutDialog({ version, onClose }: AboutDialogProps) {
           </h2>
           <button
             onClick={onClose}
-            className="text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors"
+            className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
             data-testid="about-dialog-close"
           >
             <X size={16} />
@@ -37,7 +37,7 @@ export function AboutDialog({ version, onClose }: AboutDialogProps) {
               Active Directory Management
             </p>
             <p
-              className="mt-1 text-caption text-[var(--color-text-muted)]"
+              className="mt-1 text-caption text-[var(--color-text-secondary)]"
               data-testid="about-version"
             >
               Version {version}
@@ -51,7 +51,7 @@ export function AboutDialog({ version, onClose }: AboutDialogProps) {
             </div>
             <div className="flex justify-between text-caption">
               <span className="text-[var(--color-text-secondary)]">Author</span>
-              <span className="text-[var(--color-text-primary)]">Romain G.</span>
+              <span className="text-[var(--color-text-primary)]">Rwx-G</span>
             </div>
           </div>
 

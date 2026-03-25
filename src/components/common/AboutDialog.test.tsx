@@ -11,7 +11,7 @@ describe("AboutDialog", () => {
   it("shows license and author", () => {
     render(<AboutDialog version="1.0.0" onClose={() => {}} />);
     expect(screen.getByText("Apache-2.0")).toBeDefined();
-    expect(screen.getByText("Romain G.")).toBeDefined();
+    expect(screen.getByText("Rwx-G")).toBeDefined();
   });
 
   it("has GitHub link", () => {
