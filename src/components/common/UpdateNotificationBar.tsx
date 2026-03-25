@@ -59,7 +59,7 @@ export function UpdateNotificationBar() {
 
   return (
     <div
-      className="flex items-center gap-3 border-b border-[var(--color-border-default)] bg-[var(--color-info-surface)] px-4 py-2 animate-in slide-in-from-top"
+      className="flex items-center gap-3 border-b border-[var(--color-border-default)] bg-[var(--color-info-bg)] px-4 py-2 animate-in slide-in-from-top"
       data-testid="update-notification-bar"
     >
       <Info size={16} className="shrink-0 text-[var(--color-info)]" />
@@ -83,7 +83,7 @@ export function UpdateNotificationBar() {
         </button>
         <button
           onClick={handleRemindLater}
-          className="text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors p-1"
+          className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors p-1"
           title="Remind me later"
           data-testid="update-remind-btn"
         >

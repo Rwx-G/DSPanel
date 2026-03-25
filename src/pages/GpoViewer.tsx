@@ -399,7 +399,7 @@ export function GpoViewer() {
                       setScopeLinks([]);
                     }
                   }}
-                  className="h-8 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-default)] px-2 text-caption text-[var(--color-text-primary)]"
+                  className="h-8 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2 text-caption text-[var(--color-text-primary)]"
                   data-testid="scope-gpo-dn"
                 >
                   <option value="">Choose a GPO...</option>
@@ -417,7 +417,7 @@ export function GpoViewer() {
                     onChange={(e) => setScopeGpoDn(e.target.value)}
                     onKeyDown={(e) => handleKeyDown(e, fetchScope)}
                     placeholder="CN={GUID},CN=Policies,CN=System,DC=contoso,DC=com"
-                    className="h-8 flex-1 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-default)] px-2 text-caption text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)]"
+                    className="h-8 flex-1 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2 text-caption text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)]"
                     data-testid="scope-gpo-dn"
                   />
                   <button

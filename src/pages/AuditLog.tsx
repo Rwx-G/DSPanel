@@ -228,7 +228,7 @@ export function AuditLog() {
             value={dateFrom}
             onChange={(e) => setDateFrom(e.target.value)}
             onKeyDown={handleKeyDown}
-            className="h-8 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-default)] px-2 text-caption text-[var(--color-text-primary)]"
+            className="h-8 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2 text-caption text-[var(--color-text-primary)]"
             data-testid="filter-date-from"
           />
         </div>
@@ -241,7 +241,7 @@ export function AuditLog() {
             value={dateTo}
             onChange={(e) => setDateTo(e.target.value)}
             onKeyDown={handleKeyDown}
-            className="h-8 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-default)] px-2 text-caption text-[var(--color-text-primary)]"
+            className="h-8 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2 text-caption text-[var(--color-text-primary)]"
             data-testid="filter-date-to"
           />
         </div>
@@ -255,7 +255,7 @@ export function AuditLog() {
             onChange={(e) => setOperatorFilter(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="e.g. admin"
-            className="h-8 w-32 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-default)] px-2 text-caption text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)]"
+            className="h-8 w-32 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2 text-caption text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)]"
             data-testid="filter-operator"
           />
         </div>
@@ -266,7 +266,7 @@ export function AuditLog() {
           <select
             value={actionFilter}
             onChange={(e) => setActionFilter(e.target.value)}
-            className="h-8 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-default)] px-2 text-caption text-[var(--color-text-primary)]"
+            className="h-8 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2 text-caption text-[var(--color-text-primary)]"
             data-testid="filter-action"
           >
             <option value="">All</option>
@@ -287,7 +287,7 @@ export function AuditLog() {
             onChange={(e) => setTargetFilter(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="partial match"
-            className="h-8 w-40 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-default)] px-2 text-caption text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)]"
+            className="h-8 w-40 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2 text-caption text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)]"
             data-testid="filter-target"
           />
         </div>
@@ -300,7 +300,7 @@ export function AuditLog() {
             onChange={(e) =>
               setResultFilter(e.target.value as "" | "success" | "failure")
             }
-            className="h-8 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-default)] px-2 text-caption text-[var(--color-text-primary)]"
+            className="h-8 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2 text-caption text-[var(--color-text-primary)]"
             data-testid="filter-result"
           >
             <option value="">All</option>

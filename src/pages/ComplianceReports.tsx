@@ -219,7 +219,7 @@ function CheckRow({ check }: { check: CheckResult }) {
           )}
 
           {/* Remediation */}
-          <div className="whitespace-pre-line text-[11px] leading-relaxed text-[var(--color-text-secondary)] bg-[var(--color-surface-default)] rounded p-2 font-mono">
+          <div className="whitespace-pre-line text-[11px] leading-relaxed text-[var(--color-text-secondary)] bg-[var(--color-surface-card)] rounded p-2 font-mono">
             {check.remediation}
           </div>
         </div>

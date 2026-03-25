@@ -175,7 +175,7 @@ export function Settings() {
       {/* Error */}
       {error && (
         <div
-          className="rounded-md border border-[var(--color-danger)] bg-[var(--color-danger-surface)] px-3 py-2 text-caption text-[var(--color-danger)]"
+          className="rounded-md border border-[var(--color-error)] bg-[var(--color-error-bg)] px-3 py-2 text-caption text-[var(--color-error)]"
           data-testid="settings-error"
         >
           {error}
@@ -185,7 +185,7 @@ export function Settings() {
       {/* Success */}
       {saveSuccess && (
         <div
-          className="rounded-md border border-[var(--color-success)] bg-[var(--color-success-surface)] px-3 py-2 text-caption text-[var(--color-success)]"
+          className="rounded-md border border-[var(--color-success)] bg-[var(--color-success-bg)] px-3 py-2 text-caption text-[var(--color-success)]"
           data-testid="settings-success"
         >
           Settings saved successfully.
@@ -219,7 +219,7 @@ export function Settings() {
       <div className="flex-1 overflow-y-auto">
         {activeTab === "connection" && (
           <div className="space-y-4" data-testid="tab-content-connection">
-            <div className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-primary)] p-4">
+            <div className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-4">
               <h3 className="mb-3 text-body font-semibold text-[var(--color-text-primary)]">
                 Domain Connection
               </h3>
@@ -233,7 +233,7 @@ export function Settings() {
                     value={settings.connection?.domainOverride ?? ""}
                     onChange={(e) => updateNested("connection", "domainOverride", e.target.value)}
                     placeholder="Leave empty for auto-detection"
-                    className="w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-input-bg)] px-3 py-1.5 text-body text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none"
+                    className="w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5 text-body text-[var(--color-text-primary)] placeholder-[var(--color-text-secondary)] focus:border-[var(--color-primary)] focus:outline-none"
                     data-testid="setting-domain-override"
                   />
                 </div>
@@ -246,14 +246,14 @@ export function Settings() {
                     value={settings.connection?.preferredDc ?? ""}
                     onChange={(e) => updateNested("connection", "preferredDc", e.target.value)}
                     placeholder="Leave empty for auto-selection"
-                    className="w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-input-bg)] px-3 py-1.5 text-body text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none"
+                    className="w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5 text-body text-[var(--color-text-primary)] placeholder-[var(--color-text-secondary)] focus:border-[var(--color-primary)] focus:outline-none"
                     data-testid="setting-preferred-dc"
                   />
                 </div>
               </div>
             </div>
             <GraphSettings />
-            <div className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-primary)] p-4">
+            <div className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-4">
               <h3 className="mb-3 text-body font-semibold text-[var(--color-text-primary)]">
                 Update Checks
               </h3>
@@ -264,7 +264,7 @@ export function Settings() {
                 <select
                   value={settings.update?.checkFrequency ?? "startup"}
                   onChange={(e) => updateNested("update", "checkFrequency", e.target.value)}
-                  className="w-48 rounded-md border border-[var(--color-border-default)] bg-[var(--color-input-bg)] px-3 py-1.5 text-body text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+                  className="w-48 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5 text-body text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
                   data-testid="setting-update-frequency"
                 >
                   <option value="startup">Every Startup</option>
@@ -291,7 +291,7 @@ export function Settings() {
 
         {activeTab === "security" && (
           <div className="space-y-4" data-testid="tab-content-security">
-            <div className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-primary)] p-4">
+            <div className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-4">
               <h3 className="mb-3 text-body font-semibold text-[var(--color-text-primary)]">
                 Audit Log
               </h3>
@@ -307,18 +307,18 @@ export function Settings() {
                     const val = parseInt(e.target.value, 10);
                     updateField("auditRetentionDays", isNaN(val) ? null : val);
                   }}
-                  className="w-48 rounded-md border border-[var(--color-border-default)] bg-[var(--color-input-bg)] px-3 py-1.5 text-body text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+                  className="w-48 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5 text-body text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
                   data-testid="setting-audit-retention"
                 />
                 {validationErrors.auditRetentionDays && (
                   <p
-                    className="mt-1 text-caption text-[var(--color-danger)]"
+                    className="mt-1 text-caption text-[var(--color-error)]"
                     data-testid="validation-audit-retention"
                   >
                     {validationErrors.auditRetentionDays}
                   </p>
                 )}
-                <p className="mt-1 text-caption text-[var(--color-text-muted)]">
+                <p className="mt-1 text-caption text-[var(--color-text-secondary)]">
                   Audit entries older than this will be purged at startup. Minimum: 30 days.
                 </p>
               </div>
@@ -328,7 +328,7 @@ export function Settings() {
 
         {activeTab === "reports" && (
           <div className="space-y-4" data-testid="tab-content-reports">
-            <div className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-primary)] p-4">
+            <div className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-4">
               <h3 className="mb-3 text-body font-semibold text-[var(--color-text-primary)]">
                 Export Defaults
               </h3>
@@ -340,7 +340,7 @@ export function Settings() {
                   <select
                     value={settings.reports?.defaultFormat ?? "CSV"}
                     onChange={(e) => updateNested("reports", "defaultFormat", e.target.value)}
-                    className="w-48 rounded-md border border-[var(--color-border-default)] bg-[var(--color-input-bg)] px-3 py-1.5 text-body text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+                    className="w-48 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5 text-body text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
                     data-testid="setting-export-format"
                   >
                     <option value="CSV">CSV</option>
@@ -361,7 +361,7 @@ export function Settings() {
                         updateNested("reports", "defaultExportPath", e.target.value)
                       }
                       placeholder="Leave empty for system default"
-                      className="flex-1 rounded-md border border-[var(--color-border-default)] bg-[var(--color-input-bg)] px-3 py-1.5 text-body text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none"
+                      className="flex-1 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5 text-body text-[var(--color-text-primary)] placeholder-[var(--color-text-secondary)] focus:border-[var(--color-primary)] focus:outline-none"
                       data-testid="setting-export-path"
                     />
                     <button
@@ -380,7 +380,7 @@ export function Settings() {
 
         {activeTab === "appearance" && (
           <div className="space-y-4" data-testid="tab-content-appearance">
-            <div className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-primary)] p-4">
+            <div className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-4">
               <h3 className="mb-3 text-body font-semibold text-[var(--color-text-primary)]">
                 Theme
               </h3>
@@ -398,7 +398,7 @@ export function Settings() {
                       onClick={() => handleThemeChange(mode)}
                       className={`rounded-lg border px-4 py-3 text-body font-medium transition-colors ${
                         selected
-                          ? "border-[var(--color-primary)] bg-[var(--color-primary-surface)] text-[var(--color-primary)]"
+                          ? "border-[var(--color-primary)] bg-[var(--color-primary-subtle)] text-[var(--color-primary)]"
                           : "border-[var(--color-border-default)] bg-[var(--color-surface-card)] text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]"
                       }`}
                       data-testid={`theme-${mode}`}
@@ -408,7 +408,7 @@ export function Settings() {
                   );
                 })}
               </div>
-              <p className="mt-2 text-caption text-[var(--color-text-muted)]">
+              <p className="mt-2 text-caption text-[var(--color-text-secondary)]">
                 System follows your OS preference.
               </p>
             </div>

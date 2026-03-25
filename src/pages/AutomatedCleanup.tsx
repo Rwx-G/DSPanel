@@ -110,7 +110,7 @@ function RuleEditor({
             Rule Name
           </label>
           <input
-            className="w-full rounded border border-[var(--color-border-default)] bg-[var(--color-surface-default)] px-2 py-1.5 text-caption text-[var(--color-text-primary)]"
+            className="w-full rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2 py-1.5 text-caption text-[var(--color-text-primary)]"
             value={rule.name}
             onChange={(e) => onChange({ ...rule, name: e.target.value })}
             placeholder="e.g., Disable inactive 180 days"
@@ -122,7 +122,7 @@ function RuleEditor({
             Condition
           </label>
           <select
-            className="w-full rounded border border-[var(--color-border-default)] bg-[var(--color-surface-default)] px-2 py-1.5 text-caption text-[var(--color-text-primary)]"
+            className="w-full rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2 py-1.5 text-caption text-[var(--color-text-primary)]"
             value={rule.condition}
             onChange={(e) =>
               onChange({ ...rule, condition: e.target.value as CleanupCondition })
@@ -142,7 +142,7 @@ function RuleEditor({
           </label>
           <input
             type="number"
-            className="w-full rounded border border-[var(--color-border-default)] bg-[var(--color-surface-default)] px-2 py-1.5 text-caption text-[var(--color-text-primary)]"
+            className="w-full rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2 py-1.5 text-caption text-[var(--color-text-primary)]"
             value={rule.thresholdDays}
             onChange={(e) =>
               onChange({ ...rule, thresholdDays: Math.max(1, Number(e.target.value)) })
@@ -156,7 +156,7 @@ function RuleEditor({
             Action
           </label>
           <select
-            className="w-full rounded border border-[var(--color-border-default)] bg-[var(--color-surface-default)] px-2 py-1.5 text-caption text-[var(--color-text-primary)]"
+            className="w-full rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2 py-1.5 text-caption text-[var(--color-text-primary)]"
             value={rule.action}
             onChange={(e) =>
               onChange({ ...rule, action: e.target.value as CleanupAction })
@@ -177,7 +177,7 @@ function RuleEditor({
             Target OU (Distinguished Name)
           </label>
           <input
-            className="w-full rounded border border-[var(--color-border-default)] bg-[var(--color-surface-default)] px-2 py-1.5 text-caption text-[var(--color-text-primary)]"
+            className="w-full rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2 py-1.5 text-caption text-[var(--color-text-primary)]"
             value={rule.targetOu ?? ""}
             onChange={(e) =>
               onChange({ ...rule, targetOu: e.target.value || null })
@@ -193,7 +193,7 @@ function RuleEditor({
             Exclude SAM patterns (comma-separated, e.g., svc_*, admin*)
           </label>
           <input
-            className="w-full rounded border border-[var(--color-border-default)] bg-[var(--color-surface-default)] px-2 py-1.5 text-caption text-[var(--color-text-primary)]"
+            className="w-full rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2 py-1.5 text-caption text-[var(--color-text-primary)]"
             value={rule.excludePatterns?.join(", ") ?? ""}
             onChange={(e) => {
               const val = e.target.value.trim();
@@ -213,7 +213,7 @@ function RuleEditor({
             Exclude OUs (comma-separated)
           </label>
           <input
-            className="w-full rounded border border-[var(--color-border-default)] bg-[var(--color-surface-default)] px-2 py-1.5 text-caption text-[var(--color-text-primary)]"
+            className="w-full rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2 py-1.5 text-caption text-[var(--color-text-primary)]"
             value={rule.excludeOus?.join(", ") ?? ""}
             onChange={(e) => {
               const val = e.target.value.trim();

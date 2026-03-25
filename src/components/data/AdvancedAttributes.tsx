@@ -86,12 +86,12 @@ function EditableValue({
             if (e.key === "Escape") handleCancel();
           }}
           autoFocus
-          className="flex-1 rounded border border-[var(--color-primary)] bg-[var(--color-input-bg)] px-2 py-0.5 text-body font-mono text-[var(--color-text-primary)] outline-none"
+          className="flex-1 rounded border border-[var(--color-primary)] bg-[var(--color-surface-card)] px-2 py-0.5 text-body font-mono text-[var(--color-text-primary)] outline-none"
           data-testid={`adv-edit-input-${attrKey}`}
         />
         <button
           onClick={handleConfirm}
-          className="rounded p-0.5 text-[var(--color-success)] hover:bg-[var(--color-success-subtle)]"
+          className="rounded p-0.5 text-[var(--color-success)] hover:bg-[var(--color-success-bg)]"
           aria-label="Confirm edit"
           data-testid={`adv-edit-confirm-${attrKey}`}
         >

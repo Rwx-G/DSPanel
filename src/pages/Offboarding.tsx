@@ -316,7 +316,7 @@ function OffboardingContent() {
         )}
       </div>
 
-      <div className="flex-1 overflow-auto rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-primary)] p-4">
+      <div className="flex-1 overflow-auto rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-4">
         {/* Step 1: Search */}
         {step === "search" && (
           <div className="mx-auto max-w-lg" data-testid="step-search">
@@ -351,7 +351,7 @@ function OffboardingContent() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleSearch()}
                 placeholder="jsmith"
-                className="flex-1 rounded-md border border-[var(--color-border-default)] bg-[var(--color-input-bg)] px-3 py-1.5 text-body text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+                className="flex-1 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5 text-body text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
                 data-testid="offboard-search-input"
               />
               <button
@@ -461,7 +461,7 @@ function OffboardingContent() {
                 userGroups.map((g) => (
                   <div
                     key={g}
-                    className="text-caption text-[var(--color-danger)]"
+                    className="text-caption text-[var(--color-error)]"
                   >
                     - Remove from: {g}
                   </div>
@@ -512,7 +512,7 @@ function OffboardingContent() {
                   {results.map((r, i) => (
                     <div
                       key={i}
-                      className={`text-caption ${r.success ? "text-[var(--color-success)]" : "text-[var(--color-danger)]"}`}
+                      className={`text-caption ${r.success ? "text-[var(--color-success)]" : "text-[var(--color-error)]"}`}
                     >
                       [{r.success ? "OK" : "FAIL"}] {r.action}: {r.detail}
                     </div>

@@ -163,7 +163,7 @@ export function PermissionMappingSettings() {
 
       {error && (
         <div
-          className="rounded-md border border-[var(--color-danger)] bg-[var(--color-danger-surface)] px-3 py-2 text-caption text-[var(--color-danger)]"
+          className="rounded-md border border-[var(--color-error)] bg-[var(--color-error-bg)] px-3 py-2 text-caption text-[var(--color-error)]"
           data-testid="permission-mapping-error"
         >
           {error}
@@ -172,7 +172,7 @@ export function PermissionMappingSettings() {
 
       {success && (
         <div
-          className="rounded-md border border-[var(--color-success)] bg-[var(--color-success-surface)] px-3 py-2 text-caption text-[var(--color-success)]"
+          className="rounded-md border border-[var(--color-success)] bg-[var(--color-success-bg)] px-3 py-2 text-caption text-[var(--color-success)]"
           data-testid="permission-mapping-success"
         >
           Permission mappings saved successfully.
@@ -185,7 +185,7 @@ export function PermissionMappingSettings() {
           return (
             <div
               key={level}
-              className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-primary)] p-3"
+              className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-3"
               data-testid={`permission-level-${level}`}
             >
               <div className="mb-2 flex items-center justify-between">
@@ -193,7 +193,7 @@ export function PermissionMappingSettings() {
                   <span className="text-body font-medium text-[var(--color-text-primary)]">
                     {LEVEL_LABELS[level]}
                   </span>
-                  <span className="ml-2 text-caption text-[var(--color-text-muted)]">
+                  <span className="ml-2 text-caption text-[var(--color-text-secondary)]">
                     {LEVEL_HINTS[level]}
                   </span>
                 </div>
@@ -225,7 +225,7 @@ export function PermissionMappingSettings() {
                         if (e.key === "Enter") handleSearch();
                       }}
                       placeholder="Search AD groups by name..."
-                      className="flex-1 rounded-md border border-[var(--color-border-default)] bg-[var(--color-input-bg)] px-2 py-1 text-caption text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none"
+                      className="flex-1 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2 py-1 text-caption text-[var(--color-text-primary)] placeholder-[var(--color-text-secondary)] focus:border-[var(--color-primary)] focus:outline-none"
                       data-testid={`group-search-input-${level}`}
                       autoFocus
                     />
@@ -249,18 +249,18 @@ export function PermissionMappingSettings() {
                             disabled={alreadyMapped}
                             className={`w-full rounded px-2 py-1 text-left text-caption ${
                               alreadyMapped
-                                ? "text-[var(--color-text-muted)] cursor-not-allowed"
+                                ? "text-[var(--color-text-secondary)] cursor-not-allowed"
                                 : "text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]"
                             }`}
                           >
                             <span className="font-medium">
                               {group.display_name ?? group.sam_account_name ?? extractCn(group.distinguished_name)}
                             </span>
-                            <span className="ml-2 text-[var(--color-text-muted)]">
+                            <span className="ml-2 text-[var(--color-text-secondary)]">
                               {group.distinguished_name}
                             </span>
                             {alreadyMapped && (
-                              <span className="ml-1 text-[var(--color-text-muted)]">
+                              <span className="ml-1 text-[var(--color-text-secondary)]">
                                 (already mapped)
                               </span>
                             )}
@@ -274,7 +274,7 @@ export function PermissionMappingSettings() {
 
               {/* Mapped groups list */}
               {groups.length === 0 ? (
-                <p className="text-caption text-[var(--color-text-muted)] italic">
+                <p className="text-caption text-[var(--color-text-secondary)] italic">
                   No custom groups mapped. Default detection applies.
                 </p>
               ) : (
@@ -295,7 +295,7 @@ export function PermissionMappingSettings() {
                         <span className="truncate text-caption text-[var(--color-text-primary)]">
                           {extractCn(groupDn)}
                         </span>
-                        <span className="truncate text-caption text-[var(--color-text-muted)]">
+                        <span className="truncate text-caption text-[var(--color-text-secondary)]">
                           {groupDn}
                         </span>
                       </div>
@@ -303,7 +303,7 @@ export function PermissionMappingSettings() {
                         {validationWarnings[groupDn] === undefined && (
                           <button
                             onClick={() => validateGroup(groupDn)}
-                            className="text-caption text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors"
+                            className="text-caption text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
                             title="Validate group exists in AD"
                             data-testid={`validate-group-btn`}
                           >
@@ -312,7 +312,7 @@ export function PermissionMappingSettings() {
                         )}
                         <button
                           onClick={() => removeGroup(level, groupDn)}
-                          className="text-[var(--color-text-muted)] hover:text-[var(--color-danger)] transition-colors"
+                          className="text-[var(--color-text-secondary)] hover:text-[var(--color-error)] transition-colors"
                           title="Remove group"
                           data-testid={`remove-group-btn`}
                         >

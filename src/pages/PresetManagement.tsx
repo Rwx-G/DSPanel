@@ -200,7 +200,7 @@ function PresetEditor() {
   return (
     <div className="flex flex-1 min-h-0 gap-4" data-testid="preset-management">
       {/* Left panel: Preset list */}
-      <div className="flex w-72 shrink-0 flex-col rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-primary)]">
+      <div className="flex w-72 shrink-0 flex-col rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)]">
         {/* Toolbar */}
         <div className="flex items-center gap-2 border-b border-[var(--color-border-default)] p-2">
           <button
@@ -221,7 +221,7 @@ function PresetEditor() {
           <button
             onClick={handleDelete}
             disabled={selectedIndex === null || isNew}
-            className="btn btn-sm btn-ghost text-[var(--color-danger)] hover:bg-[var(--color-danger-subtle)]"
+            className="btn btn-sm btn-ghost text-[var(--color-error)] hover:bg-[var(--color-error-bg)]"
             data-testid="preset-delete-btn"
           >
             <Trash2 size={14} /> Delete
@@ -255,8 +255,8 @@ function PresetEditor() {
                     <span
                       className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${
                         preset.type === "Onboarding"
-                          ? "bg-[var(--color-success-subtle)] text-[var(--color-success)]"
-                          : "bg-[var(--color-warning-subtle)] text-[var(--color-warning)]"
+                          ? "bg-[var(--color-success-bg)] text-[var(--color-success)]"
+                          : "bg-[var(--color-warning-bg)] text-[var(--color-warning)]"
                       }`}
                     >
                       {preset.type}
@@ -282,7 +282,7 @@ function PresetEditor() {
       </div>
 
       {/* Right panel: Editor form */}
-      <div className="flex-1 rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-primary)] p-4 overflow-auto">
+      <div className="flex-1 rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-4 overflow-auto">
         {!hasEditor ? (
           <EmptyState
             title="Select a preset"
@@ -293,7 +293,7 @@ function PresetEditor() {
             {/* Integrity warning */}
             {selectedIndex !== null && !isNew && presets[selectedIndex]?.integrityWarning && (
               <div
-                className="flex items-start gap-2 rounded-md border border-[var(--color-warning)] bg-[var(--color-warning-subtle)] p-3"
+                className="flex items-start gap-2 rounded-md border border-[var(--color-warning)] bg-[var(--color-warning-bg)] p-3"
                 data-testid="preset-integrity-warning"
               >
                 <AlertTriangle size={16} className="shrink-0 mt-0.5 text-[var(--color-warning)]" />
@@ -319,13 +319,13 @@ function PresetEditor() {
             {/* Validation errors */}
             {errors.length > 0 && (
               <div
-                className="rounded-md border border-[var(--color-danger)] bg-[var(--color-danger-subtle)] p-3"
+                className="rounded-md border border-[var(--color-error)] bg-[var(--color-error-bg)] p-3"
                 data-testid="preset-editor-errors"
               >
                 {errors.map((err) => (
                   <div
                     key={err}
-                    className="text-caption text-[var(--color-danger)]"
+                    className="text-caption text-[var(--color-error)]"
                   >
                     {err}
                   </div>
@@ -342,7 +342,7 @@ function PresetEditor() {
                 type="text"
                 value={draft.name}
                 onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-                className="w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-input-bg)] px-3 py-1.5 text-body text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+                className="w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5 text-body text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
                 placeholder="Preset name"
                 data-testid="preset-name-input"
               />
@@ -359,7 +359,7 @@ function PresetEditor() {
                   setDraft({ ...draft, description: e.target.value })
                 }
                 rows={2}
-                className="w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-input-bg)] px-3 py-1.5 text-body text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none resize-none"
+                className="w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5 text-body text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none resize-none"
                 placeholder="What this preset does..."
                 data-testid="preset-description-input"
               />
@@ -378,7 +378,7 @@ function PresetEditor() {
                     type: e.target.value as PresetType,
                   })
                 }
-                className="w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-input-bg)] px-3 py-1.5 text-body text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+                className="w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5 text-body text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
                 data-testid="preset-type-select"
               >
                 <option value="Onboarding">Onboarding</option>
@@ -433,7 +433,7 @@ function PresetEditor() {
                       </span>
                       <button
                         onClick={() => handleRemoveAttribute(key)}
-                        className="ml-auto text-[var(--color-text-secondary)] hover:text-[var(--color-danger)]"
+                        className="ml-auto text-[var(--color-text-secondary)] hover:text-[var(--color-error)]"
                         data-testid={`attr-remove-${key}`}
                       >
                         &times;
@@ -448,7 +448,7 @@ function PresetEditor() {
                   value={attrKey}
                   onChange={(e) => setAttrKey(e.target.value)}
                   placeholder="Attribute name"
-                  className="flex-1 rounded-md border border-[var(--color-border-default)] bg-[var(--color-input-bg)] px-3 py-1 text-caption text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+                  className="flex-1 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1 text-caption text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
                   data-testid="attr-key-input"
                 />
                 <input
@@ -456,7 +456,7 @@ function PresetEditor() {
                   value={attrValue}
                   onChange={(e) => setAttrValue(e.target.value)}
                   placeholder="Value"
-                  className="flex-1 rounded-md border border-[var(--color-border-default)] bg-[var(--color-input-bg)] px-3 py-1 text-caption text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+                  className="flex-1 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1 text-caption text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
                   data-testid="attr-value-input"
                 />
                 <button

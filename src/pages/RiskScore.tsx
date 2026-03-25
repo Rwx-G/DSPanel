@@ -431,7 +431,7 @@ function FactorCard({ factor }: { factor: RiskFactor }) {
       </p>
 
       {showRecommendations && (
-        <div className="mt-2 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-base)] p-2">
+        <div className="mt-2 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-bg)] p-2">
           <div className="flex items-center gap-1 text-[11px] font-medium text-[var(--color-warning)] mb-1">
             <Info size={10} />
             Recommendations
@@ -445,7 +445,7 @@ function FactorCard({ factor }: { factor: RiskFactor }) {
       )}
 
       {findings.length > 0 && (
-        <div className="mt-2 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-base)] p-2">
+        <div className="mt-2 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-bg)] p-2">
           <button
             className="flex items-center gap-1 text-[11px] font-medium text-[var(--color-text-primary)] w-full text-left"
             onClick={() => setFindingsOpen(!findingsOpen)}

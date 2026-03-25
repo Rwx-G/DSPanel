@@ -163,7 +163,7 @@ export function SnapshotHistory({ objectDn, canRestore, refreshTrigger = 0, onRe
                   {formatTimestamp(snap.timestamp)}
                 </span>
                 {snap.operator && (
-                  <span className="text-caption text-[var(--color-text-tertiary)]">
+                  <span className="text-caption text-[var(--color-text-secondary)]">
                     by {snap.operator}
                   </span>
                 )}
