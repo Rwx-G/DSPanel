@@ -24,14 +24,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Replication History section added to GroupDetail page (was only on User and Computer)
 
 #### GPO Viewer (11.3)
-- GPO Viewer page with three view modes: GPO Links, Scope Report, What-If
+- GPO Viewer page with two tabs: GPO Links and Scope Report
 - gPLink attribute parser with full flag support (enabled, disabled, enforced)
 - GPO inheritance resolver respecting block inheritance and enforcement rules
-- GPO Links view: enter object DN, see effective GPOs with inheritance chain
-- Scope Report: enter GPO DN, find all OUs and domain where it is linked
-- What-If simulation: simulate GPO application at a target OU
+- GPO Links: autocomplete search for users/computers + OU tree picker, auto-fetch on selection
+- Scope Report: GPO dropdown with auto-fetch, text badges for Enforced/Active/Disabled status
+- WMI filter display from gPCWMIFilter attribute
+- GPO name cache in AppState (5-minute TTL)
 - DomainAdmin permission gating on all GPO operations
 - Export GPO reports to CSV, Excel, PDF, HTML
+
+#### LDAP Connection Resilience
+- 3-layer error classification: IO type check, permanent error exclusion, broad string matching
+- Connection age tracking with proactive invalidation at 14 minutes (under AD's 15-min idle timeout)
+- Forced retry after proactive reconnect regardless of error type
+- Concurrent stale detection prevention (atomic timestamp reset)
+- Circuit breaker tuned: 3 failures (was 5), 30s recovery (was 60s)
+- Retry jitter (+/-50%) and max delay cap (10s) for desktop responsiveness
+
+#### Infrastructure Health Improvements
+- DC hostname resolution via AD DNS (hickory-resolver) when system DNS fails
+- DNS check shows Healthy (green) in simple bind mode when resolved via AD DNS
+- Skip connectivity checks (Services, Replication, SYSVOL, Clock, Account) for unreachable DCs instead of showing misleading data from the active DC
 
 #### Previous unreleased changes
 - Epic 11 scope audit: reduced from 6 to 3 stories - removed trigger automation, script execution, and webhook notifications (incompatible with desktop architecture, security risk)
@@ -46,6 +60,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Activity Journal moved from Tools to Settings sidebar group
+- Audit log: sort direction toggle (newest/oldest first)
+- Change History: snapshot attribute values shown in timeline when snapshots exist
 - Compliance: refactored from template-per-framework (Model A) to check-first with multi-framework mapping (Model B)
 - Compliance: corrected control references (GDPR Art.25->32, SOX Section 302->ITGC APD, PCI-DSS v3.2.1->v4.0)
 - Compliance: single scan runs 7 checks once, computes 9 framework scores simultaneously
@@ -55,6 +72,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- LDAP: "socket receive error" (TCP RST) now detected as transient error and triggers automatic reconnect
+- LDAP: all code paths (Health Check, Contacts, Printers, Replication, DNS/Kerberos) now benefit from the same reconnection resilience as User/Group/Computer lookups
+- LDAP: no more duplicate reconnects when multiple concurrent operations detect a stale connection
+- Infrastructure Health: offline DCs no longer show misleading "0ms LDAP" or "0s skew" from the active DC
+- Infrastructure Health: DC hostnames resolved via AD DNS when system DNS does not know the AD domain
+- GPO Viewer: OU chain traversal correctly includes OUs below the domain root
 - Compliance: use authenticated LDAP user instead of OS username for report generator
 - Compliance: format raw AD timestamps to human-readable dates
 - Compliance: friendly column headers instead of raw attribute names
