@@ -8,6 +8,7 @@ import { NotificationProvider } from "@/contexts/NotificationContext";
 import { NotificationHost } from "@/components/common/NotificationHost";
 import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import { DialogProvider } from "@/contexts/DialogContext";
+import { useTheme } from "@/hooks/useTheme";
 import { AppShell } from "@/components/layout/AppShell";
 import { UserLookup } from "@/pages/UserLookup";
 import { ComputerLookup } from "@/pages/ComputerLookup";
@@ -66,6 +67,9 @@ export interface AppStatus {
 }
 
 export function App() {
+  // Apply theme on mount (must be called in a component that always renders)
+  useTheme();
+
   const [status, setStatus] = useState<AppStatus>({
     isConnected: false,
     domainName: null,
