@@ -12,6 +12,7 @@ pub mod directory;
 pub mod dns_validation;
 pub mod dpapi;
 pub mod export;
+pub mod gpo;
 pub mod graph_exchange;
 pub mod health;
 pub mod ldap_directory;

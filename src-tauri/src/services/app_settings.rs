@@ -27,6 +27,9 @@ pub struct AppSettings {
     /// Cleanup rules for automated stale account management.
     #[serde(default)]
     pub cleanup_rules: Option<Vec<super::cleanup::CleanupRule>>,
+    /// Audit log retention period in days (default: 365).
+    #[serde(default)]
+    pub audit_retention_days: Option<i64>,
 }
 
 /// Service for managing persisted application settings.
@@ -177,6 +180,7 @@ mod tests {
             graph_client_id: Some("client-456".to_string()),
             privileged_groups: None,
             cleanup_rules: None,
+            audit_retention_days: None,
         };
         let json = serde_json::to_string(&settings).unwrap();
         assert!(json.contains("tenant-123"));

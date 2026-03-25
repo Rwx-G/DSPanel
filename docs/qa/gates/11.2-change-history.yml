@@ -1,0 +1,46 @@
+schema: 1
+story: "11.2"
+story_title: "AD Change History Timeline"
+gate: PASS
+status_reason: "All 6 ACs verified with 22 tests (16 Rust + 6 frontend). XML parsing, timeline rendering, diff logic, and StateInTimeView fully covered."
+reviewer: "Romain G."
+updated: "2026-03-25T12:00:00Z"
+
+waiver: { active: false }
+
+top_issues: []
+
+quality_score: 97
+
+evidence:
+  tests_reviewed: 22
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6]
+    ac_gaps: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Read-only LDAP queries for operational attributes, no write operations"
+  performance:
+    status: PASS
+    notes: "Client-side attribute filtering (useMemo), backend sorts by timestamp"
+  reliability:
+    status: PASS
+    notes: "Graceful handling of unavailable metadata, XML parse error logging"
+  maintainability:
+    status: PASS
+    notes: "StateInTimeView reusable across User/Computer/Group detail views, quick-xml for robust parsing"
+
+risk_summary:
+  totals: { critical: 0, high: 0, medium: 0, low: 0 }
+  recommendations:
+    must_fix: []
+    monitor: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: "Add snapshot-based before/after value comparison when snapshots exist"
+      refs: ["src/components/comparison/StateInTimeView.tsx", "src-tauri/src/services/object_snapshot.rs"]

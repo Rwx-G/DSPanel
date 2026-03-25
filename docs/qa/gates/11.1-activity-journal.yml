@@ -1,0 +1,48 @@
+schema: 1
+story: "11.1"
+story_title: "Activity Journal"
+gate: PASS
+status_reason: "All 7 ACs verified with 36 tests (24 Rust + 12 frontend). Audit filtering, purge, pagination, export, and error handling fully covered."
+reviewer: "Romain G."
+updated: "2026-03-25T12:00:00Z"
+
+waiver: { active: false }
+
+top_issues: []
+
+quality_score: 96
+
+evidence:
+  tests_reviewed: 36
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7]
+    ac_gaps: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "No secrets logged, read-only queries for filters, DomainAdmin not required (ReadOnly access for viewing own audit)"
+  performance:
+    status: PASS
+    notes: "SQLite indexes on timestamp and action, paginated queries (50/page), no full table scans"
+  reliability:
+    status: PASS
+    notes: "Mutex-guarded SQLite connection, graceful fallback to in-memory DB"
+  maintainability:
+    status: PASS
+    notes: "AuditFilter/AuditQueryResult structs, ExportToolbar reuse, pagination via page/pageSize"
+
+risk_summary:
+  totals: { critical: 0, high: 0, medium: 0, low: 0 }
+  recommendations:
+    must_fix: []
+    monitor: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: "Add server-side sorting (currently newest-first only)"
+      refs: ["src-tauri/src/services/audit.rs"]
+    - action: "Add retention period configuration in Settings UI"
+      refs: ["src/pages/SettingsPage.tsx", "docs/stories/12.2.app-settings.md"]

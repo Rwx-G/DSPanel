@@ -23,6 +23,7 @@ import {
   Radar,
   Route,
   Sparkles,
+  ClipboardList,
   type LucideIcon,
 } from "lucide-react";
 import { useNavigation } from "@/contexts/NavigationContext";
@@ -52,6 +53,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   radar: Radar,
   route: Route,
   sparkles: Sparkles,
+  "clipboard-list": ClipboardList,
 };
 
 const MODULES: SidebarModule[] = [
@@ -154,6 +156,13 @@ const MODULES: SidebarModule[] = [
     requiredLevel: "DomainAdmin",
   },
   {
+    id: "gpo-viewer",
+    label: "GPO Viewer",
+    icon: "shield",
+    group: "Infrastructure",
+    requiredLevel: "DomainAdmin",
+  },
+  {
     id: "security-dashboard",
     label: "Privileged Accounts",
     icon: "shield",
@@ -222,6 +231,13 @@ const MODULES: SidebarModule[] = [
     icon: "user",
     group: "Workflows",
     requiredLevel: "AccountOperator",
+  },
+  {
+    id: "audit-log",
+    label: "Activity Journal",
+    icon: "clipboard-list",
+    group: "Settings",
+    requiredLevel: "ReadOnly",
   },
 ];
 

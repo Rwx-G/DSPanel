@@ -1,7 +1,10 @@
+use std::net::IpAddr;
 use std::sync::Arc;
 use std::time::Instant;
 
 use anyhow::Result;
+use hickory_resolver::config::{NameServerConfigGroup, ResolverConfig, ResolverOpts};
+use hickory_resolver::TokioResolver;
 
 use crate::models::dc_health::{
     compute_overall_status, DcHealthCheck, DcHealthLevel, DcHealthResult, DomainControllerInfo,
@@ -194,50 +197,49 @@ fn extract_site_from_dn(dn: &str) -> String {
 pub async fn check_dc_health(
     dc: &DomainControllerInfo,
     provider: &dyn DirectoryProvider,
-    fallback_ip: Option<&str>,
+    ad_resolver: Option<&TokioResolver>,
 ) -> DcHealthResult {
     let mut checks = Vec::new();
 
-    // Check 1: DNS Resolution
-    let dns_check = check_dns(&dc.hostname).await;
-    let dns_ok = dns_check.status == DcHealthLevel::Healthy;
+    // Check 1: DNS Resolution (try system DNS, then AD DNS as fallback)
+    let (dns_check, resolved_ip) = check_dns_with_ad_fallback(&dc.hostname, ad_resolver).await;
     checks.push(dns_check);
 
-    // Determine the reachable address: resolved hostname or fallback IP
-    let effective_host = if dns_ok {
-        dc.hostname.clone()
-    } else if let Some(ip) = fallback_ip {
-        // DNS failed but we have a fallback - downgrade DNS to Warning
-        if let Some(dns) = checks.first_mut() {
-            if dns.status == DcHealthLevel::Critical {
-                dns.status = DcHealthLevel::Warning;
-                dns.message = format!("DNS resolution failed, using fallback IP {}", ip);
-                dns.value = Some(ip.to_string());
-            }
-        }
-        ip.to_string()
-    } else {
-        // No fallback - all checks will fail with hostname
-        dc.hostname.clone()
-    };
+    // Use the resolved IP for connectivity checks, or fall back to hostname
+    let effective_host = resolved_ip.unwrap_or_else(|| dc.hostname.clone());
 
     // Check 2: LDAP Ping (response time)
-    checks.push(check_ldap_ping(&effective_host, provider).await);
+    let ldap_check = check_ldap_ping(&effective_host, provider).await;
+    let dc_reachable = ldap_check.status != DcHealthLevel::Critical;
+    checks.push(ldap_check);
 
-    // Check 3: AD Services via LDAP rootDSE + SPNs (cross-platform)
-    checks.push(check_ad_services(provider, &dc.hostname).await);
+    if dc_reachable {
+        // These checks query the DC via the shared provider - only valid if reachable
+        // Check 3: AD Services via LDAP rootDSE + SPNs (cross-platform)
+        checks.push(check_ad_services(provider, &dc.hostname).await);
 
-    // Check 4: Replication health via rootDSE (cross-platform)
-    checks.push(check_replication_health(provider, &dc.hostname).await);
+        // Check 4: Replication health via rootDSE (cross-platform)
+        checks.push(check_replication_health(provider, &dc.hostname).await);
 
-    // Check 5: SYSVOL health via DFSR LDAP + SMB port probe (cross-platform)
-    checks.push(check_sysvol_smb(provider, &dc.hostname, &effective_host).await);
+        // Check 5: SYSVOL health via DFSR LDAP + SMB port probe (cross-platform)
+        checks.push(check_sysvol_smb(provider, &dc.hostname, &effective_host).await);
 
-    // Check 6: Clock skew vs local time (Kerberos threshold)
-    checks.push(check_clock_skew(provider).await);
+        // Check 6: Clock skew vs local time (Kerberos threshold)
+        checks.push(check_clock_skew(provider).await);
 
-    // Check 7: Machine account health
-    checks.push(check_machine_account(provider, &dc.hostname).await);
+        // Check 7: Machine account health
+        checks.push(check_machine_account(provider, &dc.hostname).await);
+    } else {
+        // DC is unreachable - mark all connectivity-dependent checks as N/A
+        for name in &["Services", "Replication", "SYSVOL", "Clock", "Account"] {
+            checks.push(DcHealthCheck {
+                name: name.to_string(),
+                status: DcHealthLevel::Critical,
+                message: "DC unreachable - check skipped".to_string(),
+                value: None,
+            });
+        }
+    }
 
     let overall_status = compute_overall_status(&checks);
     let checked_at = chrono::Utc::now().to_rfc3339();
@@ -251,6 +253,100 @@ pub async fn check_dc_health(
 }
 
 /// Checks DNS resolution for a DC hostname.
+///
+/// Tries system DNS first. If that fails and an AD DNS resolver is available,
+/// falls back to resolving via the AD DC's DNS server. This handles the common
+/// case where the client machine is not using AD DNS as its system resolver.
+///
+/// Returns the check result AND the resolved IP (if any) for use in subsequent
+/// connectivity checks.
+/// Returns true if the app is using simple bind (explicit credentials).
+/// In simple bind mode, AD DNS resolution is sufficient for health checks
+/// since the app connects via a direct IP, not via Kerberos/DNS discovery.
+fn is_simple_bind_mode() -> bool {
+    std::env::var("DSPANEL_LDAP_BIND_DN").is_ok()
+}
+
+async fn check_dns_with_ad_fallback(
+    hostname: &str,
+    ad_resolver: Option<&TokioResolver>,
+) -> (DcHealthCheck, Option<String>) {
+    // Try system DNS first
+    let addr = format!("{}:389", hostname);
+    if let Ok(mut addrs) = tokio::net::lookup_host(&addr).await {
+        if let Some(resolved) = addrs.next() {
+            let ip = resolved.ip().to_string();
+            return (
+                DcHealthCheck {
+                    name: "DNS".to_string(),
+                    status: DcHealthLevel::Healthy,
+                    message: format!("Resolved to {}", ip),
+                    value: Some(ip.clone()),
+                },
+                Some(ip),
+            );
+        }
+    }
+
+    // System DNS failed - try AD DNS resolver
+    if let Some(resolver) = ad_resolver {
+        let fqdn = if hostname.ends_with('.') {
+            hostname.to_string()
+        } else {
+            format!("{}.", hostname)
+        };
+        if let Ok(lookup) = resolver.lookup_ip(&fqdn).await {
+            if let Some(ip) = lookup.iter().next() {
+                let ip_str = ip.to_string();
+                // In simple bind mode, AD DNS resolution is fully sufficient
+                // (no Kerberos dependency on system DNS). In GSSAPI mode,
+                // system DNS is critical for SRV/KDC discovery -> warn.
+                let (status, msg) = if is_simple_bind_mode() {
+                    (
+                        DcHealthLevel::Healthy,
+                        format!("Resolved via AD DNS to {}", ip_str),
+                    )
+                } else {
+                    (
+                        DcHealthLevel::Warning,
+                        format!(
+                            "System DNS failed, resolved via AD DNS to {} (Kerberos may require system DNS)",
+                            ip_str
+                        ),
+                    )
+                };
+                return (
+                    DcHealthCheck {
+                        name: "DNS".to_string(),
+                        status,
+                        message: msg,
+                        value: Some(ip_str.clone()),
+                    },
+                    Some(ip_str),
+                );
+            }
+        }
+    }
+
+    // Both failed
+    let system_err = tokio::net::lookup_host(&addr)
+        .await
+        .err()
+        .map(|e| e.to_string())
+        .unwrap_or_else(|| "no addresses returned".to_string());
+    (
+        DcHealthCheck {
+            name: "DNS".to_string(),
+            status: DcHealthLevel::Critical,
+            message: format!("DNS resolution failed: {}", system_err),
+            value: None,
+        },
+        None,
+    )
+}
+
+/// Legacy check_dns kept for test compatibility.
+#[allow(dead_code)]
 async fn check_dns(hostname: &str) -> DcHealthCheck {
     let addr = format!("{}:389", hostname);
     let result = tokio::net::lookup_host(&addr).await;
@@ -873,15 +969,39 @@ pub async fn check_all_dc_health(
     provider: Arc<dyn DirectoryProvider>,
 ) -> Result<Vec<DcHealthResult>> {
     let dcs = discover_domain_controllers(&*provider).await?;
-    let fallback_ip = resolve_fallback_ip();
+
+    // Create an AD DNS resolver (uses the LDAP server as DNS) so we can
+    // resolve DC hostnames even when the client's system DNS doesn't know
+    // about the AD domain. Each DC is resolved individually - an offline DC
+    // will fail DNS (correct) while the active DC resolves (correct).
+    let ad_resolver = create_ad_dns_resolver();
 
     let mut results = Vec::new();
     for dc in &dcs {
-        let result = check_dc_health(dc, &*provider, fallback_ip.as_deref()).await;
+        let result = check_dc_health(dc, &*provider, ad_resolver.as_ref()).await;
         results.push(result);
     }
 
     Ok(results)
+}
+
+/// Creates a DNS resolver that queries the AD DC directly.
+///
+/// Uses `DSPANEL_LDAP_SERVER` as the DNS server, since AD DCs are also
+/// DNS servers for the domain. Returns None if no LDAP server is configured.
+fn create_ad_dns_resolver() -> Option<TokioResolver> {
+    let dc_ip_str = resolve_fallback_ip()?;
+    let ip = dc_ip_str.parse::<IpAddr>().ok()?;
+    let ns_group = NameServerConfigGroup::from_ips_clear(&[ip], 53, true);
+    let config = ResolverConfig::from_parts(None, vec![], ns_group);
+    let mut opts = ResolverOpts::default();
+    opts.timeout = std::time::Duration::from_secs(3);
+    opts.attempts = 1;
+    Some(
+        TokioResolver::builder_with_config(config, Default::default())
+            .with_options(opts)
+            .build(),
+    )
 }
 
 #[allow(clippy::unwrap_used)]

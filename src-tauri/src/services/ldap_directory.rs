@@ -212,6 +212,10 @@ fn build_tls_connector_with_ca(
         .context("Failed to build TLS connector with custom CA")
 }
 
+/// Maximum age of a connection before forced invalidation (14 minutes).
+/// Just under AD's MaxConnIdleTime to preempt server-side disconnect.
+const CONNECTION_MAX_AGE: std::time::Duration = std::time::Duration::from_secs(840);
+
 pub struct LdapDirectoryProvider {
     domain: Option<String>,
     server_override: Option<String>,
@@ -223,6 +227,8 @@ pub struct LdapDirectoryProvider {
     pool: tokio::sync::Mutex<Option<ldap3::Ldap>>,
     /// Authenticated user identity resolved via WhoAmI.
     authenticated_user: Mutex<Option<String>>,
+    /// Timestamp of the last successful LDAP operation.
+    last_successful_op: Mutex<Option<std::time::Instant>>,
 }
 
 /// Parses the server string and returns (host, use_tls).
@@ -270,6 +276,7 @@ impl LdapDirectoryProvider {
             connected: Mutex::new(false),
             pool: tokio::sync::Mutex::new(None),
             authenticated_user: Mutex::new(None),
+            last_successful_op: Mutex::new(None),
         }
     }
 
@@ -308,6 +315,7 @@ impl LdapDirectoryProvider {
             connected: Mutex::new(false),
             pool: tokio::sync::Mutex::new(None),
             authenticated_user: Mutex::new(None),
+            last_successful_op: Mutex::new(None),
         }
     }
 
@@ -375,38 +383,123 @@ impl LdapDirectoryProvider {
 
     /// Executes an LDAP operation with automatic reconnect on connection failure.
     ///
-    /// On connection-level failure (timeout, reset, broken pipe, LDAP protocol
-    /// errors), invalidates the pool and retries once with a fresh connection.
-    /// Business logic errors (missing attributes, permission denied) are
-    /// propagated without retry to avoid unnecessary reconnections.
+    /// Resilience strategy:
+    /// 1. **Connection age check**: If the connection is older than 14 minutes
+    ///    (just under AD's MaxConnIdleTime), proactively invalidate and reconnect.
+    /// 2. **Error classification**: Uses a three-layer approach (IO type check,
+    ///    permanent error exclusion, broad string matching) instead of fragile
+    ///    string-only detection.
+    /// 3. **Immediate retry**: On transient error, reconnect and retry once
+    ///    immediately before giving up. Most idle-timeout disconnects succeed
+    ///    on the first reconnect.
     async fn with_connection<T, Op, Fut>(&self, operation: Op) -> Result<T>
     where
         Op: Fn(ldap3::Ldap) -> Fut,
         Fut: std::future::Future<Output = Result<T>>,
     {
+        // Proactive invalidation if connection is too old.
+        // Reset the timestamp immediately to prevent concurrent operations
+        // from each triggering their own invalidation + reconnect cycle.
+        let needs_invalidation = {
+            let mut last_op = self.last_successful_op.lock().expect("lock poisoned");
+            if last_op.is_some_and(|ts| ts.elapsed() > CONNECTION_MAX_AGE) {
+                *last_op = Some(std::time::Instant::now());
+                true
+            } else {
+                false
+            }
+        };
+        if needs_invalidation {
+            tracing::info!("LDAP connection exceeded max age, proactively reconnecting");
+            self.invalidate_connection().await;
+        }
+
         let ldap = self.get_connection().await?;
         match operation(ldap).await {
-            Ok(result) => Ok(result),
+            Ok(result) => {
+                *self.last_successful_op.lock().expect("lock poisoned") =
+                    Some(std::time::Instant::now());
+                Ok(result)
+            }
             Err(err) => {
-                let msg = err.to_string().to_lowercase();
-                let is_connection_error = msg.contains("connection")
-                    || msg.contains("timeout")
-                    || msg.contains("broken pipe")
-                    || msg.contains("reset")
-                    || msg.contains("closed")
-                    || msg.contains("ldap search error")
-                    || msg.contains("ldap search failed")
-                    || msg.contains("ldap paged search");
-                if is_connection_error {
-                    tracing::warn!("LDAP connection error, reconnecting: {}", err);
+                // After a proactive invalidation, always retry once regardless
+                // of error classification - the fresh connection may have residual
+                // state from the dead socket that produces unexpected errors.
+                let should_retry = needs_invalidation || Self::is_transient_error(&err);
+                if should_retry {
+                    tracing::warn!(
+                        proactive = needs_invalidation,
+                        "LDAP error after {}, reconnecting: {}",
+                        if needs_invalidation {
+                            "proactive reconnect"
+                        } else {
+                            "transient error"
+                        },
+                        err
+                    );
                     self.invalidate_connection().await;
                     let ldap = self.get_connection().await?;
-                    operation(ldap).await
+                    let retry_result = operation(ldap).await;
+                    if retry_result.is_ok() {
+                        *self.last_successful_op.lock().expect("lock poisoned") =
+                            Some(std::time::Instant::now());
+                    }
+                    retry_result
                 } else {
+                    tracing::debug!("LDAP permanent error (not retrying): {}", err);
                     Err(err)
                 }
             }
         }
+    }
+
+    /// Determines if an error is transient (connection-level) and worth retrying.
+    ///
+    /// Three-layer classification:
+    /// 1. Check error chain for `std::io::Error` (catches all socket/network errors)
+    /// 2. Exclude known permanent errors (auth, permissions, syntax)
+    /// 3. Broad string matching as safety net for edge cases
+    fn is_transient_error(err: &anyhow::Error) -> bool {
+        // Layer 1: Any IO error in the chain = transient (socket, network, pipe)
+        for cause in err.chain() {
+            if cause.downcast_ref::<std::io::Error>().is_some() {
+                return true;
+            }
+        }
+
+        let msg = err.to_string().to_lowercase();
+
+        // Layer 2: Known permanent errors - never retry these
+        let is_permanent = msg.contains("insufficient access")
+            || msg.contains("invalid credentials")
+            || msg.contains("no such object")
+            || msg.contains("not domain-joined")
+            || msg.contains("invalid dn")
+            || msg.contains("constraint violation")
+            || msg.contains("auth method not supported")
+            || msg.contains("confidentiality required");
+
+        if is_permanent {
+            return false;
+        }
+
+        // Layer 3: Broad string matching for anything that looks like a connection issue
+        msg.contains("connection")
+            || msg.contains("timeout")
+            || msg.contains("broken pipe")
+            || msg.contains("reset")
+            || msg.contains("closed")
+            || msg.contains("socket")
+            || msg.contains("receive")
+            || msg.contains("eof")
+            || msg.contains("end of stream")
+            || msg.contains("send")
+            || msg.contains("refused")
+            || msg.contains("unreachable")
+            || msg.contains("network")
+            || msg.contains("ldap search error")
+            || msg.contains("ldap search failed")
+            || msg.contains("ldap paged search")
     }
 
     /// Establishes a new LDAP connection with the configured authentication mode.

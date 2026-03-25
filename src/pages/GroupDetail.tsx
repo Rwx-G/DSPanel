@@ -16,6 +16,7 @@ import {
   ContextMenu,
   type ContextMenuItem,
 } from "@/components/common/ContextMenu";
+import { StateInTimeView } from "@/components/comparison/StateInTimeView";
 import { useNavigation } from "@/contexts/NavigationContext";
 import { useNotifications } from "@/contexts/NotificationContext";
 import { extractErrorMessage } from "@/utils/errorMapping";
@@ -909,6 +910,15 @@ export function GroupDetail({
             No members found
           </p>
         )}
+      </div>
+
+      <div className="border-t border-[var(--color-border-default)]" />
+
+      <div data-testid="group-history-section">
+        <h3 className="mb-2 text-body font-semibold text-[var(--color-text-primary)]">
+          Replication History
+        </h3>
+        <StateInTimeView objectDn={group.distinguishedName} objectType="group" />
       </div>
 
       {showPreview && (

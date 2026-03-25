@@ -46,6 +46,8 @@ pub struct AppState {
     pub browse_computers_cache: Mutex<Option<(Instant, Vec<DirectoryEntry>)>>,
     /// Cache for browse_groups: (fetch_time, sorted_entries). TTL: 60 seconds.
     pub browse_groups_cache: Mutex<Option<(Instant, Vec<DirectoryEntry>)>>,
+    /// Cache for GPO DN -> display name mapping. TTL: 5 minutes.
+    pub gpo_name_cache: Mutex<Option<(Instant, std::collections::HashMap<String, String>)>>,
 }
 
 impl AppState {
@@ -75,6 +77,7 @@ impl AppState {
             browse_cache: Mutex::new(None),
             browse_computers_cache: Mutex::new(None),
             browse_groups_cache: Mutex::new(None),
+            gpo_name_cache: Mutex::new(None),
         }
     }
 
@@ -104,6 +107,7 @@ impl AppState {
             browse_cache: Mutex::new(None),
             browse_computers_cache: Mutex::new(None),
             browse_groups_cache: Mutex::new(None),
+            gpo_name_cache: Mutex::new(None),
         }
     }
 }

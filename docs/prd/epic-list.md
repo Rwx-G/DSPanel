@@ -20,7 +20,7 @@
 
 - **Epic 10: Reports, Export and Compliance** (4 stories) - Implement CSV/PDF export, scheduled reports, automated cleanup, and compliance report templates.
 
-- **Epic 11: Audit, Automation and Extensibility** (6 stories) - Deliver the internal audit log, AD change history timeline, trigger-based automation, external script execution, webhook notifications, and GPO viewer.
+- **Epic 11: Audit, History and GPO Insights** (3 stories) - Deliver the local activity journal, AD change history timeline, and GPO viewer.
 
 - **Epic 12: RBAC, Settings and Polish** (5 stories) - Implement granular RBAC configuration, application settings UI, auto-update, localization support, and final UX polish.
 
@@ -40,8 +40,8 @@
 | Epic 8    | 5       | Infrastructure Health              |
 | Epic 9    | 4       | Security + Risk Scoring            |
 | Epic 10   | 4       | Reports + Export + Compliance      |
-| Epic 11   | 6       | Audit + Automation + Extensibility |
+| Epic 11   | 3       | Audit + History + GPO Insights     |
 | Epic 12   | 5       | RBAC + Settings + Polish           |
-| **Total** | **60**  |                                    |
+| **Total** | **57**  |                                    |
 
 ---

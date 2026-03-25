@@ -131,9 +131,6 @@ DSPanel/
           mod.rs
           csv_export.rs
           pdf_export.rs
-        notification/
-          mod.rs
-          webhook.rs
         password/
           mod.rs
           generator.rs

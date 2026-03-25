@@ -8,12 +8,23 @@ import {
   Server,
   Hash,
   Link,
+  Search,
+  Database,
 } from "lucide-react";
 import {
   type ReplicationMetadataResult,
   type AttributeChangeDiff,
 } from "@/types/replication";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
+
+interface ObjectSnapshot {
+  id: number;
+  objectDn: string;
+  operationType: string;
+  timestamp: string;
+  operator: string;
+  attributesJson: string;
+}
 
 interface StateInTimeViewProps {
   objectDn: string;
@@ -32,6 +43,24 @@ export function StateInTimeView({
   const [selectedFrom, setSelectedFrom] = useState<string>("");
   const [selectedTo, setSelectedTo] = useState<string>("");
   const [diff, setDiff] = useState<AttributeChangeDiff[] | null>(null);
+  const [attributeFilter, setAttributeFilter] = useState("");
+  const [snapshots, setSnapshots] = useState<ObjectSnapshot[]>([]);
+
+  // Parse the latest snapshot's attributes into a map
+  const snapshotValues = useMemo(() => {
+    if (snapshots.length === 0) return null;
+    // Latest snapshot is first (ordered by timestamp DESC from backend)
+    try {
+      const parsed = JSON.parse(snapshots[0].attributesJson) as Record<string, string[]>;
+      const flat: Record<string, string> = {};
+      for (const [key, values] of Object.entries(parsed)) {
+        flat[key.toLowerCase()] = Array.isArray(values) ? values.join(", ") : String(values);
+      }
+      return flat;
+    } catch {
+      return null;
+    }
+  }, [snapshots]);
 
   // Reset when user changes
   useEffect(() => {
@@ -40,6 +69,8 @@ export function StateInTimeView({
     setDiff(null);
     setSelectedFrom("");
     setSelectedTo("");
+    setAttributeFilter("");
+    setSnapshots([]);
   }, [objectDn]);
 
   const loadMetadata = useCallback(async () => {
@@ -53,12 +84,26 @@ export function StateInTimeView({
         { objectDn },
       );
       setMetadata(result);
+
+      // Also load snapshots for attribute value display
+      invoke<ObjectSnapshot[]>("get_snapshot_history", { objectDn })
+        .then(setSnapshots)
+        .catch(() => setSnapshots([]));
     } catch (e) {
       setError(`Failed to load metadata: ${e}`);
     } finally {
       setIsLoading(false);
     }
   }, [objectDn]);
+
+  const filteredAttributes = useMemo(() => {
+    if (!metadata?.attributes) return [];
+    if (!attributeFilter) return metadata.attributes;
+    const lower = attributeFilter.toLowerCase();
+    return metadata.attributes.filter((a) =>
+      a.attributeName.toLowerCase().includes(lower),
+    );
+  }, [metadata, attributeFilter]);
 
   const timestamps = useMemo(() => {
     if (!metadata?.attributes) return [];
@@ -131,8 +176,21 @@ export function StateInTimeView({
       {/* Timeline */}
       {metadata?.isAvailable && (
         <>
-          <div className="text-caption text-[var(--color-text-secondary)]">
-            {metadata.attributes.length} attribute(s) with replication metadata
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-caption text-[var(--color-text-secondary)]">
+              {filteredAttributes.length} of {metadata.attributes.length} attribute(s)
+            </div>
+            <div className="relative">
+              <Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-[var(--color-text-secondary)]" />
+              <input
+                type="text"
+                value={attributeFilter}
+                onChange={(e) => setAttributeFilter(e.target.value)}
+                placeholder="Filter attributes..."
+                className="h-7 w-48 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-default)] pl-7 pr-2 text-caption text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)]"
+                data-testid="attribute-filter-input"
+              />
+            </div>
           </div>
 
           {/* Attribute timeline table */}
@@ -158,10 +216,16 @@ export function StateInTimeView({
                     <Server size={12} className="mr-1 inline" />
                     Originating DC
                   </th>
+                  {snapshotValues && (
+                    <th className="px-3 py-2 text-left text-caption font-medium text-[var(--color-text-secondary)]">
+                      <Database size={12} className="mr-1 inline" />
+                      Snapshot Value
+                    </th>
+                  )}
                 </tr>
               </thead>
               <tbody>
-                {metadata.attributes.map((attr, idx) => (
+                {filteredAttributes.map((attr, idx) => (
                   <tr
                     key={attr.attributeName}
                     className={`border-b border-[var(--color-border-subtle)] last:border-b-0 ${
@@ -181,6 +245,13 @@ export function StateInTimeView({
                     <td className="px-3 py-1.5 text-caption text-[var(--color-text-secondary)] truncate max-w-[200px]">
                       {attr.lastOriginatingDsaDn || "-"}
                     </td>
+                    {snapshotValues && (
+                      <td className="px-3 py-1.5 text-caption text-[var(--color-text-primary)] truncate max-w-[250px]" title={snapshotValues[attr.attributeName.toLowerCase()] ?? ""}>
+                        {snapshotValues[attr.attributeName.toLowerCase()] || (
+                          <span className="text-[var(--color-text-secondary)]">-</span>
+                        )}
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

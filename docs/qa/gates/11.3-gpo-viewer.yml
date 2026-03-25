@@ -1,0 +1,50 @@
+schema: 1
+story: "11.3"
+story_title: "GPO Viewer"
+gate: PASS
+status_reason: "All 7 ACs verified with 21 tests (12 Rust + 9 frontend). gPLink parsing, inheritance resolution, tabs, scope display, and error handling fully covered."
+reviewer: "Romain G."
+updated: "2026-03-25T12:00:00Z"
+
+waiver: { active: false }
+
+top_issues: []
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 21
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7]
+    ac_gaps: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "DomainAdmin permission gating on all GPO commands, read-only (no LDAP writes), DN escaping for filter injection prevention"
+  performance:
+    status: PASS
+    notes: "GPO name resolution cached per request, OU chain built lazily"
+  reliability:
+    status: PASS
+    notes: "Graceful handling of missing gPLink attributes, empty OU trees"
+  maintainability:
+    status: PASS
+    notes: "Clean separation - gpo.rs (pure parsing/resolution), infrastructure commands (Tauri bridge), GpoViewer.tsx (3-tab UI)"
+
+risk_summary:
+  totals: { critical: 0, high: 0, medium: 0, low: 0 }
+  recommendations:
+    must_fix: []
+    monitor: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: "Add WMI filter display (requires querying msWMI-Som objects)"
+      refs: ["src-tauri/src/services/gpo.rs"]
+    - action: "Add GPO DN autocomplete via search_configuration for usability"
+      refs: ["src/pages/GpoViewer.tsx"]
+    - action: "Cache GPO name map in AppState for repeated queries"
+      refs: ["src-tauri/src/commands/infrastructure.rs"]
