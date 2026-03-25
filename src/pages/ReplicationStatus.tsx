@@ -376,18 +376,24 @@ export function ReplicationStatus() {
                       </td>
                       {platform === "windows" && (
                       <td className="px-3 py-2">
-                        <button
-                          className="btn btn-sm flex items-center gap-1 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2.5 py-1 text-caption font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                          onClick={() => handleForceReplication(p)}
-                          disabled={forcingReplication === forceKey || simpleBind}
-                          title={simpleBind ? "Force replication is not available in simple bind mode" : "Force replication"}
-                          data-testid={`force-repl-${i}`}
-                        >
-                          <Play size={12} />
-                          {forcingReplication === forceKey
-                            ? "Syncing..."
-                            : "Sync"}
-                        </button>
+                        <div className="group relative inline-block">
+                          <button
+                            className="btn btn-sm flex items-center gap-1 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2.5 py-1 text-caption font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                            onClick={() => handleForceReplication(p)}
+                            disabled={forcingReplication === forceKey || simpleBind}
+                            data-testid={`force-repl-${i}`}
+                          >
+                            <Play size={12} />
+                            {forcingReplication === forceKey
+                              ? "Syncing..."
+                              : "Sync"}
+                          </button>
+                          {simpleBind && (
+                            <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-md bg-[var(--color-surface-elevated)] px-2.5 py-1.5 text-caption font-medium text-[var(--color-text-primary)] opacity-0 shadow-md transition-opacity duration-150 group-hover:opacity-100">
+                              Not available in simple bind mode
+                            </span>
+                          )}
+                        </div>
                       </td>
                       )}
                     </tr>
