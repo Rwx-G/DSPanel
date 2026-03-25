@@ -25,8 +25,10 @@ import {
   Info,
   type LucideIcon,
 } from "lucide-react";
+import { useState } from "react";
 import { useNavigation } from "@/contexts/NavigationContext";
 import { type SidebarModule } from "@/types/navigation";
+import { About } from "@/pages/About";
 
 const ICON_MAP: Record<string, LucideIcon> = {
   home: Home,
@@ -245,13 +247,6 @@ const MODULES: SidebarModule[] = [
     group: "Settings",
     requiredLevel: "ReadOnly",
   },
-  {
-    id: "about",
-    label: "About",
-    icon: "info",
-    group: "Settings",
-    requiredLevel: "ReadOnly",
-  },
 ];
 
 interface SidebarProps {
@@ -261,6 +256,7 @@ interface SidebarProps {
 
 export function Sidebar({ expanded, onToggle }: SidebarProps) {
   const { openTab, activeTabId, openTabs, goHome } = useNavigation();
+  const [showAbout, setShowAbout] = useState(false);
   const activeModuleId = openTabs.find((t) => t.id === activeTabId)?.moduleId;
 
   const groups = MODULES.reduce(
@@ -362,6 +358,44 @@ export function Sidebar({ expanded, onToggle }: SidebarProps) {
         ))}
       </nav>
 
+      {/* Footer */}
+      <div className="border-t border-[var(--color-border-default)] p-2">
+        <button
+          className={`group relative flex w-full items-center gap-3 rounded-md px-3 py-2 text-body text-[var(--color-text-secondary)] transition-colors duration-150 hover:bg-[var(--color-sidebar-item-hover)] hover:text-[var(--color-text-primary)] ${!expanded ? "justify-center px-0" : ""}`}
+          onClick={() => setShowAbout(true)}
+          data-testid="about-btn"
+        >
+          <Info size={18} className="shrink-0" />
+          {expanded && <span className="truncate">About</span>}
+          {!expanded && (
+            <span className="pointer-events-none absolute left-full z-50 ml-2 whitespace-nowrap rounded-md bg-[var(--color-surface-elevated)] px-2.5 py-1.5 text-caption font-medium text-[var(--color-text-primary)] opacity-0 shadow-md transition-opacity duration-150 group-hover:opacity-100">
+              About DSPanel
+            </span>
+          )}
+        </button>
+      </div>
+      {showAbout && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowAbout(false);
+          }}
+          data-testid="about-dialog-overlay"
+        >
+          <div className="w-[420px] rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] shadow-xl">
+            <About />
+            <div className="border-t border-[var(--color-border-default)] px-4 py-3 text-right">
+              <button
+                onClick={() => setShowAbout(false)}
+                className="btn btn-sm btn-primary"
+                data-testid="about-dialog-close"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </aside>
   );
 }

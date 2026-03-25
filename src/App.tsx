@@ -37,7 +37,6 @@ import { ComplianceReports } from "@/pages/ComplianceReports";
 import { AuditLog } from "@/pages/AuditLog";
 import { GpoViewer } from "@/pages/GpoViewer";
 import { Settings } from "@/pages/Settings";
-import { About } from "@/pages/About";
 
 const APP_VERSION = __APP_VERSION__;
 
@@ -190,7 +189,6 @@ const MODULE_COMPONENTS: Record<
   "audit-log": AuditLog,
   "gpo-viewer": GpoViewer,
   settings: Settings,
-  about: About,
 };
 
 function ModuleRouter({ status }: { status: AppStatus }) {
