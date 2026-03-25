@@ -239,6 +239,13 @@ const MODULES: SidebarModule[] = [
     group: "Settings",
     requiredLevel: "ReadOnly",
   },
+  {
+    id: "settings",
+    label: "Settings",
+    icon: "settings",
+    group: "Settings",
+    requiredLevel: "ReadOnly",
+  },
 ];
 
 interface SidebarProps {

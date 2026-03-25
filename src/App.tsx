@@ -36,6 +36,7 @@ import { AutomatedCleanup } from "@/pages/AutomatedCleanup";
 import { ComplianceReports } from "@/pages/ComplianceReports";
 import { AuditLog } from "@/pages/AuditLog";
 import { GpoViewer } from "@/pages/GpoViewer";
+import { Settings } from "@/pages/Settings";
 
 const APP_VERSION = __APP_VERSION__;
 
@@ -187,6 +188,7 @@ const MODULE_COMPONENTS: Record<
   "compliance-reports": ComplianceReports,
   "audit-log": AuditLog,
   "gpo-viewer": GpoViewer,
+  settings: Settings,
 };
 
 function ModuleRouter({ status }: { status: AppStatus }) {
