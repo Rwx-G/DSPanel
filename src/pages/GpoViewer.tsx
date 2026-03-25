@@ -287,6 +287,10 @@ export function GpoViewer() {
                         handleSearch();
                       } else {
                         setSearchResults([]);
+                        if (e.target.value.length === 0) {
+                          setObjectDn("");
+                          setLinksResult(null);
+                        }
                       }
                     }}
                     onFocus={() => {
@@ -349,6 +353,10 @@ export function GpoViewer() {
                 onChange={(e) => {
                   setObjectDn(e.target.value);
                   setSearchQuery("");
+                  if (!e.target.value) {
+                    setLinksResult(null);
+                    return;
+                  }
                   if (e.target.value) {
                     setLinksLoading(true);
                     setLinksError(null);
