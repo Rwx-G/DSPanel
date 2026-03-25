@@ -18,6 +18,8 @@ pub struct GpoLink {
     pub linked_at: String,
     /// Whether this link is inherited from a parent container.
     pub is_inherited: bool,
+    /// WMI filter name (if any).
+    pub wmi_filter: Option<String>,
 }
 
 /// Result of querying GPO links for an object.
@@ -153,6 +155,7 @@ pub fn resolve_effective_gpos(
                     is_disabled: false,
                     linked_at: ou_dn.clone(),
                     is_inherited: !is_direct_parent,
+                    wmi_filter: None,
                 };
 
                 if link.is_enforced {
@@ -168,6 +171,15 @@ pub fn resolve_effective_gpos(
     let mut result = enforced_links;
     result.extend(normal_links);
     (result, object_blocks_inheritance)
+}
+
+/// Summary information about a GPO for listing/autocomplete.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GpoInfo {
+    pub dn: String,
+    pub display_name: String,
+    pub wmi_filter: Option<String>,
 }
 
 #[allow(clippy::unwrap_used)]

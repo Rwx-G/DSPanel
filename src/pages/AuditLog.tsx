@@ -12,6 +12,7 @@ import {
   ClipboardList,
   ChevronLeft,
   ChevronRight,
+  ArrowUpDown,
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -36,6 +37,7 @@ interface AuditFilter {
   success: boolean | null;
   page: number;
   pageSize: number;
+  sortAscending: boolean;
 }
 
 interface AuditQueryResult {
@@ -95,6 +97,7 @@ export function AuditLog() {
   const [actionFilter, setActionFilter] = useState("");
   const [targetFilter, setTargetFilter] = useState("");
   const [resultFilter, setResultFilter] = useState<"" | "success" | "failure">("");
+  const [sortAscending, setSortAscending] = useState(false);
 
   // Expanded row
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
@@ -122,6 +125,7 @@ export function AuditLog() {
                 : null,
           page: pageNum,
           pageSize: PAGE_SIZE,
+          sortAscending,
         };
         const result = await invoke<AuditQueryResult>("query_audit_log", {
           filter,
@@ -136,7 +140,7 @@ export function AuditLog() {
         setLoading(false);
       }
     },
-    [dateFrom, dateTo, operatorFilter, actionFilter, targetFilter, resultFilter],
+    [dateFrom, dateTo, operatorFilter, actionFilter, targetFilter, resultFilter, sortAscending],
   );
 
   // Load action types for the dropdown
@@ -320,6 +324,18 @@ export function AuditLog() {
             data-testid="reset-button"
           >
             Reset
+          </button>
+          <button
+            className="btn btn-sm rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2.5 py-1 text-caption font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors flex items-center gap-1"
+            onClick={() => {
+              setSortAscending((prev) => !prev);
+              fetchEntries(0);
+            }}
+            data-testid="sort-toggle"
+            title={sortAscending ? "Oldest first" : "Newest first"}
+          >
+            <ArrowUpDown size={14} />
+            {sortAscending ? "Oldest first" : "Newest first"}
           </button>
         </div>
       </div>

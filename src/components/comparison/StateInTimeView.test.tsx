@@ -79,7 +79,11 @@ describe("StateInTimeView", () => {
   });
 
   it("loads and displays metadata", async () => {
-    mockInvoke.mockResolvedValueOnce(MOCK_METADATA);
+    mockInvoke.mockImplementation((cmd: string) => {
+      if (cmd === "get_replication_metadata") return Promise.resolve(MOCK_METADATA);
+      if (cmd === "get_snapshot_history") return Promise.resolve([]);
+      return Promise.resolve(null);
+    });
 
     render(
       <StateInTimeView
@@ -101,7 +105,11 @@ describe("StateInTimeView", () => {
   });
 
   it("displays unavailable message when metadata not available", async () => {
-    mockInvoke.mockResolvedValueOnce(MOCK_METADATA_UNAVAILABLE);
+    mockInvoke.mockImplementation((cmd: string) => {
+      if (cmd === "get_replication_metadata") return Promise.resolve(MOCK_METADATA_UNAVAILABLE);
+      if (cmd === "get_snapshot_history") return Promise.resolve([]);
+      return Promise.resolve(null);
+    });
 
     render(
       <StateInTimeView
@@ -135,9 +143,12 @@ describe("StateInTimeView", () => {
   });
 
   it("computes diff between timestamps", async () => {
-    mockInvoke
-      .mockResolvedValueOnce(MOCK_METADATA) // get_replication_metadata
-      .mockResolvedValueOnce(MOCK_DIFF); // compute_attribute_diff
+    mockInvoke.mockImplementation((cmd: string) => {
+      if (cmd === "get_replication_metadata") return Promise.resolve(MOCK_METADATA);
+      if (cmd === "get_snapshot_history") return Promise.resolve([]);
+      if (cmd === "compute_attribute_diff") return Promise.resolve(MOCK_DIFF);
+      return Promise.resolve(null);
+    });
 
     render(
       <StateInTimeView
@@ -168,7 +179,12 @@ describe("StateInTimeView", () => {
   });
 
   it("shows empty diff message when no changes", async () => {
-    mockInvoke.mockResolvedValueOnce(MOCK_METADATA).mockResolvedValueOnce([]); // empty diff
+    mockInvoke.mockImplementation((cmd: string) => {
+      if (cmd === "get_replication_metadata") return Promise.resolve(MOCK_METADATA);
+      if (cmd === "get_snapshot_history") return Promise.resolve([]);
+      if (cmd === "compute_attribute_diff") return Promise.resolve([]);
+      return Promise.resolve(null);
+    });
 
     render(
       <StateInTimeView

@@ -253,10 +253,12 @@ impl AuditService {
 
         // Fetch page
         let offset = filter.page * filter.page_size;
+        let order = if filter.sort_ascending { "ASC" } else { "DESC" };
         let query_sql = format!(
             "SELECT timestamp, operator, action, target_dn, details, success
-             FROM audit_entries {} ORDER BY id DESC LIMIT ?{} OFFSET ?{}",
+             FROM audit_entries {} ORDER BY id {} LIMIT ?{} OFFSET ?{}",
             where_sql,
+            order,
             params.len() + 1,
             params.len() + 2,
         );
@@ -338,6 +340,9 @@ pub struct AuditFilter {
     /// Page size (default 50).
     #[serde(default = "default_page_size")]
     pub page_size: usize,
+    /// Sort ascending (oldest first) instead of descending (newest first).
+    #[serde(default)]
+    pub sort_ascending: bool,
 }
 
 fn default_page_size() -> usize {
@@ -355,6 +360,7 @@ impl Default for AuditFilter {
             success: None,
             page: 0,
             page_size: 50,
+            sort_ascending: false,
         }
     }
 }

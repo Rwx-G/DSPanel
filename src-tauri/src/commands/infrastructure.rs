@@ -203,7 +203,7 @@ pub async fn get_topology(state: State<'_, AppState>) -> Result<TopologyData, Ap
 // GPO Viewer
 // ---------------------------------------------------------------------------
 
-use crate::services::gpo::{self, GpoLink, GpoLinksResult};
+use crate::services::gpo::{self, GpoInfo, GpoLink, GpoLinksResult};
 
 /// Returns GPO links for a given object DN by walking the OU hierarchy.
 /// Requires DomainAdmin permission.
@@ -228,8 +228,8 @@ pub(crate) async fn get_gpo_links_inner(
     // Build the OU chain from the object's DN up to the domain root
     let ou_chain = build_ou_chain(object_dn, &base_dn, &*provider).await?;
 
-    // Resolve GPO display names
-    let gpo_names = resolve_gpo_names(&base_dn, &*provider).await;
+    // Resolve GPO display names (cached 5 minutes)
+    let gpo_names = resolve_gpo_names_cached(state, &base_dn, &*provider).await;
 
     let (links, blocks_inheritance) = gpo::resolve_effective_gpos(&ou_chain, &gpo_names);
 
@@ -287,6 +287,7 @@ pub(crate) async fn get_gpo_scope_inner(
                             is_disabled: gpo::is_link_disabled(raw.flags),
                             linked_at: entry.distinguished_name.clone(),
                             is_inherited: false,
+                            wmi_filter: None,
                         });
                     }
                 }
@@ -325,6 +326,7 @@ async fn check_ou_for_gpo_link(
                             is_disabled: gpo::is_link_disabled(raw.flags),
                             linked_at: ou_dn.to_string(),
                             is_inherited: false,
+                            wmi_filter: None,
                         });
                     }
                 }
@@ -413,6 +415,37 @@ async fn query_gp_options(
     None
 }
 
+/// GPO name cache TTL (5 minutes).
+const GPO_NAME_CACHE_TTL: std::time::Duration = std::time::Duration::from_secs(300);
+
+/// Resolves GPO DNs to display names, using AppState cache.
+async fn resolve_gpo_names_cached(
+    state: &AppState,
+    base_dn: &str,
+    provider: &dyn crate::services::DirectoryProvider,
+) -> std::collections::HashMap<String, String> {
+    // Check cache
+    {
+        let cache = state.gpo_name_cache.lock().expect("lock poisoned");
+        if let Some((fetched_at, ref names)) = *cache {
+            if fetched_at.elapsed() < GPO_NAME_CACHE_TTL {
+                return names.clone();
+            }
+        }
+    }
+
+    // Cache miss or expired - fetch fresh
+    let names = resolve_gpo_names(base_dn, provider).await;
+
+    // Store in cache
+    {
+        let mut cache = state.gpo_name_cache.lock().expect("lock poisoned");
+        *cache = Some((std::time::Instant::now(), names.clone()));
+    }
+
+    names
+}
+
 /// Resolves GPO DNs to display names.
 async fn resolve_gpo_names(
     base_dn: &str,
@@ -469,4 +502,75 @@ pub async fn get_gpo_scope(
     state: State<'_, AppState>,
 ) -> Result<Vec<GpoLink>, AppError> {
     get_gpo_scope_inner(&state, &gpo_dn).await
+}
+
+/// Returns a list of all GPOs in the domain (for autocomplete/dropdown).
+#[tauri::command]
+pub async fn get_gpo_list(
+    state: State<'_, AppState>,
+) -> Result<Vec<GpoInfo>, AppError> {
+    get_gpo_list_inner(&state).await
+}
+
+pub(crate) async fn get_gpo_list_inner(state: &AppState) -> Result<Vec<GpoInfo>, AppError> {
+    if !state
+        .permission_service
+        .has_permission(PermissionLevel::DomainAdmin)
+    {
+        return Err(AppError::PermissionDenied(
+            "GPO viewer requires DomainAdmin permission".to_string(),
+        ));
+    }
+
+    let provider = state.directory_provider.clone();
+    let base_dn = provider
+        .base_dn()
+        .ok_or_else(|| AppError::Directory("Not connected - no base DN".to_string()))?;
+
+    let gpo_base = format!("CN=Policies,CN=System,{}", base_dn);
+    let gpos = provider
+        .search_configuration(&gpo_base, "(objectClass=groupPolicyContainer)")
+        .await
+        .map_err(|e| AppError::Directory(e.to_string()))?;
+
+    let mut result: Vec<GpoInfo> = gpos
+        .into_iter()
+        .map(|gpo| {
+            let display_name = gpo
+                .attributes
+                .get("displayName")
+                .and_then(|v| v.first())
+                .cloned()
+                .unwrap_or_else(|| {
+                    gpo.distinguished_name
+                        .split(',')
+                        .next()
+                        .and_then(|p| p.strip_prefix("CN="))
+                        .unwrap_or(&gpo.distinguished_name)
+                        .to_string()
+                });
+
+            let wmi_filter = gpo
+                .attributes
+                .get("gPCWMIFilter")
+                .and_then(|v| v.first())
+                .and_then(|wmi_ref| {
+                    // gPCWMIFilter format: "[domain;{GUID};0]" - extract the GUID
+                    wmi_ref
+                        .split(';')
+                        .nth(1)
+                        .map(|s| s.to_string())
+                })
+                .filter(|s| !s.is_empty());
+
+            GpoInfo {
+                dn: gpo.distinguished_name,
+                display_name,
+                wmi_filter,
+            }
+        })
+        .collect();
+
+    result.sort_by(|a, b| a.display_name.to_lowercase().cmp(&b.display_name.to_lowercase()));
+    Ok(result)
 }

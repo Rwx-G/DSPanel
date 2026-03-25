@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { EmptyState } from "@/components/common/EmptyState";
@@ -27,6 +27,13 @@ interface GpoLink {
   isDisabled: boolean;
   linkedAt: string;
   isInherited: boolean;
+  wmiFilter: string | null;
+}
+
+interface GpoInfo {
+  dn: string;
+  displayName: string;
+  wmiFilter: string | null;
 }
 
 interface GpoLinksResult {
@@ -47,6 +54,7 @@ const EXPORT_COLUMNS: ExportColumn[] = [
   { key: "linkedAt", header: "Linked At" },
   { key: "enforced", header: "Enforced" },
   { key: "inherited", header: "Inherited" },
+  { key: "wmiFilter", header: "WMI Filter" },
 ];
 
 // ---------------------------------------------------------------------------
@@ -80,12 +88,22 @@ export function GpoViewer() {
   const [scopeLoading, setScopeLoading] = useState(false);
   const [scopeError, setScopeError] = useState<string | null>(null);
 
+  // GPO list for autocomplete
+  const [gpoList, setGpoList] = useState<GpoInfo[]>([]);
+
   // What-if state
   const [whatIfUserDn, setWhatIfUserDn] = useState("");
   const [whatIfOuDn, setWhatIfOuDn] = useState("");
   const [whatIfResult, setWhatIfResult] = useState<GpoLinksResult | null>(null);
   const [whatIfLoading, setWhatIfLoading] = useState(false);
   const [whatIfError, setWhatIfError] = useState<string | null>(null);
+
+  // Load GPO list on mount
+  useEffect(() => {
+    invoke<GpoInfo[]>("get_gpo_list")
+      .then(setGpoList)
+      .catch(() => {});
+  }, []);
 
   const fetchGpoLinks = useCallback(async () => {
     if (!objectDn.trim()) return;
@@ -172,6 +190,7 @@ export function GpoViewer() {
             l.linkedAt,
             l.isEnforced ? "Yes" : "No",
             l.isInherited ? "Yes" : "No",
+            l.wmiFilter ?? "",
           ]}
           title="GPO Links Report"
           filenameBase="gpo_links"
@@ -249,17 +268,33 @@ export function GpoViewer() {
           <div className="flex items-end gap-3">
             <div className="flex flex-1 flex-col gap-1">
               <label className="text-[11px] font-medium text-[var(--color-text-secondary)]">
-                GPO DN
+                Select GPO
               </label>
-              <input
-                type="text"
-                value={scopeGpoDn}
-                onChange={(e) => setScopeGpoDn(e.target.value)}
-                onKeyDown={(e) => handleKeyDown(e, fetchScope)}
-                placeholder="CN={GUID},CN=Policies,CN=System,DC=contoso,DC=com"
-                className="h-8 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-default)] px-2 text-caption text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)]"
-                data-testid="scope-gpo-dn"
-              />
+              {gpoList.length > 0 ? (
+                <select
+                  value={scopeGpoDn}
+                  onChange={(e) => setScopeGpoDn(e.target.value)}
+                  className="h-8 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-default)] px-2 text-caption text-[var(--color-text-primary)]"
+                  data-testid="scope-gpo-dn"
+                >
+                  <option value="">Choose a GPO...</option>
+                  {gpoList.map((gpo) => (
+                    <option key={gpo.dn} value={gpo.dn}>
+                      {gpo.displayName}{gpo.wmiFilter ? ` [WMI: ${gpo.wmiFilter}]` : ""}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  value={scopeGpoDn}
+                  onChange={(e) => setScopeGpoDn(e.target.value)}
+                  onKeyDown={(e) => handleKeyDown(e, fetchScope)}
+                  placeholder="CN={GUID},CN=Policies,CN=System,DC=contoso,DC=com"
+                  className="h-8 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-default)] px-2 text-caption text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)]"
+                  data-testid="scope-gpo-dn"
+                />
+              )}
             </div>
             <button
               className="btn btn-sm btn-primary flex items-center gap-1"
@@ -398,6 +433,7 @@ function GpoLinksTable({
               <th className="px-3 py-2">Linked At</th>
               <th className="px-3 py-2 text-center">Enforced</th>
               <th className="px-3 py-2 text-center">Inherited</th>
+              <th className="px-3 py-2">WMI Filter</th>
             </tr>
           </thead>
           <tbody>
@@ -460,6 +496,9 @@ function GpoLinksTable({
                       Direct
                     </span>
                   )}
+                </td>
+                <td className="px-3 py-2 text-caption text-[var(--color-text-secondary)]">
+                  {link.wmiFilter ?? "-"}
                 </td>
               </tr>
             ))}
