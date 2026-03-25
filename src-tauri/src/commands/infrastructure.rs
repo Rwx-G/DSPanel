@@ -297,7 +297,14 @@ pub(crate) async fn get_gpo_scope_inner(
 
     // Check all OUs
     for ou in &ous {
-        check_ou_for_gpo_link(&ou.distinguished_name, &gpo_dn_upper, gpo_dn, &*provider, &mut result).await;
+        check_ou_for_gpo_link(
+            &ou.distinguished_name,
+            &gpo_dn_upper,
+            gpo_dn,
+            &*provider,
+            &mut result,
+        )
+        .await;
     }
 
     Ok(result)
@@ -493,9 +500,7 @@ pub async fn get_gpo_scope(
 
 /// Returns a list of all GPOs in the domain (for autocomplete/dropdown).
 #[tauri::command]
-pub async fn get_gpo_list(
-    state: State<'_, AppState>,
-) -> Result<Vec<GpoInfo>, AppError> {
+pub async fn get_gpo_list(state: State<'_, AppState>) -> Result<Vec<GpoInfo>, AppError> {
     get_gpo_list_inner(&state).await
 }
 
@@ -543,10 +548,7 @@ pub(crate) async fn get_gpo_list_inner(state: &AppState) -> Result<Vec<GpoInfo>,
                 .and_then(|v| v.first())
                 .and_then(|wmi_ref| {
                     // gPCWMIFilter format: "[domain;{GUID};0]" - extract the GUID
-                    wmi_ref
-                        .split(';')
-                        .nth(1)
-                        .map(|s| s.to_string())
+                    wmi_ref.split(';').nth(1).map(|s| s.to_string())
                 })
                 .filter(|s| !s.is_empty());
 
@@ -558,6 +560,10 @@ pub(crate) async fn get_gpo_list_inner(state: &AppState) -> Result<Vec<GpoInfo>,
         })
         .collect();
 
-    result.sort_by(|a, b| a.display_name.to_lowercase().cmp(&b.display_name.to_lowercase()));
+    result.sort_by(|a, b| {
+        a.display_name
+            .to_lowercase()
+            .cmp(&b.display_name.to_lowercase())
+    });
     Ok(result)
 }

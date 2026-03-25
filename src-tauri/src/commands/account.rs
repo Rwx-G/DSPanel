@@ -513,10 +513,7 @@ pub fn audit_log(
 
 /// Queries audit log entries with filters and pagination.
 #[tauri::command]
-pub fn query_audit_log(
-    filter: AuditFilter,
-    state: State<'_, AppState>,
-) -> AuditQueryResult {
+pub fn query_audit_log(filter: AuditFilter, state: State<'_, AppState>) -> AuditQueryResult {
     query_audit_log_inner(&state, &filter)
 }
 

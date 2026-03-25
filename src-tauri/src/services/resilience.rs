@@ -397,9 +397,21 @@ mod tests {
         assert_eq!(recorded.len(), 3);
         // Delays have jitter applied, so check they are within reasonable bounds of expected values
         // Expected base delays: 100ms, 200ms, 400ms. Jitter can reduce them.
-        assert!(recorded[0] <= Duration::from_millis(200), "first delay too large: {:?}", recorded[0]);
-        assert!(recorded[1] <= Duration::from_millis(400), "second delay too large: {:?}", recorded[1]);
-        assert!(recorded[2] <= Duration::from_millis(800), "third delay too large: {:?}", recorded[2]);
+        assert!(
+            recorded[0] <= Duration::from_millis(200),
+            "first delay too large: {:?}",
+            recorded[0]
+        );
+        assert!(
+            recorded[1] <= Duration::from_millis(400),
+            "second delay too large: {:?}",
+            recorded[1]
+        );
+        assert!(
+            recorded[2] <= Duration::from_millis(800),
+            "third delay too large: {:?}",
+            recorded[2]
+        );
     }
 
     // -- CircuitBreakerConfig tests --
@@ -631,9 +643,21 @@ mod tests {
         let recorded = delays.lock().unwrap();
         assert_eq!(recorded.len(), 3);
         // First delay is at most initial_delay (jitter may reduce it), subsequent delays collapse toward zero
-        assert!(recorded[0] <= Duration::from_millis(20), "first delay too large: {:?}", recorded[0]);
-        assert!(recorded[1] <= Duration::from_millis(10), "second delay should be near zero: {:?}", recorded[1]);
-        assert!(recorded[2] <= Duration::from_millis(10), "third delay should be near zero: {:?}", recorded[2]);
+        assert!(
+            recorded[0] <= Duration::from_millis(20),
+            "first delay too large: {:?}",
+            recorded[0]
+        );
+        assert!(
+            recorded[1] <= Duration::from_millis(10),
+            "second delay should be near zero: {:?}",
+            recorded[1]
+        );
+        assert!(
+            recorded[2] <= Duration::from_millis(10),
+            "third delay should be near zero: {:?}",
+            recorded[2]
+        );
     }
 
     #[tokio::test]
@@ -663,11 +687,31 @@ mod tests {
         let recorded = delays.lock().unwrap();
         assert_eq!(recorded.len(), 5);
         // Verify roughly exponential growth from 1ms (jitter applied, so check upper bounds)
-        assert!(recorded[0] <= Duration::from_millis(2), "delay 0: {:?}", recorded[0]);
-        assert!(recorded[1] <= Duration::from_millis(4), "delay 1: {:?}", recorded[1]);
-        assert!(recorded[2] <= Duration::from_millis(8), "delay 2: {:?}", recorded[2]);
-        assert!(recorded[3] <= Duration::from_millis(16), "delay 3: {:?}", recorded[3]);
-        assert!(recorded[4] <= Duration::from_millis(32), "delay 4: {:?}", recorded[4]);
+        assert!(
+            recorded[0] <= Duration::from_millis(2),
+            "delay 0: {:?}",
+            recorded[0]
+        );
+        assert!(
+            recorded[1] <= Duration::from_millis(4),
+            "delay 1: {:?}",
+            recorded[1]
+        );
+        assert!(
+            recorded[2] <= Duration::from_millis(8),
+            "delay 2: {:?}",
+            recorded[2]
+        );
+        assert!(
+            recorded[3] <= Duration::from_millis(16),
+            "delay 3: {:?}",
+            recorded[3]
+        );
+        assert!(
+            recorded[4] <= Duration::from_millis(32),
+            "delay 4: {:?}",
+            recorded[4]
+        );
     }
 
     #[test]

@@ -430,7 +430,11 @@ impl LdapDirectoryProvider {
                     tracing::warn!(
                         proactive = needs_invalidation,
                         "LDAP error after {}, reconnecting: {}",
-                        if needs_invalidation { "proactive reconnect" } else { "transient error" },
+                        if needs_invalidation {
+                            "proactive reconnect"
+                        } else {
+                            "transient error"
+                        },
                         err
                     );
                     self.invalidate_connection().await;
