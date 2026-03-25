@@ -10,7 +10,6 @@ import {
   ShieldAlert,
   ShieldOff,
   CheckCircle,
-  XCircle,
   ArrowRight,
   FolderTree,
 } from "lucide-react";
@@ -655,16 +654,6 @@ function ScopeTable({ links }: { links: GpoLink[] }) {
         <div className="text-caption text-[var(--color-text-secondary)]">
           Linked to {links.length} container(s)
         </div>
-        <div className="flex items-center gap-4 text-[11px] text-[var(--color-text-secondary)]">
-          <span className="flex items-center gap-1">
-            <ShieldAlert size={12} className="text-[var(--color-warning)]" />
-            Enforced
-          </span>
-          <span className="text-[var(--color-text-secondary)]">-</span>
-          <span className="flex items-center gap-1">
-            not enforced
-          </span>
-        </div>
       </div>
       <div className="overflow-auto rounded-lg border border-[var(--color-border-default)]">
         <table className="w-full text-caption" data-testid="scope-table">
@@ -690,15 +679,11 @@ function ScopeTable({ links }: { links: GpoLink[] }) {
                 </td>
                 <td className="px-3 py-2 text-center">
                   {link.isEnforced ? (
-                    <CheckCircle
-                      size={14}
-                      className="inline-block text-[var(--color-warning)]"
-                    />
+                    <span className="inline-flex rounded-full bg-[var(--color-warning)]/10 px-2 py-0.5 text-[10px] font-medium text-[var(--color-warning)]">
+                      Enforced
+                    </span>
                   ) : (
-                    <XCircle
-                      size={14}
-                      className="inline-block text-[var(--color-text-secondary)]"
-                    />
+                    <span className="text-[var(--color-text-secondary)]">-</span>
                   )}
                 </td>
                 <td className="px-3 py-2 text-center">
