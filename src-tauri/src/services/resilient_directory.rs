@@ -743,6 +743,7 @@ mod tests {
             max_retries: 3,
             initial_delay: Duration::from_millis(1),
             multiplier: 2.0,
+            ..Default::default()
         };
 
         let result = retry_with_backoff(
@@ -781,6 +782,7 @@ mod tests {
                 max_retries: 0,
                 initial_delay: Duration::from_millis(1),
                 multiplier: 2.0,
+                ..Default::default()
             },
             cb.clone(),
             noop_delay,
@@ -820,6 +822,7 @@ mod tests {
             max_retries: 3,
             initial_delay: Duration::from_millis(1),
             multiplier: 2.0,
+            ..Default::default()
         };
 
         let attempt = AtomicU32::new(0);
@@ -1371,6 +1374,7 @@ mod tests {
                 max_retries: 0,
                 initial_delay: Duration::from_millis(1),
                 multiplier: 1.0,
+                ..Default::default()
             },
             CircuitBreaker::new(CircuitBreakerConfig::default()),
             noop_delay,

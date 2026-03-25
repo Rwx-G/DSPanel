@@ -13,6 +13,8 @@ pub struct RetryConfig {
     pub initial_delay: Duration,
     /// Multiplier applied to the delay after each retry.
     pub multiplier: f64,
+    /// Maximum delay cap (prevents unbounded growth). Default: 10 seconds.
+    pub max_delay: Duration,
 }
 
 impl Default for RetryConfig {
@@ -21,6 +23,7 @@ impl Default for RetryConfig {
             max_retries: 3,
             initial_delay: Duration::from_secs(1),
             multiplier: 2.0,
+            max_delay: Duration::from_secs(10),
         }
     }
 }
@@ -64,8 +67,14 @@ where
                     "Retrying after transient error"
                 );
 
-                delay_fn(delay).await;
+                // Apply jitter: randomize delay by +/-50% to prevent thundering herd
+                let jittered = apply_jitter(delay);
+                delay_fn(jittered).await;
+                // Grow delay with cap
                 delay = Duration::from_secs_f64(delay.as_secs_f64() * config.multiplier);
+                if delay > config.max_delay {
+                    delay = config.max_delay;
+                }
             }
         }
     }
@@ -94,8 +103,8 @@ pub struct CircuitBreakerConfig {
 impl Default for CircuitBreakerConfig {
     fn default() -> Self {
         Self {
-            failure_threshold: 5,
-            recovery_timeout: Duration::from_secs(60),
+            failure_threshold: 3,
+            recovery_timeout: Duration::from_secs(30),
         }
     }
 }
@@ -212,6 +221,20 @@ impl CircuitBreaker {
     }
 }
 
+/// Applies jitter to a duration (+/-50%) to prevent synchronized retries.
+///
+/// Uses a simple hash-based pseudo-random to avoid adding a rand dependency.
+fn apply_jitter(base: Duration) -> Duration {
+    // Use current time nanoseconds as cheap entropy source
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .subsec_nanos();
+    // Map to 0.5..1.5 range
+    let factor = 0.5 + (nanos as f64 % 1000.0) / 1000.0;
+    Duration::from_secs_f64(base.as_secs_f64() * factor)
+}
+
 /// Centralized timeout configuration for all external service calls.
 #[derive(Debug, Clone)]
 pub struct TimeoutConfig {
@@ -297,6 +320,7 @@ mod tests {
             max_retries: 2,
             initial_delay: Duration::from_millis(1),
             multiplier: 2.0,
+            ..Default::default()
         };
 
         let attempt = AtomicU32::new(0);
@@ -347,6 +371,7 @@ mod tests {
             max_retries: 3,
             initial_delay: Duration::from_millis(100),
             multiplier: 2.0,
+            ..Default::default()
         };
 
         let delays: Arc<Mutex<Vec<Duration>>> = Arc::new(Mutex::new(Vec::new()));
@@ -370,9 +395,11 @@ mod tests {
 
         let recorded = delays.lock().unwrap();
         assert_eq!(recorded.len(), 3);
-        assert_eq!(recorded[0], Duration::from_millis(100));
-        assert_eq!(recorded[1], Duration::from_millis(200));
-        assert_eq!(recorded[2], Duration::from_millis(400));
+        // Delays have jitter applied, so check they are within reasonable bounds of expected values
+        // Expected base delays: 100ms, 200ms, 400ms. Jitter can reduce them.
+        assert!(recorded[0] <= Duration::from_millis(200), "first delay too large: {:?}", recorded[0]);
+        assert!(recorded[1] <= Duration::from_millis(400), "second delay too large: {:?}", recorded[1]);
+        assert!(recorded[2] <= Duration::from_millis(800), "third delay too large: {:?}", recorded[2]);
     }
 
     // -- CircuitBreakerConfig tests --
@@ -380,8 +407,8 @@ mod tests {
     #[test]
     fn test_circuit_breaker_config_default() {
         let config = CircuitBreakerConfig::default();
-        assert_eq!(config.failure_threshold, 5);
-        assert_eq!(config.recovery_timeout, Duration::from_secs(60));
+        assert_eq!(config.failure_threshold, 3);
+        assert_eq!(config.recovery_timeout, Duration::from_secs(30));
     }
 
     // -- CircuitBreaker tests --
@@ -533,6 +560,7 @@ mod tests {
             max_retries: 2,
             initial_delay: Duration::from_millis(10),
             multiplier: 2.0,
+            ..Default::default()
         };
         let attempt = AtomicU32::new(0);
 
@@ -575,6 +603,7 @@ mod tests {
             max_retries: 3,
             initial_delay: Duration::from_millis(10),
             multiplier: 0.0,
+            ..Default::default()
         };
 
         let delays: Arc<Mutex<Vec<Duration>>> = Arc::new(Mutex::new(Vec::new()));
@@ -601,10 +630,10 @@ mod tests {
         assert_eq!(attempt.load(Ordering::SeqCst), 4);
         let recorded = delays.lock().unwrap();
         assert_eq!(recorded.len(), 3);
-        // First delay is initial_delay, subsequent delays collapse to zero
-        assert_eq!(recorded[0], Duration::from_millis(10));
-        assert_eq!(recorded[1], Duration::from_secs(0));
-        assert_eq!(recorded[2], Duration::from_secs(0));
+        // First delay is at most initial_delay (jitter may reduce it), subsequent delays collapse toward zero
+        assert!(recorded[0] <= Duration::from_millis(20), "first delay too large: {:?}", recorded[0]);
+        assert!(recorded[1] <= Duration::from_millis(10), "second delay should be near zero: {:?}", recorded[1]);
+        assert!(recorded[2] <= Duration::from_millis(10), "third delay should be near zero: {:?}", recorded[2]);
     }
 
     #[tokio::test]
@@ -613,6 +642,7 @@ mod tests {
             max_retries: 5,
             initial_delay: Duration::from_millis(1),
             multiplier: 2.0,
+            ..Default::default()
         };
 
         let delays: Arc<Mutex<Vec<Duration>>> = Arc::new(Mutex::new(Vec::new()));
@@ -632,12 +662,12 @@ mod tests {
 
         let recorded = delays.lock().unwrap();
         assert_eq!(recorded.len(), 5);
-        // Verify exponential growth from 1ms without overflow
-        assert_eq!(recorded[0], Duration::from_millis(1));
-        assert_eq!(recorded[1], Duration::from_millis(2));
-        assert_eq!(recorded[2], Duration::from_millis(4));
-        assert_eq!(recorded[3], Duration::from_millis(8));
-        assert_eq!(recorded[4], Duration::from_millis(16));
+        // Verify roughly exponential growth from 1ms (jitter applied, so check upper bounds)
+        assert!(recorded[0] <= Duration::from_millis(2), "delay 0: {:?}", recorded[0]);
+        assert!(recorded[1] <= Duration::from_millis(4), "delay 1: {:?}", recorded[1]);
+        assert!(recorded[2] <= Duration::from_millis(8), "delay 2: {:?}", recorded[2]);
+        assert!(recorded[3] <= Duration::from_millis(16), "delay 3: {:?}", recorded[3]);
+        assert!(recorded[4] <= Duration::from_millis(32), "delay 4: {:?}", recorded[4]);
     }
 
     #[test]
@@ -690,6 +720,7 @@ mod tests {
             max_retries: 2,
             initial_delay: Duration::from_millis(1),
             multiplier: 1.0,
+            ..Default::default()
         };
 
         let attempt = AtomicU32::new(0);
