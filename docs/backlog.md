@@ -6,11 +6,7 @@ Items deferred from QA reviews. None are blocking - all stories are PASS.
 
 | Source | Item | Refs |
 | ------ | ---- | ---- |
-| ~~Epic 4 QA~~ | ~~Settings UI for custom permission group mapping~~ | **DONE** in Story 12.1 |
-| ~~Epic 5~~ | ~~Settings UI for `disabledOu` default (used by Offboarding workflow)~~ | **DONE** in Settings > Security |
-| ~~Epic 6 (6.2)~~ | ~~`GraphSettings` component embedded in Settings page~~ | **DONE** in Story 12.2 |
-| ~~Epic 11 QA~~ | ~~Retention period configuration in Settings UI~~ | **DONE** in Story 12.2 |
-| Epic 12 QA | Full window state save/restore with Tauri window API | `lib.rs`, `tauri.conf.json`, Story 12.4 |
+| *(none)* | - | - |
 
 ## Priority: Low
 
