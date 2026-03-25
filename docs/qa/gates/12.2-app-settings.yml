@@ -1,0 +1,42 @@
+schema: 1
+story: "12.2"
+story_title: "Application Settings"
+gate: PASS
+status_reason: "All 11 ACs met. Clean tab-based Settings page composing existing components with new fields. Full backward compatibility. 16 new tests total."
+reviewer: "Quinn (Test Architect)"
+updated: "2026-03-25T21:15:00Z"
+
+top_issues: []
+waiver: { active: false }
+
+quality_score: 100
+expires: "2026-04-08T21:15:00Z"
+
+evidence:
+  tests_reviewed: 16
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+    ac_gaps: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "No secrets in settings JSON. Graph client secret handled by existing CredentialStore. Permissions tab DomainAdmin-gated."
+  performance:
+    status: PASS
+    notes: "Single JSON load on mount. Tabs lazy-render content."
+  reliability:
+    status: PASS
+    notes: "Backward compatible with existing settings files. Missing fields default to None."
+  maintainability:
+    status: PASS
+    notes: "Composes existing components. New sections are optional structs with serde defaults."
+
+recommendations:
+  immediate: []
+  future:
+    - action: "Add Restore Defaults button per settings section"
+      refs: ["src/pages/Settings.tsx"]
+    - action: "Add directory existence validation for export path"
+      refs: ["src/pages/Settings.tsx"]
