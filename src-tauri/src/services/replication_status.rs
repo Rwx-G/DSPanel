@@ -188,27 +188,67 @@ async fn force_replication_windows(
     target_dc: &str,
     naming_context: &str,
 ) -> Result<String> {
-    let output = tokio::time::timeout(
+    // Try repadmin first (available if RSAT is installed)
+    let repadmin_result = tokio::time::timeout(
         std::time::Duration::from_secs(30),
         tokio::process::Command::new("repadmin")
             .args(["/replicate", target_dc, source_dc, naming_context])
             .output(),
     )
+    .await;
+
+    match repadmin_result {
+        Ok(Ok(output)) => {
+            let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+            let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+            if output.status.success() {
+                return Ok(format!(
+                    "Replication triggered successfully. {}",
+                    stdout.trim()
+                ));
+            }
+            anyhow::bail!(
+                "Replication failed: {}",
+                if stderr.is_empty() { &stdout } else { &stderr }
+            );
+        }
+        Ok(Err(_)) => {
+            // repadmin not found - fall back to PowerShell
+            tracing::info!("repadmin not found, falling back to PowerShell");
+        }
+        Err(_) => {
+            anyhow::bail!("Replication command timed out (30s)");
+        }
+    }
+
+    // Fallback: PowerShell with AD module
+    let ps_script = format!(
+        "Import-Module ActiveDirectory -ErrorAction Stop; \
+         Sync-ADObject -Source '{}' -Destination '{}' -Object '{}' -ErrorAction Stop",
+        source_dc, target_dc, naming_context
+    );
+
+    let ps_output = tokio::time::timeout(
+        std::time::Duration::from_secs(30),
+        tokio::process::Command::new("powershell")
+            .args(["-NoProfile", "-NonInteractive", "-Command", &ps_script])
+            .output(),
+    )
     .await
-    .map_err(|_| anyhow::anyhow!("Replication command timed out (30s)"))?
-    .map_err(|e| anyhow::anyhow!("Failed to run repadmin: {}", e))?;
+    .map_err(|_| anyhow::anyhow!("PowerShell replication command timed out (30s)"))?
+    .map_err(|e| anyhow::anyhow!("Failed to run PowerShell: {}", e))?;
 
-    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+    let stdout = String::from_utf8_lossy(&ps_output.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&ps_output.stderr).to_string();
 
-    if output.status.success() {
+    if ps_output.status.success() {
         Ok(format!(
-            "Replication triggered successfully. {}",
+            "Replication triggered successfully (via PowerShell). {}",
             stdout.trim()
         ))
     } else {
         anyhow::bail!(
-            "Replication failed: {}",
+            "Replication failed: {}. Ensure RSAT AD tools are installed.",
             if stderr.is_empty() { &stdout } else { &stderr }
         )
     }
