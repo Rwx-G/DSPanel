@@ -397,10 +397,17 @@ impl LdapDirectoryProvider {
         Op: Fn(ldap3::Ldap) -> Fut,
         Fut: std::future::Future<Output = Result<T>>,
     {
-        // Proactive invalidation if connection is too old
+        // Proactive invalidation if connection is too old.
+        // Reset the timestamp immediately to prevent concurrent operations
+        // from each triggering their own invalidation + reconnect cycle.
         let needs_invalidation = {
-            let last_op = self.last_successful_op.lock().expect("lock poisoned");
-            last_op.is_some_and(|ts| ts.elapsed() > CONNECTION_MAX_AGE)
+            let mut last_op = self.last_successful_op.lock().expect("lock poisoned");
+            if last_op.is_some_and(|ts| ts.elapsed() > CONNECTION_MAX_AGE) {
+                *last_op = Some(std::time::Instant::now());
+                true
+            } else {
+                false
+            }
         };
         if needs_invalidation {
             tracing::info!("LDAP connection exceeded max age, proactively reconnecting");
