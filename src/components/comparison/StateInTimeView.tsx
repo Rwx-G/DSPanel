@@ -8,6 +8,7 @@ import {
   Server,
   Hash,
   Link,
+  Search,
 } from "lucide-react";
 import {
   type ReplicationMetadataResult,
@@ -32,6 +33,7 @@ export function StateInTimeView({
   const [selectedFrom, setSelectedFrom] = useState<string>("");
   const [selectedTo, setSelectedTo] = useState<string>("");
   const [diff, setDiff] = useState<AttributeChangeDiff[] | null>(null);
+  const [attributeFilter, setAttributeFilter] = useState("");
 
   // Reset when user changes
   useEffect(() => {
@@ -40,6 +42,7 @@ export function StateInTimeView({
     setDiff(null);
     setSelectedFrom("");
     setSelectedTo("");
+    setAttributeFilter("");
   }, [objectDn]);
 
   const loadMetadata = useCallback(async () => {
@@ -59,6 +62,15 @@ export function StateInTimeView({
       setIsLoading(false);
     }
   }, [objectDn]);
+
+  const filteredAttributes = useMemo(() => {
+    if (!metadata?.attributes) return [];
+    if (!attributeFilter) return metadata.attributes;
+    const lower = attributeFilter.toLowerCase();
+    return metadata.attributes.filter((a) =>
+      a.attributeName.toLowerCase().includes(lower),
+    );
+  }, [metadata, attributeFilter]);
 
   const timestamps = useMemo(() => {
     if (!metadata?.attributes) return [];
@@ -131,8 +143,21 @@ export function StateInTimeView({
       {/* Timeline */}
       {metadata?.isAvailable && (
         <>
-          <div className="text-caption text-[var(--color-text-secondary)]">
-            {metadata.attributes.length} attribute(s) with replication metadata
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-caption text-[var(--color-text-secondary)]">
+              {filteredAttributes.length} of {metadata.attributes.length} attribute(s)
+            </div>
+            <div className="relative">
+              <Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-[var(--color-text-secondary)]" />
+              <input
+                type="text"
+                value={attributeFilter}
+                onChange={(e) => setAttributeFilter(e.target.value)}
+                placeholder="Filter attributes..."
+                className="h-7 w-48 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-default)] pl-7 pr-2 text-caption text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)]"
+                data-testid="attribute-filter-input"
+              />
+            </div>
           </div>
 
           {/* Attribute timeline table */}
@@ -161,7 +186,7 @@ export function StateInTimeView({
                 </tr>
               </thead>
               <tbody>
-                {metadata.attributes.map((attr, idx) => (
+                {filteredAttributes.map((attr, idx) => (
                   <tr
                     key={attr.attributeName}
                     className={`border-b border-[var(--color-border-subtle)] last:border-b-0 ${
