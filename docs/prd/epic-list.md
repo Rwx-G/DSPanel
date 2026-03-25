@@ -22,7 +22,9 @@
 
 - **Epic 11: Audit, History and GPO Insights** (3 stories) - Deliver the local activity journal, AD change history timeline, and GPO viewer.
 
-- **Epic 12: RBAC, Settings and Polish** (5 stories) - Implement granular RBAC configuration, application settings UI, auto-update, localization support, and final UX polish.
+- **Epic 12: RBAC, Settings and Polish** (4 stories) - Configure AD group-based permission mapping, application settings UI, auto-update notifications, and final UX polish.
+
+- **Epic 13: Localization** (2 stories) - Internationalize DSPanel with i18n infrastructure (i18next) and provide 5 languages: English, French, German, Italian, and Spanish.
 
 ---
 
@@ -41,7 +43,8 @@
 | Epic 9    | 4       | Security + Risk Scoring            |
 | Epic 10   | 4       | Reports + Export + Compliance      |
 | Epic 11   | 3       | Audit + History + GPO Insights     |
-| Epic 12   | 5       | RBAC + Settings + Polish           |
-| **Total** | **57**  |                                    |
+| Epic 12   | 4       | RBAC + Settings + Polish           |
+| Epic 13   | 2       | Localization (i18n)                |
+| **Total** | **58**  |                                    |
 
 ---
