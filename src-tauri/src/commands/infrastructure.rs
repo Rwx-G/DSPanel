@@ -358,8 +358,8 @@ async fn build_ou_chain(
     // Add intermediate OUs (skip the CN= component which is the object itself)
     for i in (1..parts.len()).rev() {
         let dn_suffix: String = parts[i..].join(",");
-        // Only add if it's deeper than the domain root and is an OU
-        if parts[i..].len() > base_depth {
+        // Skip components at or above the domain root level (already included)
+        if parts[i..].len() <= base_depth {
             continue;
         }
         if (parts[i].starts_with("OU=") || parts[i].starts_with("ou="))
@@ -369,50 +369,37 @@ async fn build_ou_chain(
         }
     }
 
-    // Query each OU for gPLink and gPOptions
+    // Query each OU/domain for gPLink and gPOptions
     for ou_dn in &ou_dns {
-        let gp_link = query_gp_link(ou_dn, provider).await;
-        let gp_options = query_gp_options(ou_dn, provider).await;
+        let (gp_link, gp_options) = query_gp_attributes(ou_dn, provider).await;
         chain.push((ou_dn.clone(), gp_link, gp_options));
     }
 
     Ok(chain)
 }
 
-/// Queries gPLink attribute for a specific DN.
-async fn query_gp_link(
+/// Queries gPLink and gPOptions attributes for a specific DN.
+/// Returns (gPLink, gPOptions) as optional strings.
+async fn query_gp_attributes(
     dn: &str,
     provider: &dyn crate::services::DirectoryProvider,
-) -> Option<String> {
-    if let Ok(entries) = provider
-        .search_configuration(dn, "(objectClass=*)")
-        .await
-    {
-        for entry in entries {
-            if let Some(vals) = entry.attributes.get("gPLink") {
-                return Some(vals.join(""));
-            }
-        }
+) -> (Option<String>, Option<String>) {
+    // Use read_entry which does a Base scope search for a single object
+    if let Ok(Some(entry)) = provider.read_entry(dn).await {
+        let gp_link = entry
+            .attributes
+            .get("gPLink")
+            .map(|vals| vals.join(""))
+            .filter(|s| !s.is_empty());
+        let gp_options = entry
+            .attributes
+            .get("gPOptions")
+            .map(|vals| vals.join(""))
+            .filter(|s| !s.is_empty());
+        (gp_link, gp_options)
+    } else {
+        (None, None)
     }
-    None
-}
-
-/// Queries gPOptions attribute for a specific DN.
-async fn query_gp_options(
-    dn: &str,
-    provider: &dyn crate::services::DirectoryProvider,
-) -> Option<String> {
-    if let Ok(entries) = provider
-        .search_configuration(dn, "(objectClass=*)")
-        .await
-    {
-        for entry in entries {
-            if let Some(vals) = entry.attributes.get("gPOptions") {
-                return Some(vals.join(""));
-            }
-        }
-    }
-    None
 }
 
 /// GPO name cache TTL (5 minutes).
