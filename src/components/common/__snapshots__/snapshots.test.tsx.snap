@@ -75,7 +75,7 @@ exports[`Common controls - visual snapshots > EmptyState renders with icon and a
     Try a different search query.
   </p>
   <button
-    class="btn btn-primary mt-2"
+    class="btn btn-sm btn-primary mt-2"
     data-testid="empty-state-action"
   >
     Retry
