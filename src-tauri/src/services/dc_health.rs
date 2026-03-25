@@ -209,22 +209,37 @@ pub async fn check_dc_health(
     let effective_host = resolved_ip.unwrap_or_else(|| dc.hostname.clone());
 
     // Check 2: LDAP Ping (response time)
-    checks.push(check_ldap_ping(&effective_host, provider).await);
+    let ldap_check = check_ldap_ping(&effective_host, provider).await;
+    let dc_reachable = ldap_check.status != DcHealthLevel::Critical;
+    checks.push(ldap_check);
 
-    // Check 3: AD Services via LDAP rootDSE + SPNs (cross-platform)
-    checks.push(check_ad_services(provider, &dc.hostname).await);
+    if dc_reachable {
+        // These checks query the DC via the shared provider - only valid if reachable
+        // Check 3: AD Services via LDAP rootDSE + SPNs (cross-platform)
+        checks.push(check_ad_services(provider, &dc.hostname).await);
 
-    // Check 4: Replication health via rootDSE (cross-platform)
-    checks.push(check_replication_health(provider, &dc.hostname).await);
+        // Check 4: Replication health via rootDSE (cross-platform)
+        checks.push(check_replication_health(provider, &dc.hostname).await);
 
-    // Check 5: SYSVOL health via DFSR LDAP + SMB port probe (cross-platform)
-    checks.push(check_sysvol_smb(provider, &dc.hostname, &effective_host).await);
+        // Check 5: SYSVOL health via DFSR LDAP + SMB port probe (cross-platform)
+        checks.push(check_sysvol_smb(provider, &dc.hostname, &effective_host).await);
 
-    // Check 6: Clock skew vs local time (Kerberos threshold)
-    checks.push(check_clock_skew(provider).await);
+        // Check 6: Clock skew vs local time (Kerberos threshold)
+        checks.push(check_clock_skew(provider).await);
 
-    // Check 7: Machine account health
-    checks.push(check_machine_account(provider, &dc.hostname).await);
+        // Check 7: Machine account health
+        checks.push(check_machine_account(provider, &dc.hostname).await);
+    } else {
+        // DC is unreachable - mark all connectivity-dependent checks as N/A
+        for name in &["Services", "Replication", "SYSVOL", "Clock", "Account"] {
+            checks.push(DcHealthCheck {
+                name: name.to_string(),
+                status: DcHealthLevel::Critical,
+                message: "DC unreachable - check skipped".to_string(),
+                value: None,
+            });
+        }
+    }
 
     let overall_status = compute_overall_status(&checks);
     let checked_at = chrono::Utc::now().to_rfc3339();
