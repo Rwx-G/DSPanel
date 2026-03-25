@@ -144,6 +144,22 @@ pub fn run() {
             state.app_settings.load();
             state.preset_service.load_persisted();
 
+            // Load custom permission mappings from preset storage path
+            if let Some(preset_path) = state.preset_service.get_path() {
+                match services::PermissionMappings::load_from(&preset_path) {
+                    Ok(Some(custom)) => {
+                        state.permission_service.apply_custom_mappings(&custom);
+                        tracing::info!("Custom permission mappings applied from preset storage");
+                    }
+                    Ok(None) => {
+                        tracing::debug!("No custom permission mappings found in preset storage");
+                    }
+                    Err(e) => {
+                        tracing::warn!("Failed to load permission mappings: {}", e);
+                    }
+                }
+            }
+
             // Sync Graph config from persisted settings + credential store
             {
                 let settings = state.app_settings.get();

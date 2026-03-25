@@ -4,6 +4,8 @@ use std::sync::Mutex;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
+use std::path::Path;
+
 use crate::services::directory::DirectoryProvider;
 
 /// Permission levels in ascending order of privilege.
@@ -114,6 +116,42 @@ impl PermissionMappings {
     /// Returns true if no groups are mapped at any level.
     pub fn is_empty(&self) -> bool {
         self.mappings.values().all(|groups| groups.is_empty())
+    }
+
+    /// File name for the mappings JSON file in the preset storage path.
+    const FILE_NAME: &'static str = "rbac-mappings.json";
+
+    /// Loads permission mappings from a JSON file in the given directory.
+    ///
+    /// Returns `Ok(None)` if the file does not exist (no custom mappings configured).
+    pub fn load_from(dir: &Path) -> Result<Option<Self>> {
+        let path = dir.join(Self::FILE_NAME);
+        if !path.exists() {
+            return Ok(None);
+        }
+        let json = std::fs::read_to_string(&path)
+            .map_err(|e| anyhow::anyhow!("Failed to read {}: {}", path.display(), e))?;
+        let mappings: Self = serde_json::from_str(&json)
+            .map_err(|e| anyhow::anyhow!("Failed to parse {}: {}", path.display(), e))?;
+        tracing::info!(
+            path = %path.display(),
+            "Loaded custom permission mappings"
+        );
+        Ok(Some(mappings))
+    }
+
+    /// Saves permission mappings to a JSON file in the given directory.
+    pub fn save_to(&self, dir: &Path) -> Result<()> {
+        let path = dir.join(Self::FILE_NAME);
+        let json = serde_json::to_string_pretty(self)
+            .map_err(|e| anyhow::anyhow!("Failed to serialize permission mappings: {}", e))?;
+        std::fs::write(&path, json)
+            .map_err(|e| anyhow::anyhow!("Failed to write {}: {}", path.display(), e))?;
+        tracing::info!(
+            path = %path.display(),
+            "Saved custom permission mappings"
+        );
+        Ok(())
     }
 }
 
@@ -750,5 +788,45 @@ mod tests {
         service.apply_custom_mappings(&PermissionMappings::default());
         let after_count = service.group_mappings.lock().unwrap().len();
         assert_eq!(initial_count, after_count);
+    }
+
+    // --- PermissionMappings persistence tests ---
+
+    #[test]
+    fn test_permission_mappings_save_and_load() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut m = HashMap::new();
+        m.insert(
+            PermissionLevel::HelpDesk,
+            vec!["CN=IT-Support,OU=Groups,DC=contoso,DC=com".to_string()],
+        );
+        let mappings = PermissionMappings { mappings: m };
+        mappings.save_to(dir.path()).unwrap();
+
+        let loaded = PermissionMappings::load_from(dir.path()).unwrap().unwrap();
+        assert_eq!(
+            loaded
+                .mappings
+                .get(&PermissionLevel::HelpDesk)
+                .unwrap()
+                .len(),
+            1
+        );
+    }
+
+    #[test]
+    fn test_permission_mappings_load_returns_none_when_no_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let result = PermissionMappings::load_from(dir.path()).unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_permission_mappings_load_returns_error_on_corrupt_json() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join(PermissionMappings::FILE_NAME);
+        std::fs::write(&path, "not valid json").unwrap();
+        let result = PermissionMappings::load_from(dir.path());
+        assert!(result.is_err());
     }
 }
