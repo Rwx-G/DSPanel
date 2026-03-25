@@ -1,12 +1,12 @@
 import { useState, useCallback } from "react";
-import { Plus, Save, Trash2, Settings, AlertTriangle } from "lucide-react";
+import { Plus, Save, Trash2, Settings, AlertTriangle, FolderOpen } from "lucide-react";
 import { usePresets } from "@/hooks/usePresets";
 import { usePresetPath } from "@/hooks/usePresetPath";
 import { useGroupSearch } from "@/hooks/useGroupSearch";
 import { useOUTree } from "@/hooks/useOUTree";
 import { useDialog } from "@/contexts/DialogContext";
+import { useNavigation } from "@/contexts/NavigationContext";
 import { PermissionGate } from "@/components/common/PermissionGate";
-import { PresetSettings } from "@/components/common/PresetSettings";
 import { GroupPicker, type GroupOption } from "@/components/form/GroupPicker";
 import { OUPicker } from "@/components/form/OUPicker";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
@@ -28,41 +28,32 @@ function parseCnFromDn(dn: string): string {
 }
 
 function PresetEditorWrapper() {
-  const { path: presetPath, reload: reloadPath } = usePresetPath();
-  const [showSettings, setShowSettings] = useState(false);
+  const { path: presetPath } = usePresetPath();
+  const { openTab } = useNavigation();
 
-  const handlePathSaved = useCallback(() => {
-    reloadPath();
-    setShowSettings(false);
-  }, [reloadPath]);
+  const handleOpenSettings = useCallback(() => {
+    openTab("Settings", "settings");
+  }, [openTab]);
 
   return (
     <div className="flex h-full flex-col gap-4 p-4">
-      {(!presetPath || showSettings) && <PresetSettings onSaved={handlePathSaved} />}
-      {presetPath && !showSettings && (
-        <button
-          onClick={() => setShowSettings(true)}
-          className="flex items-center gap-1.5 self-start text-caption text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
+      {presetPath && (
+        <div
+          className="flex items-center gap-1.5 self-start text-caption text-[var(--color-text-secondary)]"
           data-testid="preset-show-settings"
         >
-          <Settings size={12} />
+          <FolderOpen size={12} />
           Storage: {presetPath}
-        </button>
-      )}
-      {showSettings && presetPath && (
-        <button
-          onClick={() => setShowSettings(false)}
-          className="self-start text-caption text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
-        >
-          Hide settings
-        </button>
+        </div>
       )}
       {presetPath ? (
         <PresetEditor />
       ) : (
         <EmptyState
-          title="Configure preset storage"
-          description="Set a storage path above to start managing presets."
+          icon={<FolderOpen size={40} />}
+          title="Preset Storage Not Configured"
+          description="Configure the preset storage path in Settings to start managing presets."
+          action={{ label: "Open Settings", onClick: handleOpenSettings }}
         />
       )}
     </div>

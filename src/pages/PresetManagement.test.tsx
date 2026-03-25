@@ -4,6 +4,7 @@ import { createElement, type ReactNode } from "react";
 import { PresetManagement } from "./PresetManagement";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import { DialogProvider } from "@/contexts/DialogContext";
+import { NavigationProvider } from "@/contexts/NavigationContext";
 import type { Preset } from "@/types/preset";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -38,9 +39,13 @@ const samplePresets: Preset[] = [
 
 function Wrapper({ children }: { children: ReactNode }) {
   return createElement(
-    NotificationProvider,
+    NavigationProvider,
     null,
-    createElement(DialogProvider, null, children),
+    createElement(
+      NotificationProvider,
+      null,
+      createElement(DialogProvider, null, children),
+    ),
   );
 }
 
