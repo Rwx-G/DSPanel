@@ -4,6 +4,7 @@ use crate::error::AppError;
 use crate::models::{DeletedObject, ExchangeOnlineInfo, ObjectSnapshot, Preset, SnapshotDiff};
 use crate::services::app_settings::AppSettings;
 use crate::services::permissions::PermissionMappings;
+use crate::services::update::{self, UpdateInfo};
 use crate::services::PermissionLevel;
 use crate::state::AppState;
 
@@ -1128,6 +1129,84 @@ pub async fn validate_group_exists(
     state: State<'_, AppState>,
 ) -> Result<bool, AppError> {
     validate_group_exists_inner(&state, &group_dn).await
+}
+
+// ---------------------------------------------------------------------------
+// Update check commands
+// ---------------------------------------------------------------------------
+
+/// Checks GitHub for a newer version. Returns UpdateInfo if available, null otherwise.
+///
+/// Respects frequency settings and skip logic. Fails silently on network errors.
+pub(crate) async fn check_for_update_inner(state: &AppState) -> Option<UpdateInfo> {
+    let settings = state.app_settings.get();
+    let update_settings = settings.update.unwrap_or_default();
+
+    // Check frequency
+    let frequency = update_settings
+        .check_frequency
+        .as_deref()
+        .unwrap_or("startup");
+    if !update::should_check(frequency, update_settings.last_check_timestamp.as_deref()) {
+        return None;
+    }
+
+    // Fetch latest release
+    let info = update::fetch_latest_release(&state.http_client).await?;
+
+    // Update last check timestamp
+    {
+        let mut current = state.app_settings.get();
+        let mut us = current.update.unwrap_or_default();
+        us.last_check_timestamp = Some(chrono::Utc::now().to_rfc3339());
+        current.update = Some(us);
+        state.app_settings.update(current);
+    }
+
+    // Check if this version was skipped
+    if let Some(ref skipped) = update_settings.skipped_version {
+        if skipped == &info.version {
+            tracing::debug!(version = %info.version, "Update skipped by user");
+            return None;
+        }
+    }
+
+    // Check if it's actually newer
+    let current_version = env!("CARGO_PKG_VERSION");
+    if update::is_newer(current_version, &info.version) {
+        tracing::info!(
+            current = current_version,
+            available = %info.version,
+            "Newer version available"
+        );
+        Some(info)
+    } else {
+        None
+    }
+}
+
+/// Persists a version as "skipped" so it won't be shown again.
+pub(crate) fn skip_update_version_inner(state: &AppState, version: &str) {
+    let mut settings = state.app_settings.get();
+    let mut us = settings.update.unwrap_or_default();
+    us.skipped_version = Some(version.to_string());
+    settings.update = Some(us);
+    state.app_settings.update(settings);
+    tracing::info!(version = version, "Update version skipped by user");
+}
+
+/// Checks GitHub for a newer version.
+#[tauri::command]
+pub async fn check_for_update(
+    state: State<'_, AppState>,
+) -> Result<Option<UpdateInfo>, AppError> {
+    Ok(check_for_update_inner(&state).await)
+}
+
+/// Marks a version as skipped.
+#[tauri::command]
+pub fn skip_update_version(version: String, state: State<'_, AppState>) {
+    skip_update_version_inner(&state, &version)
 }
 
 /// Stores a credential in the OS-native secure storage.

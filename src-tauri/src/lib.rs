@@ -289,6 +289,8 @@ pub fn run() {
             commands::get_permission_mappings,
             commands::set_permission_mappings,
             commands::validate_group_exists,
+            commands::check_for_update,
+            commands::skip_update_version,
             commands::store_credential,
             commands::get_credential,
             commands::delete_credential,

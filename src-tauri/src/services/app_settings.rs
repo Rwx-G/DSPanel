@@ -39,6 +39,24 @@ pub struct AppSettings {
     /// Appearance settings (theme).
     #[serde(default)]
     pub appearance: Option<AppearanceSettings>,
+    /// Update check settings.
+    #[serde(default)]
+    pub update: Option<UpdateSettings>,
+}
+
+/// Update check settings.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateSettings {
+    /// Check frequency: "startup", "daily", "weekly", "never".
+    #[serde(default)]
+    pub check_frequency: Option<String>,
+    /// Version that the user chose to skip.
+    #[serde(default)]
+    pub skipped_version: Option<String>,
+    /// ISO-8601 timestamp of the last successful check.
+    #[serde(default)]
+    pub last_check_timestamp: Option<String>,
 }
 
 /// Connection-related settings.

@@ -30,6 +30,7 @@ pub mod resilient_directory;
 pub mod security;
 pub mod snapshot;
 pub mod topology;
+pub mod update;
 pub mod workstation_monitor;
 
 pub use app_settings::AppSettingsService;
