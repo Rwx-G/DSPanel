@@ -247,6 +247,13 @@ const MODULES: SidebarModule[] = [
     group: "Settings",
     requiredLevel: "ReadOnly",
   },
+  {
+    id: "about",
+    label: "About",
+    icon: "info",
+    group: "Settings",
+    requiredLevel: "ReadOnly",
+  },
 ];
 
 interface SidebarProps {
@@ -336,7 +343,13 @@ export function Sidebar({ expanded, onToggle }: SidebarProps) {
                       ? "bg-[var(--color-sidebar-item-active)] font-medium text-[var(--color-primary)]"
                       : "text-[var(--color-text-secondary)] hover:bg-[var(--color-sidebar-item-hover)] hover:text-[var(--color-text-primary)]"
                   } ${!expanded ? "justify-center px-0" : ""}`}
-                  onClick={() => openTab(mod.label, mod.id, mod.icon)}
+                  onClick={() => {
+                    if (mod.id === "about") {
+                      setShowAbout(true);
+                    } else {
+                      openTab(mod.label, mod.id, mod.icon);
+                    }
+                  }}
                   title={expanded ? undefined : mod.label}
                   data-testid={`sidebar-item-${mod.id}`}
                 >
@@ -358,22 +371,6 @@ export function Sidebar({ expanded, onToggle }: SidebarProps) {
         ))}
       </nav>
 
-      {/* Footer */}
-      <div className="border-t border-[var(--color-border-default)] p-2">
-        <button
-          className={`group relative flex w-full items-center gap-3 rounded-md px-3 py-2 text-body text-[var(--color-text-secondary)] transition-colors duration-150 hover:bg-[var(--color-sidebar-item-hover)] hover:text-[var(--color-text-primary)] ${!expanded ? "justify-center px-0" : ""}`}
-          onClick={() => setShowAbout(true)}
-          data-testid="about-btn"
-        >
-          <Info size={18} className="shrink-0" />
-          {expanded && <span className="truncate">About</span>}
-          {!expanded && (
-            <span className="pointer-events-none absolute left-full z-50 ml-2 whitespace-nowrap rounded-md bg-[var(--color-surface-elevated)] px-2.5 py-1.5 text-caption font-medium text-[var(--color-text-primary)] opacity-0 shadow-md transition-opacity duration-150 group-hover:opacity-100">
-              About DSPanel
-            </span>
-          )}
-        </button>
-      </div>
       {showAbout && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
