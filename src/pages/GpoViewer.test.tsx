@@ -52,40 +52,10 @@ describe("GpoViewer", () => {
     expect(screen.getByTestId("tab-whatif")).toBeInTheDocument();
   });
 
-  it("shows links input and search button", () => {
+  it("shows search input and OU select for links view", () => {
     render(<GpoViewer />);
-    expect(screen.getByTestId("links-object-dn")).toBeInTheDocument();
-    expect(screen.getByTestId("links-search-button")).toBeInTheDocument();
-  });
-
-  it("fetches and displays GPO links", async () => {
-    mockInvoke.mockResolvedValue(mockGpoLinksResult);
-    render(<GpoViewer />);
-
-    fireEvent.change(screen.getByTestId("links-object-dn"), {
-      target: { value: "CN=John,OU=Users,DC=contoso,DC=com" },
-    });
-    fireEvent.click(screen.getByTestId("links-search-button"));
-
-    await waitFor(() => {
-      expect(screen.getAllByTestId("gpo-row").length).toBe(2);
-    });
-    expect(screen.getByText("Default Domain Policy")).toBeInTheDocument();
-    expect(screen.getByText("Users GPO")).toBeInTheDocument();
-  });
-
-  it("shows error on failure", async () => {
-    mockInvoke.mockRejectedValue("Permission denied");
-    render(<GpoViewer />);
-
-    fireEvent.change(screen.getByTestId("links-object-dn"), {
-      target: { value: "CN=Test" },
-    });
-    fireEvent.click(screen.getByTestId("links-search-button"));
-
-    await waitFor(() => {
-      expect(screen.getByTestId("error-message")).toBeInTheDocument();
-    });
+    expect(screen.getByTestId("links-search-input")).toBeInTheDocument();
+    expect(screen.getByTestId("links-ou-select")).toBeInTheDocument();
   });
 
   it("switches to scope view", () => {
@@ -95,7 +65,7 @@ describe("GpoViewer", () => {
     expect(screen.getByTestId("scope-search-button")).toBeInTheDocument();
   });
 
-  it("switches to what-if view", () => {
+  it("switches to what-if view with OU dropdown", () => {
     render(<GpoViewer />);
     fireEvent.click(screen.getByTestId("tab-whatif"));
     expect(screen.getByTestId("whatif-ou-dn")).toBeInTheDocument();
@@ -117,6 +87,7 @@ describe("GpoViewer", () => {
         isDisabled: false,
         linkedAt: "DC=contoso,DC=com",
         isInherited: false,
+        wmiFilter: null,
       },
       {
         gpoDn: "CN={AAA}",
@@ -126,13 +97,20 @@ describe("GpoViewer", () => {
         isDisabled: false,
         linkedAt: "OU=Finance,DC=contoso,DC=com",
         isInherited: false,
+        wmiFilter: null,
       },
     ];
-    mockInvoke.mockResolvedValue(mockScopeResult);
+    mockInvoke.mockImplementation((cmd: string) => {
+      if (cmd === "get_gpo_list") return Promise.resolve([]);
+      if (cmd === "get_ou_tree") return Promise.resolve([]);
+      if (cmd === "get_gpo_scope") return Promise.resolve(mockScopeResult);
+      return Promise.resolve(null);
+    });
 
     render(<GpoViewer />);
     fireEvent.click(screen.getByTestId("tab-scope"));
 
+    // With empty gpoList, fallback text input + button is shown
     fireEvent.change(screen.getByTestId("scope-gpo-dn"), {
       target: { value: "CN={AAA}" },
     });

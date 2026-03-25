@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { EmptyState } from "@/components/common/EmptyState";
@@ -40,6 +40,20 @@ interface GpoLinksResult {
   objectDn: string;
   links: GpoLink[];
   blocksInheritance: boolean;
+}
+
+interface OUNode {
+  distinguishedName: string;
+  name: string;
+  children: OUNode[];
+  hasChildren: boolean;
+}
+
+interface SearchResult {
+  distinguishedName: string;
+  samAccountName: string | null;
+  displayName: string | null;
+  objectClass: string[];
 }
 
 type ViewMode = "links" | "scope" | "whatif";
@@ -91,35 +105,67 @@ export function GpoViewer() {
   // GPO list for autocomplete
   const [gpoList, setGpoList] = useState<GpoInfo[]>([]);
 
+  // OU tree for pickers
+  const [ouTree, setOuTree] = useState<OUNode[]>([]);
+
+  // Search results for object DN picker
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searching, setSearching] = useState(false);
+
   // What-if state
-  const [whatIfUserDn, setWhatIfUserDn] = useState("");
   const [whatIfOuDn, setWhatIfOuDn] = useState("");
   const [whatIfResult, setWhatIfResult] = useState<GpoLinksResult | null>(null);
   const [whatIfLoading, setWhatIfLoading] = useState(false);
   const [whatIfError, setWhatIfError] = useState<string | null>(null);
 
-  // Load GPO list on mount
+  // Load GPO list and OU tree on mount
   useEffect(() => {
     invoke<GpoInfo[]>("get_gpo_list")
       .then(setGpoList)
       .catch(() => {});
+    invoke<OUNode[]>("get_ou_tree")
+      .then(setOuTree)
+      .catch(() => {});
   }, []);
 
-  const fetchGpoLinks = useCallback(async () => {
-    if (!objectDn.trim()) return;
-    setLinksLoading(true);
-    setLinksError(null);
-    try {
-      const result = await invoke<GpoLinksResult>("get_gpo_links", {
-        objectDn: objectDn.trim(),
-      });
-      setLinksResult(result);
-    } catch (err) {
-      setLinksError(extractErrorMessage(err));
-    } finally {
-      setLinksLoading(false);
+  // Flatten OU tree for dropdown
+  const flatOUs = useMemo(() => {
+    const result: { dn: string; label: string; depth: number }[] = [];
+    function walk(nodes: OUNode[], depth: number) {
+      for (const node of nodes) {
+        result.push({
+          dn: node.distinguishedName,
+          label: "\u00A0\u00A0".repeat(depth) + node.name,
+          depth,
+        });
+        if (node.children.length > 0) walk(node.children, depth + 1);
+      }
     }
-  }, [objectDn]);
+    walk(ouTree, 0);
+    return result;
+  }, [ouTree]);
+
+  // Search for users/computers by name
+  const handleSearch = useCallback(async () => {
+    if (!searchQuery.trim() || searchQuery.trim().length < 2) return;
+    setSearching(true);
+    try {
+      const users = await invoke<SearchResult[]>("search_users", {
+        query: searchQuery.trim(),
+        maxResults: 10,
+      });
+      const computers = await invoke<SearchResult[]>("search_computers", {
+        query: searchQuery.trim(),
+        maxResults: 5,
+      });
+      setSearchResults([...users, ...computers]);
+    } catch {
+      setSearchResults([]);
+    } finally {
+      setSearching(false);
+    }
+  }, [searchQuery]);
 
   const fetchScope = useCallback(async () => {
     if (!scopeGpoDn.trim()) return;
@@ -142,12 +188,8 @@ export function GpoViewer() {
     setWhatIfLoading(true);
     setWhatIfError(null);
     try {
-      // Simulate by querying GPOs for the target OU
-      const targetDn = whatIfUserDn.trim()
-        ? `CN=SimulatedUser,${whatIfOuDn.trim()}`
-        : whatIfOuDn.trim();
       const result = await invoke<GpoLinksResult>("get_gpo_links", {
-        objectDn: targetDn,
+        objectDn: whatIfOuDn.trim(),
       });
       setWhatIfResult(result);
     } catch (err) {
@@ -155,7 +197,7 @@ export function GpoViewer() {
     } finally {
       setWhatIfLoading(false);
     }
-  }, [whatIfUserDn, whatIfOuDn]);
+  }, [whatIfOuDn]);
 
   const handleKeyDown = (e: React.KeyboardEvent, action: () => void) => {
     if (e.key === "Enter") action();
@@ -225,30 +267,92 @@ export function GpoViewer() {
       {/* Links View */}
       {viewMode === "links" && (
         <div className="flex flex-col gap-4">
-          <div className="flex items-end gap-3">
-            <div className="flex flex-1 flex-col gap-1">
+          {/* Object picker: search users/computers OR select OU */}
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="flex flex-col gap-1">
               <label className="text-[11px] font-medium text-[var(--color-text-secondary)]">
-                Object DN (user, computer, or OU)
+                Search user or computer
               </label>
-              <input
-                type="text"
-                value={objectDn}
-                onChange={(e) => setObjectDn(e.target.value)}
-                onKeyDown={(e) => handleKeyDown(e, fetchGpoLinks)}
-                placeholder="CN=John Doe,OU=Users,DC=contoso,DC=com"
-                className="h-8 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-default)] px-2 text-caption text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)]"
-                data-testid="links-object-dn"
-              />
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => handleKeyDown(e, handleSearch)}
+                  placeholder="Name or SAM..."
+                  className="h-8 w-48 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-default)] px-2 text-caption text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)]"
+                  data-testid="links-search-input"
+                />
+                <button
+                  className="btn btn-sm rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2.5 py-1 text-caption font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors flex items-center gap-1"
+                  onClick={handleSearch}
+                  disabled={searching || searchQuery.trim().length < 2}
+                >
+                  <Search size={14} />
+                </button>
+              </div>
             </div>
-            <button
-              className="btn btn-sm btn-primary flex items-center gap-1"
-              onClick={fetchGpoLinks}
-              disabled={linksLoading || !objectDn.trim()}
-              data-testid="links-search-button"
-            >
-              <Search size={14} />
-              Load GPOs
-            </button>
+
+            {searchResults.length > 0 && (
+              <div className="flex flex-col gap-1">
+                <label className="text-[11px] font-medium text-[var(--color-text-secondary)]">
+                  Select result
+                </label>
+                <select
+                  value={objectDn}
+                  onChange={(e) => {
+                    setObjectDn(e.target.value);
+                    if (e.target.value) {
+                      // Auto-fetch GPO links on selection
+                      setLinksLoading(true);
+                      setLinksError(null);
+                      invoke<GpoLinksResult>("get_gpo_links", { objectDn: e.target.value })
+                        .then(setLinksResult)
+                        .catch((err) => setLinksError(extractErrorMessage(err)))
+                        .finally(() => setLinksLoading(false));
+                    }
+                  }}
+                  className="h-8 max-w-xs rounded border border-[var(--color-border-default)] bg-[var(--color-surface-default)] px-2 text-caption text-[var(--color-text-primary)]"
+                  data-testid="links-object-dn"
+                >
+                  <option value="">Pick...</option>
+                  {searchResults.map((r) => (
+                    <option key={r.distinguishedName} value={r.distinguishedName}>
+                      {r.displayName || r.samAccountName || r.distinguishedName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] font-medium text-[var(--color-text-secondary)]">
+                Or select OU
+              </label>
+              <select
+                value={objectDn}
+                onChange={(e) => {
+                  setObjectDn(e.target.value);
+                  if (e.target.value) {
+                    setLinksLoading(true);
+                    setLinksError(null);
+                    invoke<GpoLinksResult>("get_gpo_links", { objectDn: e.target.value })
+                      .then(setLinksResult)
+                      .catch((err) => setLinksError(extractErrorMessage(err)))
+                      .finally(() => setLinksLoading(false));
+                  }
+                }}
+                className="h-8 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-default)] px-2 text-caption text-[var(--color-text-primary)]"
+                data-testid="links-ou-select"
+              >
+                <option value="">Choose OU...</option>
+                {flatOUs.map((ou) => (
+                  <option key={ou.dn} value={ou.dn}>
+                    {ou.label}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {linksError && <ErrorBanner message={linksError} />}
@@ -341,33 +445,23 @@ export function GpoViewer() {
       {viewMode === "whatif" && (
         <div className="flex flex-col gap-4">
           <div className="flex flex-wrap items-end gap-3">
-            <div className="flex flex-1 flex-col gap-1">
+            <div className="flex flex-col gap-1">
               <label className="text-[11px] font-medium text-[var(--color-text-secondary)]">
                 Target OU
               </label>
-              <input
-                type="text"
+              <select
                 value={whatIfOuDn}
                 onChange={(e) => setWhatIfOuDn(e.target.value)}
-                onKeyDown={(e) => handleKeyDown(e, fetchWhatIf)}
-                placeholder="OU=Sales,DC=contoso,DC=com"
-                className="h-8 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-default)] px-2 text-caption text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)]"
+                className="h-8 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-default)] px-2 text-caption text-[var(--color-text-primary)]"
                 data-testid="whatif-ou-dn"
-              />
-            </div>
-            <div className="flex w-64 flex-col gap-1">
-              <label className="text-[11px] font-medium text-[var(--color-text-secondary)]">
-                User DN (optional)
-              </label>
-              <input
-                type="text"
-                value={whatIfUserDn}
-                onChange={(e) => setWhatIfUserDn(e.target.value)}
-                onKeyDown={(e) => handleKeyDown(e, fetchWhatIf)}
-                placeholder="CN=User,OU=..."
-                className="h-8 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-default)] px-2 text-caption text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)]"
-                data-testid="whatif-user-dn"
-              />
+              >
+                <option value="">Choose OU...</option>
+                {flatOUs.map((ou) => (
+                  <option key={ou.dn} value={ou.dn}>
+                    {ou.label}
+                  </option>
+                ))}
+              </select>
             </div>
             <button
               className="btn btn-sm btn-primary flex items-center gap-1"
