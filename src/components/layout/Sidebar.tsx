@@ -5,8 +5,6 @@ import {
   KeyRound,
   Settings,
   Home,
-  Sun,
-  Moon,
   GitCompareArrows,
   FolderSearch,
   Layers,
@@ -27,11 +25,8 @@ import {
   Info,
   type LucideIcon,
 } from "lucide-react";
-import { useState } from "react";
 import { useNavigation } from "@/contexts/NavigationContext";
-import { useTheme } from "@/hooks/useTheme";
 import { type SidebarModule } from "@/types/navigation";
-import { AboutDialog } from "@/components/common/AboutDialog";
 
 const ICON_MAP: Record<string, LucideIcon> = {
   home: Home,
@@ -57,6 +52,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   route: Route,
   sparkles: Sparkles,
   "clipboard-list": ClipboardList,
+  info: Info,
 };
 
 const MODULES: SidebarModule[] = [
@@ -249,6 +245,13 @@ const MODULES: SidebarModule[] = [
     group: "Settings",
     requiredLevel: "ReadOnly",
   },
+  {
+    id: "about",
+    label: "About",
+    icon: "info",
+    group: "Settings",
+    requiredLevel: "ReadOnly",
+  },
 ];
 
 interface SidebarProps {
@@ -258,8 +261,6 @@ interface SidebarProps {
 
 export function Sidebar({ expanded, onToggle }: SidebarProps) {
   const { openTab, activeTabId, openTabs, goHome } = useNavigation();
-  const { currentTheme: mode, toggleTheme } = useTheme();
-  const [showAbout, setShowAbout] = useState(false);
   const activeModuleId = openTabs.find((t) => t.id === activeTabId)?.moduleId;
 
   const groups = MODULES.reduce(
@@ -361,53 +362,6 @@ export function Sidebar({ expanded, onToggle }: SidebarProps) {
         ))}
       </nav>
 
-      {/* Footer - Theme toggle */}
-      <div className="border-t border-[var(--color-border-default)] p-2">
-        <button
-          className={`group relative flex w-full items-center gap-3 rounded-md px-3 py-2 text-body text-[var(--color-text-secondary)] transition-colors duration-150 hover:bg-[var(--color-sidebar-item-hover)] hover:text-[var(--color-text-primary)] ${!expanded ? "justify-center px-0" : ""}`}
-          onClick={toggleTheme}
-          title={
-            expanded ? undefined : mode === "dark" ? "Light mode" : "Dark mode"
-          }
-          data-testid="theme-toggle"
-        >
-          {mode === "dark" ? (
-            <Sun size={18} className="shrink-0" />
-          ) : (
-            <Moon size={18} className="shrink-0" />
-          )}
-          {expanded && (
-            <span className="truncate">
-              {mode === "dark" ? "Light mode" : "Dark mode"}
-            </span>
-          )}
-          {!expanded && (
-            <span className="pointer-events-none absolute left-full z-50 ml-2 whitespace-nowrap rounded-md bg-[var(--color-surface-elevated)] px-2.5 py-1.5 text-caption font-medium text-[var(--color-text-primary)] opacity-0 shadow-md transition-opacity duration-150 group-hover:opacity-100">
-              {mode === "dark" ? "Light mode" : "Dark mode"}
-            </span>
-          )}
-        </button>
-        <button
-          className={`group relative flex w-full items-center gap-3 rounded-md px-3 py-2 text-body text-[var(--color-text-secondary)] transition-colors duration-150 hover:bg-[var(--color-sidebar-item-hover)] hover:text-[var(--color-text-primary)] ${!expanded ? "justify-center px-0" : ""}`}
-          onClick={() => setShowAbout(true)}
-          title={expanded ? undefined : "About DSPanel"}
-          data-testid="about-btn"
-        >
-          <Info size={18} className="shrink-0" />
-          {expanded && <span className="truncate">About</span>}
-          {!expanded && (
-            <span className="pointer-events-none absolute left-full z-50 ml-2 whitespace-nowrap rounded-md bg-[var(--color-surface-elevated)] px-2.5 py-1.5 text-caption font-medium text-[var(--color-text-primary)] opacity-0 shadow-md transition-opacity duration-150 group-hover:opacity-100">
-              About DSPanel
-            </span>
-          )}
-        </button>
-      </div>
-      {showAbout && (
-        <AboutDialog
-          version={__APP_VERSION__}
-          onClose={() => setShowAbout(false)}
-        />
-      )}
     </aside>
   );
 }

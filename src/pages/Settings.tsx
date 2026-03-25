@@ -416,6 +416,7 @@ export function Settings() {
             </div>
           </div>
         )}
+
       </div>
 
       {/* Save bar - shown for tabs that use AppSettings (not presets/permissions which save independently) */}

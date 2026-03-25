@@ -1,50 +1,33 @@
-import { X, ExternalLink } from "lucide-react";
+import { Info, ExternalLink } from "lucide-react";
 
-interface AboutDialogProps {
-  version: string;
-  onClose: () => void;
-}
-
-export function AboutDialog({ version, onClose }: AboutDialogProps) {
+export function About() {
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-      data-testid="about-dialog-overlay"
-    >
-      <div
-        className="w-96 rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] shadow-xl"
-        data-testid="about-dialog"
-      >
-        <div className="flex items-center justify-between border-b border-[var(--color-border-default)] px-4 py-3">
-          <h2 className="text-body font-semibold text-[var(--color-text-primary)]">
-            About DSPanel
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
-            data-testid="about-dialog-close"
-          >
-            <X size={16} />
-          </button>
-        </div>
-        <div className="space-y-3 px-4 py-4">
-          <div className="text-center">
-            <h3 className="text-heading font-bold text-[var(--color-text-primary)]">DSPanel</h3>
+    <div className="flex h-full flex-col gap-4 p-4" data-testid="about-page">
+      <div className="flex items-center gap-2">
+        <Info size={20} className="text-[var(--color-text-primary)]" />
+        <h1 className="text-heading font-semibold text-[var(--color-text-primary)]">
+          About DSPanel
+        </h1>
+      </div>
+
+      <div className="max-w-lg space-y-4">
+        <div className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-6">
+          <div className="space-y-2 text-center">
+            <h2 className="text-heading font-bold text-[var(--color-text-primary)]">DSPanel</h2>
             <p className="text-body text-[var(--color-text-secondary)]">
               Active Directory Management
             </p>
             <p
-              className="mt-1 text-caption text-[var(--color-text-secondary)]"
+              className="text-caption text-[var(--color-text-secondary)]"
               data-testid="about-version"
             >
-              Version {version}
+              Version {__APP_VERSION__}
             </p>
           </div>
+        </div>
 
-          <div className="space-y-2 rounded-md bg-[var(--color-surface-card)] p-3">
+        <div className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-4">
+          <div className="space-y-2">
             <div className="flex justify-between text-caption">
               <span className="text-[var(--color-text-secondary)]">License</span>
               <span className="text-[var(--color-text-primary)]">Apache-2.0</span>
@@ -54,7 +37,9 @@ export function AboutDialog({ version, onClose }: AboutDialogProps) {
               <span className="text-[var(--color-text-primary)]">Rwx-G</span>
             </div>
           </div>
+        </div>
 
+        <div className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-4">
           <div className="flex flex-col gap-1.5">
             <a
               href="https://github.com/Rwx-G/DSPanel"
