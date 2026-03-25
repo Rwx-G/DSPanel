@@ -21,11 +21,6 @@ Items deferred from QA reviews. None are blocking - all stories are PASS.
 | Epic 8 QA | Group DC cards by site in health dashboard for multi-site environments | `InfrastructureHealth.tsx`, Story 8.1 |
 | Epic 7 QA | Export snapshot history (CSV/JSON) | `SnapshotHistory.tsx`, Story 7.5 |
 | Epic 7 QA | Server-side pagination for large Recycle Bin contents | `ldap_directory.rs`, Story 7.2 |
-| Epic 12 QA | "Reset to Defaults" button per settings section | `Settings.tsx` |
-| Epic 12 QA | Batch-validate all mapped groups on component mount | `PermissionMappingSettings.tsx` |
-| Epic 12 QA | Keyboard shortcut hints in button tooltips | `AppShell.tsx` |
-| Epic 12 QA | Release notes preview in update notification bar | `UpdateNotificationBar.tsx` |
-| Epic 12 QA | Directory existence validation for export path | `Settings.tsx` |
 
 ## Dependencies (checked 2026-03-23)
 
