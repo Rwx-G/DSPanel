@@ -657,16 +657,12 @@ function ScopeTable({ links }: { links: GpoLink[] }) {
         </div>
         <div className="flex items-center gap-4 text-[11px] text-[var(--color-text-secondary)]">
           <span className="flex items-center gap-1">
-            <CheckCircle size={12} className="text-[var(--color-warning)]" />
+            <ShieldAlert size={12} className="text-[var(--color-warning)]" />
             Enforced
           </span>
+          <span className="text-[var(--color-text-secondary)]">-</span>
           <span className="flex items-center gap-1">
-            <CheckCircle size={12} className="text-[var(--color-success)]" />
-            Enabled
-          </span>
-          <span className="flex items-center gap-1">
-            <XCircle size={12} className="text-[var(--color-error)]" />
-            Disabled
+            not enforced
           </span>
         </div>
       </div>
@@ -676,7 +672,7 @@ function ScopeTable({ links }: { links: GpoLink[] }) {
             <tr className="bg-[var(--color-surface-card)] text-left text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">
               <th className="px-3 py-2">Container</th>
               <th className="px-3 py-2 text-center">Enforced</th>
-              <th className="px-3 py-2 text-center">Disabled</th>
+              <th className="px-3 py-2 text-center">Status</th>
             </tr>
           </thead>
           <tbody>
@@ -707,15 +703,13 @@ function ScopeTable({ links }: { links: GpoLink[] }) {
                 </td>
                 <td className="px-3 py-2 text-center">
                   {link.isDisabled ? (
-                    <XCircle
-                      size={14}
-                      className="inline-block text-[var(--color-error)]"
-                    />
+                    <span className="inline-flex rounded-full bg-[var(--color-error)]/10 px-2 py-0.5 text-[10px] font-medium text-[var(--color-error)]">
+                      Disabled
+                    </span>
                   ) : (
-                    <CheckCircle
-                      size={14}
-                      className="inline-block text-[var(--color-success)]"
-                    />
+                    <span className="inline-flex rounded-full bg-[var(--color-success)]/10 px-2 py-0.5 text-[10px] font-medium text-[var(--color-success)]">
+                      Active
+                    </span>
                   )}
                 </td>
               </tr>
