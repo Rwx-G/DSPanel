@@ -103,6 +103,7 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_window_state::Builder::default().build())
         .manage(app_state)
         .setup(|app| {
             // Detect permissions from AD groups on startup
