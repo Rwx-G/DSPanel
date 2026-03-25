@@ -2,7 +2,7 @@ use tauri::State;
 
 use crate::error::AppError;
 use crate::models::DirectoryEntry;
-use crate::services::audit::AuditEntry;
+use crate::services::audit::{AuditEntry, AuditFilter, AuditQueryResult};
 use crate::services::comparison::GroupComparisonResult;
 use crate::services::mfa::{MfaConfig, MfaSetupResult};
 use crate::services::password::{HibpResult, PasswordOptions};
@@ -509,6 +509,48 @@ pub fn audit_log(
             .audit_service
             .log_failure(&action, &target_dn, &details);
     }
+}
+
+/// Queries audit log entries with filters and pagination.
+#[tauri::command]
+pub fn query_audit_log(
+    filter: AuditFilter,
+    state: State<'_, AppState>,
+) -> AuditQueryResult {
+    query_audit_log_inner(&state, &filter)
+}
+
+pub(crate) fn query_audit_log_inner(state: &AppState, filter: &AuditFilter) -> AuditQueryResult {
+    state.audit_service.query_filtered(filter)
+}
+
+/// Returns distinct action types from the audit log (for filter dropdown).
+#[tauri::command]
+pub fn get_audit_action_types(state: State<'_, AppState>) -> Vec<String> {
+    get_audit_action_types_inner(&state)
+}
+
+pub(crate) fn get_audit_action_types_inner(state: &AppState) -> Vec<String> {
+    state.audit_service.distinct_actions()
+}
+
+/// Purges audit entries older than the specified number of days.
+/// Returns the number of deleted entries.
+#[tauri::command]
+pub fn purge_audit_entries(retention_days: i64, state: State<'_, AppState>) -> usize {
+    purge_audit_entries_inner(&state, retention_days)
+}
+
+pub(crate) fn purge_audit_entries_inner(state: &AppState, retention_days: i64) -> usize {
+    let deleted = state.audit_service.purge_older_than(retention_days);
+    if deleted > 0 {
+        tracing::info!(
+            deleted_count = deleted,
+            retention_days = retention_days,
+            "Audit log: purged old entries"
+        );
+    }
+    deleted
 }
 
 /// Adds a user to a group.

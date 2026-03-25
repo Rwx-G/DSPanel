@@ -196,6 +196,175 @@ impl AuditService {
         })
         .unwrap_or(0)
     }
+
+    /// Queries audit entries with optional filters and pagination.
+    /// Returns matching entries and total count (for pagination).
+    pub fn query_filtered(&self, filter: &AuditFilter) -> AuditQueryResult {
+        let conn = self.conn.lock().expect("lock poisoned");
+
+        let mut where_clauses: Vec<String> = Vec::new();
+        let mut params: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
+
+        if let Some(ref from) = filter.date_from {
+            where_clauses.push(format!("timestamp >= ?{}", params.len() + 1));
+            params.push(Box::new(from.clone()));
+        }
+        if let Some(ref to) = filter.date_to {
+            where_clauses.push(format!("timestamp <= ?{}", params.len() + 1));
+            params.push(Box::new(to.clone()));
+        }
+        if let Some(ref user) = filter.operator {
+            if !user.is_empty() {
+                where_clauses.push(format!("operator LIKE ?{}", params.len() + 1));
+                params.push(Box::new(format!("%{}%", user)));
+            }
+        }
+        if let Some(ref action) = filter.action {
+            if !action.is_empty() {
+                where_clauses.push(format!("action = ?{}", params.len() + 1));
+                params.push(Box::new(action.clone()));
+            }
+        }
+        if let Some(ref target) = filter.target_dn {
+            if !target.is_empty() {
+                where_clauses.push(format!("target_dn LIKE ?{}", params.len() + 1));
+                params.push(Box::new(format!("%{}%", target)));
+            }
+        }
+        if let Some(success) = filter.success {
+            where_clauses.push(format!("success = ?{}", params.len() + 1));
+            params.push(Box::new(success as i32));
+        }
+
+        let where_sql = if where_clauses.is_empty() {
+            String::new()
+        } else {
+            format!("WHERE {}", where_clauses.join(" AND "))
+        };
+
+        // Count total matching
+        let count_sql = format!("SELECT COUNT(*) FROM audit_entries {}", where_sql);
+        let param_refs: Vec<&dyn rusqlite::types::ToSql> = params.iter().map(|p| &**p).collect();
+        let total_count = conn
+            .query_row(&count_sql, param_refs.as_slice(), |row| {
+                row.get::<_, i64>(0).map(|n| n as usize)
+            })
+            .unwrap_or(0);
+
+        // Fetch page
+        let offset = filter.page * filter.page_size;
+        let query_sql = format!(
+            "SELECT timestamp, operator, action, target_dn, details, success
+             FROM audit_entries {} ORDER BY id DESC LIMIT ?{} OFFSET ?{}",
+            where_sql,
+            params.len() + 1,
+            params.len() + 2,
+        );
+        params.push(Box::new(filter.page_size as i64));
+        params.push(Box::new(offset as i64));
+
+        let param_refs: Vec<&dyn rusqlite::types::ToSql> = params.iter().map(|p| &**p).collect();
+        let mut stmt = conn
+            .prepare(&query_sql)
+            .expect("Failed to prepare filtered audit query");
+
+        let entries = stmt
+            .query_map(param_refs.as_slice(), |row| {
+                Ok(AuditEntry {
+                    timestamp: row.get(0)?,
+                    operator: row.get(1)?,
+                    action: row.get(2)?,
+                    target_dn: row.get(3)?,
+                    details: row.get(4)?,
+                    success: row.get::<_, i32>(5)? != 0,
+                })
+            })
+            .expect("Failed to query filtered audit entries")
+            .filter_map(|r| r.ok())
+            .collect();
+
+        AuditQueryResult {
+            entries,
+            total_count,
+        }
+    }
+
+    /// Returns distinct action types from the audit log.
+    pub fn distinct_actions(&self) -> Vec<String> {
+        let conn = self.conn.lock().expect("lock poisoned");
+        let mut stmt = conn
+            .prepare("SELECT DISTINCT action FROM audit_entries ORDER BY action")
+            .expect("Failed to prepare distinct actions query");
+
+        stmt.query_map([], |row| row.get(0))
+            .expect("Failed to query distinct actions")
+            .filter_map(|r| r.ok())
+            .collect()
+    }
+
+    /// Deletes audit entries older than the specified number of days.
+    /// Returns the number of deleted entries.
+    pub fn purge_older_than(&self, retention_days: i64) -> usize {
+        let cutoff = chrono::Utc::now() - chrono::Duration::days(retention_days);
+        let cutoff_str = cutoff.to_rfc3339();
+        let conn = self.conn.lock().expect("lock poisoned");
+        conn.execute(
+            "DELETE FROM audit_entries WHERE timestamp < ?1",
+            rusqlite::params![cutoff_str],
+        )
+        .unwrap_or(0)
+    }
+}
+
+/// Filter parameters for querying audit entries.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AuditFilter {
+    /// Start of date range (ISO 8601 / RFC 3339).
+    pub date_from: Option<String>,
+    /// End of date range (ISO 8601 / RFC 3339).
+    pub date_to: Option<String>,
+    /// Partial match on operator name.
+    pub operator: Option<String>,
+    /// Exact match on action type.
+    pub action: Option<String>,
+    /// Partial match on target DN.
+    pub target_dn: Option<String>,
+    /// Filter by success/failure.
+    pub success: Option<bool>,
+    /// Page number (0-based).
+    #[serde(default)]
+    pub page: usize,
+    /// Page size (default 50).
+    #[serde(default = "default_page_size")]
+    pub page_size: usize,
+}
+
+fn default_page_size() -> usize {
+    50
+}
+
+impl Default for AuditFilter {
+    fn default() -> Self {
+        Self {
+            date_from: None,
+            date_to: None,
+            operator: None,
+            action: None,
+            target_dn: None,
+            success: None,
+            page: 0,
+            page_size: 50,
+        }
+    }
+}
+
+/// Result of a filtered audit query with pagination info.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AuditQueryResult {
+    pub entries: Vec<AuditEntry>,
+    pub total_count: usize,
 }
 
 #[allow(clippy::unwrap_used)]
@@ -475,5 +644,186 @@ mod tests {
         assert_eq!(entries.len(), 100);
         // Most recent first
         assert_eq!(entries[0].action, "Action99");
+    }
+
+    // -----------------------------------------------------------------------
+    // Filtered query tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_query_filtered_no_filters() {
+        let svc = AuditService::new_in_memory();
+        svc.log_success("A", "dn1", "d1");
+        svc.log_failure("B", "dn2", "d2");
+
+        let result = svc.query_filtered(&AuditFilter::default());
+        assert_eq!(result.total_count, 2);
+        assert_eq!(result.entries.len(), 2);
+    }
+
+    #[test]
+    fn test_query_filtered_by_action() {
+        let svc = AuditService::new_in_memory();
+        svc.log_success("PasswordReset", "dn1", "d1");
+        svc.log_success("AccountEnabled", "dn2", "d2");
+        svc.log_success("PasswordReset", "dn3", "d3");
+
+        let filter = AuditFilter {
+            action: Some("PasswordReset".to_string()),
+            ..Default::default()
+        };
+        let result = svc.query_filtered(&filter);
+        assert_eq!(result.total_count, 2);
+        assert!(result.entries.iter().all(|e| e.action == "PasswordReset"));
+    }
+
+    #[test]
+    fn test_query_filtered_by_operator() {
+        let svc = AuditService::new_in_memory();
+        svc.log_success("A", "dn1", "d1");
+
+        let filter = AuditFilter {
+            operator: Some(svc.operator.lock().unwrap().clone()),
+            ..Default::default()
+        };
+        let result = svc.query_filtered(&filter);
+        assert_eq!(result.total_count, 1);
+    }
+
+    #[test]
+    fn test_query_filtered_by_target_partial() {
+        let svc = AuditService::new_in_memory();
+        svc.log_success("A", "CN=John,OU=Users,DC=test,DC=com", "d1");
+        svc.log_success("B", "CN=Jane,OU=Admins,DC=test,DC=com", "d2");
+
+        let filter = AuditFilter {
+            target_dn: Some("OU=Users".to_string()),
+            ..Default::default()
+        };
+        let result = svc.query_filtered(&filter);
+        assert_eq!(result.total_count, 1);
+        assert_eq!(result.entries[0].action, "A");
+    }
+
+    #[test]
+    fn test_query_filtered_by_success() {
+        let svc = AuditService::new_in_memory();
+        svc.log_success("A", "dn", "ok");
+        svc.log_failure("B", "dn", "err");
+        svc.log_success("C", "dn", "ok");
+
+        let filter = AuditFilter {
+            success: Some(false),
+            ..Default::default()
+        };
+        let result = svc.query_filtered(&filter);
+        assert_eq!(result.total_count, 1);
+        assert!(!result.entries[0].success);
+    }
+
+    #[test]
+    fn test_query_filtered_pagination() {
+        let svc = AuditService::new_in_memory();
+        for i in 0..25 {
+            svc.log_success(&format!("Action{}", i), "dn", "d");
+        }
+
+        let filter = AuditFilter {
+            page: 0,
+            page_size: 10,
+            ..Default::default()
+        };
+        let result = svc.query_filtered(&filter);
+        assert_eq!(result.total_count, 25);
+        assert_eq!(result.entries.len(), 10);
+
+        let filter2 = AuditFilter {
+            page: 2,
+            page_size: 10,
+            ..Default::default()
+        };
+        let result2 = svc.query_filtered(&filter2);
+        assert_eq!(result2.entries.len(), 5);
+    }
+
+    #[test]
+    fn test_query_filtered_empty_strings_ignored() {
+        let svc = AuditService::new_in_memory();
+        svc.log_success("A", "dn", "d");
+
+        let filter = AuditFilter {
+            operator: Some("".to_string()),
+            action: Some("".to_string()),
+            target_dn: Some("".to_string()),
+            ..Default::default()
+        };
+        let result = svc.query_filtered(&filter);
+        assert_eq!(result.total_count, 1);
+    }
+
+    // -----------------------------------------------------------------------
+    // Distinct actions tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_distinct_actions() {
+        let svc = AuditService::new_in_memory();
+        svc.log_success("PasswordReset", "dn", "d");
+        svc.log_success("AccountEnabled", "dn", "d");
+        svc.log_success("PasswordReset", "dn", "d");
+
+        let actions = svc.distinct_actions();
+        assert_eq!(actions.len(), 2);
+        assert!(actions.contains(&"AccountEnabled".to_string()));
+        assert!(actions.contains(&"PasswordReset".to_string()));
+    }
+
+    #[test]
+    fn test_distinct_actions_empty() {
+        let svc = AuditService::new_in_memory();
+        let actions = svc.distinct_actions();
+        assert!(actions.is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // Purge tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_purge_older_than() {
+        let svc = AuditService::new_in_memory();
+
+        // Insert an entry with an old timestamp directly
+        let old_ts = "2020-01-01T00:00:00+00:00";
+        {
+            let conn = svc.conn.lock().unwrap();
+            conn.execute(
+                "INSERT INTO audit_entries (timestamp, operator, action, target_dn, details, success)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                rusqlite::params![old_ts, "test", "OldAction", "dn", "old", 1],
+            )
+            .unwrap();
+        }
+
+        // Insert a recent entry
+        svc.log_success("RecentAction", "dn", "recent");
+
+        assert_eq!(svc.count(), 2);
+
+        let deleted = svc.purge_older_than(365);
+        assert_eq!(deleted, 1);
+        assert_eq!(svc.count(), 1);
+
+        let entries = svc.get_entries();
+        assert_eq!(entries[0].action, "RecentAction");
+    }
+
+    #[test]
+    fn test_purge_nothing_to_delete() {
+        let svc = AuditService::new_in_memory();
+        svc.log_success("Recent", "dn", "d");
+        let deleted = svc.purge_older_than(365);
+        assert_eq!(deleted, 0);
+        assert_eq!(svc.count(), 1);
     }
 }

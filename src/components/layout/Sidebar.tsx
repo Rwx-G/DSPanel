@@ -23,6 +23,7 @@ import {
   Radar,
   Route,
   Sparkles,
+  ClipboardList,
   type LucideIcon,
 } from "lucide-react";
 import { useNavigation } from "@/contexts/NavigationContext";
@@ -52,6 +53,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   radar: Radar,
   route: Route,
   sparkles: Sparkles,
+  "clipboard-list": ClipboardList,
 };
 
 const MODULES: SidebarModule[] = [
@@ -187,6 +189,13 @@ const MODULES: SidebarModule[] = [
     icon: "shield",
     group: "Security",
     requiredLevel: "DomainAdmin",
+  },
+  {
+    id: "audit-log",
+    label: "Activity Journal",
+    icon: "clipboard-list",
+    group: "Tools",
+    requiredLevel: "ReadOnly",
   },
   {
     id: "ntfs-analyzer",

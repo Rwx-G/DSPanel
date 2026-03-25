@@ -34,6 +34,7 @@ import { AttackDetection } from "@/pages/AttackDetection";
 import { EscalationPaths } from "@/pages/EscalationPaths";
 import { AutomatedCleanup } from "@/pages/AutomatedCleanup";
 import { ComplianceReports } from "@/pages/ComplianceReports";
+import { AuditLog } from "@/pages/AuditLog";
 
 const APP_VERSION = __APP_VERSION__;
 
@@ -183,6 +184,7 @@ const MODULE_COMPONENTS: Record<
   "escalation-paths": EscalationPaths,
   "automated-cleanup": AutomatedCleanup,
   "compliance-reports": ComplianceReports,
+  "audit-log": AuditLog,
 };
 
 function ModuleRouter({ status }: { status: AppStatus }) {

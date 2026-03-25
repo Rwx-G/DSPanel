@@ -162,6 +162,28 @@ pub fn run() {
                 }
             }
 
+            // Run audit log retention cleanup at startup
+            {
+                let retention_days = state
+                    .app_settings
+                    .get()
+                    .audit_retention_days
+                    .unwrap_or(365);
+                let purged = state.audit_service.purge_older_than(retention_days);
+                if purged > 0 {
+                    tracing::info!(
+                        purged_count = purged,
+                        retention_days = retention_days,
+                        "Audit log: startup cleanup completed"
+                    );
+                    state.audit_service.log_success(
+                        "AuditPurge",
+                        "audit_log",
+                        &format!("Purged {} entries older than {} days", purged, retention_days),
+                    );
+                }
+            }
+
             tracing::info!("DSPanel setup complete");
             Ok(())
         })
@@ -195,6 +217,9 @@ pub fn run() {
             commands::set_password_flags,
             commands::get_audit_entries,
             commands::audit_log,
+            commands::query_audit_log,
+            commands::get_audit_action_types,
+            commands::purge_audit_entries,
             commands::generate_password,
             commands::check_password_hibp,
             commands::mfa_setup,
