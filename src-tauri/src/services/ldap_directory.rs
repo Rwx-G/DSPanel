@@ -422,8 +422,17 @@ impl LdapDirectoryProvider {
                 Ok(result)
             }
             Err(err) => {
-                if Self::is_transient_error(&err) {
-                    tracing::warn!("LDAP transient error, reconnecting: {}", err);
+                // After a proactive invalidation, always retry once regardless
+                // of error classification - the fresh connection may have residual
+                // state from the dead socket that produces unexpected errors.
+                let should_retry = needs_invalidation || Self::is_transient_error(&err);
+                if should_retry {
+                    tracing::warn!(
+                        proactive = needs_invalidation,
+                        "LDAP error after {}, reconnecting: {}",
+                        if needs_invalidation { "proactive reconnect" } else { "transient error" },
+                        err
+                    );
                     self.invalidate_connection().await;
                     let ldap = self.get_connection().await?;
                     let retry_result = operation(ldap).await;
