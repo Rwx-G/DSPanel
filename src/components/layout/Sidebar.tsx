@@ -198,13 +198,6 @@ const MODULES: SidebarModule[] = [
     requiredLevel: "DomainAdmin",
   },
   {
-    id: "audit-log",
-    label: "Activity Journal",
-    icon: "clipboard-list",
-    group: "Tools",
-    requiredLevel: "ReadOnly",
-  },
-  {
     id: "ntfs-analyzer",
     label: "NTFS Analyzer",
     icon: "folder-search",
@@ -238,6 +231,13 @@ const MODULES: SidebarModule[] = [
     icon: "user",
     group: "Workflows",
     requiredLevel: "AccountOperator",
+  },
+  {
+    id: "audit-log",
+    label: "Activity Journal",
+    icon: "clipboard-list",
+    group: "Settings",
+    requiredLevel: "ReadOnly",
   },
 ];
 
