@@ -172,7 +172,9 @@ describe("PresetManagement", () => {
 
     fireEvent.click(screen.getByTestId("preset-item-0"));
 
-    expect(screen.getByTestId("preset-editor-form")).toBeDefined();
+    await waitFor(() => {
+      expect(screen.getByTestId("preset-editor-form")).toBeDefined();
+    });
     expect(
       (screen.getByTestId("preset-name-input") as HTMLInputElement).value,
     ).toBe("Dev Onboarding");
@@ -191,7 +193,9 @@ describe("PresetManagement", () => {
 
     fireEvent.click(screen.getByTestId("preset-new-btn"));
 
-    expect(screen.getByTestId("preset-editor-form")).toBeDefined();
+    await waitFor(() => {
+      expect(screen.getByTestId("preset-editor-form")).toBeDefined();
+    });
     expect(
       (screen.getByTestId("preset-name-input") as HTMLInputElement).value,
     ).toBe("");
