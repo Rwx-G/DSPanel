@@ -1,0 +1,48 @@
+schema: 1
+story: "10.4"
+story_title: "Compliance Report Templates"
+gate: PASS
+status_reason: "All 9 ACs met. Template library with 4 built-in templates (GDPR, HIPAA, SOX, PCI-DSS). Each template has sections with control references and data queries. Report generation executes 4 query scopes (privilegedAccounts, inactiveAccounts, disabledAccounts, passwordNeverExpires). Generated reports include timestamp, generator, and version metadata. HTML export with cover page, table of contents, styled tables, and XSS-safe escaping. Custom template CRUD via AppSettings. DomainAdmin gating on all commands."
+reviewer: "Quinn (Test Architect)"
+updated: "2026-03-24T16:00:00Z"
+
+waiver: { active: false }
+
+top_issues: []
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 18
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9]
+    ac_gaps: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "DomainAdmin permission enforced on report generation, template CRUD, and HTML export. HTML output escapes all special characters. No secrets in templates."
+  performance:
+    status: PASS
+    notes: "Each query scope limited to 5000 accounts. Report generation is async with per-section query execution."
+  reliability:
+    status: PASS
+    notes: "Unknown query scopes return empty results gracefully. Template serde roundtrip validated. HTML generation handles empty sections."
+  maintainability:
+    status: PASS
+    notes: "Built-in templates defined as Rust functions for type safety. Custom templates stored in AppSettings JSON. Clean separation between template definition, report generation, and HTML rendering. 5 Tauri commands with clear responsibilities."
+
+risk_summary:
+  totals: { critical: 0, high: 0, medium: 0, low: 0 }
+  recommendations:
+    must_fix: []
+    monitor: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: "Add PDF export for compliance reports alongside HTML"
+      refs: ["src-tauri/src/commands/compliance.rs", "src-tauri/src/services/compliance.rs"]
+    - action: "Add template import/export for sharing between DSPanel instances"
+      refs: ["src-tauri/src/commands/compliance.rs"]

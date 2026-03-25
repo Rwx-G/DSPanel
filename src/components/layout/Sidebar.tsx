@@ -22,6 +22,7 @@ import {
   Gauge,
   Radar,
   Route,
+  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 import { useNavigation } from "@/contexts/NavigationContext";
@@ -50,6 +51,7 @@ const ICON_MAP: Record<string, LucideIcon> = {
   gauge: Gauge,
   radar: Radar,
   route: Route,
+  sparkles: Sparkles,
 };
 
 const MODULES: SidebarModule[] = [
@@ -117,6 +119,13 @@ const MODULES: SidebarModule[] = [
     requiredLevel: "DomainAdmin",
   },
   {
+    id: "automated-cleanup",
+    label: "Automated Cleanup",
+    icon: "sparkles",
+    group: "Directory",
+    requiredLevel: "DomainAdmin",
+  },
+  {
     id: "infrastructure-health",
     label: "Infrastructure Health",
     icon: "activity",
@@ -169,6 +178,13 @@ const MODULES: SidebarModule[] = [
     id: "escalation-paths",
     label: "Escalation Paths",
     icon: "route",
+    group: "Security",
+    requiredLevel: "DomainAdmin",
+  },
+  {
+    id: "compliance-reports",
+    label: "Compliance Reports",
+    icon: "shield",
     group: "Security",
     requiredLevel: "DomainAdmin",
   },

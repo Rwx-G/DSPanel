@@ -7,6 +7,77 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- PDF export: page numbers in footer ("Page 1", "Page 2", etc.)
+- Cleanup rules: exclusion patterns for service accounts by SAM name (glob: svc_*, admin*) and by OU
+- Compliance: 5 new frameworks (ISO 27001, NIST 800-53, CIS v8, NIS2, ANSSI) - total 9
+- Compliance: 3 new checks (PASSWD_NOTREQD, reversible encryption, stale passwords >90d)
+- Compliance: compliance score (0-100) with per-framework breakdown
+- Compliance: severity badges (Critical/High/Medium/Low) per check
+- Compliance: PowerShell remediation commands in all reports
+- Compliance: per-framework HTML report export for auditors
+
+### Changed
+
+- Compliance: refactored from template-per-framework (Model A) to check-first with multi-framework mapping (Model B)
+- Compliance: corrected control references (GDPR Art.25->32, SOX Section 302->ITGC APD, PCI-DSS v3.2.1->v4.0)
+- Compliance: single scan runs 7 checks once, computes 9 framework scores simultaneously
+- Export: replaced single-format buttons with ExportToolbar on SecurityDashboard, RiskScore, DnsKerberos
+- Export: added ExportToolbar to UserComparison, GroupDetail, InfrastructureHealth
+- GroupHygiene: export includes all 7 categories, button visible from start
+
+### Fixed
+
+- Compliance: use authenticated LDAP user instead of OS username for report generator
+- Compliance: format raw AD timestamps to human-readable dates
+- Compliance: friendly column headers instead of raw attribute names
+- RiskScore: round pointsDeducted to 2 decimals in export
+- InfrastructureHealth: group export rows by DC (empty DC column for subsequent checks)
+- UserComparison: show user names in export title and category column
+
+## [0.10.0] - 2026-03-24
+
+Epic 10 - Reports, Export and Compliance. Multi-format export from any
+table view, automated stale account cleanup, and compliance report
+templates with framework control mapping.
+
+### Added
+
+#### Multi-Format Export (10.1)
+- Export any table view to CSV, PDF, XLSX, or HTML via reusable ExportToolbar dropdown
+- CSV: UTF-8 BOM, configurable delimiter (comma, semicolon, tab)
+- PDF: printpdf with built-in Helvetica, A4 landscape, auto-pagination
+- XLSX: rust_xlsxwriter with bold headers, auto-filters, auto-fit widths, numeric detection
+- HTML: self-contained with inline CSS, striped rows, timestamp, row count
+- ExportToolbar integrated in UserDetail, ComputerDetail, GroupHygiene, ReplicationStatus
+- Tauri `export_table` command with format selection and save dialog
+- New dependencies: printpdf 0.3, rust_xlsxwriter 0.82
+
+#### Automated Cleanup (10.3)
+- Cleanup rule engine with 3 condition types: inactive days, never logged on + created days, disabled days
+- 3 action types: disable account, move to OU, delete
+- Mandatory dry-run with selectable matches table before execution
+- Double confirmation for delete actions
+- Protected account exclusion (Administrator, krbtgt, Guest, DefaultAccount)
+- All actions audit-logged via AuditService
+- Rules persist in app-settings.json
+- DomainAdmin permission gating (backend + sidebar)
+
+#### Compliance Reports (10.4)
+- 4 built-in compliance templates: GDPR, HIPAA, SOX, PCI-DSS
+- Each template section maps to specific framework control references
+- Report generation engine with 4 query scopes (privilegedAccounts, inactiveAccounts, disabledAccounts, passwordNeverExpires)
+- Professional HTML report export with cover page, table of contents, and control reference badges
+- Custom template editor with data and static section types
+- Custom templates persist in app-settings.json
+- DomainAdmin permission gating
+
+### Fixed
+
+- Attack Detection: detect when Security Event Log is inaccessible (missing Event Log Readers membership) and display a warning banner with N/A badges instead of false "Clear" results
+- Attack Detection: use language-independent probe (Get-WinEvent -MaxEvents 1) instead of parsing localized error messages
+
 ## [0.9.0] - 2026-03-24
 
 Epic 9 - Security, Risk Scoring and Attack Detection. Security monitoring

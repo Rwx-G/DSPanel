@@ -37,6 +37,7 @@ import {
 } from "lucide-react";
 import { useDialog } from "@/contexts/DialogContext";
 import { useErrorHandler } from "@/hooks/useErrorHandler";
+import { ExportToolbar } from "@/components/common/ExportToolbar";
 
 interface NestedMemberItemProps {
   entry: DirectoryEntry;
@@ -681,6 +682,23 @@ export function GroupDetail({
             className="flex items-center gap-2"
             data-testid="member-management-controls"
           >
+              <ExportToolbar<DirectoryEntry>
+                columns={[
+                  { key: "displayName", header: "Display Name" },
+                  { key: "samAccountName", header: "SAM Account" },
+                  { key: "objectClass", header: "Type" },
+                  { key: "distinguishedName", header: "DN" },
+                ]}
+                data={members}
+                rowMapper={(m) => [
+                  m.displayName ?? "",
+                  m.samAccountName ?? "",
+                  m.objectClass ?? "",
+                  m.distinguishedName,
+                ]}
+                title={`${group.displayName || group.samAccountName} - Members`}
+                filenameBase={`${group.samAccountName}_members`}
+              />
               <div className="relative" ref={addDropdownRef}>
                 <button
                   className={`btn btn-outline btn-sm flex items-center gap-1 ${showAddDropdown ? "bg-[var(--color-primary-subtle)] border-[var(--color-primary)]" : ""}`}

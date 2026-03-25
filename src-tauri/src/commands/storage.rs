@@ -1113,6 +1113,64 @@ pub async fn save_file_dialog(
     }
 }
 
+/// Exports tabular data to the specified format via a save file dialog.
+///
+/// Supports CSV, HTML, PDF, and XLSX. For text formats (CSV, HTML), the generated
+/// content is written as UTF-8. For binary formats (PDF, XLSX), raw bytes are written.
+#[tauri::command]
+pub async fn export_table(
+    columns: Vec<crate::services::export::ColumnDefinition>,
+    rows: Vec<crate::services::export::ExportRow>,
+    format: String,
+    title: String,
+    default_name: String,
+    csv_options: Option<crate::services::export::CsvOptions>,
+) -> Result<Option<String>, AppError> {
+    use crate::services::export;
+
+    let (data, filter_name, filter_ext): (Vec<u8>, &str, &str) = match format.as_str() {
+        "csv" => {
+            let opts = csv_options.unwrap_or_default();
+            let bytes = export::export_to_csv(&columns, &rows, &opts)?;
+            (bytes, "CSV files", "csv")
+        }
+        "html" => {
+            let html = export::export_to_html(&columns, &rows, &title)?;
+            (html.into_bytes(), "HTML files", "html")
+        }
+        "pdf" => {
+            let bytes = export::export_to_pdf(&columns, &rows, &title)?;
+            (bytes, "PDF files", "pdf")
+        }
+        "xlsx" => {
+            let bytes = export::export_to_xlsx(&columns, &rows, &title)?;
+            (bytes, "Excel files", "xlsx")
+        }
+        _ => {
+            return Err(AppError::Validation(format!(
+                "Unsupported export format: {format}"
+            )));
+        }
+    };
+
+    let dialog = rfd::AsyncFileDialog::new()
+        .set_file_name(&default_name)
+        .add_filter(filter_name, &[filter_ext]);
+
+    let handle = dialog.save_file().await;
+
+    match handle {
+        Some(file) => {
+            let path = file.path().to_string_lossy().to_string();
+            tokio::fs::write(file.path(), &data)
+                .await
+                .map_err(|e| AppError::Internal(format!("Failed to write file: {e}")))?;
+            Ok(Some(path))
+        }
+        None => Ok(None),
+    }
+}
+
 /// Opens a native folder picker dialog and returns the selected path, or None if cancelled.
 #[tauri::command]
 pub async fn pick_folder_dialog() -> Result<Option<String>, AppError> {

@@ -9,7 +9,6 @@ import {
   AlertTriangle,
   Globe,
   Clock,
-  Download,
 } from "lucide-react";
 import {
   type DnsKerberosReport,
@@ -17,6 +16,7 @@ import {
   type ClockSkewStatus,
 } from "@/types/dns-validation";
 import { extractErrorMessage } from "@/utils/errorMapping";
+import { ExportToolbar } from "@/components/common/ExportToolbar";
 
 function dnsStatusColor(status: DnsRecordStatus): string {
   switch (status) {
@@ -113,33 +113,6 @@ export function DnsKerberosValidation() {
     runValidation();
   }, [runValidation]);
 
-  const exportCsv = useCallback(() => {
-    if (!report) return;
-
-    const lines = ["Type,Record/DC,Status,Details"];
-
-    for (const dns of report.dnsResults) {
-      const details = `Expected: ${dns.expectedHosts.join(";")} | Actual: ${dns.actualHosts.join(";")}`;
-      lines.push(
-        `DNS,"${dns.recordName}",${dns.status},"${details.replace(/"/g, '""')}"`,
-      );
-    }
-
-    for (const skew of report.clockSkewResults) {
-      lines.push(
-        `Clock Skew,"${skew.dcHostname}",${skew.status},"${skew.skewSeconds}s offset"`,
-      );
-    }
-
-    const blob = new Blob([lines.join("\n")], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `dns-kerberos-validation-${new Date().toISOString().slice(0, 10)}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
-  }, [report]);
-
   const dnsPassCount =
     report?.dnsResults.filter((r) => r.status === "Pass").length ?? 0;
   const dnsFailCount =
@@ -166,16 +139,31 @@ export function DnsKerberosValidation() {
             Default Kerberos threshold: 5 min
           </span>
 
-          {report && (
-            <button
-              className="btn btn-sm flex items-center gap-1"
-              onClick={exportCsv}
-              data-testid="export-button"
-            >
-              <Download size={14} />
-              Export CSV
-            </button>
-          )}
+          <ExportToolbar<{ type: string; name: string; status: string; details: string }>
+            columns={[
+              { key: "type", header: "Type" },
+              { key: "name", header: "Record / DC" },
+              { key: "status", header: "Status" },
+              { key: "details", header: "Details" },
+            ]}
+            data={[
+              ...(report?.dnsResults.map((d) => ({
+                type: "DNS",
+                name: d.recordName,
+                status: d.status,
+                details: `Expected: ${d.expectedHosts.join(", ")} | Actual: ${d.actualHosts.join(", ")}`,
+              })) ?? []),
+              ...(report?.clockSkewResults.map((c) => ({
+                type: "Clock Skew",
+                name: c.dcHostname,
+                status: c.status,
+                details: `${c.skewSeconds}s offset`,
+              })) ?? []),
+            ]}
+            rowMapper={(r) => [r.type, r.name, r.status, r.details]}
+            title="DNS & Kerberos Validation"
+            filenameBase="dns-kerberos"
+          />
 
           <button
             className="btn btn-sm flex items-center gap-1"

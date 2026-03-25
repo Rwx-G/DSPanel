@@ -8,7 +8,7 @@
   <img src="https://img.shields.io/badge/Rust-2021-orange.svg" alt="Rust">
   <img src="https://img.shields.io/badge/Tauri-v2-blue.svg" alt="Tauri">
   <img src="https://img.shields.io/badge/Platform-Windows%20|%20macOS%20|%20Linux-0078D6.svg" alt="Platform">
-  <img src="https://img.shields.io/badge/Status-v0.9.0-brightgreen.svg" alt="Status">
+  <img src="https://img.shields.io/badge/Status-v0.10.0-brightgreen.svg" alt="Status">
 </p>
 
 ---
@@ -85,6 +85,16 @@ assignment (optional - probe-based detection works without them):
 - Windows 10/11, macOS 12+, or Linux (x64)
 - Network access to an Active Directory domain
 - (Optional) Azure AD App Registration for Entra ID / Exchange Online features
+
+### Event Log Permissions
+
+The **Attack Detection** feature reads the Windows Security Event Log on the
+target DC. If the account running DSPanel is not a member of the
+**Event Log Readers** group on that DC, the Security log is silently
+inaccessible and all checks will display **N/A** with a warning banner.
+
+To grant access, add the DSPanel user to the built-in **Event Log Readers**
+group on each monitored DC (or via Group Policy).
 
 ## Installation
 

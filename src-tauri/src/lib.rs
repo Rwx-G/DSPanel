@@ -206,6 +206,7 @@ pub fn run() {
             commands::mfa_requires,
             commands::compare_users,
             commands::save_file_dialog,
+            commands::export_table,
             commands::add_user_to_group,
             commands::get_replication_metadata,
             commands::compute_attribute_diff,
@@ -281,6 +282,13 @@ pub fn run() {
             commands::get_risk_score_history,
             commands::detect_ad_attacks,
             commands::get_escalation_paths,
+            commands::get_cleanup_rules,
+            commands::save_cleanup_rules,
+            commands::cleanup_dry_run,
+            commands::cleanup_execute,
+            commands::get_compliance_frameworks,
+            commands::run_compliance_scan,
+            commands::export_compliance_framework_report,
         ])
         .run(tauri::generate_context!())
         .unwrap_or_else(|e| {

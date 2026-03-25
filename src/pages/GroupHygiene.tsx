@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { EmptyState } from "@/components/common/EmptyState";
 import { DataTable, type Column } from "@/components/data/DataTable";
+import { ExportToolbar } from "@/components/common/ExportToolbar";
 import {
   type DirectoryEntry,
   type DirectoryGroup,
@@ -577,15 +578,38 @@ export function GroupHygiene() {
             )}
           </div>
         </div>
-        <button
-          className="btn btn-primary btn-sm flex items-center gap-1.5"
-          onClick={handleScan}
-          disabled={scanning}
-          data-testid="scan-button"
-        >
-          <Search size={14} />
-          {scanning ? "Scanning..." : "Run Scan"}
-        </button>
+        <div className="flex items-center gap-2">
+          <ExportToolbar<{ category: string; name: string; scope: string; detail: string }>
+            columns={[
+              { key: "category", header: "Category" },
+              { key: "name", header: "Group Name" },
+              { key: "scope", header: "Scope" },
+              { key: "detail", header: "Detail" },
+            ]}
+            data={[
+              ...emptyGroups.map((g) => ({ category: "Empty", name: g.displayName || g.samAccountName, scope: g.scope, detail: "No members" })),
+              ...singleMemberGroups.map((g) => ({ category: "Single Member", name: g.displayName || g.samAccountName, scope: g.scope, detail: "1 member" })),
+              ...staleGroups.map((g) => ({ category: "Stale", name: g.displayName || g.samAccountName, scope: g.scope, detail: `Last modified: ${formatWhenChanged(g)}` })),
+              ...undescribedGroups.map((g) => ({ category: "No Description", name: g.displayName || g.samAccountName, scope: g.scope, detail: "" })),
+              ...cycles.map((chain) => ({ category: "Circular Nesting", name: chain.join(" -> "), scope: "-", detail: `${chain.length} groups in cycle` })),
+              ...deeplyNested.map((d) => ({ category: "Excessive Depth", name: d.groupName, scope: "-", detail: `Depth: ${d.depth} levels` })),
+              ...duplicateGroups.map((pair) => ({ category: "Duplicate Members", name: pair.map((g) => g.displayName || g.samAccountName).join(" = "), scope: pair[0]?.scope ?? "-", detail: `${pair.length} groups with identical members` })),
+            ]}
+            rowMapper={(row) => [row.category, row.name, row.scope, row.detail]}
+            title="Group Hygiene Report"
+            filenameBase="group-hygiene"
+            disabled={!scanned}
+          />
+          <button
+            className="btn btn-primary btn-sm flex items-center gap-1.5"
+            onClick={handleScan}
+            disabled={scanning}
+            data-testid="scan-button"
+          >
+            <Search size={14} />
+            {scanning ? "Scanning..." : "Run Scan"}
+          </button>
+        </div>
       </div>
 
       {/* Placeholder containers before scan - same layout as populated sections but greyed out */}

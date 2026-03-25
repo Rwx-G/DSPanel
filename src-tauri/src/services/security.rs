@@ -3049,7 +3049,7 @@ const GUID_DS_REPL_GET_CHANGES_FILTERED: &str = "89e95b76-444d-4c62-991a-0facbed
 /// Performs on-demand attack detection by analyzing Windows Security event logs.
 ///
 /// This queries the event log for suspicious patterns over the configured time window.
-/// On non-Windows platforms or when event log access fails, returns an empty report.
+/// On non-Windows platforms, returns an empty report with `event_log_accessible: false`.
 pub async fn detect_attacks(
     _provider: Arc<dyn DirectoryProvider>,
     time_window_hours: u32,
@@ -3057,10 +3057,10 @@ pub async fn detect_attacks(
     let config = AttackDetectionConfig::default();
 
     #[cfg(target_os = "windows")]
-    let alerts = analyze_windows_event_log(time_window_hours, &config);
+    let (alerts, event_log_accessible) = analyze_windows_event_log(time_window_hours, &config);
 
     #[cfg(not(target_os = "windows"))]
-    let alerts: Vec<AttackAlert> = Vec::new();
+    let (alerts, event_log_accessible): (Vec<AttackAlert>, bool) = (Vec::new(), false);
 
     let _ = &config; // suppress unused warning on non-Windows
 
@@ -3068,7 +3068,33 @@ pub async fn detect_attacks(
         alerts,
         time_window_hours,
         scanned_at: Utc::now().to_rfc3339(),
+        event_log_accessible,
     })
+}
+
+/// Probes whether the current process can read the Windows Security event log.
+/// Uses `Get-WinEvent -MaxEvents 1` as a language-independent access check:
+/// success/failure is determined by exit code, not by parsing localized messages.
+#[cfg(target_os = "windows")]
+fn can_read_security_log() -> bool {
+    use std::process::Command;
+
+    let output = Command::new("powershell")
+        .args([
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            "try{Get-WinEvent -LogName Security -MaxEvents 1 -EA Stop>$null;'true'}catch{'false'}",
+        ])
+        .output();
+
+    match output {
+        Ok(o) => {
+            let stdout = String::from_utf8_lossy(&o.stdout);
+            stdout.trim() == "true"
+        }
+        Err(_) => false,
+    }
 }
 
 /// Runs a PowerShell query for a batch of event IDs and returns parsed event records.
@@ -3136,11 +3162,18 @@ fn query_events(event_ids: &[u32], time_window_hours: u32) -> Vec<EventRecord> {
 }
 
 /// Analyzes Windows Security event log for attack indicators using structured parsing.
+/// Returns `(alerts, event_log_accessible)`.
 #[cfg(target_os = "windows")]
 fn analyze_windows_event_log(
     time_window_hours: u32,
     config: &AttackDetectionConfig,
-) -> Vec<AttackAlert> {
+) -> (Vec<AttackAlert>, bool) {
+    // Probe: check if we can read the Security log at all (language-independent).
+    let event_log_accessible = can_read_security_log();
+    if !event_log_accessible {
+        return (Vec::new(), false);
+    }
+
     let mut alerts = Vec::new();
 
     // Batch 1: Kerberos events (4768, 4769, 4771)
@@ -3203,7 +3236,7 @@ fn analyze_windows_event_log(
 
     // Sort by severity (Critical first)
     alerts.sort_by(|a, b| b.severity.cmp(&a.severity));
-    alerts
+    (alerts, true)
 }
 
 // ---------------------------------------------------------------------------

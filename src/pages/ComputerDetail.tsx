@@ -11,6 +11,7 @@ import {
   type PropertyGroup,
 } from "@/components/data/PropertyGrid";
 import { DataTable, type Column } from "@/components/data/DataTable";
+import { ExportToolbar, type ExportColumn } from "@/components/common/ExportToolbar";
 import { FilterBar, type FilterChip } from "@/components/data/FilterBar";
 import { GroupMembersDialog } from "@/components/dialogs/GroupMembersDialog";
 import { type DirectoryComputer } from "@/types/directory";
@@ -287,9 +288,18 @@ export function ComputerDetail({
       <div className="border-t border-[var(--color-border-default)]" />
 
       <div data-testid="computer-groups-section">
-        <h3 className="mb-2 text-body font-semibold text-[var(--color-text-primary)]">
-          Group Memberships ({computer.memberOf.length})
-        </h3>
+        <div className="mb-2 flex items-center justify-between">
+          <h3 className="text-body font-semibold text-[var(--color-text-primary)]">
+            Group Memberships ({computer.memberOf.length})
+          </h3>
+          <ExportToolbar<{ name: string; dn: string }>
+            columns={groupColumns.map((c): ExportColumn => ({ key: c.key, header: c.header }))}
+            data={groupRows}
+            rowMapper={(row) => [row.name, row.dn]}
+            title={`${computer.name} - Group Memberships`}
+            filenameBase={`${computer.name}_groups`}
+          />
+        </div>
         <FilterBar
           filters={groupFilters}
           onFilterChange={setGroupFilters}

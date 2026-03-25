@@ -1,34 +1,22 @@
 # Epic 10: Reports, Export and Compliance
 
-**Goal**: Implement comprehensive reporting capabilities: CSV/PDF export from any view, scheduled report generation, automated account cleanup, and compliance-ready report templates for regulatory audits.
+**Goal**: Implement comprehensive reporting capabilities: multi-format export (CSV, PDF, XLSX, HTML) from any view, automated account cleanup, and compliance-ready report templates with control mapping for regulatory audits.
 
-### Story 10.1: CSV and PDF Export
+### Story 10.1: Multi-Format Export (CSV, PDF, XLSX, HTML)
 
 As a support technician,
-I want to export any search results, group memberships, or reports to CSV or PDF,
-so that I can share data with colleagues and document findings.
+I want to export any search results, group memberships, or reports to CSV, PDF, XLSX, or HTML,
+so that I can share data with colleagues, auditors, and managers in the format they expect.
 
 #### Acceptance Criteria
 
 1. Export button available in all list/table views (search results, group members, comparison, reports)
 2. CSV export with proper encoding (UTF-8 BOM) and delimiter options
 3. PDF export with headers, timestamps, and page numbers
-4. File save dialog with suggested filename based on context
-5. Large exports show progress indicator
-
-### Story 10.2: Scheduled Reports
-
-As a DomainAdmin,
-I want to schedule recurring reports (inactive accounts, expired passwords, empty groups),
-so that I receive regular hygiene reports without manual effort.
-
-#### Acceptance Criteria
-
-1. Report scheduler UI: select report type, frequency (daily/weekly/monthly), output format, destination (local folder or email)
-2. Available report types: inactive accounts (configurable threshold), expired passwords, password never expires, empty groups, orphaned computer accounts, privileged account summary
-3. Reports run in background (Windows Task Scheduler integration or in-app scheduler)
-4. Report history shows previous runs with status and output links
-5. DomainAdmin permission required for scheduling
+4. XLSX export with formatted table, auto-filters, and sheet name matching the view
+5. HTML export as a self-contained styled file suitable for browser viewing or email attachment
+6. File save dialog with suggested filename based on context
+7. Large exports show progress indicator
 
 ### Story 10.3: Automated Cleanup
 
@@ -48,16 +36,18 @@ so that AD stays clean without manual intervention.
 ### Story 10.4: Compliance Report Templates
 
 As a DomainAdmin,
-I want predefined compliance report templates (GDPR, HIPAA, SOX),
+I want predefined compliance report templates (GDPR, HIPAA, SOX, PCI-DSS),
 so that I can generate audit-ready reports for compliance reviews.
 
 #### Acceptance Criteria
 
 1. Template library with predefined compliance report types
-2. Each template specifies which data points to collect and how to present them
-3. Generated reports include: executive summary, findings, evidence tables, recommendations
-4. Reports include timestamp and generator identification
-5. Export as PDF with professional formatting
-6. Templates are extensible (admin can create custom templates)
+2. Built-in templates for GDPR, HIPAA, SOX, and PCI-DSS standards
+3. Each template specifies which data points to collect and how to present them
+4. Each template section maps to specific framework control references (e.g., "SOX Section 404", "PCI-DSS Req. 8.1")
+5. Generated reports include: executive summary, findings with control mapping, evidence tables, recommendations
+6. Reports include timestamp and generator identification
+7. Export as PDF with professional formatting
+8. Templates are extensible (admin can create custom templates with custom control mappings)
 
 ---

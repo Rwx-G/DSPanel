@@ -14,6 +14,7 @@ import {
   Play,
   Server,
 } from "lucide-react";
+import { ExportToolbar } from "@/components/common/ExportToolbar";
 import {
   type ReplicationPartnership,
   type ReplicationPartnershipStatus,
@@ -233,6 +234,28 @@ export function ReplicationStatus() {
               </option>
             ))}
           </select>
+
+          <ExportToolbar<ReplicationPartnership>
+            columns={[
+              { key: "sourceDc", header: "Source DC" },
+              { key: "targetDc", header: "Target DC" },
+              { key: "namingContext", header: "Naming Context" },
+              { key: "status", header: "Status" },
+              { key: "lastSyncTime", header: "Last Sync" },
+              { key: "consecutiveFailures", header: "Failures" },
+            ]}
+            data={partnerships}
+            rowMapper={(p) => [
+              p.sourceDc,
+              p.targetDc,
+              p.namingContext,
+              p.status,
+              p.lastSyncTime ?? "Never",
+              String(p.consecutiveFailures),
+            ]}
+            title="AD Replication Status"
+            filenameBase="replication-status"
+          />
 
           <button
             className="btn btn-sm flex items-center gap-1"

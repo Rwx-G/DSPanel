@@ -13,6 +13,7 @@ import { useDebounce } from "@/hooks/useDebounce";
 import { useNavigation } from "@/contexts/NavigationContext";
 import { type DirectoryEntry } from "@/types/directory";
 import { type GroupCategory, type GroupDisplayItem } from "@/types/comparison";
+import { ExportToolbar } from "@/components/common/ExportToolbar";
 import { formatOuPath } from "@/utils/dn";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import {
@@ -512,6 +513,17 @@ export function UserComparison() {
             >
               {sortDirection === "asc" ? "A-Z" : "Z-A"}
             </button>
+            <ExportToolbar<GroupDisplayItem>
+              columns={[
+                { key: "name", header: "Group Name" },
+                { key: "category", header: "Category" },
+                { key: "dn", header: "Distinguished Name" },
+              ]}
+              data={filteredGroups}
+              rowMapper={(g) => [g.name, g.category === "shared" ? "Shared" : g.category === "onlyA" ? `Only ${userAName}` : `Only ${userBName}`, g.dn]}
+              title={`User Comparison - ${userAName} vs ${userBName}`}
+              filenameBase={`comparison_${userA?.samAccountName ?? "a"}_${userB?.samAccountName ?? "b"}`}
+            />
           </div>
 
           {/* Group list - fixed height with internal scroll */}

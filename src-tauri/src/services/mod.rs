@@ -1,6 +1,8 @@
 pub mod app_settings;
 pub mod audit;
+pub mod cleanup;
 pub mod comparison;
+pub mod compliance;
 pub mod credential_store;
 pub mod dacl;
 pub mod dc_health;
@@ -9,6 +11,7 @@ pub mod demo_provider;
 pub mod directory;
 pub mod dns_validation;
 pub mod dpapi;
+pub mod export;
 pub mod graph_exchange;
 pub mod health;
 pub mod ldap_directory;
