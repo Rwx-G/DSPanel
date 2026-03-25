@@ -6,10 +6,11 @@ Items deferred from QA reviews. None are blocking - all stories are PASS.
 
 | Source | Item | Refs |
 | ------ | ---- | ---- |
-| Epic 4 QA | Settings UI for custom permission group mapping (map any AD group to a DSPanel role) | Epic 12 (Story 12.1) |
-| Epic 5 | Settings UI for `disabledOu` default (used by Offboarding workflow, currently persisted in `app-settings.json` but no UI to configure it) | Epic 12 (Story 12.2), `AppSettingsService` |
-| Epic 6 (6.2) | `GraphSettings` component created but not yet embedded in a page - wire into centralized Settings view | Epic 12 (Story 12.2 AC#2), `GraphSettings.tsx` |
-| Epic 11 QA | Add retention period configuration in Settings UI (backend `audit_retention_days` exists) | Epic 12 (Story 12.2), `app_settings.rs`, `AuditLog.tsx` |
+| ~~Epic 4 QA~~ | ~~Settings UI for custom permission group mapping~~ | **DONE** in Story 12.1 |
+| Epic 5 | Settings UI for `disabledOu` default (used by Offboarding workflow) | `AppSettingsService`, Settings.tsx |
+| ~~Epic 6 (6.2)~~ | ~~`GraphSettings` component embedded in Settings page~~ | **DONE** in Story 12.2 |
+| ~~Epic 11 QA~~ | ~~Retention period configuration in Settings UI~~ | **DONE** in Story 12.2 |
+| Epic 12 QA | Full window state save/restore with Tauri window API | `lib.rs`, `tauri.conf.json`, Story 12.4 |
 
 ## Priority: Low
 
@@ -24,6 +25,11 @@ Items deferred from QA reviews. None are blocking - all stories are PASS.
 | Epic 8 QA | Group DC cards by site in health dashboard for multi-site environments | `InfrastructureHealth.tsx`, Story 8.1 |
 | Epic 7 QA | Export snapshot history (CSV/JSON) | `SnapshotHistory.tsx`, Story 7.5 |
 | Epic 7 QA | Server-side pagination for large Recycle Bin contents | `ldap_directory.rs`, Story 7.2 |
+| Epic 12 QA | "Reset to Defaults" button per settings section | `Settings.tsx` |
+| Epic 12 QA | Batch-validate all mapped groups on component mount | `PermissionMappingSettings.tsx` |
+| Epic 12 QA | Keyboard shortcut hints in button tooltips | `AppShell.tsx` |
+| Epic 12 QA | Release notes preview in update notification bar | `UpdateNotificationBar.tsx` |
+| Epic 12 QA | Directory existence validation for export path | `Settings.tsx` |
 
 ## Dependencies (checked 2026-03-23)
 
