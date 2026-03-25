@@ -44,6 +44,11 @@ interface AppSettings {
   appearance?: {
     theme?: string | null;
   } | null;
+  update?: {
+    checkFrequency?: string | null;
+    skippedVersion?: string | null;
+    lastCheckTimestamp?: string | null;
+  } | null;
 }
 
 export function Settings() {
@@ -76,7 +81,7 @@ export function Settings() {
   );
 
   const updateNested = useCallback(
-    (section: "connection" | "reports" | "appearance", key: string, value: string | null) => {
+    (section: "connection" | "reports" | "appearance" | "update", key: string, value: string | null) => {
       setSettings((prev) => ({
         ...prev,
         [section]: { ...(prev[section] ?? {}), [key]: value || null },
@@ -248,6 +253,27 @@ export function Settings() {
               </div>
             </div>
             <GraphSettings />
+            <div className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-primary)] p-4">
+              <h3 className="mb-3 text-body font-semibold text-[var(--color-text-primary)]">
+                Update Checks
+              </h3>
+              <div>
+                <label className="mb-1 block text-caption text-[var(--color-text-secondary)]">
+                  Check Frequency
+                </label>
+                <select
+                  value={settings.update?.checkFrequency ?? "startup"}
+                  onChange={(e) => updateNested("update", "checkFrequency", e.target.value)}
+                  className="w-48 rounded-md border border-[var(--color-border-default)] bg-[var(--color-input-bg)] px-3 py-1.5 text-body text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+                  data-testid="setting-update-frequency"
+                >
+                  <option value="startup">Every Startup</option>
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly</option>
+                  <option value="never">Never</option>
+                </select>
+              </div>
+            </div>
           </div>
         )}
 

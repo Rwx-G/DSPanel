@@ -4,6 +4,7 @@ import { Sidebar } from "./Sidebar";
 import { TabBar } from "./TabBar";
 import { Breadcrumbs } from "./Breadcrumbs";
 import { StatusBar, type StatusBarProps } from "./StatusBar";
+import { UpdateNotificationBar } from "@/components/common/UpdateNotificationBar";
 
 const NARROW_BREAKPOINT = 900;
 
@@ -129,6 +130,7 @@ export function AppShell({ statusBarProps, children }: AppShellProps) {
           aria-label="Main content"
           className="flex flex-1 flex-col overflow-hidden"
         >
+          <UpdateNotificationBar />
           <Breadcrumbs />
           <TabBar />
           <div className="flex-1 overflow-auto">{children}</div>
