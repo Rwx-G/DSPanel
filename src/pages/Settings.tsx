@@ -109,18 +109,29 @@ export function Settings() {
     [],
   );
 
-  const validate = useCallback((): boolean => {
+  const validate = useCallback(async (): Promise<boolean> => {
     const errors: Record<string, string> = {};
     const retention = settings.auditRetentionDays;
     if (retention !== null && retention !== undefined && retention < 30) {
       errors.auditRetentionDays = "Retention must be at least 30 days";
+    }
+    const exportPath = settings.reports?.defaultExportPath;
+    if (exportPath) {
+      try {
+        const valid = await invoke<boolean>("test_preset_path", { path: exportPath });
+        if (!valid) {
+          errors.defaultExportPath = "Directory does not exist or is not accessible";
+        }
+      } catch {
+        errors.defaultExportPath = "Could not verify directory";
+      }
     }
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
   }, [settings]);
 
   const handleSave = useCallback(async () => {
-    if (!validate()) return;
+    if (!(await validate())) return;
     setSaving(true);
     setError(null);
     setSaveSuccess(false);
@@ -135,6 +146,47 @@ export function Settings() {
       setSaving(false);
     }
   }, [settings, validate]);
+
+  const handleResetDefaults = useCallback(() => {
+    switch (activeTab) {
+      case "connection":
+        setSettings((prev) => ({
+          ...prev,
+          connection: { domainOverride: null, preferredDc: null },
+          update: { ...prev.update, checkFrequency: "startup" },
+        }));
+        break;
+      case "security":
+        setSettings((prev) => ({
+          ...prev,
+          auditRetentionDays: 365,
+          disabledOu: null,
+        }));
+        break;
+      case "reports":
+        setSettings((prev) => ({
+          ...prev,
+          reports: { defaultFormat: "CSV", defaultExportPath: null },
+        }));
+        break;
+      case "appearance":
+        setSettings((prev) => ({
+          ...prev,
+          appearance: { theme: "system" },
+        }));
+        // Apply system theme directly
+        {
+          const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches
+            ? "dark"
+            : "light";
+          applyTheme(systemTheme as ThemeMode);
+        }
+        break;
+    }
+    setDirty(true);
+    setSaveSuccess(false);
+    setValidationErrors({});
+  }, [activeTab]);
 
   const handleThemeChange = useCallback(
     (value: string) => {
@@ -396,6 +448,14 @@ export function Settings() {
                       Browse...
                     </button>
                   </div>
+                  {validationErrors.defaultExportPath && (
+                    <p
+                      className="mt-1 text-caption text-[var(--color-error)]"
+                      data-testid="validation-export-path"
+                    >
+                      {validationErrors.defaultExportPath}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -454,6 +514,13 @@ export function Settings() {
             data-testid="settings-save"
           >
             {saving ? "Saving..." : "Save Settings"}
+          </button>
+          <button
+            onClick={handleResetDefaults}
+            className="btn btn-sm rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2.5 py-1 text-caption font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors"
+            data-testid="settings-reset"
+          >
+            Reset to Defaults
           </button>
           {dirty && (
             <span className="text-caption text-[var(--color-warning)]">Unsaved changes</span>

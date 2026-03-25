@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useRef } from "react";
+import { useEffect, useCallback, useRef, useState } from "react";
 import { Search, X } from "lucide-react";
 
 interface SearchBarProps {
@@ -34,6 +34,18 @@ export function SearchBar({
     onSearchRef.current("");
   }, []);
 
+  // Focus input on Ctrl+F (via AppShell custom event)
+  const inputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const handler = () => inputRef.current?.focus();
+    window.addEventListener("dspanel:search", handler);
+    return () => window.removeEventListener("dspanel:search", handler);
+  }, []);
+
+  // Show shortcut hint in placeholder when not focused
+  const [focused, setFocused] = useState(false);
+  const displayPlaceholder = focused ? placeholder : `${placeholder} (Ctrl+F)`;
+
   return (
     <div
       className="flex items-center gap-2 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5"
@@ -45,10 +57,13 @@ export function SearchBar({
         aria-hidden="true"
       />
       <input
+        ref={inputRef}
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        placeholder={displayPlaceholder}
         aria-label={placeholder}
         className="flex-1 bg-transparent text-body text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-secondary)]"
         data-testid="search-input"

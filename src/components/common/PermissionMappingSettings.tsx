@@ -59,6 +59,17 @@ export function PermissionMappingSettings() {
     invoke<PermissionMappings>("get_permission_mappings")
       .then((m) => {
         setMappings(m);
+        // Batch-validate all mapped groups
+        const allGroups = Object.values(m.mappings ?? {}).flat();
+        for (const groupDn of allGroups) {
+          invoke<boolean>("validate_group_exists", { groupDn })
+            .then((exists) => {
+              setValidationWarnings((prev) => ({ ...prev, [groupDn]: exists }));
+            })
+            .catch(() => {
+              setValidationWarnings((prev) => ({ ...prev, [groupDn]: false }));
+            });
+        }
       })
       .catch((e) => setError(`Failed to load permission mappings: ${e}`))
       .finally(() => setLoading(false));

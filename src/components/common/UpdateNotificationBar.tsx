@@ -63,8 +63,13 @@ export function UpdateNotificationBar() {
       data-testid="update-notification-bar"
     >
       <Info size={16} className="shrink-0 text-[var(--color-info)]" />
-      <span className="flex-1 text-caption text-[var(--color-text-primary)]">
+      <span className="group relative flex-1 text-caption text-[var(--color-text-primary)]">
         <span className="font-medium">DSPanel v{updateInfo.version}</span> is available.
+        {updateInfo.releaseNotes && (
+          <span className="pointer-events-none absolute left-0 top-full z-50 mt-1.5 w-80 max-h-48 overflow-y-auto whitespace-pre-wrap rounded-md bg-[var(--color-surface-elevated)] px-3 py-2 text-caption text-[var(--color-text-primary)] opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100">
+            {updateInfo.releaseNotes}
+          </span>
+        )}
       </span>
       <div className="flex items-center gap-1.5">
         <button

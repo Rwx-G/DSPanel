@@ -129,9 +129,7 @@ describe("RecycleBin", () => {
     await waitFor(() => {
       expect(screen.getByTestId("recycle-bin-table")).toBeInTheDocument();
     });
-    const input = screen.getByPlaceholderText(
-      "Search deleted objects by name...",
-    );
+    const input = screen.getByTestId("search-input");
     fireEvent.change(input, { target: { value: "PC" } });
     await waitFor(() => {
       expect(screen.getAllByTestId("recycle-bin-row")).toHaveLength(1);
