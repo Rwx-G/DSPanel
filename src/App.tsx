@@ -35,6 +35,7 @@ import { EscalationPaths } from "@/pages/EscalationPaths";
 import { AutomatedCleanup } from "@/pages/AutomatedCleanup";
 import { ComplianceReports } from "@/pages/ComplianceReports";
 import { AuditLog } from "@/pages/AuditLog";
+import { GpoViewer } from "@/pages/GpoViewer";
 
 const APP_VERSION = __APP_VERSION__;
 
@@ -185,6 +186,7 @@ const MODULE_COMPONENTS: Record<
   "automated-cleanup": AutomatedCleanup,
   "compliance-reports": ComplianceReports,
   "audit-log": AuditLog,
+  "gpo-viewer": GpoViewer,
 };
 
 function ModuleRouter({ status }: { status: AppStatus }) {

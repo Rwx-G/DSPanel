@@ -314,6 +314,8 @@ pub fn run() {
             commands::get_compliance_frameworks,
             commands::run_compliance_scan,
             commands::export_compliance_framework_report,
+            commands::get_gpo_links,
+            commands::get_gpo_scope,
         ])
         .run(tauri::generate_context!())
         .unwrap_or_else(|e| {

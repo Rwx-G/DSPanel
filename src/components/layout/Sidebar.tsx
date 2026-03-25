@@ -156,6 +156,13 @@ const MODULES: SidebarModule[] = [
     requiredLevel: "DomainAdmin",
   },
   {
+    id: "gpo-viewer",
+    label: "GPO Viewer",
+    icon: "shield",
+    group: "Infrastructure",
+    requiredLevel: "DomainAdmin",
+  },
+  {
     id: "security-dashboard",
     label: "Privileged Accounts",
     icon: "shield",
