@@ -14,6 +14,7 @@ import { GraphSettings } from "@/components/common/GraphSettings";
 import { PresetSettings } from "@/components/common/PresetSettings";
 import { PermissionMappingSettings } from "@/components/common/PermissionMappingSettings";
 import { useTheme, type ThemeMode } from "@/hooks/useTheme";
+import { useNavigation } from "@/contexts/NavigationContext";
 
 /** Tab definitions for the settings page. */
 const TABS = [
@@ -53,6 +54,7 @@ interface AppSettings {
 }
 
 export function Settings() {
+  const { openTabs, activeTabId, clearTabData } = useNavigation();
   const [activeTab, setActiveTab] = useState<TabId>("connection");
   const [settings, setSettings] = useState<AppSettings>({});
   const [loading, setLoading] = useState(true);
@@ -63,6 +65,20 @@ export function Settings() {
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
   const { currentTheme, applyTheme } = useTheme();
+
+  // React to tab data passed via navigation (e.g. from Preset Management)
+  useEffect(() => {
+    const tab = openTabs.find(
+      (t) => t.id === activeTabId && t.moduleId === "settings",
+    );
+    if (tab?.data?.tab) {
+      const requested = tab.data.tab as string;
+      if (TABS.some((t) => t.id === requested)) {
+        setActiveTab(requested as TabId);
+        clearTabData(tab.id);
+      }
+    }
+  }, [openTabs, activeTabId, clearTabData]);
 
   // Load settings on mount
   useEffect(() => {

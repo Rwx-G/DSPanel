@@ -32,7 +32,7 @@ function PresetEditorWrapper() {
   const { openTab } = useNavigation();
 
   const handleOpenSettings = useCallback(() => {
-    openTab("Settings", "settings");
+    openTab("Settings", "settings", undefined, { tab: "presets" });
   }, [openTab]);
 
   return (

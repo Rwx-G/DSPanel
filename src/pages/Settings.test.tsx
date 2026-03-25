@@ -4,12 +4,17 @@ import { createElement, type ReactNode } from "react";
 import { Settings } from "./Settings";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import { DialogProvider } from "@/contexts/DialogContext";
+import { NavigationProvider } from "@/contexts/NavigationContext";
 
 function Wrapper({ children }: { children: ReactNode }) {
   return createElement(
-    NotificationProvider,
+    NavigationProvider,
     null,
-    createElement(DialogProvider, null, children),
+    createElement(
+      NotificationProvider,
+      null,
+      createElement(DialogProvider, null, children),
+    ),
   );
 }
 
