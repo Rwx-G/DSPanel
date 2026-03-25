@@ -9,6 +9,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Activity Journal (11.1)
+- Activity Journal page with searchable, filterable table of all write operations
+- Filtered audit queries: date range, operator, action type, target DN, success/failure
+- Pagination support for large audit logs (50 entries per page)
+- Export audit log to CSV, Excel, PDF, HTML via ExportToolbar
+- Action type dropdown populated from distinct audit actions
+- Configurable audit retention period in app settings (default: 365 days)
+- Automatic audit log cleanup at application startup
+- Purge audit entries command for manual retention management
+
+#### AD Change History Timeline (11.2)
+- Attribute name filter on StateInTimeView replication history component
+- Replication History section added to GroupDetail page (was only on User and Computer)
+
+#### GPO Viewer (11.3)
+- GPO Viewer page with three view modes: GPO Links, Scope Report, What-If
+- gPLink attribute parser with full flag support (enabled, disabled, enforced)
+- GPO inheritance resolver respecting block inheritance and enforcement rules
+- GPO Links view: enter object DN, see effective GPOs with inheritance chain
+- Scope Report: enter GPO DN, find all OUs and domain where it is linked
+- What-If simulation: simulate GPO application at a target OU
+- DomainAdmin permission gating on all GPO operations
+- Export GPO reports to CSV, Excel, PDF, HTML
+
+#### Previous unreleased changes
+- Epic 11 scope audit: reduced from 6 to 3 stories - removed trigger automation, script execution, and webhook notifications (incompatible with desktop architecture, security risk)
 - PDF export: page numbers in footer ("Page 1", "Page 2", etc.)
 - Cleanup rules: exclusion patterns for service accounts by SAM name (glob: svc_*, admin*) and by OU
 - Compliance: 5 new frameworks (ISO 27001, NIST 800-53, CIS v8, NIS2, ANSSI) - total 9
