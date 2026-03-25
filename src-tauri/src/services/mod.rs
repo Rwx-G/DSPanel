@@ -39,7 +39,7 @@ pub use health::{evaluate_health, AccountHealthStatus, HealthInput, HealthLevel}
 pub use ldap_directory::LdapDirectoryProvider;
 pub use mfa::MfaService;
 pub use object_snapshot::ObjectSnapshotService;
-pub use permissions::{PermissionConfig, PermissionLevel, PermissionService};
+pub use permissions::{PermissionConfig, PermissionLevel, PermissionMappings, PermissionService};
 pub use preset::PresetService;
 pub use resilience::{CircuitBreaker, CircuitBreakerConfig, RetryConfig, TimeoutConfig};
 pub use resilient_directory::ResilientDirectoryProvider;

@@ -10,7 +10,7 @@ use crate::services::directory::DirectoryProvider;
 ///
 /// Derived `PartialOrd` and `Ord` enable inheritance checks:
 /// `current_level >= required_level` means "has permission".
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum PermissionLevel {
     ReadOnly = 0,
@@ -82,6 +82,41 @@ impl Default for PermissionConfig {
     }
 }
 
+/// Custom permission mappings: level -> list of AD group DNs.
+///
+/// Saved as `rbac-mappings.json` in the preset storage path and shared
+/// across all DSPanel instances that use the same preset share.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct PermissionMappings {
+    /// Maps each permission level to zero or more AD group DNs.
+    pub mappings: HashMap<PermissionLevel, Vec<String>>,
+}
+
+impl PermissionMappings {
+    /// Converts the level->groups map into the internal group->level map.
+    /// When a group appears in multiple levels, the highest level wins.
+    pub fn to_group_mappings(&self) -> HashMap<String, PermissionLevel> {
+        let mut result = HashMap::new();
+        for (&level, groups) in &self.mappings {
+            for group_dn in groups {
+                // Extract CN from DN for matching (same as detect_permissions)
+                if let Some(cn) = extract_cn(group_dn) {
+                    let entry = result.entry(cn).or_insert(level);
+                    if level > *entry {
+                        *entry = level;
+                    }
+                }
+            }
+        }
+        result
+    }
+
+    /// Returns true if no groups are mapped at any level.
+    pub fn is_empty(&self) -> bool {
+        self.mappings.values().all(|groups| groups.is_empty())
+    }
+}
+
 /// Extracts the RID (last sub-authority) from a SID string like "S-1-5-21-...-512".
 fn extract_rid(sid: &str) -> Option<u32> {
     sid.rsplit('-').next()?.parse().ok()
@@ -95,7 +130,7 @@ pub struct PermissionService {
     current_level: Mutex<PermissionLevel>,
     user_groups: Mutex<Vec<String>>,
     authenticated_user: Mutex<Option<String>>,
-    group_mappings: HashMap<String, PermissionLevel>,
+    group_mappings: Mutex<HashMap<String, PermissionLevel>>,
     rid_mappings: HashMap<u32, PermissionLevel>,
 }
 
@@ -106,8 +141,23 @@ impl PermissionService {
             current_level: Mutex::new(PermissionLevel::ReadOnly),
             user_groups: Mutex::new(Vec::new()),
             authenticated_user: Mutex::new(None),
-            group_mappings: config.group_mappings,
+            group_mappings: Mutex::new(config.group_mappings),
             rid_mappings: config.rid_mappings,
+        }
+    }
+
+    /// Merges custom permission mappings into the existing group mappings.
+    ///
+    /// Custom mappings are added alongside the default DSPanel-* groups.
+    /// When a group already exists, the higher level wins.
+    pub fn apply_custom_mappings(&self, custom: &PermissionMappings) {
+        let extra = custom.to_group_mappings();
+        let mut mappings = self.group_mappings.lock().expect("lock poisoned");
+        for (group, level) in extra {
+            let entry = mappings.entry(group).or_insert(level);
+            if level > *entry {
+                *entry = level;
+            }
         }
     }
 
@@ -176,11 +226,14 @@ impl PermissionService {
         }
 
         // 2. Match by custom group name (organization-specific)
-        for group_name in &group_names {
-            if let Some(&level) = self.group_mappings.get(group_name) {
-                if level > detected_level {
-                    tracing::info!(group = %group_name, level = %level, "Group name match");
-                    detected_level = level;
+        {
+            let mappings = self.group_mappings.lock().expect("lock poisoned");
+            for group_name in &group_names {
+                if let Some(&level) = mappings.get(group_name) {
+                    if level > detected_level {
+                        tracing::info!(group = %group_name, level = %level, "Group name match");
+                        detected_level = level;
+                    }
                 }
             }
         }
@@ -562,5 +615,140 @@ mod tests {
     #[test]
     fn test_extract_cn_returns_none_for_empty() {
         assert_eq!(extract_cn(""), None);
+    }
+
+    // --- PermissionMappings tests ---
+
+    #[test]
+    fn test_permission_mappings_default_is_empty() {
+        let mappings = PermissionMappings::default();
+        assert!(mappings.is_empty());
+    }
+
+    #[test]
+    fn test_permission_mappings_to_group_mappings() {
+        let mut m = HashMap::new();
+        m.insert(
+            PermissionLevel::HelpDesk,
+            vec!["CN=IT-Support,OU=Groups,DC=contoso,DC=com".to_string()],
+        );
+        m.insert(
+            PermissionLevel::AccountOperator,
+            vec!["CN=HR-Managers,OU=Groups,DC=contoso,DC=com".to_string()],
+        );
+        let mappings = PermissionMappings { mappings: m };
+        let result = mappings.to_group_mappings();
+        assert_eq!(result.get("IT-Support"), Some(&PermissionLevel::HelpDesk));
+        assert_eq!(
+            result.get("HR-Managers"),
+            Some(&PermissionLevel::AccountOperator)
+        );
+    }
+
+    #[test]
+    fn test_permission_mappings_highest_level_wins_for_same_group() {
+        let mut m = HashMap::new();
+        m.insert(
+            PermissionLevel::HelpDesk,
+            vec!["CN=SharedGroup,OU=Groups,DC=contoso,DC=com".to_string()],
+        );
+        m.insert(
+            PermissionLevel::Admin,
+            vec!["CN=SharedGroup,OU=Groups,DC=contoso,DC=com".to_string()],
+        );
+        let mappings = PermissionMappings { mappings: m };
+        let result = mappings.to_group_mappings();
+        assert_eq!(result.get("SharedGroup"), Some(&PermissionLevel::Admin));
+    }
+
+    #[test]
+    fn test_permission_mappings_is_empty_with_empty_vecs() {
+        let mut m = HashMap::new();
+        m.insert(PermissionLevel::HelpDesk, vec![]);
+        m.insert(PermissionLevel::Admin, vec![]);
+        let mappings = PermissionMappings { mappings: m };
+        assert!(mappings.is_empty());
+    }
+
+    #[test]
+    fn test_permission_mappings_not_empty_with_entries() {
+        let mut m = HashMap::new();
+        m.insert(
+            PermissionLevel::HelpDesk,
+            vec!["CN=TestGroup,DC=example,DC=com".to_string()],
+        );
+        let mappings = PermissionMappings { mappings: m };
+        assert!(!mappings.is_empty());
+    }
+
+    #[test]
+    fn test_permission_mappings_json_roundtrip() {
+        let mut m = HashMap::new();
+        m.insert(
+            PermissionLevel::HelpDesk,
+            vec!["CN=IT-Support,OU=Groups,DC=contoso,DC=com".to_string()],
+        );
+        let mappings = PermissionMappings { mappings: m };
+        let json = serde_json::to_string(&mappings).unwrap();
+        let loaded: PermissionMappings = serde_json::from_str(&json).unwrap();
+        assert_eq!(loaded.mappings.len(), 1);
+        assert_eq!(
+            loaded
+                .mappings
+                .get(&PermissionLevel::HelpDesk)
+                .unwrap()
+                .len(),
+            1
+        );
+    }
+
+    #[test]
+    fn test_apply_custom_mappings_merges_with_defaults() {
+        let service = default_service();
+        let mut m = HashMap::new();
+        m.insert(
+            PermissionLevel::HelpDesk,
+            vec!["CN=Custom-HelpDesk,OU=Groups,DC=contoso,DC=com".to_string()],
+        );
+        let custom = PermissionMappings { mappings: m };
+        service.apply_custom_mappings(&custom);
+
+        let mappings = service.group_mappings.lock().unwrap();
+        // Default DSPanel-HelpDesk should still be there
+        assert_eq!(
+            mappings.get("DSPanel-HelpDesk"),
+            Some(&PermissionLevel::HelpDesk)
+        );
+        // Custom mapping should be added
+        assert_eq!(
+            mappings.get("Custom-HelpDesk"),
+            Some(&PermissionLevel::HelpDesk)
+        );
+    }
+
+    #[tokio::test]
+    async fn test_detect_with_custom_mappings() {
+        let service = default_service();
+        let mut m = HashMap::new();
+        m.insert(
+            PermissionLevel::Admin,
+            vec!["CN=MyAdminGroup,OU=Groups,DC=contoso,DC=com".to_string()],
+        );
+        let custom = PermissionMappings { mappings: m };
+        service.apply_custom_mappings(&custom);
+
+        let provider =
+            MockDirectoryProvider::new().with_user_groups(make_group_dns(&["MyAdminGroup"]));
+        service.detect_permissions(&provider).await.unwrap();
+        assert_eq!(service.current_level(), PermissionLevel::Admin);
+    }
+
+    #[test]
+    fn test_apply_custom_mappings_empty_is_noop() {
+        let service = default_service();
+        let initial_count = service.group_mappings.lock().unwrap().len();
+        service.apply_custom_mappings(&PermissionMappings::default());
+        let after_count = service.group_mappings.lock().unwrap().len();
+        assert_eq!(initial_count, after_count);
     }
 }
