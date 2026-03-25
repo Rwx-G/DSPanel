@@ -24,11 +24,6 @@ Items deferred from QA reviews. None are blocking - all stories are PASS.
 | Epic 8 QA | Group DC cards by site in health dashboard for multi-site environments | `InfrastructureHealth.tsx`, Story 8.1 |
 | Epic 7 QA | Export snapshot history (CSV/JSON) | `SnapshotHistory.tsx`, Story 7.5 |
 | Epic 7 QA | Server-side pagination for large Recycle Bin contents | `ldap_directory.rs`, Story 7.2 |
-| Epic 11 QA | Add server-side sort direction toggle for audit log (currently newest-first only) | `services/audit.rs`, Story 11.1 |
-| Epic 11 QA | Add snapshot-based before/after value comparison in change history | `StateInTimeView.tsx`, `object_snapshot.rs`, Story 11.2 |
-| Epic 11 QA | Add WMI filter display in GPO Viewer (requires querying msWMI-Som objects) | `services/gpo.rs`, Story 11.3 |
-| Epic 11 QA | Add GPO DN autocomplete via search_configuration for usability | `GpoViewer.tsx`, Story 11.3 |
-| Epic 11 QA | Cache GPO name map in AppState for repeated queries within a session | `commands/infrastructure.rs`, Story 11.3 |
 
 ## Dependencies (checked 2026-03-23)
 
