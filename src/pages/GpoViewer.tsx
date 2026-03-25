@@ -273,7 +273,20 @@ export function GpoViewer() {
               {gpoList.length > 0 ? (
                 <select
                   value={scopeGpoDn}
-                  onChange={(e) => setScopeGpoDn(e.target.value)}
+                  onChange={(e) => {
+                    setScopeGpoDn(e.target.value);
+                    // Auto-fetch on selection
+                    if (e.target.value) {
+                      setScopeLoading(true);
+                      setScopeError(null);
+                      invoke<GpoLink[]>("get_gpo_scope", { gpoDn: e.target.value })
+                        .then(setScopeLinks)
+                        .catch((err) => setScopeError(extractErrorMessage(err)))
+                        .finally(() => setScopeLoading(false));
+                    } else {
+                      setScopeLinks([]);
+                    }
+                  }}
                   className="h-8 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-default)] px-2 text-caption text-[var(--color-text-primary)]"
                   data-testid="scope-gpo-dn"
                 >
@@ -285,26 +298,28 @@ export function GpoViewer() {
                   ))}
                 </select>
               ) : (
-                <input
-                  type="text"
-                  value={scopeGpoDn}
-                  onChange={(e) => setScopeGpoDn(e.target.value)}
-                  onKeyDown={(e) => handleKeyDown(e, fetchScope)}
-                  placeholder="CN={GUID},CN=Policies,CN=System,DC=contoso,DC=com"
-                  className="h-8 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-default)] px-2 text-caption text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)]"
-                  data-testid="scope-gpo-dn"
-                />
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={scopeGpoDn}
+                    onChange={(e) => setScopeGpoDn(e.target.value)}
+                    onKeyDown={(e) => handleKeyDown(e, fetchScope)}
+                    placeholder="CN={GUID},CN=Policies,CN=System,DC=contoso,DC=com"
+                    className="h-8 flex-1 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-default)] px-2 text-caption text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)]"
+                    data-testid="scope-gpo-dn"
+                  />
+                  <button
+                    className="btn btn-sm btn-primary flex items-center gap-1"
+                    onClick={fetchScope}
+                    disabled={scopeLoading || !scopeGpoDn.trim()}
+                    data-testid="scope-search-button"
+                  >
+                    <Search size={14} />
+                    Find Links
+                  </button>
+                </div>
               )}
             </div>
-            <button
-              className="btn btn-sm btn-primary flex items-center gap-1"
-              onClick={fetchScope}
-              disabled={scopeLoading || !scopeGpoDn.trim()}
-              data-testid="scope-search-button"
-            >
-              <Search size={14} />
-              Find Links
-            </button>
           </div>
 
           {scopeError && <ErrorBanner message={scopeError} />}
