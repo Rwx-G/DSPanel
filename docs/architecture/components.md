@@ -137,17 +137,6 @@
 
 **Dependencies**: csv crate, printpdf/genpdf crate
 
-### notification module
-
-**Responsibility**: Send webhook notifications to Teams, Slack, or email.
-
-**Key Functions (Rust):**
-
-- `send(event: &NotificationEvent) -> Result<()>`
-- `test_channel(channel: &NotificationChannel) -> Result<bool>`
-
-**Dependencies**: reqwest
-
 ### Frontend Navigation
 
 **Responsibility**: Manage page navigation in the React app shell (sidebar, tabs, dialogs).

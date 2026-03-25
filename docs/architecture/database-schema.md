@@ -49,27 +49,6 @@ CREATE TABLE scheduled_reports (
     created_by TEXT NOT NULL
 );
 
--- Automation Rules
-CREATE TABLE automation_rules (
-    id TEXT PRIMARY KEY,  -- UUID
-    name TEXT NOT NULL,
-    is_enabled INTEGER NOT NULL DEFAULT 1,
-    trigger_type TEXT NOT NULL,
-    trigger_condition TEXT NOT NULL,  -- JSON
-    actions TEXT NOT NULL,  -- JSON
-    created_by TEXT NOT NULL,
-    last_triggered TEXT
-);
-
--- Notification Channels
-CREATE TABLE notification_channels (
-    id TEXT PRIMARY KEY,  -- UUID
-    name TEXT NOT NULL,
-    channel_type TEXT NOT NULL,  -- Webhook, SMTP
-    configuration TEXT NOT NULL,  -- JSON (URL, credentials)
-    is_enabled INTEGER NOT NULL DEFAULT 1
-);
-
 -- Risk Score History
 CREATE TABLE risk_score_history (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -57,11 +57,8 @@
 - **FR53**: The application shall compute and display a domain-wide risk score based on privileged accounts, weak passwords, dangerous configurations.
 - **FR54**: The application shall detect common AD attacks: Golden Ticket, DCSync, DCShadow, abnormal Kerberos activity.
 - **FR55**: The application shall visualize privilege escalation paths (simplified BloodHound-style graph).
-- **FR56**: The application shall support trigger-based automation: "if X then Y" rules on AD changes (e.g., new user in OU X triggers preset Y).
-- **FR57**: Users shall be able to execute external scripts (PowerShell/exe) with the selected AD object's attributes passed as parameters.
-- **FR58**: The application shall support webhook notifications to Teams, Slack, or email on configurable events.
-- **FR59**: The application shall provide a GPO viewer: which GPOs apply to a user/computer/OU, scope report, and what-if modeling.
-- **FR60**: DomainAdmin users shall be able to configure granular RBAC within DSPanel itself: customize which roles can see/do what, per OU if needed.
+- **FR56**: The application shall provide a GPO viewer: which GPOs apply to a user/computer/OU, scope report, and what-if modeling.
+- **FR57**: DomainAdmin users shall be able to configure granular RBAC within DSPanel itself: customize which roles can see/do what, per OU if needed.
 
 ### Non Functional
 

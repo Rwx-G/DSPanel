@@ -18,6 +18,6 @@
     - [Epic 8: Infrastructure Health and Monitoring](#epic-8-infrastructure-health-and-monitoring)
     - [Epic 9: Security, Risk Scoring and Attack Detection](#epic-9-security-risk-scoring-and-attack-detection)
     - [Epic 10: Reports, Export and Compliance](#epic-10-reports-export-and-compliance)
-    - [Epic 11: Audit, Automation and Extensibility](#epic-11-audit-automation-and-extensibility)
+    - [Epic 11: Audit, History and GPO Insights](#epic-11-audit-history-and-gpo-insights)
     - [Epic 12: RBAC, Settings and Polish](#epic-12-rbac-settings-and-polish)
     - [Next Steps](#next-steps)

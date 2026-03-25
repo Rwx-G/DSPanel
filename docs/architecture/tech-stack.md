@@ -16,7 +16,7 @@
 | **UI Framework**           | React                 | 18.x           | Frontend component framework                 | Component model, hooks, large ecosystem, mature tooling         |
 | **Bundler**                | Vite                  | 6.x            | Frontend build tool                          | Fast HMR, native ESM, optimized builds                          |
 | **LDAP**                   | ldap3                 | 0.11.x         | AD on-prem queries (Rust)                    | Pure Rust LDAP client, async, TLS support                       |
-| **HTTP Client**            | reqwest               | 0.12.x         | Graph API, HIBP, GitHub API, webhooks (Rust) | Async HTTP, TLS, connection pooling, widely used                |
+| **HTTP Client**            | reqwest               | 0.12.x         | Graph API, HIBP, GitHub API (Rust)            | Async HTTP, TLS, connection pooling, widely used                |
 | **Logging**                | tracing               | 0.1.x          | Structured logging (Rust)                    | Structured spans, multiple subscribers, async-aware             |
 | **Logging Subscriber**     | tracing-subscriber    | 0.3.x          | Log output formatting (Rust)                 | File + console output, filtering, JSON format                   |
 | **Logging File**           | tracing-appender      | 0.2.x          | Rolling file logs (Rust)                     | Non-blocking file appender, daily rotation                      |

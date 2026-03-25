@@ -141,7 +141,7 @@ graph TB
 | **UI Framework**           | React                 | 18.x           | Frontend component framework                 | Component model, hooks, large ecosystem, mature tooling         |
 | **Bundler**                | Vite                  | 6.x            | Frontend build tool                          | Fast HMR, native ESM, optimized builds                          |
 | **LDAP**                   | ldap3                 | 0.11.x         | AD on-prem queries (Rust)                    | Pure Rust LDAP client, async, TLS support                       |
-| **HTTP Client**            | reqwest               | 0.12.x         | Graph API, HIBP, GitHub API, webhooks (Rust) | Async HTTP, TLS, connection pooling, widely used                |
+| **HTTP Client**            | reqwest               | 0.12.x         | Graph API, HIBP, GitHub API (Rust)            | Async HTTP, TLS, connection pooling, widely used                |
 | **Logging**                | tracing               | 0.1.x          | Structured logging (Rust)                    | Structured spans, multiple subscribers, async-aware             |
 | **Logging Subscriber**     | tracing-subscriber    | 0.3.x          | Log output formatting (Rust)                 | File + console output, filtering, JSON format                   |
 | **Logging File**           | tracing-appender      | 0.2.x          | Rolling file logs (Rust)                     | Non-blocking file appender, daily rotation                      |
@@ -475,17 +475,6 @@ All TypeScript interfaces mirror the Rust structs and are used for type-safe IPC
 
 **Dependencies**: csv crate, printpdf/genpdf crate
 
-### notification module
-
-**Responsibility**: Send webhook notifications to Teams, Slack, or email.
-
-**Key Functions (Rust):**
-
-- `send(event: &NotificationEvent) -> Result<()>`
-- `test_channel(channel: &NotificationChannel) -> Result<bool>`
-
-**Dependencies**: reqwest
-
 ### Frontend Navigation
 
 **Responsibility**: Manage page navigation in the React app shell (sidebar, tabs, dialogs).
@@ -817,27 +806,6 @@ CREATE TABLE scheduled_reports (
     created_by TEXT NOT NULL
 );
 
--- Automation Rules
-CREATE TABLE automation_rules (
-    id TEXT PRIMARY KEY,  -- UUID
-    name TEXT NOT NULL,
-    is_enabled INTEGER NOT NULL DEFAULT 1,
-    trigger_type TEXT NOT NULL,
-    trigger_condition TEXT NOT NULL,  -- JSON
-    actions TEXT NOT NULL,  -- JSON
-    created_by TEXT NOT NULL,
-    last_triggered TEXT
-);
-
--- Notification Channels
-CREATE TABLE notification_channels (
-    id TEXT PRIMARY KEY,  -- UUID
-    name TEXT NOT NULL,
-    channel_type TEXT NOT NULL,  -- Webhook, SMTP
-    configuration TEXT NOT NULL,  -- JSON (URL, credentials)
-    is_enabled INTEGER NOT NULL DEFAULT 1
-);
-
 -- Risk Score History
 CREATE TABLE risk_score_history (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -982,9 +950,6 @@ DSPanel/
           mod.rs
           csv_export.rs
           pdf_export.rs
-        notification/
-          mod.rs
-          webhook.rs
         password/
           mod.rs
           generator.rs
