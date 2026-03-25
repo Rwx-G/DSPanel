@@ -139,7 +139,7 @@ export function GpoViewer() {
           label: "\u00A0\u00A0".repeat(depth) + node.name,
           depth,
         });
-        if (node.children.length > 0) walk(node.children, depth + 1);
+        if (node.children?.length > 0) walk(node.children, depth + 1);
       }
     }
     walk(ouTree, 0);

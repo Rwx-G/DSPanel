@@ -9,31 +9,6 @@ vi.mock("@tauri-apps/api/core", () => ({
 import { invoke } from "@tauri-apps/api/core";
 const mockInvoke = vi.mocked(invoke);
 
-const mockGpoLinksResult = {
-  objectDn: "CN=John,OU=Users,DC=contoso,DC=com",
-  links: [
-    {
-      gpoDn: "CN={AAA},CN=Policies,CN=System,DC=contoso,DC=com",
-      gpoName: "Default Domain Policy",
-      linkOrder: 1,
-      isEnforced: true,
-      isDisabled: false,
-      linkedAt: "DC=contoso,DC=com",
-      isInherited: true,
-    },
-    {
-      gpoDn: "CN={BBB},CN=Policies,CN=System,DC=contoso,DC=com",
-      gpoName: "Users GPO",
-      linkOrder: 1,
-      isEnforced: false,
-      isDisabled: false,
-      linkedAt: "OU=Users,DC=contoso,DC=com",
-      isInherited: false,
-    },
-  ],
-  blocksInheritance: false,
-};
-
 describe("GpoViewer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
