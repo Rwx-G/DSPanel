@@ -30,6 +30,48 @@ pub struct AppSettings {
     /// Audit log retention period in days (default: 365).
     #[serde(default)]
     pub audit_retention_days: Option<i64>,
+    /// Connection settings (domain override, preferred DC).
+    #[serde(default)]
+    pub connection: Option<ConnectionSettings>,
+    /// Report export settings.
+    #[serde(default)]
+    pub reports: Option<ReportSettings>,
+    /// Appearance settings (theme).
+    #[serde(default)]
+    pub appearance: Option<AppearanceSettings>,
+}
+
+/// Connection-related settings.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ConnectionSettings {
+    /// Override the auto-detected domain (empty = auto-detect).
+    #[serde(default)]
+    pub domain_override: Option<String>,
+    /// Preferred domain controller (empty = auto-select).
+    #[serde(default)]
+    pub preferred_dc: Option<String>,
+}
+
+/// Report export settings.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ReportSettings {
+    /// Default export format: "CSV", "PDF", "HTML", "XLSX".
+    #[serde(default)]
+    pub default_format: Option<String>,
+    /// Default export directory path.
+    #[serde(default)]
+    pub default_export_path: Option<String>,
+}
+
+/// Appearance settings.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct AppearanceSettings {
+    /// Theme mode: "light", "dark", or "system".
+    #[serde(default)]
+    pub theme: Option<String>,
 }
 
 /// Service for managing persisted application settings.
@@ -175,12 +217,9 @@ mod tests {
     #[test]
     fn test_serde_graph_fields() {
         let settings = AppSettings {
-            disabled_ou: None,
             graph_tenant_id: Some("tenant-123".to_string()),
             graph_client_id: Some("client-456".to_string()),
-            privileged_groups: None,
-            cleanup_rules: None,
-            audit_retention_days: None,
+            ..Default::default()
         };
         let json = serde_json::to_string(&settings).unwrap();
         assert!(json.contains("tenant-123"));
@@ -199,5 +238,65 @@ mod tests {
     fn test_load_does_not_panic_when_no_file() {
         let svc = AppSettingsService::new();
         svc.load();
+    }
+
+    #[test]
+    fn test_default_new_sections_are_none() {
+        let settings = AppSettings::default();
+        assert!(settings.connection.is_none());
+        assert!(settings.reports.is_none());
+        assert!(settings.appearance.is_none());
+    }
+
+    #[test]
+    fn test_serde_new_sections_roundtrip() {
+        let settings = AppSettings {
+            connection: Some(ConnectionSettings {
+                domain_override: Some("corp.example.com".to_string()),
+                preferred_dc: Some("DC01.corp.example.com".to_string()),
+            }),
+            reports: Some(ReportSettings {
+                default_format: Some("PDF".to_string()),
+                default_export_path: Some("C:\\Reports".to_string()),
+            }),
+            appearance: Some(AppearanceSettings {
+                theme: Some("dark".to_string()),
+            }),
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&settings).unwrap();
+        let loaded: AppSettings = serde_json::from_str(&json).unwrap();
+        assert_eq!(
+            loaded
+                .connection
+                .as_ref()
+                .unwrap()
+                .domain_override
+                .as_deref(),
+            Some("corp.example.com")
+        );
+        assert_eq!(
+            loaded.connection.as_ref().unwrap().preferred_dc.as_deref(),
+            Some("DC01.corp.example.com")
+        );
+        assert_eq!(
+            loaded.reports.as_ref().unwrap().default_format.as_deref(),
+            Some("PDF")
+        );
+        assert_eq!(
+            loaded.appearance.as_ref().unwrap().theme.as_deref(),
+            Some("dark")
+        );
+    }
+
+    #[test]
+    fn test_backwards_compat_old_json_without_new_sections() {
+        let json = r#"{"disabledOu":"OU=Test","auditRetentionDays":90}"#;
+        let settings: AppSettings = serde_json::from_str(json).unwrap();
+        assert_eq!(settings.disabled_ou.as_deref(), Some("OU=Test"));
+        assert_eq!(settings.audit_retention_days, Some(90));
+        assert!(settings.connection.is_none());
+        assert!(settings.reports.is_none());
+        assert!(settings.appearance.is_none());
     }
 }
