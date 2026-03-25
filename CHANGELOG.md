@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-03-25
+
+### Added
+
+#### AD Group-Based Permission Mapping (12.1)
+- Custom permission mappings: map AD security groups to DSPanel permission levels
+- PermissionMappings model with level-to-groups mapping stored as JSON in preset share
+- Multiple groups per level, highest level wins when user belongs to multiple
+- Fallback to default RID-based and DSPanel-* group detection when no custom mappings
+- DomainAdmin-gated UI with group search autocomplete and validation
+- Audit logging of all permission mapping changes
+
+#### Application Settings (12.2)
+- Centralized Settings page accessible from sidebar navigation
+- Six category tabs: Connection, Presets, Permissions, Security, Reports, Appearance
+- Connection settings: domain override, preferred DC, Microsoft Graph configuration
+- Security settings: audit log retention period with validation (minimum 30 days)
+- Reports settings: default export format (CSV/PDF/HTML/XLSX) and export directory
+- Appearance settings: theme selector (Light, Dark, System) with live preview
+- All settings persisted locally as JSON with backward compatibility
+
+#### Auto-Update Notification (12.3)
+- GitHub Releases API check at startup for newer versions
+- Non-blocking notification bar with Download, Skip This Version, and Remind Me Later
+- Semantic version comparison (handles v-prefix, pre-release suffixes)
+- Configurable check frequency: every startup, daily, weekly, or never
+- Skipped version persistence - won't show again for that version
+- Silent failure on network errors - no impact on application
+
+#### UX Polish (12.4)
+- Extended keyboard shortcuts: Ctrl+F (search), Ctrl+R/F5 (refresh), Ctrl+E (export), Ctrl+S (save), Escape (close/clear)
+- Custom event dispatch pattern for view-specific shortcut handling
+- About dialog with version, license (Apache-2.0), author (Romain G.), and GitHub links
+- Title bar branding: "DSPanel - Active Directory Management"
+
+### Fixed
+- Flaky PresetManagement test: wrapped async assertions in waitFor to prevent race conditions
+
 ## [0.11.0] - 2026-03-25
 
 ### Added
