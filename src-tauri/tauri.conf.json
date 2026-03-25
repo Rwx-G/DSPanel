@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "DSPanel",
+        "title": "DSPanel - Active Directory Management",
         "width": 1280,
         "height": 800,
         "minWidth": 800,

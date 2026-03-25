@@ -101,6 +101,41 @@ export function AppShell({ statusBarProps, children }: AppShellProps) {
         if (index < openTabs.length) {
           activateTab(openTabs[index].id);
         }
+        return;
+      }
+
+      // Ctrl+F: focus search in current view
+      if (e.ctrlKey && e.key === "f") {
+        e.preventDefault();
+        window.dispatchEvent(new CustomEvent("dspanel:search"));
+        return;
+      }
+
+      // Ctrl+R / F5: refresh current view
+      if ((e.ctrlKey && e.key === "r") || e.key === "F5") {
+        e.preventDefault();
+        window.dispatchEvent(new CustomEvent("dspanel:refresh"));
+        return;
+      }
+
+      // Ctrl+E: export current view
+      if (e.ctrlKey && e.key === "e") {
+        e.preventDefault();
+        window.dispatchEvent(new CustomEvent("dspanel:export"));
+        return;
+      }
+
+      // Ctrl+S: save in current view
+      if (e.ctrlKey && e.key === "s") {
+        e.preventDefault();
+        window.dispatchEvent(new CustomEvent("dspanel:save"));
+        return;
+      }
+
+      // Escape: close dialog or clear search
+      if (e.key === "Escape") {
+        window.dispatchEvent(new CustomEvent("dspanel:escape"));
+        return;
       }
     },
     [handleToggleSidebar, activeTabId, closeTab, openTabs, activateTab],
