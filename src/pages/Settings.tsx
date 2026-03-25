@@ -325,6 +325,28 @@ export function Settings() {
                 </p>
               </div>
             </div>
+            <div className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-4">
+              <h3 className="mb-3 text-body font-semibold text-[var(--color-text-primary)]">
+                Offboarding
+              </h3>
+              <div>
+                <label className="mb-1 block text-caption text-[var(--color-text-secondary)]">
+                  Disabled Users OU
+                </label>
+                <input
+                  type="text"
+                  value={settings.disabledOu ?? ""}
+                  onChange={(e) => updateField("disabledOu", e.target.value || null)}
+                  placeholder="OU=Disabled Users,DC=example,DC=com"
+                  className="w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5 text-body text-[var(--color-text-primary)] placeholder-[var(--color-text-secondary)] focus:border-[var(--color-primary)] focus:outline-none"
+                  data-testid="setting-disabled-ou"
+                />
+                <p className="mt-1 text-caption text-[var(--color-text-secondary)]">
+                  Target OU where disabled user accounts are moved during offboarding.
+                  Leave empty to skip the move step.
+                </p>
+              </div>
+            </div>
           </div>
         )}
 
