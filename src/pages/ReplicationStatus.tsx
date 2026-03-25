@@ -13,6 +13,7 @@ import {
   HelpCircle,
   Play,
   Server,
+  Info,
 } from "lucide-react";
 import { ExportToolbar } from "@/components/common/ExportToolbar";
 import {
@@ -291,6 +292,20 @@ export function ReplicationStatus() {
             description="No NTDS Connection objects were found in the AD configuration."
           />
         ) : (
+          <>
+          {simpleBind && platform === "windows" && (
+            <div
+              className="mb-3 flex items-start gap-2 rounded-md border border-[var(--color-info)] bg-[var(--color-info-bg)] px-3 py-2"
+              data-testid="simple-bind-info"
+            >
+              <Info size={14} className="mt-0.5 shrink-0 text-[var(--color-info)]" />
+              <p className="text-caption text-[var(--color-text-primary)]">
+                Force replication is not available in simple bind mode.
+                This feature requires a domain-joined machine with GSSAPI authentication
+                to execute replication commands on domain controllers.
+              </p>
+            </div>
+          )}
           <div className="overflow-x-auto">
             <table className="w-full text-body" data-testid="replication-table">
               <thead>
@@ -381,6 +396,7 @@ export function ReplicationStatus() {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
     </div>

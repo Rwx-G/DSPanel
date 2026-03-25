@@ -10,6 +10,7 @@ const mockInvoke = vi.fn();
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: (...args: unknown[]) => {
     if (args[0] === "get_platform") return Promise.resolve("windows");
+    if (args[0] === "is_simple_bind") return Promise.resolve(false);
     return mockInvoke(...args);
   },
 }));
