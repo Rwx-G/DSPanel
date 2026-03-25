@@ -267,72 +267,88 @@ export function GpoViewer() {
       {/* Links View */}
       {viewMode === "links" && (
         <div className="flex flex-col gap-4">
-          {/* Object picker: search users/computers OR select OU */}
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="flex flex-col gap-1">
+          <div className="flex flex-wrap items-start gap-4">
+            {/* Search user/computer - autocomplete dropdown like UserComparison */}
+            <div className="flex flex-col gap-1.5 min-w-[280px]" data-testid="links-search-input">
               <label className="text-[11px] font-medium text-[var(--color-text-secondary)]">
                 Search user or computer
               </label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={(e) => handleKeyDown(e, handleSearch)}
-                  placeholder="Name or SAM..."
-                  className="h-8 w-48 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-default)] px-2 text-caption text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)]"
-                  data-testid="links-search-input"
-                />
-                <button
-                  className="btn btn-sm rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2.5 py-1 text-caption font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors flex items-center gap-1"
-                  onClick={handleSearch}
-                  disabled={searching || searchQuery.trim().length < 2}
-                >
-                  <Search size={14} />
-                </button>
+              <div className="relative">
+                <div className="flex items-center gap-2 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5">
+                  <Search size={16} className="shrink-0 text-[var(--color-text-secondary)]" />
+                  <input
+                    type="text"
+                    className="flex-1 bg-transparent text-body text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-secondary)]"
+                    placeholder="Search by name or SAM..."
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      if (e.target.value.length >= 2) {
+                        handleSearch();
+                      } else {
+                        setSearchResults([]);
+                      }
+                    }}
+                    onFocus={() => {
+                      if (searchResults.length > 0) setSearchResults((r) => [...r]);
+                    }}
+                    onBlur={() => {
+                      setTimeout(() => setSearchResults([]), 200);
+                    }}
+                  />
+                  {searching && <LoadingSpinner size={16} />}
+                </div>
+                {searchResults.length > 0 && (
+                  <div className="absolute z-50 mt-1 max-h-48 w-full overflow-y-auto rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-elevated)] shadow-lg">
+                    {searchResults.map((entry) => (
+                      <button
+                        key={entry.distinguishedName}
+                        className="flex w-full items-baseline gap-2 px-3 py-2 text-left text-body hover:bg-[var(--color-surface-hover)] transition-colors"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          setObjectDn(entry.distinguishedName);
+                          setSearchQuery(entry.displayName || entry.samAccountName || "");
+                          setSearchResults([]);
+                          // Auto-fetch GPO links
+                          setLinksLoading(true);
+                          setLinksError(null);
+                          invoke<GpoLinksResult>("get_gpo_links", { objectDn: entry.distinguishedName })
+                            .then(setLinksResult)
+                            .catch((err) => setLinksError(extractErrorMessage(err)))
+                            .finally(() => setLinksLoading(false));
+                        }}
+                        data-testid="links-object-dn"
+                      >
+                        <span className="font-medium text-[var(--color-text-primary)]">
+                          {entry.displayName || entry.samAccountName}
+                        </span>
+                        {entry.samAccountName && (
+                          <span className="text-caption text-[var(--color-text-secondary)]">
+                            ({entry.samAccountName})
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
-            {searchResults.length > 0 && (
-              <div className="flex flex-col gap-1">
-                <label className="text-[11px] font-medium text-[var(--color-text-secondary)]">
-                  Select result
-                </label>
-                <select
-                  value={objectDn}
-                  onChange={(e) => {
-                    setObjectDn(e.target.value);
-                    if (e.target.value) {
-                      // Auto-fetch GPO links on selection
-                      setLinksLoading(true);
-                      setLinksError(null);
-                      invoke<GpoLinksResult>("get_gpo_links", { objectDn: e.target.value })
-                        .then(setLinksResult)
-                        .catch((err) => setLinksError(extractErrorMessage(err)))
-                        .finally(() => setLinksLoading(false));
-                    }
-                  }}
-                  className="h-8 max-w-xs rounded border border-[var(--color-border-default)] bg-[var(--color-surface-default)] px-2 text-caption text-[var(--color-text-primary)]"
-                  data-testid="links-object-dn"
-                >
-                  <option value="">Pick...</option>
-                  {searchResults.map((r) => (
-                    <option key={r.distinguishedName} value={r.distinguishedName}>
-                      {r.displayName || r.samAccountName || r.distinguishedName}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
+            {/* Separator */}
+            <div className="flex items-end pb-2">
+              <span className="text-caption text-[var(--color-text-secondary)]">or</span>
+            </div>
 
-            <div className="flex flex-col gap-1">
+            {/* OU picker */}
+            <div className="flex flex-col gap-1.5" data-testid="links-ou-select">
               <label className="text-[11px] font-medium text-[var(--color-text-secondary)]">
-                Or select OU
+                Select OU
               </label>
               <select
                 value={objectDn}
                 onChange={(e) => {
                   setObjectDn(e.target.value);
+                  setSearchQuery("");
                   if (e.target.value) {
                     setLinksLoading(true);
                     setLinksError(null);
@@ -342,8 +358,7 @@ export function GpoViewer() {
                       .finally(() => setLinksLoading(false));
                   }
                 }}
-                className="h-8 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-default)] px-2 text-caption text-[var(--color-text-primary)]"
-                data-testid="links-ou-select"
+                className="h-[34px] rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5 text-body text-[var(--color-text-primary)]"
               >
                 <option value="">Choose OU...</option>
                 {flatOUs.map((ou) => (
@@ -354,6 +369,13 @@ export function GpoViewer() {
               </select>
             </div>
           </div>
+
+          {/* Selected object indicator */}
+          {objectDn && (
+            <div className="text-caption text-[var(--color-text-secondary)]">
+              Showing GPOs for: <span className="font-medium text-[var(--color-text-primary)]">{formatDn(objectDn)}</span>
+            </div>
+          )}
 
           {linksError && <ErrorBanner message={linksError} />}
           {linksLoading && <LoadingSpinner />}
@@ -621,8 +643,24 @@ function GpoLinksTable({
 function ScopeTable({ links }: { links: GpoLink[] }) {
   return (
     <div className="flex flex-col gap-2">
-      <div className="text-caption text-[var(--color-text-secondary)]">
-        Linked to {links.length} container(s)
+      <div className="flex items-center justify-between">
+        <div className="text-caption text-[var(--color-text-secondary)]">
+          Linked to {links.length} container(s)
+        </div>
+        <div className="flex items-center gap-4 text-[11px] text-[var(--color-text-secondary)]">
+          <span className="flex items-center gap-1">
+            <CheckCircle size={12} className="text-[var(--color-warning)]" />
+            Enforced
+          </span>
+          <span className="flex items-center gap-1">
+            <CheckCircle size={12} className="text-[var(--color-success)]" />
+            Enabled
+          </span>
+          <span className="flex items-center gap-1">
+            <XCircle size={12} className="text-[var(--color-error)]" />
+            Disabled
+          </span>
+        </div>
       </div>
       <div className="overflow-auto rounded-lg border border-[var(--color-border-default)]">
         <table className="w-full text-caption" data-testid="scope-table">
