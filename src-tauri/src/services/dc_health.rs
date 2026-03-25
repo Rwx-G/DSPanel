@@ -245,6 +245,13 @@ pub async fn check_dc_health(
 ///
 /// Returns the check result AND the resolved IP (if any) for use in subsequent
 /// connectivity checks.
+/// Returns true if the app is using simple bind (explicit credentials).
+/// In simple bind mode, AD DNS resolution is sufficient for health checks
+/// since the app connects via a direct IP, not via Kerberos/DNS discovery.
+fn is_simple_bind_mode() -> bool {
+    std::env::var("DSPANEL_LDAP_BIND_DN").is_ok()
+}
+
 async fn check_dns_with_ad_fallback(
     hostname: &str,
     ad_resolver: Option<&TokioResolver>,
@@ -276,14 +283,28 @@ async fn check_dns_with_ad_fallback(
         if let Ok(lookup) = resolver.lookup_ip(&fqdn).await {
             if let Some(ip) = lookup.iter().next() {
                 let ip_str = ip.to_string();
+                // In simple bind mode, AD DNS resolution is fully sufficient
+                // (no Kerberos dependency on system DNS). In GSSAPI mode,
+                // system DNS is critical for SRV/KDC discovery -> warn.
+                let (status, msg) = if is_simple_bind_mode() {
+                    (
+                        DcHealthLevel::Healthy,
+                        format!("Resolved via AD DNS to {}", ip_str),
+                    )
+                } else {
+                    (
+                        DcHealthLevel::Warning,
+                        format!(
+                            "System DNS failed, resolved via AD DNS to {} (Kerberos may require system DNS)",
+                            ip_str
+                        ),
+                    )
+                };
                 return (
                     DcHealthCheck {
                         name: "DNS".to_string(),
-                        status: DcHealthLevel::Warning,
-                        message: format!(
-                            "System DNS failed, resolved via AD DNS to {}",
-                            ip_str
-                        ),
+                        status,
+                        message: msg,
                         value: Some(ip_str.clone()),
                     },
                     Some(ip_str),
