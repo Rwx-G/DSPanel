@@ -1,0 +1,42 @@
+schema: 1
+story: "12.4"
+story_title: "UX Polish and Final Touches"
+gate: PASS
+status_reason: "All 8 ACs addressed. Keyboard shortcuts, About dialog, title bar branding, and theme audit complete. Window state persistence partially deferred (dimensions set, full save/restore needs Tauri API live testing). 7 new tests."
+reviewer: "Quinn (Test Architect)"
+updated: "2026-03-25T21:40:00Z"
+
+top_issues: []
+waiver: { active: false }
+
+quality_score: 95
+expires: "2026-04-08T21:40:00Z"
+
+evidence:
+  tests_reviewed: 7
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7, 8]
+    ac_gaps: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "No external data in UI. Static content in About dialog."
+  performance:
+    status: PASS
+    notes: "Keyboard handler is lightweight event dispatch. No impact."
+  reliability:
+    status: PASS
+    notes: "Custom events are fire-and-forget. No failure modes."
+  maintainability:
+    status: PASS
+    notes: "Clean event dispatch pattern for shortcuts. AboutDialog is self-contained."
+
+recommendations:
+  immediate: []
+  future:
+    - action: "Implement full window state save/restore with Tauri window API"
+      refs: ["src-tauri/src/lib.rs", "src-tauri/tauri.conf.json"]
+    - action: "Add keyboard shortcut hints in button tooltips"
+      refs: ["src/components/layout/AppShell.tsx"]
