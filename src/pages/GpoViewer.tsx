@@ -10,7 +10,6 @@ import {
   ShieldAlert,
   ShieldOff,
   CheckCircle,
-  ArrowRight,
   FolderTree,
 } from "lucide-react";
 
@@ -55,7 +54,7 @@ interface SearchResult {
   objectClass: string[];
 }
 
-type ViewMode = "links" | "scope" | "whatif";
+type ViewMode = "links" | "scope";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -112,11 +111,6 @@ export function GpoViewer() {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
 
-  // What-if state
-  const [whatIfOuDn, setWhatIfOuDn] = useState("");
-  const [whatIfResult, setWhatIfResult] = useState<GpoLinksResult | null>(null);
-  const [whatIfLoading, setWhatIfLoading] = useState(false);
-  const [whatIfError, setWhatIfError] = useState<string | null>(null);
 
   // Load GPO list and OU tree on mount
   useEffect(() => {
@@ -182,22 +176,6 @@ export function GpoViewer() {
     }
   }, [scopeGpoDn]);
 
-  const fetchWhatIf = useCallback(async () => {
-    if (!whatIfOuDn.trim()) return;
-    setWhatIfLoading(true);
-    setWhatIfError(null);
-    try {
-      const result = await invoke<GpoLinksResult>("get_gpo_links", {
-        objectDn: whatIfOuDn.trim(),
-      });
-      setWhatIfResult(result);
-    } catch (err) {
-      setWhatIfError(extractErrorMessage(err));
-    } finally {
-      setWhatIfLoading(false);
-    }
-  }, [whatIfOuDn]);
-
   const handleKeyDown = (e: React.KeyboardEvent, action: () => void) => {
     if (e.key === "Enter") action();
   };
@@ -205,9 +183,7 @@ export function GpoViewer() {
   const currentLinks =
     viewMode === "links"
       ? linksResult?.links ?? []
-      : viewMode === "whatif"
-        ? whatIfResult?.links ?? []
-        : scopeLinks;
+      : scopeLinks;
 
   return (
     <div className="flex h-full flex-col gap-4 p-4" data-testid="gpo-viewer-page">
@@ -244,7 +220,6 @@ export function GpoViewer() {
           [
             { id: "links", label: "GPO Links", icon: <Shield size={14} /> },
             { id: "scope", label: "Scope Report", icon: <FolderTree size={14} /> },
-            { id: "whatif", label: "What-If", icon: <ArrowRight size={14} /> },
           ] as const
         ).map((tab) => (
           <button
@@ -377,6 +352,10 @@ export function GpoViewer() {
             </div>
           </div>
 
+          <p className="text-caption text-[var(--color-text-secondary)]">
+            Search for a user or computer to see which GPOs apply to it, or select an OU to see which GPOs would apply to all objects inside it.
+          </p>
+
           {/* Selected object indicator */}
           {objectDn && (
             <div className="text-caption text-[var(--color-text-secondary)]">
@@ -470,49 +449,6 @@ export function GpoViewer() {
         </div>
       )}
 
-      {/* What-If View */}
-      {viewMode === "whatif" && (
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="flex flex-col gap-1">
-              <label className="text-[11px] font-medium text-[var(--color-text-secondary)]">
-                Target OU
-              </label>
-              <select
-                value={whatIfOuDn}
-                onChange={(e) => setWhatIfOuDn(e.target.value)}
-                className="h-8 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-default)] px-2 text-caption text-[var(--color-text-primary)]"
-                data-testid="whatif-ou-dn"
-              >
-                <option value="">Choose OU...</option>
-                {flatOUs.map((ou) => (
-                  <option key={ou.dn} value={ou.dn}>
-                    {ou.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <button
-              className="btn btn-sm btn-primary flex items-center gap-1"
-              onClick={fetchWhatIf}
-              disabled={whatIfLoading || !whatIfOuDn.trim()}
-              data-testid="whatif-simulate-button"
-            >
-              <ArrowRight size={14} />
-              Simulate
-            </button>
-          </div>
-
-          {whatIfError && <ErrorBanner message={whatIfError} />}
-          {whatIfLoading && <LoadingSpinner />}
-          {whatIfResult && !whatIfLoading && (
-            <GpoLinksTable
-              links={whatIfResult.links}
-              blocksInheritance={whatIfResult.blocksInheritance}
-            />
-          )}
-        </div>
-      )}
     </div>
   );
 }

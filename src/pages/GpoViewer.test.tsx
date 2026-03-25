@@ -24,7 +24,6 @@ describe("GpoViewer", () => {
     render(<GpoViewer />);
     expect(screen.getByTestId("tab-links")).toBeInTheDocument();
     expect(screen.getByTestId("tab-scope")).toBeInTheDocument();
-    expect(screen.getByTestId("tab-whatif")).toBeInTheDocument();
   });
 
   it("shows search input and OU select for links view", () => {
@@ -38,13 +37,6 @@ describe("GpoViewer", () => {
     fireEvent.click(screen.getByTestId("tab-scope"));
     expect(screen.getByTestId("scope-gpo-dn")).toBeInTheDocument();
     expect(screen.getByTestId("scope-search-button")).toBeInTheDocument();
-  });
-
-  it("switches to what-if view with OU dropdown", () => {
-    render(<GpoViewer />);
-    fireEvent.click(screen.getByTestId("tab-whatif"));
-    expect(screen.getByTestId("whatif-ou-dn")).toBeInTheDocument();
-    expect(screen.getByTestId("whatif-simulate-button")).toBeInTheDocument();
   });
 
   it("has export toolbar", () => {
