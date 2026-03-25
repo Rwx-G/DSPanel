@@ -222,6 +222,7 @@ pub fn run() {
             commands::evaluate_health_cmd,
             commands::evaluate_health_batch,
             commands::get_platform,
+            commands::is_simple_bind,
             commands::get_current_username,
             commands::get_authenticated_identity,
             commands::get_computer_name,

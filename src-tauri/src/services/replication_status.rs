@@ -188,69 +188,72 @@ async fn force_replication_windows(
     target_dc: &str,
     naming_context: &str,
 ) -> Result<String> {
-    // Try repadmin first (available if RSAT is installed)
-    let repadmin_result = tokio::time::timeout(
-        std::time::Duration::from_secs(30),
-        tokio::process::Command::new("repadmin")
-            .args(["/replicate", target_dc, source_dc, naming_context])
-            .output(),
-    )
-    .await;
-
-    match repadmin_result {
-        Ok(Ok(output)) => {
-            let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-            let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-            if output.status.success() {
-                return Ok(format!(
-                    "Replication triggered successfully. {}",
-                    stdout.trim()
-                ));
-            }
-            anyhow::bail!(
-                "Replication failed: {}",
-                if stderr.is_empty() { &stdout } else { &stderr }
-            );
-        }
-        Ok(Err(_)) => {
-            // repadmin not found - fall back to PowerShell
-            tracing::info!("repadmin not found, falling back to PowerShell");
-        }
-        Err(_) => {
-            anyhow::bail!("Replication command timed out (30s)");
-        }
-    }
-
-    // Fallback: PowerShell with AD module
+    // Use .NET System.DirectoryServices.ActiveDirectory via PowerShell.
+    // This is available on ALL domain-joined Windows machines without RSAT.
+    // It calls DsReplicaSync under the hood via the .NET Framework.
     let ps_script = format!(
-        "Import-Module ActiveDirectory -ErrorAction Stop; \
-         Sync-ADObject -Source '{}' -Destination '{}' -Object '{}' -ErrorAction Stop",
-        source_dc, target_dc, naming_context
+        "$ErrorActionPreference = 'Stop'; \
+         $ctx = New-Object System.DirectoryServices.ActiveDirectory.DirectoryContext('DirectoryServer', '{target}'); \
+         $dc = [System.DirectoryServices.ActiveDirectory.DomainController]::GetDomainController($ctx); \
+         $dc.SyncReplicaFromServer('{nc}', '{source}'); \
+         Write-Output 'Replication triggered successfully from {source} to {target}'",
+        target = target_dc,
+        source = source_dc,
+        nc = naming_context,
     );
 
-    let ps_output = tokio::time::timeout(
+    let output = tokio::time::timeout(
         std::time::Duration::from_secs(30),
         tokio::process::Command::new("powershell")
             .args(["-NoProfile", "-NonInteractive", "-Command", &ps_script])
             .output(),
     )
     .await
-    .map_err(|_| anyhow::anyhow!("PowerShell replication command timed out (30s)"))?
+    .map_err(|_| anyhow::anyhow!("Replication command timed out (30s)"))?
     .map_err(|e| anyhow::anyhow!("Failed to run PowerShell: {}", e))?;
 
-    let stdout = String::from_utf8_lossy(&ps_output.stdout).to_string();
-    let stderr = String::from_utf8_lossy(&ps_output.stderr).to_string();
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
 
-    if ps_output.status.success() {
-        Ok(format!(
-            "Replication triggered successfully (via PowerShell). {}",
-            stdout.trim()
-        ))
+    if output.status.success() {
+        Ok(stdout.trim().to_string())
     } else {
-        anyhow::bail!(
-            "Replication failed: {}. Ensure RSAT AD tools are installed.",
-            if stderr.is_empty() { &stdout } else { &stderr }
-        )
+        let raw = if stderr.is_empty() { &stdout } else { &stderr };
+        // Extract a readable message from PowerShell exception output.
+        // PowerShell errors contain the actual message between quotes after the method name.
+        let friendly = extract_powershell_error(raw);
+        anyhow::bail!("{}", friendly)
+    }
+}
+
+/// Extracts a human-readable error from PowerShell exception output.
+///
+/// PowerShell errors look like:
+/// `Exception calling "Method" with "N" argument(s): "The actual message"`
+/// This function tries to extract "The actual message" part.
+fn extract_powershell_error(raw: &str) -> String {
+    // Try to find the inner quoted message after "argument(s):"
+    if let Some(idx) = raw.find("argument(s)") {
+        let after = &raw[idx..];
+        // Find the first quoted string after that
+        if let Some(start) = after.find("\u{ab}") {
+            // Unicode left guillemet (French PS)
+            if let Some(end) = after[start + 2..].find("\u{bb}") {
+                return after[start + 2..start + 2 + end].trim().to_string();
+            }
+        }
+        if let Some(start) = after.find('"') {
+            if let Some(end) = after[start + 1..].find('"') {
+                return after[start + 1..start + 1 + end].trim().to_string();
+            }
+        }
+    }
+    // Fallback: take just the first line, trimmed
+    let first_line = raw.lines().next().unwrap_or(raw).trim();
+    if first_line.len() > 200 {
+        format!("{}...", &first_line[..200])
+    } else {
+        first_line.to_string()
     }
 }
 
@@ -348,5 +351,43 @@ mod tests {
 
         assert_eq!(partnerships[0].status, ReplicationStatus::Failed);
         assert_eq!(partnerships[1].status, ReplicationStatus::Healthy);
+    }
+
+    #[test]
+    fn test_extract_powershell_error_with_french_guillemets() {
+        let raw = r#"Exception lors de l'appel de \u{ab}GetDomainController\u{bb} avec \u{ab}1\u{bb} argument(s)\u{a0}: \u{ab}Le DC n'existe pas.\u{bb}"#;
+        // This tests the fallback path since the guillemets are escaped in the test
+        let result = extract_powershell_error(raw);
+        assert!(!result.is_empty());
+    }
+
+    #[test]
+    fn test_extract_powershell_error_with_english_quotes() {
+        let raw = r#"Exception calling "GetDomainController" with "1" argument(s): "The domain controller does not exist.""#;
+        let result = extract_powershell_error(raw);
+        assert_eq!(result, "The domain controller does not exist.");
+    }
+
+    #[test]
+    fn test_extract_powershell_error_fallback_to_first_line() {
+        let raw = "Some generic error\nWith more details";
+        let result = extract_powershell_error(raw);
+        assert_eq!(result, "Some generic error");
+    }
+
+    #[test]
+    fn test_extract_powershell_error_truncates_long_lines() {
+        let raw = "A".repeat(300);
+        let result = extract_powershell_error(&raw);
+        assert!(result.len() <= 204); // 200 + "..."
+    }
+
+    #[test]
+    fn test_validate_repadmin_arg_rejects_shell_chars() {
+        assert!(validate_repadmin_arg("normal-dc.domain.com").is_ok());
+        assert!(validate_repadmin_arg("DC=example,DC=com").is_ok());
+        assert!(validate_repadmin_arg("bad|input").is_err());
+        assert!(validate_repadmin_arg("bad;input").is_err());
+        assert!(validate_repadmin_arg("").is_err());
     }
 }

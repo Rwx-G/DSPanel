@@ -114,12 +114,14 @@ export function ReplicationStatus() {
     null,
   );
   const [platform, setPlatform] = useState<string>("unknown");
+  const [simpleBind, setSimpleBind] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const { showConfirmation } = useDialog();
   const { notify } = useNotifications();
 
   useEffect(() => {
     invoke<string>("get_platform").then(setPlatform).catch(() => {});
+    invoke<boolean>("is_simple_bind").then(setSimpleBind).catch(() => {});
   }, []);
 
   const fetchPartnerships = useCallback(async () => {
@@ -360,10 +362,10 @@ export function ReplicationStatus() {
                       {platform === "windows" && (
                       <td className="px-3 py-2">
                         <button
-                          className="btn btn-sm flex items-center gap-1 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2.5 py-1 text-caption font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors"
+                          className="btn btn-sm flex items-center gap-1 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2.5 py-1 text-caption font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                           onClick={() => handleForceReplication(p)}
-                          disabled={forcingReplication === forceKey}
-                          title="Force replication"
+                          disabled={forcingReplication === forceKey || simpleBind}
+                          title={simpleBind ? "Force replication is not available in simple bind mode" : "Force replication"}
                           data-testid={`force-repl-${i}`}
                         >
                           <Play size={12} />
