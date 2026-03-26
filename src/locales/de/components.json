@@ -1,0 +1,286 @@
+{
+  "errorBoundary": {
+    "title": "Ein Fehler ist aufgetreten",
+    "description": "Ein unerwarteter Fehler ist aufgetreten. Dieser wurde zur Untersuchung protokolliert.",
+    "showDetails": "Fehlerdetails anzeigen",
+    "tryAgain": "Erneut versuchen"
+  },
+  "exportToolbar": {
+    "export": "Exportieren",
+    "exporting": "Wird exportiert..."
+  },
+  "searchBar": {
+    "placeholder": "Suchen...",
+    "clearSearch": "Suche leeren"
+  },
+  "loadingSpinner": {
+    "loading": "Laden"
+  },
+  "notificationHost": {
+    "dismiss": "Benachrichtigung schliessen"
+  },
+  "securityDisclaimer": {
+    "aboutModule": "Ueber dieses Modul",
+    "coverage": "Indikative Analyse - geschaetzte {{coverage}} Abdeckung",
+    "whatWeCheck": "Was wir pruefen:",
+    "limitations": "Einschraenkungen:",
+    "forCompleteAudit": "Fuer ein vollstaendiges Audit:"
+  },
+  "snapshotHistory": {
+    "loading": "Snapshot-Verlauf wird geladen...",
+    "noSnapshots": "Keine Snapshots",
+    "snapshotsDescription": "Snapshots werden automatisch vor Aenderungen erfasst.",
+    "timestamp": "Zeitstempel",
+    "operation": "Operation",
+    "operator": "Operator",
+    "objectDn": "Objekt-DN",
+    "restoreTitle": "Aus Snapshot wiederherstellen",
+    "restoreConfirm": "\"{{name}}\" auf den Zustand vom {{timestamp}} wiederherstellen?",
+    "restoreNote": "Dies ueberschreibt die aktuellen Attributwerte mit den Snapshot-Werten. Schreibgeschuetzte Attribute (objectClass, memberOf, Zeitstempel usw.) werden uebersprungen.",
+    "restoreSuccess": "Objekt erfolgreich aus Snapshot wiederhergestellt.",
+    "restoreButton": "Aus diesem Snapshot wiederherstellen",
+    "deleteTitle": "Snapshot loeschen",
+    "deleteConfirm": "Den \"{{operation}}\"-Snapshot vom {{timestamp}} loeschen?",
+    "deleteNote": "Dieser Wiederherstellungspunkt wird dauerhaft entfernt.",
+    "deleteButton": "Snapshot loeschen",
+    "deleteFailed": "Snapshot konnte nicht geloescht werden",
+    "computingDiff": "Diff wird berechnet...",
+    "noDifferences": "Keine Unterschiede gefunden - Objekt stimmt mit dem Snapshot ueberein.",
+    "attributesDiffer": "Attribut(e) unterscheiden sich vom aktuellen Zustand",
+    "attribute": "Attribut",
+    "snapshot": "Snapshot",
+    "current": "Aktuell",
+    "diffFailed": "Diff konnte nicht berechnet werden."
+  },
+  "updateBar": {
+    "versionAvailable": "DSPanel v{{version}} ist verfuegbar.",
+    "download": "Herunterladen",
+    "skip": "Ueberspringen",
+    "remindLater": "Spaeter erinnern"
+  },
+  "userActions": {
+    "resetPassword": "Passwort zuruecksetzen",
+    "requiresHelpDesk": "Erfordert HelpDesk-Berechtigung",
+    "unlock": "Entsperren",
+    "disable": "Deaktivieren",
+    "enable": "Aktivieren",
+    "unlockAccount": "Konto entsperren",
+    "enableAccount": "Konto aktivieren",
+    "disableAccount": "Konto deaktivieren",
+    "unlockConfirm": "Moechten Sie das Konto fuer {{name}} ({{sam}}) wirklich entsperren?",
+    "enableConfirm": "Moechten Sie das Konto fuer {{name}} ({{sam}}) wirklich aktivieren?",
+    "disableConfirm": "Moechten Sie das Konto fuer {{name}} ({{sam}}) wirklich deaktivieren? Der Benutzer kann sich dann nicht mehr anmelden.",
+    "actionSuccess": "{{action}} fuer {{name}} erfolgreich"
+  },
+  "graphSettings": {
+    "title": "Microsoft Graph API-Integration",
+    "description": "Azure AD-App-Registrierung fuer Exchange Online-Diagnose konfigurieren. Erfordert Mail.Read- und User.Read.All-Anwendungsberechtigungen mit Admin-Zustimmung.",
+    "tenantId": "Mandanten-ID",
+    "tenantPlaceholder": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+    "clientId": "Anwendungs-ID (Client-ID)",
+    "clientSecret": "Client-Geheimnis",
+    "clientSecretStored": "Im Betriebssystem-Anmeldeinformationsspeicher gespeichert",
+    "clientSecretPlaceholder": "Client-Geheimniswert",
+    "testConnection": "Verbindung testen",
+    "connectionSuccess": "Verbindung erfolgreich.",
+    "connectionFailed": "Verbindung fehlgeschlagen. Pruefen Sie Mandanten-ID, Client-ID und Client-Geheimnis."
+  },
+  "presetSettings": {
+    "title": "Vorlagen-Speicherpfad",
+    "description": "Konfigurieren Sie die Netzwerkfreigabe oder das lokale Verzeichnis, in dem Vorlagen-JSON-Dateien gespeichert werden. Alle DSPanel-Instanzen, die diesen Pfad teilen, sehen dieselben Vorlagen.",
+    "placeholder": "\\\\server\\freigabe\\vorlagen oder C:\\vorlagen",
+    "browseFolder": "Ordner durchsuchen",
+    "pathValid": "Pfad ist zugaenglich und gueltig.",
+    "pathInvalid": "Pfad ist nicht zugaenglich. Bitte pruefen Sie den Pfad und die Berechtigungen.",
+    "currentlyConfigured": "Aktuell konfiguriert: {{path}}",
+    "configFailed": "Pfad konnte nicht konfiguriert werden. Bitte pruefen Sie den Pfad und versuchen Sie es erneut."
+  },
+  "passwordFlags": {
+    "title": "Passwort-Flags",
+    "neverExpires": "Passwort laeuft nie ab",
+    "cannotChange": "Benutzer kann Passwort nicht aendern",
+    "insufficientPermissions": "(unzureichende Berechtigungen zum Lesen)",
+    "saveChanges": "Aenderungen speichern",
+    "requiresAccountOperator": "Erfordert AccountOperator-Berechtigung"
+  },
+  "pagination": {
+    "firstPage": "Erste Seite",
+    "previousPage": "Vorherige Seite",
+    "nextPage": "Naechste Seite",
+    "lastPage": "Letzte Seite",
+    "noItems": "Keine Eintraege",
+    "showing": "Zeige {{start}}-{{end}} von {{total}} Eintraegen",
+    "pageSize": "Seitengroesse:"
+  },
+  "permissionMapping": {
+    "domainAdminRequired": "DomainAdmin-Zugriff erforderlich, um Berechtigungszuordnungen zu verwalten.",
+    "description": "AD-Sicherheitsgruppen DSPanel-Berechtigungsstufen zuordnen. Wenn ein Benutzer mehreren zugeordneten Gruppen angehoert, gewinnt die hoechste Stufe. Die Standarderkennung (RID-basiert + DSPanel-*-Gruppen) bleibt neben benutzerdefinierten Zuordnungen aktiv.",
+    "readOnly": "Nur lesen",
+    "helpDesk": "HelpDesk",
+    "accountOperator": "Kontobediener",
+    "admin": "Admin",
+    "domainAdmin": "Domaenen-Admin",
+    "readOnlyHint": "Nur-Lese-Zugriff auf Verzeichnisdaten",
+    "helpDeskHint": "Passwortzuruecksetzungen und Kontoentsperrungen",
+    "accountOperatorHint": "Gruppenverwaltung und Kontoaenderungen",
+    "adminHint": "Voller Admin (Objekterstellung, OU-Verwaltung)",
+    "domainAdminHint": "Vollzugriff einschliesslich Sicherheit und Infrastruktur",
+    "addGroup": "Gruppe hinzufuegen",
+    "searchGroupsPlaceholder": "AD-Gruppen nach Name suchen...",
+    "noCustomGroups": "Keine benutzerdefinierten Gruppen zugeordnet. Standarderkennung wird angewendet.",
+    "alreadyMapped": "(bereits zugeordnet)",
+    "searchFailed": "Suche fehlgeschlagen. Bitte versuchen Sie es erneut.",
+    "noGroupsFound": "Keine Gruppen gefunden",
+    "savedSuccessfully": "Berechtigungszuordnungen erfolgreich gespeichert.",
+    "saveMappings": "Zuordnungen speichern",
+    "groupNotFoundInAd": "Gruppe nicht im AD gefunden",
+    "validateGroupExists": "Pruefen, ob die Gruppe im AD existiert",
+    "removeGroup": "Gruppe entfernen"
+  },
+  "workstationMonitoring": {
+    "title": "Ueberwachung: {{hostname}}",
+    "refresh5s": "5s",
+    "refresh10s": "10s",
+    "refresh30s": "30s",
+    "resume": "Fortsetzen",
+    "pause": "Pause",
+    "connecting": "Verbindung zur Arbeitsstation wird hergestellt...",
+    "cpu": "CPU",
+    "memory": "Arbeitsspeicher",
+    "disks": "Festplatten",
+    "sessions": "Sitzungen ({{count}})",
+    "noActiveSessions": "Keine aktiven Sitzungen",
+    "unavailable": "Nicht verfuegbar",
+    "services": "Dienste ({{count}})",
+    "autoStart": "Autostart",
+    "showAutoStart": "Nur Autostart-Dienste anzeigen"
+  },
+  "dataTable": {
+    "noData": "Keine Daten verfuegbar",
+    "exportCsv": "Als CSV exportieren"
+  },
+  "filterBar": {
+    "placeholder": "Filtern...",
+    "clearAll": "Alle Filter loeschen",
+    "removeFilter": "{{label}}-Filter entfernen"
+  },
+  "propertyGrid": {
+    "noProperties": "Keine Eigenschaften anzuzeigen",
+    "confirmEdit": "Bearbeitung bestaetigen",
+    "cancelEdit": "Bearbeitung abbrechen"
+  },
+  "diffViewer": {
+    "noDifferences": "Keine Unterschiede",
+    "inline": "Inline",
+    "sideBySide": "Nebeneinander"
+  },
+  "advancedAttributes": {
+    "title": "Erweiterte Attribute ({{count}})",
+    "noAttributes": "Keine erweiterten Attribute verfuegbar",
+    "filterPlaceholder": "Attribute filtern...",
+    "showEmpty": "Leere anzeigen",
+    "noMatch": "Keine Attribute entsprechen \"{{query}}\"",
+    "favorites": "Favoriten",
+    "allAttributes": "Alle Attribute",
+    "empty": "(leer)",
+    "confirmEdit": "Bearbeitung bestaetigen",
+    "cancelEdit": "Bearbeitung abbrechen",
+    "clearFilter": "Filter loeschen"
+  },
+  "exchangePanel": {
+    "title": "Exchange-Postfach",
+    "mailboxGuid": "Postfach-GUID",
+    "recipientType": "Empfaengertyp",
+    "primarySmtp": "Primaerer SMTP",
+    "forwardingTo": "Weiterleitung an",
+    "emailAliases": "E-Mail-Aliase ({{count}})",
+    "delegates": "Stellvertreter ({{count}})"
+  },
+  "groupPicker": {
+    "placeholder": "Gruppen suchen...",
+    "clearSearch": "Suche leeren",
+    "searchFailed": "Suche fehlgeschlagen. Bitte versuchen Sie es erneut.",
+    "noGroups": "Keine Gruppen gefunden"
+  },
+  "ouPicker": {
+    "loading": "OUs werden geladen...",
+    "loadFailed": "OUs konnten nicht geladen werden",
+    "loadFailedHint": "Ueberpruefen Sie Ihre AD-Verbindung und versuchen Sie es erneut.",
+    "noOus": "Keine OUs verfuegbar",
+    "selected": "Ausgewaehlt: {{ou}}"
+  },
+  "passwordInput": {
+    "hide": "Passwort verbergen",
+    "show": "Passwort anzeigen"
+  },
+  "comboBox": {
+    "placeholder": "Auswaehlen...",
+    "searchPlaceholder": "Suchen...",
+    "searchOptions": "Optionen suchen",
+    "noResults": "Keine Ergebnisse"
+  },
+  "dateTimePicker": {
+    "placeholder": "Datum auswaehlen...",
+    "previousMonth": "Vorheriger Monat",
+    "nextMonth": "Naechster Monat",
+    "decreaseHours": "Stunden verringern",
+    "increaseHours": "Stunden erhoehen",
+    "decreaseMinutes": "Minuten verringern",
+    "increaseMinutes": "Minuten erhoehen",
+    "months": ["Januar", "Februar", "Maerz", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"]
+  },
+  "validationSummary": {
+    "error_one": "{{count}} Validierungsfehler",
+    "error_other": "{{count}} Validierungsfehler"
+  },
+  "stateInTimeView": {
+    "loadHistory": "Replikationsverlauf laden",
+    "notAvailable": "Replikationsmetadaten sind fuer dieses Objekt nicht verfuegbar.",
+    "attributeCount": "{{filtered}} von {{total}} Attribut(en)",
+    "filterPlaceholder": "Attribute filtern...",
+    "attribute": "Attribut",
+    "lastChanged": "Zuletzt geaendert",
+    "version": "Version",
+    "originatingDc": "Urspruenglicher DC",
+    "snapshotValue": "Snapshot-Wert",
+    "compareTimeRanges": "Zeitraeume vergleichen",
+    "from": "Von...",
+    "to": "Bis...",
+    "compare": "Vergleichen",
+    "noChanges": "Keine Attributaenderungen in diesem Zeitraum erkannt.",
+    "versionBefore": "Version vorher",
+    "versionAfter": "Version nachher",
+    "changedAt": "Geaendert am",
+    "linkedAttributeChanges": "Verknuepfte Attributaenderungen ({{count}})",
+    "linkedObject": "Verknuepftes Objekt",
+    "changed": "Geaendert",
+    "removed": "Entfernt"
+  },
+  "uncPermissionsAudit": {
+    "notAvailable": "Auf dieser Plattform nicht verfuegbar",
+    "notAvailableDescription": "Das UNC-Pfad-Berechtigungsaudit erfordert Windows. NTFS ACL-APIs sind unter macOS oder Linux nicht verfuegbar.",
+    "uncPath": "UNC-Pfad",
+    "uncPlaceholder": "\\\\server\\freigabe\\ordner",
+    "audit": "Audit",
+    "acesFound": "{{count}} ACE(s) gefunden fuer {{path}}",
+    "exportCsv": "CSV exportieren",
+    "bothUsers": "Beide Benutzer",
+    "onlyUser": "Nur {{name}}",
+    "trustee": "Berechtigter",
+    "permissions": "Berechtigungen",
+    "accessSummary": "Zugriffsuebersicht",
+    "rulesGrantAccess": "{{count}} Regel(n) gewaehren Zugriff",
+    "rulesDenyAccess": "{{count}} Regel(n) verweigern Zugriff",
+    "via": "ueber {{groups}}",
+    "differences": "Unterschiede",
+    "hasAccessVia": "{{userA}} hat {{permissions}}-Zugriff ueber {{trustee}} - {{userB}} nicht",
+    "errorsCount": "{{count}} Fehler beim Audit",
+    "userHasAccess": "{{name}} hat Zugriff ueber {{trustee}}",
+    "userDenied": "{{name}} wird verweigert ueber {{trustee}}",
+    "noMatchingGroup": "Keine passende Gruppe fuer {{name}}"
+  },
+  "groupChainTree": {
+    "circularReference": "(Zirkulaere Referenz)",
+    "noMembers": "Keine Mitglieder"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "pageTitle": "Computer-Suche",
+  "searchPlaceholder": "Nach Computername suchen...",
+  "all": "Alle",
+  "allOs": "Alle Betriebssysteme",
+  "windows": "Windows",
+  "otherOs": "Andere",
+  "loadingComputers": "Computer werden geladen...",
+  "found_one": "{{count}} Computer gefunden",
+  "found_other": "{{count}} Computer gefunden",
+  "noComputersFound": "Keine Computer gefunden",
+  "failedToLoad": "Computer konnten nicht geladen werden",
+  "noComputersMatch": "Keine Computer entsprechen \"{{query}}\"",
+  "noFilterResults": "Keine Computer entsprechen den ausgewaehlten Filtern.",
+  "selectComputer": "Waehlen Sie einen Computer, um Details anzuzeigen",
+  "unknownOs": "Unbekanntes Betriebssystem"
+}

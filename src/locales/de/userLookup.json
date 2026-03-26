@@ -1,0 +1,18 @@
+{
+  "searchPlaceholder": "Nach Name, Benutzername oder E-Mail suchen...",
+  "all": "Alle",
+  "healthy": "Gesund",
+  "warning": "Warnung",
+  "loadingUsers": "Benutzer werden geladen...",
+  "found_one": "{{count}} Benutzer gefunden",
+  "found_other": "{{count}} Benutzer gefunden",
+  "noUsersFound": "Keine Benutzer gefunden",
+  "failedToLoad": "Benutzer konnten nicht geladen werden",
+  "noUsersWithHealth": "Keine Benutzer mit Gesundheitsstatus {{status}}.",
+  "noUsersMatch": "Keine Benutzer entsprechen \"{{query}}\"",
+  "noUsersAvailable": "Keine Benutzer verfuegbar.",
+  "selectUser": "Waehlen Sie einen Benutzer, um Details anzuzeigen",
+  "startOffboarding": "Offboarding fuer {{name}} starten",
+  "cannotCompareWithSelf": "Ein Benutzer kann nicht mit sich selbst verglichen werden",
+  "compareWith": "{{name}} mit {{other}} vergleichen"
+}

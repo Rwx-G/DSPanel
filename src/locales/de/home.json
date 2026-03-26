@@ -1,0 +1,23 @@
+{
+  "dashboard": "Dashboard",
+  "activeDirectory": "Active Directory",
+  "currentSession": "Aktuelle Sitzung",
+  "authenticatedAs": "Authentifiziert als",
+  "level": "Stufe",
+  "domainJoined": "Domaene beigetreten",
+  "environment": "Umgebung",
+  "mfaSecurity": "MFA-Sicherheit",
+  "configured": "Konfiguriert",
+  "notConfigured": "Nicht konfiguriert",
+  "setupMfa": "MFA einrichten",
+  "revokeMfa": "MFA widerrufen",
+  "adGroupMemberships": "AD-Gruppenmitgliedschaften",
+  "notConnectedWarning": "Nicht mit Active Directory verbunden. Verzeichnisabfragen sind nicht verfuegbar. Stellen Sie sicher, dass dieser Computer zur Domaene gehoert und Netzwerkzugriff auf einen Domain Controller hat.",
+  "generating": "Wird generiert...",
+  "permissions": "Berechtigungen",
+  "readOnly": "Nur lesen",
+  "helpDesk": "HelpDesk",
+  "accountOperator": "Kontobediener",
+  "admin": "Admin",
+  "domainAdmin": "Domaenen-Admin"
+}

@@ -1,0 +1,11 @@
+{
+  "skipToMain": "Zum Hauptinhalt springen",
+  "mainContent": "Hauptinhalt",
+  "breadcrumb": "Brotkruemelnavigation",
+  "scrollTabsLeft": "Tabs nach links scrollen",
+  "scrollTabsRight": "Tabs nach rechts scrollen",
+  "closeTab": "{{title}} schliessen",
+  "closeOthers": "Andere schliessen",
+  "closeAll": "Alle schliessen",
+  "tabOptions": "Tab-Optionen"
+}

@@ -1,0 +1,81 @@
+{
+  "passwordReset": {
+    "title": "Passwort zuruecksetzen",
+    "successTitle": "Passwort erfolgreich zurueckgesetzt",
+    "successMessage": "Das Passwort fuer {{name}} wurde zurueckgesetzt.",
+    "mustChangeAtLogon": "Benutzer muss das Passwort bei der naechsten Anmeldung aendern.",
+    "autoGenerate": "Automatisch generieren",
+    "manualEntry": "Manuelle Eingabe",
+    "enterNewPassword": "Neues Passwort eingeben",
+    "atLeast8Chars": "Mindestens 8 Zeichen",
+    "uppercaseLetter": "Grossbuchstabe",
+    "lowercaseLetter": "Kleinbuchstabe",
+    "digit": "Ziffer",
+    "specialCharacter": "Sonderzeichen",
+    "meetsComplexity": "Erfuellt Komplexitaetsanforderungen (3+ Kategorien)",
+    "needsCategories": "Benoetigt 3+ Zeichenkategorien",
+    "generatePassword": "Passwort generieren",
+    "breachUnavailable": "Datenleck-Pruefung nicht verfuegbar",
+    "foundInBreaches": "In {{count}} Datenlecks gefunden - Neugenerierung empfohlen",
+    "notInBreaches": "In keinem bekannten Datenleck gefunden",
+    "mustChangeCheckbox": "Muss Passwort bei naechster Anmeldung aendern",
+    "resetButton": "Passwort zuruecksetzen"
+  },
+  "moveObject": {
+    "titleBulk": "{{count}} Objekte verschieben",
+    "titleSingle": "{{name}} verschieben",
+    "selectTargetOu": "Waehlen Sie die Ziel-Organisationseinheit:",
+    "objectsWillBeMoved": "Die folgenden Objekte werden verschoben:",
+    "from": "Von: {{path}}",
+    "to": "Nach: {{path}}",
+    "move": "Verschieben",
+    "moving": "Objekte werden verschoben..."
+  },
+  "mfa": {
+    "verificationRequired": "MFA-Verifizierung erforderlich",
+    "enterCode": "Geben Sie den 6-stelligen Code aus Ihrer Authenticator-App oder einen Backup-Code ein.",
+    "invalidCode": "Ungueltiger Code. Bitte versuchen Sie es erneut.",
+    "verify": "Verifizieren",
+    "verifying": "Wird verifiziert..."
+  },
+  "mfaSetup": {
+    "title": "MFA einrichten",
+    "description": "Fuegen Sie eine zusaetzliche Sicherheitsebene hinzu, indem Sie TOTP-basierte Multi-Faktor-Authentifizierung aktivieren. Sie benoetigen eine Authenticator-App (Google Authenticator, Authy usw.).",
+    "beginSetup": "Einrichtung starten",
+    "step1Title": "Schritt 1: QR-Code scannen",
+    "step1Description": "Scannen Sie diesen QR-Code mit Ihrer Authenticator-App oder geben Sie das Geheimnis manuell ein:",
+    "qrAlt": "MFA QR-Code",
+    "enterCodeDescription": "Geben Sie den 6-stelligen Code aus Ihrer Authenticator-App zur Verifizierung ein:",
+    "invalidCodeRetry": "Ungueltiger Code. Bitte ueberpruefen Sie Ihre Authenticator-App und versuchen Sie es erneut.",
+    "step2Title": "Schritt 2: Backup-Codes speichern",
+    "step2Description": "MFA wurde erfolgreich eingerichtet! Speichern Sie diese Backup-Codes an einem sicheren Ort. Jeder Code kann nur einmal verwendet werden."
+  },
+  "confirmation": {
+    "details": "Details"
+  },
+  "dryRunPreview": {
+    "title": "Ausstehende Aenderungen ({{count}})"
+  },
+  "groupMembers": {
+    "title": "Mitglieder von {{name}}",
+    "memberCount_one": "({{count}} Mitglied)",
+    "memberCount_other": "({{count}} Mitglieder)",
+    "loadingMembers": "Mitglieder werden geladen...",
+    "failedToLoad": "Mitglieder konnten nicht geladen werden",
+    "noMembers": "Keine Mitglieder",
+    "noMembersDescription": "Diese Gruppe hat keine Mitglieder.",
+    "accountName": "Kontoname",
+    "close": "Schliessen"
+  },
+  "memberChangePreview": {
+    "toAdd_one": "{{count}} Mitglied hinzuzufuegen",
+    "toAdd_other": "{{count}} Mitglieder hinzuzufuegen",
+    "toRemove_one": "{{count}} Mitglied zu entfernen",
+    "toRemove_other": "{{count}} Mitglieder zu entfernen",
+    "title": "Mitgliederaenderungen - {{name}}",
+    "applying": "Wird angewendet..."
+  },
+  "progress": {
+    "percentage": "{{value}}%"
+  }
+}

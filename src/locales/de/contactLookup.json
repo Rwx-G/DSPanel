@@ -1,0 +1,17 @@
+{
+  "pageTitle": "Kontakt-Suche",
+  "searchPlaceholder": "Kontakte nach Name, E-Mail oder Unternehmen suchen...",
+  "loadingContacts": "Kontakte werden geladen...",
+  "found_one": "{{count}} Kontakt gefunden",
+  "found_other": "{{count}} Kontakte gefunden",
+  "noContactsFound": "Keine Kontakte gefunden",
+  "failedToLoad": "Kontakte konnten nicht geladen werden",
+  "noContactsMatch": "Keine Kontakte entsprechen \"{{query}}\"",
+  "selectContact": "Waehlen Sie einen Kontakt, um Details anzuzeigen",
+  "deleteContact": "Kontakt loeschen",
+  "deleteConfirmation": "Moechten Sie {{name}} wirklich loeschen?",
+  "deleteSuccess": "Kontakt erfolgreich geloescht",
+  "noEmail": "Keine E-Mail",
+  "contactInfo": "Kontaktinformationen",
+  "organization": "Organisation"
+}

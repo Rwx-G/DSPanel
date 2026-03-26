@@ -1,0 +1,20 @@
+{
+  "pageTitle": "Infrastruktur-Gesundheit",
+  "check": "Pruefen",
+  "gc": "GC",
+  "site": "Standort",
+  "autoRefresh1m": "1 Min",
+  "autoRefresh5m": "5 Min",
+  "autoRefresh15m": "15 Min",
+  "autoRefreshOff": "Aus",
+  "checkingDcs": "Domain Controller werden geprueft...",
+  "healthCheckFailed": "Gesundheitspruefung fehlgeschlagen",
+  "noDcsFound": "Keine Domain Controller gefunden",
+  "noDcsDescription": "In der AD-Konfiguration wurden keine Domain Controller gefunden.",
+  "lastChecked": "Zuletzt geprueft:",
+  "exportDc": "DC",
+  "exportOverall": "Gesamt",
+  "exportCheckStatus": "Pruefungsstatus",
+  "exportMessage": "Nachricht",
+  "exportTitle": "Infrastruktur-Gesundheitsbericht"
+}
