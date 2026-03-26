@@ -1,0 +1,13 @@
+{
+  "searchPlaceholder": "Search groups by name or description...",
+  "all": "All",
+  "loadingGroups": "Loading groups...",
+  "found_one": "{{count}} group found",
+  "found_other": "{{count}} groups found",
+  "noGroupsFound": "No groups found",
+  "failedToLoad": "Failed to load groups",
+  "noSecurityGroups": "No Security groups found.",
+  "noDistributionGroups": "No Distribution groups found.",
+  "noGroupsMatch": "No groups match \"{{query}}\"",
+  "selectGroup": "Select a group to view details"
+}

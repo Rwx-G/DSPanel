@@ -1,0 +1,264 @@
+{
+  "errorBoundary": {
+    "title": "Something went wrong",
+    "description": "An unexpected error occurred. This has been logged for investigation.",
+    "showDetails": "Show error details",
+    "tryAgain": "Try Again"
+  },
+  "exportToolbar": {
+    "export": "Export",
+    "exporting": "Exporting..."
+  },
+  "searchBar": {
+    "placeholder": "Search...",
+    "clearSearch": "Clear search"
+  },
+  "loadingSpinner": {
+    "loading": "Loading"
+  },
+  "notificationHost": {
+    "dismiss": "Dismiss notification"
+  },
+  "securityDisclaimer": {
+    "aboutModule": "About this module",
+    "coverage": "Indicative analysis - estimated {{coverage}} coverage",
+    "whatWeCheck": "What we check:",
+    "limitations": "Limitations:",
+    "forCompleteAudit": "For a complete audit:"
+  },
+  "snapshotHistory": {
+    "loading": "Loading snapshot history...",
+    "noSnapshots": "No snapshots",
+    "snapshotsDescription": "Snapshots are captured automatically before modifications.",
+    "timestamp": "Timestamp",
+    "operation": "Operation",
+    "operator": "Operator",
+    "objectDn": "Object DN",
+    "restoreTitle": "Restore from Snapshot",
+    "restoreConfirm": "Restore \"{{name}}\" to its state from {{timestamp}}?",
+    "restoreNote": "This will overwrite current attribute values with the snapshot values. Read-only attributes (objectClass, memberOf, timestamps, etc.) will be skipped.",
+    "restoreSuccess": "Object restored from snapshot successfully.",
+    "restoreButton": "Restore from this snapshot",
+    "deleteTitle": "Delete Snapshot",
+    "deleteConfirm": "Delete the \"{{operation}}\" snapshot from {{timestamp}}?",
+    "deleteNote": "This restore point will be permanently removed.",
+    "deleteButton": "Delete snapshot",
+    "deleteFailed": "Failed to delete snapshot",
+    "computingDiff": "Computing diff...",
+    "noDifferences": "No differences found - object matches the snapshot.",
+    "attributesDiffer": "Attribute(s) differ from current state",
+    "attribute": "Attribute",
+    "snapshot": "Snapshot",
+    "current": "Current",
+    "diffFailed": "Failed to compute diff."
+  },
+  "updateBar": {
+    "versionAvailable": "DSPanel v{{version}} is available.",
+    "download": "Download",
+    "skip": "Skip",
+    "remindLater": "Remind me later"
+  },
+  "userActions": {
+    "resetPassword": "Reset Password",
+    "requiresHelpDesk": "Requires HelpDesk permission",
+    "unlock": "Unlock",
+    "disable": "Disable",
+    "enable": "Enable",
+    "unlockAccount": "Unlock Account",
+    "enableAccount": "Enable Account",
+    "disableAccount": "Disable Account",
+    "unlockConfirm": "Are you sure you want to unlock the account for {{name}} ({{sam}})?",
+    "enableConfirm": "Are you sure you want to enable the account for {{name}} ({{sam}})?",
+    "disableConfirm": "Are you sure you want to disable the account for {{name}} ({{sam}})? The user will no longer be able to log in.",
+    "actionSuccess": "{{action}} successful for {{name}}"
+  },
+  "graphSettings": {
+    "title": "Microsoft Graph Integration",
+    "description": "Configure Azure AD App Registration for Exchange Online diagnostics. Requires Mail.Read and User.Read.All application permissions with admin consent.",
+    "tenantId": "Tenant ID",
+    "tenantPlaceholder": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+    "clientId": "Application (Client) ID",
+    "clientSecret": "Client Secret",
+    "clientSecretStored": "Stored in OS credential store",
+    "clientSecretPlaceholder": "Client secret value",
+    "testConnection": "Test Connection",
+    "connectionSuccess": "Connection successful.",
+    "connectionFailed": "Connection failed. Check tenant ID, client ID, and client secret."
+  },
+  "presetSettings": {
+    "title": "Preset Storage Path",
+    "description": "Configure the network share or local directory where preset JSON files are stored. All DSPanel instances sharing this path will see the same presets.",
+    "placeholder": "\\\\server\\share\\presets or C:\\presets",
+    "browseFolder": "Browse for folder",
+    "pathValid": "Path is accessible and valid.",
+    "pathInvalid": "Path is not accessible. Please check the path and permissions.",
+    "currentlyConfigured": "Currently configured: {{path}}",
+    "configFailed": "Failed to configure path. Please check the path and try again."
+  },
+  "passwordFlags": {
+    "title": "Password Flags",
+    "neverExpires": "Password Never Expires",
+    "cannotChange": "User Cannot Change Password",
+    "insufficientPermissions": "(insufficient permissions to read)",
+    "saveChanges": "Save Changes",
+    "requiresAccountOperator": "Requires AccountOperator permission"
+  },
+  "permissionMapping": {
+    "domainAdminRequired": "DomainAdmin access required to manage permission mappings.",
+    "description": "Map AD security groups to DSPanel permission levels. When a user belongs to multiple mapped groups, the highest level wins. Default detection (RID-based + DSPanel-* groups) remains active alongside custom mappings.",
+    "readOnly": "Read Only",
+    "helpDesk": "Help Desk",
+    "accountOperator": "Account Operator",
+    "admin": "Admin",
+    "domainAdmin": "Domain Admin",
+    "readOnlyHint": "View-only access to directory data",
+    "helpDeskHint": "Password resets and account unlocks",
+    "accountOperatorHint": "Group management and account modifications",
+    "adminHint": "Full admin (object creation, OU management)",
+    "domainAdminHint": "Full access including security and infrastructure",
+    "addGroup": "Add Group",
+    "searchGroupsPlaceholder": "Search AD groups by name...",
+    "noCustomGroups": "No custom groups mapped. Default detection applies.",
+    "alreadyMapped": "(already mapped)",
+    "searchFailed": "Search failed. Please try again.",
+    "noGroupsFound": "No groups found",
+    "savedSuccessfully": "Permission mappings saved successfully.",
+    "saveMappings": "Save Mappings"
+  },
+  "workstationMonitoring": {
+    "title": "Monitoring: {{hostname}}",
+    "refresh5s": "5s",
+    "refresh10s": "10s",
+    "refresh30s": "30s",
+    "resume": "Resume",
+    "pause": "Pause",
+    "connecting": "Connecting to workstation...",
+    "cpu": "CPU",
+    "memory": "Memory",
+    "disks": "Disks",
+    "sessions": "Sessions ({{count}})",
+    "noActiveSessions": "No active sessions",
+    "unavailable": "Unavailable",
+    "services": "Services ({{count}})",
+    "autoStart": "Auto-start",
+    "showAutoStart": "Show only auto-start services"
+  },
+  "dataTable": {
+    "noData": "No data available",
+    "exportCsv": "Export to CSV"
+  },
+  "filterBar": {
+    "placeholder": "Filter...",
+    "clearAll": "Clear all filters",
+    "removeFilter": "Remove {{label}} filter"
+  },
+  "propertyGrid": {
+    "noProperties": "No properties to display"
+  },
+  "diffViewer": {
+    "noDifferences": "No differences",
+    "inline": "Inline",
+    "sideBySide": "Side by Side"
+  },
+  "advancedAttributes": {
+    "title": "Advanced Attributes ({{count}})",
+    "noAttributes": "No advanced attributes available",
+    "filterPlaceholder": "Filter attributes...",
+    "showEmpty": "Show empty",
+    "noMatch": "No attributes match \"{{query}}\"",
+    "favorites": "Favorites",
+    "allAttributes": "All Attributes",
+    "empty": "(empty)"
+  },
+  "exchangePanel": {
+    "title": "Exchange Mailbox",
+    "mailboxGuid": "Mailbox GUID",
+    "recipientType": "Recipient Type",
+    "primarySmtp": "Primary SMTP",
+    "forwardingTo": "Forwarding To",
+    "emailAliases": "Email Aliases ({{count}})",
+    "delegates": "Delegates ({{count}})"
+  },
+  "groupPicker": {
+    "placeholder": "Search groups...",
+    "clearSearch": "Clear search",
+    "searchFailed": "Search failed. Please try again.",
+    "noGroups": "No groups found"
+  },
+  "ouPicker": {
+    "loading": "Loading OUs...",
+    "loadFailed": "Failed to load OUs",
+    "loadFailedHint": "Check your AD connection and try again.",
+    "noOus": "No OUs available",
+    "selected": "Selected: {{ou}}"
+  },
+  "passwordInput": {
+    "hide": "Hide password",
+    "show": "Show password"
+  },
+  "comboBox": {
+    "placeholder": "Select...",
+    "searchPlaceholder": "Search...",
+    "noResults": "No results"
+  },
+  "dateTimePicker": {
+    "placeholder": "Select date...",
+    "previousMonth": "Previous month",
+    "nextMonth": "Next month",
+    "months": ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+  },
+  "validationSummary": {
+    "error_one": "{{count}} validation error",
+    "error_other": "{{count}} validation errors"
+  },
+  "stateInTimeView": {
+    "loadHistory": "Load Replication History",
+    "notAvailable": "Replication metadata is not available for this object.",
+    "attributeCount": "{{filtered}} of {{total}} attribute(s)",
+    "filterPlaceholder": "Filter attributes...",
+    "attribute": "Attribute",
+    "lastChanged": "Last Changed",
+    "version": "Version",
+    "originatingDc": "Originating DC",
+    "snapshotValue": "Snapshot Value",
+    "compareTimeRanges": "Compare Time Ranges",
+    "from": "From...",
+    "to": "To...",
+    "compare": "Compare",
+    "noChanges": "No attribute changes detected in this time range.",
+    "versionBefore": "Version Before",
+    "versionAfter": "Version After",
+    "changedAt": "Changed At",
+    "linkedAttributeChanges": "Linked Attribute Changes ({{count}})",
+    "linkedObject": "Linked Object",
+    "changed": "Changed",
+    "removed": "Removed"
+  },
+  "uncPermissionsAudit": {
+    "notAvailable": "Not available on this platform",
+    "notAvailableDescription": "UNC path permissions audit requires Windows. NTFS ACL APIs are not available on macOS or Linux.",
+    "uncPath": "UNC Path",
+    "uncPlaceholder": "\\\\server\\share\\folder",
+    "audit": "Audit",
+    "acesFound": "{{count}} ACE(s) found for {{path}}",
+    "exportCsv": "Export CSV",
+    "bothUsers": "Both users",
+    "onlyUser": "{{name}} only",
+    "trustee": "Trustee",
+    "permissions": "Permissions",
+    "accessSummary": "Access Summary",
+    "rulesGrantAccess": "{{count}} rule(s) grant access",
+    "rulesDenyAccess": "{{count}} rule(s) deny access",
+    "via": "via {{groups}}",
+    "differences": "Differences",
+    "hasAccessVia": "{{userA}} has {{permissions}} access via {{trustee}} - {{userB}} does not",
+    "errorsCount": "{{count}} error(s) during audit",
+    "userHasAccess": "{{name}} has access via {{trustee}}",
+    "userDenied": "{{name}} is denied via {{trustee}}",
+    "noMatchingGroup": "No matching group for {{name}}"
+  },
+  "groupChainTree": {
+    "circularReference": "(circular reference)",
+    "noMembers": "No members"
+  }
+}

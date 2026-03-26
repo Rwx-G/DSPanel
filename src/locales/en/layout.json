@@ -1,0 +1,10 @@
+{
+  "skipToMain": "Skip to main content",
+  "mainContent": "Main content",
+  "breadcrumb": "Breadcrumb",
+  "scrollTabsLeft": "Scroll tabs left",
+  "scrollTabsRight": "Scroll tabs right",
+  "closeTab": "Close {{title}}",
+  "closeOthers": "Close Others",
+  "closeAll": "Close All"
+}

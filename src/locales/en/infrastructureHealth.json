@@ -1,0 +1,15 @@
+{
+  "pageTitle": "Infrastructure Health",
+  "check": "Check",
+  "gc": "GC",
+  "site": "Site",
+  "autoRefresh1m": "1 min",
+  "autoRefresh5m": "5 min",
+  "autoRefresh15m": "15 min",
+  "autoRefreshOff": "Off",
+  "checkingDcs": "Checking domain controllers...",
+  "healthCheckFailed": "Health Check Failed",
+  "noDcsFound": "No Domain Controllers Found",
+  "noDcsDescription": "No domain controllers were discovered in the AD configuration.",
+  "lastChecked": "Last checked:"
+}

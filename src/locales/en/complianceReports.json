@@ -1,0 +1,18 @@
+{
+  "pageTitle": "Compliance Reports",
+  "runScan": "Run Compliance Scan",
+  "reScan": "Re-scan",
+  "scanningLabel": "Scanning...",
+  "emptyTitle": "Compliance Reports",
+  "emptyDescription": "Run a compliance scan to assess your Active Directory against 9 frameworks: GDPR, HIPAA, SOX, PCI-DSS v4.0, ISO 27001, NIST 800-53, CIS v8, NIS2, and ANSSI.",
+  "globalScore": "Global Compliance Score",
+  "accountsScanned": "accounts scanned",
+  "findingsLabel": "findings",
+  "checks": "Checks",
+  "checkClear": "Clear",
+  "check": "Check",
+  "severity": "Severity",
+  "findings": "Findings",
+  "remediation": "Remediation",
+  "report": "Report"
+}

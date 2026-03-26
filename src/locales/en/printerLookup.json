@@ -1,0 +1,18 @@
+{
+  "searchPlaceholder": "Search printers by name, location, or server...",
+  "loadingPrinters": "Loading printers...",
+  "found_one": "{{count}} printer found",
+  "found_other": "{{count}} printers found",
+  "noPrintersFound": "No printers found",
+  "failedToLoad": "Failed to load printers",
+  "noPrintersAvailable": "No printers available.",
+  "selectPrinter": "Select a printer to view details",
+  "deletePrinter": "Delete Printer",
+  "deleteConfirmation": "Are you sure you want to delete {{name}}?",
+  "deleteSuccess": "Printer deleted successfully",
+  "general": "General",
+  "serverInfo": "Server Info",
+  "server": "Server",
+  "sharePath": "Share Path",
+  "driver": "Driver"
+}
