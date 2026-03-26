@@ -226,6 +226,7 @@ async fn force_replication_windows(
     }
 }
 
+#[cfg(target_os = "windows")]
 /// Extracts a human-readable error from PowerShell exception output.
 ///
 /// PowerShell errors look like:
@@ -353,14 +354,15 @@ mod tests {
         assert_eq!(partnerships[1].status, ReplicationStatus::Healthy);
     }
 
+    #[cfg(target_os = "windows")]
     #[test]
     fn test_extract_powershell_error_with_french_guillemets() {
         let raw = r#"Exception lors de l'appel de \u{ab}GetDomainController\u{bb} avec \u{ab}1\u{bb} argument(s)\u{a0}: \u{ab}Le DC n'existe pas.\u{bb}"#;
-        // This tests the fallback path since the guillemets are escaped in the test
         let result = extract_powershell_error(raw);
         assert!(!result.is_empty());
     }
 
+    #[cfg(target_os = "windows")]
     #[test]
     fn test_extract_powershell_error_with_english_quotes() {
         let raw = r#"Exception calling "GetDomainController" with "1" argument(s): "The domain controller does not exist.""#;
@@ -368,6 +370,7 @@ mod tests {
         assert_eq!(result, "The domain controller does not exist.");
     }
 
+    #[cfg(target_os = "windows")]
     #[test]
     fn test_extract_powershell_error_fallback_to_first_line() {
         let raw = "Some generic error\nWith more details";
@@ -375,6 +378,7 @@ mod tests {
         assert_eq!(result, "Some generic error");
     }
 
+    #[cfg(target_os = "windows")]
     #[test]
     fn test_extract_powershell_error_truncates_long_lines() {
         let raw = "A".repeat(300);
