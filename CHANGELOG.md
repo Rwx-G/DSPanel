@@ -24,6 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Language selector in Settings > Appearance (English, French, German, Italian, Spanish)
 - Locale-aware date, number, and percentage formatting via `Intl` APIs
 - Runtime language switching with persistence to AppSettings
+- Complete translations for French, German, Italian, and Spanish (37 namespace files each)
+- Translation completeness tests (168 tests: key parity, empty values, interpolation, pluralization, dates)
 - Developer documentation for localization (`docs/architecture/localization.md`)
 - Risk score weight configuration UI in Settings > Security
 - Attack detection threshold and exclusion list configuration in Settings > Security
