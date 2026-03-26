@@ -155,10 +155,9 @@ describe("PresetManagement", () => {
 
     await waitFor(() => {
       expect(screen.getByText("Dev Onboarding")).toBeDefined();
+      expect(screen.getAllByText("Onboarding").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("Offboarding").length).toBeGreaterThan(0);
     });
-
-    expect(screen.getAllByText("Onboarding").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Offboarding").length).toBeGreaterThan(0);
   });
 
   it("clicking a preset shows the editor form", async () => {
@@ -179,10 +178,10 @@ describe("PresetManagement", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("preset-editor-form")).toBeDefined();
+      expect(
+        (screen.getByTestId("preset-name-input") as HTMLInputElement).value,
+      ).toBe("Dev Onboarding");
     });
-    expect(
-      (screen.getByTestId("preset-name-input") as HTMLInputElement).value,
-    ).toBe("Dev Onboarding");
   });
 
   it("new button creates blank editor", async () => {

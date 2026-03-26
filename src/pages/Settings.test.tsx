@@ -102,8 +102,8 @@ describe("Settings", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("setting-domain-override")).toBeDefined();
+      expect(screen.getByTestId("setting-preferred-dc")).toBeDefined();
     });
-    expect(screen.getByTestId("setting-preferred-dc")).toBeDefined();
   });
 
   it("switches to security tab", async () => {
@@ -118,8 +118,8 @@ describe("Settings", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("tab-content-security")).toBeDefined();
+      expect(screen.getByTestId("setting-audit-retention")).toBeDefined();
     });
-    expect(screen.getByTestId("setting-audit-retention")).toBeDefined();
   });
 
   it("switches to reports tab", async () => {
@@ -134,9 +134,9 @@ describe("Settings", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("tab-content-reports")).toBeDefined();
+      expect(screen.getByTestId("setting-export-format")).toBeDefined();
+      expect(screen.getByTestId("setting-export-path")).toBeDefined();
     });
-    expect(screen.getByTestId("setting-export-format")).toBeDefined();
-    expect(screen.getByTestId("setting-export-path")).toBeDefined();
   });
 
   it("switches to appearance tab", async () => {
@@ -151,10 +151,10 @@ describe("Settings", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("tab-content-appearance")).toBeDefined();
+      expect(screen.getByTestId("theme-light")).toBeDefined();
+      expect(screen.getByTestId("theme-dark")).toBeDefined();
+      expect(screen.getByTestId("theme-system")).toBeDefined();
     });
-    expect(screen.getByTestId("theme-light")).toBeDefined();
-    expect(screen.getByTestId("theme-dark")).toBeDefined();
-    expect(screen.getByTestId("theme-system")).toBeDefined();
   });
 
   it("shows validation error for low audit retention", async () => {

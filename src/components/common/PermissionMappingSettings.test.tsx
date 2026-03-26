@@ -166,7 +166,9 @@ describe("PermissionMappingSettings", () => {
 
     fireEvent.click(screen.getByTestId("remove-group-btn"));
 
-    expect(screen.queryByText("CN=IT-Support,OU=Groups,DC=contoso,DC=com")).toBeNull();
+    await waitFor(() => {
+      expect(screen.queryByText("CN=IT-Support,OU=Groups,DC=contoso,DC=com")).toBeNull();
+    });
   });
 
   it("save button is disabled when no changes", async () => {
