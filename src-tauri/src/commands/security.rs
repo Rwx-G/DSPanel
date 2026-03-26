@@ -3,7 +3,7 @@ use tauri::State;
 use crate::error::AppError;
 use crate::models::security::{
     AttackDetectionReport, EscalationGraphResult, PrivilegedAccountsReport, RiskScoreHistory,
-    RiskScoreResult, RiskWeights,
+    RiskScoreResult,
 };
 use crate::services::PermissionLevel;
 use crate::state::AppState;
@@ -65,7 +65,7 @@ pub(crate) async fn get_risk_score_inner(state: &AppState) -> Result<RiskScoreRe
     }
 
     let provider = state.directory_provider.clone();
-    let weights = RiskWeights::default();
+    let weights = state.app_settings.get().risk_weights.unwrap_or_default();
 
     let result = crate::services::security::compute_risk_score(provider, &weights)
         .await
@@ -130,7 +130,12 @@ pub(crate) async fn detect_attacks_inner(
     }
 
     let provider = state.directory_provider.clone();
-    crate::services::security::detect_attacks(provider, time_window_hours)
+    let config = state
+        .app_settings
+        .get()
+        .attack_detection_config
+        .unwrap_or_default();
+    crate::services::security::detect_attacks(provider, time_window_hours, config)
         .await
         .map_err(|e| AppError::Directory(e.to_string()))
 }

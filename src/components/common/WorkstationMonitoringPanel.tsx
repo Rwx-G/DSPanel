@@ -11,6 +11,7 @@ import {
   Pause,
   Play,
   AlertCircle,
+  Filter,
 } from "lucide-react";
 import { type SystemMetrics } from "@/types/system-metrics";
 import { extractErrorMessage } from "@/utils/errorMapping";
@@ -59,6 +60,7 @@ export function WorkstationMonitoringPanel({
   const [error, setError] = useState<string | null>(null);
   const [refreshInterval, setRefreshInterval] = useState(5);
   const [paused, setPaused] = useState(false);
+  const [autoStartOnly, setAutoStartOnly] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchMetrics = useCallback(async () => {
@@ -241,12 +243,26 @@ export function WorkstationMonitoringPanel({
             >
               <div className="flex items-center gap-1.5 text-caption font-medium text-[var(--color-text-primary)]">
                 <Server size={14} /> Services ({metrics.services.length})
+                <button
+                  onClick={() => setAutoStartOnly(!autoStartOnly)}
+                  className={`ml-auto flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors ${
+                    autoStartOnly
+                      ? "bg-[var(--color-primary)] text-white"
+                      : "bg-[var(--color-surface-hover)] text-[var(--color-text-secondary)]"
+                  }`}
+                  title="Show only auto-start services"
+                  data-testid="filter-auto-start"
+                >
+                  <Filter size={10} /> Auto-start
+                </button>
               </div>
               {metrics.services.length > 0 ? (
                 <div className="max-h-32 overflow-y-auto">
                   <table className="w-full text-caption">
                     <tbody>
-                      {metrics.services.map((svc) => (
+                      {metrics.services
+                        .filter((svc) => !autoStartOnly || svc.startMode === "Auto")
+                        .map((svc) => (
                         <tr
                           key={svc.name}
                           className="border-b border-[var(--color-border-subtle)]"

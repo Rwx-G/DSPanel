@@ -38,6 +38,23 @@ interface AppSettings {
   privilegedGroups?: string[] | null;
   cleanupRules?: unknown[] | null;
   auditRetentionDays?: number | null;
+  riskWeights?: {
+    privilegedHygiene?: number;
+    passwordPolicy?: number;
+    staleAccounts?: number;
+    kerberosSecurity?: number;
+    dangerousConfigs?: number;
+    infrastructureHardening?: number;
+    gpoSecurity?: number;
+    trustSecurity?: number;
+    certificateSecurity?: number;
+  } | null;
+  attackDetectionConfig?: {
+    bruteForceThreshold?: number;
+    kerberoastingThreshold?: number;
+    excludedIps?: string[];
+    excludedAccounts?: string[];
+  } | null;
   connection?: {
     domainOverride?: string | null;
     preferredDc?: string | null;
@@ -161,6 +178,8 @@ export function Settings() {
           ...prev,
           auditRetentionDays: 365,
           disabledOu: null,
+          riskWeights: null,
+          attackDetectionConfig: null,
         }));
         break;
       case "reports":
@@ -391,6 +410,161 @@ export function Settings() {
                   Target OU where disabled user accounts are moved during offboarding.
                   Select an OU or clear to skip the move step.
                 </p>
+              </div>
+            </div>
+
+            {/* Risk Score Weights */}
+            <div className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-4">
+              <h3 className="mb-3 text-body font-semibold text-[var(--color-text-primary)]">
+                Risk Score Weights
+              </h3>
+              <p className="mb-3 text-caption text-[var(--color-text-secondary)]">
+                Adjust the relative weight of each risk factor. Weights should sum to 100.
+              </p>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {([
+                  ["privilegedHygiene", "Privileged Hygiene", 15],
+                  ["passwordPolicy", "Password Policy", 10],
+                  ["staleAccounts", "Stale Accounts", 10],
+                  ["kerberosSecurity", "Kerberos Security", 20],
+                  ["dangerousConfigs", "Dangerous Configs", 10],
+                  ["infrastructureHardening", "Infrastructure Hardening", 10],
+                  ["gpoSecurity", "GPO Security", 10],
+                  ["trustSecurity", "Trust Security", 10],
+                  ["certificateSecurity", "Certificate Security", 5],
+                ] as const).map(([key, label, defaultVal]) => (
+                  <div key={key} className="flex items-center gap-2">
+                    <label className="w-44 text-caption text-[var(--color-text-secondary)]">{label}</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      step={1}
+                      value={settings.riskWeights?.[key] ?? defaultVal}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value);
+                        setSettings((prev) => ({
+                          ...prev,
+                          riskWeights: {
+                            ...{
+                              privilegedHygiene: 15, passwordPolicy: 10, staleAccounts: 10,
+                              kerberosSecurity: 20, dangerousConfigs: 10, infrastructureHardening: 10,
+                              gpoSecurity: 10, trustSecurity: 10, certificateSecurity: 5,
+                            },
+                            ...prev.riskWeights,
+                            [key]: isNaN(val) ? defaultVal : val,
+                          },
+                        }));
+                        setDirty(true);
+                      }}
+                      className="w-20 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2 py-1 text-body text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+                      data-testid={`setting-weight-${key}`}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Attack Detection Config */}
+            <div className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-4">
+              <h3 className="mb-3 text-body font-semibold text-[var(--color-text-primary)]">
+                Attack Detection
+              </h3>
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <label className="w-44 text-caption text-[var(--color-text-secondary)]">Brute Force Threshold</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={settings.attackDetectionConfig?.bruteForceThreshold ?? 10}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10);
+                      setSettings((prev) => ({
+                        ...prev,
+                        attackDetectionConfig: {
+                          ...{ bruteForceThreshold: 10, kerberoastingThreshold: 3, excludedIps: [], excludedAccounts: [] },
+                          ...prev.attackDetectionConfig,
+                          bruteForceThreshold: isNaN(val) ? 10 : val,
+                        },
+                      }));
+                      setDirty(true);
+                    }}
+                    className="w-20 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2 py-1 text-body text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+                    data-testid="setting-brute-force-threshold"
+                  />
+                  <span className="text-caption text-[var(--color-text-secondary)]">failed logins from same IP</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <label className="w-44 text-caption text-[var(--color-text-secondary)]">Kerberoasting Threshold</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={settings.attackDetectionConfig?.kerberoastingThreshold ?? 3}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10);
+                      setSettings((prev) => ({
+                        ...prev,
+                        attackDetectionConfig: {
+                          ...{ bruteForceThreshold: 10, kerberoastingThreshold: 3, excludedIps: [], excludedAccounts: [] },
+                          ...prev.attackDetectionConfig,
+                          kerberoastingThreshold: isNaN(val) ? 3 : val,
+                        },
+                      }));
+                      setDirty(true);
+                    }}
+                    className="w-20 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2 py-1 text-body text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+                    data-testid="setting-kerberoasting-threshold"
+                  />
+                  <span className="text-caption text-[var(--color-text-secondary)]">TGS requests with RC4</span>
+                </div>
+                <div>
+                  <label className="mb-1 block text-caption text-[var(--color-text-secondary)]">
+                    Excluded IPs (comma-separated)
+                  </label>
+                  <input
+                    type="text"
+                    value={(settings.attackDetectionConfig?.excludedIps ?? []).join(", ")}
+                    onChange={(e) => {
+                      const ips = e.target.value.split(",").map((s) => s.trim()).filter(Boolean);
+                      setSettings((prev) => ({
+                        ...prev,
+                        attackDetectionConfig: {
+                          ...{ bruteForceThreshold: 10, kerberoastingThreshold: 3, excludedIps: [], excludedAccounts: [] },
+                          ...prev.attackDetectionConfig,
+                          excludedIps: ips,
+                        },
+                      }));
+                      setDirty(true);
+                    }}
+                    placeholder="e.g. 10.0.0.1, 192.168.1.100"
+                    className="w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5 text-body text-[var(--color-text-primary)] placeholder-[var(--color-text-secondary)] focus:border-[var(--color-primary)] focus:outline-none"
+                    data-testid="setting-excluded-ips"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-caption text-[var(--color-text-secondary)]">
+                    Excluded Accounts (comma-separated)
+                  </label>
+                  <input
+                    type="text"
+                    value={(settings.attackDetectionConfig?.excludedAccounts ?? []).join(", ")}
+                    onChange={(e) => {
+                      const accts = e.target.value.split(",").map((s) => s.trim()).filter(Boolean);
+                      setSettings((prev) => ({
+                        ...prev,
+                        attackDetectionConfig: {
+                          ...{ bruteForceThreshold: 10, kerberoastingThreshold: 3, excludedIps: [], excludedAccounts: [] },
+                          ...prev.attackDetectionConfig,
+                          excludedAccounts: accts,
+                        },
+                      }));
+                      setDirty(true);
+                    }}
+                    placeholder="e.g. svc_backup, health_check"
+                    className="w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5 text-body text-[var(--color-text-primary)] placeholder-[var(--color-text-secondary)] focus:border-[var(--color-primary)] focus:outline-none"
+                    data-testid="setting-excluded-accounts"
+                  />
+                </div>
               </div>
             </div>
           </div>

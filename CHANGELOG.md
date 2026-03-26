@@ -17,6 +17,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Remove `audit_log` IPC command (audit writes are now backend-internal only)
 - Add TOTP replay protection with 60-second code reuse cache
 
+### Added
+
+- Risk score weight configuration UI in Settings > Security
+- Attack detection threshold and exclusion list configuration in Settings > Security
+- Click-to-detail expandable panels on topology DC nodes
+- Auto-start service filter toggle in workstation monitoring
+- DC health cards grouped by AD site in Infrastructure Health
+- Snapshot history export (CSV/Excel/PDF/HTML) via ExportToolbar
+
 ### Fixed
 
 - Add missing `validate_search_input` to `search_computers_inner`

@@ -16,6 +16,7 @@ import {
   CheckCircle,
   AlertTriangle,
   HelpCircle,
+  MapPin,
 } from "lucide-react";
 import { ExportToolbar } from "@/components/common/ExportToolbar";
 import {
@@ -387,14 +388,35 @@ export function InfrastructureHealth() {
             description="No domain controllers were discovered in the AD configuration."
           />
         ) : (
-          <div className="flex flex-col gap-4">
-            {results.map((result) => (
-              <DcHealthCard
-                key={result.dc.hostname}
-                result={result}
-                isExpanded={!collapsedDcs.has(result.dc.hostname)}
-                onToggle={() => handleToggleDc(result.dc.hostname)}
-              />
+          <div className="flex flex-col gap-6">
+            {Object.entries(
+              results.reduce<Record<string, DcHealthResult[]>>((groups, result) => {
+                const site = result.dc.siteName || "Unknown Site";
+                (groups[site] ??= []).push(result);
+                return groups;
+              }, {}),
+            ).map(([site, dcs]) => (
+              <div key={site}>
+                <div className="mb-2 flex items-center gap-2">
+                  <MapPin size={14} className="text-[var(--color-primary)]" />
+                  <h3 className="text-body font-semibold text-[var(--color-text-primary)]">
+                    {site}
+                  </h3>
+                  <span className="text-caption text-[var(--color-text-secondary)]">
+                    ({dcs.length} DC{dcs.length > 1 ? "s" : ""})
+                  </span>
+                </div>
+                <div className="flex flex-col gap-4">
+                  {dcs.map((result) => (
+                    <DcHealthCard
+                      key={result.dc.hostname}
+                      result={result}
+                      isExpanded={!collapsedDcs.has(result.dc.hostname)}
+                      onToggle={() => handleToggleDc(result.dc.hostname)}
+                    />
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
         )}

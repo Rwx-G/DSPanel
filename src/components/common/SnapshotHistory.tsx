@@ -13,6 +13,7 @@ import {
 import { useNotifications } from "@/contexts/NotificationContext";
 import { useDialog } from "@/contexts/DialogContext";
 import { extractErrorMessage } from "@/utils/errorMapping";
+import { ExportToolbar, type ExportColumn } from "./ExportToolbar";
 
 interface ObjectSnapshot {
   id: number;
@@ -136,8 +137,29 @@ export function SnapshotHistory({ objectDn, canRestore, refreshTrigger = 0, onRe
     );
   }
 
+  const exportColumns: ExportColumn[] = [
+    { key: "timestamp", header: "Timestamp" },
+    { key: "operationType", header: "Operation" },
+    { key: "operator", header: "Operator" },
+    { key: "objectDn", header: "Object DN" },
+  ];
+
   return (
     <div className="space-y-2" data-testid="snapshot-history">
+      <div className="flex items-center justify-end">
+        <ExportToolbar
+          columns={exportColumns}
+          data={snapshots}
+          rowMapper={(s) => [
+            formatTimestamp(s.timestamp),
+            s.operationType,
+            s.operator,
+            s.objectDn,
+          ]}
+          title={`Snapshot History - ${objectDn}`}
+          filenameBase="snapshot_history"
+        />
+      </div>
       <ul className="space-y-1">
         {snapshots.map((snap) => (
           <li

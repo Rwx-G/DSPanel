@@ -11,62 +11,102 @@ import {
   Globe,
   GitBranch,
   CheckCircle,
+  ChevronDown,
 } from "lucide-react";
 import { type TopologyData, type TopologyDcNode } from "@/types/topology";
 import { extractErrorMessage } from "@/utils/errorMapping";
 
-/** Renders a single DC entry within a site card. */
+/** Renders a single DC entry within a site card, expandable on click. */
 function DcEntry({ dc }: { dc: TopologyDcNode }) {
+  const [expanded, setExpanded] = useState(false);
+
   return (
-    <div className="flex items-start gap-4 px-4 py-3">
-      <div className="relative mt-0.5 shrink-0">
-        <Server size={20} className="text-[var(--color-text-secondary)]" />
-        <span
-          className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[var(--color-surface-card)]"
-          style={{
-            backgroundColor: dc.isOnline ? "var(--color-success)" : "var(--color-error)",
-          }}
-          title={dc.isOnline ? "Online" : "Offline"}
-        />
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="font-mono text-body font-medium text-[var(--color-text-primary)]">
-          {dc.hostname}
+    <div>
+      <button
+        className="flex w-full items-start gap-4 px-4 py-3 text-left hover:bg-[var(--color-surface-hover)] transition-colors"
+        onClick={() => setExpanded(!expanded)}
+        data-testid={`dc-entry-${dc.hostname}`}
+      >
+        <div className="relative mt-0.5 shrink-0">
+          <Server size={20} className="text-[var(--color-text-secondary)]" />
+          <span
+            className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[var(--color-surface-card)]"
+            style={{
+              backgroundColor: dc.isOnline ? "var(--color-success)" : "var(--color-error)",
+            }}
+            title={dc.isOnline ? "Online" : "Offline"}
+          />
         </div>
-        <div className="mt-1 flex flex-wrap gap-1.5">
-          {dc.isPdc && (
-            <span className="flex items-center gap-1 rounded bg-[#8b5cf6] px-1.5 py-0.5 text-[10px] font-medium text-white">
-              <Crown size={10} /> PDC
-            </span>
-          )}
-          {dc.isGc && (
-            <span className="flex items-center gap-1 rounded bg-[var(--color-primary)] px-1.5 py-0.5 text-[10px] font-medium text-white">
-              <Globe size={10} /> GC
-            </span>
-          )}
-          {dc.fsmoRoles.filter((r) => r !== "PDC").map((role) => (
-            <span
-              key={role}
-              className="rounded bg-[var(--color-text-secondary)] px-1.5 py-0.5 text-[10px] font-medium text-white"
-            >
-              {role}
-            </span>
-          ))}
-        </div>
-        <div className="mt-1 space-y-0.5 text-caption text-[var(--color-text-secondary)]">
-          {dc.osVersion && <div>{dc.osVersion}</div>}
-          {dc.ipAddress && <div>IP: {dc.ipAddress}</div>}
-          <div className="flex items-center gap-1.5">
-            <span
-              className="inline-block h-2 w-2 rounded-full"
-              style={{ backgroundColor: dc.isOnline ? "var(--color-success)" : "var(--color-error)" }}
-            />
-            <span style={{ color: dc.isOnline ? "var(--color-success)" : "var(--color-error)" }}>
-              {dc.isOnline ? "Online" : "Offline"}
-            </span>
+        <div className="min-w-0 flex-1">
+          <div className="font-mono text-body font-medium text-[var(--color-text-primary)]">
+            {dc.hostname}
+          </div>
+          <div className="mt-1 flex flex-wrap gap-1.5">
+            {dc.isPdc && (
+              <span className="flex items-center gap-1 rounded bg-[#8b5cf6] px-1.5 py-0.5 text-[10px] font-medium text-white">
+                <Crown size={10} /> PDC
+              </span>
+            )}
+            {dc.isGc && (
+              <span className="flex items-center gap-1 rounded bg-[var(--color-primary)] px-1.5 py-0.5 text-[10px] font-medium text-white">
+                <Globe size={10} /> GC
+              </span>
+            )}
+            {dc.fsmoRoles.filter((r) => r !== "PDC").map((role) => (
+              <span
+                key={role}
+                className="rounded bg-[var(--color-text-secondary)] px-1.5 py-0.5 text-[10px] font-medium text-white"
+              >
+                {role}
+              </span>
+            ))}
           </div>
         </div>
-      </div>
+        <ChevronDown
+          size={14}
+          className={`mt-1 shrink-0 text-[var(--color-text-secondary)] transition-transform ${expanded ? "rotate-180" : ""}`}
+        />
+      </button>
+      {expanded && (
+        <div className="border-t border-[var(--color-border-subtle)] bg-[var(--color-surface-hover)] px-4 py-2">
+          <table className="w-full text-caption">
+            <tbody>
+              <tr>
+                <td className="py-0.5 pr-3 font-medium text-[var(--color-text-secondary)]">Status</td>
+                <td className="py-0.5" style={{ color: dc.isOnline ? "var(--color-success)" : "var(--color-error)" }}>
+                  {dc.isOnline ? "Online" : "Offline"}
+                </td>
+              </tr>
+              {dc.ipAddress && (
+                <tr>
+                  <td className="py-0.5 pr-3 font-medium text-[var(--color-text-secondary)]">IP Address</td>
+                  <td className="py-0.5 font-mono text-[var(--color-text-primary)]">{dc.ipAddress}</td>
+                </tr>
+              )}
+              {dc.osVersion && (
+                <tr>
+                  <td className="py-0.5 pr-3 font-medium text-[var(--color-text-secondary)]">OS</td>
+                  <td className="py-0.5 text-[var(--color-text-primary)]">{dc.osVersion}</td>
+                </tr>
+              )}
+              <tr>
+                <td className="py-0.5 pr-3 font-medium text-[var(--color-text-secondary)]">Site</td>
+                <td className="py-0.5 text-[var(--color-text-primary)]">{dc.siteName}</td>
+              </tr>
+              <tr>
+                <td className="py-0.5 pr-3 font-medium text-[var(--color-text-secondary)]">Global Catalog</td>
+                <td className="py-0.5 text-[var(--color-text-primary)]">{dc.isGc ? "Yes" : "No"}</td>
+              </tr>
+              {dc.fsmoRoles.length > 0 && (
+                <tr>
+                  <td className="py-0.5 pr-3 font-medium text-[var(--color-text-secondary)]">FSMO Roles</td>
+                  <td className="py-0.5 text-[var(--color-text-primary)]">{dc.fsmoRoles.join(", ")}</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

@@ -3053,9 +3053,8 @@ const GUID_DS_REPL_GET_CHANGES_FILTERED: &str = "89e95b76-444d-4c62-991a-0facbed
 pub async fn detect_attacks(
     _provider: Arc<dyn DirectoryProvider>,
     time_window_hours: u32,
+    config: AttackDetectionConfig,
 ) -> Result<AttackDetectionReport> {
-    let config = AttackDetectionConfig::default();
-
     #[cfg(target_os = "windows")]
     let (alerts, event_log_accessible) = analyze_windows_event_log(time_window_hours, &config);
 
