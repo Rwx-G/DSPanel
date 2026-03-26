@@ -1,0 +1,286 @@
+{
+  "errorBoundary": {
+    "title": "Algo salio mal",
+    "description": "Ocurrio un error inesperado. Esto ha sido registrado para investigacion.",
+    "showDetails": "Mostrar detalles del error",
+    "tryAgain": "Intentar de nuevo"
+  },
+  "exportToolbar": {
+    "export": "Exportar",
+    "exporting": "Exportando..."
+  },
+  "searchBar": {
+    "placeholder": "Buscar...",
+    "clearSearch": "Borrar busqueda"
+  },
+  "loadingSpinner": {
+    "loading": "Cargando"
+  },
+  "notificationHost": {
+    "dismiss": "Descartar notificacion"
+  },
+  "securityDisclaimer": {
+    "aboutModule": "Acerca de este modulo",
+    "coverage": "Analisis indicativo - cobertura estimada del {{coverage}}",
+    "whatWeCheck": "Lo que verificamos:",
+    "limitations": "Limitaciones:",
+    "forCompleteAudit": "Para una auditoria completa:"
+  },
+  "snapshotHistory": {
+    "loading": "Cargando historial de instantaneas...",
+    "noSnapshots": "Sin instantaneas",
+    "snapshotsDescription": "Las instantaneas se capturan automaticamente antes de las modificaciones.",
+    "timestamp": "Marca de tiempo",
+    "operation": "Operacion",
+    "operator": "Operador",
+    "objectDn": "DN del objeto",
+    "restoreTitle": "Restaurar desde instantanea",
+    "restoreConfirm": "Restaurar \"{{name}}\" a su estado del {{timestamp}}?",
+    "restoreNote": "Esto sobrescribira los valores de atributos actuales con los valores de la instantanea. Los atributos de solo lectura (objectClass, memberOf, marcas de tiempo, etc.) seran omitidos.",
+    "restoreSuccess": "Objeto restaurado desde la instantanea exitosamente.",
+    "restoreButton": "Restaurar desde esta instantanea",
+    "deleteTitle": "Eliminar instantanea",
+    "deleteConfirm": "Eliminar la instantanea \"{{operation}}\" del {{timestamp}}?",
+    "deleteNote": "Este punto de restauracion sera eliminado permanentemente.",
+    "deleteButton": "Eliminar instantanea",
+    "deleteFailed": "No se pudo eliminar la instantanea",
+    "computingDiff": "Calculando diferencias...",
+    "noDifferences": "No se encontraron diferencias - el objeto coincide con la instantanea.",
+    "attributesDiffer": "Atributo(s) difieren del estado actual",
+    "attribute": "Atributo",
+    "snapshot": "Instantanea",
+    "current": "Actual",
+    "diffFailed": "No se pudieron calcular las diferencias."
+  },
+  "updateBar": {
+    "versionAvailable": "DSPanel v{{version}} esta disponible.",
+    "download": "Descargar",
+    "skip": "Omitir",
+    "remindLater": "Recordar mas tarde"
+  },
+  "userActions": {
+    "resetPassword": "Restablecer contrasena",
+    "requiresHelpDesk": "Requiere permiso de Mesa de ayuda",
+    "unlock": "Desbloquear",
+    "disable": "Deshabilitar",
+    "enable": "Habilitar",
+    "unlockAccount": "Desbloquear cuenta",
+    "enableAccount": "Habilitar cuenta",
+    "disableAccount": "Deshabilitar cuenta",
+    "unlockConfirm": "Esta seguro de que desea desbloquear la cuenta de {{name}} ({{sam}})?",
+    "enableConfirm": "Esta seguro de que desea habilitar la cuenta de {{name}} ({{sam}})?",
+    "disableConfirm": "Esta seguro de que desea deshabilitar la cuenta de {{name}} ({{sam}})? El usuario ya no podra iniciar sesion.",
+    "actionSuccess": "{{action}} exitoso para {{name}}"
+  },
+  "graphSettings": {
+    "title": "Integracion con Microsoft Graph",
+    "description": "Configure el registro de aplicacion de Azure AD para diagnosticos de Exchange Online. Requiere permisos de aplicacion Mail.Read y User.Read.All con consentimiento de administrador.",
+    "tenantId": "ID de inquilino",
+    "tenantPlaceholder": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+    "clientId": "ID de aplicacion (Cliente)",
+    "clientSecret": "Secreto de cliente",
+    "clientSecretStored": "Almacenado en el almacen de credenciales del SO",
+    "clientSecretPlaceholder": "Valor del secreto de cliente",
+    "testConnection": "Probar conexion",
+    "connectionSuccess": "Conexion exitosa.",
+    "connectionFailed": "La conexion fallo. Verifique el ID de inquilino, ID de cliente y secreto de cliente."
+  },
+  "presetSettings": {
+    "title": "Ruta de almacenamiento de presets",
+    "description": "Configure el recurso compartido de red o directorio local donde se almacenan los archivos JSON de presets. Todas las instancias de DSPanel que compartan esta ruta veran los mismos presets.",
+    "placeholder": "\\\\servidor\\recurso\\presets o C:\\presets",
+    "browseFolder": "Buscar carpeta",
+    "pathValid": "La ruta es accesible y valida.",
+    "pathInvalid": "La ruta no es accesible. Verifique la ruta y los permisos.",
+    "currentlyConfigured": "Configurado actualmente: {{path}}",
+    "configFailed": "No se pudo configurar la ruta. Verifique la ruta e intente de nuevo."
+  },
+  "passwordFlags": {
+    "title": "Indicadores de contrasena",
+    "neverExpires": "La contrasena nunca expira",
+    "cannotChange": "El usuario no puede cambiar la contrasena",
+    "insufficientPermissions": "(permisos insuficientes para leer)",
+    "saveChanges": "Guardar cambios",
+    "requiresAccountOperator": "Requiere permiso de Operador de cuentas"
+  },
+  "pagination": {
+    "firstPage": "Primera pagina",
+    "previousPage": "Pagina anterior",
+    "nextPage": "Pagina siguiente",
+    "lastPage": "Ultima pagina",
+    "noItems": "Sin elementos",
+    "showing": "Mostrando {{start}}-{{end}} de {{total}} elementos",
+    "pageSize": "Tamano de pagina:"
+  },
+  "permissionMapping": {
+    "domainAdminRequired": "Se requiere acceso de DomainAdmin para administrar las asignaciones de permisos.",
+    "description": "Asigne grupos de seguridad AD a niveles de permisos de DSPanel. Cuando un usuario pertenece a varios grupos asignados, el nivel mas alto prevalece. La deteccion predeterminada (basada en RID + grupos DSPanel-*) permanece activa junto con las asignaciones personalizadas.",
+    "readOnly": "Solo lectura",
+    "helpDesk": "Mesa de ayuda",
+    "accountOperator": "Operador de cuentas",
+    "admin": "Admin",
+    "domainAdmin": "Administrador de dominio",
+    "readOnlyHint": "Acceso de solo lectura a datos del directorio",
+    "helpDeskHint": "Restablecimiento de contrasenas y desbloqueo de cuentas",
+    "accountOperatorHint": "Administracion de grupos y modificaciones de cuentas",
+    "adminHint": "Administrador completo (creacion de objetos, administracion de OUs)",
+    "domainAdminHint": "Acceso completo incluyendo seguridad e infraestructura",
+    "addGroup": "Agregar grupo",
+    "searchGroupsPlaceholder": "Buscar grupos AD por nombre...",
+    "noCustomGroups": "No hay grupos personalizados asignados. Se aplica la deteccion predeterminada.",
+    "alreadyMapped": "(ya asignado)",
+    "searchFailed": "La busqueda fallo. Intente de nuevo.",
+    "noGroupsFound": "No se encontraron grupos",
+    "savedSuccessfully": "Asignaciones de permisos guardadas exitosamente.",
+    "saveMappings": "Guardar asignaciones",
+    "groupNotFoundInAd": "Grupo no encontrado en AD",
+    "validateGroupExists": "Validar que el grupo existe en AD",
+    "removeGroup": "Eliminar grupo"
+  },
+  "workstationMonitoring": {
+    "title": "Monitoreo: {{hostname}}",
+    "refresh5s": "5s",
+    "refresh10s": "10s",
+    "refresh30s": "30s",
+    "resume": "Reanudar",
+    "pause": "Pausar",
+    "connecting": "Conectando a la estacion de trabajo...",
+    "cpu": "CPU",
+    "memory": "Memoria",
+    "disks": "Discos",
+    "sessions": "Sesiones ({{count}})",
+    "noActiveSessions": "Sin sesiones activas",
+    "unavailable": "No disponible",
+    "services": "Servicios ({{count}})",
+    "autoStart": "Inicio automatico",
+    "showAutoStart": "Mostrar solo servicios de inicio automatico"
+  },
+  "dataTable": {
+    "noData": "No hay datos disponibles",
+    "exportCsv": "Exportar a CSV"
+  },
+  "filterBar": {
+    "placeholder": "Filtrar...",
+    "clearAll": "Borrar todos los filtros",
+    "removeFilter": "Eliminar filtro {{label}}"
+  },
+  "propertyGrid": {
+    "noProperties": "No hay propiedades para mostrar",
+    "confirmEdit": "Confirmar edicion",
+    "cancelEdit": "Cancelar edicion"
+  },
+  "diffViewer": {
+    "noDifferences": "Sin diferencias",
+    "inline": "En linea",
+    "sideBySide": "Lado a lado"
+  },
+  "advancedAttributes": {
+    "title": "Atributos avanzados ({{count}})",
+    "noAttributes": "No hay atributos avanzados disponibles",
+    "filterPlaceholder": "Filtrar atributos...",
+    "showEmpty": "Mostrar vacios",
+    "noMatch": "Ningun atributo coincide con \"{{query}}\"",
+    "favorites": "Favoritos",
+    "allAttributes": "Todos los atributos",
+    "empty": "(vacio)",
+    "confirmEdit": "Confirmar edicion",
+    "cancelEdit": "Cancelar edicion",
+    "clearFilter": "Borrar filtro"
+  },
+  "exchangePanel": {
+    "title": "Buzon de Exchange",
+    "mailboxGuid": "GUID del buzon",
+    "recipientType": "Tipo de destinatario",
+    "primarySmtp": "SMTP principal",
+    "forwardingTo": "Reenviar a",
+    "emailAliases": "Alias de correo ({{count}})",
+    "delegates": "Delegados ({{count}})"
+  },
+  "groupPicker": {
+    "placeholder": "Buscar grupos...",
+    "clearSearch": "Borrar busqueda",
+    "searchFailed": "La busqueda fallo. Intente de nuevo.",
+    "noGroups": "No se encontraron grupos"
+  },
+  "ouPicker": {
+    "loading": "Cargando OUs...",
+    "loadFailed": "No se pudieron cargar las OUs",
+    "loadFailedHint": "Verifique su conexion AD e intente de nuevo.",
+    "noOus": "No hay OUs disponibles",
+    "selected": "Seleccionada: {{ou}}"
+  },
+  "passwordInput": {
+    "hide": "Ocultar contrasena",
+    "show": "Mostrar contrasena"
+  },
+  "comboBox": {
+    "placeholder": "Seleccionar...",
+    "searchPlaceholder": "Buscar...",
+    "searchOptions": "Buscar opciones",
+    "noResults": "Sin resultados"
+  },
+  "dateTimePicker": {
+    "placeholder": "Seleccionar fecha...",
+    "previousMonth": "Mes anterior",
+    "nextMonth": "Mes siguiente",
+    "decreaseHours": "Disminuir horas",
+    "increaseHours": "Aumentar horas",
+    "decreaseMinutes": "Disminuir minutos",
+    "increaseMinutes": "Aumentar minutos",
+    "months": ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
+  },
+  "validationSummary": {
+    "error_one": "{{count}} error de validacion",
+    "error_other": "{{count}} errores de validacion"
+  },
+  "stateInTimeView": {
+    "loadHistory": "Cargar historial de replicacion",
+    "notAvailable": "Los metadatos de replicacion no estan disponibles para este objeto.",
+    "attributeCount": "{{filtered}} de {{total}} atributo(s)",
+    "filterPlaceholder": "Filtrar atributos...",
+    "attribute": "Atributo",
+    "lastChanged": "Ultimo cambio",
+    "version": "Version",
+    "originatingDc": "DC de origen",
+    "snapshotValue": "Valor de la instantanea",
+    "compareTimeRanges": "Comparar rangos de tiempo",
+    "from": "Desde...",
+    "to": "Hasta...",
+    "compare": "Comparar",
+    "noChanges": "No se detectaron cambios de atributos en este rango de tiempo.",
+    "versionBefore": "Version anterior",
+    "versionAfter": "Version posterior",
+    "changedAt": "Cambiado el",
+    "linkedAttributeChanges": "Cambios en atributos vinculados ({{count}})",
+    "linkedObject": "Objeto vinculado",
+    "changed": "Cambiado",
+    "removed": "Eliminado"
+  },
+  "uncPermissionsAudit": {
+    "notAvailable": "No disponible en esta plataforma",
+    "notAvailableDescription": "La auditoria de permisos de ruta UNC requiere Windows. Las APIs de ACL NTFS no estan disponibles en macOS o Linux.",
+    "uncPath": "Ruta UNC",
+    "uncPlaceholder": "\\\\servidor\\recurso\\carpeta",
+    "audit": "Auditar",
+    "acesFound": "{{count}} ACE(s) encontrados para {{path}}",
+    "exportCsv": "Exportar CSV",
+    "bothUsers": "Ambos usuarios",
+    "onlyUser": "Solo {{name}}",
+    "trustee": "Beneficiario",
+    "permissions": "Permisos",
+    "accessSummary": "Resumen de acceso",
+    "rulesGrantAccess": "{{count}} regla(s) conceden acceso",
+    "rulesDenyAccess": "{{count}} regla(s) deniegan acceso",
+    "via": "a traves de {{groups}}",
+    "differences": "Diferencias",
+    "hasAccessVia": "{{userA}} tiene acceso {{permissions}} a traves de {{trustee}} - {{userB}} no",
+    "errorsCount": "{{count}} error(es) durante la auditoria",
+    "userHasAccess": "{{name}} tiene acceso a traves de {{trustee}}",
+    "userDenied": "{{name}} tiene acceso denegado a traves de {{trustee}}",
+    "noMatchingGroup": "No hay grupo coincidente para {{name}}"
+  },
+  "groupChainTree": {
+    "circularReference": "(referencia circular)",
+    "noMembers": "Sin miembros"
+  }
+}

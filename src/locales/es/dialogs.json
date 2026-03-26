@@ -1,0 +1,81 @@
+{
+  "passwordReset": {
+    "title": "Restablecer contrasena",
+    "successTitle": "Contrasena restablecida exitosamente",
+    "successMessage": "La contrasena de {{name}} ha sido restablecida.",
+    "mustChangeAtLogon": "El usuario debe cambiar la contrasena en el proximo inicio de sesion.",
+    "autoGenerate": "Generar automaticamente",
+    "manualEntry": "Entrada manual",
+    "enterNewPassword": "Ingrese la nueva contrasena",
+    "atLeast8Chars": "Al menos 8 caracteres",
+    "uppercaseLetter": "Letra mayuscula",
+    "lowercaseLetter": "Letra minuscula",
+    "digit": "Digito",
+    "specialCharacter": "Caracter especial",
+    "meetsComplexity": "Cumple los requisitos de complejidad (3+ categorias)",
+    "needsCategories": "Necesita 3+ categorias de caracteres",
+    "generatePassword": "Generar contrasena",
+    "breachUnavailable": "Verificacion de brechas no disponible",
+    "foundInBreaches": "Encontrada en {{count}} brechas - considere regenerar",
+    "notInBreaches": "No encontrada en ninguna brecha conocida",
+    "mustChangeCheckbox": "Debe cambiar la contrasena en el proximo inicio de sesion",
+    "resetButton": "Restablecer contrasena"
+  },
+  "moveObject": {
+    "titleBulk": "Mover {{count}} objetos",
+    "titleSingle": "Mover {{name}}",
+    "selectTargetOu": "Seleccione la Unidad Organizativa de destino:",
+    "objectsWillBeMoved": "Los siguientes objetos seran movidos:",
+    "from": "Desde: {{path}}",
+    "to": "Hacia: {{path}}",
+    "move": "Mover",
+    "moving": "Moviendo objeto(s)..."
+  },
+  "mfa": {
+    "verificationRequired": "Verificacion MFA requerida",
+    "enterCode": "Ingrese el codigo de 6 digitos de su aplicacion de autenticacion, o un codigo de respaldo.",
+    "invalidCode": "Codigo invalido. Intente de nuevo.",
+    "verify": "Verificar",
+    "verifying": "Verificando..."
+  },
+  "mfaSetup": {
+    "title": "Configurar MFA",
+    "description": "Agregue una capa adicional de seguridad habilitando la autenticacion multifactor basada en TOTP. Necesitara una aplicacion de autenticacion (Google Authenticator, Authy, etc.).",
+    "beginSetup": "Iniciar configuracion",
+    "step1Title": "Paso 1: Escanear codigo QR",
+    "step1Description": "Escanee este codigo QR con su aplicacion de autenticacion, o ingrese el secreto manualmente:",
+    "qrAlt": "Codigo QR de MFA",
+    "enterCodeDescription": "Ingrese el codigo de 6 digitos de su aplicacion de autenticacion para verificar:",
+    "invalidCodeRetry": "Codigo invalido. Verifique su aplicacion de autenticacion e intente de nuevo.",
+    "step2Title": "Paso 2: Guardar codigos de respaldo",
+    "step2Description": "MFA ha sido configurado exitosamente. Guarde estos codigos de respaldo en un lugar seguro. Cada codigo solo puede usarse una vez."
+  },
+  "confirmation": {
+    "details": "Detalles"
+  },
+  "dryRunPreview": {
+    "title": "Cambios pendientes ({{count}})"
+  },
+  "groupMembers": {
+    "title": "Miembros de {{name}}",
+    "memberCount_one": "({{count}} miembro)",
+    "memberCount_other": "({{count}} miembros)",
+    "loadingMembers": "Cargando miembros...",
+    "failedToLoad": "No se pudieron cargar los miembros",
+    "noMembers": "Sin miembros",
+    "noMembersDescription": "Este grupo no tiene miembros.",
+    "accountName": "Nombre de cuenta",
+    "close": "Cerrar"
+  },
+  "memberChangePreview": {
+    "toAdd_one": "{{count}} miembro a agregar",
+    "toAdd_other": "{{count}} miembros a agregar",
+    "toRemove_one": "{{count}} miembro a eliminar",
+    "toRemove_other": "{{count}} miembros a eliminar",
+    "title": "Cambios de miembros - {{name}}",
+    "applying": "Aplicando..."
+  },
+  "progress": {
+    "percentage": "{{value}}%"
+  }
+}

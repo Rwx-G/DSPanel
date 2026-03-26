@@ -1,0 +1,20 @@
+{
+  "pageTitle": "Informes de cumplimiento",
+  "runScan": "Ejecutar escaneo de cumplimiento",
+  "reScan": "Volver a escanear",
+  "scanningLabel": "Escaneando...",
+  "emptyTitle": "Informes de cumplimiento",
+  "emptyDescription": "Ejecute un escaneo de cumplimiento para evaluar su Active Directory contra 9 marcos: GDPR, HIPAA, SOX, PCI-DSS v4.0, ISO 27001, NIST 800-53, CIS v8, NIS2 y ANSSI.",
+  "globalScore": "Puntuacion global de cumplimiento",
+  "accountsScanned": "cuentas escaneadas",
+  "findingsLabel": "hallazgos",
+  "checks": "Verificaciones",
+  "checkClear": "Sin hallazgos",
+  "check": "Verificacion",
+  "severity": "Severidad",
+  "findings": "Hallazgos",
+  "description": "Descripcion",
+  "remediation": "Remediacion",
+  "report": "Informe",
+  "exportTitle": "Escaneo de cumplimiento - Todas las verificaciones"
+}

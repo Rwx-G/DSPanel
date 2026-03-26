@@ -1,0 +1,11 @@
+{
+  "skipToMain": "Ir al contenido principal",
+  "mainContent": "Contenido principal",
+  "breadcrumb": "Ruta de navegacion",
+  "scrollTabsLeft": "Desplazar pestanas a la izquierda",
+  "scrollTabsRight": "Desplazar pestanas a la derecha",
+  "closeTab": "Cerrar {{title}}",
+  "closeOthers": "Cerrar otras",
+  "closeAll": "Cerrar todas",
+  "tabOptions": "Opciones de pestana"
+}

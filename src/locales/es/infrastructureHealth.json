@@ -1,0 +1,20 @@
+{
+  "pageTitle": "Estado de la infraestructura",
+  "check": "Verificar",
+  "gc": "GC",
+  "site": "Sitio",
+  "autoRefresh1m": "1 min",
+  "autoRefresh5m": "5 min",
+  "autoRefresh15m": "15 min",
+  "autoRefreshOff": "Desactivado",
+  "checkingDcs": "Verificando controladores de dominio...",
+  "healthCheckFailed": "Verificacion de estado fallida",
+  "noDcsFound": "No se encontraron Domain Controllers",
+  "noDcsDescription": "No se descubrieron controladores de dominio en la configuracion de AD.",
+  "lastChecked": "Ultima verificacion:",
+  "exportDc": "DC",
+  "exportOverall": "General",
+  "exportCheckStatus": "Estado de verificacion",
+  "exportMessage": "Mensaje",
+  "exportTitle": "Informe de estado de la infraestructura"
+}
