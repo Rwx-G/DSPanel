@@ -11,12 +11,12 @@ describe("SearchBar", () => {
     vi.useRealTimers();
   });
 
-  it("should render with placeholder", () => {
+  it("should render with placeholder and shortcut hint", () => {
     render(<SearchBar value="" onChange={vi.fn()} onSearch={vi.fn()} />);
-    expect(screen.getByPlaceholderText("Search...")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Search... (Ctrl+F)")).toBeInTheDocument();
   });
 
-  it("should render with custom placeholder", () => {
+  it("should render with custom placeholder and shortcut hint", () => {
     render(
       <SearchBar
         value=""
@@ -25,7 +25,7 @@ describe("SearchBar", () => {
         placeholder="Find user..."
       />,
     );
-    expect(screen.getByPlaceholderText("Find user...")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Find user... (Ctrl+F)")).toBeInTheDocument();
   });
 
   it("should display the current value", () => {

@@ -4,6 +4,7 @@ import { createElement, type ReactNode } from "react";
 import { PresetManagement } from "./PresetManagement";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import { DialogProvider } from "@/contexts/DialogContext";
+import { NavigationProvider } from "@/contexts/NavigationContext";
 import type { Preset } from "@/types/preset";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -38,9 +39,13 @@ const samplePresets: Preset[] = [
 
 function Wrapper({ children }: { children: ReactNode }) {
   return createElement(
-    NotificationProvider,
+    NavigationProvider,
     null,
-    createElement(DialogProvider, null, children),
+    createElement(
+      NotificationProvider,
+      null,
+      createElement(DialogProvider, null, children),
+    ),
   );
 }
 
@@ -150,10 +155,9 @@ describe("PresetManagement", () => {
 
     await waitFor(() => {
       expect(screen.getByText("Dev Onboarding")).toBeDefined();
+      expect(screen.getAllByText("Onboarding").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("Offboarding").length).toBeGreaterThan(0);
     });
-
-    expect(screen.getAllByText("Onboarding").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Offboarding").length).toBeGreaterThan(0);
   });
 
   it("clicking a preset shows the editor form", async () => {
@@ -172,10 +176,12 @@ describe("PresetManagement", () => {
 
     fireEvent.click(screen.getByTestId("preset-item-0"));
 
-    expect(screen.getByTestId("preset-editor-form")).toBeDefined();
-    expect(
-      (screen.getByTestId("preset-name-input") as HTMLInputElement).value,
-    ).toBe("Dev Onboarding");
+    await waitFor(() => {
+      expect(screen.getByTestId("preset-editor-form")).toBeDefined();
+      expect(
+        (screen.getByTestId("preset-name-input") as HTMLInputElement).value,
+      ).toBe("Dev Onboarding");
+    });
   });
 
   it("new button creates blank editor", async () => {
@@ -191,7 +197,9 @@ describe("PresetManagement", () => {
 
     fireEvent.click(screen.getByTestId("preset-new-btn"));
 
-    expect(screen.getByTestId("preset-editor-form")).toBeDefined();
+    await waitFor(() => {
+      expect(screen.getByTestId("preset-editor-form")).toBeDefined();
+    });
     expect(
       (screen.getByTestId("preset-name-input") as HTMLInputElement).value,
     ).toBe("");

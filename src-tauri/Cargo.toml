@@ -1,6 +1,6 @@
 [package]
 name = "dspanel"
-version = "0.11.0"
+version = "0.12.0"
 description = "DSPanel - Active Directory management tool"
 authors = ["Romain G."]
 license = "Apache-2.0"
@@ -55,6 +55,9 @@ windows = { version = "0.62", features = [
     "Win32_Foundation",
     "Win32_Storage_FileSystem",
 ] }
+
+[target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
+tauri-plugin-window-state = "2.4.1"
 
 [features]
 default = ["gssapi"]

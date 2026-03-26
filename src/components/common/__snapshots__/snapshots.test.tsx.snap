@@ -75,7 +75,7 @@ exports[`Common controls - visual snapshots > EmptyState renders with icon and a
     Try a different search query.
   </p>
   <button
-    class="btn btn-primary mt-2"
+    class="btn btn-sm btn-primary mt-2"
     data-testid="empty-state-action"
   >
     Retry
@@ -212,7 +212,7 @@ exports[`Common controls - visual snapshots > SearchBar renders correctly 1`] = 
     aria-label="Search users..."
     class="flex-1 bg-transparent text-body text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-secondary)]"
     data-testid="search-input"
-    placeholder="Search users..."
+    placeholder="Search users... (Ctrl+F)"
     type="text"
     value="test query"
   />

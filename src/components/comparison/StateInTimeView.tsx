@@ -187,7 +187,7 @@ export function StateInTimeView({
                 value={attributeFilter}
                 onChange={(e) => setAttributeFilter(e.target.value)}
                 placeholder="Filter attributes..."
-                className="h-7 w-48 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-default)] pl-7 pr-2 text-caption text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)]"
+                className="h-7 w-48 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] pl-7 pr-2 text-caption text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)]"
                 data-testid="attribute-filter-input"
               />
             </div>

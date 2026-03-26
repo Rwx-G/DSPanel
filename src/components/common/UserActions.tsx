@@ -91,52 +91,76 @@ export function UserActions({
 
   return (
     <div className="flex items-center gap-2" data-testid="user-actions">
-      <button
-        className="btn btn-sm btn-primary flex items-center gap-1"
-        onClick={onResetPassword}
-        disabled={!canAct}
-        title={!canAct ? "Requires HelpDesk permission" : undefined}
-        data-testid="reset-password-btn"
-      >
-        <KeyRound size={12} />
-        Reset Password
-      </button>
+      <div className="group relative">
+        <button
+          className="btn btn-sm btn-primary flex items-center gap-1"
+          onClick={onResetPassword}
+          disabled={!canAct}
+          data-testid="reset-password-btn"
+        >
+          <KeyRound size={12} />
+          Reset Password
+        </button>
+        {!canAct && (
+          <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-md bg-[var(--color-surface-elevated)] px-2.5 py-1.5 text-caption font-medium text-[var(--color-text-primary)] opacity-0 shadow-md transition-opacity duration-150 group-hover:opacity-100">
+            Requires HelpDesk permission
+          </span>
+        )}
+      </div>
 
       {user.lockedOut && (
-        <button
-          className="btn btn-sm btn-secondary flex items-center gap-1"
-          onClick={handleUnlock}
-          disabled={!canAct || loading === "Unlock"}
-          title={!canAct ? "Requires HelpDesk permission" : undefined}
-          data-testid="unlock-btn"
-        >
-          <Unlock size={12} />
-          Unlock
-        </button>
+        <div className="group relative">
+          <button
+            className="btn btn-sm btn-secondary flex items-center gap-1"
+            onClick={handleUnlock}
+            disabled={!canAct || loading === "Unlock"}
+            data-testid="unlock-btn"
+          >
+            <Unlock size={12} />
+            Unlock
+          </button>
+          {!canAct && (
+            <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-md bg-[var(--color-surface-elevated)] px-2.5 py-1.5 text-caption font-medium text-[var(--color-text-primary)] opacity-0 shadow-md transition-opacity duration-150 group-hover:opacity-100">
+              Requires HelpDesk permission
+            </span>
+          )}
+        </div>
       )}
 
       {user.enabled ? (
-        <button
-          className="btn btn-sm btn-secondary flex items-center gap-1 text-[var(--color-error)]"
-          onClick={handleDisable}
-          disabled={!canAct || loading === "Disable"}
-          title={!canAct ? "Requires HelpDesk permission" : undefined}
-          data-testid="disable-btn"
-        >
-          <PowerOff size={12} />
-          Disable
-        </button>
+        <div className="group relative">
+          <button
+            className="btn btn-sm btn-secondary flex items-center gap-1 text-[var(--color-error)]"
+            onClick={handleDisable}
+            disabled={!canAct || loading === "Disable"}
+            data-testid="disable-btn"
+          >
+            <PowerOff size={12} />
+            Disable
+          </button>
+          {!canAct && (
+            <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-md bg-[var(--color-surface-elevated)] px-2.5 py-1.5 text-caption font-medium text-[var(--color-text-primary)] opacity-0 shadow-md transition-opacity duration-150 group-hover:opacity-100">
+              Requires HelpDesk permission
+            </span>
+          )}
+        </div>
       ) : (
-        <button
-          className="btn btn-sm btn-secondary flex items-center gap-1 text-[var(--color-success)]"
-          onClick={handleEnable}
-          disabled={!canAct || loading === "Enable"}
-          title={!canAct ? "Requires HelpDesk permission" : undefined}
-          data-testid="enable-btn"
-        >
-          <Power size={12} />
-          Enable
-        </button>
+        <div className="group relative">
+          <button
+            className="btn btn-sm btn-secondary flex items-center gap-1 text-[var(--color-success)]"
+            onClick={handleEnable}
+            disabled={!canAct || loading === "Enable"}
+            data-testid="enable-btn"
+          >
+            <Power size={12} />
+            Enable
+          </button>
+          {!canAct && (
+            <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-md bg-[var(--color-surface-elevated)] px-2.5 py-1.5 text-caption font-medium text-[var(--color-text-primary)] opacity-0 shadow-md transition-opacity duration-150 group-hover:opacity-100">
+              Requires HelpDesk permission
+            </span>
+          )}
+        </div>
       )}
     </div>
   );

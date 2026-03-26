@@ -103,6 +103,7 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_window_state::Builder::default().build())
         .manage(app_state)
         .setup(|app| {
             // Detect permissions from AD groups on startup
@@ -143,6 +144,22 @@ pub fn run() {
             // Restore persisted settings
             state.app_settings.load();
             state.preset_service.load_persisted();
+
+            // Load custom permission mappings from preset storage path
+            if let Some(preset_path) = state.preset_service.get_path() {
+                match services::PermissionMappings::load_from(&preset_path) {
+                    Ok(Some(custom)) => {
+                        state.permission_service.apply_custom_mappings(&custom);
+                        tracing::info!("Custom permission mappings applied from preset storage");
+                    }
+                    Ok(None) => {
+                        tracing::debug!("No custom permission mappings found in preset storage");
+                    }
+                    Err(e) => {
+                        tracing::warn!("Failed to load permission mappings: {}", e);
+                    }
+                }
+            }
 
             // Sync Graph config from persisted settings + credential store
             {
@@ -206,6 +223,7 @@ pub fn run() {
             commands::evaluate_health_cmd,
             commands::evaluate_health_batch,
             commands::get_platform,
+            commands::is_simple_bind,
             commands::get_current_username,
             commands::get_authenticated_identity,
             commands::get_computer_name,
@@ -270,6 +288,11 @@ pub fn run() {
             commands::modify_attribute,
             commands::get_app_settings,
             commands::set_app_settings,
+            commands::get_permission_mappings,
+            commands::set_permission_mappings,
+            commands::validate_group_exists,
+            commands::check_for_update,
+            commands::skip_update_version,
             commands::store_credential,
             commands::get_credential,
             commands::delete_credential,

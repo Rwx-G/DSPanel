@@ -3,6 +3,8 @@ use tauri::State;
 use crate::error::AppError;
 use crate::models::{DeletedObject, ExchangeOnlineInfo, ObjectSnapshot, Preset, SnapshotDiff};
 use crate::services::app_settings::AppSettings;
+use crate::services::permissions::PermissionMappings;
+use crate::services::update::{self, UpdateInfo};
 use crate::services::PermissionLevel;
 use crate::state::AppState;
 
@@ -1023,6 +1025,188 @@ pub fn set_app_settings(settings: AppSettings, state: State<'_, AppState>) {
     state.app_settings.update(settings);
 }
 
+// ---------------------------------------------------------------------------
+// Permission mapping commands
+// ---------------------------------------------------------------------------
+
+/// Returns the current custom permission mappings from preset storage.
+pub(crate) fn get_permission_mappings_inner(state: &AppState) -> PermissionMappings {
+    let preset_path = state.preset_service.get_path();
+    match preset_path {
+        Some(path) => PermissionMappings::load_from(&path)
+            .ok()
+            .flatten()
+            .unwrap_or_default(),
+        None => PermissionMappings::default(),
+    }
+}
+
+/// Validates, saves, and applies new permission mappings. Requires DomainAdmin.
+pub(crate) fn set_permission_mappings_inner(
+    state: &AppState,
+    mappings: &PermissionMappings,
+) -> Result<(), AppError> {
+    if !state
+        .permission_service
+        .has_permission(PermissionLevel::DomainAdmin)
+    {
+        return Err(AppError::PermissionDenied(
+            "Permission mapping changes require DomainAdmin permission".to_string(),
+        ));
+    }
+
+    let preset_path = state.preset_service.get_path().ok_or_else(|| {
+        AppError::Configuration(
+            "Preset storage path is not configured. Configure it in Settings first.".to_string(),
+        )
+    })?;
+
+    // Save to preset share
+    mappings
+        .save_to(&preset_path)
+        .map_err(|e| AppError::Internal(e.to_string()))?;
+
+    // Apply to permission service (re-merge from defaults + custom)
+    state.permission_service.apply_custom_mappings(mappings);
+
+    // Audit the change
+    let detail = format!(
+        "Permission mappings updated: {} levels with groups configured",
+        mappings.mappings.values().filter(|g| !g.is_empty()).count()
+    );
+    state
+        .audit_service
+        .log_success("PermissionMappingUpdate", "rbac-mappings.json", &detail);
+
+    Ok(())
+}
+
+/// Validates that an AD group DN exists by searching for it.
+pub(crate) async fn validate_group_exists_inner(
+    state: &AppState,
+    group_dn: &str,
+) -> Result<bool, AppError> {
+    let provider = state.directory_provider.clone();
+    // Extract CN from DN to search
+    let cn = group_dn
+        .split(',')
+        .next()
+        .and_then(|part| {
+            part.strip_prefix("CN=")
+                .or_else(|| part.strip_prefix("cn="))
+        })
+        .unwrap_or("");
+
+    if cn.is_empty() {
+        return Ok(false);
+    }
+
+    match provider.search_groups(cn, 5).await {
+        Ok(results) => Ok(results.iter().any(|g| g.distinguished_name == group_dn)),
+        Err(_) => Ok(false),
+    }
+}
+
+/// Returns the current custom permission mappings.
+#[tauri::command]
+pub fn get_permission_mappings(state: State<'_, AppState>) -> PermissionMappings {
+    get_permission_mappings_inner(&state)
+}
+
+/// Saves new permission mappings. Requires DomainAdmin.
+#[tauri::command]
+pub fn set_permission_mappings(
+    mappings: PermissionMappings,
+    state: State<'_, AppState>,
+) -> Result<(), AppError> {
+    set_permission_mappings_inner(&state, &mappings)
+}
+
+/// Validates that an AD group exists by DN.
+#[tauri::command]
+pub async fn validate_group_exists(
+    group_dn: String,
+    state: State<'_, AppState>,
+) -> Result<bool, AppError> {
+    validate_group_exists_inner(&state, &group_dn).await
+}
+
+// ---------------------------------------------------------------------------
+// Update check commands
+// ---------------------------------------------------------------------------
+
+/// Checks GitHub for a newer version. Returns UpdateInfo if available, null otherwise.
+///
+/// Respects frequency settings and skip logic. Fails silently on network errors.
+pub(crate) async fn check_for_update_inner(state: &AppState) -> Option<UpdateInfo> {
+    let settings = state.app_settings.get();
+    let update_settings = settings.update.unwrap_or_default();
+
+    // Check frequency
+    let frequency = update_settings
+        .check_frequency
+        .as_deref()
+        .unwrap_or("startup");
+    if !update::should_check(frequency, update_settings.last_check_timestamp.as_deref()) {
+        return None;
+    }
+
+    // Fetch latest release
+    let info = update::fetch_latest_release(&state.http_client).await?;
+
+    // Update last check timestamp
+    {
+        let mut current = state.app_settings.get();
+        let mut us = current.update.unwrap_or_default();
+        us.last_check_timestamp = Some(chrono::Utc::now().to_rfc3339());
+        current.update = Some(us);
+        state.app_settings.update(current);
+    }
+
+    // Check if this version was skipped
+    if let Some(ref skipped) = update_settings.skipped_version {
+        if skipped == &info.version {
+            tracing::debug!(version = %info.version, "Update skipped by user");
+            return None;
+        }
+    }
+
+    // Check if it's actually newer
+    let current_version = env!("CARGO_PKG_VERSION");
+    if update::is_newer(current_version, &info.version) {
+        tracing::info!(
+            current = current_version,
+            available = %info.version,
+            "Newer version available"
+        );
+        Some(info)
+    } else {
+        None
+    }
+}
+
+/// Persists a version as "skipped" so it won't be shown again.
+pub(crate) fn skip_update_version_inner(state: &AppState, version: &str) {
+    let mut settings = state.app_settings.get();
+    let mut us = settings.update.unwrap_or_default();
+    us.skipped_version = Some(version.to_string());
+    settings.update = Some(us);
+    state.app_settings.update(settings);
+    tracing::info!(version = version, "Update version skipped by user");
+}
+
+/// Checks GitHub for a newer version.
+#[tauri::command]
+pub async fn check_for_update(state: State<'_, AppState>) -> Result<Option<UpdateInfo>, AppError> {
+    Ok(check_for_update_inner(&state).await)
+}
+
+/// Marks a version as skipped.
+#[tauri::command]
+pub fn skip_update_version(version: String, state: State<'_, AppState>) {
+    skip_update_version_inner(&state, &version)
+}
+
 /// Stores a credential in the OS-native secure storage.
 #[tauri::command]
 pub fn store_credential(
@@ -1859,6 +2043,92 @@ mod tests {
         let state = make_state();
         let result = compute_snapshot_diff_inner(&state, 999).await;
         assert!(result.is_err());
+    }
+
+    // -----------------------------------------------------------------------
+    // permission mapping tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_get_permission_mappings_empty_when_no_preset_path() {
+        let state = make_state();
+        let result = get_permission_mappings_inner(&state);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_get_permission_mappings_empty_when_no_file() {
+        let (state, _dir) = make_state_with_preset_dir(PermissionLevel::DomainAdmin);
+        let result = get_permission_mappings_inner(&state);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_set_permission_mappings_requires_domain_admin() {
+        let (state, _dir) = make_state_with_preset_dir(PermissionLevel::AccountOperator);
+        let mappings = PermissionMappings::default();
+        let result = set_permission_mappings_inner(&state, &mappings);
+        assert!(matches!(result.unwrap_err(), AppError::PermissionDenied(_)));
+    }
+
+    #[test]
+    fn test_set_permission_mappings_requires_preset_path() {
+        let state = make_state_with_level(PermissionLevel::DomainAdmin);
+        let mappings = PermissionMappings::default();
+        let result = set_permission_mappings_inner(&state, &mappings);
+        assert!(matches!(result.unwrap_err(), AppError::Configuration(_)));
+    }
+
+    #[test]
+    fn test_set_permission_mappings_saves_and_loads() {
+        let (state, _dir) = make_state_with_preset_dir(PermissionLevel::DomainAdmin);
+        let mut m = std::collections::HashMap::new();
+        m.insert(
+            PermissionLevel::HelpDesk,
+            vec!["CN=IT-Support,OU=Groups,DC=contoso,DC=com".to_string()],
+        );
+        let mappings = PermissionMappings { mappings: m };
+        set_permission_mappings_inner(&state, &mappings).unwrap();
+
+        // Verify saved by loading
+        let loaded = get_permission_mappings_inner(&state);
+        assert_eq!(
+            loaded
+                .mappings
+                .get(&PermissionLevel::HelpDesk)
+                .unwrap()
+                .len(),
+            1
+        );
+    }
+
+    #[test]
+    fn test_set_permission_mappings_audits() {
+        let (state, _dir) = make_state_with_preset_dir(PermissionLevel::DomainAdmin);
+        let mappings = PermissionMappings::default();
+        set_permission_mappings_inner(&state, &mappings).unwrap();
+
+        let entries = state.audit_service.get_entries();
+        assert!(entries
+            .iter()
+            .any(|e| e.action == "PermissionMappingUpdate"));
+    }
+
+    #[tokio::test]
+    async fn test_validate_group_exists_returns_false_for_empty() {
+        let state = make_state();
+        let result = validate_group_exists_inner(&state, "").await.unwrap();
+        assert!(!result);
+    }
+
+    #[tokio::test]
+    async fn test_validate_group_exists_returns_false_for_nonexistent() {
+        let state = make_state();
+        let result =
+            validate_group_exists_inner(&state, "CN=NonexistentGroup,OU=Groups,DC=example,DC=com")
+                .await
+                .unwrap();
+        assert!(!result);
     }
 
     #[tokio::test]

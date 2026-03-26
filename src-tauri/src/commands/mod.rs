@@ -212,6 +212,15 @@ pub fn get_platform() -> String {
     get_platform_inner()
 }
 
+/// Returns true if the app is using simple bind (explicit credentials).
+///
+/// In simple bind mode, some OS-level operations (like force replication
+/// via repadmin/PowerShell) are not available.
+#[tauri::command]
+pub fn is_simple_bind() -> bool {
+    std::env::var("DSPANEL_LDAP_BIND_DN").is_ok()
+}
+
 #[allow(clippy::unwrap_used)]
 #[cfg(test)]
 mod tests {

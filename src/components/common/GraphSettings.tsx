@@ -101,7 +101,7 @@ export function GraphSettings() {
 
   return (
     <div
-      className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-primary)] p-4"
+      className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-4"
       data-testid="graph-settings"
     >
       <h3 className="mb-3 text-body font-semibold text-[var(--color-text-primary)]">
@@ -126,7 +126,7 @@ export function GraphSettings() {
               setTestResult(null);
             }}
             placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-            className="w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-input-bg)] px-3 py-1.5 text-body text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none"
+            className="w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5 text-body text-[var(--color-text-primary)] placeholder-[var(--color-text-secondary)] focus:border-[var(--color-primary)] focus:outline-none"
             data-testid="graph-tenant-id"
           />
         </div>
@@ -143,7 +143,7 @@ export function GraphSettings() {
               setTestResult(null);
             }}
             placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-            className="w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-input-bg)] px-3 py-1.5 text-body text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none"
+            className="w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5 text-body text-[var(--color-text-primary)] placeholder-[var(--color-text-secondary)] focus:border-[var(--color-primary)] focus:outline-none"
             data-testid="graph-client-id"
           />
         </div>
@@ -161,7 +161,7 @@ export function GraphSettings() {
               setTestResult(null);
             }}
             placeholder={hasStoredSecret && !secretTouched ? "Stored in OS credential store" : "Client secret value"}
-            className="w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-input-bg)] px-3 py-1.5 text-body text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none"
+            className="w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5 text-body text-[var(--color-text-primary)] placeholder-[var(--color-text-secondary)] focus:border-[var(--color-primary)] focus:outline-none"
             data-testid="graph-client-secret"
           />
         </div>
@@ -188,7 +188,7 @@ export function GraphSettings() {
 
       {testResult !== null && (
         <div
-          className={`mt-2 text-caption ${testResult ? "text-[var(--color-success)]" : "text-[var(--color-danger)]"}`}
+          className={`mt-2 text-caption ${testResult ? "text-[var(--color-success)]" : "text-[var(--color-error)]"}`}
           data-testid="graph-test-status"
         >
           {testResult

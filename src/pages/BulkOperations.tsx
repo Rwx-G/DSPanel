@@ -1329,7 +1329,7 @@ export function BulkOperations() {
                       className={`flex flex-col items-start gap-2 rounded-lg border p-3 text-left transition-colors ${
                         permitted
                           ? "border-[var(--color-border-default)] bg-[var(--color-surface-card)] hover:border-[var(--color-primary)] hover:bg-[var(--color-surface-hover)] cursor-pointer"
-                          : "border-[var(--color-border-subtle)] bg-[var(--color-surface-default)] opacity-50 cursor-not-allowed"
+                          : "border-[var(--color-border-subtle)] bg-[var(--color-surface-card)] opacity-50 cursor-not-allowed"
                       }`}
                       data-testid={`op-card-${card.id}`}
                     >

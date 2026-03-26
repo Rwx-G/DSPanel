@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { ComboBox, type ComboBoxOption } from "./ComboBox";
 
 const options: ComboBoxOption[] = [
@@ -123,36 +123,44 @@ describe("ComboBox", () => {
     expect(screen.getByTestId("combobox-dropdown")).toBeInTheDocument();
   });
 
-  it("should navigate options with ArrowDown", () => {
+  it("should navigate options with ArrowDown", async () => {
     render(<ComboBox options={options} value="" onChange={vi.fn()} />);
     fireEvent.click(screen.getByTestId("combobox-trigger"));
     const container = screen.getByTestId("combobox");
     fireEvent.keyDown(container, { key: "ArrowDown" });
-    expect(screen.getByTestId("combobox-option-us").className).toContain(
-      "bg-[var(--color-primary-subtle)]",
-    );
+    await waitFor(() => {
+      expect(screen.getByTestId("combobox-option-us").className).toContain(
+        "bg-[var(--color-primary-subtle)]",
+      );
+    });
     fireEvent.keyDown(container, { key: "ArrowDown" });
-    expect(screen.getByTestId("combobox-option-uk").className).toContain(
-      "bg-[var(--color-primary-subtle)]",
-    );
-    expect(screen.getByTestId("combobox-option-us").className).not.toContain(
-      "bg-[var(--color-primary-subtle)]",
-    );
+    await waitFor(() => {
+      expect(screen.getByTestId("combobox-option-uk").className).toContain(
+        "bg-[var(--color-primary-subtle)]",
+      );
+      expect(screen.getByTestId("combobox-option-us").className).not.toContain(
+        "bg-[var(--color-primary-subtle)]",
+      );
+    });
   });
 
-  it("should navigate options with ArrowUp", () => {
+  it("should navigate options with ArrowUp", async () => {
     render(<ComboBox options={options} value="" onChange={vi.fn()} />);
     fireEvent.click(screen.getByTestId("combobox-trigger"));
     const container = screen.getByTestId("combobox");
     fireEvent.keyDown(container, { key: "ArrowDown" });
     fireEvent.keyDown(container, { key: "ArrowDown" });
-    expect(screen.getByTestId("combobox-option-uk").className).toContain(
-      "bg-[var(--color-primary-subtle)]",
-    );
+    await waitFor(() => {
+      expect(screen.getByTestId("combobox-option-uk").className).toContain(
+        "bg-[var(--color-primary-subtle)]",
+      );
+    });
     fireEvent.keyDown(container, { key: "ArrowUp" });
-    expect(screen.getByTestId("combobox-option-us").className).toContain(
-      "bg-[var(--color-primary-subtle)]",
-    );
+    await waitFor(() => {
+      expect(screen.getByTestId("combobox-option-us").className).toContain(
+        "bg-[var(--color-primary-subtle)]",
+      );
+    });
   });
 
   it("should select highlighted option with Enter", () => {

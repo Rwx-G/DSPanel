@@ -72,7 +72,11 @@ pub(crate) async fn force_replication_inner(
 
     crate::services::replication_status::force_replication(source_dc, target_dc, naming_context)
         .await
-        .map_err(|e| AppError::Directory(e.to_string()))
+        .map_err(|e| {
+            let msg = e.to_string();
+            // Propagate the actual error detail instead of a generic message
+            AppError::DirectoryTyped(crate::error::DirectoryError::Other(msg))
+        })
 }
 
 // ---------------------------------------------------------------------------

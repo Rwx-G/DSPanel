@@ -289,15 +289,15 @@ function getStrengthLabel(length: number): { text: string; class: string } {
   if (length >= 24)
     return {
       text: "Excellent",
-      class: "bg-green-100 text-[var(--color-success)]",
+      class: "bg-[var(--color-success-bg)] text-[var(--color-success)]",
     };
   if (length >= 20)
-    return { text: "Strong", class: "bg-blue-100 text-[var(--color-info)]" };
+    return { text: "Strong", class: "bg-[var(--color-info-bg)] text-[var(--color-info)]" };
   if (length >= 16)
-    return { text: "Good", class: "bg-green-100 text-[var(--color-success)]" };
+    return { text: "Good", class: "bg-[var(--color-success-bg)] text-[var(--color-success)]" };
   if (length >= 12)
-    return { text: "Fair", class: "bg-yellow-100 text-[var(--color-warning)]" };
-  return { text: "Weak", class: "bg-red-100 text-[var(--color-error)]" };
+    return { text: "Fair", class: "bg-[var(--color-warning-bg)] text-[var(--color-warning)]" };
+  return { text: "Weak", class: "bg-[var(--color-error-bg)] text-[var(--color-error)]" };
 }
 
 function CheckboxOption({
@@ -388,7 +388,7 @@ function HibpStatusBadge({ result }: { result: HibpResult }) {
   if (result.isBreached) {
     return (
       <span
-        className="inline-flex items-center gap-1.5 rounded-full bg-red-100 px-3 py-1 text-caption font-medium text-[var(--color-error)]"
+        className="inline-flex items-center gap-1.5 rounded-full bg-[var(--color-error-bg)] px-3 py-1 text-caption font-medium text-[var(--color-error)]"
         data-testid="hibp-breached"
       >
         <ShieldAlert size={14} />

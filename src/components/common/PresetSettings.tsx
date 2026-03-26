@@ -41,7 +41,7 @@ export function PresetSettings({ onSaved }: PresetSettingsProps = {}) {
 
   return (
     <div
-      className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-primary)] p-4"
+      className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-4"
       data-testid="preset-settings"
     >
       <h3 className="mb-3 text-body font-semibold text-[var(--color-text-primary)]">
@@ -63,7 +63,7 @@ export function PresetSettings({ onSaved }: PresetSettingsProps = {}) {
           }}
           placeholder={"\\\\server\\share\\presets or C:\\presets"
           }
-          className="flex-1 rounded-md border border-[var(--color-border-default)] bg-[var(--color-input-bg)] px-3 py-1.5 text-body text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none"
+          className="flex-1 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5 text-body text-[var(--color-text-primary)] placeholder-[var(--color-text-secondary)] focus:border-[var(--color-primary)] focus:outline-none"
           data-testid="preset-path-input"
           disabled={loading}
         />
@@ -76,11 +76,13 @@ export function PresetSettings({ onSaved }: PresetSettingsProps = {}) {
             }
           }}
           disabled={loading}
-          className="btn btn-sm btn-outline"
-          title="Browse for folder"
+          className="group relative btn btn-sm btn-outline"
           data-testid="preset-path-browse"
         >
           <FolderOpen size={14} />
+          <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-md bg-[var(--color-surface-elevated)] px-2.5 py-1.5 text-caption font-medium text-[var(--color-text-primary)] opacity-0 shadow-md transition-opacity duration-150 group-hover:opacity-100">
+            Browse for folder
+          </span>
         </button>
         <button
           onClick={handleTest}
@@ -103,7 +105,7 @@ export function PresetSettings({ onSaved }: PresetSettingsProps = {}) {
       {/* Status feedback */}
       {testResult !== null && (
         <div
-          className={`mt-2 text-caption ${testResult ? "text-[var(--color-success)]" : "text-[var(--color-danger)]"}`}
+          className={`mt-2 text-caption ${testResult ? "text-[var(--color-success)]" : "text-[var(--color-error)]"}`}
           data-testid="preset-path-status"
         >
           {testResult
@@ -123,7 +125,7 @@ export function PresetSettings({ onSaved }: PresetSettingsProps = {}) {
 
       {valid === false && testResult === null && (
         <div
-          className="mt-2 text-caption text-[var(--color-danger)]"
+          className="mt-2 text-caption text-[var(--color-error)]"
           data-testid="preset-path-error"
         >
           Failed to configure path. Please check the path and try again.

@@ -1,0 +1,42 @@
+schema: 1
+story: "12.1"
+story_title: "AD Group-Based Permission Mapping"
+gate: PASS
+status_reason: "All 9 ACs met with comprehensive test coverage (28 new tests). Security-critical DomainAdmin gate enforced on backend and frontend. Clean architecture extending existing PermissionService."
+reviewer: "Quinn (Test Architect)"
+updated: "2026-03-25T21:10:00Z"
+
+top_issues: []
+waiver: { active: false }
+
+quality_score: 100
+expires: "2026-04-08T21:10:00Z"
+
+evidence:
+  tests_reviewed: 28
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7, 8, 9]
+    ac_gaps: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "DomainAdmin gate on backend (set_permission_mappings_inner) and frontend (usePermissions check). No secrets in mapping file. LDAP-based group validation."
+  performance:
+    status: PASS
+    notes: "Lightweight JSON file I/O at startup. Mutex lock on group_mappings is brief and uncontended in desktop context."
+  reliability:
+    status: PASS
+    notes: "Graceful fallback: missing file returns None, corrupt JSON returns error logged but does not crash. Default detection always active."
+  maintainability:
+    status: PASS
+    notes: "Clean model/service/command/UI separation. Existing PermissionService extended without interface changes. Well-documented with doc comments."
+
+recommendations:
+  immediate: []
+  future:
+    - action: "Add Reset to Defaults button in UI to clear all custom mappings"
+      refs: ["src/components/common/PermissionMappingSettings.tsx"]
+    - action: "Batch-validate all mapped groups on component mount"
+      refs: ["src/components/common/PermissionMappingSettings.tsx"]

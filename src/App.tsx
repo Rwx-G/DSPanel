@@ -8,6 +8,7 @@ import { NotificationProvider } from "@/contexts/NotificationContext";
 import { NotificationHost } from "@/components/common/NotificationHost";
 import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import { DialogProvider } from "@/contexts/DialogContext";
+import { useTheme } from "@/hooks/useTheme";
 import { AppShell } from "@/components/layout/AppShell";
 import { UserLookup } from "@/pages/UserLookup";
 import { ComputerLookup } from "@/pages/ComputerLookup";
@@ -36,6 +37,7 @@ import { AutomatedCleanup } from "@/pages/AutomatedCleanup";
 import { ComplianceReports } from "@/pages/ComplianceReports";
 import { AuditLog } from "@/pages/AuditLog";
 import { GpoViewer } from "@/pages/GpoViewer";
+import { Settings } from "@/pages/Settings";
 
 const APP_VERSION = __APP_VERSION__;
 
@@ -65,6 +67,9 @@ export interface AppStatus {
 }
 
 export function App() {
+  // Apply theme on mount (must be called in a component that always renders)
+  useTheme();
+
   const [status, setStatus] = useState<AppStatus>({
     isConnected: false,
     domainName: null,
@@ -187,6 +192,7 @@ const MODULE_COMPONENTS: Record<
   "compliance-reports": ComplianceReports,
   "audit-log": AuditLog,
   "gpo-viewer": GpoViewer,
+  settings: Settings,
 };
 
 function ModuleRouter({ status }: { status: AppStatus }) {

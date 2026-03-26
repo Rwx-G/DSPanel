@@ -291,7 +291,7 @@ function OnboardingContent() {
       </div>
 
       {/* Step content */}
-      <div className="flex-1 overflow-auto rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-primary)] p-4">
+      <div className="flex-1 overflow-auto rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-4">
         {/* Step 1: User Details */}
         {step === "details" && (
           <div className="mx-auto max-w-lg space-y-4" data-testid="step-details">
@@ -305,7 +305,7 @@ function OnboardingContent() {
                 onChange={(e) =>
                   setDetails({ ...details, firstName: e.target.value })
                 }
-                className="w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-input-bg)] px-3 py-1.5 text-body text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+                className="w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5 text-body text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
                 data-testid="input-firstname"
               />
             </div>
@@ -319,7 +319,7 @@ function OnboardingContent() {
                 onChange={(e) =>
                   setDetails({ ...details, lastName: e.target.value })
                 }
-                className="w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-input-bg)] px-3 py-1.5 text-body text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+                className="w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5 text-body text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
                 data-testid="input-lastname"
               />
             </div>
@@ -334,7 +334,7 @@ function OnboardingContent() {
                   setDetails({ ...details, displayName: e.target.value })
                 }
                 placeholder={autoDisplayName}
-                className="w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-input-bg)] px-3 py-1.5 text-body text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+                className="w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5 text-body text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
                 data-testid="input-displayname"
               />
             </div>
@@ -350,7 +350,7 @@ function OnboardingContent() {
                     setLoginManual(true);
                     setDetails({ ...details, login: e.target.value });
                   }}
-                  className="flex-1 rounded-md border border-[var(--color-border-default)] bg-[var(--color-input-bg)] px-3 py-1.5 text-body text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+                  className="flex-1 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5 text-body text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
                   data-testid="input-login"
                 />
                 {loginManual && (
@@ -374,7 +374,7 @@ function OnboardingContent() {
                   onChange={(e) =>
                     setDetails({ ...details, password: e.target.value })
                   }
-                  className="flex-1 rounded-md border border-[var(--color-border-default)] bg-[var(--color-input-bg)] px-3 py-1.5 text-body font-mono text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+                  className="flex-1 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5 text-body font-mono text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
                   data-testid="input-password"
                 />
                 <button
@@ -578,7 +578,7 @@ function OnboardingContent() {
                     </div>
                   </>
                 ) : (
-                  <div className="flex items-center gap-2 text-[var(--color-danger)]">
+                  <div className="flex items-center gap-2 text-[var(--color-error)]">
                     <AlertTriangle size={20} />
                     <span className="text-body font-semibold">
                       Failed to create user

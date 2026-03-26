@@ -1,22 +1,23 @@
 # Epic 12: RBAC, Settings and Polish
 
-**Goal**: Implement granular RBAC configuration within DSPanel, centralize all application settings, add auto-update notifications, prepare for localization, and finalize UX polish for a production-ready release.
+**Goal**: Configure AD group-based permission mapping, centralize all application settings, add auto-update notifications, and finalize UX polish for a production-ready release.
 
-### Story 12.1: Granular RBAC Configuration
+### Story 12.1: AD Group-Based Permission Mapping
 
 As a DomainAdmin,
-I want to define custom permission profiles in DSPanel beyond the 4 default levels,
-so that I can precisely control who can do what, per OU if needed.
+I want to map AD security groups to DSPanel permission levels,
+so that access control is driven by AD group membership rather than auto-detection only.
 
 #### Acceptance Criteria
 
-1. RBAC configuration UI in settings (DomainAdmin only)
-2. Custom profiles: name, base level, feature overrides (enable/disable specific actions)
-3. OU-scoped permissions: a profile can be restricted to specific OUs
-4. Profile assignment: map AD groups to custom profiles
-5. Custom profiles override default level behavior
-6. Changes saved to preset storage (shared across instances)
-7. Audit logging of RBAC changes
+1. Permission mapping UI in settings (DomainAdmin only)
+2. For each of the 5 permission levels (ReadOnly, HelpDesk, AccountOperator, Admin, DomainAdmin), allow mapping one or more AD groups
+3. Multiple groups can be mapped to the same permission level
+4. The highest matching level wins when a user belongs to multiple mapped groups
+5. When no mapping is configured, fall back to the current auto-detection logic
+6. Mappings saved to preset storage (shared across instances)
+7. Audit logging of permission mapping changes
+8. Validation: warn if a mapped group does not exist in AD
 
 ### Story 12.2: Application Settings
 
@@ -26,11 +27,11 @@ so that I can customize the tool to my environment.
 
 #### Acceptance Criteria
 
-1. Settings organized by category: Connection, Presets, Security, Notifications, Reports, Appearance
+1. Settings organized by category: Connection, Presets, Security, Reports, Appearance
 2. Connection: domain override, preferred DC, Graph tenant/app config
 3. Presets: storage path configuration
 4. Security: MFA settings, audit log retention
-5. Appearance: dark/light theme toggle, language selection
+5. Appearance: dark/light theme toggle
 6. Settings persisted locally (per-user) with sensible defaults
 7. Settings validation with clear error messages
 
@@ -49,22 +50,7 @@ so that I stay up to date.
 5. Check frequency configurable (default: every startup)
 6. Works without internet (silently skips check)
 
-### Story 12.4: Localization Support
-
-As a French-speaking user,
-I want DSPanel to be available in French,
-so that I can use the tool in my preferred language.
-
-#### Acceptance Criteria
-
-1. All user-facing strings externalized to JSON translation files (i18next)
-2. English (en) as default language
-3. French (fr) translation provided
-4. Language selection in settings (hot-switchable at runtime)
-5. Date, number, and currency formatting follows selected locale
-6. Developer documentation explains how to add new languages
-
-### Story 12.5: UX Polish and Final Touches
+### Story 12.4: UX Polish and Final Touches
 
 As a user,
 I want DSPanel to feel polished and professional,

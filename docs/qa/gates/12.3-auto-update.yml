@@ -1,0 +1,40 @@
+schema: 1
+story: "12.3"
+story_title: "Auto-Update Notification"
+gate: PASS
+status_reason: "All 8 ACs met. Clean update service with pure testable functions, GitHub API integration, and non-blocking notification bar. 25 new tests."
+reviewer: "Quinn (Test Architect)"
+updated: "2026-03-25T21:25:00Z"
+
+top_issues: []
+waiver: { active: false }
+
+quality_score: 100
+expires: "2026-04-08T21:25:00Z"
+
+evidence:
+  tests_reviewed: 25
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4, 5, 6, 7, 8]
+    ac_gaps: []
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Read-only GitHub API call. URL opening via Tauri opener plugin. No user input in URLs."
+  performance:
+    status: PASS
+    notes: "Single async HTTP call at startup with 5s timeout. Frequency-based throttling prevents excessive calls."
+  reliability:
+    status: PASS
+    notes: "All errors caught silently. Malformed versions handled gracefully. Missing settings default correctly."
+  maintainability:
+    status: PASS
+    notes: "Pure functions for version logic. Clean separation between service, commands, and UI."
+
+recommendations:
+  immediate: []
+  future:
+    - action: "Add release notes preview in notification bar tooltip"
+      refs: ["src/components/common/UpdateNotificationBar.tsx"]

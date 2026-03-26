@@ -45,7 +45,7 @@ export function EmptyState({
       )}
       {action && (
         <button
-          className="btn btn-primary mt-2"
+          className="btn btn-sm btn-primary mt-2"
           onClick={action.onClick}
           data-testid="empty-state-action"
         >

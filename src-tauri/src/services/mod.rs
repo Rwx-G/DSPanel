@@ -30,6 +30,7 @@ pub mod resilient_directory;
 pub mod security;
 pub mod snapshot;
 pub mod topology;
+pub mod update;
 pub mod workstation_monitor;
 
 pub use app_settings::AppSettingsService;
@@ -39,7 +40,7 @@ pub use health::{evaluate_health, AccountHealthStatus, HealthInput, HealthLevel}
 pub use ldap_directory::LdapDirectoryProvider;
 pub use mfa::MfaService;
 pub use object_snapshot::ObjectSnapshotService;
-pub use permissions::{PermissionConfig, PermissionLevel, PermissionService};
+pub use permissions::{PermissionConfig, PermissionLevel, PermissionMappings, PermissionService};
 pub use preset::PresetService;
 pub use resilience::{CircuitBreaker, CircuitBreakerConfig, RetryConfig, TimeoutConfig};
 pub use resilient_directory::ResilientDirectoryProvider;

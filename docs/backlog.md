@@ -6,10 +6,7 @@ Items deferred from QA reviews. None are blocking - all stories are PASS.
 
 | Source | Item | Refs |
 | ------ | ---- | ---- |
-| Epic 4 QA | Settings UI for custom permission group mapping (map any AD group to a DSPanel role) | Epic 12 (Story 12.1) |
-| Epic 5 | Settings UI for `disabledOu` default (used by Offboarding workflow, currently persisted in `app-settings.json` but no UI to configure it) | Epic 12 (Story 12.2), `AppSettingsService` |
-| Epic 6 (6.2) | `GraphSettings` component created but not yet embedded in a page - wire into centralized Settings view | Epic 12 (Story 12.2 AC#2), `GraphSettings.tsx` |
-| Epic 11 QA | Add retention period configuration in Settings UI (backend `audit_retention_days` exists) | Epic 12 (Story 12.2), `app_settings.rs`, `AuditLog.tsx` |
+| *(none)* | - | - |
 
 ## Priority: Low
 

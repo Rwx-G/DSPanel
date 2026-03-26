@@ -4,6 +4,7 @@ import { Sidebar } from "./Sidebar";
 import { TabBar } from "./TabBar";
 import { Breadcrumbs } from "./Breadcrumbs";
 import { StatusBar, type StatusBarProps } from "./StatusBar";
+import { UpdateNotificationBar } from "@/components/common/UpdateNotificationBar";
 
 const NARROW_BREAKPOINT = 900;
 
@@ -100,6 +101,41 @@ export function AppShell({ statusBarProps, children }: AppShellProps) {
         if (index < openTabs.length) {
           activateTab(openTabs[index].id);
         }
+        return;
+      }
+
+      // Ctrl+F: focus search in current view
+      if (e.ctrlKey && e.key === "f") {
+        e.preventDefault();
+        window.dispatchEvent(new CustomEvent("dspanel:search"));
+        return;
+      }
+
+      // Ctrl+R / F5: refresh current view
+      if ((e.ctrlKey && e.key === "r") || e.key === "F5") {
+        e.preventDefault();
+        window.dispatchEvent(new CustomEvent("dspanel:refresh"));
+        return;
+      }
+
+      // Ctrl+E: export current view
+      if (e.ctrlKey && e.key === "e") {
+        e.preventDefault();
+        window.dispatchEvent(new CustomEvent("dspanel:export"));
+        return;
+      }
+
+      // Ctrl+S: save in current view
+      if (e.ctrlKey && e.key === "s") {
+        e.preventDefault();
+        window.dispatchEvent(new CustomEvent("dspanel:save"));
+        return;
+      }
+
+      // Escape: close dialog or clear search
+      if (e.key === "Escape") {
+        window.dispatchEvent(new CustomEvent("dspanel:escape"));
+        return;
       }
     },
     [handleToggleSidebar, activeTabId, closeTab, openTabs, activateTab],
@@ -129,6 +165,7 @@ export function AppShell({ statusBarProps, children }: AppShellProps) {
           aria-label="Main content"
           className="flex flex-1 flex-col overflow-hidden"
         >
+          <UpdateNotificationBar />
           <Breadcrumbs />
           <TabBar />
           <div className="flex-1 overflow-auto">{children}</div>
