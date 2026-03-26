@@ -165,11 +165,10 @@ describe("UserActions", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("confirmation-dialog")).toBeInTheDocument();
+      expect(screen.getByTestId("dialog-message")).toHaveTextContent(
+        "unlock the account for John Doe",
+      );
     });
-
-    expect(screen.getByTestId("dialog-message")).toHaveTextContent(
-      "unlock the account for John Doe",
-    );
   });
 
   it("calls unlock_account when confirmed", async () => {

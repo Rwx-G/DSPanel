@@ -157,12 +157,11 @@ describe("GroupManagement", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("group-results-list")).toBeInTheDocument();
+      expect(screen.getByTestId("group-result-Developers")).toBeInTheDocument();
+      expect(
+        screen.getByTestId("group-result-Finance-Analysts"),
+      ).toBeInTheDocument();
     });
-
-    expect(screen.getByTestId("group-result-Developers")).toBeInTheDocument();
-    expect(
-      screen.getByTestId("group-result-Finance-Analysts"),
-    ).toBeInTheDocument();
   });
 
   it("shows loading state during initial load", () => {
@@ -186,9 +185,8 @@ describe("GroupManagement", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("group-management-error")).toBeInTheDocument();
+      expect(screen.getByText("Failed to load groups")).toBeInTheDocument();
     });
-
-    expect(screen.getByText("Failed to load groups")).toBeInTheDocument();
   });
 
   it("shows empty state when no groups", async () => {
@@ -203,11 +201,10 @@ describe("GroupManagement", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("group-management-empty")).toBeInTheDocument();
+      expect(
+        screen.getByTestId("empty-state-title"),
+      ).toHaveTextContent("No groups found");
     });
-
-    expect(
-      screen.getByTestId("empty-state-title"),
-    ).toHaveTextContent("No groups found");
   });
 
   it("displays group details when a group is selected", async () => {
@@ -224,10 +221,8 @@ describe("GroupManagement", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("group-detail")).toBeInTheDocument();
+      expect(screen.getByTestId("group-detail").querySelector("h2")).toHaveTextContent("Developers");
     });
-
-    const detail = screen.getByTestId("group-detail");
-    expect(detail.querySelector("h2")).toHaveTextContent("Developers");
   });
 
   it("shows member list in detail panel", async () => {
@@ -301,11 +296,10 @@ describe("GroupManagement", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("group-detail")).toBeInTheDocument();
+      // Scope and category are shown in the group detail (badge + PropertyGrid)
+      expect(screen.getAllByText("Domain Local").length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText("Distribution").length).toBeGreaterThanOrEqual(1);
     });
-
-    // Scope and category are shown in the group detail (badge + PropertyGrid)
-    expect(screen.getAllByText("Domain Local").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText("Distribution").length).toBeGreaterThanOrEqual(1);
   });
 
   it("shows placeholder when no group is selected", async () => {
@@ -316,11 +310,10 @@ describe("GroupManagement", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("group-results-list")).toBeInTheDocument();
+      expect(
+        screen.getByText("Select a group to view details"),
+      ).toBeInTheDocument();
     });
-
-    expect(
-      screen.getByText("Select a group to view details"),
-    ).toBeInTheDocument();
   });
 
   it("has aria-live status region", async () => {
@@ -330,11 +323,10 @@ describe("GroupManagement", () => {
     render(<GroupManagement />, { wrapper: TestProviders });
 
     await waitFor(() => {
-      expect(screen.getByTestId("group-management-status")).toBeInTheDocument();
+      const status = screen.getByTestId("group-management-status");
+      expect(status).toBeInTheDocument();
+      expect(status).toHaveAttribute("aria-live", "polite");
     });
-
-    const status = screen.getByTestId("group-management-status");
-    expect(status).toHaveAttribute("aria-live", "polite");
   });
 
   it("shows category and scope info on list items", async () => {
@@ -344,15 +336,14 @@ describe("GroupManagement", () => {
     render(<GroupManagement />, { wrapper: TestProviders });
 
     await waitFor(() => {
-      expect(screen.getByTestId("group-result-Developers")).toBeInTheDocument();
+      const listItem = screen.getByTestId("group-result-Developers");
+      expect(listItem).toBeInTheDocument();
+      // List item shows scope/category info inline with abbreviation
+      // Scope abbreviation "G" for Global should be visible
+      expect(listItem.textContent).toContain("G");
+      // Category and scope details appear in subtitle line
+      expect(listItem.textContent).toContain("Security");
     });
-
-    // List item shows scope/category info inline with abbreviation
-    const listItem = screen.getByTestId("group-result-Developers");
-    // Scope abbreviation "G" for Global should be visible
-    expect(listItem.textContent).toContain("G");
-    // Category and scope details appear in subtitle line
-    expect(listItem.textContent).toContain("Security");
   });
 
   describe("Deep-link and member loading", () => {
@@ -375,10 +366,8 @@ describe("GroupManagement", () => {
 
       await waitFor(() => {
         expect(screen.getByTestId("group-detail")).toBeInTheDocument();
+        expect(screen.getByTestId("group-detail").querySelector("h2")).toHaveTextContent("Finance-Analysts");
       });
-
-      const detail = screen.getByTestId("group-detail");
-      expect(detail.querySelector("h2")).toHaveTextContent("Finance-Analysts");
       unmount();
     });
 
@@ -418,10 +407,8 @@ describe("GroupManagement", () => {
 
       await waitFor(() => {
         expect(screen.getByTestId("group-detail")).toBeInTheDocument();
+        expect(screen.getByTestId("group-detail").querySelector("h2")).toHaveTextContent("Remote-Group");
       });
-
-      const detail = screen.getByTestId("group-detail");
-      expect(detail.querySelector("h2")).toHaveTextContent("Remote-Group");
     });
 
     it("members load when a group is selected", async () => {
@@ -464,11 +451,10 @@ describe("GroupManagement", () => {
 
       await waitFor(() => {
         expect(screen.getByTestId("group-results-list")).toBeInTheDocument();
+        // No group selected - should show placeholder
+        expect(screen.getByText("Select a group to view details")).toBeInTheDocument();
+        expect(screen.queryByTestId("group-members-section")).not.toBeInTheDocument();
       });
-
-      // No group selected - should show placeholder
-      expect(screen.getByText("Select a group to view details")).toBeInTheDocument();
-      expect(screen.queryByTestId("group-members-section")).not.toBeInTheDocument();
     });
   });
 
@@ -533,10 +519,9 @@ describe("GroupManagement", () => {
         expect(
           screen.getByTestId("member-management-controls"),
         ).toBeInTheDocument();
+        expect(screen.getByTestId("add-member-btn")).toBeInTheDocument();
+        expect(screen.getByTestId("select-all-checkbox")).toBeInTheDocument();
       });
-
-      expect(screen.getByTestId("add-member-btn")).toBeInTheDocument();
-      expect(screen.getByTestId("select-all-checkbox")).toBeInTheDocument();
     });
 
     it("disables add/remove controls for ReadOnly users", async () => {
@@ -544,12 +529,11 @@ describe("GroupManagement", () => {
 
       await waitFor(() => {
         expect(screen.getByText("John Doe")).toBeInTheDocument();
+        // Controls are rendered but disabled for ReadOnly
+        expect(screen.getByTestId("add-member-btn")).toBeDisabled();
+        expect(screen.getByTestId("remove-selected-btn")).toBeDisabled();
+        expect(screen.getByTestId("preview-changes-btn")).toBeDisabled();
       });
-
-      // Controls are rendered but disabled for ReadOnly
-      expect(screen.getByTestId("add-member-btn")).toBeDisabled();
-      expect(screen.getByTestId("remove-selected-btn")).toBeDisabled();
-      expect(screen.getByTestId("preview-changes-btn")).toBeDisabled();
     });
 
     it("multi-select on member list works", async () => {
@@ -564,11 +548,10 @@ describe("GroupManagement", () => {
 
       await waitFor(() => {
         expect(screen.getByTestId("remove-selected-btn")).toBeInTheDocument();
+        expect(screen.getByTestId("remove-selected-btn")).toHaveTextContent(
+          "Remove (1)",
+        );
       });
-
-      expect(screen.getByTestId("remove-selected-btn")).toHaveTextContent(
-        "Remove (1)",
-      );
     });
 
     it("remove selected adds pending removals", async () => {
@@ -588,11 +571,10 @@ describe("GroupManagement", () => {
 
       await waitFor(() => {
         expect(screen.getByTestId("preview-changes-btn")).toBeInTheDocument();
+        expect(screen.getByTestId("preview-changes-btn")).toHaveTextContent(
+          "Preview (1)",
+        );
       });
-
-      expect(screen.getByTestId("preview-changes-btn")).toHaveTextContent(
-        "Preview (1)",
-      );
     });
 
     it("preview dialog shows pending removals", async () => {
@@ -618,11 +600,10 @@ describe("GroupManagement", () => {
 
       await waitFor(() => {
         expect(screen.getByTestId("member-change-preview")).toBeInTheDocument();
+        expect(screen.getByTestId("member-change-summary")).toHaveTextContent(
+          "1 member to remove",
+        );
       });
-
-      expect(screen.getByTestId("member-change-summary")).toHaveTextContent(
-        "1 member to remove",
-      );
     });
 
     it("apply removes members and refreshes list", async () => {
@@ -675,9 +656,8 @@ describe("GroupManagement", () => {
 
       await waitFor(() => {
         expect(screen.getByTestId("member-search-results")).toBeInTheDocument();
+        expect(screen.getByText("New User")).toBeInTheDocument();
       });
-
-      expect(screen.getByText("New User")).toBeInTheDocument();
     });
 
     it("add to group adds pending change", async () => {
@@ -701,11 +681,10 @@ describe("GroupManagement", () => {
 
       await waitFor(() => {
         expect(screen.getByTestId("preview-changes-btn")).toBeInTheDocument();
+        expect(screen.getByTestId("preview-changes-btn")).toHaveTextContent(
+          "Preview (1)",
+        );
       });
-
-      expect(screen.getByTestId("preview-changes-btn")).toHaveTextContent(
-        "Preview (1)",
-      );
     });
 
     it("select-all checkbox selects all members", async () => {
@@ -719,11 +698,10 @@ describe("GroupManagement", () => {
 
       await waitFor(() => {
         expect(screen.getByTestId("remove-selected-btn")).toBeInTheDocument();
+        expect(screen.getByTestId("remove-selected-btn")).toHaveTextContent(
+          "Remove (2)",
+        );
       });
-
-      expect(screen.getByTestId("remove-selected-btn")).toHaveTextContent(
-        "Remove (2)",
-      );
     });
   });
 

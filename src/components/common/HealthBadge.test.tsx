@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { HealthBadge } from "./HealthBadge";
 import type { AccountHealthStatus } from "@/types/health";
 
@@ -60,7 +60,7 @@ describe("HealthBadge", () => {
     expect(screen.getByTestId("health-badge")).toHaveTextContent("2 issues");
   });
 
-  it("shows tooltip on hover", () => {
+  it("shows tooltip on hover", async () => {
     render(
       <HealthBadge
         healthStatus={makeStatus({
@@ -78,13 +78,15 @@ describe("HealthBadge", () => {
 
     expect(screen.queryByTestId("health-tooltip")).not.toBeInTheDocument();
     fireEvent.mouseEnter(screen.getByTestId("health-badge"));
-    expect(screen.getByTestId("health-tooltip")).toBeInTheDocument();
-    expect(screen.getByTestId("health-flag-Inactive30Days")).toHaveTextContent(
-      "Inactive30Days",
-    );
+    await waitFor(() => {
+      expect(screen.getByTestId("health-tooltip")).toBeInTheDocument();
+      expect(screen.getByTestId("health-flag-Inactive30Days")).toHaveTextContent(
+        "Inactive30Days",
+      );
+    });
   });
 
-  it("hides tooltip on mouse leave", () => {
+  it("hides tooltip on mouse leave", async () => {
     render(
       <HealthBadge
         healthStatus={makeStatus({
@@ -101,16 +103,22 @@ describe("HealthBadge", () => {
     );
 
     fireEvent.mouseEnter(screen.getByTestId("health-badge"));
-    expect(screen.getByTestId("health-tooltip")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByTestId("health-tooltip")).toBeInTheDocument();
+    });
 
     fireEvent.mouseLeave(screen.getByTestId("health-badge"));
-    expect(screen.queryByTestId("health-tooltip")).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByTestId("health-tooltip")).not.toBeInTheDocument();
+    });
   });
 
-  it("shows 'No issues detected' in tooltip for Healthy status", () => {
+  it("shows 'No issues detected' in tooltip for Healthy status", async () => {
     render(<HealthBadge healthStatus={makeStatus()} />);
     fireEvent.mouseEnter(screen.getByTestId("health-badge"));
-    expect(screen.getByText("No issues detected")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText("No issues detected")).toBeInTheDocument();
+    });
   });
 
   it("renders Critical level badge", () => {
@@ -155,7 +163,7 @@ describe("HealthBadge", () => {
     );
   });
 
-  it("shows tooltip on focus and hides on blur", () => {
+  it("shows tooltip on focus and hides on blur", async () => {
     render(
       <HealthBadge
         healthStatus={makeStatus({
@@ -173,10 +181,14 @@ describe("HealthBadge", () => {
 
     const badge = screen.getByTestId("health-badge");
     fireEvent.focus(badge);
-    expect(screen.getByTestId("health-tooltip")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByTestId("health-tooltip")).toBeInTheDocument();
+    });
 
     fireEvent.blur(badge);
-    expect(screen.queryByTestId("health-tooltip")).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByTestId("health-tooltip")).not.toBeInTheDocument();
+    });
   });
 
   it("has correct aria-label for healthy status", () => {
@@ -222,7 +234,7 @@ describe("HealthBadge", () => {
     );
   });
 
-  it("hides tooltip when Escape is pressed", () => {
+  it("hides tooltip when Escape is pressed", async () => {
     render(
       <HealthBadge
         healthStatus={makeStatus({
@@ -236,13 +248,17 @@ describe("HealthBadge", () => {
 
     const badge = screen.getByTestId("health-badge");
     fireEvent.mouseEnter(badge);
-    expect(screen.getByTestId("health-tooltip")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByTestId("health-tooltip")).toBeInTheDocument();
+    });
 
     fireEvent.keyDown(badge, { key: "Escape" });
-    expect(screen.queryByTestId("health-tooltip")).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByTestId("health-tooltip")).not.toBeInTheDocument();
+    });
   });
 
-  it("toggles tooltip when Enter key is pressed", () => {
+  it("toggles tooltip when Enter key is pressed", async () => {
     render(
       <HealthBadge
         healthStatus={makeStatus({
@@ -258,14 +274,18 @@ describe("HealthBadge", () => {
 
     // Open with Enter
     fireEvent.keyDown(badge, { key: "Enter" });
-    expect(screen.getByTestId("health-tooltip")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByTestId("health-tooltip")).toBeInTheDocument();
+    });
 
     // Close with Enter
     fireEvent.keyDown(badge, { key: "Enter" });
-    expect(screen.queryByTestId("health-tooltip")).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByTestId("health-tooltip")).not.toBeInTheDocument();
+    });
   });
 
-  it("toggles tooltip when Space key is pressed", () => {
+  it("toggles tooltip when Space key is pressed", async () => {
     render(
       <HealthBadge
         healthStatus={makeStatus({
@@ -281,14 +301,18 @@ describe("HealthBadge", () => {
 
     // Open with Space
     fireEvent.keyDown(badge, { key: " " });
-    expect(screen.getByTestId("health-tooltip")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByTestId("health-tooltip")).toBeInTheDocument();
+    });
 
     // Close with Space
     fireEvent.keyDown(badge, { key: " " });
-    expect(screen.queryByTestId("health-tooltip")).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByTestId("health-tooltip")).not.toBeInTheDocument();
+    });
   });
 
-  it("repositions tooltip when it would overflow right edge of viewport", () => {
+  it("repositions tooltip when it would overflow right edge of viewport", async () => {
     // Mock getBoundingClientRect to simulate badge near right edge
     const mockRect = {
       left: window.innerWidth - 20,
@@ -321,10 +345,12 @@ describe("HealthBadge", () => {
     vi.spyOn(badge, "getBoundingClientRect").mockReturnValue(mockRect);
 
     fireEvent.mouseEnter(badge);
-    expect(screen.getByTestId("health-tooltip")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByTestId("health-tooltip")).toBeInTheDocument();
+    });
   });
 
-  it("repositions tooltip above badge when it would overflow bottom of viewport", () => {
+  it("repositions tooltip above badge when it would overflow bottom of viewport", async () => {
     // Mock getBoundingClientRect to simulate badge near bottom edge
     const mockRect = {
       left: 100,
@@ -357,6 +383,8 @@ describe("HealthBadge", () => {
     vi.spyOn(badge, "getBoundingClientRect").mockReturnValue(mockRect);
 
     fireEvent.mouseEnter(badge);
-    expect(screen.getByTestId("health-tooltip")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByTestId("health-tooltip")).toBeInTheDocument();
+    });
   });
 });
