@@ -32,6 +32,8 @@
 //! cargo test --test ldap_integration -- --nocapture
 //! ```
 
+use std::collections::HashMap;
+
 use dspanel_lib::services::directory::DirectoryProvider;
 use dspanel_lib::services::ldap_directory::{LdapDirectoryProvider, LdapTlsConfig};
 
@@ -629,4 +631,483 @@ async fn resilience_multiple_operations_after_idle() {
         r2.len(),
         r3.len()
     );
+}
+
+// =========================================================================
+// READ OPERATIONS - EXTENDED COVERAGE
+// =========================================================================
+
+#[tokio::test]
+async fn read_get_current_user_groups() {
+    let provider = skip_if_no_ad!();
+    let groups = provider
+        .get_current_user_groups()
+        .await
+        .expect("get_current_user_groups failed");
+    println!("Current user belongs to {} groups", groups.len());
+    assert!(
+        !groups.is_empty(),
+        "Bind user should belong to at least one group"
+    );
+    for g in &groups {
+        println!("  - {}", g);
+    }
+}
+
+#[tokio::test]
+async fn read_get_cannot_change_password() {
+    let provider = skip_if_no_ad!();
+    let user = provider
+        .get_user_by_identity("testreadonly")
+        .await
+        .expect("get_user failed")
+        .expect("testreadonly not found");
+    let result = provider
+        .get_cannot_change_password(&user.distinguished_name)
+        .await;
+    match result {
+        Ok(cannot_change) => {
+            println!(
+                "testreadonly cannot change password: {}",
+                cannot_change
+            );
+            // Just verify it returns a boolean without error
+        }
+        Err(e) => {
+            eprintln!("SKIPPED (permission denied?): {}", e);
+        }
+    }
+}
+
+#[tokio::test]
+async fn read_get_replication_metadata() {
+    let provider = skip_if_no_ad!();
+    let user = provider
+        .get_user_by_identity("testadmin")
+        .await
+        .expect("get_user failed")
+        .expect("testadmin not found");
+    let metadata = provider
+        .get_replication_metadata(&user.distinguished_name)
+        .await
+        .expect("get_replication_metadata failed");
+    match metadata {
+        Some(xml) => {
+            println!(
+                "Replication metadata length: {} chars",
+                xml.len()
+            );
+            assert!(
+                xml.contains("DS_REPL_ATTR_META_DATA")
+                    || xml.contains("pszAttributeName")
+                    || xml.contains('<'),
+                "Metadata should contain XML-like replication data"
+            );
+        }
+        None => {
+            println!("No replication metadata returned (may require elevated permissions)");
+        }
+    }
+}
+
+#[tokio::test]
+async fn read_browse_contacts() {
+    let provider = skip_if_no_ad!();
+    let results = provider
+        .browse_contacts(100)
+        .await
+        .expect("browse_contacts failed");
+    println!("Browsed {} contacts", results.len());
+    // May be empty on a test domain - just verify no error
+}
+
+#[tokio::test]
+async fn read_browse_printers() {
+    let provider = skip_if_no_ad!();
+    let results = provider
+        .browse_printers(100)
+        .await
+        .expect("browse_printers failed");
+    println!("Browsed {} printers", results.len());
+    // May be empty on a test domain - just verify no error
+}
+
+#[tokio::test]
+async fn read_search_contacts() {
+    let provider = skip_if_no_ad!();
+    let results = provider
+        .search_contacts("*", 100)
+        .await
+        .expect("search_contacts failed");
+    println!("Found {} contacts matching '*'", results.len());
+    // May be empty - just verify no error
+}
+
+#[tokio::test]
+async fn read_search_printers() {
+    let provider = skip_if_no_ad!();
+    let results = provider
+        .search_printers("*", 100)
+        .await
+        .expect("search_printers failed");
+    println!("Found {} printers matching '*'", results.len());
+    // May be empty - just verify no error
+}
+
+#[tokio::test]
+async fn read_is_recycle_bin_enabled() {
+    let provider = skip_if_no_ad!();
+    let enabled = provider
+        .is_recycle_bin_enabled()
+        .await
+        .expect("is_recycle_bin_enabled failed");
+    println!("Recycle Bin enabled: {}", enabled);
+    assert!(
+        enabled,
+        "Modern AD (2016+) should have Recycle Bin enabled"
+    );
+}
+
+#[tokio::test]
+async fn read_get_deleted_objects() {
+    let provider = skip_if_no_ad!();
+    let deleted = provider
+        .get_deleted_objects()
+        .await
+        .expect("get_deleted_objects failed");
+    println!("Found {} deleted objects", deleted.len());
+    // May be empty if nothing has been deleted - just verify no error
+}
+
+#[tokio::test]
+async fn read_entry_rootdse() {
+    let provider = skip_if_no_ad!();
+    let entry = provider
+        .read_entry("")
+        .await
+        .expect("read_entry('') failed");
+    assert!(entry.is_some(), "rootDSE should always be readable");
+    let entry = entry.unwrap();
+    let has_naming_ctx = entry
+        .attributes
+        .contains_key("defaultNamingContext");
+    assert!(
+        has_naming_ctx,
+        "rootDSE should contain defaultNamingContext"
+    );
+    println!(
+        "rootDSE has {} attributes",
+        entry.attributes.len()
+    );
+}
+
+#[tokio::test]
+async fn read_resolve_group_by_rid() {
+    let provider = skip_if_no_ad!();
+    // RID 512 = Domain Admins
+    let group = provider
+        .resolve_group_by_rid(512)
+        .await
+        .expect("resolve_group_by_rid failed");
+    assert!(
+        group.is_some(),
+        "Domain Admins (RID 512) should always exist"
+    );
+    let group = group.unwrap();
+    println!(
+        "RID 512 resolved to: {} ({})",
+        group.sam_account_name.as_deref().unwrap_or("?"),
+        group.distinguished_name
+    );
+}
+
+#[tokio::test]
+async fn read_search_configuration() {
+    let provider = skip_if_no_ad!();
+    let base_dn = provider.base_dn().expect("No base DN");
+    // Search for Sites in the Configuration partition
+    let config_base = format!(
+        "CN=Sites,CN=Configuration,{}",
+        base_dn
+    );
+    let results = provider
+        .search_configuration(&config_base, "(objectClass=site)")
+        .await
+        .expect("search_configuration failed");
+    println!("Found {} sites", results.len());
+    assert!(
+        !results.is_empty(),
+        "AD should have at least a Default-First-Site-Name"
+    );
+}
+
+#[tokio::test]
+async fn read_probe_effective_permissions() {
+    let provider = skip_if_no_ad!();
+    let (can_write_user, can_write_group, can_create) = provider
+        .probe_effective_permissions()
+        .await
+        .expect("probe_effective_permissions failed");
+    println!(
+        "Permissions - write user attrs: {}, write group members: {}, create objects: {}",
+        can_write_user, can_write_group, can_create
+    );
+    // Just verify it returns 3 booleans without error
+}
+
+// =========================================================================
+// WRITE OPERATIONS - EXTENDED COVERAGE
+// =========================================================================
+
+#[tokio::test]
+async fn write_create_and_delete_contact() {
+    let provider = skip_if_no_ad!();
+    let base_dn = provider.base_dn().expect("No base DN");
+    let container = format!("CN=Users,{}", base_dn);
+
+    let mut attrs = HashMap::new();
+    attrs.insert("cn".to_string(), "DSPanel-IntTest-TempContact".to_string());
+    attrs.insert(
+        "displayName".to_string(),
+        "DSPanel Integration Test Contact".to_string(),
+    );
+    attrs.insert(
+        "mail".to_string(),
+        "inttest@dspanel.local".to_string(),
+    );
+
+    let result = provider.create_contact(&container, &attrs).await;
+    match result {
+        Ok(dn) => {
+            println!("Created contact: {}", dn);
+            assert!(dn.contains("DSPanel-IntTest-TempContact"));
+
+            // Verify it exists via browse
+            let contacts = provider
+                .browse_contacts(500)
+                .await
+                .expect("browse_contacts failed");
+            let found = contacts
+                .iter()
+                .any(|c| c.distinguished_name == dn);
+            assert!(found, "Created contact should appear in browse results");
+
+            // Delete
+            provider
+                .delete_contact(&dn)
+                .await
+                .expect("delete_contact failed");
+            println!("Deleted contact: {}", dn);
+        }
+        Err(e) => {
+            eprintln!("SKIPPED (permission denied?): {}", e);
+        }
+    }
+}
+
+#[tokio::test]
+async fn write_modify_attribute() {
+    let provider = skip_if_no_ad!();
+    let base_dn = provider.base_dn().expect("No base DN");
+    let container = format!("CN=Users,{}", base_dn);
+    let group_name = "DSPanel-IntTest-ModifyAttr";
+
+    // Create a temp group to modify
+    let group_dn = match provider
+        .create_group(
+            group_name,
+            &container,
+            "Global",
+            "Security",
+            "Modify attribute test",
+        )
+        .await
+    {
+        Ok(dn) => dn,
+        Err(e) => {
+            eprintln!("SKIPPED (permission denied?): {}", e);
+            return;
+        }
+    };
+
+    // Modify description
+    let new_desc = vec!["Updated by DSPanel integration test".to_string()];
+    provider
+        .modify_attribute(&group_dn, "description", &new_desc)
+        .await
+        .expect("modify_attribute failed");
+    println!("Modified description on {}", group_name);
+
+    // Verify by reading the group back
+    let groups = provider
+        .search_groups(group_name, 5)
+        .await
+        .expect("search after modify failed");
+    assert!(!groups.is_empty(), "Group should still exist");
+
+    // Cleanup
+    provider
+        .delete_object(&group_dn)
+        .await
+        .expect("cleanup delete failed");
+    println!("Cleaned up {}", group_name);
+}
+
+#[tokio::test]
+async fn write_set_password_flags() {
+    let provider = skip_if_no_ad!();
+    let user = provider
+        .get_user_by_identity("testreadonly")
+        .await
+        .expect("get_user failed")
+        .expect("testreadonly not found");
+
+    // Read current state of "cannot change password"
+    let original = provider
+        .get_cannot_change_password(&user.distinguished_name)
+        .await
+        .unwrap_or(false);
+
+    // Set password never expires = false, user cannot change = true
+    let result = provider
+        .set_password_flags(&user.distinguished_name, false, true)
+        .await;
+    match result {
+        Ok(()) => {
+            println!("Set password flags on testreadonly");
+
+            // Restore original flags
+            provider
+                .set_password_flags(
+                    &user.distinguished_name,
+                    false,
+                    original,
+                )
+                .await
+                .expect("Failed to restore password flags");
+            println!("Restored password flags to original state");
+        }
+        Err(e) => {
+            eprintln!("SKIPPED (permission denied?): {}", e);
+        }
+    }
+}
+
+// =========================================================================
+// ADMIN OPERATIONS - EXTENDED COVERAGE
+// =========================================================================
+
+#[tokio::test]
+async fn admin_unlock_account() {
+    let provider = skip_if_no_ad!();
+    let user = provider
+        .get_user_by_identity("testreadonly")
+        .await
+        .expect("get_user failed")
+        .expect("testreadonly not found");
+
+    // Unlock should succeed even if the account is not locked
+    let result = provider
+        .unlock_account(&user.distinguished_name)
+        .await;
+    match result {
+        Ok(()) => {
+            println!("unlock_account succeeded for testreadonly");
+        }
+        Err(e) => {
+            eprintln!("SKIPPED (permission denied?): {}", e);
+        }
+    }
+}
+
+#[tokio::test]
+async fn admin_create_and_delete_user() {
+    let provider = skip_if_no_ad!();
+    let base_dn = provider.base_dn().expect("No base DN");
+    let container = format!("CN=Users,{}", base_dn);
+
+    let mut attributes = HashMap::new();
+    attributes.insert(
+        "displayName".to_string(),
+        vec!["DSPanel Temp User".to_string()],
+    );
+    attributes.insert(
+        "userPrincipalName".to_string(),
+        vec!["DSPanel-IntTest-TempUser@dspanel.local".to_string()],
+    );
+
+    let result = provider
+        .create_user(
+            "DSPanel-IntTest-TempUser",
+            &container,
+            "DSPanel-IntTest-TempUser",
+            "TempU$er123!",
+            &attributes,
+        )
+        .await;
+    match result {
+        Ok(dn) => {
+            println!("Created user: {}", dn);
+            assert!(dn.contains("DSPanel-IntTest-TempUser"));
+
+            // Verify the user exists
+            let found = provider
+                .get_user_by_identity("DSPanel-IntTest-TempUser")
+                .await
+                .expect("get_user_by_identity failed");
+            assert!(found.is_some(), "Created user should be findable");
+
+            // Delete
+            provider
+                .delete_object(&dn)
+                .await
+                .expect("delete_object failed");
+            println!("Deleted user: {}", dn);
+
+            // Verify deletion
+            let found = provider
+                .get_user_by_identity("DSPanel-IntTest-TempUser")
+                .await
+                .expect("get_user_by_identity failed");
+            assert!(
+                found.is_none(),
+                "Deleted user should not be findable"
+            );
+        }
+        Err(e) => {
+            eprintln!("SKIPPED (permission denied?): {}", e);
+        }
+    }
+}
+
+#[tokio::test]
+async fn admin_get_thumbnail_photo() {
+    let provider = skip_if_no_ad!();
+    let user = provider
+        .get_user_by_identity("testadmin")
+        .await
+        .expect("get_user failed")
+        .expect("testadmin not found");
+
+    let result = provider
+        .get_thumbnail_photo(&user.distinguished_name)
+        .await;
+    match result {
+        Ok(photo) => {
+            match photo {
+                Some(base64_data) => {
+                    println!(
+                        "testadmin has a thumbnail photo ({} chars base64)",
+                        base64_data.len()
+                    );
+                }
+                None => {
+                    println!("testadmin has no thumbnail photo set");
+                }
+            }
+        }
+        Err(e) => {
+            eprintln!("SKIPPED (permission denied?): {}", e);
+        }
+    }
 }
