@@ -1,0 +1,20 @@
+{
+  "pageTitle": "Sante de l'infrastructure",
+  "check": "Verifier",
+  "gc": "GC",
+  "site": "Site",
+  "autoRefresh1m": "1 min",
+  "autoRefresh5m": "5 min",
+  "autoRefresh15m": "15 min",
+  "autoRefreshOff": "Desactive",
+  "checkingDcs": "Verification des Domain Controllers...",
+  "healthCheckFailed": "Verification de sante echouee",
+  "noDcsFound": "Aucun Domain Controller trouve",
+  "noDcsDescription": "Aucun Domain Controller n'a ete decouvert dans la configuration AD.",
+  "lastChecked": "Derniere verification :",
+  "exportDc": "DC",
+  "exportOverall": "Global",
+  "exportCheckStatus": "Statut de la verification",
+  "exportMessage": "Message",
+  "exportTitle": "Rapport de sante de l'infrastructure"
+}

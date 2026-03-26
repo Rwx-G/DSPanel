@@ -1,0 +1,18 @@
+{
+  "searchPlaceholder": "Rechercher des imprimantes par nom, emplacement ou serveur...",
+  "loadingPrinters": "Chargement des imprimantes...",
+  "found_one": "{{count}} imprimante trouvee",
+  "found_other": "{{count}} imprimantes trouvees",
+  "noPrintersFound": "Aucune imprimante trouvee",
+  "failedToLoad": "Echec du chargement des imprimantes",
+  "noPrintersAvailable": "Aucune imprimante disponible.",
+  "selectPrinter": "Selectionnez une imprimante pour voir les details",
+  "deletePrinter": "Supprimer l'imprimante",
+  "deleteConfirmation": "Etes-vous sur de vouloir supprimer {{name}} ?",
+  "deleteSuccess": "Imprimante supprimee avec succes",
+  "general": "General",
+  "serverInfo": "Informations du serveur",
+  "server": "Serveur",
+  "sharePath": "Chemin de partage",
+  "driver": "Pilote"
+}

@@ -1,0 +1,22 @@
+{
+  "searchPlaceholder": "Rechercher des objets supprimes par nom...",
+  "all": "Tous",
+  "users": "Utilisateurs",
+  "computers": "Ordinateurs",
+  "groups": "Groupes",
+  "contacts": "Contacts",
+  "printers": "Imprimantes",
+  "noDeletedObjects": "Aucun objet supprime",
+  "noObjectsMatch": "Aucun objet ne correspond aux filtres actuels.",
+  "recycleBinEmpty": "La corbeille est vide.",
+  "deleted": "Supprime",
+  "originalOu": "OU d'origine",
+  "restore": "Restaurer",
+  "failedToLoad": "Echec du chargement de la corbeille",
+  "notEnabled": "Corbeille AD non activee",
+  "notEnabledDescription": "La fonctionnalite optionnelle Corbeille Active Directory n'est pas activee sur ce domaine. Contactez votre administrateur de domaine pour l'activer.",
+  "loadingRecycleBin": "Chargement de la corbeille...",
+  "restoreObject": "Restaurer \"{{name}}\"",
+  "selectTargetOu": "Selectionnez l'OU cible pour la restauration :",
+  "restoring": "Restauration..."
+}

@@ -1,0 +1,11 @@
+{
+  "skipToMain": "Aller au contenu principal",
+  "mainContent": "Contenu principal",
+  "breadcrumb": "Fil d'Ariane",
+  "scrollTabsLeft": "Defiler les onglets vers la gauche",
+  "scrollTabsRight": "Defiler les onglets vers la droite",
+  "closeTab": "Fermer {{title}}",
+  "closeOthers": "Fermer les autres",
+  "closeAll": "Tout fermer",
+  "tabOptions": "Options de l'onglet"
+}

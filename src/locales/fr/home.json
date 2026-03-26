@@ -1,0 +1,23 @@
+{
+  "dashboard": "Tableau de bord",
+  "activeDirectory": "Active Directory",
+  "currentSession": "Session en cours",
+  "authenticatedAs": "Authentifie en tant que",
+  "level": "Niveau",
+  "domainJoined": "Joint au domaine",
+  "environment": "Environnement",
+  "mfaSecurity": "Securite MFA",
+  "configured": "Configure",
+  "notConfigured": "Non configure",
+  "setupMfa": "Configurer MFA",
+  "revokeMfa": "Revoquer MFA",
+  "adGroupMemberships": "Appartenances aux groupes AD",
+  "notConnectedWarning": "Non connecte a Active Directory. Les recherches dans l'annuaire ne seront pas disponibles. Verifiez que cette machine est jointe au domaine et dispose d'un acces reseau a un Domain Controller.",
+  "generating": "Generation...",
+  "permissions": "Permissions",
+  "readOnly": "Lecture seule",
+  "helpDesk": "Help Desk",
+  "accountOperator": "Operateur de comptes",
+  "admin": "Admin",
+  "domainAdmin": "Administrateur du domaine"
+}

@@ -1,0 +1,20 @@
+{
+  "pageTitle": "Rapports de conformite",
+  "runScan": "Lancer l'analyse de conformite",
+  "reScan": "Relancer",
+  "scanningLabel": "Analyse en cours...",
+  "emptyTitle": "Rapports de conformite",
+  "emptyDescription": "Lancez une analyse de conformite pour evaluer votre Active Directory selon 9 referentiels : RGPD, HIPAA, SOX, PCI-DSS v4.0, ISO 27001, NIST 800-53, CIS v8, NIS2 et ANSSI.",
+  "globalScore": "Score de conformite global",
+  "accountsScanned": "comptes analyses",
+  "findingsLabel": "constats",
+  "checks": "Verifications",
+  "checkClear": "OK",
+  "check": "Verification",
+  "severity": "Severite",
+  "findings": "Constats",
+  "description": "Description",
+  "remediation": "Remediation",
+  "report": "Rapport",
+  "exportTitle": "Analyse de conformite - Toutes les verifications"
+}
