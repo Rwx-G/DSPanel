@@ -571,3 +571,468 @@ pub(crate) async fn get_gpo_list_inner(state: &AppState) -> Result<Vec<GpoInfo>,
     });
     Ok(result)
 }
+
+#[allow(clippy::unwrap_used)]
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::services::directory::tests::MockDirectoryProvider;
+    use crate::services::{PermissionConfig, PermissionLevel};
+    use std::collections::HashMap;
+    use std::sync::Arc;
+
+    fn make_state() -> AppState {
+        let provider = Arc::new(MockDirectoryProvider::new());
+        AppState::new_for_test(provider, PermissionConfig::default())
+    }
+
+    fn make_state_with_level(level: PermissionLevel) -> AppState {
+        let provider = Arc::new(MockDirectoryProvider::new());
+        let state = AppState::new_for_test(provider, PermissionConfig::default());
+        state.permission_service.set_level(level);
+        state
+    }
+
+    fn make_state_disconnected() -> AppState {
+        let provider = Arc::new(MockDirectoryProvider::disconnected());
+        let state = AppState::new_for_test(provider, PermissionConfig::default());
+        state.permission_service.set_level(PermissionLevel::DomainAdmin);
+        state
+    }
+
+    fn make_state_with_config_entries(entries: Vec<crate::models::DirectoryEntry>) -> AppState {
+        let provider = Arc::new(MockDirectoryProvider::new().with_configuration_entries(entries));
+        let state = AppState::new_for_test(provider, PermissionConfig::default());
+        state.permission_service.set_level(PermissionLevel::DomainAdmin);
+        state
+    }
+
+    // -----------------------------------------------------------------------
+    // get_dc_health_inner - permission checks
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_get_dc_health_requires_domain_admin() {
+        let state = make_state(); // ReadOnly by default
+        let result = get_dc_health_inner(&state).await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            AppError::PermissionDenied(msg) => {
+                assert!(msg.contains("DomainAdmin"));
+            }
+            other => panic!("Expected PermissionDenied, got: {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_dc_health_denied_for_helpdesk() {
+        let state = make_state_with_level(PermissionLevel::HelpDesk);
+        let result = get_dc_health_inner(&state).await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            AppError::PermissionDenied(_) => {}
+            other => panic!("Expected PermissionDenied, got: {:?}", other),
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // get_replication_status_inner - permission checks
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_get_replication_status_requires_domain_admin() {
+        let state = make_state();
+        let result = get_replication_status_inner(&state).await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            AppError::PermissionDenied(msg) => {
+                assert!(msg.contains("DomainAdmin"));
+            }
+            other => panic!("Expected PermissionDenied, got: {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_replication_status_succeeds_with_domain_admin() {
+        let state = make_state_with_level(PermissionLevel::DomainAdmin);
+        // Mock provider returns empty configuration entries, so the result
+        // will be an empty list (no NTDS connections found)
+        let result = get_replication_status_inner(&state).await;
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // force_replication_inner - permission checks
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_force_replication_requires_domain_admin() {
+        let state = make_state();
+        let result =
+            force_replication_inner(&state, "DC1.example.com", "DC2.example.com", "DC=example,DC=com")
+                .await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            AppError::PermissionDenied(msg) => {
+                assert!(msg.contains("DomainAdmin"));
+            }
+            other => panic!("Expected PermissionDenied, got: {:?}", other),
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // get_dns_kerberos_validation_inner - permission checks
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_get_dns_kerberos_validation_requires_domain_admin() {
+        let state = make_state();
+        let result = get_dns_kerberos_validation_inner(&state, 300).await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            AppError::PermissionDenied(msg) => {
+                assert!(msg.contains("DomainAdmin"));
+            }
+            other => panic!("Expected PermissionDenied, got: {:?}", other),
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // get_workstation_metrics_inner - permission checks
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_get_workstation_metrics_requires_helpdesk() {
+        let state = make_state(); // ReadOnly by default
+        let result = get_workstation_metrics_inner(&state, "WORKSTATION01").await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            AppError::PermissionDenied(msg) => {
+                assert!(msg.contains("HelpDesk"));
+            }
+            other => panic!("Expected PermissionDenied, got: {:?}", other),
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // get_topology_inner - permission checks
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_get_topology_requires_domain_admin() {
+        let state = make_state();
+        let result = get_topology_inner(&state).await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            AppError::PermissionDenied(msg) => {
+                assert!(msg.contains("DomainAdmin"));
+            }
+            other => panic!("Expected PermissionDenied, got: {:?}", other),
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // get_gpo_links_inner - permission checks
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_get_gpo_links_requires_domain_admin() {
+        let state = make_state();
+        let result = get_gpo_links_inner(&state, "CN=User,OU=Users,DC=example,DC=com").await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            AppError::PermissionDenied(msg) => {
+                assert!(msg.contains("DomainAdmin"));
+            }
+            other => panic!("Expected PermissionDenied, got: {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_gpo_links_succeeds_with_domain_admin() {
+        let state = make_state_with_level(PermissionLevel::DomainAdmin);
+        let result = get_gpo_links_inner(&state, "CN=User,OU=Users,DC=example,DC=com").await;
+        assert!(result.is_ok());
+        let gpo_result = result.unwrap();
+        assert_eq!(gpo_result.object_dn, "CN=User,OU=Users,DC=example,DC=com");
+    }
+
+    // -----------------------------------------------------------------------
+    // get_gpo_scope_inner - permission checks
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_get_gpo_scope_requires_domain_admin() {
+        let state = make_state();
+        let result = get_gpo_scope_inner(
+            &state,
+            "CN={GUID},CN=Policies,CN=System,DC=example,DC=com",
+        )
+        .await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            AppError::PermissionDenied(_) => {}
+            other => panic!("Expected PermissionDenied, got: {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_gpo_scope_succeeds_with_domain_admin() {
+        let state = make_state_with_level(PermissionLevel::DomainAdmin);
+        let result = get_gpo_scope_inner(
+            &state,
+            "CN={GUID},CN=Policies,CN=System,DC=example,DC=com",
+        )
+        .await;
+        assert!(result.is_ok());
+    }
+
+    // -----------------------------------------------------------------------
+    // get_gpo_list_inner - permission checks
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_get_gpo_list_requires_domain_admin() {
+        let state = make_state();
+        let result = get_gpo_list_inner(&state).await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            AppError::PermissionDenied(_) => {}
+            other => panic!("Expected PermissionDenied, got: {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_gpo_list_returns_sorted_results() {
+        let gpo_entries = vec![
+            crate::models::DirectoryEntry {
+                distinguished_name: "CN={B-GUID},CN=Policies,CN=System,DC=example,DC=com"
+                    .to_string(),
+                sam_account_name: None,
+                display_name: None,
+                object_class: Some("groupPolicyContainer".to_string()),
+                attributes: {
+                    let mut m = HashMap::new();
+                    m.insert("displayName".to_string(), vec!["Zebra Policy".to_string()]);
+                    m
+                },
+            },
+            crate::models::DirectoryEntry {
+                distinguished_name: "CN={A-GUID},CN=Policies,CN=System,DC=example,DC=com"
+                    .to_string(),
+                sam_account_name: None,
+                display_name: None,
+                object_class: Some("groupPolicyContainer".to_string()),
+                attributes: {
+                    let mut m = HashMap::new();
+                    m.insert("displayName".to_string(), vec!["Alpha Policy".to_string()]);
+                    m
+                },
+            },
+        ];
+
+        let state = make_state_with_config_entries(gpo_entries);
+        let result = get_gpo_list_inner(&state).await.unwrap();
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].display_name, "Alpha Policy");
+        assert_eq!(result[1].display_name, "Zebra Policy");
+    }
+
+    #[tokio::test]
+    async fn test_get_gpo_list_fallback_display_name_from_cn() {
+        let gpo_entries = vec![crate::models::DirectoryEntry {
+            distinguished_name: "CN={NO-NAME-GUID},CN=Policies,CN=System,DC=example,DC=com"
+                .to_string(),
+            sam_account_name: None,
+            display_name: None,
+            object_class: Some("groupPolicyContainer".to_string()),
+            attributes: HashMap::new(), // No displayName attribute
+        }];
+
+        let state = make_state_with_config_entries(gpo_entries);
+        let result = get_gpo_list_inner(&state).await.unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].display_name, "{NO-NAME-GUID}");
+    }
+
+    #[tokio::test]
+    async fn test_get_gpo_list_not_connected_returns_error() {
+        let state = make_state_disconnected();
+        let result = get_gpo_list_inner(&state).await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            AppError::Directory(msg) => {
+                assert!(msg.contains("Not connected"));
+            }
+            other => panic!("Expected Directory error, got: {:?}", other),
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // ldap_escape_dn
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_ldap_escape_dn_special_chars() {
+        assert_eq!(ldap_escape_dn("CN=test"), "CN=test");
+        assert_eq!(ldap_escape_dn("CN=te*st"), "CN=te\\2ast");
+        assert_eq!(ldap_escape_dn("CN=te(st)"), "CN=te\\28st\\29");
+        assert_eq!(ldap_escape_dn("CN=te\\st"), "CN=te\\5cst");
+    }
+
+    #[test]
+    fn test_ldap_escape_dn_null_char() {
+        assert_eq!(ldap_escape_dn("CN=te\0st"), "CN=te\\00st");
+    }
+
+    // -----------------------------------------------------------------------
+    // resolve_gpo_names_cached - cache behavior
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_resolve_gpo_names_cached_populates_cache() {
+        let state = make_state_with_level(PermissionLevel::DomainAdmin);
+        let provider = state.directory_provider.clone();
+        let base_dn = provider.base_dn().unwrap();
+
+        let names = resolve_gpo_names_cached(&state, &base_dn, &*provider).await;
+        // With empty configuration entries, we get an empty map
+        assert!(names.is_empty());
+
+        // Cache should now be populated
+        let cache = state.gpo_name_cache.lock().unwrap();
+        assert!(cache.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_resolve_gpo_names_cached_returns_cached_value() {
+        let state = make_state_with_level(PermissionLevel::DomainAdmin);
+        let provider = state.directory_provider.clone();
+        let base_dn = provider.base_dn().unwrap();
+
+        // Pre-populate the cache with known data
+        {
+            let mut cache = state.gpo_name_cache.lock().unwrap();
+            let mut names = std::collections::HashMap::new();
+            names.insert("CN=GPO1".to_string(), "Test GPO".to_string());
+            *cache = Some((std::time::Instant::now(), names));
+        }
+
+        let names = resolve_gpo_names_cached(&state, &base_dn, &*provider).await;
+        assert_eq!(names.len(), 1);
+        assert_eq!(names.get("CN=GPO1").unwrap(), "Test GPO");
+    }
+
+    // -----------------------------------------------------------------------
+    // build_ou_chain
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_build_ou_chain_extracts_ou_hierarchy() {
+        let provider = Arc::new(MockDirectoryProvider::new());
+        let base_dn = "DC=example,DC=com";
+        let object_dn = "CN=User1,OU=Engineering,OU=Departments,DC=example,DC=com";
+
+        let chain = build_ou_chain(object_dn, base_dn, &*provider).await.unwrap();
+
+        // Should include: domain root, OU=Departments, OU=Engineering
+        assert_eq!(chain.len(), 3);
+        assert_eq!(chain[0].0, "DC=example,DC=com");
+        assert_eq!(chain[1].0, "OU=Departments,DC=example,DC=com");
+        assert_eq!(chain[2].0, "OU=Engineering,OU=Departments,DC=example,DC=com");
+    }
+
+    #[tokio::test]
+    async fn test_build_ou_chain_object_at_domain_root() {
+        let provider = Arc::new(MockDirectoryProvider::new());
+        let base_dn = "DC=example,DC=com";
+        let object_dn = "CN=User1,DC=example,DC=com";
+
+        let chain = build_ou_chain(object_dn, base_dn, &*provider).await.unwrap();
+
+        // Should only include the domain root
+        assert_eq!(chain.len(), 1);
+        assert_eq!(chain[0].0, "DC=example,DC=com");
+    }
+
+    // -----------------------------------------------------------------------
+    // resolve_gpo_names (non-cached)
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_resolve_gpo_names_with_entries() {
+        let entries = vec![crate::models::DirectoryEntry {
+            distinguished_name: "CN={GPO-GUID},CN=Policies,CN=System,DC=example,DC=com"
+                .to_string(),
+            sam_account_name: None,
+            display_name: None,
+            object_class: Some("groupPolicyContainer".to_string()),
+            attributes: {
+                let mut m = HashMap::new();
+                m.insert("displayName".to_string(), vec!["My GPO".to_string()]);
+                m
+            },
+        }];
+
+        let provider = Arc::new(MockDirectoryProvider::new().with_configuration_entries(entries));
+        let names = resolve_gpo_names("DC=example,DC=com", &*provider).await;
+
+        assert_eq!(names.len(), 1);
+        assert_eq!(
+            names
+                .get("CN={GPO-GUID},CN=POLICIES,CN=SYSTEM,DC=EXAMPLE,DC=COM")
+                .unwrap(),
+            "My GPO"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_resolve_gpo_names_fallback_to_cn() {
+        let entries = vec![crate::models::DirectoryEntry {
+            distinguished_name: "CN={GPO-NO-NAME},CN=Policies,CN=System,DC=example,DC=com"
+                .to_string(),
+            sam_account_name: None,
+            display_name: None,
+            object_class: Some("groupPolicyContainer".to_string()),
+            attributes: HashMap::new(),
+        }];
+
+        let provider = Arc::new(MockDirectoryProvider::new().with_configuration_entries(entries));
+        let names = resolve_gpo_names("DC=example,DC=com", &*provider).await;
+
+        assert_eq!(names.len(), 1);
+        let name = names
+            .get("CN={GPO-NO-NAME},CN=POLICIES,CN=SYSTEM,DC=EXAMPLE,DC=COM")
+            .unwrap();
+        assert_eq!(name, "{GPO-NO-NAME}");
+    }
+
+    // -----------------------------------------------------------------------
+    // get_gpo_list_inner - WMI filter parsing
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_get_gpo_list_extracts_wmi_filter() {
+        let gpo_entries = vec![crate::models::DirectoryEntry {
+            distinguished_name: "CN={W-GUID},CN=Policies,CN=System,DC=example,DC=com".to_string(),
+            sam_account_name: None,
+            display_name: None,
+            object_class: Some("groupPolicyContainer".to_string()),
+            attributes: {
+                let mut m = HashMap::new();
+                m.insert("displayName".to_string(), vec!["WMI Policy".to_string()]);
+                m.insert(
+                    "gPCWMIFilter".to_string(),
+                    vec!["EXAMPLE.COM;{WMI-GUID};0".to_string()],
+                );
+                m
+            },
+        }];
+
+        let state = make_state_with_config_entries(gpo_entries);
+        let result = get_gpo_list_inner(&state).await.unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].wmi_filter, Some("{WMI-GUID}".to_string()));
+    }
+}

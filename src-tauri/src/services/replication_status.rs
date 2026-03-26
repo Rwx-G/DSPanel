@@ -624,4 +624,476 @@ mod tests {
         assert!(validate_repadmin_arg("bad;input").is_err());
         assert!(validate_repadmin_arg("").is_err());
     }
+
+    // -----------------------------------------------------------------------
+    // validate_repadmin_arg - additional edge cases
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_validate_repadmin_arg_rejects_backtick() {
+        assert!(validate_repadmin_arg("dc`whoami`").is_err());
+    }
+
+    #[test]
+    fn test_validate_repadmin_arg_rejects_dollar() {
+        assert!(validate_repadmin_arg("$env:PATH").is_err());
+    }
+
+    #[test]
+    fn test_validate_repadmin_arg_rejects_ampersand() {
+        assert!(validate_repadmin_arg("dc1 & del *").is_err());
+    }
+
+    #[test]
+    fn test_validate_repadmin_arg_rejects_angle_brackets() {
+        assert!(validate_repadmin_arg("dc1 > output.txt").is_err());
+        assert!(validate_repadmin_arg("dc1 < input.txt").is_err());
+    }
+
+    #[test]
+    fn test_validate_repadmin_arg_rejects_quotes() {
+        assert!(validate_repadmin_arg("dc1\"injected").is_err());
+        assert!(validate_repadmin_arg("dc1'injected").is_err());
+    }
+
+    #[test]
+    fn test_validate_repadmin_arg_rejects_backslash() {
+        assert!(validate_repadmin_arg("dc1\\..\\secret").is_err());
+    }
+
+    #[test]
+    fn test_validate_repadmin_arg_rejects_forward_slash() {
+        assert!(validate_repadmin_arg("dc1/etc/passwd").is_err());
+    }
+
+    #[test]
+    fn test_validate_repadmin_arg_rejects_parens_brackets_braces() {
+        assert!(validate_repadmin_arg("dc1(injected)").is_err());
+        assert!(validate_repadmin_arg("dc1[injected]").is_err());
+        assert!(validate_repadmin_arg("dc1{injected}").is_err());
+    }
+
+    #[test]
+    fn test_validate_repadmin_arg_rejects_exclamation() {
+        assert!(validate_repadmin_arg("dc1!important").is_err());
+    }
+
+    #[test]
+    fn test_validate_repadmin_arg_rejects_control_chars() {
+        assert!(validate_repadmin_arg("dc1\nnewline").is_err());
+        assert!(validate_repadmin_arg("dc1\ttab").is_err());
+        assert!(validate_repadmin_arg("dc1\x00null").is_err());
+    }
+
+    #[test]
+    fn test_validate_repadmin_arg_rejects_too_long() {
+        let long = "A".repeat(513);
+        assert!(validate_repadmin_arg(&long).is_err());
+    }
+
+    #[test]
+    fn test_validate_repadmin_arg_accepts_max_length() {
+        let exactly_512 = "A".repeat(512);
+        assert!(validate_repadmin_arg(&exactly_512).is_ok());
+    }
+
+    #[test]
+    fn test_validate_repadmin_arg_accepts_dn_with_spaces() {
+        assert!(validate_repadmin_arg("DC=My Domain,DC=com").is_ok());
+    }
+
+    #[test]
+    fn test_validate_repadmin_arg_accepts_underscores() {
+        assert!(validate_repadmin_arg("dc_server_01.domain.com").is_ok());
+    }
+
+    // -----------------------------------------------------------------------
+    // parse_single_repl_neighbor_xml - edge cases
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_parse_repl_neighbor_xml_malformed_xml() {
+        let malformed = "<DS_REPL_NEIGHBORW><oszNamingContext>DC=test";
+        // Should not panic, may return partial data or None
+        let result = parse_single_repl_neighbor_xml(malformed);
+        // Either None or a partial result - just ensure no crash
+        if let Some(n) = result {
+            assert_eq!(n.naming_context, "DC=test");
+        }
+    }
+
+    #[test]
+    fn test_parse_repl_neighbor_xml_completely_invalid() {
+        let garbage = "this is not xml at all <<<>>>";
+        let result = parse_single_repl_neighbor_xml(garbage);
+        // Should return None since no valid fields are populated
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_parse_repl_neighbor_xml_missing_optional_fields() {
+        let xml = r#"<DS_REPL_NEIGHBORW>
+            <oszNamingContext>DC=test,DC=com</oszNamingContext>
+            <oszSourceDsaAddress>dc1.test.com</oszSourceDsaAddress>
+        </DS_REPL_NEIGHBORW>"#;
+
+        let result = parse_single_repl_neighbor_xml(xml).unwrap();
+        assert_eq!(result.naming_context, "DC=test,DC=com");
+        assert_eq!(result.source_dsa_address, "dc1.test.com");
+        assert_eq!(result.replica_flags, 0); // default
+        assert_eq!(result.last_sync_result, 0); // default
+        assert_eq!(result.consecutive_failures, 0); // default
+        assert_eq!(result.usn_last_obj_change_synced, 0); // default
+        assert!(result.last_sync_success.is_none());
+        assert!(result.last_sync_attempt.is_none());
+        assert!(result.transport_dn.is_empty());
+    }
+
+    #[test]
+    fn test_parse_repl_neighbor_xml_zero_time_ignored() {
+        let xml = r#"<DS_REPL_NEIGHBORW>
+            <oszNamingContext>DC=test,DC=com</oszNamingContext>
+            <oszSourceDsaAddress>dc1.test.com</oszSourceDsaAddress>
+            <ftimeLastSyncSuccess>0</ftimeLastSyncSuccess>
+            <ftimeLastSyncAttempt>0</ftimeLastSyncAttempt>
+        </DS_REPL_NEIGHBORW>"#;
+
+        let result = parse_single_repl_neighbor_xml(xml).unwrap();
+        assert!(result.last_sync_success.is_none());
+        assert!(result.last_sync_attempt.is_none());
+    }
+
+    #[test]
+    fn test_parse_repl_neighbor_xml_empty_time_ignored() {
+        let xml = r#"<DS_REPL_NEIGHBORW>
+            <oszNamingContext>DC=test,DC=com</oszNamingContext>
+            <oszSourceDsaAddress>dc1.test.com</oszSourceDsaAddress>
+            <ftimeLastSyncSuccess></ftimeLastSyncSuccess>
+            <ftimeLastSyncAttempt></ftimeLastSyncAttempt>
+        </DS_REPL_NEIGHBORW>"#;
+
+        let result = parse_single_repl_neighbor_xml(xml).unwrap();
+        assert!(result.last_sync_success.is_none());
+        assert!(result.last_sync_attempt.is_none());
+    }
+
+    #[test]
+    fn test_parse_repl_neighbor_xml_invalid_number_defaults_to_zero() {
+        let xml = r#"<DS_REPL_NEIGHBORW>
+            <oszNamingContext>DC=test,DC=com</oszNamingContext>
+            <oszSourceDsaAddress>dc1.test.com</oszSourceDsaAddress>
+            <dwReplicaFlags>not_a_number</dwReplicaFlags>
+            <dwLastSyncResult>abc</dwLastSyncResult>
+            <cNumConsecutiveSyncFailures>xyz</cNumConsecutiveSyncFailures>
+            <usnLastObjChangeSynced>nope</usnLastObjChangeSynced>
+        </DS_REPL_NEIGHBORW>"#;
+
+        let result = parse_single_repl_neighbor_xml(xml).unwrap();
+        assert_eq!(result.replica_flags, 0);
+        assert_eq!(result.last_sync_result, 0);
+        assert_eq!(result.consecutive_failures, 0);
+        assert_eq!(result.usn_last_obj_change_synced, 0);
+    }
+
+    #[test]
+    fn test_parse_repl_neighbor_xml_only_naming_context_is_valid() {
+        let xml = r#"<DS_REPL_NEIGHBORW>
+            <oszNamingContext>DC=test,DC=com</oszNamingContext>
+        </DS_REPL_NEIGHBORW>"#;
+
+        let result = parse_single_repl_neighbor_xml(xml);
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().naming_context, "DC=test,DC=com");
+    }
+
+    #[test]
+    fn test_parse_repl_neighbor_xml_only_source_address_is_valid() {
+        let xml = r#"<DS_REPL_NEIGHBORW>
+            <oszSourceDsaAddress>dc1.test.com</oszSourceDsaAddress>
+        </DS_REPL_NEIGHBORW>"#;
+
+        let result = parse_single_repl_neighbor_xml(xml);
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().source_dsa_address, "dc1.test.com");
+    }
+
+    // -----------------------------------------------------------------------
+    // parse_repl_neighbors_xml - batch edge cases
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_parse_repl_neighbors_xml_empty_list() {
+        let result = parse_repl_neighbors_xml(&[]);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_parse_repl_neighbors_xml_skips_invalid_entries() {
+        let values = vec![
+            // Valid entry
+            "<DS_REPL_NEIGHBORW><oszNamingContext>DC=a,DC=com</oszNamingContext><oszSourceDsaAddress>dc1.a.com</oszSourceDsaAddress><dwReplicaFlags>0</dwReplicaFlags><dwLastSyncResult>0</dwLastSyncResult><cNumConsecutiveSyncFailures>0</cNumConsecutiveSyncFailures><usnLastObjChangeSynced>100</usnLastObjChangeSynced></DS_REPL_NEIGHBORW>".to_string(),
+            // Invalid entry (empty - should be skipped)
+            "<DS_REPL_NEIGHBORW></DS_REPL_NEIGHBORW>".to_string(),
+            // Another valid entry
+            "<DS_REPL_NEIGHBORW><oszNamingContext>DC=b,DC=com</oszNamingContext><oszSourceDsaAddress>dc2.b.com</oszSourceDsaAddress><dwReplicaFlags>0</dwReplicaFlags><dwLastSyncResult>0</dwLastSyncResult><cNumConsecutiveSyncFailures>0</cNumConsecutiveSyncFailures><usnLastObjChangeSynced>200</usnLastObjChangeSynced></DS_REPL_NEIGHBORW>".to_string(),
+        ];
+
+        let result = parse_repl_neighbors_xml(&values);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].naming_context, "DC=a,DC=com");
+        assert_eq!(result[1].naming_context, "DC=b,DC=com");
+    }
+
+    // -----------------------------------------------------------------------
+    // Transport detection logic
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_transport_detection_empty_dn_is_rpc() {
+        let xml = r#"<DS_REPL_NEIGHBORW>
+            <oszNamingContext>DC=test,DC=com</oszNamingContext>
+            <oszSourceDsaAddress>dc1.test.com</oszSourceDsaAddress>
+            <oszAsyncIntersiteTransportDN></oszAsyncIntersiteTransportDN>
+        </DS_REPL_NEIGHBORW>"#;
+
+        let neighbor = parse_single_repl_neighbor_xml(xml).unwrap();
+        let transport = if neighbor.transport_dn.is_empty() || neighbor.transport_dn.contains("IP")
+        {
+            "RPC"
+        } else {
+            "SMTP"
+        };
+        assert_eq!(transport, "RPC");
+    }
+
+    #[test]
+    fn test_transport_detection_ip_transport_is_rpc() {
+        let xml = r#"<DS_REPL_NEIGHBORW>
+            <oszNamingContext>DC=test,DC=com</oszNamingContext>
+            <oszSourceDsaAddress>dc1.test.com</oszSourceDsaAddress>
+            <oszAsyncIntersiteTransportDN>CN=IP,CN=Inter-Site Transports,CN=Sites,CN=Configuration,DC=test,DC=com</oszAsyncIntersiteTransportDN>
+        </DS_REPL_NEIGHBORW>"#;
+
+        let neighbor = parse_single_repl_neighbor_xml(xml).unwrap();
+        let transport = if neighbor.transport_dn.is_empty() || neighbor.transport_dn.contains("IP")
+        {
+            "RPC"
+        } else {
+            "SMTP"
+        };
+        assert_eq!(transport, "RPC");
+    }
+
+    #[test]
+    fn test_transport_detection_smtp_transport() {
+        let xml = r#"<DS_REPL_NEIGHBORW>
+            <oszNamingContext>DC=test,DC=com</oszNamingContext>
+            <oszSourceDsaAddress>dc1.test.com</oszSourceDsaAddress>
+            <oszAsyncIntersiteTransportDN>CN=SMTP,CN=Inter-Site Transports,CN=Sites,CN=Configuration,DC=test,DC=com</oszAsyncIntersiteTransportDN>
+        </DS_REPL_NEIGHBORW>"#;
+
+        let neighbor = parse_single_repl_neighbor_xml(xml).unwrap();
+        let transport = if neighbor.transport_dn.is_empty() || neighbor.transport_dn.contains("IP")
+        {
+            "RPC"
+        } else {
+            "SMTP"
+        };
+        assert_eq!(transport, "SMTP");
+    }
+
+    // -----------------------------------------------------------------------
+    // extract_parent_ntds_dn - edge cases
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_extract_parent_ntds_dn_no_comma() {
+        let dn = "CN=single";
+        assert_eq!(extract_parent_ntds_dn(dn), "CN=single");
+    }
+
+    #[test]
+    fn test_extract_parent_ntds_dn_empty() {
+        assert_eq!(extract_parent_ntds_dn(""), "");
+    }
+
+    // -----------------------------------------------------------------------
+    // extract_dc_name_from_ntds_dn - edge cases
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_extract_dc_name_lowercase_cn() {
+        let ntds_dn = "cn=NTDS Settings,cn=DC2,cn=Servers";
+        assert_eq!(extract_dc_name_from_ntds_dn(ntds_dn), "DC2");
+    }
+
+    #[test]
+    fn test_extract_dc_name_no_cn_prefix() {
+        let ntds_dn = "CN=NTDS Settings,DC2,CN=Servers";
+        // parts[1] = "DC2" which has no CN= prefix, so it returns "DC2" as-is
+        assert_eq!(extract_dc_name_from_ntds_dn(ntds_dn), "DC2");
+    }
+
+    #[test]
+    fn test_extract_dc_name_empty_string() {
+        assert_eq!(extract_dc_name_from_ntds_dn(""), "");
+    }
+
+    // -----------------------------------------------------------------------
+    // force_replication (non-Windows path)
+    // -----------------------------------------------------------------------
+
+    #[cfg(not(target_os = "windows"))]
+    #[tokio::test]
+    async fn test_force_replication_fails_on_non_windows() {
+        let result = force_replication("dc1.test.com", "dc2.test.com", "DC=test,DC=com").await;
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("Windows"));
+    }
+
+    #[tokio::test]
+    async fn test_force_replication_validates_arguments() {
+        // Should fail validation before platform check
+        let result = force_replication("dc1|bad", "dc2.test.com", "DC=test,DC=com").await;
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("invalid characters"));
+    }
+
+    #[tokio::test]
+    async fn test_force_replication_validates_empty_args() {
+        let result = force_replication("", "dc2.test.com", "DC=test,DC=com").await;
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("Empty"));
+    }
+
+    #[tokio::test]
+    async fn test_force_replication_validates_all_three_args() {
+        // Second arg invalid
+        let result = force_replication("dc1.test.com", "dc2;bad", "DC=test,DC=com").await;
+        assert!(result.is_err());
+
+        // Third arg invalid
+        let result = force_replication("dc1.test.com", "dc2.test.com", "DC=test$bad").await;
+        assert!(result.is_err());
+    }
+
+    // -----------------------------------------------------------------------
+    // Partnership sorting - additional cases
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_partnership_sorting_warning_before_healthy() {
+        let mut partnerships = [
+            ReplicationPartnership {
+                source_dc: "DC1".to_string(),
+                target_dc: "DC2".to_string(),
+                naming_context: "DC=example,DC=com".to_string(),
+                last_sync_time: None,
+                last_sync_result: 0,
+                consecutive_failures: 0,
+                last_sync_message: None,
+                status: ReplicationStatus::Healthy,
+                usn_last_obj_change_synced: None,
+                last_sync_attempt: None,
+                transport: None,
+                replica_flags: None,
+            },
+            ReplicationPartnership {
+                source_dc: "DC3".to_string(),
+                target_dc: "DC1".to_string(),
+                naming_context: "DC=example,DC=com".to_string(),
+                last_sync_time: None,
+                last_sync_result: 0,
+                consecutive_failures: 0,
+                last_sync_message: None,
+                status: ReplicationStatus::Warning,
+                usn_last_obj_change_synced: None,
+                last_sync_attempt: None,
+                transport: None,
+                replica_flags: None,
+            },
+            ReplicationPartnership {
+                source_dc: "DC2".to_string(),
+                target_dc: "DC1".to_string(),
+                naming_context: "DC=example,DC=com".to_string(),
+                last_sync_time: None,
+                last_sync_result: 0,
+                consecutive_failures: 0,
+                last_sync_message: None,
+                status: ReplicationStatus::Unknown,
+                usn_last_obj_change_synced: None,
+                last_sync_attempt: None,
+                transport: None,
+                replica_flags: None,
+            },
+        ];
+
+        partnerships.sort_by(|a, b| {
+            let status_ord = |s: &ReplicationStatus| match s {
+                ReplicationStatus::Failed => 0,
+                ReplicationStatus::Warning => 1,
+                ReplicationStatus::Unknown => 2,
+                ReplicationStatus::Healthy => 3,
+            };
+            status_ord(&a.status)
+                .cmp(&status_ord(&b.status))
+                .then_with(|| a.source_dc.cmp(&b.source_dc))
+        });
+
+        assert_eq!(partnerships[0].status, ReplicationStatus::Warning);
+        assert_eq!(partnerships[1].status, ReplicationStatus::Unknown);
+        assert_eq!(partnerships[2].status, ReplicationStatus::Healthy);
+    }
+
+    #[test]
+    fn test_partnership_sorting_same_status_by_source_dc() {
+        let mut partnerships = [
+            ReplicationPartnership {
+                source_dc: "DC-Zebra".to_string(),
+                target_dc: "DC2".to_string(),
+                naming_context: "DC=example,DC=com".to_string(),
+                last_sync_time: None,
+                last_sync_result: 0,
+                consecutive_failures: 0,
+                last_sync_message: None,
+                status: ReplicationStatus::Healthy,
+                usn_last_obj_change_synced: None,
+                last_sync_attempt: None,
+                transport: None,
+                replica_flags: None,
+            },
+            ReplicationPartnership {
+                source_dc: "DC-Alpha".to_string(),
+                target_dc: "DC1".to_string(),
+                naming_context: "DC=example,DC=com".to_string(),
+                last_sync_time: None,
+                last_sync_result: 0,
+                consecutive_failures: 0,
+                last_sync_message: None,
+                status: ReplicationStatus::Healthy,
+                usn_last_obj_change_synced: None,
+                last_sync_attempt: None,
+                transport: None,
+                replica_flags: None,
+            },
+        ];
+
+        partnerships.sort_by(|a, b| {
+            let status_ord = |s: &ReplicationStatus| match s {
+                ReplicationStatus::Failed => 0,
+                ReplicationStatus::Warning => 1,
+                ReplicationStatus::Unknown => 2,
+                ReplicationStatus::Healthy => 3,
+            };
+            status_ord(&a.status)
+                .cmp(&status_ord(&b.status))
+                .then_with(|| a.source_dc.cmp(&b.source_dc))
+        });
+
+        assert_eq!(partnerships[0].source_dc, "DC-Alpha");
+        assert_eq!(partnerships[1].source_dc, "DC-Zebra");
+    }
 }

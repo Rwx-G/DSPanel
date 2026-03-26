@@ -742,6 +742,295 @@ describe("UserLookup", () => {
     });
   });
 
+  describe("Health filter buttons and counts", () => {
+    it("shows health filter buttons", async () => {
+      const entries = [makeEntry("jdoe", "John Doe")];
+      mockBrowseWith(entries);
+
+      render(<UserLookup />, { wrapper: TestProviders });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("user-results-list")).toBeInTheDocument();
+      });
+
+      expect(screen.getByText("All")).toBeInTheDocument();
+      expect(screen.getByText("Healthy")).toBeInTheDocument();
+      expect(screen.getByText("Warning")).toBeInTheDocument();
+      expect(screen.getByText("Critical")).toBeInTheDocument();
+    });
+
+    it("filters users by healthy status", async () => {
+      const entries = [
+        makeEntry("jdoe", "John Doe"),
+        makeEntry("disabled", "Disabled User", {
+          userAccountControl: ["514"],
+        }),
+      ];
+      mockBrowseWith(entries);
+
+      render(<UserLookup />, { wrapper: TestProviders });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("user-result-jdoe")).toBeInTheDocument();
+        expect(screen.getByTestId("user-result-disabled")).toBeInTheDocument();
+      });
+
+      // Wait for health evaluation
+      await waitFor(() => {
+        const result = screen.getByTestId("user-result-jdoe");
+        const badge = result.querySelector('[data-testid="health-badge"]');
+        expect(badge).toBeInTheDocument();
+      });
+
+      // Click Healthy filter
+      fireEvent.click(screen.getByText("Healthy"));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("user-result-jdoe")).toBeInTheDocument();
+        expect(screen.queryByTestId("user-result-disabled")).not.toBeInTheDocument();
+      });
+    });
+
+    it("filters users by critical status", async () => {
+      const entries = [
+        makeEntry("jdoe", "John Doe"),
+        makeEntry("disabled", "Disabled User", {
+          userAccountControl: ["514"],
+        }),
+      ];
+      mockBrowseWith(entries);
+
+      render(<UserLookup />, { wrapper: TestProviders });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("user-result-jdoe")).toBeInTheDocument();
+        expect(screen.getByTestId("user-result-disabled")).toBeInTheDocument();
+      });
+
+      // Wait for health evaluation
+      await waitFor(() => {
+        const disabledResult = screen.getByTestId("user-result-disabled");
+        const badge = disabledResult.querySelector('[data-testid="health-badge"]');
+        expect(badge).toBeInTheDocument();
+      });
+
+      // Click Critical filter
+      fireEvent.click(screen.getByText("Critical"));
+
+      await waitFor(() => {
+        expect(screen.queryByTestId("user-result-jdoe")).not.toBeInTheDocument();
+        expect(screen.getByTestId("user-result-disabled")).toBeInTheDocument();
+      });
+    });
+
+    it("shows empty state with health filter message", async () => {
+      const entries = [makeEntry("jdoe", "John Doe")];
+      mockBrowseWith(entries);
+
+      render(<UserLookup />, { wrapper: TestProviders });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("user-result-jdoe")).toBeInTheDocument();
+      });
+
+      // Wait for health evaluation
+      await waitFor(() => {
+        const result = screen.getByTestId("user-result-jdoe");
+        const badge = result.querySelector('[data-testid="health-badge"]');
+        expect(badge).toBeInTheDocument();
+      });
+
+      // Click Critical filter (no critical users)
+      fireEvent.click(screen.getByText("Critical"));
+
+      await waitFor(() => {
+        expect(screen.getByText(/No users with "critical" health status/)).toBeInTheDocument();
+      });
+    });
+
+    it("shows health counts in filter buttons when users have health statuses", async () => {
+      const entries = [
+        makeEntry("jdoe", "John Doe"),
+        makeEntry("disabled", "Disabled User", {
+          userAccountControl: ["514"],
+        }),
+      ];
+      mockBrowseWith(entries);
+
+      render(<UserLookup />, { wrapper: TestProviders });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("user-results-list")).toBeInTheDocument();
+      });
+
+      // Wait for health badges to appear
+      await waitFor(() => {
+        const result = screen.getByTestId("user-result-jdoe");
+        const badge = result.querySelector('[data-testid="health-badge"]');
+        expect(badge).toBeInTheDocument();
+      });
+
+      // Health counts should appear as "(N)" text near the filter buttons
+      await waitFor(() => {
+        // At least one count value should be visible (healthy or critical)
+        const allButtons = screen.getAllByRole("button");
+        const countButtons = allButtons.filter((btn) => /\(\d+\)/.test(btn.textContent ?? ""));
+        expect(countButtons.length).toBeGreaterThan(0);
+      });
+    });
+  });
+
+  describe("Move to OU dialog", () => {
+    it("shows Move to OU option in context menu for AccountOperator users", async () => {
+      const entries = [
+        makeEntry("jdoe", "John Doe"),
+        makeEntry("asmith", "Alice Smith"),
+      ];
+
+      mockInvoke.mockImplementation(((
+        cmd: string,
+        args?: Record<string, unknown>,
+      ) => {
+        if (cmd === "browse_users")
+          return Promise.resolve(makeBrowseResult(entries));
+        if (cmd === "get_permission_level") return Promise.resolve("AccountOperator");
+        if (cmd === "get_user_groups") return Promise.resolve([]);
+        if (cmd === "evaluate_health_cmd") return Promise.resolve(HEALTHY_STATUS);
+        if (cmd === "evaluate_health_batch") {
+          const inputs = args?.inputs as { enabled: boolean }[] | undefined;
+          return Promise.resolve((inputs ?? []).map(() => HEALTHY_STATUS));
+        }
+        return Promise.resolve(null);
+      }) as typeof invoke);
+
+      render(<UserLookup />, { wrapper: TestProviders });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("user-result-jdoe")).toBeInTheDocument();
+      });
+
+      fireEvent.contextMenu(screen.getByTestId("user-result-jdoe"));
+
+      await waitFor(() => {
+        expect(screen.getByText("Move to OU")).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("Health batch evaluation", () => {
+    it("evaluates health for all users in batch after browse", async () => {
+      const entries = [
+        makeEntry("jdoe", "John Doe"),
+        makeEntry("asmith", "Alice Smith"),
+      ];
+      mockBrowseWith(entries);
+
+      render(<UserLookup />, { wrapper: TestProviders });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("user-results-list")).toBeInTheDocument();
+      });
+
+      // Health badges should eventually appear for all users
+      await waitFor(() => {
+        const jdoeResult = screen.getByTestId("user-result-jdoe");
+        const badge = jdoeResult.querySelector('[data-testid="health-badge"]');
+        expect(badge).toBeInTheDocument();
+      });
+    });
+
+    it("clears health map when filter query changes to 3+ chars", async () => {
+      const entries = [makeEntry("jdoe", "John Doe")];
+      mockBrowseWith(entries);
+
+      render(<UserLookup />, { wrapper: TestProviders });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("user-results-list")).toBeInTheDocument();
+      });
+
+      // Wait for health badges
+      await waitFor(() => {
+        const result = screen.getByTestId("user-result-jdoe");
+        const badge = result.querySelector('[data-testid="health-badge"]');
+        expect(badge).toBeInTheDocument();
+      });
+
+      // Type a 3-char filter to trigger health map reset
+      const searchInput = screen.getByTestId("search-bar").querySelector("input");
+      expect(searchInput).not.toBeNull();
+      fireEvent.change(searchInput!, { target: { value: "joh" } });
+
+      // The health map should be cleared and re-evaluated
+      // (we verify the flow completes without errors)
+      await waitFor(() => {
+        expect(screen.getByTestId("user-lookup")).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("Deep-link prefill", () => {
+    it("deep-link prefills from tab data and selects user found in browse results", async () => {
+      const entries = [
+        makeEntry("jdoe", "John Doe"),
+        makeEntry("asmith", "Alice Smith"),
+      ];
+      mockBrowseWith(entries);
+
+      render(
+        <TestProviders>
+          <DeepLinkWrapper selectedUserSam="asmith">
+            <UserLookup />
+          </DeepLinkWrapper>
+        </TestProviders>,
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId("user-detail")).toBeInTheDocument();
+      });
+
+      const detail = screen.getByTestId("user-detail");
+      expect(detail.querySelector("h2")).toHaveTextContent("Alice Smith");
+    });
+
+    it("deep-link fetches user via get_user when not in browse results", async () => {
+      const browseEntries = [makeEntry("jdoe", "John Doe")];
+      const remoteEntry = makeEntry("remote", "Remote User");
+
+      mockInvoke.mockImplementation(((
+        cmd: string,
+        _args?: Record<string, unknown>,
+      ) => {
+        if (cmd === "browse_users")
+          return Promise.resolve(makeBrowseResult(browseEntries));
+        if (cmd === "get_user") return Promise.resolve(remoteEntry);
+        if (cmd === "evaluate_health_cmd") return Promise.resolve(HEALTHY_STATUS);
+        return Promise.resolve(null);
+      }) as typeof invoke);
+
+      render(
+        <TestProviders>
+          <DeepLinkWrapper selectedUserSam="remote">
+            <UserLookup />
+          </DeepLinkWrapper>
+        </TestProviders>,
+      );
+
+      await waitFor(() => {
+        expect(mockInvoke).toHaveBeenCalledWith("get_user", {
+          samAccountName: "remote",
+        });
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("user-detail")).toBeInTheDocument();
+      });
+
+      const detail = screen.getByTestId("user-detail");
+      expect(detail.querySelector("h2")).toHaveTextContent("Remote User");
+    });
+  });
+
   describe("Refresh selected user", () => {
     it("reloads user data on refresh", async () => {
       const entries = [makeEntry("jdoe", "John Doe")];

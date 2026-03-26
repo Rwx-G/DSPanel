@@ -1,8 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { type ReactNode } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 import { UserComparison } from "./UserComparison";
-import { NavigationProvider } from "@/contexts/NavigationContext";
+import {
+  NavigationProvider,
+  useNavigation,
+} from "@/contexts/NavigationContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import { DialogProvider } from "@/contexts/DialogContext";
 import type { DirectoryEntry } from "@/types/directory";
@@ -746,6 +749,144 @@ describe("UserComparison", () => {
         "add_user_to_group",
         expect.any(Object),
       );
+    });
+  });
+
+  describe("Deep-link prefill", () => {
+    function ComparisonDeepLinkWrapper({
+      children,
+      samA,
+      samB,
+    }: {
+      children: ReactNode;
+      samA: string;
+      samB: string;
+    }) {
+      const { openTab } = useNavigation();
+      const opened = useRef(false);
+
+      useEffect(() => {
+        if (!opened.current) {
+          opened.current = true;
+          openTab("User Comparison", "user-comparison", "compare", {
+            compareSamA: samA,
+            compareSamB: samB,
+          });
+        }
+      }, [openTab, samA, samB]);
+
+      return <>{children}</>;
+    }
+
+    it("auto-loads users and compares when deep-link data is provided", async () => {
+      const userA = makeEntry("jdoe", "John Doe", [
+        "CN=Domain Users,DC=example,DC=com",
+      ]);
+      const userB = makeEntry("asmith", "Alice Smith", [
+        "CN=Domain Users,DC=example,DC=com",
+      ]);
+
+      mockInvoke.mockImplementation(async (cmd: string, args?: unknown) => {
+        if (cmd === "search_users") {
+          const a = args as { query: string };
+          if (a.query === "jdoe") return [userA];
+          if (a.query === "asmith") return [userB];
+          return [];
+        }
+        if (cmd === "get_user") {
+          const a = args as { samAccountName: string };
+          if (a.samAccountName === "jdoe") return userA;
+          if (a.samAccountName === "asmith") return userB;
+          return null;
+        }
+        if (cmd === "compare_users") return MOCK_COMPARISON;
+        if (cmd === "analyze_ntfs")
+          return {
+            paths: [],
+            conflicts: [],
+            totalAces: 0,
+            totalPathsScanned: 0,
+            totalErrors: 0,
+          };
+        return null;
+      });
+
+      render(
+        <TestProviders>
+          <ComparisonDeepLinkWrapper samA="jdoe" samB="asmith">
+            <UserComparison />
+          </ComparisonDeepLinkWrapper>
+        </TestProviders>,
+      );
+
+      // The prefill should trigger a comparison
+      await waitFor(() => {
+        expect(mockInvoke).toHaveBeenCalledWith("search_users", {
+          query: "jdoe",
+        });
+        expect(mockInvoke).toHaveBeenCalledWith("search_users", {
+          query: "asmith",
+        });
+      });
+    });
+  });
+
+  describe("UNC permissions section", () => {
+    it("renders UncPermissionsAudit component inside the section", async () => {
+      await renderWithComparison();
+
+      expect(screen.getByTestId("unc-permissions-section")).toBeInTheDocument();
+      expect(
+        screen.getByText("UNC Path Permissions Audit"),
+      ).toBeInTheDocument();
+    });
+
+    it("info popup shows detailed description text", async () => {
+      await renderWithComparison();
+
+      fireEvent.click(screen.getByTestId("unc-info-button"));
+
+      await waitFor(() => {
+        const popup = screen.getByTestId("unc-info-popup");
+        expect(popup).toBeInTheDocument();
+        expect(popup).toHaveTextContent("Permissions Cross-Reference");
+        expect(popup).toHaveTextContent("Enter a UNC path");
+      });
+    });
+
+    it("info popup closes on second click", async () => {
+      await renderWithComparison();
+
+      fireEvent.click(screen.getByTestId("unc-info-button"));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("unc-info-popup")).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByTestId("unc-info-button"));
+
+      await waitFor(() => {
+        expect(screen.queryByTestId("unc-info-popup")).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("Export functionality", () => {
+    it("renders export toolbar in comparison results", async () => {
+      await renderWithComparison();
+
+      expect(screen.getByTestId("export-toolbar")).toBeInTheDocument();
+    });
+
+    it("shows export menu with format options", async () => {
+      await renderWithComparison();
+
+      const exportBtn = screen.getByTestId("export-button");
+      fireEvent.click(exportBtn);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("export-menu")).toBeInTheDocument();
+      });
     });
   });
 
