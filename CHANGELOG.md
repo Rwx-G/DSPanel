@@ -19,6 +19,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- i18n infrastructure with i18next and react-i18next (namespace-based)
+- English translation files for all 32 pages, 64 components, and 9 dialogs (36 namespace files)
+- Language selector in Settings > Appearance (English, French, German, Italian, Spanish)
+- Locale-aware date, number, and percentage formatting via `Intl` APIs
+- Runtime language switching with persistence to AppSettings
+- Developer documentation for localization (`docs/architecture/localization.md`)
 - Risk score weight configuration UI in Settings > Security
 - Attack detection threshold and exclusion list configuration in Settings > Security
 - Click-to-detail expandable panels on topology DC nodes
