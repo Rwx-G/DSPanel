@@ -9,6 +9,7 @@
   <img src="https://img.shields.io/badge/Tauri-v2-blue.svg" alt="Tauri">
   <img src="https://img.shields.io/badge/Platform-Windows%20|%20macOS%20|%20Linux-0078D6.svg" alt="Platform">
   <img src="https://img.shields.io/badge/Status-v0.12.0-brightgreen.svg" alt="Status">
+  <img src="https://img.shields.io/badge/Coverage-87%25_Rust_|_88%25_TS-brightgreen.svg" alt="Coverage">
 </p>
 
 ---
@@ -131,38 +132,70 @@ pnpm tauri build
 pnpm tauri dev
 ```
 
-### Integration Tests (Real AD)
+### Testing
 
-Integration tests run against a real Active Directory domain controller. They are
-skipped by default and gated by environment variables.
+#### Unit tests
+
+```bash
+# Frontend (1881 tests, 88% coverage)
+pnpm test
+
+# Rust (1520 tests, 87% coverage)
+cargo test --manifest-path src-tauri/Cargo.toml --lib
+```
+
+#### Coverage reports
+
+Coverage is generated automatically by CI on every PR (GitHub Actions Summary +
+downloadable LCOV artifacts). To generate locally:
+
+```bash
+# Frontend
+pnpm exec vitest run --coverage
+
+# Rust (requires cargo-llvm-cov)
+cargo llvm-cov --manifest-path src-tauri/Cargo.toml --lib
+```
+
+#### Integration tests (Real AD - not in CI)
+
+Integration tests run against a real Active Directory domain with replication
+(2 DCs). They are **not part of CI** - they require a lab environment with
+network access to domain controllers. All 45 tests are validated manually
+before each release.
 
 **Lab setup:**
 
-1. Windows Server 2022 VM (Hyper-V, Internal switch, 2-4 GB RAM)
-2. Promote to DC, then populate with [BadBlood](https://github.com/davidprowe/BadBlood)
-3. Create three test accounts: `TestReadOnly` (standard user), `TestOperator`
+1. 2x Windows Server 2022 VMs (Hyper-V, Internal switch)
+2. Promote both to DCs in the same domain with AD replication
+3. Populate with [BadBlood](https://github.com/davidprowe/BadBlood) for realistic data
+4. Create three test accounts: `TestReadOnly` (standard user), `TestOperator`
    (Account Operators), `TestAdmin` (Domain Admins + Enterprise Admins)
+
+**Test coverage (45 tests):**
+
+| Category | Tests | Permission | Operations |
+| -------- | ----- | ---------- | ---------- |
+| Read | 27 | ReadOnly | Search, browse, schema, OU tree, nested groups, replication metadata, contacts, printers, recycle bin, rootDSE, RID resolution, configuration, permissions probe, topology, DC health |
+| Write | 7 | AccountOperator | Create/delete groups, add/remove members, move objects, modify attributes, update managedBy, set password flags, create/delete contacts |
+| Admin | 6 | DomainAdmin | Password reset, unlock, disable/enable accounts, create/delete users, thumbnail photos |
+| Resilience | 1 | ReadOnly | Connection pool stability after idle |
+| DC Health | 4 | DomainAdmin | Single DC check, multi-DC check, replication partnerships, topology |
 
 **Running:**
 
 ```bash
-# Read-only tests (15 tests)
-export DSPANEL_LDAP_SERVER=172.31.72.165
-export DSPANEL_LDAP_BIND_DN="CN=TestReadOnly,CN=Users,DC=dspanel,DC=local"
-export DSPANEL_LDAP_BIND_PASSWORD="P@ssw0rd2026!"
-cargo test --test ldap_integration -- --nocapture read_
+export DSPANEL_LDAP_SERVER=<dc1-ip>
+export DSPANEL_LDAP_BIND_DN="CN=TestAdmin,CN=Users,DC=example,DC=local"
+export DSPANEL_LDAP_BIND_PASSWORD="<password>"
 
-# Write tests (4 tests - requires Account Operator)
-export DSPANEL_LDAP_BIND_DN="CN=TestOperator,CN=Users,DC=dspanel,DC=local"
-cargo test --test ldap_integration -- --nocapture write_
-
-# Admin tests (2 tests - requires Domain Admin)
-export DSPANEL_LDAP_BIND_DN="CN=TestAdmin,CN=Users,DC=dspanel,DC=local"
-cargo test --test ldap_integration -- --nocapture admin_
-
-# All tests (22 tests - use admin account)
-export DSPANEL_LDAP_BIND_DN="CN=TestAdmin,CN=Users,DC=dspanel,DC=local"
+# All tests
 cargo test --test ldap_integration -- --nocapture
+
+# By permission level
+cargo test --test ldap_integration -- --nocapture read_
+cargo test --test ldap_integration -- --nocapture write_
+cargo test --test ldap_integration -- --nocapture admin_
 ```
 
 ## Configuration

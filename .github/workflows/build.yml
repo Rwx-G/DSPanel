@@ -115,3 +115,87 @@ jobs:
             src-tauri/target/release/bundle/**/*.AppImage
             src-tauri/target/release/bundle/**/*.deb
           retention-days: 30
+
+  coverage:
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/pnpm/store
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: ${{ runner.os }}-pnpm-
+
+      - name: Cache cargo registry and build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src-tauri/target
+          key: ${{ runner.os }}-cargo-cov-${{ hashFiles('src-tauri/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-cov-
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libssl-dev libayatana-appindicator3-dev librsvg2-dev libkrb5-dev clang libclang-dev
+
+      - name: Install frontend dependencies
+        run: pnpm install
+
+      - name: Rust coverage (unit tests)
+        working-directory: src-tauri
+        run: |
+          cargo llvm-cov --lib --lcov --output-path ../coverage/rust-lcov.info
+          cargo llvm-cov --lib --json --output-path ../coverage/rust-coverage.json
+          echo "## Rust Coverage (unit tests)" >> $GITHUB_STEP_SUMMARY
+          cargo llvm-cov --lib 2>&1 | grep "^TOTAL" | awk '{print "| Lines | " $10 " | " $8 " missed |"}' >> $GITHUB_STEP_SUMMARY
+
+      - name: Frontend coverage
+        run: |
+          pnpm exec vitest run --coverage --coverage.reporter=json-summary --coverage.reporter=lcov --coverage.reportsDirectory=coverage/frontend
+          echo "## Frontend Coverage" >> $GITHUB_STEP_SUMMARY
+          node -e "
+            const r = require('./coverage/frontend/coverage-summary.json');
+            const t = r.total;
+            console.log('| Metric | Coverage |');
+            console.log('|--------|----------|');
+            console.log('| Statements | ' + t.statements.pct + '% |');
+            console.log('| Branches | ' + t.branches.pct + '% |');
+            console.log('| Functions | ' + t.functions.pct + '% |');
+            console.log('| Lines | ' + t.lines.pct + '% |');
+          " >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload coverage reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reports
+          path: |
+            coverage/rust-lcov.info
+            coverage/rust-coverage.json
+            coverage/frontend/lcov.info
+            coverage/frontend/coverage-summary.json
+          retention-days: 30

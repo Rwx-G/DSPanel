@@ -27,6 +27,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Snapshot history export (CSV/Excel/PDF/HTML) via ExportToolbar
 - Replication status enriched with msDS-ReplAllInboundNeighbors data (USN, transport, replica flags)
 
+### Changed
+
+- CI now generates coverage reports (Rust + Frontend) with GitHub Actions Summary and LCOV artifacts
+- Test suite expanded from 2922 to 3446 tests (+524): 1881 frontend, 1520 Rust unit, 45 AD integration
+- Coverage: 87% Rust lines, 88% frontend lines (up from 76% and 82%)
+- Integration tests expanded to 45 scenarios against real AD with 2-DC replication (validated before release, not in CI)
+
 ### Fixed
 
 - Add missing `validate_search_input` to `search_computers_inner`
