@@ -83,7 +83,7 @@ async function waitForEditorReady() {
   await waitFor(
     () => {
       // Editor is ready when the loading spinner is gone
-      expect(screen.queryByText("Loading presets...")).toBeNull();
+      expect(screen.queryByText("Loading...")).toBeNull();
       // And the preset management testid is present
       expect(screen.getByTestId("preset-management")).toBeDefined();
     },
@@ -407,6 +407,11 @@ describe("PresetManagement", () => {
 
     await waitForEditorReady();
 
+    // Wait for preset items to render
+    await waitFor(() => {
+      expect(screen.getByTestId("preset-item-0")).toBeDefined();
+    });
+
     // The warning icon should be visible in the preset list item
     const presetItem = screen.getByTestId("preset-item-0");
     expect(presetItem.querySelector('[aria-label="Preset modified externally"]')).toBeDefined();
@@ -456,7 +461,7 @@ describe("PresetManagement", () => {
     );
 
     await waitFor(() => {
-      expect(screen.queryByText("Loading presets...")).toBeNull();
+      expect(screen.queryByText("Loading...")).toBeNull();
       expect(screen.getByTestId("preset-item-0")).toBeDefined();
     }, { timeout: 5000 });
 

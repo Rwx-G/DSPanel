@@ -676,7 +676,7 @@ export function Settings() {
             </div>
             <div className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-4">
               <h3 className="mb-3 text-body font-semibold text-[var(--color-text-primary)]">
-                Language
+                {t("language")}
               </h3>
               <select
                 value={settings.appearance?.language ?? "en"}

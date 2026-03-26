@@ -249,15 +249,6 @@ export function GroupHygiene() {
       );
       setScanned(true);
 
-      // Audit log the scan completion
-      const totalIssues =
-        emptyEntries.length +
-        detectedCycles.length +
-        singleEntries.length +
-        staleEntries.length +
-        undescribedEntries.length +
-        nestingResults.length +
-        duplicateEntries.length;
       // Audit logging handled internally by the backend
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

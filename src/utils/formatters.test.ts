@@ -3,6 +3,7 @@ import { i18n } from "../i18n";
 import {
   formatDate,
   formatDateTime,
+  formatRelativeTime,
   formatNumber,
   formatPercent,
 } from "./formatters";
@@ -65,6 +66,26 @@ describe("formatters", () => {
 
     it("returns empty string for undefined", () => {
       expect(formatNumber(undefined)).toBe("");
+    });
+  });
+
+  describe("formatRelativeTime", () => {
+    it("formats a recent date as relative time", () => {
+      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+      const result = formatRelativeTime(fiveMinutesAgo);
+      expect(result).toContain("minute");
+    });
+
+    it("returns empty string for null", () => {
+      expect(formatRelativeTime(null)).toBe("");
+    });
+
+    it("returns empty string for undefined", () => {
+      expect(formatRelativeTime(undefined)).toBe("");
+    });
+
+    it("returns original string for invalid date", () => {
+      expect(formatRelativeTime("not-a-date")).toBe("not-a-date");
     });
   });
 
