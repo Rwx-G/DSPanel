@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { Plus, Save, Trash2, Settings, AlertTriangle, FolderOpen } from "lucide-react";
+import { Plus, Save, Trash2, AlertTriangle, FolderOpen } from "lucide-react";
 import { usePresets } from "@/hooks/usePresets";
 import { usePresetPath } from "@/hooks/usePresetPath";
 import { useGroupSearch } from "@/hooks/useGroupSearch";

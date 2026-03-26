@@ -252,11 +252,11 @@ export function PermissionMappingSettings() {
                   {searchResults.length > 0 && (
                     <div className="mt-2 max-h-32 overflow-y-auto">
                       {searchResults.map((group) => {
-                        const alreadyMapped = groups.includes(group.distinguished_name);
+                        const alreadyMapped = groups.includes(group.distinguishedName);
                         return (
                           <button
-                            key={group.distinguished_name}
-                            onClick={() => addGroup(level, group.distinguished_name)}
+                            key={group.distinguishedName}
+                            onClick={() => addGroup(level, group.distinguishedName)}
                             disabled={alreadyMapped}
                             className={`w-full rounded px-2 py-1 text-left text-caption ${
                               alreadyMapped
@@ -265,10 +265,10 @@ export function PermissionMappingSettings() {
                             }`}
                           >
                             <span className="font-medium">
-                              {group.display_name ?? group.sam_account_name ?? extractCn(group.distinguished_name)}
+                              {group.displayName ?? group.samAccountName ?? extractCn(group.distinguishedName)}
                             </span>
                             <span className="ml-2 text-[var(--color-text-secondary)]">
-                              {group.distinguished_name}
+                              {group.distinguishedName}
                             </span>
                             {alreadyMapped && (
                               <span className="ml-1 text-[var(--color-text-secondary)]">
@@ -297,11 +297,12 @@ export function PermissionMappingSettings() {
                     >
                       <div className="flex items-center gap-2 min-w-0">
                         {validationWarnings[groupDn] === false && (
-                          <AlertTriangle
-                            size={14}
-                            className="shrink-0 text-[var(--color-warning)]"
-                            title="Group not found in AD"
-                          />
+                          <span title="Group not found in AD">
+                            <AlertTriangle
+                              size={14}
+                              className="shrink-0 text-[var(--color-warning)]"
+                            />
+                          </span>
                         )}
                         <span className="truncate text-caption text-[var(--color-text-primary)]">
                           {extractCn(groupDn)}

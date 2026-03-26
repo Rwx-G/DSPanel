@@ -27,9 +27,9 @@ function setupMocks(level = "DomainAdmin") {
       case "search_groups":
         return Promise.resolve([
           {
-            distinguished_name: "CN=IT-Support,OU=Groups,DC=contoso,DC=com",
-            sam_account_name: "IT-Support",
-            display_name: "IT Support",
+            distinguishedName: "CN=IT-Support,OU=Groups,DC=contoso,DC=com",
+            samAccountName: "IT-Support",
+            displayName: "IT Support",
             object_class: "group",
             attributes: {},
           },

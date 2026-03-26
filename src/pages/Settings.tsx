@@ -184,7 +184,6 @@ export function Settings() {
         break;
     }
     setDirty(true);
-    setSaveSuccess(false);
     setValidationErrors({});
   }, [activeTab]);
 
@@ -465,11 +464,6 @@ export function Settings() {
               </h3>
               <div className="flex gap-3">
                 {(["light", "dark", "system"] as const).map((mode) => {
-                  const isSelected =
-                    (settings.appearance?.theme ?? "system") === mode ||
-                    (!settings.appearance?.theme &&
-                      mode === "system") ||
-                    (mode !== "system" && !settings.appearance?.theme && currentTheme === mode);
                   const selected = (settings.appearance?.theme ?? "system") === mode;
                   return (
                     <button
