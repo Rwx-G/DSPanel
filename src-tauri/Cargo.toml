@@ -44,6 +44,7 @@ csv = "1"
 printpdf = "0.3"
 rust_xlsxwriter = "0.82"
 rusqlite = { version = "0.39", features = ["bundled"] }
+zeroize = "1"
 notify = { version = "8", features = ["macos_fsevent"] }
 notify-debouncer-mini = "0.7"
 keyring = { version = "3", features = ["sync-secret-service"] }

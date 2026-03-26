@@ -201,6 +201,18 @@ pub fn run() {
                 }
             }
 
+            // Warn if MFA is configured on a non-Windows platform (no DPAPI encryption)
+            #[cfg(not(target_os = "windows"))]
+            {
+                if state.mfa_service.is_configured() {
+                    tracing::warn!(
+                        "MFA is configured but DPAPI is not available on this platform. \
+                         The TOTP secret in mfa.dat is NOT encrypted at rest. \
+                         See SECURITY.md for details."
+                    );
+                }
+            }
+
             tracing::info!("DSPanel setup complete");
             Ok(())
         })
@@ -234,7 +246,6 @@ pub fn run() {
             commands::get_cannot_change_password,
             commands::set_password_flags,
             commands::get_audit_entries,
-            commands::audit_log,
             commands::query_audit_log,
             commands::get_audit_action_types,
             commands::purge_audit_entries,

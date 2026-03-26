@@ -68,7 +68,7 @@ describe("useMfaGate", () => {
     });
   });
 
-  it("allows action when invoke throws (fallback to allow)", async () => {
+  it("denies action when invoke throws (fail-closed)", async () => {
     mockInvoke.mockRejectedValueOnce(new Error("network error") as never);
 
     const { result } = renderHook(() => useMfaGate(), {
@@ -80,7 +80,7 @@ describe("useMfaGate", () => {
       allowed = await result.current.checkMfa("PasswordReset");
     });
 
-    expect(allowed).toBe(true);
+    expect(allowed).toBe(false);
   });
 
   it("returns checkMfa function", () => {
@@ -114,7 +114,7 @@ describe("useMfaGate", () => {
     });
   });
 
-  it("allows action when mfa_requires invoke fails", async () => {
+  it("denies action when mfa_requires invoke fails (fail-closed)", async () => {
     mockInvoke
       .mockResolvedValueOnce(true as never) // mfa_is_configured
       .mockRejectedValueOnce(new Error("command not found") as never); // mfa_requires
@@ -128,8 +128,8 @@ describe("useMfaGate", () => {
       allowed = await result.current.checkMfa("SomeAction");
     });
 
-    // Falls into catch block, returns true
-    expect(allowed).toBe(true);
+    // Falls into catch block, returns false (fail-closed)
+    expect(allowed).toBe(false);
   });
 
   it("can be called multiple times", async () => {

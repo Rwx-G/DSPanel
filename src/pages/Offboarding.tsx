@@ -233,16 +233,7 @@ function OffboardingContent() {
       }
     }
 
-    // Audit
-    try {
-      await invoke("audit_log", {
-        action: "Offboarding",
-        targetDn: dn,
-        details: `Offboarding completed: ${actionResults.filter((r) => r.success).length}/${actionResults.length} actions succeeded`,
-      });
-    } catch {
-      // Audit failure is non-blocking
-    }
+    // Audit logging handled internally by the backend for each operation
 
     setResults(actionResults);
     setStep("execute");

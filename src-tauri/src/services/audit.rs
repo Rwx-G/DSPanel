@@ -89,7 +89,7 @@ impl AuditService {
 
     fn init_schema(&self) {
         let conn = self.conn.lock().expect("lock poisoned");
-        conn.execute_batch(
+        if let Err(e) = conn.execute_batch(
             "CREATE TABLE IF NOT EXISTS audit_entries (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 timestamp TEXT NOT NULL,
@@ -101,8 +101,9 @@ impl AuditService {
             );
             CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit_entries(timestamp);
             CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_entries(action);",
-        )
-        .expect("Failed to initialize audit schema");
+        ) {
+            tracing::error!("Failed to initialize audit schema: {}", e);
+        }
     }
 
     fn insert_entry(&self, entry: &AuditEntry) {
@@ -166,14 +167,18 @@ impl AuditService {
     /// Returns all audit entries (most recent first).
     pub fn get_entries(&self) -> Vec<AuditEntry> {
         let conn = self.conn.lock().expect("lock poisoned");
-        let mut stmt = conn
-            .prepare(
-                "SELECT timestamp, operator, action, target_dn, details, success
-                 FROM audit_entries ORDER BY id DESC",
-            )
-            .expect("Failed to prepare audit query");
+        let mut stmt = match conn.prepare(
+            "SELECT timestamp, operator, action, target_dn, details, success
+             FROM audit_entries ORDER BY id DESC",
+        ) {
+            Ok(s) => s,
+            Err(e) => {
+                tracing::error!("Failed to prepare audit query: {}", e);
+                return Vec::new();
+            }
+        };
 
-        stmt.query_map([], |row| {
+        let result: Vec<AuditEntry> = match stmt.query_map([], |row| {
             Ok(AuditEntry {
                 timestamp: row.get(0)?,
                 operator: row.get(1)?,
@@ -182,10 +187,14 @@ impl AuditService {
                 details: row.get(4)?,
                 success: row.get::<_, i32>(5)? != 0,
             })
-        })
-        .expect("Failed to query audit entries")
-        .filter_map(|r| r.ok())
-        .collect()
+        }) {
+            Ok(rows) => rows.filter_map(|r| r.ok()).collect(),
+            Err(e) => {
+                tracing::error!("Failed to query audit entries: {}", e);
+                Vec::new()
+            }
+        };
+        result
     }
 
     /// Returns the total number of audit entries.
@@ -266,24 +275,33 @@ impl AuditService {
         params.push(Box::new(offset as i64));
 
         let param_refs: Vec<&dyn rusqlite::types::ToSql> = params.iter().map(|p| &**p).collect();
-        let mut stmt = conn
-            .prepare(&query_sql)
-            .expect("Failed to prepare filtered audit query");
+        let mut stmt = match conn.prepare(&query_sql) {
+            Ok(s) => s,
+            Err(e) => {
+                tracing::error!("Failed to prepare filtered audit query: {}", e);
+                return AuditQueryResult {
+                    entries: Vec::new(),
+                    total_count: 0,
+                };
+            }
+        };
 
-        let entries = stmt
-            .query_map(param_refs.as_slice(), |row| {
-                Ok(AuditEntry {
-                    timestamp: row.get(0)?,
-                    operator: row.get(1)?,
-                    action: row.get(2)?,
-                    target_dn: row.get(3)?,
-                    details: row.get(4)?,
-                    success: row.get::<_, i32>(5)? != 0,
-                })
+        let entries = match stmt.query_map(param_refs.as_slice(), |row| {
+            Ok(AuditEntry {
+                timestamp: row.get(0)?,
+                operator: row.get(1)?,
+                action: row.get(2)?,
+                target_dn: row.get(3)?,
+                details: row.get(4)?,
+                success: row.get::<_, i32>(5)? != 0,
             })
-            .expect("Failed to query filtered audit entries")
-            .filter_map(|r| r.ok())
-            .collect();
+        }) {
+            Ok(rows) => rows.filter_map(|r| r.ok()).collect(),
+            Err(e) => {
+                tracing::error!("Failed to query filtered audit entries: {}", e);
+                Vec::new()
+            }
+        };
 
         AuditQueryResult {
             entries,
@@ -294,14 +312,23 @@ impl AuditService {
     /// Returns distinct action types from the audit log.
     pub fn distinct_actions(&self) -> Vec<String> {
         let conn = self.conn.lock().expect("lock poisoned");
-        let mut stmt = conn
-            .prepare("SELECT DISTINCT action FROM audit_entries ORDER BY action")
-            .expect("Failed to prepare distinct actions query");
+        let mut stmt =
+            match conn.prepare("SELECT DISTINCT action FROM audit_entries ORDER BY action") {
+                Ok(s) => s,
+                Err(e) => {
+                    tracing::error!("Failed to prepare distinct actions query: {}", e);
+                    return Vec::new();
+                }
+            };
 
-        stmt.query_map([], |row| row.get(0))
-            .expect("Failed to query distinct actions")
-            .filter_map(|r| r.ok())
-            .collect()
+        let result: Vec<String> = match stmt.query_map([], |row| row.get(0)) {
+            Ok(rows) => rows.filter_map(|r| r.ok()).collect(),
+            Err(e) => {
+                tracing::error!("Failed to query distinct actions: {}", e);
+                Vec::new()
+            }
+        };
+        result
     }
 
     /// Deletes audit entries older than the specified number of days.

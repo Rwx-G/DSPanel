@@ -255,12 +255,7 @@ export function GroupHygiene() {
         undescribedEntries.length +
         nestingResults.length +
         duplicateEntries.length;
-      invoke("audit_log", {
-        action: "HygieneScanCompleted",
-        targetDn: "",
-        details: `Scan complete: ${totalIssues} issue(s) found (${emptyEntries.length} empty, ${detectedCycles.length} circular, ${singleEntries.length} single-member, ${staleEntries.length} stale, ${undescribedEntries.length} undescribed, ${nestingResults.length} deep-nested, ${duplicateEntries.length} duplicate)`,
-        success: true,
-      }).catch(() => {});
+      // Audit logging handled internally by the backend
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       setScanError(message);

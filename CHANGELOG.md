@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- Add DomainAdmin permission check on `purge_audit_entries` command
+- Fix MFA bypass: IPC errors in `useMfaGate` now deny access instead of allowing
+- Add startup warning when MFA is configured on non-Windows (no DPAPI encryption)
+- Document non-Windows MFA secret storage limitations in SECURITY.md
+- Add `zeroize` crate to clear LDAP passwords and TOTP secrets from memory on drop
+- Remove `audit_log` IPC command (audit writes are now backend-internal only)
+- Add TOTP replay protection with 60-second code reuse cache
+
+### Fixed
+
+- Add missing `validate_search_input` to `search_computers_inner`
+- Replace `.expect()` panics in `audit.rs` SQLite operations with graceful error logging
+- Re-detect AD permissions before each critical write operation (password reset, account enable/disable, flag changes)
+
 ## [0.12.0] - 2026-03-25
 
 ### Added

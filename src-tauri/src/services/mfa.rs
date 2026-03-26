@@ -3,15 +3,20 @@ use hmac::{Hmac, Mac};
 use rand::RngExt;
 use serde::{Deserialize, Serialize};
 use sha1::Sha1;
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
 use std::time::Instant;
+use zeroize::Zeroize;
 
 type HmacSha1 = Hmac<Sha1>;
 
 /// Duration for which a successful MFA verification remains valid.
 const MFA_SESSION_WINDOW: std::time::Duration = std::time::Duration::from_secs(300); // 5 minutes
+
+/// Duration for which a used TOTP code is cached to prevent replay attacks.
+const TOTP_REPLAY_TTL: std::time::Duration = std::time::Duration::from_secs(60);
 
 /// Result of MFA setup containing the secret and backup codes.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -61,6 +66,9 @@ pub struct MfaService {
     persist_path: Option<PathBuf>,
     failed_attempts: Mutex<u32>,
     last_verified: Mutex<Option<Instant>>,
+    /// Cache of recently used TOTP codes to prevent replay attacks.
+    /// Maps code -> timestamp when it was used.
+    used_codes: Mutex<HashMap<String, Instant>>,
 }
 
 impl Default for MfaService {
@@ -84,6 +92,7 @@ impl MfaService {
             persist_path,
             failed_attempts: Mutex::new(0),
             last_verified: Mutex::new(None),
+            used_codes: Mutex::new(HashMap::new()),
         }
     }
 
@@ -98,6 +107,7 @@ impl MfaService {
             persist_path: None,
             failed_attempts: Mutex::new(0),
             last_verified: Mutex::new(None),
+            used_codes: Mutex::new(HashMap::new()),
         }
     }
 
@@ -251,6 +261,21 @@ impl MfaService {
             }
         }
 
+        // Evict expired entries from the replay cache
+        {
+            let mut used = self.used_codes.lock().expect("lock poisoned");
+            used.retain(|_, ts| ts.elapsed() < TOTP_REPLAY_TTL);
+        }
+
+        // Check replay: reject codes already used within the TTL window
+        {
+            let used = self.used_codes.lock().expect("lock poisoned");
+            if used.contains_key(code) {
+                tracing::warn!("TOTP replay detected: code already used");
+                return Ok(false);
+            }
+        }
+
         let secret = self
             .secret
             .lock()
@@ -285,6 +310,10 @@ impl MfaService {
             if expected == code {
                 *self.failed_attempts.lock().expect("lock poisoned") = 0;
                 *self.last_verified.lock().expect("lock poisoned") = Some(Instant::now());
+                self.used_codes
+                    .lock()
+                    .expect("lock poisoned")
+                    .insert(code.to_string(), Instant::now());
                 return Ok(true);
             }
         }
@@ -300,11 +329,24 @@ impl MfaService {
 
     /// Revokes MFA setup by removing the stored secret and persisted file.
     pub fn revoke(&self) {
+        if let Some(ref mut secret) = *self.secret.lock().expect("lock poisoned") {
+            secret.zeroize();
+        }
         *self.secret.lock().expect("lock poisoned") = None;
         self.backup_codes.lock().expect("lock poisoned").clear();
         *self.failed_attempts.lock().expect("lock poisoned") = 0;
         if let Some(ref path) = self.persist_path {
             let _ = fs::remove_file(path);
+        }
+    }
+}
+
+impl Drop for MfaService {
+    fn drop(&mut self) {
+        if let Ok(mut secret) = self.secret.lock() {
+            if let Some(ref mut s) = *secret {
+                s.zeroize();
+            }
         }
     }
 }

@@ -11,6 +11,44 @@ use crate::state::AppState;
 
 use super::capture_snapshot;
 
+/// Re-detects AD permissions and verifies the required level before a critical write.
+/// If re-detection fails or would lower the current level, the existing level is preserved.
+async fn require_fresh_permission(
+    state: &AppState,
+    required: PermissionLevel,
+    operation: &str,
+) -> Result<(), AppError> {
+    let previous_level = state.permission_service.current_level();
+    let provider = state.directory_provider.clone();
+    match state
+        .permission_service
+        .detect_permissions(&*provider)
+        .await
+    {
+        Ok(()) => {
+            // If re-detection returned a lower level, keep the previous one
+            // to avoid false negatives from transient AD query issues
+            if state.permission_service.current_level() < previous_level {
+                tracing::warn!(
+                    "Permission re-detection returned lower level than cached; keeping {:?}",
+                    previous_level
+                );
+                state.permission_service.set_level(previous_level);
+            }
+        }
+        Err(e) => {
+            tracing::warn!("Permission re-detection failed before {}: {}", operation, e);
+        }
+    }
+    if !state.permission_service.has_permission(required) {
+        return Err(AppError::PermissionDenied(format!(
+            "{} requires {:?} permission or higher",
+            operation, required
+        )));
+    }
+    Ok(())
+}
+
 /// Resets a user's password via the directory provider.
 pub(crate) async fn reset_password_inner(
     state: &AppState,
@@ -18,14 +56,7 @@ pub(crate) async fn reset_password_inner(
     new_password: &str,
     must_change_at_next_logon: bool,
 ) -> Result<(), AppError> {
-    if !state
-        .permission_service
-        .has_permission(PermissionLevel::HelpDesk)
-    {
-        return Err(AppError::PermissionDenied(
-            "Password reset requires HelpDesk permission or higher".to_string(),
-        ));
-    }
+    require_fresh_permission(state, PermissionLevel::HelpDesk, "Password reset").await?;
 
     state
         .mfa_service
@@ -60,14 +91,7 @@ pub(crate) async fn reset_password_inner(
 
 /// Unlocks a user account via the directory provider.
 pub(crate) async fn unlock_account_inner(state: &AppState, user_dn: &str) -> Result<(), AppError> {
-    if !state
-        .permission_service
-        .has_permission(PermissionLevel::HelpDesk)
-    {
-        return Err(AppError::PermissionDenied(
-            "Account unlock requires HelpDesk permission or higher".to_string(),
-        ));
-    }
+    require_fresh_permission(state, PermissionLevel::HelpDesk, "Account unlock").await?;
 
     capture_snapshot(state, user_dn, "AccountUnlock").await;
     let provider = state.directory_provider.clone();
@@ -89,14 +113,7 @@ pub(crate) async fn unlock_account_inner(state: &AppState, user_dn: &str) -> Res
 
 /// Enables a user account via the directory provider.
 pub(crate) async fn enable_account_inner(state: &AppState, user_dn: &str) -> Result<(), AppError> {
-    if !state
-        .permission_service
-        .has_permission(PermissionLevel::HelpDesk)
-    {
-        return Err(AppError::PermissionDenied(
-            "Account enable requires HelpDesk permission or higher".to_string(),
-        ));
-    }
+    require_fresh_permission(state, PermissionLevel::HelpDesk, "Account enable").await?;
 
     capture_snapshot(state, user_dn, "AccountEnable").await;
     let provider = state.directory_provider.clone();
@@ -118,14 +135,7 @@ pub(crate) async fn enable_account_inner(state: &AppState, user_dn: &str) -> Res
 
 /// Disables a user account via the directory provider.
 pub(crate) async fn disable_account_inner(state: &AppState, user_dn: &str) -> Result<(), AppError> {
-    if !state
-        .permission_service
-        .has_permission(PermissionLevel::HelpDesk)
-    {
-        return Err(AppError::PermissionDenied(
-            "Account disable requires HelpDesk permission or higher".to_string(),
-        ));
-    }
+    require_fresh_permission(state, PermissionLevel::HelpDesk, "Account disable").await?;
 
     state
         .mfa_service
@@ -169,14 +179,12 @@ pub(crate) async fn set_password_flags_inner(
     password_never_expires: bool,
     user_cannot_change_password: bool,
 ) -> Result<(), AppError> {
-    if !state
-        .permission_service
-        .has_permission(PermissionLevel::AccountOperator)
-    {
-        return Err(AppError::PermissionDenied(
-            "Password flag management requires AccountOperator permission or higher".to_string(),
-        ));
-    }
+    require_fresh_permission(
+        state,
+        PermissionLevel::AccountOperator,
+        "Password flag management",
+    )
+    .await?;
 
     state
         .mfa_service
@@ -491,26 +499,6 @@ pub fn get_audit_entries(state: State<'_, AppState>) -> Vec<AuditEntry> {
     get_audit_entries_inner(&state)
 }
 
-/// Logs an audit event from the frontend (for operations not backed by a write command).
-#[tauri::command]
-pub fn audit_log(
-    action: String,
-    target_dn: String,
-    details: String,
-    success: bool,
-    state: State<'_, AppState>,
-) {
-    if success {
-        state
-            .audit_service
-            .log_success(&action, &target_dn, &details);
-    } else {
-        state
-            .audit_service
-            .log_failure(&action, &target_dn, &details);
-    }
-}
-
 /// Queries audit log entries with filters and pagination.
 #[tauri::command]
 pub fn query_audit_log(filter: AuditFilter, state: State<'_, AppState>) -> AuditQueryResult {
@@ -532,13 +520,28 @@ pub(crate) fn get_audit_action_types_inner(state: &AppState) -> Vec<String> {
 }
 
 /// Purges audit entries older than the specified number of days.
-/// Returns the number of deleted entries.
+/// Returns the number of deleted entries. Requires DomainAdmin permission.
 #[tauri::command]
-pub fn purge_audit_entries(retention_days: i64, state: State<'_, AppState>) -> usize {
+pub fn purge_audit_entries(
+    retention_days: i64,
+    state: State<'_, AppState>,
+) -> Result<usize, AppError> {
     purge_audit_entries_inner(&state, retention_days)
 }
 
-pub(crate) fn purge_audit_entries_inner(state: &AppState, retention_days: i64) -> usize {
+pub(crate) fn purge_audit_entries_inner(
+    state: &AppState,
+    retention_days: i64,
+) -> Result<usize, AppError> {
+    if !state
+        .permission_service
+        .has_permission(PermissionLevel::DomainAdmin)
+    {
+        return Err(AppError::PermissionDenied(
+            "Audit purge requires DomainAdmin permission".to_string(),
+        ));
+    }
+
     let deleted = state.audit_service.purge_older_than(retention_days);
     if deleted > 0 {
         tracing::info!(
@@ -547,7 +550,7 @@ pub(crate) fn purge_audit_entries_inner(state: &AppState, retention_days: i64) -
             "Audit log: purged old entries"
         );
     }
-    deleted
+    Ok(deleted)
 }
 
 /// Adds a user to a group.

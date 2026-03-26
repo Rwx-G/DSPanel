@@ -61,8 +61,6 @@ function setupMocks(level = "AccountOperator") {
         return Promise.resolve(undefined);
       case "move_object":
         return Promise.resolve(undefined);
-      case "audit_log":
-        return Promise.resolve(undefined);
       default:
         return Promise.resolve(null);
     }

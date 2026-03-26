@@ -59,9 +59,10 @@ pub(crate) async fn search_computers_inner(
     state: &AppState,
     query: &str,
 ) -> Result<Vec<DirectoryEntry>, AppError> {
+    let sanitized = validate_search_input(query)?;
     let provider = state.directory_provider.clone();
     provider
-        .search_computers(query, 50)
+        .search_computers(&sanitized, 50)
         .await
         .map_err(|e| AppError::Directory(e.to_string()))
 }

@@ -164,6 +164,17 @@ impl std::fmt::Debug for LdapAuthMode {
     }
 }
 
+impl Drop for LdapAuthMode {
+    fn drop(&mut self) {
+        if let LdapAuthMode::SimpleBind {
+            ref mut password, ..
+        } = self
+        {
+            zeroize::Zeroize::zeroize(password);
+        }
+    }
+}
+
 /// `DirectoryProvider` implementation using on-premises Active Directory via LDAP.
 ///
 /// Supports both GSSAPI (Kerberos) and simple bind authentication. The auth mode
