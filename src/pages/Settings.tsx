@@ -15,6 +15,9 @@ import { PresetSettings } from "@/components/common/PresetSettings";
 import { PermissionMappingSettings } from "@/components/common/PermissionMappingSettings";
 import { useTheme, type ThemeMode } from "@/hooks/useTheme";
 import { useNavigation } from "@/contexts/NavigationContext";
+import { useNotifications } from "@/contexts/NotificationContext";
+import { OUPicker } from "@/components/form/OUPicker";
+import { useOUTree } from "@/hooks/useOUTree";
 
 /** Tab definitions for the settings page. */
 const TABS = [
@@ -60,9 +63,9 @@ export function Settings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const { notify } = useNotifications();
+  const { nodes: ouNodes, loading: ouLoading, error: ouError } = useOUTree({ silent: true });
 
   const { currentTheme, applyTheme } = useTheme();
 
@@ -84,7 +87,7 @@ export function Settings() {
   useEffect(() => {
     invoke<AppSettings>("get_app_settings")
       .then((s) => setSettings(s))
-      .catch((e) => setError(`Failed to load settings: ${e}`))
+      .catch((e) => notify(`Failed to load settings: ${e}`, "error"))
       .finally(() => setLoading(false));
   }, []);
 
@@ -92,7 +95,7 @@ export function Settings() {
     <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
       setSettings((prev) => ({ ...prev, [key]: value }));
       setDirty(true);
-      setSaveSuccess(false);
+
     },
     [],
   );
@@ -104,7 +107,7 @@ export function Settings() {
         [section]: { ...(prev[section] ?? {}), [key]: value || null },
       }));
       setDirty(true);
-      setSaveSuccess(false);
+
     },
     [],
   );
@@ -133,19 +136,16 @@ export function Settings() {
   const handleSave = useCallback(async () => {
     if (!(await validate())) return;
     setSaving(true);
-    setError(null);
-    setSaveSuccess(false);
     try {
       await invoke("set_app_settings", { settings });
       setDirty(false);
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 3000);
+      notify("Settings saved successfully", "success");
     } catch (e) {
-      setError(`Failed to save settings: ${e}`);
+      notify(`Failed to save settings: ${e}`, "error");
     } finally {
       setSaving(false);
     }
-  }, [settings, validate]);
+  }, [settings, validate, notify]);
 
   const handleResetDefaults = useCallback(() => {
     switch (activeTab) {
@@ -225,26 +225,6 @@ export function Settings() {
         <SettingsIcon size={20} className="text-[var(--color-text-primary)]" />
         <h1 className="text-heading font-semibold text-[var(--color-text-primary)]">Settings</h1>
       </div>
-
-      {/* Error */}
-      {error && (
-        <div
-          className="rounded-md border border-[var(--color-error)] bg-[var(--color-error-bg)] px-3 py-2 text-caption text-[var(--color-error)]"
-          data-testid="settings-error"
-        >
-          {error}
-        </div>
-      )}
-
-      {/* Success */}
-      {saveSuccess && (
-        <div
-          className="rounded-md border border-[var(--color-success)] bg-[var(--color-success-bg)] px-3 py-2 text-caption text-[var(--color-success)]"
-          data-testid="settings-success"
-        >
-          Settings saved successfully.
-        </div>
-      )}
 
       {/* Tabs */}
       <div className="flex gap-1 border-b border-[var(--color-border-default)]">
@@ -385,17 +365,32 @@ export function Settings() {
                 <label className="mb-1 block text-caption text-[var(--color-text-secondary)]">
                   Disabled Users OU
                 </label>
-                <input
-                  type="text"
-                  value={settings.disabledOu ?? ""}
-                  onChange={(e) => updateField("disabledOu", e.target.value || null)}
-                  placeholder="OU=Disabled Users,DC=example,DC=com"
-                  className="w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5 text-body text-[var(--color-text-primary)] placeholder-[var(--color-text-secondary)] focus:border-[var(--color-primary)] focus:outline-none"
-                  data-testid="setting-disabled-ou"
-                />
+                {settings.disabledOu && (
+                  <div className="mb-2 flex items-center gap-2">
+                    <span className="text-caption text-[var(--color-text-primary)]" data-testid="setting-disabled-ou-value">
+                      {settings.disabledOu}
+                    </span>
+                    <button
+                      onClick={() => updateField("disabledOu", null)}
+                      className="text-caption text-[var(--color-error)] hover:underline"
+                      data-testid="setting-disabled-ou-clear"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                )}
+                <div className="max-h-48 overflow-y-auto rounded-md border border-[var(--color-border-default)]" data-testid="setting-disabled-ou">
+                  <OUPicker
+                    nodes={ouNodes}
+                    selectedOU={settings.disabledOu ?? undefined}
+                    onSelect={(dn) => updateField("disabledOu", dn)}
+                    loading={ouLoading}
+                    error={ouError}
+                  />
+                </div>
                 <p className="mt-1 text-caption text-[var(--color-text-secondary)]">
                   Target OU where disabled user accounts are moved during offboarding.
-                  Leave empty to skip the move step.
+                  Select an OU or clear to skip the move step.
                 </p>
               </div>
             </div>

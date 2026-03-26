@@ -54,6 +54,8 @@ function setupMocks() {
         return Promise.resolve({ mappings: {} });
       case "get_preset_path":
         return Promise.resolve("C:\\presets");
+      case "get_ou_tree":
+        return Promise.resolve([]);
       case "get_credential":
         return Promise.resolve(null);
       case "pick_folder_dialog":
@@ -227,25 +229,6 @@ describe("Settings", () => {
 
     await waitFor(() => {
       expect(mockInvoke).toHaveBeenCalledWith("set_app_settings", expect.any(Object));
-    });
-  });
-
-  it("shows success message after save", async () => {
-    setupMocks();
-    render(<Wrapper><Settings /></Wrapper>);
-
-    await waitFor(() => {
-      expect(screen.getByTestId("setting-domain-override")).toBeDefined();
-    });
-
-    fireEvent.change(screen.getByTestId("setting-domain-override"), {
-      target: { value: "test" },
-    });
-
-    fireEvent.click(screen.getByTestId("settings-save"));
-
-    await waitFor(() => {
-      expect(screen.getByTestId("settings-success")).toBeDefined();
     });
   });
 
