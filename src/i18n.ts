@@ -2,6 +2,10 @@ import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
 import * as en from "./locales/en";
+import * as fr from "./locales/fr";
+import * as de from "./locales/de";
+import * as it from "./locales/it";
+import * as es from "./locales/es";
 
 export const supportedLanguages = [
   { code: "en", label: "English" },
@@ -18,6 +22,10 @@ export const namespaces = Object.keys(en) as (keyof typeof en)[];
 i18n.use(initReactI18next).init({
   resources: {
     en,
+    fr,
+    de,
+    it,
+    es,
   },
   lng: "en",
   fallbackLng: "en",

@@ -76,14 +76,14 @@ describe("i18n", () => {
 
   it("switches language at runtime", async () => {
     expect(i18n.language).toBe("en");
-    // Switch to a language that only has English fallback (no translations yet)
     await i18n.changeLanguage("fr");
     expect(i18n.language).toBe("fr");
-    // Falls back to English since fr translations aren't loaded yet
-    expect(i18n.t("common:save")).toBe("Save");
+    // French translations are now loaded
+    expect(i18n.t("common:save")).toBe("Enregistrer");
     // Switch back
     await i18n.changeLanguage("en");
     expect(i18n.language).toBe("en");
+    expect(i18n.t("common:save")).toBe("Save");
   });
 
   it("falls back to English for missing keys", () => {
