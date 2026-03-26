@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 
 export interface DiffLine {
   type: "unchanged" | "added" | "removed";
@@ -28,6 +29,7 @@ const LINE_PREFIX: Record<DiffLine["type"], string> = {
 };
 
 export function DiffViewer({ lines, defaultMode = "inline" }: DiffViewerProps) {
+  const { t } = useTranslation(["components"]);
   const [mode, setMode] = useState<DiffMode>(defaultMode);
 
   if (lines.length === 0) {
@@ -36,7 +38,7 @@ export function DiffViewer({ lines, defaultMode = "inline" }: DiffViewerProps) {
         className="py-4 text-center text-caption text-[var(--color-text-secondary)]"
         data-testid="diff-viewer-empty"
       >
-        No differences
+        {t("components:diffViewer.noDifferences")}
       </div>
     );
   }
@@ -54,7 +56,7 @@ export function DiffViewer({ lines, defaultMode = "inline" }: DiffViewerProps) {
           aria-pressed={mode === "inline"}
           data-testid="diff-mode-inline"
         >
-          Inline
+          {t("components:diffViewer.inline")}
         </button>
         <button
           className={`rounded px-2 py-0.5 text-caption transition-colors ${
@@ -66,7 +68,7 @@ export function DiffViewer({ lines, defaultMode = "inline" }: DiffViewerProps) {
           aria-pressed={mode === "side-by-side"}
           data-testid="diff-mode-side-by-side"
         >
-          Side by Side
+          {t("components:diffViewer.sideBySide")}
         </button>
       </div>
 

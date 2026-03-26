@@ -27,10 +27,12 @@ import {
   MoveObjectDialog,
   type MoveTarget,
 } from "@/components/dialogs/MoveObjectDialog";
+import { useTranslation } from "react-i18next";
 
 type HealthFilter = "all" | "healthy" | "warning" | "critical";
 
 export function UserLookup() {
+  const { t } = useTranslation(["userLookup", "common"]);
   const {
     items: users,
     loading,
@@ -193,7 +195,7 @@ export function UserLookup() {
       const targetName = user.displayName || user.samAccountName;
 
       const offboardItem: ContextMenuItem = {
-        label: `Start Offboarding for ${targetName}`,
+        label: t("startOffboarding", { name: targetName }),
         icon: <UserMinus size={14} />,
         onClick: () => {
           openTab("Offboarding", "offboarding", "user", {
@@ -204,7 +206,7 @@ export function UserLookup() {
 
       const moveItem: ContextMenuItem | null = canMove
         ? {
-            label: "Move to OU",
+            label: t("common:moveToOu"),
             icon: <FolderInput size={14} />,
             onClick: () => {
               setMoveTargets([
@@ -220,7 +222,7 @@ export function UserLookup() {
       if (!selectedUser) {
         setContextMenuItems([
           {
-            label: "Select a user first to compare",
+            label: t("selectUser"),
             icon: <GitCompareArrows size={14} />,
             onClick: () => {},
             disabled: true,
@@ -235,7 +237,7 @@ export function UserLookup() {
       if (selectedUser.samAccountName === user.samAccountName) {
         setContextMenuItems([
           {
-            label: "Cannot compare a user with itself",
+            label: t("cannotCompareWithSelf"),
             icon: <GitCompareArrows size={14} />,
             onClick: () => {},
             disabled: true,
@@ -252,7 +254,7 @@ export function UserLookup() {
 
       setContextMenuItems([
         {
-          label: `Compare ${selectedName} with ${targetName}`,
+          label: t("compareWith", { name: selectedName, other: targetName }),
           icon: <GitCompareArrows size={14} />,
           onClick: () => {
             openTab("User Comparison", "user-comparison", "compare", {
@@ -345,17 +347,17 @@ export function UserLookup() {
             value={filterText}
             onChange={handleFilterChange}
             onSearch={handleFilterChange}
-            placeholder="Search by name, username, or email..."
+            placeholder={t("searchPlaceholder")}
             debounceMs={300}
           />
         </div>
         <div className="flex items-center gap-1">
           {(
             [
-              { key: "all", label: "All" },
-              { key: "healthy", label: "Healthy" },
-              { key: "warning", label: "Warning" },
-              { key: "critical", label: "Critical" },
+              { key: "all", label: t("common:all") },
+              { key: "healthy", label: t("healthy") },
+              { key: "warning", label: t("warning") },
+              { key: "critical", label: t("common:critical") },
             ] as const
           ).map(({ key, label }) => (
             <button
@@ -379,11 +381,11 @@ export function UserLookup() {
         aria-live="polite"
         data-testid="user-lookup-status"
       >
-        {loading && "Loading users..."}
+        {loading && t("loadingUsers")}
         {!loading &&
           filteredUsers.length > 0 &&
-          `${filteredUsers.length} user${filteredUsers.length > 1 ? "s" : ""} found`}
-        {!loading && filteredUsers.length === 0 && !error && "No users found"}
+          t("found", { count: filteredUsers.length })}
+        {!loading && filteredUsers.length === 0 && !error && t("noUsersFound")}
         {error && `Error: ${error}`}
       </div>
 
@@ -393,7 +395,7 @@ export function UserLookup() {
             className="flex flex-1 items-center justify-center"
             data-testid="user-lookup-loading"
           >
-            <LoadingSpinner message="Loading users..." />
+            <LoadingSpinner message={t("loadingUsers")} />
           </div>
         )}
 
@@ -404,9 +406,9 @@ export function UserLookup() {
           >
             <EmptyState
               icon={<AlertCircle size={48} />}
-              title="Failed to load users"
+              title={t("failedToLoad")}
               description={error}
-              action={{ label: "Retry", onClick: refresh }}
+              action={{ label: t("common:retry"), onClick: refresh }}
             />
           </div>
         )}
@@ -415,13 +417,13 @@ export function UserLookup() {
           <div className="flex flex-1 items-center justify-center">
             <EmptyState
               icon={<UserX size={48} />}
-              title="No users found"
+              title={t("noUsersFound")}
               description={
                 healthFilter !== "all"
-                  ? `No users with "${healthFilter}" health status.`
+                  ? t("noUsersWithHealth", { status: healthFilter })
                   : filterText
-                    ? `No users match "${filterText}".`
-                    : "No users available."
+                    ? t("noUsersMatch", { query: filterText })
+                    : t("noUsersAvailable")
               }
             />
           </div>
@@ -466,7 +468,7 @@ export function UserLookup() {
               ) : (
                 <div className="flex h-full items-center justify-center">
                   <p className="text-body text-[var(--color-text-secondary)]">
-                    Select a user to view details
+                    {t("selectUser")}
                   </p>
                 </div>
               )}

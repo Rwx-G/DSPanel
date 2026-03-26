@@ -25,13 +25,7 @@ import {
   type DcHealthLevel,
 } from "@/types/dc-health";
 import { extractErrorMessage } from "@/utils/errorMapping";
-
-const REFRESH_INTERVALS = [
-  { label: "1 min", value: 60 },
-  { label: "5 min", value: 300 },
-  { label: "15 min", value: 900 },
-  { label: "Off", value: 0 },
-];
+import { useTranslation } from "react-i18next";
 
 function statusColor(level: DcHealthLevel): string {
   switch (level) {
@@ -97,6 +91,7 @@ function DcHealthCard({
   isExpanded: boolean;
   onToggle: () => void;
 }) {
+  const { t } = useTranslation(["infrastructureHealth", "common"]);
   const borderColor = statusColor(result.overallStatus);
 
   return (
@@ -132,7 +127,7 @@ function DcHealthCard({
             ))}
           </div>
           <span className="text-caption text-[var(--color-text-secondary)]">
-            Site: {result.dc.siteName}
+            {t("site")}: {result.dc.siteName}
             {result.dc.functionalLevel && (
               <> - {result.dc.functionalLevel}</>
             )}
@@ -175,10 +170,10 @@ function DcHealthCard({
             </colgroup>
             <thead>
               <tr className="text-left text-[var(--color-text-secondary)]">
-                <th className="pb-2 font-medium">Check</th>
-                <th className="pb-2 font-medium">Status</th>
-                <th className="pb-2 font-medium">Details</th>
-                <th className="pb-2 font-medium">Value</th>
+                <th className="pb-2 font-medium">{t("check")}</th>
+                <th className="pb-2 font-medium">{t("common:status")}</th>
+                <th className="pb-2 font-medium">{t("common:details")}</th>
+                <th className="pb-2 font-medium">{t("common:value")}</th>
               </tr>
             </thead>
             <tbody>
@@ -188,7 +183,7 @@ function DcHealthCard({
             </tbody>
           </table>
           <div className="mt-2 text-[10px] text-[var(--color-text-secondary)]">
-            Last checked: {new Date(result.checkedAt).toLocaleTimeString()}
+            {t("lastChecked")}: {new Date(result.checkedAt).toLocaleTimeString()}
           </div>
         </div>
       )}
@@ -221,6 +216,15 @@ function CheckRow({ check }: { check: DcHealthCheck }) {
 }
 
 export function InfrastructureHealth() {
+  const { t } = useTranslation(["infrastructureHealth", "common"]);
+
+  const REFRESH_INTERVALS = [
+    { label: t("autoRefresh1m"), value: 60 },
+    { label: t("autoRefresh5m"), value: 300 },
+    { label: t("autoRefresh15m"), value: 900 },
+    { label: t("autoRefreshOff"), value: 0 },
+  ];
+
   const [results, setResults] = useState<DcHealthResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -288,7 +292,7 @@ export function InfrastructureHealth() {
       {/* Toolbar */}
       <div className="flex items-center justify-between border-b border-[var(--color-border-default)] px-4 py-2">
         <h2 className="text-body font-semibold text-[var(--color-text-primary)]">
-          Infrastructure Health
+          {t("pageTitle")}
         </h2>
         <div className="flex items-center gap-3">
           {/* Summary badges */}
@@ -366,7 +370,7 @@ export function InfrastructureHealth() {
             data-testid="refresh-button"
           >
             <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-            Refresh
+            {t("common:refresh")}
           </button>
         </div>
       </div>
@@ -374,18 +378,18 @@ export function InfrastructureHealth() {
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4">
         {loading && results.length === 0 ? (
-          <LoadingSpinner message="Checking domain controllers..." />
+          <LoadingSpinner message={t("checkingDcs")} />
         ) : error ? (
           <EmptyState
             icon={<AlertCircle size={40} />}
-            title="Health Check Failed"
+            title={t("healthCheckFailed")}
             description={error}
           />
         ) : results.length === 0 ? (
           <EmptyState
             icon={<Server size={40} />}
-            title="No Domain Controllers Found"
-            description="No domain controllers were discovered in the AD configuration."
+            title={t("noDcsFound")}
+            description={t("noDcsDescription")}
           />
         ) : (
           <div className="flex flex-col gap-6">

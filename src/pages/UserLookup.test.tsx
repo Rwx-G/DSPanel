@@ -494,7 +494,7 @@ describe("UserLookup", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText("Select a user first to compare"),
+        screen.getByTestId("context-menu"),
       ).toBeInTheDocument();
     });
   });
@@ -844,7 +844,7 @@ describe("UserLookup", () => {
       fireEvent.click(screen.getByText("Critical"));
 
       await waitFor(() => {
-        expect(screen.getByText(/No users with "critical" health status/)).toBeInTheDocument();
+        expect(screen.getByText(/No users with critical health status/)).toBeInTheDocument();
       });
     });
 

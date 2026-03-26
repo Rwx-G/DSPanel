@@ -5,6 +5,7 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { ExportToolbar } from "@/components/common/ExportToolbar";
 import { SecurityDisclaimer } from "@/components/common/SecurityDisclaimer";
 import { extractErrorMessage } from "@/utils/errorMapping";
+import { useTranslation } from "react-i18next";
 import {
   Play,
   AlertTriangle,
@@ -96,6 +97,7 @@ function FrameworkCard({
   fw: FrameworkScore;
   onExport: () => void;
 }) {
+  const { t } = useTranslation(["complianceReports"]);
   const color = FRAMEWORK_COLORS[fw.standard] ?? "#546e7a";
   return (
     <div
@@ -114,7 +116,7 @@ function FrameworkCard({
         </span>
       </div>
       <div className="text-[10px] text-[var(--color-text-secondary)]">
-        {fw.totalChecks} checks - {fw.checksWithFindings} with findings
+        {fw.totalChecks} {t("checks")} - {fw.checksWithFindings} {t("findingsLabel")}
       </div>
       <button
         className="self-end mt-1 flex items-center gap-1 text-[10px] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
@@ -122,7 +124,7 @@ function FrameworkCard({
         data-testid={`export-fw-${fw.standard}`}
       >
         <Download size={10} />
-        Export {fw.standard} Report
+        {t("common:export")} {fw.standard} {t("report")}
       </button>
     </div>
   );
@@ -133,6 +135,7 @@ function FrameworkCard({
 // ---------------------------------------------------------------------------
 
 function CheckRow({ check }: { check: CheckResult }) {
+  const { t } = useTranslation(["complianceReports"]);
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -161,7 +164,7 @@ function CheckRow({ check }: { check: CheckResult }) {
         )}
         {check.findingCount === 0 && (
           <span className="inline-flex items-center gap-1 text-[10px] text-[var(--color-success)]">
-            <CheckCircle size={10} /> Clear
+            <CheckCircle size={10} /> {t("checkClear")}
           </span>
         )}
       </button>
@@ -233,6 +236,7 @@ function CheckRow({ check }: { check: CheckResult }) {
 // ---------------------------------------------------------------------------
 
 export function ComplianceReports() {
+  const { t } = useTranslation(["complianceReports", "common"]);
   const [scan, setScan] = useState<ComplianceScanResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -271,7 +275,7 @@ export function ComplianceReports() {
       <div className="flex items-center justify-between border-b border-[var(--color-border-default)] px-4 py-2">
         <h2 className="flex items-center gap-1.5 text-body font-semibold text-[var(--color-text-primary)]">
           <Shield size={16} />
-          Compliance Reports
+          {t("pageTitle")}
           <SecurityDisclaimer
             coverage="~15-20%"
             checks="7 checks across 9 frameworks (GDPR, HIPAA, SOX, PCI-DSS v4.0, ISO 27001, NIST 800-53, CIS v8, NIS2, ANSSI). Checks: privileged accounts (adminCount), inactive accounts (>90d), PASSWD_NOTREQD flag, reversible encryption, stale passwords (>90d), password never expires, disabled accounts. Compliance score 0-100 with per-framework breakdown. Per-framework HTML report export with control references and PowerShell remediation."
@@ -308,7 +312,7 @@ export function ComplianceReports() {
             data-testid="scan-button"
           >
             <Play size={14} />
-            {loading ? "Scanning..." : scan ? "Re-scan" : "Run Compliance Scan"}
+            {loading ? t("scanningLabel") : scan ? t("reScan") : t("runScan")}
           </button>
         </div>
       </div>
@@ -321,14 +325,14 @@ export function ComplianceReports() {
         )}
 
         {error && (
-          <EmptyState icon={<AlertTriangle size={40} />} title="Scan Failed" description={error} />
+          <EmptyState icon={<AlertTriangle size={40} />} title={t("scanFailed")} description={error} />
         )}
 
         {!scan && !loading && !error && (
           <EmptyState
             icon={<Shield size={40} />}
-            title="Compliance Reports"
-            description="Run a compliance scan to assess your Active Directory against 9 frameworks: GDPR, HIPAA, SOX, PCI-DSS v4.0, ISO 27001, NIST 800-53, CIS v8, NIS2, and ANSSI."
+            title={t("emptyTitle")}
+            description={t("emptyDescription")}
           />
         )}
 
@@ -341,10 +345,10 @@ export function ComplianceReports() {
               </div>
               <div>
                 <div className="text-body font-semibold text-[var(--color-text-primary)]">
-                  Global Compliance Score
+                  {t("globalScore")}
                 </div>
                 <div className="text-[11px] text-[var(--color-text-secondary)]">
-                  {scan.totalAccountsScanned} accounts scanned - {scan.totalFindings} findings - {scan.scannedAt} - {scan.generator}
+                  {scan.totalAccountsScanned} {t("accountsScanned")} - {scan.totalFindings} {t("findingsLabel")} - {scan.scannedAt} - {scan.generator}
                 </div>
               </div>
             </div>
@@ -367,20 +371,20 @@ export function ComplianceReports() {
             >
               <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--color-border-default)]">
                 <h3 className="text-caption font-semibold text-[var(--color-text-primary)]">
-                  Checks ({scan.checks.length})
+                  {t("checks")} ({scan.checks.length})
                 </h3>
                 <div className="flex items-center gap-2 text-[10px] text-[var(--color-text-secondary)]">
                   <span className="flex items-center gap-1">
-                    <span className="inline-block w-2 h-2 rounded-full bg-[var(--color-error)]" /> Critical
+                    <span className="inline-block w-2 h-2 rounded-full bg-[var(--color-error)]" /> {t("common:critical")}
                   </span>
                   <span className="flex items-center gap-1">
-                    <span className="inline-block w-2 h-2 rounded-full" style={{ background: "#e65100" }} /> High
+                    <span className="inline-block w-2 h-2 rounded-full" style={{ background: "#e65100" }} /> {t("common:high")}
                   </span>
                   <span className="flex items-center gap-1">
-                    <span className="inline-block w-2 h-2 rounded-full" style={{ background: "#f9a825" }} /> Medium
+                    <span className="inline-block w-2 h-2 rounded-full" style={{ background: "#f9a825" }} /> {t("common:medium")}
                   </span>
                   <span className="flex items-center gap-1">
-                    <span className="inline-block w-2 h-2 rounded-full" style={{ background: "#546e7a" }} /> Low
+                    <span className="inline-block w-2 h-2 rounded-full" style={{ background: "#546e7a" }} /> {t("common:low")}
                   </span>
                 </div>
               </div>

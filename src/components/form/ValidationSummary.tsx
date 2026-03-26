@@ -1,4 +1,5 @@
 import { AlertCircle } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 interface ValidationSummaryProps {
   errors: Record<string, string>;
@@ -9,6 +10,7 @@ export function ValidationSummary({
   errors,
   onErrorClick,
 }: ValidationSummaryProps) {
+  const { t } = useTranslation(["components"]);
   const errorEntries = Object.entries(errors);
 
   if (errorEntries.length === 0) return null;
@@ -22,9 +24,7 @@ export function ValidationSummary({
       <div className="flex items-center gap-2 text-body font-medium text-[var(--color-error)]">
         <AlertCircle size={16} />
         <span>
-          {errorEntries.length === 1
-            ? "1 validation error"
-            : `${errorEntries.length} validation errors`}
+          {t("components:validationSummary.error", { count: errorEntries.length })}
         </span>
       </div>
       <ul className="mt-2 space-y-1 pl-6">

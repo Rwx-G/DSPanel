@@ -24,6 +24,7 @@ import {
   type MoveTarget,
 } from "@/components/dialogs/MoveObjectDialog";
 import { Users, AlertCircle, Shield, Mail, FolderInput } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 const SCOPE_LABELS: Record<string, string> = {
   Global: "Global",
@@ -45,6 +46,7 @@ const SCOPE_COLORS: Record<string, string> = {
 };
 
 function GroupBadge({ group }: { group: DirectoryGroup }) {
+  const { t } = useTranslation(["groupManagement", "common"]);
   const [showTooltip, setShowTooltip] = useState(false);
   const tooltipId = useId();
   const badgeRef = useRef<HTMLDivElement>(null);
@@ -98,18 +100,18 @@ function GroupBadge({ group }: { group: DirectoryGroup }) {
             <ul className="space-y-1">
               <li className="flex items-center gap-1.5">
                 <CategoryIcon size={12} className={`mr-1 shrink-0 ${isSecurity ? "text-[var(--color-info)]" : "text-[var(--color-warning)]"}`} />
-                <span className="text-caption font-medium text-[var(--color-text-primary)]">{group.category}</span>
+                <span className="text-caption font-medium text-[var(--color-text-primary)]">{t(`common:${group.category.toLowerCase()}`)}</span>
               </li>
               <li className="flex items-center gap-1.5">
                 <Users size={12} className="mr-1 shrink-0 text-[var(--color-text-secondary)]" />
                 <div>
                   <span className="text-caption font-medium text-[var(--color-text-primary)]">{SCOPE_LABELS[group.scope] || group.scope}</span>
-                  <p className="text-[10px] text-[var(--color-text-secondary)]">Scope</p>
+                  <p className="text-[10px] text-[var(--color-text-secondary)]">{t("common:scope")}</p>
                 </div>
               </li>
               <li className="flex items-center gap-1.5">
                 <Users size={12} className="mr-1 shrink-0 text-[var(--color-text-secondary)]" />
-                <span className="text-caption font-medium text-[var(--color-text-primary)]">{group.memberCount} member{group.memberCount !== 1 ? "s" : ""}</span>
+                <span className="text-caption font-medium text-[var(--color-text-primary)]">{t("common:member", { count: group.memberCount })}</span>
               </li>
             </ul>
           </div>,
@@ -120,6 +122,7 @@ function GroupBadge({ group }: { group: DirectoryGroup }) {
 }
 
 export function GroupManagement() {
+  const { t } = useTranslation(["groupManagement", "common"]);
   const {
     items: groups,
     loading,
@@ -251,7 +254,7 @@ export function GroupManagement() {
       const items: ContextMenuItem[] = [];
       if (canMove) {
         items.push({
-          label: "Move to OU",
+          label: t("common:moveToOu"),
           icon: <FolderInput size={14} />,
           onClick: () => {
             setMoveTargets([
@@ -292,7 +295,7 @@ export function GroupManagement() {
             {group.displayName || group.samAccountName}
           </p>
           <p className="truncate text-caption text-[var(--color-text-secondary)]">
-            {group.scope} {group.category} - {group.memberCount} member(s)
+            {group.scope} {group.category} - {t("common:member", { count: group.memberCount })}
           </p>
         </div>
         <GroupBadge group={group} />
@@ -309,16 +312,16 @@ export function GroupManagement() {
             value={filterText}
             onChange={handleFilterChange}
             onSearch={handleFilterChange}
-            placeholder="Search groups by name or description..."
+            placeholder={t("searchPlaceholder")}
             debounceMs={300}
           />
         </div>
         <div className="flex items-center gap-1">
           {(
             [
-              { key: "all", label: "All" },
-              { key: "Security", label: "Security" },
-              { key: "Distribution", label: "Distribution" },
+              { key: "all", label: t("all") },
+              { key: "Security", label: t("common:security") },
+              { key: "Distribution", label: t("common:distribution") },
             ] as const
           ).map(({ key, label }) => (
             <button
@@ -344,12 +347,12 @@ export function GroupManagement() {
         aria-live="polite"
         data-testid="group-management-status"
       >
-        {loading && "Loading groups..."}
+        {loading && t("loadingGroups")}
         {!loading &&
           filteredGroups.length > 0 &&
-          `${filteredGroups.length} group${filteredGroups.length > 1 ? "s" : ""} found`}
-        {!loading && filteredGroups.length === 0 && !error && "No groups found"}
-        {error && `Error: ${error}`}
+          t("found", { count: filteredGroups.length })}
+        {!loading && filteredGroups.length === 0 && !error && t("noGroupsFound")}
+        {error && `${t("common:error")}: ${error}`}
       </div>
 
       <div className="flex flex-1 overflow-hidden">
@@ -358,7 +361,7 @@ export function GroupManagement() {
             className="flex flex-1 items-center justify-center"
             data-testid="group-management-loading"
           >
-            <LoadingSpinner message="Loading groups..." />
+            <LoadingSpinner message={t("loadingGroups")} />
           </div>
         )}
 
@@ -369,9 +372,9 @@ export function GroupManagement() {
           >
             <EmptyState
               icon={<AlertCircle size={48} />}
-              title="Failed to load groups"
+              title={t("failedToLoad")}
               description={error}
-              action={{ label: "Retry", onClick: refresh }}
+              action={{ label: t("common:retry"), onClick: refresh }}
             />
           </div>
         )}
@@ -383,13 +386,13 @@ export function GroupManagement() {
           >
             <EmptyState
               icon={<Users size={48} />}
-              title="No groups found"
+              title={t("noGroupsFound")}
               description={
                 categoryFilter !== "all"
-                  ? `No ${categoryFilter} groups found.`
+                  ? categoryFilter === "Security" ? t("noSecurityGroups") : t("noDistributionGroups")
                   : filterText
-                    ? `No groups match "${filterText}".`
-                    : "No groups available."
+                    ? t("noGroupsMatch", { filter: filterText })
+                    : t("noGroupsFound")
               }
             />
           </div>
@@ -433,7 +436,7 @@ export function GroupManagement() {
               ) : (
                 <div className="flex h-full items-center justify-center">
                   <p className="text-body text-[var(--color-text-secondary)]">
-                    Select a group to view details
+                    {t("selectGroup")}
                   </p>
                 </div>
               )}

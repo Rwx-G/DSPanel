@@ -3,6 +3,7 @@ import {
   useNotifications,
   type NotificationSeverity,
 } from "@/contexts/NotificationContext";
+import { useTranslation } from "react-i18next";
 
 const SEVERITY_ICON: Record<NotificationSeverity, typeof Info> = {
   info: Info,
@@ -33,6 +34,7 @@ const SEVERITY_BAR_COLOR: Record<NotificationSeverity, string> = {
 };
 
 export function NotificationHost() {
+  const { t } = useTranslation(["components"]);
   const { notifications, dismiss, autoDismissMs } = useNotifications();
 
   if (notifications.length === 0) return null;
@@ -75,7 +77,7 @@ export function NotificationHost() {
               <button
                 onClick={() => dismiss(notification.id)}
                 className="mt-0.5 shrink-0 rounded-sm p-0.5 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
-                aria-label="Dismiss notification"
+                aria-label={t("components:notificationHost.dismiss")}
                 data-testid={`notification-dismiss-${notification.id}`}
               >
                 <X size={14} />

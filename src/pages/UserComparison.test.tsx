@@ -322,7 +322,7 @@ describe("UserComparison", () => {
 
     const summary = screen.getByTestId("delta-summary");
     expect(summary).toHaveTextContent("1");
-    expect(summary).toHaveTextContent("shared");
+    expect(summary).toHaveTextContent("Shared");
   });
 
   it("filters groups by text input", async () => {
@@ -607,8 +607,8 @@ describe("UserComparison", () => {
   it("group items display category badge labels", async () => {
     await renderWithComparison();
 
-    // Check that category labels appear
-    expect(screen.getByText("Shared")).toBeInTheDocument();
+    // Check that category labels appear (multiple elements may contain "Shared")
+    expect(screen.getAllByText("Shared").length).toBeGreaterThanOrEqual(1);
   });
 
   it("shows user names in delta summary", async () => {

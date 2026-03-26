@@ -2,6 +2,7 @@ import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { FolderOpen } from "lucide-react";
 import { usePresetPath } from "@/hooks/usePresetPath";
+import { useTranslation } from "react-i18next";
 
 /**
  * Preset storage path configuration section.
@@ -16,6 +17,7 @@ interface PresetSettingsProps {
 }
 
 export function PresetSettings({ onSaved }: PresetSettingsProps = {}) {
+  const { t } = useTranslation(["components", "common"]);
   const { path, loading, valid, setPath, testPath } = usePresetPath();
   const [inputPath, setInputPath] = useState(path ?? "");
   const [testResult, setTestResult] = useState<boolean | null>(null);
@@ -45,12 +47,10 @@ export function PresetSettings({ onSaved }: PresetSettingsProps = {}) {
       data-testid="preset-settings"
     >
       <h3 className="mb-3 text-body font-semibold text-[var(--color-text-primary)]">
-        Preset Storage Path
+        {t("components:presetSettings.title")}
       </h3>
       <p className="mb-3 text-caption text-[var(--color-text-secondary)]">
-        Configure the network share or local directory where preset JSON files
-        are stored. All DSPanel instances sharing this path will see the same
-        presets.
+        {t("components:presetSettings.description")}
       </p>
 
       <div className="flex items-center gap-2">
@@ -90,7 +90,7 @@ export function PresetSettings({ onSaved }: PresetSettingsProps = {}) {
           className="btn btn-sm btn-secondary"
           data-testid="preset-path-test"
         >
-          Test
+          {t("common:test")}
         </button>
         <button
           onClick={handleSave}
@@ -98,7 +98,7 @@ export function PresetSettings({ onSaved }: PresetSettingsProps = {}) {
           className="btn btn-sm btn-primary"
           data-testid="preset-path-save"
         >
-          Save
+          {t("common:save")}
         </button>
       </div>
 
@@ -109,8 +109,8 @@ export function PresetSettings({ onSaved }: PresetSettingsProps = {}) {
           data-testid="preset-path-status"
         >
           {testResult
-            ? "Path is accessible and valid."
-            : "Path is not accessible. Please check the path and permissions."}
+            ? t("components:presetSettings.pathValid")
+            : t("components:presetSettings.pathInvalid")}
         </div>
       )}
 
@@ -119,7 +119,7 @@ export function PresetSettings({ onSaved }: PresetSettingsProps = {}) {
           className="mt-2 text-caption text-[var(--color-success)]"
           data-testid="preset-path-configured"
         >
-          Currently configured: {path}
+          {t("components:presetSettings.currentlyConfigured", { path })}
         </div>
       )}
 
@@ -128,7 +128,7 @@ export function PresetSettings({ onSaved }: PresetSettingsProps = {}) {
           className="mt-2 text-caption text-[var(--color-error)]"
           data-testid="preset-path-error"
         >
-          Failed to configure path. Please check the path and try again.
+          {t("components:presetSettings.configFailed")}
         </div>
       )}
     </div>

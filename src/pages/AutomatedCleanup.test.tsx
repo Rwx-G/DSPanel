@@ -720,7 +720,7 @@ describe("AutomatedCleanup", () => {
 
     expect(screen.getByText("1 / 2 succeeded")).toBeInTheDocument();
     expect(screen.getByText("OK")).toBeInTheDocument();
-    expect(screen.getByText("Failed")).toBeInTheDocument();
+    expect(screen.getByText("FAIL")).toBeInTheDocument();
   });
 
   it("double confirm for delete then actually executes on second click", async () => {

@@ -9,6 +9,7 @@ import { parseCnFromDn } from "@/utils/dn";
 import { formatCsv, downloadCsv } from "@/utils/csvExport";
 import { extractErrorMessage } from "@/utils/errorMapping";
 import { type DirectoryEntry } from "@/types/directory";
+import { useTranslation } from "react-i18next";
 import {
   Trash2,
   UserPlus,
@@ -67,112 +68,124 @@ export interface BulkProgress {
 
 interface OperationCard {
   id: BulkOperationType;
-  label: string;
+  labelKey: string;
   icon: typeof Trash2;
-  description: string;
+  descriptionKey: string;
   minPermission: PermissionLevel;
+  minPermissionLabel: string;
 }
 
 interface OperationCategory {
-  label: string;
+  labelKey: string;
   cards: OperationCard[];
 }
 
 const OPERATION_CATEGORIES: OperationCategory[] = [
   {
-    label: "Members",
+    labelKey: "categoryMembers",
     cards: [
       {
         id: "add",
-        label: "Add Members",
+        labelKey: "addMembers",
         icon: UserPlus,
-        description: "Add members to a target group",
+        descriptionKey: "addDescription",
         minPermission: "HelpDesk",
+        minPermissionLabel: "helpDesk",
       },
       {
         id: "delete",
-        label: "Remove Members",
+        labelKey: "removeMembers",
         icon: Trash2,
-        description: "Remove members from a group",
+        descriptionKey: "removeDescription",
         minPermission: "AccountOperator",
+        minPermissionLabel: "accountOperator",
       },
       {
         id: "transfer",
-        label: "Transfer Members",
+        labelKey: "transferMembers",
         icon: ArrowRightLeft,
-        description: "Move members from one group to another",
+        descriptionKey: "transferDescription",
         minPermission: "AccountOperator",
+        minPermissionLabel: "accountOperator",
       },
       {
         id: "copy-memberships",
-        label: "Copy User Groups",
+        labelKey: "copyUserGroups",
         icon: Users,
-        description: "Copy group memberships from one user to another",
+        descriptionKey: "copyDescription",
         minPermission: "HelpDesk",
+        minPermissionLabel: "helpDesk",
       },
       {
         id: "import-csv",
-        label: "Import CSV",
+        labelKey: "importCsv",
         icon: Upload,
-        description: "Add members to a group from a CSV file",
+        descriptionKey: "importDescription",
         minPermission: "HelpDesk",
+        minPermissionLabel: "helpDesk",
       },
     ],
   },
   {
-    label: "Groups",
+    labelKey: "categoryGroups",
     cards: [
       {
         id: "create-groups",
-        label: "Create Groups",
+        labelKey: "createGroups",
         icon: FilePlus2,
-        description: "Bulk create groups from CSV template",
+        descriptionKey: "createDescription",
         minPermission: "AccountOperator",
+        minPermissionLabel: "accountOperator",
       },
       {
         id: "clone-group",
-        label: "Clone Group",
+        labelKey: "cloneGroup",
         icon: Copy,
-        description: "Create a copy of a group with its members",
+        descriptionKey: "cloneDescription",
         minPermission: "AccountOperator",
+        minPermissionLabel: "accountOperator",
       },
       {
         id: "merge-groups",
-        label: "Merge Groups",
+        labelKey: "mergeGroups",
         icon: Merge,
-        description: "Combine members from multiple groups into one",
+        descriptionKey: "mergeDescription",
         minPermission: "AccountOperator",
+        minPermissionLabel: "accountOperator",
       },
       {
         id: "move-groups",
-        label: "Move Groups",
+        labelKey: "moveGroups",
         icon: FolderInput,
-        description: "Move groups to a different OU",
+        descriptionKey: "moveDescription",
         minPermission: "Admin",
+        minPermissionLabel: "admin",
       },
     ],
   },
   {
-    label: "Properties",
+    labelKey: "categoryProperties",
     cards: [
       {
         id: "update-manager",
-        label: "Set ManagedBy",
+        labelKey: "updateManager",
         icon: Shield,
-        description: "Set the managedBy attribute on groups",
+        descriptionKey: "managerDescription",
         minPermission: "AccountOperator",
+        minPermissionLabel: "accountOperator",
       },
     ],
   },
   {
-    label: "Export",
+    labelKey: "categoryExport",
     cards: [
       {
         id: "export-csv",
-        label: "Export CSV",
+        labelKey: "exportCsv",
         icon: Download,
-        description: "Export group members to a CSV file",
+        descriptionKey: "exportDescription",
         minPermission: "ReadOnly",
+        minPermissionLabel: "readOnly",
       },
     ],
   },
@@ -413,6 +426,7 @@ function UserSearchPicker({
 }
 
 export function BulkOperations() {
+  const { t } = useTranslation(["bulkOperations", "common"]);
   const { hasPermission } = usePermissions();
   const searchGroups = useGroupSearch();
 
@@ -1312,9 +1326,9 @@ export function BulkOperations() {
 
         <div className="space-y-4" data-testid="operation-picker">
           {OPERATION_CATEGORIES.map((category) => (
-            <div key={category.label}>
+            <div key={category.labelKey}>
               <h3 className="mb-2 text-caption font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">
-                {category.label}
+                {t(category.labelKey)}
               </h3>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                 {category.cards.map((card) => {
@@ -1325,7 +1339,7 @@ export function BulkOperations() {
                       key={card.id}
                       onClick={() => setSelectedOp(card.id)}
                       disabled={!permitted}
-                      title={!permitted ? `Requires ${card.minPermission} permission` : undefined}
+                      title={!permitted ? t(card.minPermissionLabel) : undefined}
                       className={`flex flex-col items-start gap-2 rounded-lg border p-3 text-left transition-colors ${
                         permitted
                           ? "border-[var(--color-border-default)] bg-[var(--color-surface-card)] hover:border-[var(--color-primary)] hover:bg-[var(--color-surface-hover)] cursor-pointer"
@@ -1339,11 +1353,11 @@ export function BulkOperations() {
                           className="text-[var(--color-primary)]"
                         />
                         <span className="text-body font-medium text-[var(--color-text-primary)]">
-                          {card.label}
+                          {t(card.labelKey)}
                         </span>
                       </div>
                       <p className="text-caption text-[var(--color-text-secondary)]">
-                        {card.description}
+                        {t(card.descriptionKey)}
                       </p>
                     </button>
                   );
@@ -1383,8 +1397,10 @@ export function BulkOperations() {
           Back
         </button>
         <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">
-          {OPERATION_CATEGORIES.flatMap((cat) => cat.cards).find((c) => c.id === selectedOp)?.label ??
-            "Bulk Operation"}
+          {(() => {
+            const card = OPERATION_CATEGORIES.flatMap((cat) => cat.cards).find((c) => c.id === selectedOp);
+            return card ? t(card.labelKey) : t("pageTitle");
+          })()}
         </h2>
       </div>
 

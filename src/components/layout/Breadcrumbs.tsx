@@ -1,12 +1,14 @@
 import { ChevronRight } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { useNavigation } from "@/contexts/NavigationContext";
 
 export function Breadcrumbs() {
+  const { t } = useTranslation("layout");
   const { breadcrumbs, navigateTo } = useNavigation();
 
   return (
     <nav
-      aria-label="Breadcrumb"
+      aria-label={t("breadcrumb")}
       className="flex h-8 items-center gap-1 border-b border-[var(--color-border-subtle)] px-4 text-caption text-[var(--color-text-secondary)] bg-[var(--color-surface-bg)]"
       data-testid="breadcrumbs"
     >

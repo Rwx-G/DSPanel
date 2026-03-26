@@ -2,6 +2,7 @@ import { useState, useCallback } from "react";
 import { ChevronDown, ChevronRight, Pencil, Check, X } from "lucide-react";
 import { AlertTriangle, AlertCircle, CheckCircle } from "lucide-react";
 import { CopyButton } from "@/components/common/CopyButton";
+import { useTranslation } from "react-i18next";
 
 export type PropertySeverity = "Warning" | "Critical" | "Success" | "Error";
 
@@ -123,6 +124,7 @@ function EditableCell({
 }
 
 export function PropertyGrid({ groups, onEdit }: PropertyGridProps) {
+  const { t } = useTranslation(["components"]);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
   const toggleGroup = (category: string) => {
@@ -143,7 +145,7 @@ export function PropertyGrid({ groups, onEdit }: PropertyGridProps) {
         className="py-4 text-center text-caption text-[var(--color-text-secondary)]"
         data-testid="property-grid-empty"
       >
-        No properties to display
+        {t("components:propertyGrid.noProperties")}
       </div>
     );
   }

@@ -14,6 +14,7 @@ import { useNotifications } from "@/contexts/NotificationContext";
 import { useDialog } from "@/contexts/DialogContext";
 import { extractErrorMessage } from "@/utils/errorMapping";
 import { ExportToolbar, type ExportColumn } from "./ExportToolbar";
+import { useTranslation } from "react-i18next";
 
 interface ObjectSnapshot {
   id: number;
@@ -39,6 +40,7 @@ interface SnapshotHistoryProps {
 }
 
 export function SnapshotHistory({ objectDn, canRestore, refreshTrigger = 0, onRestored }: SnapshotHistoryProps) {
+  const { t } = useTranslation(["components", "common"]);
   const [snapshots, setSnapshots] = useState<ObjectSnapshot[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<number | null>(null);
@@ -93,9 +95,9 @@ export function SnapshotHistory({ objectDn, canRestore, refreshTrigger = 0, onRe
     async (snapshot: ObjectSnapshot) => {
       const objectName = snapshot.objectDn.split(",")[0]?.replace("CN=", "") || snapshot.objectDn;
       const confirmed = await showConfirmation(
-        "Restore from Snapshot",
-        `Restore "${objectName}" to its state from ${formatTimestamp(snapshot.timestamp)}?`,
-        "This will overwrite current attribute values with the snapshot values. Read-only attributes (objectClass, memberOf, timestamps, etc.) will be skipped.",
+        t("components:snapshotHistory.restoreTitle"),
+        t("components:snapshotHistory.restoreConfirm", { name: objectName, timestamp: formatTimestamp(snapshot.timestamp) }),
+        t("components:snapshotHistory.restoreNote"),
       );
 
       if (!confirmed) return;
@@ -109,7 +111,7 @@ export function SnapshotHistory({ objectDn, canRestore, refreshTrigger = 0, onRe
         } catch {
           // Non-blocking: snapshot stays if delete fails
         }
-        notify("Object restored from snapshot successfully.", "success");
+        notify(t("components:snapshotHistory.restoreSuccess"), "success");
         setExpandedId(null);
         setDiffs(null);
         await fetchHistory();
@@ -124,15 +126,15 @@ export function SnapshotHistory({ objectDn, canRestore, refreshTrigger = 0, onRe
   );
 
   if (loading) {
-    return <LoadingSpinner message="Loading snapshot history..." />;
+    return <LoadingSpinner message={t("components:snapshotHistory.loading")} />;
   }
 
   if (snapshots.length === 0) {
     return (
       <EmptyState
         icon={<History size={32} />}
-        title="No snapshots"
-        description="Snapshots are captured automatically before modifications."
+        title={t("components:snapshotHistory.noSnapshots")}
+        description={t("components:snapshotHistory.snapshotsDescription")}
       />
     );
   }
@@ -196,7 +198,7 @@ export function SnapshotHistory({ objectDn, canRestore, refreshTrigger = 0, onRe
                     className="btn btn-sm btn-ghost"
                     onClick={() => handleRestore(snap)}
                     disabled={restoring}
-                    title="Restore from this snapshot"
+                    title={t("components:snapshotHistory.restoreButton")}
                     data-testid={`snapshot-restore-${snap.id}`}
                   >
                     <RotateCcw size={14} />
@@ -207,19 +209,19 @@ export function SnapshotHistory({ objectDn, canRestore, refreshTrigger = 0, onRe
                   onClick={async (e) => {
                     e.stopPropagation();
                     const confirmed = await showConfirmation(
-                      "Delete Snapshot",
-                      `Delete the "${snap.operationType}" snapshot from ${formatTimestamp(snap.timestamp)}?`,
-                      "This restore point will be permanently removed.",
+                      t("components:snapshotHistory.deleteTitle"),
+                      t("components:snapshotHistory.deleteConfirm", { operation: snap.operationType, timestamp: formatTimestamp(snap.timestamp) }),
+                      t("components:snapshotHistory.deleteNote"),
                     );
                     if (!confirmed) return;
                     try {
                       await invoke("delete_snapshot", { snapshotId: snap.id });
                       await fetchHistory();
                     } catch {
-                      notify("Failed to delete snapshot", "error");
+                      notify(t("components:snapshotHistory.deleteFailed"), "error");
                     }
                   }}
-                  title="Delete snapshot"
+                  title={t("components:snapshotHistory.deleteButton")}
                   data-testid={`snapshot-delete-${snap.id}`}
                 >
                   <Trash2 size={14} />
@@ -233,28 +235,27 @@ export function SnapshotHistory({ objectDn, canRestore, refreshTrigger = 0, onRe
                 data-testid={`snapshot-details-${snap.id}`}
               >
                 {diffLoading ? (
-                  <LoadingSpinner message="Computing diff..." />
+                  <LoadingSpinner message={t("components:snapshotHistory.computingDiff")} />
                 ) : diffs ? (
                   <div className="space-y-1">
                     {diffs.filter((d) => d.changed).length === 0 ? (
                       <p className="text-caption text-[var(--color-text-secondary)]">
-                        No differences found - object matches the snapshot.
+                        {t("components:snapshotHistory.noDifferences")}
                       </p>
                     ) : (
                       <>
                         <div className="flex items-center gap-1 text-caption text-[var(--color-warning)]">
                           <AlertTriangle size={12} />
                           <span>
-                            {diffs.filter((d) => d.changed).length} attribute(s)
-                            differ from current state
+                            {t("components:snapshotHistory.attributesDiffer", { count: diffs.filter((d) => d.changed).length })}
                           </span>
                         </div>
                         <table className="w-full text-caption">
                           <thead>
                             <tr className="text-left text-[var(--color-text-secondary)]">
-                              <th className="py-1 pr-2">Attribute</th>
-                              <th className="py-1 pr-2">Snapshot</th>
-                              <th className="py-1">Current</th>
+                              <th className="py-1 pr-2">{t("components:snapshotHistory.attribute")}</th>
+                              <th className="py-1 pr-2">{t("components:snapshotHistory.snapshot")}</th>
+                              <th className="py-1">{t("components:snapshotHistory.current")}</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -283,7 +284,7 @@ export function SnapshotHistory({ objectDn, canRestore, refreshTrigger = 0, onRe
                   </div>
                 ) : (
                   <p className="text-caption text-[var(--color-text-secondary)]">
-                    Failed to compute diff.
+                    {t("components:snapshotHistory.diffFailed")}
                   </p>
                 )}
               </div>

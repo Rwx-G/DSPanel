@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { loadPersistedLanguage } from "./i18n";
 import {
   NavigationProvider,
   useNavigation,
@@ -84,6 +85,7 @@ export function App() {
 
   useEffect(() => {
     installGlobalErrorHandlers();
+    loadPersistedLanguage();
 
     invoke<DomainInfo>("get_domain_info")
       .then((info) => {

@@ -206,8 +206,8 @@ describe("EscalationPaths", () => {
       expect(screen.getByTestId("graph-legend")).toBeInTheDocument();
     });
 
-    expect(screen.getByText("Nodes:")).toBeInTheDocument();
-    expect(screen.getByText("Edges:")).toBeInTheDocument();
+    expect(screen.getByText("nodes:")).toBeInTheDocument();
+    expect(screen.getByText("edges:")).toBeInTheDocument();
   });
 
   it("shows node type counts in compact legend", async () => {

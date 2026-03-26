@@ -21,6 +21,7 @@ import {
   Info,
   ThumbsUp,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 /** Wrapper for hygiene result sections - shows green "all clear" when count is 0 */
 function HygieneSection({
@@ -44,6 +45,7 @@ function HygieneSection({
   actions?: React.ReactNode;
   children?: React.ReactNode;
 }) {
+  const { t } = useTranslation(["groupHygiene"]);
   const [showTip, setShowTip] = useState(false);
   const isClean = count === 0;
   return (
@@ -105,7 +107,7 @@ function HygieneSection({
       </div>
       {isClean ? (
         <p className="mt-2 text-caption text-[var(--color-success)]">
-          All clear - no issues detected
+          {t("allClear")}
         </p>
       ) : (
         <div className="mt-3">{children}</div>
@@ -170,6 +172,7 @@ interface DeepNestingResult {
 }
 
 export function GroupHygiene() {
+  const { t } = useTranslation(["groupHygiene", "common"]);
   const [scanning, setScanning] = useState(false);
   const [emptyGroups, setEmptyGroups] = useState<DirectoryGroup[]>([]);
   const [cycles, setCycles] = useState<string[][]>([]);
@@ -537,7 +540,7 @@ export function GroupHygiene() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">
-            Group Hygiene
+            {t("pageTitle")}
           </h2>
           <div className="relative">
             <button
@@ -555,7 +558,7 @@ export function GroupHygiene() {
                 data-testid="hygiene-info-popup"
               >
                 <p className="text-caption font-semibold text-[var(--color-text-primary)] mb-1.5">
-                  Group Hygiene Scanner
+                  {t("scannerTitle")}
                 </p>
                 <ul className="space-y-1 text-caption text-[var(--color-text-secondary)]">
                   <li><strong>Empty groups</strong> - no members at all</li>
@@ -602,7 +605,7 @@ export function GroupHygiene() {
             data-testid="scan-button"
           >
             <Search size={14} />
-            {scanning ? "Scanning..." : "Run Scan"}
+            {scanning ? t("scanning") : t("runScan")}
           </button>
         </div>
       </div>
@@ -611,13 +614,13 @@ export function GroupHygiene() {
       {!scanned && !scanning && !scanError && (
         <div className="space-y-4 opacity-50 pointer-events-none">
           {[
-            { title: "Empty Groups", hint: "No members at all" },
-            { title: "Single-Member Groups", hint: "Only one member, possibly redundant" },
-            { title: "Stale Groups", hint: "Not modified in over 180 days" },
-            { title: "Groups Without Description", hint: "Missing documentation" },
-            { title: "Circular Nesting", hint: "Circular group nesting detected" },
-            { title: "Excessive Nesting Depth", hint: "Nested deeper than 3 levels" },
-            { title: "Duplicate Groups", hint: "Identical member sets" },
+            { title: t("emptyGroups"), hint: t("emptyGroupsHint") },
+            { title: t("singleMemberGroups"), hint: t("singleMemberGroupsHint") },
+            { title: t("staleGroups"), hint: t("staleGroupsHint") },
+            { title: t("undescribedGroups"), hint: t("undescribedGroupsHint") },
+            { title: t("circularNesting"), hint: t("circularNestingHint") },
+            { title: t("excessiveDepth"), hint: t("excessiveDepthHint") },
+            { title: t("duplicateGroups"), hint: t("duplicateGroupsHint") },
           ].map((section) => (
             <div
               key={section.title}
@@ -630,7 +633,7 @@ export function GroupHygiene() {
                 </span>
               </h3>
               <p className="text-caption text-[var(--color-text-secondary)]">
-                Run scan to detect: {section.hint}
+                {t("runScanToDetect")}: {section.hint}
               </p>
             </div>
           ))}
@@ -642,7 +645,7 @@ export function GroupHygiene() {
           className="flex items-center justify-center py-8"
           data-testid="scan-loading"
         >
-          <LoadingSpinner message="Scanning for group issues..." />
+          <LoadingSpinner message={t("scanningMessage")} />
         </div>
       )}
 
@@ -650,9 +653,9 @@ export function GroupHygiene() {
         <div data-testid="scan-error">
           <EmptyState
             icon={<AlertCircle size={48} />}
-            title="Scan failed"
+            title={t("scanFailed")}
             description={scanError}
-            action={{ label: "Retry", onClick: handleScan }}
+            action={{ label: t("common:retry"), onClick: handleScan }}
           />
         </div>
       )}
@@ -662,7 +665,7 @@ export function GroupHygiene() {
         <>
           {/* Empty Groups */}
           <HygieneSection
-            title="Empty Groups"
+            title={t("emptyGroups")}
             count={emptyGroups.length}
             testId="empty-groups-section"
             countTestId="empty-groups-count"
@@ -677,7 +680,7 @@ export function GroupHygiene() {
                     disabled={!canDelete}
                     data-testid="select-all-empty"
                   />
-                  Select all
+                  {t("selectAll")}
                 </label>
                 <button
                   className="btn btn-outline btn-sm flex items-center gap-1 tabular-nums"
@@ -687,7 +690,7 @@ export function GroupHygiene() {
                   data-testid="delete-selected-btn"
                 >
                   <Trash2 size={14} />
-                  Delete Selected ({selectedEmpty.size})
+                  {t("deleteSelected", { count: selectedEmpty.size })}
                 </button>
               </div>
             }
@@ -707,7 +710,7 @@ export function GroupHygiene() {
 
           {/* Single-Member Groups */}
           <HygieneSection
-            title="Single-Member Groups"
+            title={t("singleMemberGroups")}
             count={singleMemberGroups.length}
             testId="single-member-groups-section"
             countTestId="single-member-groups-count"
@@ -727,7 +730,7 @@ export function GroupHygiene() {
 
           {/* Stale Groups */}
           <HygieneSection
-            title="Stale Groups"
+            title={t("staleGroups")}
             count={staleGroups.length}
             testId="stale-groups-section"
             countTestId="stale-groups-count"
@@ -748,7 +751,7 @@ export function GroupHygiene() {
 
           {/* Groups Without Description */}
           <HygieneSection
-            title="Groups Without Description"
+            title={t("undescribedGroups")}
             count={undescribedGroups.length}
             testId="undescribed-groups-section"
             countTestId="undescribed-groups-count"
@@ -768,7 +771,7 @@ export function GroupHygiene() {
 
           {/* Circular Nesting */}
           <HygieneSection
-            title="Circular Nesting"
+            title={t("circularNesting")}
             count={cycles.length}
             testId="circular-groups-section"
             countTestId="cycles-count"
@@ -811,7 +814,7 @@ export function GroupHygiene() {
 
           {/* Excessive Nesting Depth */}
           <HygieneSection
-            title="Excessive Nesting Depth"
+            title={t("excessiveDepth")}
             count={deeplyNested.length}
             testId="deep-nesting-section"
             countTestId="deep-nesting-count"
@@ -852,7 +855,7 @@ export function GroupHygiene() {
 
           {/* Duplicate Groups */}
           <HygieneSection
-            title="Duplicate Groups"
+            title={t("duplicateGroups")}
             count={duplicateGroups.length}
             testId="duplicate-groups-section"
             countTestId="duplicate-groups-count"
@@ -867,7 +870,7 @@ export function GroupHygiene() {
                   data-testid={`duplicate-cluster-${idx}`}
                 >
                   <p className="mb-1 text-caption text-[var(--color-text-secondary)]">
-                    These groups share identical members:
+                    {t("identicalMembers")}:
                   </p>
                   <div className="flex flex-wrap gap-2">
                     {cluster.map((g) => (
@@ -896,11 +899,10 @@ export function GroupHygiene() {
         >
           <div className="max-h-96 w-full max-w-md overflow-auto rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-4 shadow-lg">
             <h3 className="mb-3 text-body font-semibold text-[var(--color-text-primary)]">
-              Delete {selectedGroupsForPreview.length} Empty Group(s)?
+              {t("deleteConfirmTitle", { count: selectedGroupsForPreview.length })}
             </h3>
             <p className="mb-3 text-caption text-[var(--color-text-secondary)]">
-              This action cannot be undone. The following groups will be
-              permanently deleted:
+              {t("deleteConfirmMessage")}
             </p>
             <ul className="mb-4 max-h-48 space-y-1 overflow-auto">
               {selectedGroupsForPreview.map((g) => (
@@ -921,14 +923,14 @@ export function GroupHygiene() {
                 onClick={() => setShowDeletePreview(false)}
                 data-testid="delete-preview-cancel"
               >
-                Cancel
+                {t("common:cancel")}
               </button>
               <button
                 className="btn bg-[var(--color-error)] text-white hover:opacity-90"
                 onClick={handleDeleteSelected}
                 data-testid="delete-preview-confirm"
               >
-                Delete
+                {t("common:delete")}
               </button>
             </div>
           </div>

@@ -17,6 +17,7 @@ import { GroupMembersDialog } from "@/components/dialogs/GroupMembersDialog";
 import { type DirectoryComputer } from "@/types/directory";
 import { parseCnFromDn } from "@/utils/dn";
 import { Users, Trash2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { StateInTimeView } from "@/components/comparison/StateInTimeView";
 import { WorkstationMonitoringPanel } from "@/components/common/WorkstationMonitoringPanel";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -31,6 +32,7 @@ export function ComputerDetail({
   computer: DirectoryComputer;
   onDeleted?: () => void;
 }) {
+  const { t } = useTranslation(["computerDetail", "common"]);
   const [groupFilterText, setGroupFilterText] = useState("");
   const [showMonitoring, setShowMonitoring] = useState(false);
   const [platform, setPlatform] = useState("unknown");
@@ -47,14 +49,14 @@ export function ComputerDetail({
 
   const handleDeleteComputer = useCallback(async () => {
     const confirmed = await showConfirmation(
-      "Delete Computer",
-      `Are you sure you want to delete "${computer.name}"?`,
-      "This action cannot be undone.",
+      t("deleteComputer"),
+      t("deleteConfirmation", { name: computer.name }),
+      t("common:cannotBeUndone"),
     );
     if (!confirmed) return;
     try {
       await invoke("delete_ad_object", { dn: computer.distinguishedName });
-      notify("Computer deleted successfully", "success");
+      notify(t("deleteSuccess"), "success");
       onDeleted?.();
     } catch (err) {
       handleError(err, "deleting computer");
@@ -150,52 +152,52 @@ export function ComputerDetail({
 
   const propertyGroups: PropertyGroup[] = [
     {
-      category: "Identity",
+      category: t("common:identity"),
       items: [
-        { label: "Computer Name", value: computer.name },
-        { label: "DNS Hostname", value: computer.dnsHostName },
-        { label: "Operating System", value: computer.operatingSystem },
-        { label: "OS Version", value: computer.osVersion },
+        { label: t("computerName"), value: computer.name },
+        { label: t("dnsHostname"), value: computer.dnsHostName },
+        { label: t("operatingSystem"), value: computer.operatingSystem },
+        { label: t("osVersion"), value: computer.osVersion },
       ],
     },
     {
-      category: "Status",
+      category: t("common:status"),
       items: [
         {
-          label: "Account Status",
-          value: computer.enabled ? "Enabled" : "Disabled",
+          label: t("common:status"),
+          value: computer.enabled ? t("common:enabled") : t("common:disabled"),
         },
-        { label: "Last Logon", value: computer.lastLogon ?? "Never" },
+        { label: t("lastLogon"), value: computer.lastLogon ?? t("common:never") },
       ],
     },
     {
-      category: "Location",
+      category: t("common:location"),
       items: [
-        { label: "OU Path", value: computer.organizationalUnit },
+        { label: t("common:ouPath"), value: computer.organizationalUnit },
         {
-          label: "Distinguished Name",
+          label: t("common:distinguishedName"),
           value: computer.distinguishedName,
         },
       ],
     },
     {
-      category: "Network",
+      category: t("common:network"),
       items: [
         {
-          label: "IP Address(es)",
+          label: t("ipAddress"),
           value: isResolvingDns
             ? dnsTimedOut
-              ? "Resolving... (taking longer than expected)"
-              : "Resolving..."
+              ? t("resolvingSlow")
+              : t("resolving")
             : resolvedAddresses.length > 0
               ? resolvedAddresses.join(", ")
-              : "N/A",
+              : t("common:na"),
           severity:
             isResolvingDns && dnsTimedOut ? ("Warning" as const) : undefined,
         },
         {
-          label: "Ping",
-          value: pingResult ?? "Not tested",
+          label: t("pingStatus"),
+          value: pingResult ?? t("notTested"),
           severity: pingResult
             ? pingResult.startsWith("Reachable")
               ? ("Success" as const)
@@ -249,11 +251,11 @@ export function ComputerDetail({
               data-testid="computer-delete-btn"
             >
               <Trash2 size={14} />
-              Delete
+              {t("common:delete")}
             </button>
           )}
           <StatusBadge
-            text={computer.enabled ? "Enabled" : "Disabled"}
+            text={computer.enabled ? t("common:enabled") : t("common:disabled")}
             variant={computer.enabled ? "success" : "error"}
           />
         </div>
@@ -271,7 +273,7 @@ export function ComputerDetail({
           disabled={isPinging || !computer.dnsHostName}
           data-testid="ping-button"
         >
-          {isPinging ? "Pinging..." : "Ping"}
+          {isPinging ? t("pinging") : t("ping")}
         </button>
         {pingResult && (
           <StatusBadge
@@ -290,7 +292,7 @@ export function ComputerDetail({
       <div data-testid="computer-groups-section">
         <div className="mb-2 flex items-center justify-between">
           <h3 className="text-body font-semibold text-[var(--color-text-primary)]">
-            Group Memberships ({computer.memberOf.length})
+            {t("groupMemberships")} ({computer.memberOf.length})
           </h3>
           <ExportToolbar<{ name: string; dn: string }>
             columns={groupColumns.map((c): ExportColumn => ({ key: c.key, header: c.header }))}
@@ -304,7 +306,7 @@ export function ComputerDetail({
           filters={groupFilters}
           onFilterChange={setGroupFilters}
           onTextFilter={setGroupFilterText}
-          placeholder="Filter groups..."
+          placeholder={t("filterGroups")}
         />
         <DataTable
           columns={groupColumns}
@@ -318,7 +320,7 @@ export function ComputerDetail({
 
       <div data-testid="computer-history-section">
         <h3 className="mb-2 text-body font-semibold text-[var(--color-text-primary)]">
-          Replication History
+          {t("replicationHistory")}
         </h3>
         <StateInTimeView
           objectDn={computer.distinguishedName}
@@ -348,7 +350,7 @@ export function ComputerDetail({
               className="btn btn-sm rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2.5 py-1 text-caption font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors"
               onClick={() => setShowMonitoring(true)}
             >
-              Open Workstation Monitoring
+              {t("openMonitoring")}
             </button>
           ) : (
             <WorkstationMonitoringPanel hostname={computer.dnsHostName} />

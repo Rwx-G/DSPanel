@@ -151,7 +151,7 @@ describe("GpoViewer", () => {
     });
 
     // Should show the formatted DN path
-    expect(screen.getByText(/Showing GPOs for:/)).toBeInTheDocument();
+    expect(screen.getByText(/Showing GPOs for/)).toBeInTheDocument();
   });
 
   it("shows empty GPO table when links result has zero links", async () => {

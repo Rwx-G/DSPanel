@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { DialogShell } from "@/components/dialogs/DialogShell";
+import { useTranslation } from "react-i18next";
 
 export type ChangeType = "add" | "modify" | "delete";
 
@@ -33,6 +34,7 @@ export function DryRunPreviewDialog({
   onExecute,
   onCancel,
 }: DryRunPreviewDialogProps) {
+  const { t } = useTranslation(["dialogs", "common"]);
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -58,7 +60,7 @@ export function DryRunPreviewDialog({
           className="text-body font-semibold text-[var(--color-text-primary)]"
           data-testid="dryrun-title"
         >
-          Pending Changes ({changes.length})
+          {t("dialogs:dryRunPreview.title", { count: changes.length })}
         </h2>
       </div>
 
@@ -94,14 +96,14 @@ export function DryRunPreviewDialog({
           onClick={onCancel}
           data-testid="dryrun-cancel"
         >
-          Cancel
+          {t("common:cancel")}
         </button>
         <button
           className="btn btn-primary"
           onClick={onExecute}
           data-testid="dryrun-execute"
         >
-          Execute
+          {t("common:execute")}
         </button>
       </div>
     </DialogShell>

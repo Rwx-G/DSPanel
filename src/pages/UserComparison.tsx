@@ -25,6 +25,7 @@ import { UncPermissionsAudit } from "@/components/comparison/UncPermissionsAudit
 import { useNotifications } from "@/contexts/NotificationContext";
 import { usePermissions } from "@/hooks/usePermissions";
 import { extractErrorMessage } from "@/utils/errorMapping";
+import { useTranslation } from "react-i18next";
 
 function parseDnOu(dn: string): string {
   const ou = formatOuPath(dn);
@@ -51,17 +52,17 @@ const CATEGORY_STYLES: Record<
   shared: {
     bg: "bg-[var(--color-success-bg)]",
     text: "text-[var(--color-success)]",
-    label: "Shared",
+    label: "shared",
   },
   onlyA: {
     bg: "bg-[var(--color-error-bg)]",
     text: "text-[var(--color-error)]",
-    label: "Only A",
+    label: "onlyA",
   },
   onlyB: {
     bg: "bg-[var(--color-primary-subtle)]",
     text: "text-[var(--color-primary)]",
-    label: "Only B",
+    label: "onlyB",
   },
 };
 
@@ -76,6 +77,7 @@ function UserSearchField({
   selectedUser: DirectoryEntry | null;
   testId: string;
 }) {
+  const { t } = useTranslation(["userComparison", "common"]);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<DirectoryEntry[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -123,7 +125,7 @@ function UserSearchField({
           <input
             type="text"
             className="flex-1 bg-transparent text-body text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-secondary)]"
-            placeholder="Search by name or SAM..."
+            placeholder={t("searchPlaceholder")}
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
@@ -183,22 +185,22 @@ function UserSearchField({
             {selectedUser.displayName ?? selectedUser.samAccountName}
           </div>
           <div className="mt-1 space-y-0.5 text-caption text-[var(--color-text-secondary)]">
-            <div>SAM: {selectedUser.samAccountName}</div>
-            <div>Title: {selectedUser.attributes?.title?.[0] ?? "-"}</div>
+            <div>{t("sam")} {selectedUser.samAccountName}</div>
+            <div>{t("titleLabel")} {selectedUser.attributes?.title?.[0] ?? "-"}</div>
             <div>
-              Department: {selectedUser.attributes?.department?.[0] ?? "-"}
+              {t("departmentLabel")} {selectedUser.attributes?.department?.[0] ?? "-"}
             </div>
             <div>
-              OU:{" "}
+              {t("ouLabel")}{" "}
               {selectedUser.distinguishedName
                 ? parseDnOu(selectedUser.distinguishedName)
                 : "-"}
             </div>
             <div>
-              Last Logon: {selectedUser.attributes?.lastLogon?.[0] ?? "-"}
+              {t("lastLogonLabel")} {selectedUser.attributes?.lastLogon?.[0] ?? "-"}
             </div>
-            <div>Status: {formatAccountStatus(selectedUser)}</div>
-            <div>Groups: {selectedUser.attributes?.memberOf?.length ?? 0}</div>
+            <div>{t("statusLabel")} {formatAccountStatus(selectedUser)}</div>
+            <div>{t("groupsLabel")} {selectedUser.attributes?.memberOf?.length ?? 0}</div>
           </div>
         </div>
       )}
@@ -213,6 +215,7 @@ function UncPermissionsSection({
   userA: DirectoryEntry;
   userB: DirectoryEntry;
 }) {
+  const { t } = useTranslation(["userComparison"]);
   const [showInfo, setShowInfo] = useState(false);
 
   return (
@@ -222,14 +225,14 @@ function UncPermissionsSection({
     >
       <div className="mb-3 flex items-center gap-2">
         <h2 className="text-body font-semibold text-[var(--color-text-primary)]">
-          UNC Path Permissions Audit
+          {t("uncPermissionsAudit")}
         </h2>
         <div className="relative" data-testid="unc-info">
           <button
             className="flex h-6 w-6 items-center justify-center rounded-full text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors"
             onClick={() => setShowInfo(!showInfo)}
             onBlur={() => setTimeout(() => setShowInfo(false), 150)}
-            aria-label="About UNC permissions audit"
+            aria-label={t("aboutUncAudit")}
             data-testid="unc-info-button"
           >
             <Info size={14} />
@@ -240,14 +243,10 @@ function UncPermissionsSection({
               data-testid="unc-info-popup"
             >
               <p className="text-caption font-semibold text-[var(--color-text-primary)] mb-1">
-                Permissions Cross-Reference
+                {t("permissionsCrossReference")}
               </p>
               <p className="text-caption text-[var(--color-text-secondary)]">
-                Enter a UNC path to see its NTFS permissions cross-referenced
-                with both users. Each ACE shows whether User A and User B have
-                access through their group memberships, helping you quickly
-                identify why one user can access a resource and the other
-                cannot.
+                {t("uncDescription")}
               </p>
             </div>
           )}
@@ -259,6 +258,7 @@ function UncPermissionsSection({
 }
 
 export function UserComparison() {
+  const { t } = useTranslation(["userComparison", "common"]);
   const {
     userA,
     userB,
@@ -315,7 +315,7 @@ export function UserComparison() {
       e.preventDefault();
       const items: ContextMenuItem[] = [
         {
-          label: "View group members",
+          label: t("viewGroupMembers"),
           icon: <Users size={14} />,
           onClick: () =>
             setGroupMembersDialog({ dn: group.dn, name: group.name }),
@@ -324,7 +324,7 @@ export function UserComparison() {
 
       if (group.category === "onlyB" && userA) {
         items.push({
-          label: `Add ${userA.displayName ?? userA.samAccountName} to this group`,
+          label: t("addToGroup", { name: userA.displayName ?? userA.samAccountName }),
           icon: <UserPlus size={14} />,
           disabled: !canModifyGroups,
           onClick: async () => {
@@ -347,7 +347,7 @@ export function UserComparison() {
 
       if (group.category === "onlyA" && userB) {
         items.push({
-          label: `Add ${userB.displayName ?? userB.samAccountName} to this group`,
+          label: t("addToGroup", { name: userB.displayName ?? userB.samAccountName }),
           icon: <UserPlus size={14} />,
           disabled: !canModifyGroups,
           onClick: async () => {
@@ -387,7 +387,7 @@ export function UserComparison() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold text-[var(--color-text-primary)]">
-          User Comparison
+          {t("pageTitle")}
         </h1>
         <button
           className="btn btn-outline btn-sm flex items-center gap-1.5"
@@ -395,20 +395,20 @@ export function UserComparison() {
           data-testid="comparison-reset"
         >
           <RotateCcw size={14} />
-          Reset
+          {t("common:reset")}
         </button>
       </div>
 
       {/* User selection panels */}
       <div className="grid grid-cols-2 gap-4">
         <UserSearchField
-          label="User A"
+          label={t("userA")}
           onSelect={selectUserA}
           selectedUser={userA}
           testId="user-a"
         />
         <UserSearchField
-          label="User B"
+          label={t("userB")}
           onSelect={selectUserB}
           selectedUser={userB}
           testId="user-b"
@@ -428,7 +428,7 @@ export function UserComparison() {
           ) : (
             <GitCompareArrows size={16} />
           )}
-          Compare Groups
+          {t("compareGroups")}
         </button>
       </div>
 
@@ -453,7 +453,7 @@ export function UserComparison() {
             <div className="flex items-center gap-2">
               <span className="inline-block h-3 w-3 rounded-full bg-[var(--color-success)]" />
               <span className="text-body text-[var(--color-text-primary)]">
-                <strong>{comparisonResult.sharedGroups.length}</strong> shared
+                <strong>{comparisonResult.sharedGroups.length}</strong> {t("shared")}
               </span>
             </div>
             <div className="flex items-center gap-2">
@@ -501,8 +501,8 @@ export function UserComparison() {
               }
               data-testid="sort-field"
             >
-              <option value="name">Sort by Name</option>
-              <option value="category">Sort by Type</option>
+              <option value="name">{t("sortByName")}</option>
+              <option value="category">{t("sortByType")}</option>
             </select>
             <button
               className="btn btn-ghost px-2 py-1.5 text-caption"
@@ -511,7 +511,7 @@ export function UserComparison() {
               }
               data-testid="sort-direction"
             >
-              {sortDirection === "asc" ? "A-Z" : "Z-A"}
+              {sortDirection === "asc" ? t("aToZ") : t("zToA")}
             </button>
             <ExportToolbar<GroupDisplayItem>
               columns={[
@@ -530,7 +530,7 @@ export function UserComparison() {
           <div className="max-h-[360px] overflow-y-auto rounded-lg border border-[var(--color-border-default)]">
             {filteredGroups.length === 0 ? (
               <div className="py-8 text-center text-caption text-[var(--color-text-secondary)]">
-                No groups to display
+                {t("noGroupsToDisplay")}
               </div>
             ) : (
               <div>
@@ -548,7 +548,7 @@ export function UserComparison() {
                         className={`inline-flex min-w-[60px] items-center justify-center rounded-full px-2 py-0.5 text-[11px] font-medium ${style.text} ${style.bg}`}
                       >
                         {group.category === "shared"
-                          ? "Shared"
+                          ? t("shared")
                           : group.category === "onlyA"
                             ? userAName
                             : userBName}

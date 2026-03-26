@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Search, X } from "lucide-react";
 import { TagChip } from "@/components/common/TagChip";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
+import { useTranslation } from "react-i18next";
 
 export interface GroupOption {
   distinguishedName: string;
@@ -24,11 +25,12 @@ export function GroupPicker({
   selectedGroups,
   onSelectionChange,
   onSearch,
-  placeholder = "Search groups...",
+  placeholder,
   disabled = false,
   debounceMs = 300,
   singleSelect = false,
 }: GroupPickerProps) {
+  const { t } = useTranslation(["components"]);
   const [searchText, setSearchText] = useState("");
   const [results, setResults] = useState<GroupOption[]>([]);
   const [loading, setLoading] = useState(false);
@@ -189,7 +191,7 @@ export function GroupPicker({
             setSearchText(e.target.value);
             setHighlightIndex(-1);
           }}
-          placeholder={placeholder}
+          placeholder={placeholder ?? t("components:groupPicker.placeholder")}
           disabled={disabled}
           className="flex-1 bg-transparent text-body text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-secondary)]"
           data-testid="group-picker-search"
@@ -205,7 +207,7 @@ export function GroupPicker({
               setIsOpen(false);
             }}
             className="rounded-sm p-0.5 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
-            aria-label="Clear search"
+            aria-label={t("components:groupPicker.clearSearch")}
             data-testid="group-picker-clear"
           >
             <X size={14} />
@@ -249,7 +251,7 @@ export function GroupPicker({
           className="absolute z-20 mt-1 w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] shadow-md px-3 py-2 text-caption text-[var(--color-error)]"
           data-testid="group-picker-error"
         >
-          Search failed. Please try again.
+          {t("components:groupPicker.searchFailed")}
         </div>
       )}
 
@@ -262,7 +264,7 @@ export function GroupPicker({
             className="absolute z-20 mt-1 w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] shadow-md px-3 py-2 text-caption text-[var(--color-text-secondary)]"
             data-testid="group-picker-no-results"
           >
-            No groups found
+            {t("components:groupPicker.noGroups")}
           </div>
         )}
     </div>

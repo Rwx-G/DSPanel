@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { Calendar, ChevronLeft, ChevronRight, Clock, X } from "lucide-react";
 import { CalendarGrid } from "@/components/form/CalendarGrid";
+import { useTranslation } from "react-i18next";
 
 interface DateTimePickerProps {
   value: Date | null;
@@ -41,9 +42,10 @@ export function DateTimePicker({
   onChange,
   includeTime = false,
   disabled = false,
-  placeholder = "Select date...",
+  placeholder,
   error = false,
 }: DateTimePickerProps) {
+  const { t } = useTranslation(["components"]);
   const [isOpen, setIsOpen] = useState(false);
   const [viewYear, setViewYear] = useState(
     () => value?.getFullYear() ?? new Date().getFullYear(),
@@ -154,7 +156,7 @@ export function DateTimePicker({
               : "text-[var(--color-text-secondary)]"
           }
         >
-          {value ? formatDate(value, includeTime) : placeholder}
+          {value ? formatDate(value, includeTime) : (placeholder ?? t("components:dateTimePicker.placeholder"))}
         </span>
         <div className="flex items-center gap-1">
           {value && !disabled && (
@@ -187,7 +189,7 @@ export function DateTimePicker({
             <button
               onClick={handlePrevMonth}
               className="rounded-sm p-1 hover:bg-[var(--color-surface-hover)] transition-colors"
-              aria-label="Previous month"
+              aria-label={t("components:dateTimePicker.previousMonth")}
               data-testid="date-time-prev-month"
             >
               <ChevronLeft size={16} />
@@ -201,7 +203,7 @@ export function DateTimePicker({
             <button
               onClick={handleNextMonth}
               className="rounded-sm p-1 hover:bg-[var(--color-surface-hover)] transition-colors"
-              aria-label="Next month"
+              aria-label={t("components:dateTimePicker.nextMonth")}
               data-testid="date-time-next-month"
             >
               <ChevronRight size={16} />

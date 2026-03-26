@@ -411,7 +411,7 @@ describe("Offboarding", () => {
     });
 
     // Should show "Remove from all groups (2)" - Domain Users filtered out
-    expect(screen.getByText(/Remove from all groups \(2\)/)).toBeDefined();
+    expect(screen.getByText(/Remove from all groups.*2/)).toBeDefined();
   });
 
   it("shows moveToDisabledOU checkbox and OU picker when enabled", async () => {

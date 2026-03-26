@@ -24,6 +24,7 @@ import { useBrowse } from "@/hooks/useBrowse";
 import { useModifyAttribute } from "@/hooks/useModifyAttribute";
 import { type PrinterInfo, mapEntryToPrinter } from "@/types/printer";
 import { Printer, AlertCircle, Trash2, FolderInput } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 function usePrinterBrowse() {
   return useBrowse<PrinterInfo>({
@@ -41,6 +42,7 @@ function usePrinterBrowse() {
 }
 
 export function PrinterLookup() {
+  const { t } = useTranslation(["printerLookup", "common"]);
   const {
     items: printers,
     loading,
@@ -124,7 +126,7 @@ export function PrinterLookup() {
       const items: ContextMenuItem[] = [];
       if (canMove) {
         items.push({
-          label: "Move to OU",
+          label: t("common:moveToOu"),
           icon: <FolderInput size={14} />,
           onClick: () => {
             setMoveTargets([
@@ -147,20 +149,20 @@ export function PrinterLookup() {
   const buildPropertyGroups = useCallback(
     (printer: PrinterInfo): PropertyGroup[] => [
       {
-        category: "General",
+        category: t("general"),
         items: [
-          { label: "Name", value: printer.name, editable: canEdit, attributeName: "printerName" },
-          { label: "Location", value: printer.location, editable: canEdit, attributeName: "location" },
-          { label: "Description", value: printer.description, editable: canEdit, attributeName: "description" },
-          { label: "Distinguished Name", value: printer.dn },
+          { label: t("common:name"), value: printer.name, editable: canEdit, attributeName: "printerName" },
+          { label: t("common:location"), value: printer.location, editable: canEdit, attributeName: "location" },
+          { label: t("common:description"), value: printer.description, editable: canEdit, attributeName: "description" },
+          { label: t("common:distinguishedName"), value: printer.dn },
         ],
       },
       {
-        category: "Server Info",
+        category: t("serverInfo"),
         items: [
-          { label: "Server", value: printer.serverName, editable: canEdit, attributeName: "serverName" },
-          { label: "Share Path", value: printer.sharePath, editable: canEdit, attributeName: "uNCName" },
-          { label: "Driver", value: printer.driverName, editable: canEdit, attributeName: "driverName" },
+          { label: t("server"), value: printer.serverName, editable: canEdit, attributeName: "serverName" },
+          { label: t("sharePath"), value: printer.sharePath, editable: canEdit, attributeName: "uNCName" },
+          { label: t("driver"), value: printer.driverName, editable: canEdit, attributeName: "driverName" },
         ],
       },
     ],
@@ -188,7 +190,7 @@ export function PrinterLookup() {
             {printer.name}
           </p>
           <p className="truncate text-caption text-[var(--color-text-secondary)]">
-            {printer.location || printer.serverName || "No location"}
+            {printer.location || printer.serverName || t("noLocation")}
           </p>
         </div>
       </button>
@@ -204,7 +206,7 @@ export function PrinterLookup() {
             value={filterText}
             onChange={setFilterText}
             onSearch={setFilterText}
-            placeholder="Search printers by name, location, or server..."
+            placeholder={t("searchPlaceholder")}
             debounceMs={300}
           />
         </div>
@@ -215,12 +217,12 @@ export function PrinterLookup() {
         aria-live="polite"
         data-testid="printer-lookup-status"
       >
-        {loading && "Loading printers..."}
+        {loading && t("loadingPrinters")}
         {!loading &&
           printers.length > 0 &&
-          `${printers.length} printer${printers.length > 1 ? "s" : ""} found`}
-        {!loading && printers.length === 0 && !error && "No printers found"}
-        {error && `Error: ${error}`}
+          t("found", { count: printers.length })}
+        {!loading && printers.length === 0 && !error && t("noPrintersFound")}
+        {error && `${t("common:error")}: ${error}`}
       </div>
 
       <div className="flex flex-1 overflow-hidden">
@@ -229,7 +231,7 @@ export function PrinterLookup() {
             className="flex flex-1 items-center justify-center"
             data-testid="printer-lookup-loading"
           >
-            <LoadingSpinner message="Loading printers..." />
+            <LoadingSpinner message={t("loadingPrinters")} />
           </div>
         )}
 
@@ -240,9 +242,9 @@ export function PrinterLookup() {
           >
             <EmptyState
               icon={<AlertCircle size={48} />}
-              title="Failed to load printers"
+              title={t("failedToLoad")}
               description={error}
-              action={{ label: "Retry", onClick: refresh }}
+              action={{ label: t("common:retry"), onClick: refresh }}
             />
           </div>
         )}
@@ -251,11 +253,11 @@ export function PrinterLookup() {
           <div className="flex flex-1 items-center justify-center">
             <EmptyState
               icon={<Printer size={48} />}
-              title="No printers found"
+              title={t("noPrintersFound")}
               description={
                 filterText
-                  ? `No printers match "${filterText}".`
-                  : "No printers available."
+                  ? t("noPrintersMatch", { filter: filterText })
+                  : t("noPrintersAvailable")
               }
             />
           </div>
@@ -299,7 +301,7 @@ export function PrinterLookup() {
                         data-testid="printer-delete-btn"
                       >
                         <Trash2 size={14} />
-                        Delete
+                        {t("common:delete")}
                       </button>
                     )}
 
@@ -311,7 +313,7 @@ export function PrinterLookup() {
                           data-testid="pending-changes-bar"
                         >
                           <span className="text-caption text-[var(--color-text-primary)]">
-                            {pendingChanges.length} change(s)
+                            {t("common:change", { count: pendingChanges.length })}
                             {pendingChanges.map((c) => (
                               <span
                                 key={c.attributeName}
@@ -325,14 +327,14 @@ export function PrinterLookup() {
                             onClick={clearChanges}
                             className="btn btn-sm btn-ghost"
                           >
-                            Discard
+                            {t("common:discard")}
                           </button>
                           <button
                             onClick={handleSaveChanges}
                             disabled={saving}
                             className="btn btn-sm btn-primary"
                           >
-                            {saving ? "Saving..." : "Save"}
+                            {saving ? t("common:saving") : t("common:save")}
                           </button>
                         </div>
                       </>
@@ -347,7 +349,7 @@ export function PrinterLookup() {
               ) : (
                 <div className="flex h-full items-center justify-center">
                   <p className="text-body text-[var(--color-text-secondary)]">
-                    Select a printer to view details
+                    {t("selectPrinter")}
                   </p>
                 </div>
               )}

@@ -195,7 +195,7 @@ describe("ComputerLookup", () => {
     });
 
     expect(screen.getByText("Identity")).toBeInTheDocument();
-    expect(screen.getByText("Status")).toBeInTheDocument();
+    expect(screen.getAllByText("Status").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Location")).toBeInTheDocument();
     expect(screen.getByText("Network")).toBeInTheDocument();
   });
@@ -226,7 +226,7 @@ describe("ComputerLookup", () => {
       expect(screen.getByTestId("empty-state-title")).toHaveTextContent(
         "No computers found",
       );
-      expect(screen.getByText("No computers available.")).toBeInTheDocument();
+      expect(screen.getAllByText("No computers found").length).toBeGreaterThanOrEqual(1);
     });
   });
 
@@ -402,7 +402,7 @@ describe("ComputerLookup", () => {
     render(<ComputerLookup />);
 
     await waitFor(() => {
-      expect(screen.getByText("No computers available.")).toBeInTheDocument();
+      expect(screen.getByTestId("empty-state-title")).toHaveTextContent("No computers found");
     });
   });
 

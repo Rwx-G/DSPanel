@@ -39,6 +39,7 @@ import {
 import { useDialog } from "@/contexts/DialogContext";
 import { useErrorHandler } from "@/hooks/useErrorHandler";
 import { ExportToolbar } from "@/components/common/ExportToolbar";
+import { useTranslation } from "react-i18next";
 
 interface NestedMemberItemProps {
   entry: DirectoryEntry;
@@ -65,6 +66,7 @@ function NestedMemberItem({
   onToggleSelect,
   onRowContextMenu,
 }: NestedMemberItemProps) {
+  const { t } = useTranslation(["groupDetail", "common"]);
   const name =
     entry.displayName ??
     entry.samAccountName ??
@@ -144,10 +146,10 @@ function NestedMemberItem({
             disabled={isCircular && !isExpanded}
             title={
               isCircular && !isExpanded
-                ? "Circular reference detected"
+                ? t("circularDetected")
                 : isExpanded
-                  ? "Collapse"
-                  : "Expand"
+                  ? t("collapse")
+                  : t("expand")
             }
             data-testid={`expand-${name}`}
           >
@@ -189,7 +191,7 @@ function NestedMemberItem({
         )}
         {isGroup && isCircular && !isExpanded && (
           <span className="shrink-0 text-caption text-[var(--color-warning)]">
-            circular
+            {t("circularReference")}
           </span>
         )}
       </div>
@@ -202,7 +204,7 @@ function NestedMemberItem({
         >
           {isLoading ? (
             <div className="py-2 pl-8">
-              <LoadingSpinner message="Loading..." />
+              <LoadingSpinner message={t("loadingNested")} />
             </div>
           ) : sortedSubs.length > 0 ? (
             sortedSubs.map((sub) => (
@@ -220,7 +222,7 @@ function NestedMemberItem({
             ))
           ) : (
             <p className="py-2 pl-8 text-caption text-[var(--color-text-secondary)]">
-              No members
+              {t("noMembers")}
             </p>
           )}
         </div>
@@ -246,20 +248,21 @@ export function GroupDetail({
   onMembersRefresh,
   onDeleted,
 }: GroupDetailProps) {
+  const { t } = useTranslation(["groupDetail", "common"]);
   const { notify } = useNotifications();
   const { showConfirmation } = useDialog();
   const { handleError } = useErrorHandler();
 
   const handleDeleteGroup = useCallback(async () => {
     const confirmed = await showConfirmation(
-      "Delete Group",
-      `Are you sure you want to delete "${group.displayName || group.samAccountName}"?`,
-      "This action cannot be undone.",
+      t("deleteGroup"),
+      t("deleteConfirmation", { name: group.displayName || group.samAccountName }),
+      t("common:cannotBeUndone"),
     );
     if (!confirmed) return;
     try {
       await invoke("delete_ad_object", { dn: group.distinguishedName });
-      notify("Group deleted successfully", "success");
+      notify(t("deleteSuccess"), "success");
       onDeleted?.();
     } catch (err) {
       handleError(err, "deleting group");
@@ -359,7 +362,7 @@ export function GroupDetail({
       const items: ContextMenuItem[] = isGroup
         ? [
             {
-              label: `Open "${entryName}" in Group Management`,
+              label: t("openInGroups", { name: entryName }),
               icon: <FolderOpen size={14} />,
               onClick: () => {
                 openTab("Group Management", "groups", "users-group", {
@@ -370,7 +373,7 @@ export function GroupDetail({
           ]
         : [
             {
-              label: `Open "${entryName}" in User Lookup`,
+              label: t("openInUsers", { name: entryName }),
               icon: <User size={14} />,
               onClick: () => {
                 openTab("User Lookup", "users", "user", {
@@ -403,29 +406,29 @@ export function GroupDetail({
 
   const propertyGroups: PropertyGroup[] = [
     {
-      category: "Identity",
+      category: t("common:identity"),
       items: [
-        { label: "Display Name", value: group.displayName },
-        { label: "SAM Account Name", value: group.samAccountName },
-        { label: "Description", value: group.description || "-" },
+        { label: t("common:displayName"), value: group.displayName },
+        { label: t("common:samAccountName"), value: group.samAccountName },
+        { label: t("common:description"), value: group.description || "-" },
       ],
     },
     {
       category: "Location",
       items: [
-        { label: "Distinguished Name", value: group.distinguishedName },
+        { label: t("common:distinguishedName"), value: group.distinguishedName },
         {
-          label: "Organizational Unit",
+          label: t("organizationalUnit"),
           value: group.organizationalUnit || "-",
         },
       ],
     },
     {
-      category: "Group Type",
+      category: t("groupType"),
       items: [
-        { label: "Scope", value: group.scope },
-        { label: "Category", value: group.category },
-        { label: "Member Count", value: String(group.memberCount) },
+        { label: t("common:scope"), value: group.scope },
+        { label: t("common:category"), value: group.category },
+        { label: t("memberCount"), value: String(group.memberCount) },
       ],
     },
   ];
@@ -604,7 +607,7 @@ export function GroupDetail({
               data-testid="group-delete-btn"
             >
               <Trash2 size={14} />
-              Delete
+              {t("common:delete")}
             </button>
           )}
           <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${
@@ -646,8 +649,8 @@ export function GroupDetail({
               className="text-body font-semibold text-[var(--color-text-primary)]"
               data-testid="members-title"
             >
-              Members ({directMembers.length})
-              {nestedGroups.length > 0 && ` and ${nestedGroups.length} nested group(s)`}
+              {t("members")} ({directMembers.length})
+              {nestedGroups.length > 0 && ` ${t("nestedGroups", { count: nestedGroups.length })}`}
             </h3>
             <div className="relative">
               <button
@@ -665,15 +668,10 @@ export function GroupDetail({
                     data-testid="member-help-popup"
                   >
                     <p className="text-caption font-semibold text-[var(--color-text-primary)] mb-1">
-                      Member Management
+                      {t("memberManagement")}
                     </p>
                     <p className="text-caption text-[var(--color-text-secondary)]">
-                      Click "+ Add" to search and stage new users or groups
-                      as members. Select existing members or nested groups
-                      with checkboxes and click "Remove" to stage removals.
-                      Click "Preview" to review all pending changes, then
-                      "Apply" to execute them. Nested groups can be expanded
-                      with the chevron to inspect their content.
+                      {t("memberManagementHelp")}
                     </p>
                   </div>
                 )}
@@ -717,7 +715,7 @@ export function GroupDetail({
                   data-testid="add-member-btn"
                 >
                   <UserPlus size={14} />
-                  Add
+                  {t("addMember")}
                 </button>
                 {showAddDropdown && (
                   <div
@@ -737,8 +735,8 @@ export function GroupDetail({
                           setMemberSearchText(e.target.value);
                           handleMemberSearch(e.target.value);
                         }}
-                        placeholder="Search users or groups to add..."
-                        aria-label="Search users or groups to add"
+                        placeholder={t("memberSearchPlaceholder")}
+                        aria-label={t("memberSearchPlaceholder")}
                         className="flex-1 bg-transparent text-body text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)]"
                         style={{ outline: "none", boxShadow: "none" }}
                         data-testid="member-search-input"
@@ -763,7 +761,7 @@ export function GroupDetail({
                       memberSearchText.length > 0 &&
                       memberSearchResults.length === 0 && (
                         <div className="px-3 py-3 text-center text-caption text-[var(--color-text-secondary)]">
-                          No results found
+                          {t("noMembersFound")}
                         </div>
                       )}
 
@@ -804,9 +802,9 @@ export function GroupDetail({
                               </div>
                               <span className="ml-2 shrink-0 text-caption text-[var(--color-text-secondary)]">
                                 {isAlreadyMember
-                                  ? "Member"
+                                  ? t("memberStatus")
                                   : isPending
-                                    ? "Pending"
+                                    ? t("memberStatus")
                                     : ""}
                               </span>
                             </button>
@@ -817,7 +815,7 @@ export function GroupDetail({
 
                     {!memberSearchText && (
                       <div className="px-3 py-3 text-center text-caption text-[var(--color-text-secondary)]">
-                        Type to search for users or groups
+                        {t("searchHint")}
                       </div>
                     )}
                   </div>
@@ -831,7 +829,7 @@ export function GroupDetail({
                 data-testid="remove-selected-btn"
               >
                 <UserMinus size={14} />
-                Remove
+                {t("removeMember")}
                 {selectedMembers.size > 0 && ` (${selectedMembers.size})`}
               </button>
               <button
@@ -842,7 +840,7 @@ export function GroupDetail({
                 data-testid="preview-changes-btn"
               >
                 <Eye size={14} />
-                Preview
+                {t("common:preview")}
                 {pendingChanges.length > 0 && ` (${pendingChanges.length})`}
               </button>
             </div>
@@ -852,16 +850,16 @@ export function GroupDetail({
         {canManageMembers && pendingChanges.length > 0 && (
           <div className="mb-3 flex items-center gap-3 rounded-md border border-[var(--color-primary)] bg-[var(--color-primary-subtle)] px-3 py-1.5 text-caption text-[var(--color-primary)]">
             <span>
-              {pendingAdds > 0 && `${pendingAdds} to add`}
+              {pendingAdds > 0 && t("toAdd", { count: pendingAdds })}
               {pendingAdds > 0 && pendingRemoves > 0 && ", "}
-              {pendingRemoves > 0 && `${pendingRemoves} to remove`}
+              {pendingRemoves > 0 && t("toRemove", { count: pendingRemoves })}
             </span>
             <button
               className="ml-auto text-caption underline hover:no-underline"
               onClick={() => setPendingChanges([])}
               data-testid="clear-pending-btn"
             >
-              Clear
+              {t("clearPending")}
             </button>
           </div>
         )}
@@ -876,14 +874,14 @@ export function GroupDetail({
                 onChange={(e) => handleSelectAll(e.target.checked)}
                 data-testid="select-all-checkbox"
               />
-              Select all
+              {t("selectAll")}
             </label>
           </div>
         )}
 
         {/* Unified member list: groups first (with chevron), then users */}
         {membersLoading ? (
-          <LoadingSpinner message="Loading members..." />
+          <LoadingSpinner message={t("loadingNested")} />
         ) : members.length > 0 ? (
           <div
             className="rounded-lg border border-[var(--color-border-default)] overflow-hidden"
@@ -907,7 +905,7 @@ export function GroupDetail({
           </div>
         ) : (
           <p className="text-caption text-[var(--color-text-secondary)]">
-            No members found
+            {t("noMembersFound")}
           </p>
         )}
       </div>
@@ -916,7 +914,7 @@ export function GroupDetail({
 
       <div data-testid="group-history-section">
         <h3 className="mb-2 text-body font-semibold text-[var(--color-text-primary)]">
-          Replication History
+          {t("replicationHistory")}
         </h3>
         <StateInTimeView objectDn={group.distinguishedName} objectType="group" />
       </div>

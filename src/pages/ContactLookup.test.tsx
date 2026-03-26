@@ -123,8 +123,8 @@ describe("ContactLookup", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText("No contacts available."),
-      ).toBeInTheDocument();
+        screen.getByTestId("empty-state-title"),
+      ).toHaveTextContent("No contacts found");
     });
   });
 
@@ -496,7 +496,7 @@ describe("ContactLookup", () => {
       expect(screen.getByTestId("pending-changes-bar")).toBeInTheDocument();
     });
 
-    expect(screen.getByText(/1 change\(s\)/)).toBeInTheDocument();
+    expect(screen.getByText(/1 change/)).toBeInTheDocument();
     expect(screen.getByText("mail")).toBeInTheDocument();
   });
 
@@ -567,8 +567,8 @@ describe("ContactLookup", () => {
 
     await waitFor(() => {
       expect(mockShowConfirmation).toHaveBeenCalledWith(
-        "Save Changes",
-        expect.stringContaining("1 change(s)"),
+        "Save",
+        "Pending changes",
         expect.stringContaining("mail"),
       );
     });

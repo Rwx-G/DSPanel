@@ -18,6 +18,7 @@ import { useOUTree } from "@/hooks/useOUTree";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { EmptyState } from "@/components/common/EmptyState";
 import type { DirectoryEntry } from "@/types/directory";
+import { useTranslation } from "react-i18next";
 
 type OffboardStep = "search" | "actions" | "preview" | "execute";
 
@@ -36,6 +37,7 @@ interface ActionResult {
 }
 
 function OffboardingContent() {
+  const { t } = useTranslation(["offboarding", "common"]);
   const { handleError } = useErrorHandler();
   const { showConfirmation } = useDialog();
   const { openTabs, activeTabId, clearTabData } = useNavigation();
@@ -275,7 +277,7 @@ function OffboardingContent() {
     <div className="flex h-full flex-col p-4" data-testid="offboarding-wizard">
       {/* Step indicator */}
       <div className="mb-4 flex items-center gap-2" data-testid="offboard-step-indicator">
-        {["Search User", "Select Actions", "Preview", "Execute"].map(
+        {[t("stepSearch"), t("stepActions"), t("stepPreview"), t("stepExecute")].map(
           (label, i) => (
             <div key={label} className="flex items-center gap-2">
               <div
@@ -312,7 +314,7 @@ function OffboardingContent() {
         {step === "search" && (
           <div className="mx-auto max-w-lg" data-testid="step-search">
             <label className="mb-1 flex items-center gap-1.5 text-caption font-semibold text-[var(--color-text-secondary)]">
-              Enter sAMAccountName
+              {t("enterSamAccountName")}
               <div className="relative">
                 <button
                   type="button"
@@ -351,7 +353,7 @@ function OffboardingContent() {
                 className="btn btn-sm btn-primary"
                 data-testid="offboard-search-btn"
               >
-                {searching ? <LoadingSpinner size={14} /> : "Search"}
+                {searching ? <LoadingSpinner size={14} /> : t("common:search")}
               </button>
             </div>
           </div>
@@ -373,23 +375,23 @@ function OffboardingContent() {
               {[
                 {
                   key: "disableAccount" as const,
-                  label: "Disable Account",
-                  desc: "Set ACCOUNTDISABLE flag in userAccountControl",
+                  label: t("disableAccount"),
+                  desc: t("disableAccountDesc"),
                 },
                 {
                   key: "removeGroups" as const,
-                  label: `Remove from all groups (${userGroups.length})`,
-                  desc: "Remove from all groups except Domain Users",
+                  label: t("removeGroups", { count: userGroups.length }),
+                  desc: t("removeGroupsDesc"),
                 },
                 {
                   key: "setRandomPassword" as const,
-                  label: "Set Random Password",
-                  desc: "Reset password to a random value",
+                  label: t("setRandomPassword"),
+                  desc: t("setRandomPasswordDesc"),
                 },
                 {
                   key: "moveToDisabledOU" as const,
-                  label: "Move to Disabled OU",
-                  desc: "Move the user to a designated Disabled Users OU",
+                  label: t("moveToDisabledOU"),
+                  desc: t("moveToDisabledOUDesc"),
                 },
               ].map(({ key, label, desc }) => (
                 <label
@@ -420,7 +422,7 @@ function OffboardingContent() {
             {actions.moveToDisabledOU && (
               <div>
                 <label className="mb-1 block text-caption font-semibold text-[var(--color-text-secondary)]">
-                  Disabled OU
+                  {t("disabledOULabel")}
                 </label>
                 <OUPicker
                   nodes={ouNodes}
@@ -440,12 +442,12 @@ function OffboardingContent() {
         {step === "preview" && user && (
           <div className="mx-auto max-w-lg space-y-3" data-testid="step-offboard-preview">
             <h3 className="text-body font-semibold text-[var(--color-text-primary)]">
-              Changes to apply to {user.displayName ?? user.samAccountName}
+              {t("changesToApply", { name: user.displayName ?? user.samAccountName })}
             </h3>
             <div className="space-y-2 rounded-md bg-[var(--color-surface-hover)] p-3">
               {actions.disableAccount && (
                 <div className="text-caption text-[var(--color-warning)]">
-                  - Account will be disabled
+                  - {t("accountWillBeDisabled")}
                 </div>
               )}
               {actions.removeGroups &&
@@ -459,7 +461,7 @@ function OffboardingContent() {
                 ))}
               {actions.setRandomPassword && (
                 <div className="text-caption text-[var(--color-warning)]">
-                  - Password will be reset to random value
+                  - {t("passwordWillBeReset")}
                 </div>
               )}
               {actions.moveToDisabledOU && (
@@ -475,7 +477,7 @@ function OffboardingContent() {
         {step === "execute" && (
           <div className="mx-auto max-w-lg" data-testid="step-offboard-results">
             {executing ? (
-              <LoadingSpinner message="Executing offboarding..." />
+              <LoadingSpinner message={t("executingOffboarding")} />
             ) : (
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
@@ -492,7 +494,7 @@ function OffboardingContent() {
                   )}
                   <span className="text-body font-semibold text-[var(--color-text-primary)]">
                     {results.filter((r) => r.success).length}/{results.length}{" "}
-                    actions completed
+                    {t("actionsCompleted")}
                   </span>
                 </div>
 
@@ -517,14 +519,14 @@ function OffboardingContent() {
                     data-testid="btn-copy-offboard-summary"
                   >
                     {copied ? <Check size={14} /> : <Copy size={14} />}
-                    Copy Summary
+                    {t("copySummary")}
                   </button>
                   <button
                     onClick={handleReset}
                     className="btn btn-sm btn-primary"
                     data-testid="btn-new-offboarding"
                   >
-                    <UserMinus size={14} /> New Offboarding
+                    <UserMinus size={14} /> {t("newOffboarding")}
                   </button>
                 </div>
               </div>
@@ -549,7 +551,7 @@ function OffboardingContent() {
             className="btn btn-sm btn-secondary"
             data-testid="offboard-btn-back"
           >
-            <ChevronLeft size={14} /> Back
+            <ChevronLeft size={14} /> {t("common:back")}
           </button>
           {step === "preview" ? (
             <button
@@ -558,7 +560,7 @@ function OffboardingContent() {
               className="btn btn-sm btn-primary"
               data-testid="offboard-btn-execute"
             >
-              <UserMinus size={14} /> Execute Offboarding
+              <UserMinus size={14} /> {t("executeOffboarding")}
             </button>
           ) : (
             <button
@@ -567,7 +569,7 @@ function OffboardingContent() {
               className="btn btn-sm btn-primary"
               data-testid="offboard-btn-next"
             >
-              Next <ChevronRight size={14} />
+              {t("common:next")} <ChevronRight size={14} />
             </button>
           )}
         </div>
@@ -577,14 +579,15 @@ function OffboardingContent() {
 }
 
 export function Offboarding() {
+  const { t } = useTranslation(["offboarding", "common"]);
   return (
     <PermissionGate
       requiredLevel="AccountOperator"
       fallback={
         <div className="flex h-full items-center justify-center p-8">
           <EmptyState
-            title="Access Denied"
-            description="Offboarding requires AccountOperator permission or higher."
+            title={t("common:accessDenied")}
+            description={t("accessDeniedDescription")}
           />
         </div>
       }

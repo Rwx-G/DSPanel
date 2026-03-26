@@ -7,6 +7,7 @@ import { useMfaGate } from "@/hooks/useMfaGate";
 import { extractErrorMessage } from "@/utils/errorMapping";
 import { type DirectoryUser } from "@/types/directory";
 import { Unlock, Power, PowerOff, KeyRound } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 interface UserActionsProps {
   user: DirectoryUser;
@@ -19,6 +20,7 @@ export function UserActions({
   onRefresh,
   onResetPassword,
 }: UserActionsProps) {
+  const { t } = useTranslation(["components", "common"]);
   const { showConfirmation } = useDialog();
   const { notify } = useNotifications();
   const { checkMfa } = useMfaGate();
@@ -47,7 +49,7 @@ export function UserActions({
       setLoading(action);
       try {
         await invoke(command, { userDn: user.distinguishedName });
-        notify(`${action} successful for ${user.displayName}`, "success");
+        notify(t("components:userActions.actionSuccess", { action, name: user.displayName }), "success");
         onRefresh();
       } catch (e) {
         notify(extractErrorMessage(e), "error");
@@ -61,9 +63,9 @@ export function UserActions({
   const handleUnlock = useCallback(
     () =>
       handleAction(
-        "Unlock",
+        t("components:userActions.unlockAccount"),
         "unlock_account",
-        `Are you sure you want to unlock the account for ${user.displayName} (${user.samAccountName})?`,
+        t("components:userActions.unlockConfirm", { name: user.displayName, sam: user.samAccountName }),
       ),
     [handleAction, user],
   );
@@ -71,9 +73,9 @@ export function UserActions({
   const handleEnable = useCallback(
     () =>
       handleAction(
-        "Enable",
+        t("components:userActions.enableAccount"),
         "enable_account",
-        `Are you sure you want to enable the account for ${user.displayName} (${user.samAccountName})?`,
+        t("components:userActions.enableConfirm", { name: user.displayName, sam: user.samAccountName }),
       ),
     [handleAction, user],
   );
@@ -81,9 +83,9 @@ export function UserActions({
   const handleDisable = useCallback(
     () =>
       handleAction(
-        "Disable",
+        t("components:userActions.disableAccount"),
         "disable_account",
-        `Are you sure you want to disable the account for ${user.displayName} (${user.samAccountName})? The user will no longer be able to log in.`,
+        t("components:userActions.disableConfirm", { name: user.displayName, sam: user.samAccountName }),
         "AccountDisable",
       ),
     [handleAction, user],
@@ -99,11 +101,11 @@ export function UserActions({
           data-testid="reset-password-btn"
         >
           <KeyRound size={12} />
-          Reset Password
+          {t("components:userActions.resetPassword")}
         </button>
         {!canAct && (
           <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-md bg-[var(--color-surface-elevated)] px-2.5 py-1.5 text-caption font-medium text-[var(--color-text-primary)] opacity-0 shadow-md transition-opacity duration-150 group-hover:opacity-100">
-            Requires HelpDesk permission
+            {t("components:userActions.requiresHelpDesk")}
           </span>
         )}
       </div>
@@ -117,11 +119,11 @@ export function UserActions({
             data-testid="unlock-btn"
           >
             <Unlock size={12} />
-            Unlock
+            {t("components:userActions.unlock")}
           </button>
           {!canAct && (
             <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-md bg-[var(--color-surface-elevated)] px-2.5 py-1.5 text-caption font-medium text-[var(--color-text-primary)] opacity-0 shadow-md transition-opacity duration-150 group-hover:opacity-100">
-              Requires HelpDesk permission
+              {t("components:userActions.requiresHelpDesk")}
             </span>
           )}
         </div>
@@ -136,11 +138,11 @@ export function UserActions({
             data-testid="disable-btn"
           >
             <PowerOff size={12} />
-            Disable
+            {t("components:userActions.disable")}
           </button>
           {!canAct && (
             <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-md bg-[var(--color-surface-elevated)] px-2.5 py-1.5 text-caption font-medium text-[var(--color-text-primary)] opacity-0 shadow-md transition-opacity duration-150 group-hover:opacity-100">
-              Requires HelpDesk permission
+              {t("components:userActions.requiresHelpDesk")}
             </span>
           )}
         </div>
@@ -153,11 +155,11 @@ export function UserActions({
             data-testid="enable-btn"
           >
             <Power size={12} />
-            Enable
+            {t("components:userActions.enable")}
           </button>
           {!canAct && (
             <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-md bg-[var(--color-surface-elevated)] px-2.5 py-1.5 text-caption font-medium text-[var(--color-text-primary)] opacity-0 shadow-md transition-opacity duration-150 group-hover:opacity-100">
-              Requires HelpDesk permission
+              {t("components:userActions.requiresHelpDesk")}
             </span>
           )}
         </div>

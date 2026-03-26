@@ -15,9 +15,11 @@ import {
 } from "lucide-react";
 import { type TopologyData, type TopologyDcNode } from "@/types/topology";
 import { extractErrorMessage } from "@/utils/errorMapping";
+import { useTranslation } from "react-i18next";
 
 /** Renders a single DC entry within a site card, expandable on click. */
 function DcEntry({ dc }: { dc: TopologyDcNode }) {
+  const { t } = useTranslation(["topology", "common"]);
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -34,7 +36,7 @@ function DcEntry({ dc }: { dc: TopologyDcNode }) {
             style={{
               backgroundColor: dc.isOnline ? "var(--color-success)" : "var(--color-error)",
             }}
-            title={dc.isOnline ? "Online" : "Offline"}
+            title={dc.isOnline ? t("online") : t("offline")}
           />
         </div>
         <div className="min-w-0 flex-1">
@@ -72,34 +74,34 @@ function DcEntry({ dc }: { dc: TopologyDcNode }) {
           <table className="w-full text-caption">
             <tbody>
               <tr>
-                <td className="py-0.5 pr-3 font-medium text-[var(--color-text-secondary)]">Status</td>
+                <td className="py-0.5 pr-3 font-medium text-[var(--color-text-secondary)]">{t("common:status")}</td>
                 <td className="py-0.5" style={{ color: dc.isOnline ? "var(--color-success)" : "var(--color-error)" }}>
-                  {dc.isOnline ? "Online" : "Offline"}
+                  {dc.isOnline ? t("online") : t("offline")}
                 </td>
               </tr>
               {dc.ipAddress && (
                 <tr>
-                  <td className="py-0.5 pr-3 font-medium text-[var(--color-text-secondary)]">IP Address</td>
+                  <td className="py-0.5 pr-3 font-medium text-[var(--color-text-secondary)]">{t("ipAddress")}</td>
                   <td className="py-0.5 font-mono text-[var(--color-text-primary)]">{dc.ipAddress}</td>
                 </tr>
               )}
               {dc.osVersion && (
                 <tr>
-                  <td className="py-0.5 pr-3 font-medium text-[var(--color-text-secondary)]">OS</td>
+                  <td className="py-0.5 pr-3 font-medium text-[var(--color-text-secondary)]">{t("os")}</td>
                   <td className="py-0.5 text-[var(--color-text-primary)]">{dc.osVersion}</td>
                 </tr>
               )}
               <tr>
-                <td className="py-0.5 pr-3 font-medium text-[var(--color-text-secondary)]">Site</td>
+                <td className="py-0.5 pr-3 font-medium text-[var(--color-text-secondary)]">{t("site")}</td>
                 <td className="py-0.5 text-[var(--color-text-primary)]">{dc.siteName}</td>
               </tr>
               <tr>
-                <td className="py-0.5 pr-3 font-medium text-[var(--color-text-secondary)]">Global Catalog</td>
-                <td className="py-0.5 text-[var(--color-text-primary)]">{dc.isGc ? "Yes" : "No"}</td>
+                <td className="py-0.5 pr-3 font-medium text-[var(--color-text-secondary)]">{t("globalCatalog")}</td>
+                <td className="py-0.5 text-[var(--color-text-primary)]">{dc.isGc ? t("common:yes") : t("common:no")}</td>
               </tr>
               {dc.fsmoRoles.length > 0 && (
                 <tr>
-                  <td className="py-0.5 pr-3 font-medium text-[var(--color-text-secondary)]">FSMO Roles</td>
+                  <td className="py-0.5 pr-3 font-medium text-[var(--color-text-secondary)]">{t("fsmoRoles")}</td>
                   <td className="py-0.5 text-[var(--color-text-primary)]">{dc.fsmoRoles.join(", ")}</td>
                 </tr>
               )}
@@ -122,6 +124,7 @@ function replLinkStatusColor(status: string): string {
 
 /** Structured card view for AD topology. */
 function SimpleTopologyView({ data }: { data: TopologyData }) {
+  const { t } = useTranslation(["topology", "common"]);
   const totalDcs = data.sites.reduce((n, s) => n + s.dcs.length, 0);
 
   return (
@@ -159,7 +162,7 @@ function SimpleTopologyView({ data }: { data: TopologyData }) {
             {site.subnets.length > 0 && (
               <div className="border-t border-[var(--color-border-default)] px-4 py-3">
                 <div className="text-caption font-medium text-[var(--color-text-secondary)]">
-                  Subnets
+                  {t("subnets")}
                 </div>
                 <div className="mt-1 flex flex-wrap gap-2">
                   {site.subnets.map((subnet) => (
@@ -182,7 +185,7 @@ function SimpleTopologyView({ data }: { data: TopologyData }) {
             <div className="flex items-center gap-3 border-b border-[var(--color-border-default)] px-4 py-3">
               <RefreshCw size={18} className="text-[var(--color-text-secondary)]" />
               <h3 className="text-body font-semibold text-[var(--color-text-primary)]">
-                Replication Links
+                {t("replicationLinks")}
               </h3>
             </div>
             <div className="divide-y divide-[var(--color-border-subtle)]">
@@ -222,7 +225,7 @@ function SimpleTopologyView({ data }: { data: TopologyData }) {
             <div className="flex items-center gap-3 border-b border-[var(--color-border-default)] px-4 py-3">
               <GitBranch size={18} className="text-[var(--color-text-secondary)]" />
               <h3 className="text-body font-semibold text-[var(--color-text-primary)]">
-                Site Links
+                {t("siteLinks")}
               </h3>
             </div>
             <div className="divide-y divide-[var(--color-border-subtle)]">
@@ -237,8 +240,8 @@ function SimpleTopologyView({ data }: { data: TopologyData }) {
                     </span>
                   </div>
                   <div className="flex items-center gap-4 text-caption text-[var(--color-text-secondary)]">
-                    <span>Cost: {sl.cost}</span>
-                    <span>Interval: {sl.replInterval} min</span>
+                    <span>{t("cost")} {sl.cost}</span>
+                    <span>{t("interval")} {sl.replInterval} {t("min")}</span>
                   </div>
                 </div>
               ))}
@@ -262,6 +265,7 @@ function SimpleTopologyView({ data }: { data: TopologyData }) {
 }
 
 export function TopologyView() {
+  const { t } = useTranslation(["topology", "common"]);
   const [data, setData] = useState<TopologyData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -288,7 +292,7 @@ export function TopologyView() {
       {/* Toolbar */}
       <div className="flex items-center justify-between border-b border-[var(--color-border-default)] px-4 py-2">
         <h2 className="text-body font-semibold text-[var(--color-text-primary)]">
-          AD Topology
+          {t("pageTitle")}
         </h2>
         <div className="flex items-center gap-2">
           {data && (
@@ -306,7 +310,7 @@ export function TopologyView() {
             data-testid="refresh-button"
           >
             <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-            Refresh
+            {t("common:refresh")}
           </button>
         </div>
       </div>
@@ -315,13 +319,13 @@ export function TopologyView() {
       <div className="flex-1 overflow-y-auto">
         {loading ? (
           <div className="flex h-full items-center justify-center">
-            <LoadingSpinner message="Loading AD topology..." />
+            <LoadingSpinner message={t("loadingTopology")} />
           </div>
         ) : error ? (
           <div className="flex h-full items-center justify-center">
             <EmptyState
               icon={<AlertCircle size={40} />}
-              title="Topology Load Failed"
+              title={t("loadFailed")}
               description={error}
             />
           </div>
@@ -329,8 +333,8 @@ export function TopologyView() {
           <div className="flex h-full items-center justify-center">
             <EmptyState
               icon={<Server size={40} />}
-              title="No Topology Data"
-              description="No AD sites were found in the configuration."
+              title={t("noData")}
+              description={t("noDataDescription")}
             />
           </div>
         ) : (

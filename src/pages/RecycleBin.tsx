@@ -9,6 +9,7 @@ import { useOUTree } from "@/hooks/useOUTree";
 import { useErrorHandler } from "@/hooks/useErrorHandler";
 import { useNotifications } from "@/contexts/NotificationContext";
 import { DialogShell } from "@/components/dialogs/DialogShell";
+import { useTranslation } from "react-i18next";
 import {
   Trash2,
   AlertTriangle,
@@ -31,13 +32,13 @@ interface DeletedObject {
 
 type ObjectTypeFilter = "all" | "user" | "computer" | "group" | "contact" | "printQueue";
 
-const TYPE_LABELS: Record<string, string> = {
-  user: "User",
-  computer: "Computer",
-  group: "Group",
-  contact: "Contact",
-  printQueue: "Printer",
-  other: "Other",
+const TYPE_LABEL_KEYS: Record<string, string> = {
+  user: "common:user",
+  computer: "common:computer",
+  group: "common:group",
+  contact: "common:contact",
+  printQueue: "common:printer",
+  other: "common:other",
 };
 
 const TYPE_BADGE_VARIANT: Record<string, "info" | "success" | "warning" | "error" | "neutral"> = {
@@ -59,6 +60,7 @@ const TYPE_ICONS: Record<string, typeof User> = {
 };
 
 export function RecycleBin() {
+  const { t } = useTranslation(["recycleBin", "common"]);
   const [objects, setObjects] = useState<DeletedObject[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -87,7 +89,7 @@ export function RecycleBin() {
       }
     } catch (err) {
       handleError(err, "loading Recycle Bin");
-      setError("Failed to load Recycle Bin data.");
+      setError(t("failedToLoad"));
     } finally {
       setLoading(false);
     }
@@ -147,7 +149,7 @@ export function RecycleBin() {
         className="flex h-full items-center justify-center"
         data-testid="recycle-bin-loading"
       >
-        <LoadingSpinner message="Loading Recycle Bin..." />
+        <LoadingSpinner message={t("loadingRecycleBin")} />
       </div>
     );
   }
@@ -160,9 +162,9 @@ export function RecycleBin() {
       >
         <EmptyState
           icon={<Trash2 size={48} />}
-          title="Failed to load Recycle Bin"
+          title={t("failedToLoad")}
           description={error}
-          action={{ label: "Retry", onClick: loadData }}
+          action={{ label: t("common:retry"), onClick: loadData }}
         />
       </div>
     );
@@ -176,8 +178,8 @@ export function RecycleBin() {
       >
         <EmptyState
           icon={<AlertTriangle size={48} />}
-          title="AD Recycle Bin Not Enabled"
-          description="The Active Directory Recycle Bin optional feature is not enabled on this domain. Contact your domain administrator to enable it."
+          title={t("notEnabled")}
+          description={t("notEnabledDescription")}
         />
       </div>
     );
@@ -191,19 +193,19 @@ export function RecycleBin() {
             value={filterText}
             onChange={setFilterText}
             onSearch={setFilterText}
-            placeholder="Search deleted objects by name..."
+            placeholder={t("searchPlaceholder")}
             debounceMs={300}
           />
         </div>
         <div className="flex items-center gap-1">
           {(
             [
-              { key: "all", label: "All" },
-              { key: "user", label: "Users" },
-              { key: "computer", label: "Computers" },
-              { key: "group", label: "Groups" },
-              { key: "contact", label: "Contacts" },
-              { key: "printQueue", label: "Printers" },
+              { key: "all", label: t("common:all") },
+              { key: "user", label: t("users") },
+              { key: "computer", label: t("computers") },
+              { key: "group", label: t("groups") },
+              { key: "contact", label: t("contacts") },
+              { key: "printQueue", label: t("printers") },
             ] as const
           ).map(({ key, label }) => (
             <button
@@ -223,7 +225,7 @@ export function RecycleBin() {
         <button
           className="btn btn-sm btn-ghost"
           onClick={loadData}
-          title="Refresh"
+          title={t("common:refresh")}
           data-testid="recycle-bin-refresh"
         >
           <RefreshCw size={14} />
@@ -235,11 +237,11 @@ export function RecycleBin() {
           <div className="flex h-full items-center justify-center">
             <EmptyState
               icon={<Trash2 size={48} />}
-              title="No deleted objects"
+              title={t("noDeletedObjects")}
               description={
                 filterText || typeFilter !== "all"
-                  ? "No objects match the current filters."
-                  : "The Recycle Bin is empty."
+                  ? t("noObjectsMatch")
+                  : t("recycleBinEmpty")
               }
             />
           </div>
@@ -250,11 +252,11 @@ export function RecycleBin() {
           >
             <thead className="sticky top-0 bg-[var(--color-surface-card)]">
               <tr className="border-b border-[var(--color-border-subtle)] text-left text-caption text-[var(--color-text-secondary)]">
-                <th className="px-3 py-2 font-medium">Name</th>
-                <th className="px-3 py-2 font-medium">Type</th>
-                <th className="px-3 py-2 font-medium">Deleted</th>
-                <th className="px-3 py-2 font-medium">Original OU</th>
-                <th className="px-3 py-2 font-medium">Actions</th>
+                <th className="px-3 py-2 font-medium">{t("common:name")}</th>
+                <th className="px-3 py-2 font-medium">{t("common:type")}</th>
+                <th className="px-3 py-2 font-medium">{t("deleted")}</th>
+                <th className="px-3 py-2 font-medium">{t("originalOu")}</th>
+                <th className="px-3 py-2 font-medium">{t("common:actions")}</th>
               </tr>
             </thead>
             <tbody>
@@ -280,7 +282,7 @@ export function RecycleBin() {
                     </td>
                     <td className="px-3 py-2">
                       <StatusBadge
-                        text={TYPE_LABELS[obj.objectType] || obj.objectType}
+                        text={t(TYPE_LABEL_KEYS[obj.objectType] || obj.objectType)}
                         variant={TYPE_BADGE_VARIANT[obj.objectType] || "neutral"}
                       />
                     </td>
@@ -302,7 +304,7 @@ export function RecycleBin() {
                         }}
                         data-testid="restore-btn"
                       >
-                        Restore
+                        {t("restore")}
                       </button>
                     </td>
                   </tr>
@@ -347,6 +349,7 @@ function RestoreDialog({
   onClose: () => void;
   restoring: boolean;
 }) {
+  const { t } = useTranslation(["recycleBin", "common"]);
   const { nodes, loading, error } = useOUTree({ silent: true });
 
   return (
@@ -359,13 +362,13 @@ function RestoreDialog({
     >
       <div className="border-b border-[var(--color-border-subtle)] px-4 py-3">
         <h2 className="text-body font-semibold text-[var(--color-text-primary)]">
-          Restore "{object.name}"
+          {t("restoreObject", { name: object.name })}
         </h2>
       </div>
 
       <div className="px-4 py-3">
         <p className="mb-3 text-caption text-[var(--color-text-secondary)]">
-          Select the target OU for restoration:
+          {t("selectTargetOu")}
         </p>
         <OUPicker
           nodes={nodes}
@@ -383,7 +386,7 @@ function RestoreDialog({
           disabled={restoring}
           data-testid="restore-cancel"
         >
-          Cancel
+          {t("common:cancel")}
         </button>
         <button
           className="btn btn-sm btn-primary"
@@ -391,7 +394,7 @@ function RestoreDialog({
           disabled={!selectedOU || restoring}
           data-testid="restore-confirm"
         >
-          {restoring ? "Restoring..." : "Restore"}
+          {restoring ? t("restoring") : t("restore")}
         </button>
       </div>
     </DialogShell>

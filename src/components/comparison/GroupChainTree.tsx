@@ -10,6 +10,7 @@ import {
 import { type DirectoryEntry } from "@/types/directory";
 import { parseCnFromDn } from "@/utils/dn";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
+import { useTranslation } from "react-i18next";
 
 // Session-level cache shared across all GroupChainNode instances.
 // Prevents redundant LDAP queries when the same group appears in multiple branches.
@@ -33,6 +34,7 @@ function GroupChainNode({
   depth,
   ancestors,
 }: GroupChainNodeProps) {
+  const { t } = useTranslation(["components"]);
   const [expanded, setExpanded] = useState(false);
   const [members, setMembers] = useState<DirectoryEntry[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -118,7 +120,7 @@ function GroupChainNode({
             className="text-[11px] text-[var(--color-warning)] italic"
             data-testid={`circular-ref-${groupName}`}
           >
-            (circular reference)
+            {t("components:groupChainTree.circularReference")}
           </span>
         )}
       </button>
@@ -148,7 +150,7 @@ function GroupChainNode({
                   className="text-[11px] text-[var(--color-text-secondary)]"
                   style={{ paddingLeft: `${(depth + 1) * 16 + 8}px` }}
                 >
-                  No members
+                  {t("components:groupChainTree.noMembers")}
                 </div>
               )}
               {sorted.map((member) => {

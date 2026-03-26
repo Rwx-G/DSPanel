@@ -23,6 +23,7 @@ import {
 } from "@/types/security";
 import { extractErrorMessage } from "@/utils/errorMapping";
 import { SecurityDisclaimer } from "@/components/common/SecurityDisclaimer";
+import { useTranslation } from "react-i18next";
 
 function zoneColor(zone: RiskZone): string {
   switch (zone) {
@@ -359,6 +360,7 @@ function ScoreBar({ score }: { score: number }) {
 
 /** Single finding row inside a FactorCard. */
 function FindingRow({ finding }: { finding: RiskFinding }) {
+  const { t } = useTranslation(["riskScore"]);
   return (
     <div
       className="flex flex-col gap-1 py-1.5 border-b border-[var(--color-border-default)] last:border-b-0"
@@ -395,7 +397,7 @@ function FindingRow({ finding }: { finding: RiskFinding }) {
       </div>
       {finding.frameworkRef && (
         <div className="text-[10px] text-[var(--color-text-secondary)] pl-1 italic">
-          Ref: {finding.frameworkRef}
+          {t("ref")} {finding.frameworkRef}
         </div>
       )}
     </div>
@@ -404,6 +406,7 @@ function FindingRow({ finding }: { finding: RiskFinding }) {
 
 /** Factor breakdown card. */
 function FactorCard({ factor }: { factor: RiskFactor }) {
+  const { t } = useTranslation(["riskScore", "common"]);
   const [findingsOpen, setFindingsOpen] = useState(false);
   const showRecommendations = factor.score < 70 && factor.recommendations.length > 0;
   const findings = factor.findings ?? [];
@@ -419,8 +422,8 @@ function FactorCard({ factor }: { factor: RiskFactor }) {
           {factor.name}
         </span>
         <div className="flex items-center gap-2 text-[11px] text-[var(--color-text-secondary)]">
-          <span>Score: {Math.round(factor.score)}</span>
-          <span>Weight: {factor.weight}%</span>
+          <span>{t("score")} {Math.round(factor.score)}</span>
+          <span>{t("weight")} {factor.weight}%</span>
         </div>
       </div>
 
@@ -434,7 +437,7 @@ function FactorCard({ factor }: { factor: RiskFactor }) {
         <div className="mt-2 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-bg)] p-2">
           <div className="flex items-center gap-1 text-[11px] font-medium text-[var(--color-warning)] mb-1">
             <Info size={10} />
-            Recommendations
+            {t("recommendations")}
           </div>
           <ul className="list-disc list-inside text-[11px] text-[var(--color-text-secondary)] space-y-0.5">
             {factor.recommendations.map((rec, i) => (
@@ -452,7 +455,7 @@ function FactorCard({ factor }: { factor: RiskFactor }) {
             data-testid={`findings-toggle-${factor.id}`}
           >
             {findingsOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-            Findings ({findings.length})
+            {t("findings", { count: findings.length })}
           </button>
 
           {findingsOpen && (
@@ -469,7 +472,7 @@ function FactorCard({ factor }: { factor: RiskFactor }) {
               style={{ color: "var(--color-success)" }}
               data-testid={`impact-if-fixed-${factor.id}`}
             >
-              Potential gain: +{Math.round(impactIfFixed)} points
+              {t("potentialGain", { points: Math.round(impactIfFixed) })}
             </div>
           )}
         </div>
@@ -480,6 +483,7 @@ function FactorCard({ factor }: { factor: RiskFactor }) {
 
 /** Sparkline using div bars for 30-day history. */
 function TrendSparkline({ history }: { history: RiskScoreHistory[] }) {
+  const { t } = useTranslation(["riskScore"]);
   const maxScore = 100;
   const barHeight = 64;
   const totalDays = 30;
@@ -500,7 +504,7 @@ function TrendSparkline({ history }: { history: RiskScoreHistory[] }) {
       <div className="flex items-center gap-1 mb-2">
         <TrendingUp size={14} className="text-[var(--color-text-secondary)]" />
         <span className="text-caption font-semibold text-[var(--color-text-primary)]">
-          30-Day Trend
+          {t("trend30Day")}
         </span>
       </div>
       <div className="flex items-end gap-px" style={{ height: barHeight }}>
@@ -547,6 +551,7 @@ function TrendSparkline({ history }: { history: RiskScoreHistory[] }) {
 }
 
 export function RiskScoreDashboard() {
+  const { t } = useTranslation(["riskScore", "common"]);
   const [result, setResult] = useState<RiskScoreResult | null>(null);
   const [history, setHistory] = useState<RiskScoreHistory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -577,7 +582,7 @@ export function RiskScoreDashboard() {
       {/* Toolbar */}
       <div className="flex items-center justify-between border-b border-[var(--color-border-default)] px-4 py-2">
         <h2 className="flex items-center gap-1.5 text-body font-semibold text-[var(--color-text-primary)]">
-          Domain Risk Score
+          {t("pageTitle")}
           <SecurityDisclaimer
             coverage="~40%"
             checks="9 risk factors, ~70 individual checks: privileged hygiene, password policy, stale accounts, Kerberos security, dangerous configs, infrastructure hardening, GPO security, trust security, AD CS certificates. CIS Benchmark and MITRE ATT&CK mapped."
@@ -628,7 +633,7 @@ export function RiskScoreDashboard() {
             data-testid="refresh-button"
           >
             <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
-            Refresh
+            {t("common:refresh")}
           </button>
         </div>
       </div>
@@ -637,25 +642,25 @@ export function RiskScoreDashboard() {
       <div className="flex-1 overflow-y-auto p-4">
         {loading && !result && (
           <div className="flex items-center justify-center py-16">
-            <LoadingSpinner message="Computing risk score..." />
+            <LoadingSpinner message={t("computing")} />
           </div>
         )}
 
         {error && !result && (
           <EmptyState
             icon={<AlertCircle size={32} />}
-            title="Risk Score Unavailable"
+            title={t("unavailable")}
             description={error}
-            action={{ label: "Retry", onClick: fetchData }}
+            action={{ label: t("common:retry"), onClick: fetchData }}
           />
         )}
 
         {!loading && !error && !result && (
           <EmptyState
             icon={<ShieldCheck size={32} />}
-            title="No Risk Data"
-            description="No risk score data is available. Try refreshing."
-            action={{ label: "Refresh", onClick: fetchData }}
+            title={t("noData")}
+            description={t("noDataDescription")}
+            action={{ label: t("common:refresh"), onClick: fetchData }}
           />
         )}
 
@@ -676,7 +681,7 @@ export function RiskScoreDashboard() {
                     data-testid="worst-factor-badge"
                   >
                     <AlertTriangle size={12} />
-                    Weakest: {result.worstFactorName} ({Math.round(result.worstFactorScore)}/100)
+                    {t("weakest")} {result.worstFactorName} ({Math.round(result.worstFactorScore)}/100)
                   </div>
                 )}
                 <span className="mt-2 text-[11px] text-[var(--color-text-secondary)]">
@@ -704,7 +709,7 @@ export function RiskScoreDashboard() {
             {/* Factor breakdown */}
             <div>
               <h3 className="text-caption font-semibold text-[var(--color-text-primary)] mb-3">
-                Factor Breakdown
+                {t("factorBreakdown")}
               </h3>
               <div
                 className="grid grid-cols-1 md:grid-cols-2 gap-3"

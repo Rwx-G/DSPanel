@@ -17,6 +17,7 @@ import {
 } from "@/types/dns-validation";
 import { extractErrorMessage } from "@/utils/errorMapping";
 import { ExportToolbar } from "@/components/common/ExportToolbar";
+import { useTranslation } from "react-i18next";
 
 function dnsStatusColor(status: DnsRecordStatus): string {
   switch (status) {
@@ -89,6 +90,7 @@ function ClockStatusIcon({
 }
 
 export function DnsKerberosValidation() {
+  const { t } = useTranslation(["dnsKerberos", "common"]);
   const [report, setReport] = useState<DnsKerberosReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -132,11 +134,11 @@ export function DnsKerberosValidation() {
       {/* Toolbar */}
       <div className="flex items-center justify-between border-b border-[var(--color-border-default)] px-4 py-2">
         <h2 className="text-body font-semibold text-[var(--color-text-primary)]">
-          DNS & Kerberos Validation
+          {t("pageTitle")}
         </h2>
         <div className="flex items-center gap-3">
           <span className="text-caption text-[var(--color-text-secondary)]">
-            Default Kerberos threshold: 5 min
+            {t("kerberosThreshold")}
           </span>
 
           <ExportToolbar<{ type: string; name: string; status: string; details: string }>
@@ -172,7 +174,7 @@ export function DnsKerberosValidation() {
             data-testid="run-button"
           >
             <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-            {report ? "Re-run" : "Run Validation"}
+            {report ? t("reRun") : t("runValidation")}
           </button>
         </div>
       </div>
@@ -180,48 +182,48 @@ export function DnsKerberosValidation() {
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4">
         {loading ? (
-          <LoadingSpinner message="Running DNS and Kerberos validation..." />
+          <LoadingSpinner message={t("running")} />
         ) : error ? (
           <EmptyState
             icon={<AlertCircle size={40} />}
-            title="Validation Failed"
+            title={t("validationFailed")}
             description={error}
           />
         ) : !report ? (
           <EmptyState
             icon={<Globe size={40} />}
-            title="DNS & Kerberos Validation"
-            description="Click 'Run Validation' to check DNS SRV records and Kerberos clock skew."
+            title={t("emptyTitle")}
+            description={t("emptyDescription")}
           />
         ) : (
           <div className="space-y-6">
             {/* Summary */}
             <div className="flex items-center gap-4 text-caption">
               <span className="flex items-center gap-1.5">
-                <Globe size={14} /> DNS: {dnsPassCount} pass
+                <Globe size={14} /> {t("dns")}: {dnsPassCount} {t("pass")}
                 {dnsFailCount > 0 && (
                   <span style={{ color: "var(--color-error)" }}>
-                    , {dnsFailCount} fail
+                    , {dnsFailCount} {t("fail")}
                   </span>
                 )}
               </span>
               <span className="flex items-center gap-1.5">
-                <Clock size={14} /> Clock: {clockOkCount} ok
+                <Clock size={14} /> {t("clock")}: {clockOkCount} {t("ok")}
                 {clockWarnCount > 0 && (
                   <span style={{ color: "var(--color-warning)" }}>
-                    , {clockWarnCount} issues
+                    , {clockWarnCount} {t("issues")}
                   </span>
                 )}
               </span>
               <span className="text-[var(--color-text-secondary)]">
-                Checked: {new Date(report.checkedAt).toLocaleTimeString()}
+                {t("checked")}: {new Date(report.checkedAt).toLocaleTimeString()}
               </span>
             </div>
 
             {/* DNS Results */}
             <section>
               <h3 className="mb-3 text-body font-semibold text-[var(--color-text-primary)]">
-                DNS SRV Records
+                {t("dnsSrvRecords")}
               </h3>
               <div className="overflow-x-auto rounded-lg border border-[var(--color-border-default)]">
                 <table
@@ -230,11 +232,11 @@ export function DnsKerberosValidation() {
                 >
                   <thead>
                     <tr className="border-b border-[var(--color-border-default)] bg-[var(--color-surface-card)] text-left text-[var(--color-text-secondary)]">
-                      <th className="w-16 px-3 py-2.5 text-center font-medium">Status</th>
-                      <th className="px-4 py-2.5 font-medium">Record</th>
-                      <th className="px-4 py-2.5 font-medium">Expected</th>
-                      <th className="px-4 py-2.5 font-medium">Actual</th>
-                      <th className="px-4 py-2.5 font-medium">Issues</th>
+                      <th className="w-16 px-3 py-2.5 text-center font-medium">{t("common:status")}</th>
+                      <th className="px-4 py-2.5 font-medium">{t("record")}</th>
+                      <th className="px-4 py-2.5 font-medium">{t("expected")}</th>
+                      <th className="px-4 py-2.5 font-medium">{t("actual")}</th>
+                      <th className="px-4 py-2.5 font-medium">{t("issues")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -258,12 +260,12 @@ export function DnsKerberosValidation() {
                         <td className="px-4 py-2.5">
                           {dns.missingHosts.length > 0 && (
                             <span style={{ color: "var(--color-error)" }}>
-                              Missing: {dns.missingHosts.join(", ")}
+                              {t("missing")}: {dns.missingHosts.join(", ")}
                             </span>
                           )}
                           {dns.extraHosts.length > 0 && (
                             <span style={{ color: "var(--color-warning)" }}>
-                              Extra: {dns.extraHosts.join(", ")}
+                              {t("extra")}: {dns.extraHosts.join(", ")}
                             </span>
                           )}
                           {dns.missingHosts.length === 0 &&
@@ -283,7 +285,7 @@ export function DnsKerberosValidation() {
             {/* Clock Skew Results */}
             <section>
               <h3 className="mb-3 text-body font-semibold text-[var(--color-text-primary)]">
-                Kerberos Clock Skew
+                {t("kerberosClockSkew")}
               </h3>
               <div className="overflow-x-auto rounded-lg border border-[var(--color-border-default)]">
                 <table
@@ -292,10 +294,10 @@ export function DnsKerberosValidation() {
                 >
                   <thead>
                     <tr className="border-b border-[var(--color-border-default)] bg-[var(--color-surface-card)] text-left text-[var(--color-text-secondary)]">
-                      <th className="w-16 px-3 py-2.5 text-center font-medium">Status</th>
-                      <th className="px-4 py-2.5 font-medium">Domain Controller</th>
-                      <th className="px-4 py-2.5 font-medium">DC Time</th>
-                      <th className="w-24 px-4 py-2.5 font-medium">Skew</th>
+                      <th className="w-16 px-3 py-2.5 text-center font-medium">{t("common:status")}</th>
+                      <th className="px-4 py-2.5 font-medium">{t("dc")}</th>
+                      <th className="px-4 py-2.5 font-medium">{t("dcTime")}</th>
+                      <th className="w-24 px-4 py-2.5 font-medium">{t("skew")}</th>
                     </tr>
                   </thead>
                   <tbody>

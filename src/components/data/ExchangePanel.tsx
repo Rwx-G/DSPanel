@@ -3,12 +3,14 @@ import { ChevronDown, ChevronRight, Mail } from "lucide-react";
 import { CopyButton } from "@/components/common/CopyButton";
 import { type ExchangeMailboxInfo } from "@/types/exchange";
 import { parseCnFromDn } from "@/utils/dn";
+import { useTranslation } from "react-i18next";
 
 interface ExchangePanelProps {
   exchangeInfo: ExchangeMailboxInfo;
 }
 
 export function ExchangePanel({ exchangeInfo }: ExchangePanelProps) {
+  const { t } = useTranslation(["components", "common"]);
   const [expanded, setExpanded] = useState(true);
 
   return (
@@ -20,7 +22,7 @@ export function ExchangePanel({ exchangeInfo }: ExchangePanelProps) {
       >
         {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         <Mail size={14} />
-        Exchange Mailbox
+        {t("components:exchangePanel.title")}
       </button>
 
       {expanded && (
@@ -31,20 +33,20 @@ export function ExchangePanel({ exchangeInfo }: ExchangePanelProps) {
           <table className="w-full text-caption">
             <tbody>
               <PropertyRow
-                label="Mailbox GUID"
+                label={t("components:exchangePanel.mailboxGuid")}
                 value={exchangeInfo.mailboxGuid}
               />
               <PropertyRow
-                label="Recipient Type"
+                label={t("components:exchangePanel.recipientType")}
                 value={exchangeInfo.recipientType}
               />
               <PropertyRow
-                label="Primary SMTP"
+                label={t("components:exchangePanel.primarySmtp")}
                 value={exchangeInfo.primarySmtpAddress}
               />
               {exchangeInfo.forwardingAddress && (
                 <PropertyRow
-                  label="Forwarding To"
+                  label={t("components:exchangePanel.forwardingTo")}
                   value={parseCnFromDn(exchangeInfo.forwardingAddress)}
                   title={exchangeInfo.forwardingAddress}
                 />
@@ -55,7 +57,7 @@ export function ExchangePanel({ exchangeInfo }: ExchangePanelProps) {
           {exchangeInfo.emailAliases.length > 0 && (
             <div className="border-t border-[var(--color-border-subtle)] px-3 py-2">
               <h4 className="mb-1 text-caption font-medium text-[var(--color-text-secondary)]">
-                Email Aliases ({exchangeInfo.emailAliases.length})
+                {t("components:exchangePanel.emailAliases", { count: exchangeInfo.emailAliases.length })}
               </h4>
               <ul className="space-y-0.5" data-testid="exchange-aliases-list">
                 {exchangeInfo.emailAliases.map((alias) => (
@@ -74,7 +76,7 @@ export function ExchangePanel({ exchangeInfo }: ExchangePanelProps) {
           {exchangeInfo.delegates.length > 0 && (
             <div className="border-t border-[var(--color-border-subtle)] px-3 py-2">
               <h4 className="mb-1 text-caption font-medium text-[var(--color-text-secondary)]">
-                Delegates ({exchangeInfo.delegates.length})
+                {t("components:exchangePanel.delegates", { count: exchangeInfo.delegates.length })}
               </h4>
               <ul className="space-y-0.5" data-testid="exchange-delegates-list">
                 {exchangeInfo.delegates.map((dn) => (
@@ -104,6 +106,7 @@ function PropertyRow({
   value: string;
   title?: string;
 }) {
+  const { t } = useTranslation(["common"]);
   return (
     <tr className="border-b border-[var(--color-border-subtle)] last:border-b-0">
       <td className="w-1/3 px-3 py-1.5 text-[var(--color-text-secondary)]">
@@ -111,7 +114,7 @@ function PropertyRow({
       </td>
       <td className="px-3 py-1.5 text-[var(--color-text-primary)]">
         <span className="flex items-center gap-1" title={title}>
-          <span className="font-mono">{value || "N/A"}</span>
+          <span className="font-mono">{value || t("common:na")}</span>
           {value && <CopyButton text={value} />}
         </span>
       </td>

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Info, AlertTriangle } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 interface SecurityDisclaimerProps {
   /** Estimated coverage compared to specialized tools (e.g., "~30%"). */
@@ -18,6 +19,7 @@ export function SecurityDisclaimer({
   limitations,
   tools,
 }: SecurityDisclaimerProps) {
+  const { t } = useTranslation(["components"]);
   const [show, setShow] = useState(false);
 
   return (
@@ -26,7 +28,7 @@ export function SecurityDisclaimer({
         className="flex h-5 w-5 items-center justify-center rounded-full text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors"
         onClick={() => setShow(!show)}
         onBlur={() => setTimeout(() => setShow(false), 200)}
-        aria-label="About this module"
+        aria-label={t("components:securityDisclaimer.aboutModule")}
         data-testid="security-disclaimer-btn"
       >
         <Info size={13} />
@@ -36,13 +38,13 @@ export function SecurityDisclaimer({
           <div className="flex items-start gap-2 mb-2">
             <AlertTriangle size={14} className="mt-0.5 shrink-0 text-[var(--color-warning)]" />
             <p className="text-caption font-medium text-[var(--color-text-primary)]">
-              Indicative analysis - estimated {coverage} coverage
+              {t("components:securityDisclaimer.coverage", { coverage })}
             </p>
           </div>
           <div className="space-y-1.5 text-caption text-[var(--color-text-secondary)]">
-            <p><strong>What we check:</strong> {checks}</p>
-            <p><strong>Limitations:</strong> {limitations}</p>
-            <p><strong>For a complete audit:</strong> {tools}</p>
+            <p><strong>{t("components:securityDisclaimer.whatWeCheck")}</strong> {checks}</p>
+            <p><strong>{t("components:securityDisclaimer.limitations")}</strong> {limitations}</p>
+            <p><strong>{t("components:securityDisclaimer.forCompleteAudit")}</strong> {tools}</p>
           </div>
         </div>
       )}

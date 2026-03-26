@@ -521,7 +521,7 @@ describe("PrinterLookup", () => {
       expect(screen.getByTestId("pending-changes-bar")).toBeInTheDocument();
     });
 
-    expect(screen.getByText(/1 change\(s\)/)).toBeInTheDocument();
+    expect(screen.getByText(/1 change/)).toBeInTheDocument();
     expect(screen.getByText("location")).toBeInTheDocument();
   });
 

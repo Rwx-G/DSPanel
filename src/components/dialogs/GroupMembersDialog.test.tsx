@@ -60,7 +60,7 @@ describe("GroupMembersDialog", () => {
 
     expect(screen.getByText("John Doe")).toBeInTheDocument();
     expect(screen.getByText("Alice Smith")).toBeInTheDocument();
-    expect(screen.getByText("(2 members)")).toBeInTheDocument();
+    expect(screen.getByText(/2 members/)).toBeInTheDocument();
   });
 
   it("shows empty state when no members", async () => {

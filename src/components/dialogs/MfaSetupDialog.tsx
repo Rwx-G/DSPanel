@@ -4,6 +4,7 @@ import { DialogShell } from "@/components/dialogs/DialogShell";
 import { CopyButton } from "@/components/common/CopyButton";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { ShieldCheck } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 interface MfaSetupResult {
   secretBase32: string;
@@ -19,6 +20,7 @@ interface MfaSetupDialogProps {
 type SetupStep = "init" | "verify" | "backup";
 
 export function MfaSetupDialog({ onComplete, onCancel }: MfaSetupDialogProps) {
+  const { t } = useTranslation(["dialogs", "common"]);
   const [step, setStep] = useState<SetupStep>("init");
   const [setupResult, setSetupResult] = useState<MfaSetupResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -49,7 +51,7 @@ export function MfaSetupDialog({ onComplete, onCancel }: MfaSetupDialogProps) {
         setStep("backup");
       } else {
         setVerifyError(
-          "Invalid code. Please check your authenticator app and try again.",
+          t("dialogs:mfaSetup.invalidCodeRetry"),
         );
         setVerifyCode("");
       }
@@ -68,14 +70,12 @@ export function MfaSetupDialog({ onComplete, onCancel }: MfaSetupDialogProps) {
         <div className="flex items-center gap-2 border-b border-[var(--color-border-subtle)] px-4 py-3">
           <ShieldCheck size={20} className="text-[var(--color-primary)]" />
           <h2 className="text-body font-semibold text-[var(--color-text-primary)]">
-            Set Up MFA
+            {t("dialogs:mfaSetup.title")}
           </h2>
         </div>
         <div className="px-4 py-4 space-y-3">
           <p className="text-body text-[var(--color-text-secondary)]">
-            Add an extra layer of security by enabling TOTP-based multi-factor
-            authentication. You will need an authenticator app (Google
-            Authenticator, Authy, etc.).
+            {t("dialogs:mfaSetup.description")}
           </p>
           {error && (
             <p
@@ -92,7 +92,7 @@ export function MfaSetupDialog({ onComplete, onCancel }: MfaSetupDialogProps) {
             onClick={onCancel}
             data-testid="setup-cancel"
           >
-            Cancel
+            {t("common:cancel")}
           </button>
           <button
             className="btn btn-primary"
@@ -100,7 +100,7 @@ export function MfaSetupDialog({ onComplete, onCancel }: MfaSetupDialogProps) {
             disabled={loading}
             data-testid="setup-begin"
           >
-            {loading ? <LoadingSpinner size={16} /> : "Begin Setup"}
+            {loading ? <LoadingSpinner size={16} /> : t("dialogs:mfaSetup.beginSetup")}
           </button>
         </div>
       </DialogShell>
@@ -117,13 +117,12 @@ export function MfaSetupDialog({ onComplete, onCancel }: MfaSetupDialogProps) {
         <div className="flex items-center gap-2 border-b border-[var(--color-border-subtle)] px-4 py-3">
           <ShieldCheck size={20} className="text-[var(--color-primary)]" />
           <h2 className="text-body font-semibold text-[var(--color-text-primary)]">
-            Step 1: Scan QR Code
+            {t("dialogs:mfaSetup.step1Title")}
           </h2>
         </div>
         <div className="px-4 py-4 space-y-3">
           <p className="text-body text-[var(--color-text-secondary)]">
-            Scan this QR code with your authenticator app, or enter the secret
-            manually:
+            {t("dialogs:mfaSetup.step1Description")}
           </p>
           <div
             className="flex justify-center p-2 bg-white rounded-lg"
@@ -131,7 +130,7 @@ export function MfaSetupDialog({ onComplete, onCancel }: MfaSetupDialogProps) {
           >
             <img
               src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(setupResult.qrUri)}`}
-              alt="MFA QR Code"
+              alt={t("dialogs:mfaSetup.qrAlt")}
               width={200}
               height={200}
               data-testid="qr-image"
@@ -147,7 +146,7 @@ export function MfaSetupDialog({ onComplete, onCancel }: MfaSetupDialogProps) {
             <CopyButton text={setupResult.secretBase32} />
           </div>
           <p className="text-body text-[var(--color-text-secondary)]">
-            Enter the 6-digit code from your authenticator app to verify:
+            {t("dialogs:mfaSetup.enterCodeDescription")}
           </p>
           <input
             type="text"
@@ -172,7 +171,7 @@ export function MfaSetupDialog({ onComplete, onCancel }: MfaSetupDialogProps) {
         </div>
         <div className="flex justify-end gap-2 border-t border-[var(--color-border-subtle)] px-4 py-3">
           <button className="btn btn-secondary" onClick={onCancel}>
-            Cancel
+            {t("common:cancel")}
           </button>
           <button
             className="btn btn-primary"
@@ -180,7 +179,7 @@ export function MfaSetupDialog({ onComplete, onCancel }: MfaSetupDialogProps) {
             disabled={verifyCode.length < 6}
             data-testid="verify-btn"
           >
-            Verify
+            {t("dialogs:mfa.verify")}
           </button>
         </div>
       </DialogShell>
@@ -197,13 +196,12 @@ export function MfaSetupDialog({ onComplete, onCancel }: MfaSetupDialogProps) {
         <div className="flex items-center gap-2 border-b border-[var(--color-border-subtle)] px-4 py-3">
           <ShieldCheck size={20} className="text-[var(--color-success)]" />
           <h2 className="text-body font-semibold text-[var(--color-text-primary)]">
-            Step 2: Save Backup Codes
+            {t("dialogs:mfaSetup.step2Title")}
           </h2>
         </div>
         <div className="px-4 py-4 space-y-3">
           <p className="text-body text-[var(--color-text-primary)]">
-            MFA has been set up successfully! Save these backup codes in a safe
-            place. Each code can only be used once.
+            {t("dialogs:mfaSetup.step2Description")}
           </p>
           <div
             className="grid grid-cols-2 gap-1 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-bg)] p-3"
@@ -226,7 +224,7 @@ export function MfaSetupDialog({ onComplete, onCancel }: MfaSetupDialogProps) {
             onClick={onComplete}
             data-testid="setup-complete"
           >
-            Done
+            {t("common:done")}
           </button>
         </div>
       </DialogShell>

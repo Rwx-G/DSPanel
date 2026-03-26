@@ -183,12 +183,12 @@ describe("GroupDetail", () => {
 
   it("shows loading spinner when members are loading", () => {
     renderGroupDetail({ membersLoading: true, members: [] });
-    expect(screen.getByText("Loading members...")).toBeInTheDocument();
+    expect(screen.getByText("Loading...")).toBeInTheDocument();
   });
 
   it("shows no members message when members list is empty", () => {
     renderGroupDetail({ members: [] });
-    expect(screen.getByText("No members found")).toBeInTheDocument();
+    expect(screen.getByText("No results found")).toBeInTheDocument();
   });
 
   it("displays property values in the grid", () => {
@@ -448,7 +448,7 @@ describe("GroupDetail", () => {
 
       await waitFor(() => {
         expect(
-          screen.getByText(/Open "SubGroup" in Group Management/),
+          screen.getByText("Open in Group Management"),
         ).toBeInTheDocument();
       });
     });
@@ -466,7 +466,7 @@ describe("GroupDetail", () => {
 
       await waitFor(() => {
         expect(
-          screen.getByText(/Open "John Doe" in User Lookup/),
+          screen.getByText("Open in User Lookup"),
         ).toBeInTheDocument();
       });
     });

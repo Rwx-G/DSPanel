@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { DialogShell } from "@/components/dialogs/DialogShell";
 import { ShieldCheck } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 interface MfaDialogProps {
   onVerified: () => void;
@@ -9,6 +10,7 @@ interface MfaDialogProps {
 }
 
 export function MfaDialog({ onVerified, onCancel }: MfaDialogProps) {
+  const { t } = useTranslation(["dialogs", "common"]);
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -27,7 +29,7 @@ export function MfaDialog({ onVerified, onCancel }: MfaDialogProps) {
       if (valid) {
         onVerified();
       } else {
-        setError("Invalid code. Please try again.");
+        setError(t("dialogs:mfa.invalidCode"));
         setCode("");
         inputRef.current?.focus();
       }
@@ -59,13 +61,13 @@ export function MfaDialog({ onVerified, onCancel }: MfaDialogProps) {
       <div className="flex items-center gap-2 border-b border-[var(--color-border-subtle)] px-4 py-3">
         <ShieldCheck size={20} className="text-[var(--color-primary)]" />
         <h2 className="text-body font-semibold text-[var(--color-text-primary)]">
-          MFA Verification Required
+          {t("dialogs:mfa.verificationRequired")}
         </h2>
       </div>
 
       <div className="px-4 py-4 space-y-3">
         <p className="text-body text-[var(--color-text-secondary)]">
-          Enter the 6-digit code from your authenticator app, or a backup code.
+          {t("dialogs:mfa.enterCode")}
         </p>
         <input
           ref={inputRef}
@@ -96,7 +98,7 @@ export function MfaDialog({ onVerified, onCancel }: MfaDialogProps) {
           onClick={onCancel}
           data-testid="mfa-cancel"
         >
-          Cancel
+          {t("common:cancel")}
         </button>
         <button
           className="btn btn-primary"
@@ -104,7 +106,7 @@ export function MfaDialog({ onVerified, onCancel }: MfaDialogProps) {
           disabled={code.length < 6 || loading}
           data-testid="mfa-verify"
         >
-          {loading ? "Verifying..." : "Verify"}
+          {loading ? t("dialogs:mfa.verifying") : t("dialogs:mfa.verify")}
         </button>
       </div>
     </DialogShell>

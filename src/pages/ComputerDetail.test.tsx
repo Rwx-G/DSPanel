@@ -131,7 +131,7 @@ describe("ComputerDetail", () => {
   it("renders property groups for Identity, Status, Location, Network", () => {
     render(<ComputerDetail computer={makeComputer()} />);
     expect(screen.getByText("Identity")).toBeInTheDocument();
-    expect(screen.getByText("Status")).toBeInTheDocument();
+    expect(screen.getAllByText("Status").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Location")).toBeInTheDocument();
     expect(screen.getByText("Network")).toBeInTheDocument();
   });

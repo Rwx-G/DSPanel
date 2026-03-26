@@ -688,7 +688,7 @@ describe("UserDetail", () => {
     await waitFor(() => {
       expect(screen.getByTestId("pending-changes-bar")).toBeInTheDocument();
     });
-    expect(screen.getByText(/1 change\(s\)/)).toBeInTheDocument();
+    expect(screen.getByText(/1 unsaved change/)).toBeInTheDocument();
   });
 
   it("clears pending changes when Discard button is clicked", async () => {
@@ -870,7 +870,7 @@ describe("UserDetail", () => {
     // Floating indicator should show save button and scroll button
     expect(screen.getByTestId("floating-save-btn")).toBeInTheDocument();
     expect(screen.getByTestId("floating-scroll-btn")).toBeInTheDocument();
-    expect(screen.getByText(/unsaved change/)).toBeInTheDocument();
+    expect(screen.getAllByText(/unsaved change/).length).toBeGreaterThanOrEqual(1);
 
     // Restore original mock
     globalThis.IntersectionObserver =
@@ -976,7 +976,7 @@ describe("UserDetail", () => {
     fireEvent.click(screen.getByTestId("edit-confirm-department"));
 
     await waitFor(() => {
-      expect(screen.getByText(/2 change\(s\)/)).toBeInTheDocument();
+      expect(screen.getByText(/2 unsaved change/)).toBeInTheDocument();
     });
   });
 

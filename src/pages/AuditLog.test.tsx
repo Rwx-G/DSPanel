@@ -68,7 +68,7 @@ describe("AuditLog", () => {
   it("displays entry count", async () => {
     render(<AuditLog />);
     await waitFor(() => {
-      expect(screen.getByText(/3 entries found/)).toBeInTheDocument();
+      expect(screen.getByText(/3 entries/)).toBeInTheDocument();
     });
   });
 
@@ -719,7 +719,7 @@ describe("AuditLog", () => {
 
     render(<AuditLog />);
     await waitFor(() => {
-      expect(screen.getByText("1 entry found")).toBeInTheDocument();
+      expect(screen.getByText(/1 entry/)).toBeInTheDocument();
     });
   });
 
