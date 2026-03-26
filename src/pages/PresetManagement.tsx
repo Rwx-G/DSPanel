@@ -374,8 +374,8 @@ function PresetEditor() {
                 className="w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5 text-body text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
                 data-testid="preset-type-select"
               >
-                <option value="Onboarding">Onboarding</option>
-                <option value="Offboarding">Offboarding</option>
+                <option value="Onboarding">{t("typeOnboarding")}</option>
+                <option value="Offboarding">{t("typeOffboarding")}</option>
               </select>
             </div>
 

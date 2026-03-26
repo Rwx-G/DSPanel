@@ -354,7 +354,7 @@ export function Sidebar({ expanded, onToggle }: SidebarProps) {
 
       {/* Navigation */}
       <nav
-        aria-label="Main navigation"
+        aria-label={t("sidebar:mainNavigation")}
         className="flex-1 overflow-y-auto overflow-x-hidden py-2"
       >
         {Object.entries(groups).map(([groupName, modules], groupIndex) => (

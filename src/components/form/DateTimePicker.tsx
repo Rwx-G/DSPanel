@@ -229,7 +229,7 @@ export function DateTimePicker({
                 <button
                   onClick={() => handleTimeChange("hours", -1)}
                   className="rounded-sm px-1 py-0.5 text-caption hover:bg-[var(--color-surface-hover)] transition-colors"
-                  aria-label="Decrease hours"
+                  aria-label={t("components:dateTimePicker.decreaseHours")}
                   data-testid="time-hours-down"
                 >
                   -
@@ -243,7 +243,7 @@ export function DateTimePicker({
                 <button
                   onClick={() => handleTimeChange("hours", 1)}
                   className="rounded-sm px-1 py-0.5 text-caption hover:bg-[var(--color-surface-hover)] transition-colors"
-                  aria-label="Increase hours"
+                  aria-label={t("components:dateTimePicker.increaseHours")}
                   data-testid="time-hours-up"
                 >
                   +
@@ -256,7 +256,7 @@ export function DateTimePicker({
                 <button
                   onClick={() => handleTimeChange("minutes", -1)}
                   className="rounded-sm px-1 py-0.5 text-caption hover:bg-[var(--color-surface-hover)] transition-colors"
-                  aria-label="Decrease minutes"
+                  aria-label={t("components:dateTimePicker.decreaseMinutes")}
                   data-testid="time-minutes-down"
                 >
                   -
@@ -270,7 +270,7 @@ export function DateTimePicker({
                 <button
                   onClick={() => handleTimeChange("minutes", 1)}
                   className="rounded-sm px-1 py-0.5 text-caption hover:bg-[var(--color-surface-hover)] transition-colors"
-                  aria-label="Increase minutes"
+                  aria-label={t("components:dateTimePicker.increaseMinutes")}
                   data-testid="time-minutes-up"
                 >
                   +

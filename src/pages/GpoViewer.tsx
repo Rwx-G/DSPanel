@@ -214,7 +214,7 @@ export function GpoViewer() {
             l.isInherited ? t("common:yes") : t("common:no"),
             l.wmiFilter ?? "",
           ]}
-          title="GPO Links Report"
+          title={t("linksReportTitle")}
           filenameBase="gpo_links"
         />
       </div>

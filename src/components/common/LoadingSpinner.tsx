@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+
 interface LoadingSpinnerProps {
   message?: string;
   active?: boolean;
@@ -9,6 +11,7 @@ export function LoadingSpinner({
   active = true,
   size = 24,
 }: LoadingSpinnerProps) {
+  const { t } = useTranslation(["components"]);
   if (!active) return null;
 
   return (
@@ -20,7 +23,7 @@ export function LoadingSpinner({
         className="animate-spin rounded-full border-2 border-[var(--color-border-default)] border-t-[var(--color-primary)]"
         style={{ width: size, height: size }}
         role="status"
-        aria-label="Loading"
+        aria-label={t("components:loadingSpinner.loading")}
       />
       {message && (
         <p

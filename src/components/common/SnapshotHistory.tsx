@@ -140,10 +140,10 @@ export function SnapshotHistory({ objectDn, canRestore, refreshTrigger = 0, onRe
   }
 
   const exportColumns: ExportColumn[] = [
-    { key: "timestamp", header: "Timestamp" },
-    { key: "operationType", header: "Operation" },
-    { key: "operator", header: "Operator" },
-    { key: "objectDn", header: "Object DN" },
+    { key: "timestamp", header: t("components:snapshotHistory.timestamp") },
+    { key: "operationType", header: t("components:snapshotHistory.operation") },
+    { key: "operator", header: t("components:snapshotHistory.operator") },
+    { key: "objectDn", header: t("components:snapshotHistory.objectDn") },
   ];
 
   return (

@@ -169,7 +169,7 @@ export function TabBar() {
           className="fixed z-50 min-w-[160px] rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] py-1 shadow-lg"
           style={{ left: contextMenu.x, top: contextMenu.y }}
           role="menu"
-          aria-label="Tab options"
+          aria-label={t("layout:tabOptions")}
           data-testid="tab-context-menu"
         >
           <button

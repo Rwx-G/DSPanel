@@ -79,6 +79,7 @@ export function UncPermissionsAudit({
   userA,
   userB,
 }: UncPermissionsAuditProps) {
+  const { t } = useTranslation(["components"]);
   const platform = usePlatform();
   const [uncPath, setUncPath] = useState("");
   const [isAuditing, setIsAuditing] = useState(false);
@@ -155,8 +156,8 @@ export function UncPermissionsAudit({
       <div data-testid="unc-permissions-audit">
         <EmptyState
           icon={<Monitor size={40} />}
-          title="Not available on this platform"
-          description="UNC path permissions audit requires Windows. NTFS ACL APIs are not available on macOS or Linux."
+          title={t("components:uncPermissionsAudit.notAvailable")}
+          description={t("components:uncPermissionsAudit.notAvailableDescription")}
         />
       </div>
     );

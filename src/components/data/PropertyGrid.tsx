@@ -48,6 +48,7 @@ function EditableCell({
   item: PropertyItem;
   onEdit: (attributeName: string, oldValue: string, newValue: string) => void;
 }) {
+  const { t } = useTranslation(["components"]);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(item.value);
 
@@ -86,7 +87,7 @@ function EditableCell({
         <button
           onClick={handleConfirm}
           className="rounded p-0.5 text-[var(--color-success)] hover:bg-[var(--color-success-bg)]"
-          aria-label="Confirm edit"
+          aria-label={t("components:propertyGrid.confirmEdit")}
           data-testid={`edit-confirm-${item.attributeName}`}
         >
           <Check size={14} />
@@ -94,7 +95,7 @@ function EditableCell({
         <button
           onClick={handleCancel}
           className="rounded p-0.5 text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]"
-          aria-label="Cancel edit"
+          aria-label={t("components:propertyGrid.cancelEdit")}
           data-testid={`edit-cancel-${item.attributeName}`}
         >
           <X size={14} />

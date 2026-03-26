@@ -84,13 +84,13 @@ function HygieneSection({
               {showTip && (
                 <div className={`absolute left-0 z-50 w-80 rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-3 shadow-lg ${tooltipPosition === "above" ? "bottom-full mb-1" : "top-full mt-1"}`}>
                   <p className="text-caption text-[var(--color-text-primary)]">
-                    <strong>What:</strong> {tooltip.what}
+                    <strong>{t("what")}</strong> {tooltip.what}
                   </p>
                   <p className="mt-1 text-caption text-[var(--color-text-primary)]">
-                    <strong>Why:</strong> {tooltip.why}
+                    <strong>{t("why")}</strong> {tooltip.why}
                   </p>
                   <p className="mt-1 text-caption text-[var(--color-text-primary)]">
-                    <strong>Fix:</strong> {tooltip.fix}
+                    <strong>{t("fix")}</strong> {tooltip.fix}
                   </p>
                   {tooltip.warn && (
                     <p className="mt-1.5 flex items-start gap-1 text-caption text-[var(--color-warning)]">
@@ -552,16 +552,16 @@ export function GroupHygiene() {
                   {t("scannerTitle")}
                 </p>
                 <ul className="space-y-1 text-caption text-[var(--color-text-secondary)]">
-                  <li><strong>Empty groups</strong> - no members at all</li>
-                  <li><strong>Single-member groups</strong> - only one member, possibly redundant</li>
-                  <li><strong>Stale groups</strong> - not modified in over 180 days</li>
-                  <li><strong>No description</strong> - missing documentation</li>
-                  <li><strong>Circular nesting</strong> - Group A contains B contains A</li>
-                  <li><strong>Excessive depth</strong> - nested deeper than 3 levels</li>
-                  <li><strong>Duplicate groups</strong> - identical member sets</li>
+                  <li>{t("scannerDesc1")}</li>
+                  <li>{t("scannerDesc2")}</li>
+                  <li>{t("scannerDesc3")}</li>
+                  <li>{t("scannerDesc4")}</li>
+                  <li>{t("scannerDesc5")}</li>
+                  <li>{t("scannerDesc6")}</li>
+                  <li>{t("scannerDesc7")}</li>
                 </ul>
                 <p className="mt-1.5 text-caption text-[var(--color-text-disabled)]">
-                  Empty groups can be deleted in bulk (DomainAdmin required).
+                  {t("scannerBulkDelete")}
                 </p>
               </div>
             )}

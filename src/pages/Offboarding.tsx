@@ -328,10 +328,10 @@ function OffboardingContent() {
                 {showSearchHelp && (
                   <div className="absolute left-0 z-50 w-72 rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-3 shadow-lg top-full mt-1">
                     <p className="text-caption text-[var(--color-text-primary)]">
-                      <strong>What:</strong> The sAMAccountName is the user login (e.g. jsmith).
+                      {t("samWhat")}
                     </p>
                     <p className="mt-1 text-caption text-[var(--color-text-primary)]">
-                      <strong>Where:</strong> In User Lookup, select a user - it is shown just below the display name with a copy button.
+                      {t("samWhere")}
                     </p>
                   </div>
                 )}

@@ -64,7 +64,8 @@
     "failedToLoad": "Failed to load members",
     "noMembers": "No members",
     "noMembersDescription": "This group has no members.",
-    "accountName": "Account Name"
+    "accountName": "Account Name",
+    "close": "Close"
   },
   "memberChangePreview": {
     "toAdd_one": "{{count}} member to add",

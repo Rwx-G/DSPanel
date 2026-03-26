@@ -542,12 +542,12 @@ function OnboardingContent() {
                       className="rounded-md bg-[var(--color-surface-hover)] p-4 font-mono text-caption space-y-1"
                       data-testid="onboarding-summary"
                     >
-                      <div>Login: {result.login}</div>
-                      <div>Password: {result.password}</div>
-                      <div>DN: {result.userDn}</div>
-                      <div>OU: {result.targetOu}</div>
+                      <div>{t("summaryLogin")} {result.login}</div>
+                      <div>{t("summaryPassword")} {result.password}</div>
+                      <div>{t("dnLabel")} {result.userDn}</div>
+                      <div>{t("ouLabel")} {result.targetOu}</div>
                       {result.groups.map((g) => (
-                        <div key={g}>Group: {g}</div>
+                        <div key={g}>{t("groupLabel")} {g}</div>
                       ))}
                     </div>
                     <div className="flex gap-2">

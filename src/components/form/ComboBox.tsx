@@ -181,7 +181,7 @@ export function ComboBox({
               }}
               placeholder={t("components:comboBox.searchPlaceholder")}
               className="w-full bg-transparent px-2 py-1 text-body text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-secondary)]"
-              aria-label="Search options"
+              aria-label={t("components:comboBox.searchOptions")}
               data-testid="combobox-search"
             />
           </div>

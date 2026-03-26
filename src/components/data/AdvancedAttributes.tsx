@@ -94,7 +94,7 @@ function EditableValue({
         <button
           onClick={handleConfirm}
           className="rounded p-0.5 text-[var(--color-success)] hover:bg-[var(--color-success-bg)]"
-          aria-label="Confirm edit"
+          aria-label={t("components:advancedAttributes.confirmEdit")}
           data-testid={`adv-edit-confirm-${attrKey}`}
         >
           <Check size={14} />
@@ -102,7 +102,7 @@ function EditableValue({
         <button
           onClick={handleCancel}
           className="rounded p-0.5 text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]"
-          aria-label="Cancel edit"
+          aria-label={t("components:advancedAttributes.cancelEdit")}
           data-testid={`adv-edit-cancel-${attrKey}`}
         >
           <X size={14} />
@@ -289,7 +289,7 @@ export function AdvancedAttributes({ rawAttributes, schemaAttributes, onEdit }: 
               <button
                 onClick={() => setSearchText("")}
                 className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
-                aria-label="Clear filter"
+                aria-label={t("components:advancedAttributes.clearFilter")}
               >
                 <X size={14} />
               </button>

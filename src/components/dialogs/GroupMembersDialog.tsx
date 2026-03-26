@@ -80,7 +80,7 @@ export function GroupMembersDialog({
           <button
             className="btn btn-sm btn-secondary"
             onClick={onClose}
-            aria-label="Close"
+            aria-label={t("dialogs:groupMembers.close")}
             data-testid="group-members-close"
           >
             <X size={14} />

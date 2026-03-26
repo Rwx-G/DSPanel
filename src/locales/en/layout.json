@@ -6,5 +6,6 @@
   "scrollTabsRight": "Scroll tabs right",
   "closeTab": "Close {{title}}",
   "closeOthers": "Close Others",
-  "closeAll": "Close All"
+  "closeAll": "Close All",
+  "tabOptions": "Tab options"
 }

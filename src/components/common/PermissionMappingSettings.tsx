@@ -297,7 +297,7 @@ export function PermissionMappingSettings() {
                     >
                       <div className="flex items-center gap-2 min-w-0">
                         {validationWarnings[groupDn] === false && (
-                          <span title="Group not found in AD">
+                          <span title={t("components:permissionMapping.groupNotFoundInAd")}>
                             <AlertTriangle
                               size={14}
                               className="shrink-0 text-[var(--color-warning)]"
@@ -316,7 +316,7 @@ export function PermissionMappingSettings() {
                           <button
                             onClick={() => validateGroup(groupDn)}
                             className="text-caption text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
-                            title="Validate group exists in AD"
+                            title={t("components:permissionMapping.validateGroupExists")}
                             data-testid={`validate-group-btn`}
                           >
                             <Search size={12} />
@@ -325,7 +325,7 @@ export function PermissionMappingSettings() {
                         <button
                           onClick={() => removeGroup(level, groupDn)}
                           className="text-[var(--color-text-secondary)] hover:text-[var(--color-error)] transition-colors"
-                          title="Remove group"
+                          title={t("components:permissionMapping.removeGroup")}
                           data-testid={`remove-group-btn`}
                         >
                           <X size={14} />

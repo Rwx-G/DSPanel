@@ -39,5 +39,7 @@
   "executeOnboarding": "Execute Onboarding",
   "accessDeniedDescription": "Onboarding requires AccountOperator permission or higher.",
   "createUser": "Create User",
-  "presetModifiedAriaLabel": "Preset modified externally"
+  "presetModifiedAriaLabel": "Preset modified externally",
+  "summaryLogin": "Login:",
+  "summaryPassword": "Password:"
 }

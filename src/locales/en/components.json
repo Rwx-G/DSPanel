@@ -103,6 +103,15 @@
     "saveChanges": "Save Changes",
     "requiresAccountOperator": "Requires AccountOperator permission"
   },
+  "pagination": {
+    "firstPage": "First page",
+    "previousPage": "Previous page",
+    "nextPage": "Next page",
+    "lastPage": "Last page",
+    "noItems": "No items",
+    "showing": "Showing {{start}}-{{end}} of {{total}} items",
+    "pageSize": "Page size:"
+  },
   "permissionMapping": {
     "domainAdminRequired": "DomainAdmin access required to manage permission mappings.",
     "description": "Map AD security groups to DSPanel permission levels. When a user belongs to multiple mapped groups, the highest level wins. Default detection (RID-based + DSPanel-* groups) remains active alongside custom mappings.",
@@ -123,7 +132,10 @@
     "searchFailed": "Search failed. Please try again.",
     "noGroupsFound": "No groups found",
     "savedSuccessfully": "Permission mappings saved successfully.",
-    "saveMappings": "Save Mappings"
+    "saveMappings": "Save Mappings",
+    "groupNotFoundInAd": "Group not found in AD",
+    "validateGroupExists": "Validate group exists in AD",
+    "removeGroup": "Remove group"
   },
   "workstationMonitoring": {
     "title": "Monitoring: {{hostname}}",
@@ -153,7 +165,9 @@
     "removeFilter": "Remove {{label}} filter"
   },
   "propertyGrid": {
-    "noProperties": "No properties to display"
+    "noProperties": "No properties to display",
+    "confirmEdit": "Confirm edit",
+    "cancelEdit": "Cancel edit"
   },
   "diffViewer": {
     "noDifferences": "No differences",
@@ -168,7 +182,10 @@
     "noMatch": "No attributes match \"{{query}}\"",
     "favorites": "Favorites",
     "allAttributes": "All Attributes",
-    "empty": "(empty)"
+    "empty": "(empty)",
+    "confirmEdit": "Confirm edit",
+    "cancelEdit": "Cancel edit",
+    "clearFilter": "Clear filter"
   },
   "exchangePanel": {
     "title": "Exchange Mailbox",
@@ -199,12 +216,17 @@
   "comboBox": {
     "placeholder": "Select...",
     "searchPlaceholder": "Search...",
+    "searchOptions": "Search options",
     "noResults": "No results"
   },
   "dateTimePicker": {
     "placeholder": "Select date...",
     "previousMonth": "Previous month",
     "nextMonth": "Next month",
+    "decreaseHours": "Decrease hours",
+    "increaseHours": "Increase hours",
+    "decreaseMinutes": "Decrease minutes",
+    "increaseMinutes": "Increase minutes",
     "months": ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
   },
   "validationSummary": {
