@@ -67,7 +67,7 @@ export function Settings() {
   const { notify } = useNotifications();
   const { nodes: ouNodes, loading: ouLoading, error: ouError } = useOUTree({ silent: true });
 
-  const { currentTheme, applyTheme } = useTheme();
+  const { applyTheme } = useTheme();
 
   // React to tab data passed via navigation (e.g. from Preset Management)
   useEffect(() => {
