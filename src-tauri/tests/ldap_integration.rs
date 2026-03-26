@@ -33,9 +33,13 @@
 //! ```
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use dspanel_lib::services::directory::DirectoryProvider;
+use dspanel_lib::services::dc_health;
 use dspanel_lib::services::ldap_directory::{LdapDirectoryProvider, LdapTlsConfig};
+use dspanel_lib::services::replication_status;
+use dspanel_lib::services::topology;
 
 async fn create_connected_provider() -> Option<LdapDirectoryProvider> {
     let server = std::env::var("DSPANEL_LDAP_SERVER").ok()?;
@@ -1108,6 +1112,160 @@ async fn admin_get_thumbnail_photo() {
         }
         Err(e) => {
             eprintln!("SKIPPED (permission denied?): {}", e);
+        }
+    }
+}
+
+// =========================================================================
+// DC HEALTH - READ OPERATIONS
+// =========================================================================
+
+#[tokio::test]
+async fn read_dc_health_check() {
+    let provider = skip_if_no_ad!();
+    let provider: Arc<dyn DirectoryProvider> = Arc::new(provider);
+
+    // Discover DCs first
+    let dcs = dc_health::discover_domain_controllers(&*provider)
+        .await
+        .expect("discover_domain_controllers failed");
+    println!("Discovered {} domain controller(s)", dcs.len());
+    assert!(!dcs.is_empty(), "Should discover at least one DC");
+
+    // Find DC1 (172.31.72.165) or use the first DC
+    let dc = dcs
+        .iter()
+        .find(|d| d.hostname.contains("172.31.72.165") || d.hostname.to_lowercase().contains("dc1"))
+        .unwrap_or(&dcs[0]);
+    println!("Checking health of: {}", dc.hostname);
+
+    let result = dc_health::check_dc_health(dc, &*provider, None).await;
+    println!(
+        "Overall status: {:?}, checks: {}",
+        result.overall_status,
+        result.checks.len()
+    );
+    assert!(
+        !result.checks.is_empty(),
+        "Health check should produce at least one check"
+    );
+    for check in &result.checks {
+        println!(
+            "  [{:?}] {} - {}",
+            check.status,
+            check.name,
+            check.message
+        );
+    }
+    assert!(
+        !result.checked_at.is_empty(),
+        "checked_at should be populated"
+    );
+}
+
+#[tokio::test]
+async fn read_dc_health_multiple_dcs() {
+    let provider = skip_if_no_ad!();
+    let provider: Arc<dyn DirectoryProvider> = Arc::new(provider);
+
+    let results = dc_health::check_all_dc_health(provider.clone())
+        .await
+        .expect("check_all_dc_health failed");
+
+    println!("Health results for {} DC(s)", results.len());
+    assert!(
+        !results.is_empty(),
+        "Should get health results for at least one DC"
+    );
+
+    for result in &results {
+        println!(
+            "DC: {} | Site: {} | Status: {:?} | FSMO: {:?} | Checks: {}",
+            result.dc.hostname,
+            result.dc.site_name,
+            result.overall_status,
+            result.dc.fsmo_roles,
+            result.checks.len()
+        );
+    }
+
+    // Verify at least the connected DC is healthy or has checks
+    let connected_dc = results
+        .iter()
+        .find(|r| r.checks.iter().any(|c| c.name == "LDAP"));
+    assert!(
+        connected_dc.is_some(),
+        "At least one DC should have an LDAP check"
+    );
+}
+
+#[tokio::test]
+async fn read_replication_partnerships() {
+    let provider = skip_if_no_ad!();
+    let provider: Arc<dyn DirectoryProvider> = Arc::new(provider);
+
+    let partnerships = replication_status::get_replication_partnerships(provider.clone())
+        .await
+        .expect("get_replication_partnerships failed");
+
+    println!("Found {} replication partnership(s)", partnerships.len());
+    // With two DCs we expect at least one replication partnership
+    assert!(
+        !partnerships.is_empty(),
+        "Two-DC domain should have at least one replication partnership"
+    );
+
+    for p in &partnerships {
+        println!(
+            "  {} -> {} | NC: {} | Status: {:?}",
+            p.source_dc, p.target_dc, p.naming_context, p.status
+        );
+    }
+}
+
+#[tokio::test]
+async fn read_topology_data() {
+    let provider = skip_if_no_ad!();
+    let provider: Arc<dyn DirectoryProvider> = Arc::new(provider);
+
+    let topo = topology::get_topology(provider.clone())
+        .await
+        .expect("get_topology failed");
+
+    println!(
+        "Topology: {} site(s), {} replication link(s), {} site link(s)",
+        topo.sites.len(),
+        topo.replication_links.len(),
+        topo.site_links.len()
+    );
+
+    assert!(
+        !topo.sites.is_empty(),
+        "Should discover at least one AD site"
+    );
+
+    for site in &topo.sites {
+        println!(
+            "  Site: {} | DCs: {} | Subnets: {:?}",
+            site.name,
+            site.dcs.len(),
+            site.subnets
+        );
+        for dc in &site.dcs {
+            println!(
+                "    DC: {} | GC: {} | FSMO: {:?}",
+                dc.hostname, dc.is_gc, dc.fsmo_roles
+            );
+        }
+    }
+
+    if !topo.replication_links.is_empty() {
+        println!("Replication links:");
+        for link in &topo.replication_links {
+            println!(
+                "  {} -> {} | status: {:?}",
+                link.source_dc, link.target_dc, link.status
+            );
         }
     }
 }

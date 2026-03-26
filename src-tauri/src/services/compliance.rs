@@ -929,4 +929,655 @@ mod tests {
     fn html_escapes() {
         assert_eq!(he("<script>"), "&lt;script&gt;");
     }
+
+    // -- Additional check definition tests --
+
+    #[test]
+    fn all_checks_have_unique_ids() {
+        let checks = builtin_checks();
+        let mut ids: Vec<&str> = checks.iter().map(|c| c.id.as_str()).collect();
+        let original_len = ids.len();
+        ids.sort();
+        ids.dedup();
+        assert_eq!(ids.len(), original_len, "Duplicate check IDs found");
+    }
+
+    #[test]
+    fn all_checks_have_severity() {
+        for c in builtin_checks() {
+            assert!(
+                ["Critical", "High", "Medium", "Low"].contains(&c.severity.as_str()),
+                "Check {} has invalid severity: {}",
+                c.id,
+                c.severity
+            );
+        }
+    }
+
+    #[test]
+    fn all_checks_have_title_and_description() {
+        for c in builtin_checks() {
+            assert!(!c.title.is_empty(), "Check {} has empty title", c.id);
+            assert!(
+                !c.description.is_empty(),
+                "Check {} has empty description",
+                c.id
+            );
+        }
+    }
+
+    #[test]
+    fn all_checks_have_query_scope() {
+        for c in builtin_checks() {
+            assert!(
+                !c.query_scope.is_empty(),
+                "Check {} has empty query_scope",
+                c.id
+            );
+        }
+    }
+
+    #[test]
+    fn all_checks_have_query_attributes() {
+        for c in builtin_checks() {
+            assert!(
+                !c.query_attributes.is_empty(),
+                "Check {} has no query_attributes",
+                c.id
+            );
+        }
+    }
+
+    // -- Score computation edge cases --
+
+    #[test]
+    fn compute_score_all_critical() {
+        let results = vec![
+            CheckResult {
+                check_id: "a".into(),
+                title: "".into(),
+                description: "".into(),
+                severity: "Critical".into(),
+                finding_count: 1,
+                headers: vec![],
+                rows: vec![vec![]],
+                frameworks: vec![],
+                remediation: "".into(),
+            },
+            CheckResult {
+                check_id: "b".into(),
+                title: "".into(),
+                description: "".into(),
+                severity: "Critical".into(),
+                finding_count: 1,
+                headers: vec![],
+                rows: vec![vec![]],
+                frameworks: vec![],
+                remediation: "".into(),
+            },
+            CheckResult {
+                check_id: "c".into(),
+                title: "".into(),
+                description: "".into(),
+                severity: "Critical".into(),
+                finding_count: 1,
+                headers: vec![],
+                rows: vec![vec![]],
+                frameworks: vec![],
+                remediation: "".into(),
+            },
+            CheckResult {
+                check_id: "d".into(),
+                title: "".into(),
+                description: "".into(),
+                severity: "Critical".into(),
+                finding_count: 1,
+                headers: vec![],
+                rows: vec![vec![]],
+                frameworks: vec![],
+                remediation: "".into(),
+            },
+        ];
+        // 100 - 25*4 = 0
+        assert_eq!(compute_global_score(&results), 0);
+    }
+
+    #[test]
+    fn compute_score_saturates_at_zero() {
+        let results = vec![
+            CheckResult {
+                check_id: "a".into(),
+                title: "".into(),
+                description: "".into(),
+                severity: "Critical".into(),
+                finding_count: 1,
+                headers: vec![],
+                rows: vec![vec![]],
+                frameworks: vec![],
+                remediation: "".into(),
+            },
+            CheckResult {
+                check_id: "b".into(),
+                title: "".into(),
+                description: "".into(),
+                severity: "Critical".into(),
+                finding_count: 1,
+                headers: vec![],
+                rows: vec![vec![]],
+                frameworks: vec![],
+                remediation: "".into(),
+            },
+            CheckResult {
+                check_id: "c".into(),
+                title: "".into(),
+                description: "".into(),
+                severity: "Critical".into(),
+                finding_count: 1,
+                headers: vec![],
+                rows: vec![vec![]],
+                frameworks: vec![],
+                remediation: "".into(),
+            },
+            CheckResult {
+                check_id: "d".into(),
+                title: "".into(),
+                description: "".into(),
+                severity: "Critical".into(),
+                finding_count: 1,
+                headers: vec![],
+                rows: vec![vec![]],
+                frameworks: vec![],
+                remediation: "".into(),
+            },
+            CheckResult {
+                check_id: "e".into(),
+                title: "".into(),
+                description: "".into(),
+                severity: "Critical".into(),
+                finding_count: 1,
+                headers: vec![],
+                rows: vec![vec![]],
+                frameworks: vec![],
+                remediation: "".into(),
+            },
+        ];
+        // 100 - 25*5 = -25 -> saturates at 0
+        assert_eq!(compute_global_score(&results), 0);
+    }
+
+    #[test]
+    fn compute_score_medium_penalty() {
+        let results = vec![CheckResult {
+            check_id: "a".into(),
+            title: "".into(),
+            description: "".into(),
+            severity: "Medium".into(),
+            finding_count: 3,
+            headers: vec![],
+            rows: vec![vec![], vec![], vec![]],
+            frameworks: vec![],
+            remediation: "".into(),
+        }];
+        // 100 - 5 = 95
+        assert_eq!(compute_global_score(&results), 95);
+    }
+
+    #[test]
+    fn compute_score_low_penalty() {
+        let results = vec![CheckResult {
+            check_id: "a".into(),
+            title: "".into(),
+            description: "".into(),
+            severity: "Low".into(),
+            finding_count: 1,
+            headers: vec![],
+            rows: vec![vec![]],
+            frameworks: vec![],
+            remediation: "".into(),
+        }];
+        // 100 - 2 = 98
+        assert_eq!(compute_global_score(&results), 98);
+    }
+
+    #[test]
+    fn compute_score_empty_results() {
+        assert_eq!(compute_global_score(&[]), 100);
+    }
+
+    #[test]
+    fn compute_score_no_findings_ignored() {
+        let results = vec![CheckResult {
+            check_id: "a".into(),
+            title: "".into(),
+            description: "".into(),
+            severity: "Critical".into(),
+            finding_count: 0, // no findings - should not penalize
+            headers: vec![],
+            rows: vec![],
+            frameworks: vec![],
+            remediation: "".into(),
+        }];
+        assert_eq!(compute_global_score(&results), 100);
+    }
+
+    // -- Framework scores edge cases --
+
+    #[test]
+    fn framework_scores_empty_results() {
+        let scores = compute_framework_scores(&[]);
+        assert_eq!(scores.len(), FRAMEWORKS.len());
+        for s in &scores {
+            assert_eq!(s.score, 100);
+            assert_eq!(s.total_checks, 0);
+            assert_eq!(s.checks_with_findings, 0);
+        }
+    }
+
+    #[test]
+    fn framework_scores_multiple_findings() {
+        let results = vec![
+            CheckResult {
+                check_id: "a".into(),
+                title: "".into(),
+                description: "".into(),
+                severity: "Critical".into(),
+                finding_count: 5,
+                headers: vec![],
+                rows: vec![vec![]; 5],
+                frameworks: vec![fm("GDPR", "Art. 32")],
+                remediation: "".into(),
+            },
+            CheckResult {
+                check_id: "b".into(),
+                title: "".into(),
+                description: "".into(),
+                severity: "Medium".into(),
+                finding_count: 2,
+                headers: vec![],
+                rows: vec![vec![]; 2],
+                frameworks: vec![fm("GDPR", "Art. 5")],
+                remediation: "".into(),
+            },
+        ];
+        let scores = compute_framework_scores(&results);
+        let gdpr = scores.iter().find(|s| s.standard == "GDPR").unwrap();
+        // 100 - 25 (critical) - 5 (medium) = 70
+        assert_eq!(gdpr.score, 70);
+        assert_eq!(gdpr.total_checks, 2);
+        assert_eq!(gdpr.checks_with_findings, 2);
+        assert_eq!(gdpr.control_refs.len(), 2);
+    }
+
+    // -- Query execution helpers --
+
+    #[test]
+    fn parse_filetime_valid() {
+        let ticks = (1_705_276_800i64 + 11_644_473_600) * 10_000_000;
+        let dt = parse_filetime(Some(&ticks.to_string()));
+        assert!(dt.is_some());
+    }
+
+    #[test]
+    fn parse_filetime_zero() {
+        assert!(parse_filetime(Some("0")).is_none());
+    }
+
+    #[test]
+    fn parse_filetime_negative() {
+        assert!(parse_filetime(Some("-1")).is_none());
+    }
+
+    #[test]
+    fn parse_filetime_none() {
+        assert!(parse_filetime(None).is_none());
+    }
+
+    #[test]
+    fn parse_filetime_invalid() {
+        assert!(parse_filetime(Some("not_a_number")).is_none());
+    }
+
+    #[test]
+    fn uac_flag_detection() {
+        let mut entry = DirectoryEntry::new("CN=Test,DC=test".to_string());
+        entry
+            .attributes
+            .insert("userAccountControl".to_string(), vec!["514".to_string()]);
+        assert!(uac_has_flag(&entry, 0x0002)); // disabled
+        assert!(!uac_has_flag(&entry, 0x10000)); // pwd never expires
+    }
+
+    #[test]
+    fn uac_flag_no_attribute() {
+        let entry = DirectoryEntry::new("CN=Test,DC=test".to_string());
+        assert!(!uac_has_flag(&entry, 0x0002));
+    }
+
+    #[test]
+    fn uac_flag_invalid_value() {
+        let mut entry = DirectoryEntry::new("CN=Test,DC=test".to_string());
+        entry
+            .attributes
+            .insert("userAccountControl".to_string(), vec!["abc".to_string()]);
+        assert!(!uac_has_flag(&entry, 0x0002));
+    }
+
+    // -- Attribute formatting --
+
+    #[test]
+    fn format_filetime_zero_shows_never() {
+        assert_eq!(
+            format_ad_attribute("lastLogonTimestamp", "0"),
+            "Never"
+        );
+    }
+
+    #[test]
+    fn format_filetime_max_shows_never() {
+        assert_eq!(
+            format_ad_attribute("accountExpires", "9223372036854775807"),
+            "Never"
+        );
+    }
+
+    #[test]
+    fn format_when_created_valid() {
+        let result = format_ad_attribute("whenCreated", "20240315143022.0Z");
+        assert_eq!(result, "2024-03-15 14:30");
+    }
+
+    #[test]
+    fn format_when_created_invalid() {
+        assert_eq!(
+            format_ad_attribute("whenCreated", "bad_date"),
+            "bad_date"
+        );
+    }
+
+    #[test]
+    fn format_uac_multiple_flags() {
+        // 66050 = 0x10000 (PwdNeverExpires) | 0x0002 (Disabled) | 0x200 (normal acct)
+        let result = format_ad_attribute("userAccountControl", "66050");
+        assert!(result.contains("Disabled"));
+        assert!(result.contains("PwdNeverExpires"));
+    }
+
+    #[test]
+    fn format_uac_invalid() {
+        assert_eq!(format_ad_attribute("userAccountControl", "xyz"), "xyz");
+    }
+
+    #[test]
+    fn format_unknown_attribute() {
+        assert_eq!(
+            format_ad_attribute("someCustomAttr", "value123"),
+            "value123"
+        );
+    }
+
+    #[test]
+    fn format_empty_value() {
+        assert_eq!(format_ad_attribute("lastLogonTimestamp", ""), "");
+    }
+
+    #[test]
+    fn format_dash_value() {
+        assert_eq!(format_ad_attribute("lastLogonTimestamp", "-"), "-");
+    }
+
+    // -- Friendly header --
+
+    #[test]
+    fn friendly_header_known() {
+        assert_eq!(friendly_header("sAMAccountName"), "Username");
+        assert_eq!(friendly_header("displayName"), "Display Name");
+        assert_eq!(friendly_header("lastLogonTimestamp"), "Last Logon");
+        assert_eq!(friendly_header("pwdLastSet"), "Password Set");
+        assert_eq!(friendly_header("whenCreated"), "Created");
+        assert_eq!(friendly_header("whenChanged"), "Last Modified");
+        assert_eq!(friendly_header("userAccountControl"), "Account Flags");
+    }
+
+    #[test]
+    fn friendly_header_unknown() {
+        assert_eq!(friendly_header("customAttr"), "customAttr");
+    }
+
+    // -- HTML report structure tests --
+
+    #[test]
+    fn export_framework_report_empty_checks() {
+        let scan = ComplianceScanResult {
+            scanned_at: "2026-03-24".into(),
+            generator: "test".into(),
+            total_accounts_scanned: 0,
+            global_score: 100,
+            total_findings: 0,
+            framework_scores: compute_framework_scores(&[]),
+            checks: vec![],
+        };
+        let html = export_framework_report(&scan, "GDPR");
+        assert!(html.starts_with("<!DOCTYPE html>"));
+        assert!(html.contains("GDPR Compliance Report"));
+        assert!(html.contains("100/100"));
+    }
+
+    #[test]
+    fn export_framework_report_high_score_color() {
+        let scan = ComplianceScanResult {
+            scanned_at: "2026-03-24".into(),
+            generator: "test".into(),
+            total_accounts_scanned: 10,
+            global_score: 90,
+            total_findings: 1,
+            framework_scores: vec![FrameworkScore {
+                standard: "GDPR".into(),
+                score: 90,
+                total_checks: 1,
+                checks_with_findings: 1,
+                control_refs: vec!["Art. 32".into()],
+            }],
+            checks: vec![],
+        };
+        let html = export_framework_report(&scan, "GDPR");
+        // High score (>=80) should use green color
+        assert!(html.contains("#2e7d32"));
+    }
+
+    #[test]
+    fn export_framework_report_low_score_color() {
+        let scan = ComplianceScanResult {
+            scanned_at: "2026-03-24".into(),
+            generator: "test".into(),
+            total_accounts_scanned: 10,
+            global_score: 30,
+            total_findings: 10,
+            framework_scores: vec![FrameworkScore {
+                standard: "GDPR".into(),
+                score: 30,
+                total_checks: 5,
+                checks_with_findings: 5,
+                control_refs: vec![],
+            }],
+            checks: vec![],
+        };
+        let html = export_framework_report(&scan, "GDPR");
+        // Low score (<50) should use red color
+        assert!(html.contains("#c62828"));
+    }
+
+    #[test]
+    fn export_framework_report_unknown_framework_defaults() {
+        let scan = ComplianceScanResult {
+            scanned_at: "2026-03-24".into(),
+            generator: "test".into(),
+            total_accounts_scanned: 0,
+            global_score: 100,
+            total_findings: 0,
+            framework_scores: vec![],
+            checks: vec![],
+        };
+        let html = export_framework_report(&scan, "UNKNOWN_FW");
+        assert!(html.contains("UNKNOWN_FW Compliance Report"));
+        // Should default to 100 score when no matching framework
+        assert!(html.contains("100/100"));
+    }
+
+    // -- HTML escape edge cases --
+
+    #[test]
+    fn html_escape_ampersand() {
+        assert_eq!(he("A & B"), "A &amp; B");
+    }
+
+    #[test]
+    fn html_escape_quotes() {
+        assert_eq!(he("say \"hello\""), "say &quot;hello&quot;");
+    }
+
+    #[test]
+    fn html_escape_empty() {
+        assert_eq!(he(""), "");
+    }
+
+    // -- execute_query scope tests --
+
+    #[tokio::test]
+    async fn execute_query_unknown_scope_returns_empty() {
+        use crate::services::directory::tests::MockDirectoryProvider;
+
+        let provider = Arc::new(MockDirectoryProvider::new());
+        let result = execute_query(provider, "unknownScope").await.unwrap();
+        assert!(result.is_empty());
+    }
+
+    #[tokio::test]
+    async fn execute_query_privileged_accounts() {
+        use crate::services::directory::tests::MockDirectoryProvider;
+
+        let mut admin = DirectoryEntry::new("CN=Admin,DC=test".to_string());
+        admin.sam_account_name = Some("admin".to_string());
+        admin.object_class = Some("user".to_string());
+        admin
+            .attributes
+            .insert("adminCount".to_string(), vec!["1".to_string()]);
+
+        let mut normal = DirectoryEntry::new("CN=User,DC=test".to_string());
+        normal.sam_account_name = Some("user".to_string());
+        normal.object_class = Some("user".to_string());
+
+        let provider =
+            Arc::new(MockDirectoryProvider::new().with_users(vec![admin, normal]));
+
+        let result = execute_query(provider, "privilegedAccounts").await.unwrap();
+        assert_eq!(result.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn execute_query_disabled_accounts() {
+        use crate::services::directory::tests::MockDirectoryProvider;
+
+        let mut disabled = DirectoryEntry::new("CN=Disabled,DC=test".to_string());
+        disabled.sam_account_name = Some("disabled".to_string());
+        disabled.object_class = Some("user".to_string());
+        disabled
+            .attributes
+            .insert("userAccountControl".to_string(), vec!["514".to_string()]);
+
+        let provider = Arc::new(MockDirectoryProvider::new().with_users(vec![disabled]));
+
+        let result = execute_query(provider, "disabledAccounts").await.unwrap();
+        assert_eq!(result.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn execute_query_password_never_expires() {
+        use crate::services::directory::tests::MockDirectoryProvider;
+
+        let mut user = DirectoryEntry::new("CN=User,DC=test".to_string());
+        user.sam_account_name = Some("user".to_string());
+        user.object_class = Some("user".to_string());
+        user.attributes
+            .insert("userAccountControl".to_string(), vec!["66048".to_string()]); // 0x10000 + 512
+
+        let provider = Arc::new(MockDirectoryProvider::new().with_users(vec![user]));
+
+        let result = execute_query(provider, "passwordNeverExpires")
+            .await
+            .unwrap();
+        assert_eq!(result.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn execute_query_password_not_required() {
+        use crate::services::directory::tests::MockDirectoryProvider;
+
+        let mut user = DirectoryEntry::new("CN=User,DC=test".to_string());
+        user.sam_account_name = Some("user".to_string());
+        user.object_class = Some("user".to_string());
+        user.attributes
+            .insert("userAccountControl".to_string(), vec!["544".to_string()]); // 0x20 + 512
+
+        let provider = Arc::new(MockDirectoryProvider::new().with_users(vec![user]));
+
+        let result = execute_query(provider, "passwordNotRequired")
+            .await
+            .unwrap();
+        assert_eq!(result.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn execute_query_reversible_encryption() {
+        use crate::services::directory::tests::MockDirectoryProvider;
+
+        let mut user = DirectoryEntry::new("CN=User,DC=test".to_string());
+        user.sam_account_name = Some("user".to_string());
+        user.object_class = Some("user".to_string());
+        user.attributes
+            .insert("userAccountControl".to_string(), vec!["640".to_string()]); // 0x80 + 512
+
+        let provider = Arc::new(MockDirectoryProvider::new().with_users(vec![user]));
+
+        let result = execute_query(provider, "reversibleEncryption")
+            .await
+            .unwrap();
+        assert_eq!(result.len(), 1);
+    }
+
+    // -- run_compliance_scan integration --
+
+    #[tokio::test]
+    async fn run_compliance_scan_with_empty_directory() {
+        use crate::services::directory::tests::MockDirectoryProvider;
+
+        let provider = Arc::new(MockDirectoryProvider::new());
+        let result = run_compliance_scan(provider).await.unwrap();
+
+        assert_eq!(result.checks.len(), 7);
+        assert_eq!(result.total_findings, 0);
+        assert_eq!(result.global_score, 100);
+        assert_eq!(result.framework_scores.len(), FRAMEWORKS.len());
+        // MockDirectoryProvider returns None for authenticated_user,
+        // so generator falls back to USERNAME env var or "DSPanel"
+        assert!(!result.generator.is_empty());
+        assert!(!result.scanned_at.is_empty());
+    }
+
+    #[tokio::test]
+    async fn run_compliance_scan_detects_findings() {
+        use crate::services::directory::tests::MockDirectoryProvider;
+
+        let mut user = DirectoryEntry::new("CN=Admin,DC=test".to_string());
+        user.sam_account_name = Some("admin".to_string());
+        user.display_name = Some("Admin".to_string());
+        user.object_class = Some("user".to_string());
+        user.attributes
+            .insert("adminCount".to_string(), vec!["1".to_string()]);
+
+        let provider = Arc::new(MockDirectoryProvider::new().with_users(vec![user]));
+        let result = run_compliance_scan(provider).await.unwrap();
+
+        assert!(result.total_findings > 0);
+        assert!(result.global_score < 100);
+    }
 }

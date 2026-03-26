@@ -164,4 +164,178 @@ mod tests {
         // Should contain HTML structure
         assert!(html.contains("html") || html.contains("HTML") || html.contains("<"));
     }
+
+    // -----------------------------------------------------------------------
+    // run_compliance_scan - success path with mock data
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_run_compliance_scan_success_with_domain_admin() {
+        let state = make_state_with_level(PermissionLevel::DomainAdmin);
+        let has_perm = state
+            .permission_service
+            .has_permission(PermissionLevel::DomainAdmin);
+        assert!(has_perm);
+
+        let result = compliance::run_compliance_scan(state.directory_provider.clone())
+            .await
+            .unwrap();
+
+        assert_eq!(result.checks.len(), 7);
+        assert!(!result.scanned_at.is_empty());
+        assert_eq!(result.framework_scores.len(), 9);
+    }
+
+    #[tokio::test]
+    async fn test_run_compliance_scan_with_findings() {
+        // Create users that trigger checks
+        let mut admin = crate::models::DirectoryEntry::new("CN=Admin,DC=test".to_string());
+        admin.sam_account_name = Some("admin".to_string());
+        admin.display_name = Some("Admin".to_string());
+        admin.object_class = Some("user".to_string());
+        admin
+            .attributes
+            .insert("adminCount".to_string(), vec!["1".to_string()]);
+
+        let mut disabled = crate::models::DirectoryEntry::new("CN=Disabled,DC=test".to_string());
+        disabled.sam_account_name = Some("disabled".to_string());
+        disabled.display_name = Some("Disabled".to_string());
+        disabled.object_class = Some("user".to_string());
+        disabled.attributes.insert(
+            "userAccountControl".to_string(),
+            vec!["514".to_string()],
+        );
+
+        let provider = Arc::new(
+            MockDirectoryProvider::new().with_users(vec![admin, disabled]),
+        );
+        let state = AppState::new_for_test(provider, PermissionConfig::default());
+        state
+            .permission_service
+            .set_level(PermissionLevel::DomainAdmin);
+
+        let result = compliance::run_compliance_scan(state.directory_provider.clone())
+            .await
+            .unwrap();
+
+        assert!(result.total_findings > 0);
+        assert!(result.global_score < 100);
+
+        // Verify at least privilegedAccounts and disabledAccounts checks have findings
+        let priv_check = result
+            .checks
+            .iter()
+            .find(|c| c.check_id == "privileged_accounts")
+            .unwrap();
+        assert!(priv_check.finding_count > 0);
+
+        let disabled_check = result
+            .checks
+            .iter()
+            .find(|c| c.check_id == "disabled_accounts")
+            .unwrap();
+        assert!(disabled_check.finding_count > 0);
+    }
+
+    // -----------------------------------------------------------------------
+    // export report format validation
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_export_framework_report_contains_proper_html_structure() {
+        let scan = ComplianceScanResult {
+            scanned_at: "2026-03-26T10:00:00Z".to_string(),
+            generator: "TestAdmin".to_string(),
+            total_accounts_scanned: 50,
+            global_score: 70,
+            total_findings: 3,
+            framework_scores: vec![compliance::FrameworkScore {
+                standard: "HIPAA".to_string(),
+                score: 80,
+                total_checks: 5,
+                checks_with_findings: 2,
+                control_refs: vec!["164.312(a)(1)".to_string()],
+            }],
+            checks: vec![compliance::CheckResult {
+                check_id: "test_check".to_string(),
+                title: "Test Check".to_string(),
+                description: "A test check".to_string(),
+                severity: "High".to_string(),
+                finding_count: 2,
+                headers: vec!["Username".to_string(), "Display Name".to_string()],
+                rows: vec![
+                    vec!["admin".to_string(), "Administrator".to_string()],
+                    vec!["svc_sql".to_string(), "SQL Service".to_string()],
+                ],
+                frameworks: vec![compliance::FrameworkMapping {
+                    standard: "HIPAA".to_string(),
+                    control_ref: "164.312(a)(1)".to_string(),
+                }],
+                remediation: "Fix the issue.".to_string(),
+            }],
+        };
+
+        let html = compliance::export_framework_report(&scan, "HIPAA");
+
+        // Validate HTML structure
+        assert!(html.starts_with("<!DOCTYPE html>"));
+        assert!(html.contains("<html"));
+        assert!(html.contains("</html>"));
+        assert!(html.contains("HIPAA Compliance Report"));
+        assert!(html.contains("TestAdmin"));
+        assert!(html.contains("164.312(a)(1)"));
+        assert!(html.contains("Test Check"));
+        assert!(html.contains("admin"));
+        assert!(html.contains("svc_sql"));
+        assert!(html.contains("Fix the issue."));
+        assert!(html.contains("High"));
+        // Table structure
+        assert!(html.contains("<table>"));
+        assert!(html.contains("<th>"));
+        assert!(html.contains("<td>"));
+    }
+
+    #[test]
+    fn test_export_framework_report_different_frameworks() {
+        let scan = ComplianceScanResult {
+            scanned_at: "2026-03-26".to_string(),
+            generator: "test".to_string(),
+            total_accounts_scanned: 0,
+            global_score: 100,
+            total_findings: 0,
+            framework_scores: vec![],
+            checks: vec![],
+        };
+
+        for fw in compliance::FRAMEWORKS {
+            let html = compliance::export_framework_report(&scan, fw);
+            assert!(
+                html.contains(&format!("{} Compliance Report", fw)),
+                "Report for {} missing title",
+                fw
+            );
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Permission level boundary checks
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_run_compliance_scan_denied_for_account_operator() {
+        let state = make_state_with_level(PermissionLevel::AccountOperator);
+        let has_perm = state
+            .permission_service
+            .has_permission(PermissionLevel::DomainAdmin);
+        assert!(!has_perm);
+    }
+
+    #[tokio::test]
+    async fn test_run_compliance_scan_denied_for_readonly() {
+        let state = make_state(); // ReadOnly by default
+        let has_perm = state
+            .permission_service
+            .has_permission(PermissionLevel::DomainAdmin);
+        assert!(!has_perm);
+    }
 }

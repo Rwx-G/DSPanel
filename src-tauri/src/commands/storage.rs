@@ -2144,4 +2144,421 @@ mod tests {
         assert!(!diffs.is_empty());
         assert!(diffs.iter().any(|d| d.attribute == "mail"));
     }
+
+    // -----------------------------------------------------------------------
+    // Contact CRUD - success/failure paths
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_create_contact_failure_audits() {
+        let state = make_state_with_level_and_failure(PermissionLevel::AccountOperator);
+        let attrs = HashMap::new();
+        let result =
+            create_contact_inner(&state, "OU=Contacts,DC=example,DC=com", &attrs).await;
+        assert!(result.is_err());
+
+        let entries = state.audit_service.get_entries();
+        assert!(entries.iter().any(|e| e.action == "ContactCreateFailed"));
+    }
+
+    #[tokio::test]
+    async fn test_update_contact_requires_account_operator() {
+        let state = make_state(); // ReadOnly
+        let attrs = HashMap::new();
+        let result =
+            update_contact_inner(&state, "CN=Contact,OU=Contacts,DC=example,DC=com", &attrs)
+                .await;
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), AppError::PermissionDenied(_)));
+    }
+
+    #[tokio::test]
+    async fn test_update_contact_success_and_audit() {
+        let (state, provider) =
+            make_state_with_level_and_provider(PermissionLevel::AccountOperator);
+        let mut attrs = HashMap::new();
+        attrs.insert("mail".to_string(), "new@example.com".to_string());
+
+        let result = update_contact_inner(
+            &state,
+            "CN=Contact,OU=Contacts,DC=example,DC=com",
+            &attrs,
+        )
+        .await;
+        assert!(result.is_ok());
+
+        let calls = provider.update_contact_calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+
+        let entries = state.audit_service.get_entries();
+        assert!(entries.iter().any(|e| e.action == "ContactUpdated"));
+    }
+
+    #[tokio::test]
+    async fn test_update_contact_failure_audits() {
+        let state = make_state_with_level_and_failure(PermissionLevel::AccountOperator);
+        let attrs = HashMap::new();
+        let result = update_contact_inner(
+            &state,
+            "CN=Contact,OU=Contacts,DC=example,DC=com",
+            &attrs,
+        )
+        .await;
+        assert!(result.is_err());
+
+        let entries = state.audit_service.get_entries();
+        assert!(entries.iter().any(|e| e.action == "ContactUpdateFailed"));
+    }
+
+    #[tokio::test]
+    async fn test_delete_contact_success_and_audit() {
+        let (state, provider) =
+            make_state_with_level_and_provider(PermissionLevel::AccountOperator);
+        let result =
+            delete_contact_inner(&state, "CN=Contact,OU=Contacts,DC=example,DC=com").await;
+        assert!(result.is_ok());
+
+        let calls = provider.delete_contact_calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+
+        let entries = state.audit_service.get_entries();
+        assert!(entries.iter().any(|e| e.action == "ContactDeleted"));
+    }
+
+    #[tokio::test]
+    async fn test_delete_contact_failure_audits() {
+        let state = make_state_with_level_and_failure(PermissionLevel::AccountOperator);
+        let result =
+            delete_contact_inner(&state, "CN=Contact,OU=Contacts,DC=example,DC=com").await;
+        assert!(result.is_err());
+
+        let entries = state.audit_service.get_entries();
+        assert!(entries.iter().any(|e| e.action == "ContactDeleteFailed"));
+    }
+
+    // -----------------------------------------------------------------------
+    // Printer CRUD - success/failure paths
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_create_printer_success_and_audit() {
+        let (state, provider) =
+            make_state_with_level_and_provider(PermissionLevel::DomainAdmin);
+        let mut attrs = HashMap::new();
+        attrs.insert("printerName".to_string(), "HP LaserJet".to_string());
+
+        let result =
+            create_printer_inner(&state, "OU=Printers,DC=example,DC=com", &attrs).await;
+        assert!(result.is_ok());
+
+        let calls = provider.create_printer_calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+
+        let entries = state.audit_service.get_entries();
+        assert!(entries.iter().any(|e| e.action == "PrinterCreated"));
+    }
+
+    #[tokio::test]
+    async fn test_create_printer_failure_audits() {
+        let state = make_state_with_level_and_failure(PermissionLevel::DomainAdmin);
+        let attrs = HashMap::new();
+        let result =
+            create_printer_inner(&state, "OU=Printers,DC=example,DC=com", &attrs).await;
+        assert!(result.is_err());
+
+        let entries = state.audit_service.get_entries();
+        assert!(entries.iter().any(|e| e.action == "PrinterCreateFailed"));
+    }
+
+    #[tokio::test]
+    async fn test_update_printer_requires_domain_admin() {
+        let state = make_state_with_level(PermissionLevel::AccountOperator);
+        let attrs = HashMap::new();
+        let result = update_printer_inner(
+            &state,
+            "CN=Printer,OU=Printers,DC=example,DC=com",
+            &attrs,
+        )
+        .await;
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), AppError::PermissionDenied(_)));
+    }
+
+    #[tokio::test]
+    async fn test_update_printer_success_and_audit() {
+        let (state, provider) =
+            make_state_with_level_and_provider(PermissionLevel::DomainAdmin);
+        let mut attrs = HashMap::new();
+        attrs.insert("location".to_string(), "Floor 3".to_string());
+
+        let result = update_printer_inner(
+            &state,
+            "CN=Printer,OU=Printers,DC=example,DC=com",
+            &attrs,
+        )
+        .await;
+        assert!(result.is_ok());
+
+        let calls = provider.update_printer_calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+
+        let entries = state.audit_service.get_entries();
+        assert!(entries.iter().any(|e| e.action == "PrinterUpdated"));
+    }
+
+    #[tokio::test]
+    async fn test_update_printer_failure_audits() {
+        let state = make_state_with_level_and_failure(PermissionLevel::DomainAdmin);
+        let attrs = HashMap::new();
+        let result = update_printer_inner(
+            &state,
+            "CN=Printer,OU=Printers,DC=example,DC=com",
+            &attrs,
+        )
+        .await;
+        assert!(result.is_err());
+
+        let entries = state.audit_service.get_entries();
+        assert!(entries.iter().any(|e| e.action == "PrinterUpdateFailed"));
+    }
+
+    #[tokio::test]
+    async fn test_delete_printer_success_and_audit() {
+        let (state, provider) =
+            make_state_with_level_and_provider(PermissionLevel::DomainAdmin);
+        let result =
+            delete_printer_inner(&state, "CN=Printer,OU=Printers,DC=example,DC=com").await;
+        assert!(result.is_ok());
+
+        let calls = provider.delete_printer_calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+
+        let entries = state.audit_service.get_entries();
+        assert!(entries.iter().any(|e| e.action == "PrinterDeleted"));
+    }
+
+    #[tokio::test]
+    async fn test_delete_printer_failure_audits() {
+        let state = make_state_with_level_and_failure(PermissionLevel::DomainAdmin);
+        let result =
+            delete_printer_inner(&state, "CN=Printer,OU=Printers,DC=example,DC=com").await;
+        assert!(result.is_err());
+
+        let entries = state.audit_service.get_entries();
+        assert!(entries.iter().any(|e| e.action == "PrinterDeleteFailed"));
+    }
+
+    // -----------------------------------------------------------------------
+    // Thumbnail photo - size validation
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_set_thumbnail_photo_rejects_oversized() {
+        let state = make_state_with_level(PermissionLevel::AccountOperator);
+        // Create a base64 string that decodes to > 100KB
+        // 140000 base64 chars ~ 105KB decoded
+        let large_photo = "A".repeat(140_000);
+        let result = set_thumbnail_photo_inner(
+            &state,
+            "CN=John,OU=Users,DC=example,DC=com",
+            &large_photo,
+        )
+        .await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            AppError::Validation(msg) => {
+                assert!(msg.contains("exceeds maximum size"));
+            }
+            other => panic!("Expected Validation, got: {:?}", other),
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Credential store - via inner functions
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_delete_credential_rejects_invalid_key() {
+        let state = make_state();
+        let result = delete_credential_inner(&state, "bad_key");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_credential_store_overwrite() {
+        let state = make_state();
+        store_credential_inner(&state, "graph_client_secret", "v1").unwrap();
+        store_credential_inner(&state, "graph_client_secret", "v2").unwrap();
+        let result = get_credential_inner(&state, "graph_client_secret").unwrap();
+        assert_eq!(result, Some("v2".to_string()));
+    }
+
+    // -----------------------------------------------------------------------
+    // Recycle bin - disabled state
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_is_recycle_bin_disabled() {
+        let provider = Arc::new(
+            MockDirectoryProvider::new().with_recycle_bin_disabled(),
+        );
+        let state = AppState::new_for_test(provider, PermissionConfig::default());
+        state
+            .permission_service
+            .set_level(PermissionLevel::DomainAdmin);
+
+        let result = is_recycle_bin_enabled_inner(&state).await.unwrap();
+        assert!(!result);
+    }
+
+    // -----------------------------------------------------------------------
+    // Snapshot - delete single
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_delete_single_snapshot() {
+        let state = make_state();
+        let id = state
+            .object_snapshot_service
+            .capture("dn1", "Op1", "{}", "test");
+        assert!(state.object_snapshot_service.delete_snapshot(id));
+        assert!(get_snapshot_inner(&state, id).is_none());
+    }
+
+    #[test]
+    fn test_delete_nonexistent_snapshot() {
+        let state = make_state();
+        assert!(!state.object_snapshot_service.delete_snapshot(999));
+    }
+
+    // -----------------------------------------------------------------------
+    // validate_group_exists - with matching group
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_validate_group_exists_returns_true_for_existing() {
+        let group = DirectoryEntry {
+            distinguished_name: "CN=IT-Support,OU=Groups,DC=example,DC=com".to_string(),
+            sam_account_name: Some("IT-Support".to_string()),
+            display_name: Some("IT Support".to_string()),
+            object_class: Some("group".to_string()),
+            attributes: HashMap::new(),
+        };
+        let provider = Arc::new(MockDirectoryProvider::new().with_groups(vec![group]));
+        let state = AppState::new_for_test(provider, PermissionConfig::default());
+
+        let result = validate_group_exists_inner(
+            &state,
+            "CN=IT-Support,OU=Groups,DC=example,DC=com",
+        )
+        .await
+        .unwrap();
+        assert!(result);
+    }
+
+    // -----------------------------------------------------------------------
+    // App settings - get/set
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_get_app_settings_default() {
+        let state = make_state();
+        let settings = state.app_settings.get();
+        // Default settings should have no graph config
+        assert!(settings.graph_tenant_id.is_none());
+        assert!(settings.graph_client_id.is_none());
+    }
+
+    #[test]
+    fn test_set_app_settings_roundtrip() {
+        let state = make_state();
+        let mut settings = state.app_settings.get();
+        settings.graph_tenant_id = Some("test-tenant".to_string());
+        settings.graph_client_id = Some("test-client".to_string());
+        state.app_settings.update(settings);
+
+        let loaded = state.app_settings.get();
+        assert_eq!(loaded.graph_tenant_id, Some("test-tenant".to_string()));
+        assert_eq!(loaded.graph_client_id, Some("test-client".to_string()));
+    }
+
+    // -----------------------------------------------------------------------
+    // skip_update_version
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_skip_update_version_persists() {
+        let state = make_state();
+        skip_update_version_inner(&state, "1.2.3");
+
+        let settings = state.app_settings.get();
+        let update = settings.update.unwrap();
+        assert_eq!(update.skipped_version, Some("1.2.3".to_string()));
+    }
+
+    #[test]
+    fn test_skip_update_version_overwrites_previous() {
+        let state = make_state();
+        skip_update_version_inner(&state, "1.0.0");
+        skip_update_version_inner(&state, "2.0.0");
+
+        let settings = state.app_settings.get();
+        let update = settings.update.unwrap();
+        assert_eq!(update.skipped_version, Some("2.0.0".to_string()));
+    }
+
+    // -----------------------------------------------------------------------
+    // Preset accept checksum
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_accept_preset_checksum_nonexistent() {
+        let (state, _dir) = make_state_with_preset_dir(PermissionLevel::AccountOperator);
+        let result = accept_preset_checksum_inner(&state, "NonExistent");
+        // Should fail since preset does not exist
+        assert!(result.is_err());
+    }
+
+    // -----------------------------------------------------------------------
+    // Snapshot - compute diff with matching entry
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_compute_snapshot_diff_detects_changes() {
+        let users = vec![{
+            let mut entry = DirectoryEntry {
+                distinguished_name: "CN=John Doe,OU=Users,DC=example,DC=com".to_string(),
+                sam_account_name: Some("jdoe".to_string()),
+                display_name: Some("John Doe".to_string()),
+                object_class: Some("user".to_string()),
+                attributes: HashMap::new(),
+            };
+            entry.attributes.insert(
+                "mail".to_string(),
+                vec!["newemail@example.com".to_string()],
+            );
+            entry
+        }];
+        let state = make_state_with_users(users);
+
+        // Snapshot has old email
+        state.object_snapshot_service.capture(
+            "CN=John Doe,OU=Users,DC=example,DC=com",
+            "Op",
+            r#"{"mail":["oldemail@example.com"]}"#,
+            "TestAdmin",
+        );
+
+        let diffs = compute_snapshot_diff_inner(&state, 1).await.unwrap();
+        let mail_diff = diffs.iter().find(|d| d.attribute == "mail").unwrap();
+        assert!(mail_diff.changed);
+        assert_eq!(
+            mail_diff.snapshot_value,
+            Some("oldemail@example.com".to_string())
+        );
+        assert_eq!(
+            mail_diff.current_value,
+            Some("newemail@example.com".to_string())
+        );
+    }
 }

@@ -1408,4 +1408,642 @@ mod tests {
         assert!(provider.search_users("test", 50).await.is_err());
         assert!(provider.get_ou_tree().await.is_err());
     }
+
+    // -----------------------------------------------------------------------
+    // Resilient delete_object passthrough
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_resilient_delete_object() {
+        let inner = Arc::new(MockDirectoryProvider::new());
+        let provider = ResilientDirectoryProvider::new(
+            inner,
+            RetryConfig::default(),
+            CircuitBreaker::new(CircuitBreakerConfig::default()),
+            noop_delay,
+        );
+
+        let result = provider.delete_object("CN=User,DC=test").await;
+        assert!(result.is_ok());
+    }
+
+    // -----------------------------------------------------------------------
+    // Resilient remove_group_member passthrough
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_resilient_remove_group_member() {
+        let inner = Arc::new(MockDirectoryProvider::new());
+        let provider = ResilientDirectoryProvider::new(
+            inner,
+            RetryConfig::default(),
+            CircuitBreaker::new(CircuitBreakerConfig::default()),
+            noop_delay,
+        );
+
+        let result = provider
+            .remove_group_member("CN=Group,DC=test", "CN=User,DC=test")
+            .await;
+        assert!(result.is_ok());
+    }
+
+    // -----------------------------------------------------------------------
+    // Resilient create_group passthrough
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_resilient_create_group() {
+        let inner = Arc::new(MockDirectoryProvider::new());
+        let provider = ResilientDirectoryProvider::new(
+            inner,
+            RetryConfig::default(),
+            CircuitBreaker::new(CircuitBreakerConfig::default()),
+            noop_delay,
+        );
+
+        let result = provider
+            .create_group("TestGroup", "OU=Groups,DC=test", "Global", "Security", "A test group")
+            .await;
+        assert!(result.is_ok());
+    }
+
+    // -----------------------------------------------------------------------
+    // Resilient move_object passthrough
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_resilient_move_object() {
+        let inner = Arc::new(MockDirectoryProvider::new());
+        let provider = ResilientDirectoryProvider::new(
+            inner,
+            RetryConfig::default(),
+            CircuitBreaker::new(CircuitBreakerConfig::default()),
+            noop_delay,
+        );
+
+        let result = provider
+            .move_object("CN=User,OU=Old,DC=test", "OU=New,DC=test")
+            .await;
+        assert!(result.is_ok());
+    }
+
+    // -----------------------------------------------------------------------
+    // Resilient update_managed_by passthrough
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_resilient_update_managed_by() {
+        let inner = Arc::new(MockDirectoryProvider::new());
+        let provider = ResilientDirectoryProvider::new(
+            inner,
+            RetryConfig::default(),
+            CircuitBreaker::new(CircuitBreakerConfig::default()),
+            noop_delay,
+        );
+
+        let result = provider
+            .update_managed_by("CN=Group,DC=test", "CN=Manager,DC=test")
+            .await;
+        assert!(result.is_ok());
+    }
+
+    // -----------------------------------------------------------------------
+    // Resilient browse_contacts passthrough
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_resilient_browse_contacts() {
+        let inner = Arc::new(MockDirectoryProvider::new());
+        let provider = ResilientDirectoryProvider::new(
+            inner,
+            RetryConfig::default(),
+            CircuitBreaker::new(CircuitBreakerConfig::default()),
+            noop_delay,
+        );
+
+        let results = provider.browse_contacts(100).await.unwrap();
+        assert!(results.is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // Resilient browse_printers passthrough
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_resilient_browse_printers() {
+        let inner = Arc::new(MockDirectoryProvider::new());
+        let provider = ResilientDirectoryProvider::new(
+            inner,
+            RetryConfig::default(),
+            CircuitBreaker::new(CircuitBreakerConfig::default()),
+            noop_delay,
+        );
+
+        let results = provider.browse_printers(100).await.unwrap();
+        assert!(results.is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // Resilient browse_groups passthrough
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_resilient_browse_groups() {
+        let groups = vec![DirectoryEntry {
+            distinguished_name: "CN=Admins,DC=test".to_string(),
+            sam_account_name: Some("Admins".to_string()),
+            display_name: Some("Admins".to_string()),
+            object_class: Some("group".to_string()),
+            attributes: HashMap::new(),
+        }];
+        let inner = Arc::new(MockDirectoryProvider::new().with_groups(groups));
+        let provider = ResilientDirectoryProvider::new(
+            inner,
+            RetryConfig::default(),
+            CircuitBreaker::new(CircuitBreakerConfig::default()),
+            noop_delay,
+        );
+
+        let results = provider.browse_groups(500).await.unwrap();
+        assert_eq!(results.len(), 1);
+    }
+
+    // -----------------------------------------------------------------------
+    // Resilient modify_attribute passthrough
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_resilient_modify_attribute() {
+        let inner = Arc::new(MockDirectoryProvider::new());
+        let provider = ResilientDirectoryProvider::new(
+            inner,
+            RetryConfig::default(),
+            CircuitBreaker::new(CircuitBreakerConfig::default()),
+            noop_delay,
+        );
+
+        let result = provider
+            .modify_attribute("CN=User,DC=test", "mail", &["user@test.com".to_string()])
+            .await;
+        assert!(result.is_ok());
+    }
+
+    // -----------------------------------------------------------------------
+    // Resilient authenticated_user passthrough
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_resilient_authenticated_user() {
+        let inner = Arc::new(MockDirectoryProvider::new());
+        let provider = ResilientDirectoryProvider::new(
+            inner,
+            RetryConfig::default(),
+            CircuitBreaker::new(CircuitBreakerConfig::default()),
+            noop_delay,
+        );
+
+        // MockDirectoryProvider returns None for authenticated_user
+        let user = provider.authenticated_user();
+        assert!(user.is_none());
+    }
+
+    // -----------------------------------------------------------------------
+    // Resilient probe_effective_permissions passthrough
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_resilient_probe_effective_permissions() {
+        let inner = Arc::new(MockDirectoryProvider::new());
+        let provider = ResilientDirectoryProvider::new(
+            inner,
+            RetryConfig::default(),
+            CircuitBreaker::new(CircuitBreakerConfig::default()),
+            noop_delay,
+        );
+
+        let result = provider.probe_effective_permissions().await.unwrap();
+        // MockDirectoryProvider returns (false, false, false)
+        assert_eq!(result, (false, false, false));
+    }
+
+    // -----------------------------------------------------------------------
+    // Resilient is_recycle_bin_enabled passthrough
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_resilient_is_recycle_bin_enabled() {
+        let inner = Arc::new(MockDirectoryProvider::new());
+        let provider = ResilientDirectoryProvider::new(
+            inner,
+            RetryConfig::default(),
+            CircuitBreaker::new(CircuitBreakerConfig::default()),
+            noop_delay,
+        );
+
+        let result = provider.is_recycle_bin_enabled().await.unwrap();
+        assert!(result);
+    }
+
+    // -----------------------------------------------------------------------
+    // Resilient get_deleted_objects passthrough
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_resilient_get_deleted_objects() {
+        let inner = Arc::new(MockDirectoryProvider::new());
+        let provider = ResilientDirectoryProvider::new(
+            inner,
+            RetryConfig::default(),
+            CircuitBreaker::new(CircuitBreakerConfig::default()),
+            noop_delay,
+        );
+
+        let results = provider.get_deleted_objects().await.unwrap();
+        assert!(results.is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // Resilient restore_deleted_object passthrough
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_resilient_restore_deleted_object() {
+        let inner = Arc::new(MockDirectoryProvider::new());
+        let provider = ResilientDirectoryProvider::new(
+            inner,
+            RetryConfig::default(),
+            CircuitBreaker::new(CircuitBreakerConfig::default()),
+            noop_delay,
+        );
+
+        let result = provider
+            .restore_deleted_object("CN=Deleted,CN=Deleted Objects,DC=test", "OU=Users,DC=test")
+            .await;
+        assert!(result.is_ok());
+    }
+
+    // -----------------------------------------------------------------------
+    // Resilient get_thumbnail_photo passthrough
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_resilient_get_thumbnail_photo() {
+        let inner = Arc::new(
+            MockDirectoryProvider::new()
+                .with_thumbnail_photo("CN=User,DC=test", "base64data"),
+        );
+        let provider = ResilientDirectoryProvider::new(
+            inner,
+            RetryConfig::default(),
+            CircuitBreaker::new(CircuitBreakerConfig::default()),
+            noop_delay,
+        );
+
+        let result = provider
+            .get_thumbnail_photo("CN=User,DC=test")
+            .await
+            .unwrap();
+        assert_eq!(result, Some("base64data".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_resilient_get_thumbnail_photo_missing() {
+        let inner = Arc::new(MockDirectoryProvider::new());
+        let provider = ResilientDirectoryProvider::new(
+            inner,
+            RetryConfig::default(),
+            CircuitBreaker::new(CircuitBreakerConfig::default()),
+            noop_delay,
+        );
+
+        let result = provider
+            .get_thumbnail_photo("CN=NoPhoto,DC=test")
+            .await
+            .unwrap();
+        assert!(result.is_none());
+    }
+
+    // -----------------------------------------------------------------------
+    // Resilient set_thumbnail_photo passthrough
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_resilient_set_thumbnail_photo() {
+        let inner = Arc::new(MockDirectoryProvider::new());
+        let provider = ResilientDirectoryProvider::new(
+            inner,
+            RetryConfig::default(),
+            CircuitBreaker::new(CircuitBreakerConfig::default()),
+            noop_delay,
+        );
+
+        let result = provider
+            .set_thumbnail_photo("CN=User,DC=test", "base64data")
+            .await;
+        assert!(result.is_ok());
+    }
+
+    // -----------------------------------------------------------------------
+    // Resilient remove_thumbnail_photo passthrough
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_resilient_remove_thumbnail_photo() {
+        let inner = Arc::new(MockDirectoryProvider::new());
+        let provider = ResilientDirectoryProvider::new(
+            inner,
+            RetryConfig::default(),
+            CircuitBreaker::new(CircuitBreakerConfig::default()),
+            noop_delay,
+        );
+
+        let result = provider
+            .remove_thumbnail_photo("CN=User,DC=test")
+            .await;
+        assert!(result.is_ok());
+    }
+
+    // -----------------------------------------------------------------------
+    // Resilient create/update/delete contact passthroughs
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_resilient_create_contact() {
+        let inner = Arc::new(MockDirectoryProvider::new());
+        let provider = ResilientDirectoryProvider::new(
+            inner,
+            RetryConfig::default(),
+            CircuitBreaker::new(CircuitBreakerConfig::default()),
+            noop_delay,
+        );
+
+        let attrs = HashMap::from([("displayName".to_string(), "Test Contact".to_string())]);
+        let result = provider
+            .create_contact("OU=Contacts,DC=test", &attrs)
+            .await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_resilient_update_contact() {
+        let inner = Arc::new(MockDirectoryProvider::new());
+        let provider = ResilientDirectoryProvider::new(
+            inner,
+            RetryConfig::default(),
+            CircuitBreaker::new(CircuitBreakerConfig::default()),
+            noop_delay,
+        );
+
+        let attrs = HashMap::from([("mail".to_string(), "new@test.com".to_string())]);
+        let result = provider
+            .update_contact("CN=Contact,DC=test", &attrs)
+            .await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_resilient_delete_contact() {
+        let inner = Arc::new(MockDirectoryProvider::new());
+        let provider = ResilientDirectoryProvider::new(
+            inner,
+            RetryConfig::default(),
+            CircuitBreaker::new(CircuitBreakerConfig::default()),
+            noop_delay,
+        );
+
+        let result = provider.delete_contact("CN=Contact,DC=test").await;
+        assert!(result.is_ok());
+    }
+
+    // -----------------------------------------------------------------------
+    // Resilient create/update/delete printer passthroughs
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_resilient_create_printer() {
+        let inner = Arc::new(MockDirectoryProvider::new());
+        let provider = ResilientDirectoryProvider::new(
+            inner,
+            RetryConfig::default(),
+            CircuitBreaker::new(CircuitBreakerConfig::default()),
+            noop_delay,
+        );
+
+        let attrs = HashMap::from([("printerName".to_string(), "HP1".to_string())]);
+        let result = provider
+            .create_printer("OU=Printers,DC=test", &attrs)
+            .await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_resilient_update_printer() {
+        let inner = Arc::new(MockDirectoryProvider::new());
+        let provider = ResilientDirectoryProvider::new(
+            inner,
+            RetryConfig::default(),
+            CircuitBreaker::new(CircuitBreakerConfig::default()),
+            noop_delay,
+        );
+
+        let attrs = HashMap::from([("location".to_string(), "Room 101".to_string())]);
+        let result = provider
+            .update_printer("CN=HP1,DC=test", &attrs)
+            .await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_resilient_delete_printer() {
+        let inner = Arc::new(MockDirectoryProvider::new());
+        let provider = ResilientDirectoryProvider::new(
+            inner,
+            RetryConfig::default(),
+            CircuitBreaker::new(CircuitBreakerConfig::default()),
+            noop_delay,
+        );
+
+        let result = provider.delete_printer("CN=HP1,DC=test").await;
+        assert!(result.is_ok());
+    }
+
+    // -----------------------------------------------------------------------
+    // Resilient search_contacts and search_printers
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_resilient_search_contacts() {
+        let inner = Arc::new(MockDirectoryProvider::new());
+        let provider = ResilientDirectoryProvider::new(
+            inner,
+            RetryConfig::default(),
+            CircuitBreaker::new(CircuitBreakerConfig::default()),
+            noop_delay,
+        );
+
+        let results = provider.search_contacts("test", 50).await.unwrap();
+        assert!(results.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_resilient_search_printers() {
+        let inner = Arc::new(MockDirectoryProvider::new());
+        let provider = ResilientDirectoryProvider::new(
+            inner,
+            RetryConfig::default(),
+            CircuitBreaker::new(CircuitBreakerConfig::default()),
+            noop_delay,
+        );
+
+        let results = provider.search_printers("test", 50).await.unwrap();
+        assert!(results.is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // Resilient get_schema_attributes passthrough
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_resilient_get_schema_attributes() {
+        let inner = Arc::new(MockDirectoryProvider::new());
+        let provider = ResilientDirectoryProvider::new(
+            inner,
+            RetryConfig::default(),
+            CircuitBreaker::new(CircuitBreakerConfig::default()),
+            noop_delay,
+        );
+
+        let results = provider.get_schema_attributes().await.unwrap();
+        // MockDirectoryProvider returns a fixed set of schema attributes
+        assert!(!results.is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // Resilient search_configuration passthrough
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_resilient_search_configuration() {
+        let inner = Arc::new(MockDirectoryProvider::new());
+        let provider = ResilientDirectoryProvider::new(
+            inner,
+            RetryConfig::default(),
+            CircuitBreaker::new(CircuitBreakerConfig::default()),
+            noop_delay,
+        );
+
+        let results = provider
+            .search_configuration("CN=Configuration,DC=test", "(objectClass=*)")
+            .await
+            .unwrap();
+        assert!(results.is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // Resilient read_entry passthrough
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_resilient_read_entry() {
+        let inner = Arc::new(MockDirectoryProvider::new());
+        let provider = ResilientDirectoryProvider::new(
+            inner,
+            RetryConfig::default(),
+            CircuitBreaker::new(CircuitBreakerConfig::default()),
+            noop_delay,
+        );
+
+        let result = provider.read_entry("CN=User,DC=test").await.unwrap();
+        assert!(result.is_none());
+    }
+
+    // -----------------------------------------------------------------------
+    // Resilient create_user passthrough
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_resilient_create_user() {
+        let inner = Arc::new(MockDirectoryProvider::new());
+        let provider = ResilientDirectoryProvider::new(
+            inner,
+            RetryConfig::default(),
+            CircuitBreaker::new(CircuitBreakerConfig::default()),
+            noop_delay,
+        );
+
+        let attrs = HashMap::new();
+        let result = provider
+            .create_user("John Doe", "OU=Users,DC=test", "jdoe", "P@ss1234", &attrs)
+            .await;
+        assert!(result.is_ok());
+    }
+
+    // -----------------------------------------------------------------------
+    // Resilient resolve_group_by_rid passthrough
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_resilient_resolve_group_by_rid() {
+        let inner = Arc::new(MockDirectoryProvider::new());
+        let provider = ResilientDirectoryProvider::new(
+            inner,
+            RetryConfig::default(),
+            CircuitBreaker::new(CircuitBreakerConfig::default()),
+            noop_delay,
+        );
+
+        let result = provider.resolve_group_by_rid(512).await.unwrap();
+        assert!(result.is_none());
+    }
+
+    // -----------------------------------------------------------------------
+    // Failure propagation through more operations
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_resilient_failure_propagates_write_operations() {
+        let inner = Arc::new(MockDirectoryProvider::new().with_failure());
+        let provider = ResilientDirectoryProvider::new(
+            inner,
+            RetryConfig {
+                max_retries: 0,
+                initial_delay: Duration::from_millis(1),
+                multiplier: 1.0,
+                ..Default::default()
+            },
+            CircuitBreaker::new(CircuitBreakerConfig {
+                failure_threshold: 100, // high threshold to avoid circuit breaker
+                recovery_timeout: Duration::from_secs(60),
+            }),
+            noop_delay,
+        );
+
+        assert!(provider.delete_object("CN=User,DC=test").await.is_err());
+        assert!(provider.enable_account("CN=User,DC=test").await.is_err());
+        assert!(provider.disable_account("CN=User,DC=test").await.is_err());
+        assert!(provider.unlock_account("CN=User,DC=test").await.is_err());
+        assert!(provider
+            .reset_password("CN=User,DC=test", "pass", false)
+            .await
+            .is_err());
+    }
+
+    // -----------------------------------------------------------------------
+    // Disconnected provider passthrough
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_resilient_disconnected_provider() {
+        let inner = Arc::new(MockDirectoryProvider::disconnected());
+        let provider = ResilientDirectoryProvider::new(
+            inner,
+            RetryConfig::default(),
+            CircuitBreaker::new(CircuitBreakerConfig::default()),
+            noop_delay,
+        );
+
+        assert!(!provider.is_connected());
+        assert!(provider.domain_name().is_none());
+        assert!(provider.base_dn().is_none());
+    }
 }
