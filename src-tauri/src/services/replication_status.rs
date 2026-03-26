@@ -6,6 +6,20 @@ use crate::models::replication_status::{
 };
 use crate::services::DirectoryProvider;
 
+/// Parsed data from a single DS_REPL_NEIGHBORW XML element.
+#[derive(Debug, Default)]
+struct ReplNeighborXml {
+    naming_context: String,
+    source_dsa_address: String,
+    replica_flags: u32,
+    last_sync_success: Option<String>,
+    last_sync_attempt: Option<String>,
+    last_sync_result: u32,
+    consecutive_failures: u32,
+    usn_last_obj_change_synced: i64,
+    transport_dn: String,
+}
+
 /// Discovers replication partnerships by querying NTDS Connection objects
 /// in the AD Configuration partition.
 pub async fn get_replication_partnerships(
@@ -38,6 +52,18 @@ pub async fn get_replication_partnerships(
             Some((ntds_dn, hostname))
         })
         .collect();
+
+    // Try to enrich with msDS-ReplAllInboundNeighbors from rootDSE (XML format)
+    let repl_neighbors = match provider.read_entry("").await {
+        Ok(Some(root_dse)) => {
+            if let Some(xml_values) = root_dse.attributes.get("msDS-ReplAllInboundNeighbors") {
+                parse_repl_neighbors_xml(xml_values)
+            } else {
+                Vec::new()
+            }
+        }
+        _ => Vec::new(),
+    };
 
     let now_ms = chrono::Utc::now().timestamp_millis();
     let mut partnerships = Vec::new();
@@ -92,6 +118,22 @@ pub async fn get_replication_partnerships(
             .unwrap_or(base_dn.as_str())
             .to_string();
 
+        // Try to find matching msDS-ReplNeighbor data for enrichment
+        let neighbor = repl_neighbors.iter().find(|n| {
+            let src_match = source_dc.to_lowercase().starts_with(
+                &n.source_dsa_address
+                    .split('.')
+                    .next()
+                    .unwrap_or("")
+                    .to_lowercase(),
+            ) || n
+                .source_dsa_address
+                .to_lowercase()
+                .contains(&source_dc.to_lowercase());
+            let nc_match = n.naming_context.eq_ignore_ascii_case(&naming_context);
+            src_match && nc_match
+        });
+
         partnerships.push(ReplicationPartnership {
             source_dc,
             target_dc,
@@ -101,7 +143,63 @@ pub async fn get_replication_partnerships(
             consecutive_failures,
             last_sync_message,
             status,
+            usn_last_obj_change_synced: neighbor.map(|n| n.usn_last_obj_change_synced),
+            last_sync_attempt: neighbor.and_then(|n| n.last_sync_attempt.clone()),
+            transport: neighbor.map(|n| {
+                if n.transport_dn.is_empty() || n.transport_dn.contains("IP") {
+                    "RPC".to_string()
+                } else {
+                    "SMTP".to_string()
+                }
+            }),
+            replica_flags: neighbor.map(|n| n.replica_flags),
         });
+    }
+
+    // Add any msDS-ReplNeighbor entries that don't match an nTDSConnection.
+    // These represent active replication neighbors without a static connection object.
+    for neighbor in &repl_neighbors {
+        if neighbor.source_dsa_address.is_empty() {
+            continue;
+        }
+        let source_host = neighbor
+            .source_dsa_address
+            .split('.')
+            .next()
+            .unwrap_or(&neighbor.source_dsa_address)
+            .to_string();
+        let already_exists = partnerships.iter().any(|p| {
+            p.source_dc.eq_ignore_ascii_case(&source_host)
+                && p.naming_context
+                    .eq_ignore_ascii_case(&neighbor.naming_context)
+        });
+        if !already_exists {
+            let status = compute_replication_status(
+                neighbor.last_sync_result,
+                neighbor.last_sync_success.as_deref(),
+                now_ms,
+            );
+            partnerships.push(ReplicationPartnership {
+                source_dc: source_host,
+                target_dc: "(local)".to_string(),
+                naming_context: neighbor.naming_context.clone(),
+                last_sync_time: neighbor.last_sync_success.clone(),
+                last_sync_result: neighbor.last_sync_result,
+                consecutive_failures: neighbor.consecutive_failures,
+                last_sync_message: None,
+                status,
+                usn_last_obj_change_synced: Some(neighbor.usn_last_obj_change_synced),
+                last_sync_attempt: neighbor.last_sync_attempt.clone(),
+                transport: Some(
+                    if neighbor.transport_dn.is_empty() || neighbor.transport_dn.contains("IP") {
+                        "RPC".to_string()
+                    } else {
+                        "SMTP".to_string()
+                    },
+                ),
+                replica_flags: Some(neighbor.replica_flags),
+            });
+        }
     }
 
     // Sort: failed first, then by source DC
@@ -258,6 +356,82 @@ fn extract_powershell_error(raw: &str) -> String {
     }
 }
 
+/// Parses msDS-ReplAllInboundNeighbors XML values into structured data.
+///
+/// Each value in the attribute is an XML fragment representing one
+/// DS_REPL_NEIGHBORW element with fields like oszNamingContext,
+/// oszSourceDsaAddress, ftimeLastSyncSuccess, etc.
+fn parse_repl_neighbors_xml(xml_values: &[String]) -> Vec<ReplNeighborXml> {
+    let mut neighbors = Vec::new();
+
+    for xml_str in xml_values {
+        if let Some(neighbor) = parse_single_repl_neighbor_xml(xml_str) {
+            neighbors.push(neighbor);
+        }
+    }
+
+    neighbors
+}
+
+/// Parses a single DS_REPL_NEIGHBORW XML fragment.
+fn parse_single_repl_neighbor_xml(xml: &str) -> Option<ReplNeighborXml> {
+    use quick_xml::events::Event;
+    use quick_xml::Reader;
+
+    let mut reader = Reader::from_str(xml);
+    reader.config_mut().trim_text(true);
+    let mut neighbor = ReplNeighborXml::default();
+    let mut current_tag = String::new();
+
+    loop {
+        match reader.read_event() {
+            Ok(Event::Start(e)) => {
+                current_tag = String::from_utf8_lossy(e.name().as_ref()).to_string();
+            }
+            Ok(Event::Text(e)) => {
+                let text = String::from_utf8_lossy(&e).trim().to_string();
+                match current_tag.as_str() {
+                    "oszNamingContext" => neighbor.naming_context = text,
+                    "oszSourceDsaAddress" => neighbor.source_dsa_address = text,
+                    "oszAsyncIntersiteTransportDN" => neighbor.transport_dn = text,
+                    "dwReplicaFlags" => {
+                        neighbor.replica_flags = text.parse().unwrap_or(0);
+                    }
+                    "ftimeLastSyncSuccess" => {
+                        if !text.is_empty() && text != "0" {
+                            neighbor.last_sync_success = Some(text);
+                        }
+                    }
+                    "ftimeLastSyncAttempt" => {
+                        if !text.is_empty() && text != "0" {
+                            neighbor.last_sync_attempt = Some(text);
+                        }
+                    }
+                    "dwLastSyncResult" => {
+                        neighbor.last_sync_result = text.parse().unwrap_or(0);
+                    }
+                    "cNumConsecutiveSyncFailures" => {
+                        neighbor.consecutive_failures = text.parse().unwrap_or(0);
+                    }
+                    "usnLastObjChangeSynced" => {
+                        neighbor.usn_last_obj_change_synced = text.parse().unwrap_or(0);
+                    }
+                    _ => {}
+                }
+            }
+            Ok(Event::Eof) => break,
+            Err(_) => break,
+            _ => {}
+        }
+    }
+
+    if neighbor.naming_context.is_empty() && neighbor.source_dsa_address.is_empty() {
+        return None;
+    }
+
+    Some(neighbor)
+}
+
 /// Extracts the parent NTDS Settings DN from a connection DN.
 ///
 /// Connection DN: CN=<guid>,CN=NTDS Settings,CN=DC1,CN=Servers,...
@@ -325,6 +499,10 @@ mod tests {
                 consecutive_failures: 0,
                 last_sync_message: None,
                 status: ReplicationStatus::Healthy,
+                usn_last_obj_change_synced: None,
+                last_sync_attempt: None,
+                transport: None,
+                replica_flags: None,
             },
             ReplicationPartnership {
                 source_dc: "DC2".to_string(),
@@ -335,6 +513,10 @@ mod tests {
                 consecutive_failures: 5,
                 last_sync_message: Some("Error".to_string()),
                 status: ReplicationStatus::Failed,
+                usn_last_obj_change_synced: None,
+                last_sync_attempt: None,
+                transport: None,
+                replica_flags: None,
             },
         ];
 
@@ -384,6 +566,54 @@ mod tests {
         let raw = "A".repeat(300);
         let result = extract_powershell_error(&raw);
         assert!(result.len() <= 204); // 200 + "..."
+    }
+
+    #[test]
+    fn test_parse_repl_neighbor_xml() {
+        let xml = r#"<DS_REPL_NEIGHBORW>
+            <oszNamingContext>DC=example,DC=com</oszNamingContext>
+            <oszSourceDsaAddress>dc2.example.com</oszSourceDsaAddress>
+            <oszAsyncIntersiteTransportDN></oszAsyncIntersiteTransportDN>
+            <dwReplicaFlags>117</dwReplicaFlags>
+            <ftimeLastSyncSuccess>2026-03-26T10:30:00Z</ftimeLastSyncSuccess>
+            <ftimeLastSyncAttempt>2026-03-26T10:30:00Z</ftimeLastSyncAttempt>
+            <dwLastSyncResult>0</dwLastSyncResult>
+            <cNumConsecutiveSyncFailures>0</cNumConsecutiveSyncFailures>
+            <usnLastObjChangeSynced>45678</usnLastObjChangeSynced>
+        </DS_REPL_NEIGHBORW>"#;
+
+        let result = parse_single_repl_neighbor_xml(xml);
+        assert!(result.is_some());
+        let n = result.unwrap();
+        assert_eq!(n.naming_context, "DC=example,DC=com");
+        assert_eq!(n.source_dsa_address, "dc2.example.com");
+        assert_eq!(n.replica_flags, 117);
+        assert_eq!(n.last_sync_result, 0);
+        assert_eq!(n.consecutive_failures, 0);
+        assert_eq!(n.usn_last_obj_change_synced, 45678);
+        assert_eq!(
+            n.last_sync_success,
+            Some("2026-03-26T10:30:00Z".to_string())
+        );
+    }
+
+    #[test]
+    fn test_parse_repl_neighbors_xml_multiple() {
+        let values = vec![
+            "<DS_REPL_NEIGHBORW><oszNamingContext>DC=a,DC=com</oszNamingContext><oszSourceDsaAddress>dc1.a.com</oszSourceDsaAddress><dwReplicaFlags>0</dwReplicaFlags><dwLastSyncResult>0</dwLastSyncResult><cNumConsecutiveSyncFailures>0</cNumConsecutiveSyncFailures><usnLastObjChangeSynced>100</usnLastObjChangeSynced></DS_REPL_NEIGHBORW>".to_string(),
+            "<DS_REPL_NEIGHBORW><oszNamingContext>DC=a,DC=com</oszNamingContext><oszSourceDsaAddress>dc2.a.com</oszSourceDsaAddress><dwReplicaFlags>0</dwReplicaFlags><dwLastSyncResult>8453</dwLastSyncResult><cNumConsecutiveSyncFailures>3</cNumConsecutiveSyncFailures><usnLastObjChangeSynced>50</usnLastObjChangeSynced></DS_REPL_NEIGHBORW>".to_string(),
+        ];
+        let neighbors = parse_repl_neighbors_xml(&values);
+        assert_eq!(neighbors.len(), 2);
+        assert_eq!(neighbors[0].source_dsa_address, "dc1.a.com");
+        assert_eq!(neighbors[1].last_sync_result, 8453);
+        assert_eq!(neighbors[1].consecutive_failures, 3);
+    }
+
+    #[test]
+    fn test_parse_repl_neighbor_xml_empty_returns_none() {
+        let result = parse_single_repl_neighbor_xml("<DS_REPL_NEIGHBORW></DS_REPL_NEIGHBORW>");
+        assert!(result.is_none());
     }
 
     #[test]

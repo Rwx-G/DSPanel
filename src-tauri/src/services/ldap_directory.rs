@@ -2716,7 +2716,13 @@ impl DirectoryProvider for LdapDirectoryProvider {
                         &dn,
                         ldap3::Scope::Base,
                         "(objectClass=*)",
-                        vec!["*", "currentTime", "fSMORoleOwner", "msDS-Behavior-Version"],
+                        vec![
+                            "*",
+                            "currentTime",
+                            "fSMORoleOwner",
+                            "msDS-Behavior-Version",
+                            "msDS-ReplAllInboundNeighbors",
+                        ],
                     )
                     .await
                     .context("Base scope read failed")?

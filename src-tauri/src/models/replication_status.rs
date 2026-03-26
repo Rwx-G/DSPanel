@@ -20,6 +20,18 @@ pub struct ReplicationPartnership {
     pub last_sync_message: Option<String>,
     /// Overall status of this partnership.
     pub status: ReplicationStatus,
+    /// Last successful sync USN (Update Sequence Number), from msDS-ReplNeighbor.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub usn_last_obj_change_synced: Option<i64>,
+    /// Last sync attempt time (may differ from last success), from msDS-ReplNeighbor.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_sync_attempt: Option<String>,
+    /// Replication transport type (e.g., "RPC", "SMTP").
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub transport: Option<String>,
+    /// Replica flags bitmask describing the replication link properties.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub replica_flags: Option<u32>,
 }
 
 /// Status of a replication partnership.
@@ -189,6 +201,10 @@ mod tests {
             consecutive_failures: 0,
             last_sync_message: None,
             status: ReplicationStatus::Healthy,
+            usn_last_obj_change_synced: None,
+            last_sync_attempt: None,
+            transport: None,
+            replica_flags: None,
         };
         let json = serde_json::to_string(&partnership).unwrap();
         assert!(json.contains("sourceDc"));

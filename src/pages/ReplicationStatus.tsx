@@ -245,6 +245,8 @@ export function ReplicationStatus() {
               { key: "namingContext", header: "Naming Context" },
               { key: "status", header: "Status" },
               { key: "lastSyncTime", header: "Last Sync" },
+              { key: "usn", header: "USN" },
+              { key: "transport", header: "Transport" },
               { key: "consecutiveFailures", header: "Failures" },
             ]}
             data={partnerships}
@@ -254,6 +256,8 @@ export function ReplicationStatus() {
               p.namingContext,
               p.status,
               p.lastSyncTime ?? "Never",
+              p.usnLastObjChangeSynced != null ? String(p.usnLastObjChangeSynced) : "",
+              p.transport ?? "",
               String(p.consecutiveFailures),
             ]}
             title="AD Replication Status"
@@ -315,6 +319,8 @@ export function ReplicationStatus() {
                   <th className="px-3 py-2 font-medium">Target DC</th>
                   <th className="px-3 py-2 font-medium">Naming Context</th>
                   <th className="px-3 py-2 font-medium">Last Sync</th>
+                  <th className="px-3 py-2 font-medium">USN</th>
+                  <th className="px-3 py-2 font-medium">Transport</th>
                   <th className="px-3 py-2 font-medium">Errors</th>
                   {platform === "windows" && (
                     <th className="px-3 py-2 font-medium">Actions</th>
@@ -358,6 +364,12 @@ export function ReplicationStatus() {
                         >
                           {formatLatency(p.lastSyncTime)}
                         </span>
+                      </td>
+                      <td className="px-3 py-2 font-mono text-caption text-[var(--color-text-secondary)]">
+                        {p.usnLastObjChangeSynced != null ? p.usnLastObjChangeSynced.toLocaleString() : "-"}
+                      </td>
+                      <td className="px-3 py-2 text-caption text-[var(--color-text-secondary)]">
+                        {p.transport ?? "-"}
                       </td>
                       <td className="px-3 py-2">
                         {p.consecutiveFailures > 0 ? (

@@ -12,9 +12,7 @@ Items deferred from QA reviews. None are blocking - all stories are PASS.
 
 | Source | Item | Refs |
 | ------ | ---- | ---- |
-| Epic 6 QA | Interactive Browser auth (device code flow) as alternative to client secret for Graph API | `graph_exchange.rs`, Epic 12 (Story 12.2) |
-| Epic 8 QA | LDAP msDS-ReplNeighbor for richer replication status data | `replication_status.rs`, Story 8.2 |
-| Epic 7 QA | Server-side pagination for large Recycle Bin contents | `ldap_directory.rs`, Story 7.2 |
+| *(none)* | - | - |
 
 ## Dependencies (checked 2026-03-23)
 

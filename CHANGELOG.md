@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Auto-start service filter toggle in workstation monitoring
 - DC health cards grouped by AD site in Infrastructure Health
 - Snapshot history export (CSV/Excel/PDF/HTML) via ExportToolbar
+- Replication status enriched with msDS-ReplAllInboundNeighbors data (USN, transport, replica flags)
 
 ### Fixed
 
