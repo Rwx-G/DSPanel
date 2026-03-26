@@ -1,0 +1,20 @@
+{
+  "pageTitle": "Rapporti di conformita",
+  "runScan": "Avvia scansione di conformita",
+  "reScan": "Ripeti scansione",
+  "scanningLabel": "Scansione...",
+  "emptyTitle": "Rapporti di conformita",
+  "emptyDescription": "Avviare una scansione di conformita per valutare Active Directory rispetto a 9 framework: GDPR, HIPAA, SOX, PCI-DSS v4.0, ISO 27001, NIST 800-53, CIS v8, NIS2 e ANSSI.",
+  "globalScore": "Punteggio di conformita globale",
+  "accountsScanned": "account analizzati",
+  "findingsLabel": "risultati",
+  "checks": "Controlli",
+  "checkClear": "Nessun problema",
+  "check": "Controllo",
+  "severity": "Gravita",
+  "findings": "Risultati",
+  "description": "Descrizione",
+  "remediation": "Rimedio",
+  "report": "Rapporto",
+  "exportTitle": "Scansione di conformita - Tutti i controlli"
+}

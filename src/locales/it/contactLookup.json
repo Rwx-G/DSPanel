@@ -1,0 +1,17 @@
+{
+  "pageTitle": "Ricerca contatti",
+  "searchPlaceholder": "Cerca contatti per nome, email o azienda...",
+  "loadingContacts": "Caricamento contatti...",
+  "found_one": "{{count}} contatto trovato",
+  "found_other": "{{count}} contatti trovati",
+  "noContactsFound": "Nessun contatto trovato",
+  "failedToLoad": "Impossibile caricare i contatti",
+  "noContactsMatch": "Nessun contatto corrisponde a \"{{query}}\"",
+  "selectContact": "Selezionare un contatto per visualizzare i dettagli",
+  "deleteContact": "Elimina contatto",
+  "deleteConfirmation": "Confermare l'eliminazione di {{name}}?",
+  "deleteSuccess": "Contatto eliminato con successo",
+  "noEmail": "Nessuna email",
+  "contactInfo": "Informazioni contatto",
+  "organization": "Organizzazione"
+}

@@ -1,0 +1,20 @@
+{
+  "pageTitle": "Stato infrastruttura",
+  "check": "Controlla",
+  "gc": "GC",
+  "site": "Sito",
+  "autoRefresh1m": "1 min",
+  "autoRefresh5m": "5 min",
+  "autoRefresh15m": "15 min",
+  "autoRefreshOff": "Off",
+  "checkingDcs": "Controllo Domain Controller...",
+  "healthCheckFailed": "Controllo di salute fallito",
+  "noDcsFound": "Nessun Domain Controller trovato",
+  "noDcsDescription": "Nessun Domain Controller rilevato nella configurazione AD.",
+  "lastChecked": "Ultimo controllo:",
+  "exportDc": "DC",
+  "exportOverall": "Globale",
+  "exportCheckStatus": "Stato controllo",
+  "exportMessage": "Messaggio",
+  "exportTitle": "Rapporto stato infrastruttura"
+}

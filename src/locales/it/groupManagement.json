@@ -1,0 +1,13 @@
+{
+  "searchPlaceholder": "Cerca gruppi per nome o descrizione...",
+  "all": "Tutti",
+  "loadingGroups": "Caricamento gruppi...",
+  "found_one": "{{count}} gruppo trovato",
+  "found_other": "{{count}} gruppi trovati",
+  "noGroupsFound": "Nessun gruppo trovato",
+  "failedToLoad": "Impossibile caricare i gruppi",
+  "noSecurityGroups": "Nessun gruppo di sicurezza trovato.",
+  "noDistributionGroups": "Nessun gruppo di distribuzione trovato.",
+  "noGroupsMatch": "Nessun gruppo corrisponde a \"{{query}}\"",
+  "selectGroup": "Selezionare un gruppo per visualizzare i dettagli"
+}

@@ -1,0 +1,23 @@
+{
+  "dashboard": "Pannello di controllo",
+  "activeDirectory": "Active Directory",
+  "currentSession": "Sessione corrente",
+  "authenticatedAs": "Autenticato come",
+  "level": "Livello",
+  "domainJoined": "Aggiunto al dominio",
+  "environment": "Ambiente",
+  "mfaSecurity": "Sicurezza MFA",
+  "configured": "Configurato",
+  "notConfigured": "Non configurato",
+  "setupMfa": "Configura MFA",
+  "revokeMfa": "Revoca MFA",
+  "adGroupMemberships": "Appartenenze ai gruppi AD",
+  "notConnectedWarning": "Non connesso ad Active Directory. Le ricerche nella directory non saranno disponibili. Verificare che questa macchina sia unita al dominio e abbia accesso di rete a un Domain Controller.",
+  "generating": "Generazione...",
+  "permissions": "Permessi",
+  "readOnly": "Sola lettura",
+  "helpDesk": "Help Desk",
+  "accountOperator": "Operatore account",
+  "admin": "Amministratore",
+  "domainAdmin": "Amministratore di dominio"
+}

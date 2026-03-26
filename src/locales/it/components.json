@@ -1,0 +1,286 @@
+{
+  "errorBoundary": {
+    "title": "Qualcosa e andato storto",
+    "description": "Si e verificato un errore imprevisto. L'evento e stato registrato per analisi.",
+    "showDetails": "Mostra dettagli errore",
+    "tryAgain": "Riprova"
+  },
+  "exportToolbar": {
+    "export": "Esporta",
+    "exporting": "Esportazione..."
+  },
+  "searchBar": {
+    "placeholder": "Cerca...",
+    "clearSearch": "Cancella ricerca"
+  },
+  "loadingSpinner": {
+    "loading": "Caricamento"
+  },
+  "notificationHost": {
+    "dismiss": "Chiudi notifica"
+  },
+  "securityDisclaimer": {
+    "aboutModule": "Informazioni su questo modulo",
+    "coverage": "Analisi indicativa - copertura stimata {{coverage}}",
+    "whatWeCheck": "Cosa controlliamo:",
+    "limitations": "Limitazioni:",
+    "forCompleteAudit": "Per un audit completo:"
+  },
+  "snapshotHistory": {
+    "loading": "Caricamento cronologia snapshot...",
+    "noSnapshots": "Nessun snapshot",
+    "snapshotsDescription": "Gli snapshot vengono acquisiti automaticamente prima delle modifiche.",
+    "timestamp": "Data e ora",
+    "operation": "Operazione",
+    "operator": "Operatore",
+    "objectDn": "DN oggetto",
+    "restoreTitle": "Ripristina da snapshot",
+    "restoreConfirm": "Ripristinare \"{{name}}\" allo stato del {{timestamp}}?",
+    "restoreNote": "I valori degli attributi correnti verranno sovrascritti con i valori dello snapshot. Gli attributi di sola lettura (objectClass, memberOf, timestamp, ecc.) verranno ignorati.",
+    "restoreSuccess": "Oggetto ripristinato dallo snapshot con successo.",
+    "restoreButton": "Ripristina da questo snapshot",
+    "deleteTitle": "Elimina snapshot",
+    "deleteConfirm": "Eliminare lo snapshot \"{{operation}}\" del {{timestamp}}?",
+    "deleteNote": "Questo punto di ripristino verra rimosso definitivamente.",
+    "deleteButton": "Elimina snapshot",
+    "deleteFailed": "Impossibile eliminare lo snapshot",
+    "computingDiff": "Calcolo differenze...",
+    "noDifferences": "Nessuna differenza trovata - l'oggetto corrisponde allo snapshot.",
+    "attributesDiffer": "Attributo/i diverso/i dallo stato corrente",
+    "attribute": "Attributo",
+    "snapshot": "Snapshot",
+    "current": "Corrente",
+    "diffFailed": "Impossibile calcolare le differenze."
+  },
+  "updateBar": {
+    "versionAvailable": "DSPanel v{{version}} e disponibile.",
+    "download": "Scarica",
+    "skip": "Ignora",
+    "remindLater": "Ricordamelo piu tardi"
+  },
+  "userActions": {
+    "resetPassword": "Reimposta password",
+    "requiresHelpDesk": "Richiede permesso HelpDesk",
+    "unlock": "Sblocca",
+    "disable": "Disabilita",
+    "enable": "Abilita",
+    "unlockAccount": "Sblocca account",
+    "enableAccount": "Abilita account",
+    "disableAccount": "Disabilita account",
+    "unlockConfirm": "Confermare lo sblocco dell'account per {{name}} ({{sam}})?",
+    "enableConfirm": "Confermare l'abilitazione dell'account per {{name}} ({{sam}})?",
+    "disableConfirm": "Confermare la disabilitazione dell'account per {{name}} ({{sam}})? L'utente non potra piu accedere.",
+    "actionSuccess": "{{action}} riuscito per {{name}}"
+  },
+  "graphSettings": {
+    "title": "Integrazione Microsoft Graph",
+    "description": "Configurare la registrazione app Azure AD per la diagnostica Exchange Online. Richiede i permessi applicazione Mail.Read e User.Read.All con consenso amministratore.",
+    "tenantId": "ID tenant",
+    "tenantPlaceholder": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+    "clientId": "ID applicazione (client)",
+    "clientSecret": "Segreto client",
+    "clientSecretStored": "Archiviato nell'archivio credenziali del sistema operativo",
+    "clientSecretPlaceholder": "Valore segreto client",
+    "testConnection": "Test connessione",
+    "connectionSuccess": "Connessione riuscita.",
+    "connectionFailed": "Connessione fallita. Verificare ID tenant, ID client e segreto client."
+  },
+  "presetSettings": {
+    "title": "Percorso archiviazione preset",
+    "description": "Configurare la condivisione di rete o la directory locale dove vengono archiviati i file JSON dei preset. Tutte le istanze DSPanel che condividono questo percorso vedranno gli stessi preset.",
+    "placeholder": "\\\\server\\condivisione\\preset o C:\\preset",
+    "browseFolder": "Sfoglia cartelle",
+    "pathValid": "Il percorso e accessibile e valido.",
+    "pathInvalid": "Il percorso non e accessibile. Verificare il percorso e i permessi.",
+    "currentlyConfigured": "Attualmente configurato: {{path}}",
+    "configFailed": "Impossibile configurare il percorso. Verificare il percorso e riprovare."
+  },
+  "passwordFlags": {
+    "title": "Flag password",
+    "neverExpires": "Password senza scadenza",
+    "cannotChange": "L'utente non puo cambiare la password",
+    "insufficientPermissions": "(permessi insufficienti per la lettura)",
+    "saveChanges": "Salva modifiche",
+    "requiresAccountOperator": "Richiede permesso AccountOperator"
+  },
+  "pagination": {
+    "firstPage": "Prima pagina",
+    "previousPage": "Pagina precedente",
+    "nextPage": "Pagina successiva",
+    "lastPage": "Ultima pagina",
+    "noItems": "Nessun elemento",
+    "showing": "Visualizzazione {{start}}-{{end}} di {{total}} elementi",
+    "pageSize": "Dimensione pagina:"
+  },
+  "permissionMapping": {
+    "domainAdminRequired": "Accesso DomainAdmin richiesto per gestire le mappature dei permessi.",
+    "description": "Mappare i gruppi di sicurezza AD ai livelli di permesso DSPanel. Quando un utente appartiene a piu gruppi mappati, il livello piu alto prevale. Il rilevamento predefinito (basato su RID + gruppi DSPanel-*) resta attivo insieme alle mappature personalizzate.",
+    "readOnly": "Sola lettura",
+    "helpDesk": "Help Desk",
+    "accountOperator": "Operatore account",
+    "admin": "Amministratore",
+    "domainAdmin": "Amministratore di dominio",
+    "readOnlyHint": "Accesso di sola visualizzazione ai dati della directory",
+    "helpDeskHint": "Reimpostazione password e sblocco account",
+    "accountOperatorHint": "Gestione gruppi e modifica account",
+    "adminHint": "Amministrazione completa (creazione oggetti, gestione OU)",
+    "domainAdminHint": "Accesso completo inclusa sicurezza e infrastruttura",
+    "addGroup": "Aggiungi gruppo",
+    "searchGroupsPlaceholder": "Cerca gruppi AD per nome...",
+    "noCustomGroups": "Nessun gruppo personalizzato mappato. Si applica il rilevamento predefinito.",
+    "alreadyMapped": "(gia mappato)",
+    "searchFailed": "Ricerca fallita. Riprovare.",
+    "noGroupsFound": "Nessun gruppo trovato",
+    "savedSuccessfully": "Mappature permessi salvate con successo.",
+    "saveMappings": "Salva mappature",
+    "groupNotFoundInAd": "Gruppo non trovato in AD",
+    "validateGroupExists": "Verificare che il gruppo esista in AD",
+    "removeGroup": "Rimuovi gruppo"
+  },
+  "workstationMonitoring": {
+    "title": "Monitoraggio: {{hostname}}",
+    "refresh5s": "5s",
+    "refresh10s": "10s",
+    "refresh30s": "30s",
+    "resume": "Riprendi",
+    "pause": "Pausa",
+    "connecting": "Connessione alla workstation...",
+    "cpu": "CPU",
+    "memory": "Memoria",
+    "disks": "Dischi",
+    "sessions": "Sessioni ({{count}})",
+    "noActiveSessions": "Nessuna sessione attiva",
+    "unavailable": "Non disponibile",
+    "services": "Servizi ({{count}})",
+    "autoStart": "Avvio automatico",
+    "showAutoStart": "Mostra solo i servizi ad avvio automatico"
+  },
+  "dataTable": {
+    "noData": "Nessun dato disponibile",
+    "exportCsv": "Esporta in CSV"
+  },
+  "filterBar": {
+    "placeholder": "Filtra...",
+    "clearAll": "Cancella tutti i filtri",
+    "removeFilter": "Rimuovi filtro {{label}}"
+  },
+  "propertyGrid": {
+    "noProperties": "Nessuna proprieta da visualizzare",
+    "confirmEdit": "Conferma modifica",
+    "cancelEdit": "Annulla modifica"
+  },
+  "diffViewer": {
+    "noDifferences": "Nessuna differenza",
+    "inline": "In linea",
+    "sideBySide": "Affiancato"
+  },
+  "advancedAttributes": {
+    "title": "Attributi avanzati ({{count}})",
+    "noAttributes": "Nessun attributo avanzato disponibile",
+    "filterPlaceholder": "Filtra attributi...",
+    "showEmpty": "Mostra vuoti",
+    "noMatch": "Nessun attributo corrisponde a \"{{query}}\"",
+    "favorites": "Preferiti",
+    "allAttributes": "Tutti gli attributi",
+    "empty": "(vuoto)",
+    "confirmEdit": "Conferma modifica",
+    "cancelEdit": "Annulla modifica",
+    "clearFilter": "Cancella filtro"
+  },
+  "exchangePanel": {
+    "title": "Casella di posta Exchange",
+    "mailboxGuid": "GUID casella di posta",
+    "recipientType": "Tipo destinatario",
+    "primarySmtp": "SMTP primario",
+    "forwardingTo": "Inoltro a",
+    "emailAliases": "Alias email ({{count}})",
+    "delegates": "Delegati ({{count}})"
+  },
+  "groupPicker": {
+    "placeholder": "Cerca gruppi...",
+    "clearSearch": "Cancella ricerca",
+    "searchFailed": "Ricerca fallita. Riprovare.",
+    "noGroups": "Nessun gruppo trovato"
+  },
+  "ouPicker": {
+    "loading": "Caricamento OU...",
+    "loadFailed": "Impossibile caricare le OU",
+    "loadFailedHint": "Verificare la connessione AD e riprovare.",
+    "noOus": "Nessuna OU disponibile",
+    "selected": "Selezionata: {{ou}}"
+  },
+  "passwordInput": {
+    "hide": "Nascondi password",
+    "show": "Mostra password"
+  },
+  "comboBox": {
+    "placeholder": "Seleziona...",
+    "searchPlaceholder": "Cerca...",
+    "searchOptions": "Cerca opzioni",
+    "noResults": "Nessun risultato"
+  },
+  "dateTimePicker": {
+    "placeholder": "Seleziona data...",
+    "previousMonth": "Mese precedente",
+    "nextMonth": "Mese successivo",
+    "decreaseHours": "Diminuisci ore",
+    "increaseHours": "Aumenta ore",
+    "decreaseMinutes": "Diminuisci minuti",
+    "increaseMinutes": "Aumenta minuti",
+    "months": ["Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"]
+  },
+  "validationSummary": {
+    "error_one": "{{count}} errore di validazione",
+    "error_other": "{{count}} errori di validazione"
+  },
+  "stateInTimeView": {
+    "loadHistory": "Carica cronologia replica",
+    "notAvailable": "I metadati di replica non sono disponibili per questo oggetto.",
+    "attributeCount": "{{filtered}} di {{total}} attributo/i",
+    "filterPlaceholder": "Filtra attributi...",
+    "attribute": "Attributo",
+    "lastChanged": "Ultima modifica",
+    "version": "Versione",
+    "originatingDc": "DC di origine",
+    "snapshotValue": "Valore snapshot",
+    "compareTimeRanges": "Confronta intervalli temporali",
+    "from": "Da...",
+    "to": "A...",
+    "compare": "Confronta",
+    "noChanges": "Nessuna modifica degli attributi rilevata in questo intervallo temporale.",
+    "versionBefore": "Versione precedente",
+    "versionAfter": "Versione successiva",
+    "changedAt": "Modificato il",
+    "linkedAttributeChanges": "Modifiche attributi collegati ({{count}})",
+    "linkedObject": "Oggetto collegato",
+    "changed": "Modificato",
+    "removed": "Rimosso"
+  },
+  "uncPermissionsAudit": {
+    "notAvailable": "Non disponibile su questa piattaforma",
+    "notAvailableDescription": "L'audit dei permessi del percorso UNC richiede Windows. Le API NTFS ACL non sono disponibili su macOS o Linux.",
+    "uncPath": "Percorso UNC",
+    "uncPlaceholder": "\\\\server\\condivisione\\cartella",
+    "audit": "Audit",
+    "acesFound": "{{count}} ACE trovata/e per {{path}}",
+    "exportCsv": "Esporta CSV",
+    "bothUsers": "Entrambi gli utenti",
+    "onlyUser": "Solo {{name}}",
+    "trustee": "Beneficiario",
+    "permissions": "Permessi",
+    "accessSummary": "Riepilogo accesso",
+    "rulesGrantAccess": "{{count}} regola/e concede/ono l'accesso",
+    "rulesDenyAccess": "{{count}} regola/e nega/no l'accesso",
+    "via": "tramite {{groups}}",
+    "differences": "Differenze",
+    "hasAccessVia": "{{userA}} ha accesso {{permissions}} tramite {{trustee}} - {{userB}} no",
+    "errorsCount": "{{count}} errore/i durante l'audit",
+    "userHasAccess": "{{name}} ha accesso tramite {{trustee}}",
+    "userDenied": "{{name}} e negato tramite {{trustee}}",
+    "noMatchingGroup": "Nessun gruppo corrispondente per {{name}}"
+  },
+  "groupChainTree": {
+    "circularReference": "(riferimento circolare)",
+    "noMembers": "Nessun membro"
+  }
+}

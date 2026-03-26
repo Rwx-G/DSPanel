@@ -1,0 +1,11 @@
+{
+  "skipToMain": "Vai al contenuto principale",
+  "mainContent": "Contenuto principale",
+  "breadcrumb": "Breadcrumb",
+  "scrollTabsLeft": "Scorri schede a sinistra",
+  "scrollTabsRight": "Scorri schede a destra",
+  "closeTab": "Chiudi {{title}}",
+  "closeOthers": "Chiudi le altre",
+  "closeAll": "Chiudi tutte",
+  "tabOptions": "Opzioni scheda"
+}

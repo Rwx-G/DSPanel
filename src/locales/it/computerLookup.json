@@ -1,0 +1,17 @@
+{
+  "pageTitle": "Ricerca computer",
+  "searchPlaceholder": "Cerca per nome computer...",
+  "all": "Tutti",
+  "allOs": "Tutti i SO",
+  "windows": "Windows",
+  "otherOs": "Altro",
+  "loadingComputers": "Caricamento computer...",
+  "found_one": "{{count}} computer trovato",
+  "found_other": "{{count}} computer trovati",
+  "noComputersFound": "Nessun computer trovato",
+  "failedToLoad": "Impossibile caricare i computer",
+  "noComputersMatch": "Nessun computer corrisponde a \"{{query}}\"",
+  "noFilterResults": "Nessun computer corrisponde ai filtri selezionati.",
+  "selectComputer": "Selezionare un computer per visualizzare i dettagli",
+  "unknownOs": "SO sconosciuto"
+}
