@@ -38,5 +38,6 @@
   "confirmMessage": "Execute offboarding for {{name}}?",
   "executingOffboarding": "Executing offboarding...",
   "copySummary": "Copy Summary",
-  "accessDeniedDescription": "Offboarding requires AccountOperator permission or higher."
+  "accessDeniedDescription": "Offboarding requires AccountOperator permission or higher.",
+  "whatIsSamAriaLabel": "What is sAMAccountName?"
 }

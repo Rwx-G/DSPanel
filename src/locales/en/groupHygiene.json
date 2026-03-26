@@ -82,5 +82,6 @@
   "exportColCategory": "Category",
   "exportColGroupName": "Group Name",
   "exportColScope": "Scope",
-  "exportColDetail": "Detail"
+  "exportColDetail": "Detail",
+  "identicalMembers": "These groups share identical members"
 }

@@ -259,7 +259,7 @@ function PresetEditor() {
                       <AlertTriangle
                         size={14}
                         className="shrink-0 text-[var(--color-warning)]"
-                        aria-label="Preset modified externally"
+                        aria-label={t("presetModifiedAriaLabel")}
                       />
                     )}
                   </div>
@@ -402,7 +402,7 @@ function PresetEditor() {
                 selectedGroups={selectedGroups}
                 onSelectionChange={handleGroupChange}
                 onSearch={searchGroups}
-                placeholder="Search AD groups..."
+                placeholder={t("searchGroupsPlaceholder")}
               />
             </div>
 

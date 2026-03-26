@@ -339,7 +339,7 @@ function HibpInfoTooltip() {
         className="flex h-6 w-6 items-center justify-center rounded-full text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors"
         onClick={() => setOpen(!open)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
-        aria-label="About breach database"
+        aria-label={t("aboutBreachDbAriaLabel")}
         data-testid="hibp-info-btn"
       >
         <Info size={14} />

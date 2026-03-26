@@ -16,6 +16,7 @@
   "gposInOrder": "{{count}} GPO(s) in effective order",
   "number": "#",
   "gpoName": "GPO Name",
+  "linkOrder": "Link Order",
   "linkedAt": "Linked At",
   "enforced": "Enforced",
   "wmiFilter": "WMI Filter",

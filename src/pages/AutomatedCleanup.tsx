@@ -509,11 +509,11 @@ export function AutomatedCleanup() {
               <div className="flex items-center gap-2">
                 <ExportToolbar<CleanupMatch>
                   columns={[
-                    { key: "displayName", header: "Display Name" },
-                    { key: "samAccountName", header: "SAM Account" },
-                    { key: "currentState", header: "Current State" },
-                    { key: "proposedAction", header: "Proposed Action" },
-                    { key: "dn", header: "DN" },
+                    { key: "displayName", header: t("common:displayName") },
+                    { key: "samAccountName", header: t("samAccount") },
+                    { key: "currentState", header: t("currentState") },
+                    { key: "proposedAction", header: t("proposedAction") },
+                    { key: "dn", header: t("common:distinguishedName") },
                   ]}
                   data={dryRunResult.matches}
                   rowMapper={(m) => [

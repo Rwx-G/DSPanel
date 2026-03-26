@@ -19,6 +19,8 @@
   "emptyTitle": "No audit entries found",
   "emptyDescription": "Write operations performed through DSPanel will appear here. Adjust your filters if you expect results.",
   "page": "page",
+  "details": "Details",
   "fullTargetDn": "Full Target DN",
-  "none": "(none)"
+  "none": "(none)",
+  "exportTitle": "DSPanel Activity Journal"
 }

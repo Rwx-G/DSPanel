@@ -143,10 +143,10 @@ export function DnsKerberosValidation() {
 
           <ExportToolbar<{ type: string; name: string; status: string; details: string }>
             columns={[
-              { key: "type", header: "Type" },
-              { key: "name", header: "Record / DC" },
-              { key: "status", header: "Status" },
-              { key: "details", header: "Details" },
+              { key: "type", header: t("common:type") },
+              { key: "name", header: t("recordOrDc") },
+              { key: "status", header: t("common:status") },
+              { key: "details", header: t("common:details") },
             ]}
             data={[
               ...(report?.dnsResults.map((d) => ({
@@ -163,7 +163,7 @@ export function DnsKerberosValidation() {
               })) ?? []),
             ]}
             rowMapper={(r) => [r.type, r.name, r.status, r.details]}
-            title="DNS & Kerberos Validation"
+            title={t("exportTitle")}
             filenameBase="dns-kerberos"
           />
 

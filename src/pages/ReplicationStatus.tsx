@@ -242,14 +242,14 @@ export function ReplicationStatus() {
 
           <ExportToolbar<ReplicationPartnership>
             columns={[
-              { key: "sourceDc", header: "Source DC" },
-              { key: "targetDc", header: "Target DC" },
-              { key: "namingContext", header: "Naming Context" },
-              { key: "status", header: "Status" },
-              { key: "lastSyncTime", header: "Last Sync" },
-              { key: "usn", header: "USN" },
-              { key: "transport", header: "Transport" },
-              { key: "consecutiveFailures", header: "Failures" },
+              { key: "sourceDc", header: t("sourceDc") },
+              { key: "targetDc", header: t("targetDc") },
+              { key: "namingContext", header: t("namingContext") },
+              { key: "status", header: t("common:status") },
+              { key: "lastSyncTime", header: t("lastSync") },
+              { key: "usn", header: t("usn") },
+              { key: "transport", header: t("transport") },
+              { key: "consecutiveFailures", header: t("failures") },
             ]}
             data={partnerships}
             rowMapper={(p) => [
@@ -262,7 +262,7 @@ export function ReplicationStatus() {
               p.transport ?? "",
               String(p.consecutiveFailures),
             ]}
-            title="AD Replication Status"
+            title={t("pageTitle")}
             filenameBase="replication-status"
           />
 

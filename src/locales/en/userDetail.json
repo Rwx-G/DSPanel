@@ -22,5 +22,7 @@
   "objectSnapshots": "Object Snapshots",
   "selectUser": "Select a user to view details",
   "unsavedChanges": "{{count}} unsaved change(s)",
-  "scrollToActionBar": "Scroll to action bar"
+  "scrollToActionBar": "Scroll to action bar",
+  "viewGroupMembers": "View group members",
+  "openInGroupManagement": "Open in Group Management"
 }

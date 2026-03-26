@@ -141,8 +141,8 @@ export function ComputerDetail({
   );
 
   const groupColumns: Column<{ name: string; dn: string }>[] = [
-    { key: "name", header: "Group Name", sortable: true },
-    { key: "dn", header: "Distinguished Name", sortable: true },
+    { key: "name", header: t("groupName"), sortable: true },
+    { key: "dn", header: t("common:distinguishedName"), sortable: true },
   ];
 
   const groupRows = filteredGroups.map((dn) => ({
@@ -224,7 +224,7 @@ export function ComputerDetail({
   const contextMenuItems: ContextMenuItem[] = contextMenuRow
     ? [
         {
-          label: "View group members",
+          label: t("viewGroupMembers"),
           icon: <Users size={14} />,
           onClick: () => {
             setGroupMembersDialog({

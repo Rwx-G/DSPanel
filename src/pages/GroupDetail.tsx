@@ -657,7 +657,7 @@ export function GroupDetail({
                 className="flex h-5 w-5 items-center justify-center rounded-full text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors"
                   onClick={() => setShowHelp(!showHelp)}
                   onBlur={() => setTimeout(() => setShowHelp(false), 150)}
-                  aria-label="Member management help"
+                  aria-label={t("memberManagement")}
                   data-testid="member-help-btn"
                 >
                   <Info size={13} />
@@ -683,10 +683,10 @@ export function GroupDetail({
           >
               <ExportToolbar<DirectoryEntry>
                 columns={[
-                  { key: "displayName", header: "Display Name" },
-                  { key: "samAccountName", header: "SAM Account" },
-                  { key: "objectClass", header: "Type" },
-                  { key: "distinguishedName", header: "DN" },
+                  { key: "displayName", header: t("common:displayName") },
+                  { key: "samAccountName", header: t("common:samAccountName") },
+                  { key: "objectClass", header: t("common:type") },
+                  { key: "distinguishedName", header: t("common:distinguishedName") },
                 ]}
                 data={members}
                 rowMapper={(m) => [
@@ -745,7 +745,7 @@ export function GroupDetail({
                       <button
                         onClick={closeAddDropdown}
                         className="rounded-sm p-0.5 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
-                        aria-label="Close"
+                        aria-label={t("common:close")}
                       >
                         <X size={14} />
                       </button>

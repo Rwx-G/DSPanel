@@ -383,7 +383,7 @@ export function UserDetail({
   const contextMenuItems: ContextMenuItem[] = contextMenuRow
     ? [
         {
-          label: "View group members",
+          label: t("viewGroupMembers"),
           icon: <Users size={14} />,
           onClick: () => {
             setGroupMembersDialog({
@@ -393,7 +393,7 @@ export function UserDetail({
           },
         },
         {
-          label: "Open in Group Management",
+          label: t("openInGroupManagement"),
           icon: <FolderOpen size={14} />,
           onClick: () => {
             openTab("Group Management", "groups", "users-group", {

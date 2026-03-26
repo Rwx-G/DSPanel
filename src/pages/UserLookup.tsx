@@ -179,8 +179,8 @@ export function UserLookup() {
     : [];
 
   const groupColumns: Column<{ name: string; dn: string }>[] = [
-    { key: "name", header: "Group Name", sortable: true },
-    { key: "dn", header: "Distinguished Name", sortable: true },
+    { key: "name", header: t("common:name"), sortable: true },
+    { key: "dn", header: t("common:distinguishedName"), sortable: true },
   ];
 
   const groupRows = filteredGroups.map((dn) => ({

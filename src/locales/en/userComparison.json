@@ -27,5 +27,6 @@
   "viewGroupMembers": "View group members",
   "addToGroup": "Add {{name}} to this group",
   "selectUserFirst": "Select a user first to compare",
-  "vs": "vs"
+  "vs": "vs",
+  "filterGroups": "Filter groups..."
 }

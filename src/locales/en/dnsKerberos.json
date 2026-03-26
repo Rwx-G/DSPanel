@@ -23,5 +23,7 @@
   "dcTime": "DC Time",
   "skew": "Skew",
   "missing": "Missing",
-  "extra": "Extra"
+  "extra": "Extra",
+  "recordOrDc": "Record / DC",
+  "exportTitle": "DNS & Kerberos Validation"
 }

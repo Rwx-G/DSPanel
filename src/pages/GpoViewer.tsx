@@ -61,14 +61,17 @@ type ViewMode = "links" | "scope";
 // Constants
 // ---------------------------------------------------------------------------
 
-const EXPORT_COLUMNS: ExportColumn[] = [
-  { key: "gpoName", header: "GPO Name" },
-  { key: "linkOrder", header: "Link Order" },
-  { key: "linkedAt", header: "Linked At" },
-  { key: "enforced", header: "Enforced" },
-  { key: "inherited", header: "Inherited" },
-  { key: "wmiFilter", header: "WMI Filter" },
-];
+function useGpoExportColumns(): ExportColumn[] {
+  const { t } = useTranslation(["gpoViewer", "common"]);
+  return [
+    { key: "gpoName", header: t("gpoName") },
+    { key: "linkOrder", header: t("linkOrder") },
+    { key: "linkedAt", header: t("linkedAt") },
+    { key: "enforced", header: t("enforced") },
+    { key: "inherited", header: t("statusInherited") },
+    { key: "wmiFilter", header: t("wmiFilter") },
+  ];
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -88,6 +91,7 @@ function formatDn(dn: string): string {
 
 export function GpoViewer() {
   const { t } = useTranslation(["gpoViewer", "common"]);
+  const gpoExportColumns = useGpoExportColumns();
   const [viewMode, setViewMode] = useState<ViewMode>("links");
 
   // Links view state
@@ -200,7 +204,7 @@ export function GpoViewer() {
           </p>
         </div>
         <ExportToolbar
-          columns={EXPORT_COLUMNS}
+          columns={gpoExportColumns}
           data={currentLinks}
           rowMapper={(l) => [
             l.gpoName,

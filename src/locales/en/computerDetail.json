@@ -18,5 +18,7 @@
   "groupMemberships": "Group Memberships",
   "replicationHistory": "Replication History",
   "filterGroups": "Filter groups...",
+  "groupName": "Group Name",
+  "viewGroupMembers": "View group members",
   "openMonitoring": "Open Workstation Monitoring"
 }

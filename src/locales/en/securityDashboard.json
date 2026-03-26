@@ -28,5 +28,7 @@
   "scanningPrivileged": "Scanning privileged accounts...",
   "scanFailed": "Scan Failed",
   "noPrivilegedFound": "No Privileged Accounts Found",
-  "noMembersInGroups": "No members were found in the default privileged groups."
+  "noMembersInGroups": "No members were found in the default privileged groups.",
+  "passwordAge": "Password Age",
+  "exportTitle": "Privileged Accounts Report"
 }

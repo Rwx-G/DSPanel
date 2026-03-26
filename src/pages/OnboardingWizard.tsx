@@ -421,7 +421,7 @@ function OnboardingContent() {
                         <AlertTriangle
                           size={14}
                           className="shrink-0 text-[var(--color-warning)]"
-                          aria-label="Preset modified externally"
+                          aria-label={t("presetModifiedAriaLabel")}
                         />
                       )}
                     </div>

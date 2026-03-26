@@ -13,6 +13,8 @@
   "check": "Check",
   "severity": "Severity",
   "findings": "Findings",
+  "description": "Description",
   "remediation": "Remediation",
-  "report": "Report"
+  "report": "Report",
+  "exportTitle": "Compliance Scan - All Checks"
 }

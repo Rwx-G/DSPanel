@@ -29,5 +29,6 @@
   "groupOrAttrRequired": "At least one group or attribute is required",
   "duplicateName": "A preset with this name already exists",
   "loadingPresets": "Loading presets...",
-  "accessDenied": "Preset management requires AccountOperator permission or higher."
+  "accessDenied": "Preset management requires AccountOperator permission or higher.",
+  "presetModifiedAriaLabel": "Preset modified externally"
 }

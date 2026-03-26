@@ -52,14 +52,17 @@ interface AuditQueryResult {
 
 const PAGE_SIZE = 50;
 
-const EXPORT_COLUMNS: ExportColumn[] = [
-  { key: "timestamp", header: "Timestamp" },
-  { key: "operator", header: "Operator" },
-  { key: "action", header: "Action" },
-  { key: "targetDn", header: "Target" },
-  { key: "details", header: "Details" },
-  { key: "result", header: "Result" },
-];
+function useExportColumns(): ExportColumn[] {
+  const { t } = useTranslation(["auditLog", "common"]);
+  return [
+    { key: "timestamp", header: t("timestamp") },
+    { key: "operator", header: t("operator") },
+    { key: "action", header: t("action") },
+    { key: "targetDn", header: t("target") },
+    { key: "details", header: t("common:details") },
+    { key: "result", header: t("result") },
+  ];
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -85,6 +88,7 @@ function formatDn(dn: string): string {
 
 export function AuditLog() {
   const { t } = useTranslation(["auditLog", "common"]);
+  const exportColumns = useExportColumns();
   const [entries, setEntries] = useState<AuditEntry[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [page, setPage] = useState(0);
@@ -190,7 +194,7 @@ export function AuditLog() {
         </div>
         <div className="flex items-center gap-2">
           <ExportToolbar
-            columns={EXPORT_COLUMNS}
+            columns={exportColumns}
             data={entries}
             rowMapper={(e) => [
               formatTimestamp(e.timestamp),
@@ -200,7 +204,7 @@ export function AuditLog() {
               e.details,
               e.success ? t("success") : t("failure"),
             ]}
-            title="DSPanel Activity Journal"
+            title={t("exportTitle")}
             filenameBase="audit_log"
           />
           <button

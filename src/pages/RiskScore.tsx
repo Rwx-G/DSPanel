@@ -603,13 +603,13 @@ export function RiskScoreDashboard() {
           )}
           <ExportToolbar<{ factor: string; finding: string; severity: string; points: string; remediation: string; complexity: string; ref: string }>
             columns={[
-              { key: "factor", header: "Factor" },
-              { key: "finding", header: "Finding" },
-              { key: "severity", header: "Severity" },
-              { key: "points", header: "Points Deducted" },
-              { key: "remediation", header: "Remediation" },
-              { key: "complexity", header: "Complexity" },
-              { key: "ref", header: "Framework Ref" },
+              { key: "factor", header: t("factor") },
+              { key: "finding", header: t("finding") },
+              { key: "severity", header: t("severity") },
+              { key: "points", header: t("pointsDeducted") },
+              { key: "remediation", header: t("remediation") },
+              { key: "complexity", header: t("complexity") },
+              { key: "ref", header: t("frameworkRef") },
             ]}
             data={result?.factors.flatMap((f) =>
               f.findings.map((fi) => ({

@@ -77,7 +77,7 @@ function HygieneSection({
                 className="flex h-5 w-5 items-center justify-center rounded-full text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors"
                 onClick={() => setShowTip(!showTip)}
                 onBlur={() => setTimeout(() => setShowTip(false), 150)}
-                aria-label={`About ${title}`}
+                aria-label={t("aboutGroupHygiene")}
               >
                 <Info size={13} />
               </button>
@@ -395,17 +395,17 @@ export function GroupHygiene() {
     cols.push(
       {
         key: "name",
-        header: "Name",
+        header: t("common:name"),
         sortable: true,
       },
       {
         key: "scope",
-        header: "Scope",
+        header: t("common:scope"),
         sortable: true,
       },
       {
         key: "ou",
-        header: "Organizational Unit",
+        header: t("organizationalUnit"),
         sortable: true,
       },
       {
@@ -419,17 +419,17 @@ export function GroupHygiene() {
             className="btn btn-ghost btn-sm flex items-center gap-1 whitespace-nowrap"
             onClick={() => handleGoToGroup(row.dn)}
             data-testid={`go-to-group-${row.name}`}
-            title="Open in Group Management"
+            title={t("openInGroupManagement")}
           >
             <ExternalLink size={12} />
-            Go to
+            {t("goTo")}
           </button>
         ),
       },
     );
 
     return cols;
-  }, [canDelete, selectedEmpty, handleSelectEmpty, handleGoToGroup]);
+  }, [canDelete, selectedEmpty, handleSelectEmpty, handleGoToGroup, t]);
 
   const emptyGroupRows: EmptyGroupRow[] = emptyGroups.map((g) => ({
     select: "",
@@ -453,8 +453,8 @@ export function GroupHygiene() {
 
   const simpleGroupColumns: Column<SimpleGroupRow>[] = useMemo(
     () => [
-      { key: "name", header: "Name", sortable: true },
-      { key: "scope", header: "Scope", sortable: true },
+      { key: "name", header: t("common:name"), sortable: true },
+      { key: "scope", header: t("common:scope"), sortable: true },
       {
         key: "actions",
         header: "",
@@ -466,15 +466,15 @@ export function GroupHygiene() {
             className="btn btn-ghost btn-sm flex items-center gap-1 whitespace-nowrap"
             onClick={() => handleGoToGroup(row.dn)}
             data-testid={`go-to-group-${row.name}`}
-            title="Open in Group Management"
+            title={t("openInGroupManagement")}
           >
             <ExternalLink size={12} />
-            Go to
+            {t("goTo")}
           </button>
         ),
       },
     ],
-    [handleGoToGroup],
+    [handleGoToGroup, t],
   );
 
   type StaleGroupRow = {
@@ -487,9 +487,9 @@ export function GroupHygiene() {
 
   const staleGroupColumns: Column<StaleGroupRow>[] = useMemo(
     () => [
-      { key: "name", header: "Name", sortable: true },
-      { key: "scope", header: "Scope", sortable: true },
-      { key: "lastModified", header: "Last Modified", sortable: true },
+      { key: "name", header: t("common:name"), sortable: true },
+      { key: "scope", header: t("common:scope"), sortable: true },
+      { key: "lastModified", header: t("common:modified"), sortable: true },
       {
         key: "actions",
         header: "",
@@ -501,15 +501,15 @@ export function GroupHygiene() {
             className="btn btn-ghost btn-sm flex items-center gap-1 whitespace-nowrap"
             onClick={() => handleGoToGroup(row.dn)}
             data-testid={`go-to-group-${row.name}`}
-            title="Open in Group Management"
+            title={t("openInGroupManagement")}
           >
             <ExternalLink size={12} />
-            Go to
+            {t("goTo")}
           </button>
         ),
       },
     ],
-    [handleGoToGroup],
+    [handleGoToGroup, t],
   );
 
   function formatWhenChanged(group: DirectoryGroup): string {
@@ -538,7 +538,7 @@ export function GroupHygiene() {
               className="flex h-5 w-5 items-center justify-center rounded-full text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors"
               onClick={() => setShowInfo(!showInfo)}
               onBlur={() => setTimeout(() => setShowInfo(false), 150)}
-              aria-label="About group hygiene"
+              aria-label={t("aboutGroupHygiene")}
               data-testid="hygiene-info-btn"
             >
               <Info size={13} />
@@ -570,10 +570,10 @@ export function GroupHygiene() {
         <div className="flex items-center gap-2">
           <ExportToolbar<{ category: string; name: string; scope: string; detail: string }>
             columns={[
-              { key: "category", header: "Category" },
-              { key: "name", header: "Group Name" },
-              { key: "scope", header: "Scope" },
-              { key: "detail", header: "Detail" },
+              { key: "category", header: t("exportColCategory") },
+              { key: "name", header: t("exportColGroupName") },
+              { key: "scope", header: t("exportColScope") },
+              { key: "detail", header: t("exportColDetail") },
             ]}
             data={[
               ...emptyGroups.map((g) => ({ category: "Empty", name: g.displayName || g.samAccountName, scope: g.scope, detail: "No members" })),
@@ -585,7 +585,7 @@ export function GroupHygiene() {
               ...duplicateGroups.map((pair) => ({ category: "Duplicate Members", name: pair.map((g) => g.displayName || g.samAccountName).join(" = "), scope: pair[0]?.scope ?? "-", detail: `${pair.length} groups with identical members` })),
             ]}
             rowMapper={(row) => [row.category, row.name, row.scope, row.detail]}
-            title="Group Hygiene Report"
+            title={t("exportTitle")}
             filenameBase="group-hygiene"
             disabled={!scanned}
           />
@@ -834,10 +834,10 @@ export function GroupHygiene() {
                     className="btn btn-ghost btn-sm flex items-center gap-1 whitespace-nowrap"
                     onClick={() => handleGoToGroup(item.groupDn)}
                     data-testid={`go-to-group-${item.groupName}`}
-                    title="Open in Group Management"
+                    title={t("openInGroupManagement")}
                   >
                     <ExternalLink size={12} />
-                    Go to
+                    {t("goTo")}
                   </button>
                 </div>
               ))}

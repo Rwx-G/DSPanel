@@ -487,7 +487,7 @@ export function UserComparison() {
               <input
                 type="text"
                 className="flex-1 bg-transparent text-body text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-secondary)]"
-                placeholder="Filter groups..."
+                placeholder={t("filterGroups")}
                 value={filter}
                 onChange={(e) => setFilter(e.target.value)}
                 data-testid="group-filter"
@@ -515,9 +515,9 @@ export function UserComparison() {
             </button>
             <ExportToolbar<GroupDisplayItem>
               columns={[
-                { key: "name", header: "Group Name" },
-                { key: "category", header: "Category" },
-                { key: "dn", header: "Distinguished Name" },
+                { key: "name", header: t("groupName") },
+                { key: "category", header: t("common:category") },
+                { key: "dn", header: t("common:distinguishedName") },
               ]}
               data={filteredGroups}
               rowMapper={(g) => [g.name, g.category === "shared" ? "Shared" : g.category === "onlyA" ? `Only ${userAName}` : `Only ${userBName}`, g.dn]}

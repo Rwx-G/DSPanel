@@ -11,5 +11,10 @@
   "healthCheckFailed": "Health Check Failed",
   "noDcsFound": "No Domain Controllers Found",
   "noDcsDescription": "No domain controllers were discovered in the AD configuration.",
-  "lastChecked": "Last checked:"
+  "lastChecked": "Last checked:",
+  "exportDc": "DC",
+  "exportOverall": "Overall",
+  "exportCheckStatus": "Check Status",
+  "exportMessage": "Message",
+  "exportTitle": "Infrastructure Health Report"
 }

@@ -187,12 +187,12 @@ export function SecurityDashboard() {
           {/* Export */}
           <ExportToolbar<PrivilegedAccountInfo>
             columns={[
-              { key: "samAccountName", header: "Username" },
-              { key: "displayName", header: "Display Name" },
-              { key: "groups", header: "Groups" },
-              { key: "lastLogon", header: "Last Logon" },
-              { key: "passwordAge", header: "Password Age" },
-              { key: "enabled", header: "Enabled" },
+              { key: "samAccountName", header: t("username") },
+              { key: "displayName", header: t("common:displayName") },
+              { key: "groups", header: t("groups") },
+              { key: "lastLogon", header: t("common:lastLogon") },
+              { key: "passwordAge", header: t("passwordAge") },
+              { key: "enabled", header: t("common:enabled") },
             ]}
             data={report?.accounts ?? []}
             rowMapper={(a) => [
@@ -203,7 +203,7 @@ export function SecurityDashboard() {
               a.passwordAgeDays != null ? `${a.passwordAgeDays}d` : "-",
               String(a.enabled),
             ]}
-            title="Privileged Accounts Report"
+            title={t("exportTitle")}
             filenameBase="privileged-accounts"
           />
 

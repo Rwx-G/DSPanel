@@ -249,6 +249,7 @@ function OUPicker({
   disabled?: boolean;
   testId?: string;
 }) {
+  const { t } = useTranslation(["bulkOperations"]);
   const [ous, setOus] = useState<OUNode[]>([]);
   const [loading, setLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
@@ -292,7 +293,7 @@ function OUPicker({
         type="button"
       >
         <span className={value ? "text-[var(--color-text-primary)]" : "text-[var(--color-text-secondary)]"}>
-          {loading ? "Loading OUs..." : selectedLabel || value || "Select an OU..."}
+          {loading ? t("bulkOperations:loadingOus") : selectedLabel || value || t("bulkOperations:selectOu")}
         </span>
         <ChevronDown size={14} className="shrink-0 text-[var(--color-text-secondary)]" />
       </button>
@@ -323,7 +324,7 @@ function UserSearchPicker({
   selected,
   onSelect,
   disabled = false,
-  placeholder = "Search user...",
+  placeholder,
   testId = "user-search-picker",
 }: {
   selected: DirectoryEntry | null;
@@ -785,7 +786,7 @@ export function BulkOperations() {
 
   const handleExportCsv = useCallback(async () => {
     if (members.length === 0) return;
-    const headers = ["Display Name", "SAM Account Name", "Distinguished Name"];
+    const headers = [t("headerDisplayName"), t("headerSamAccountName"), t("headerDistinguishedName")];
     const rows = members.map((m) => [
       m.displayName ?? "",
       m.samAccountName ?? "",
@@ -1321,7 +1322,7 @@ export function BulkOperations() {
         data-testid="bulk-operations"
       >
         <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">
-          Groups Bulk Operations
+          {t("pageTitle")}
         </h2>
 
         <div className="space-y-4" data-testid="operation-picker">
@@ -1394,7 +1395,7 @@ export function BulkOperations() {
           data-testid="bulk-back-btn"
         >
           <ArrowLeft size={14} />
-          Back
+          {t("back")}
         </button>
         <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">
           {(() => {
@@ -1418,13 +1419,13 @@ export function BulkOperations() {
             {(selectedOp === "delete" || selectedOp === "transfer") && (
               <div data-testid="source-group-section">
                 <label className="mb-2 block text-caption font-medium text-[var(--color-text-secondary)]">
-                  {selectedOp === "transfer" ? "Source Group" : "Group"}
+                  {selectedOp === "transfer" ? t("sourceGroup") : t("group")}
                 </label>
                 <GroupPicker
                   selectedGroups={sourceGroups}
                   onSelectionChange={setSourceGroups}
                   onSearch={searchGroups}
-                  placeholder="Search group..."
+                  placeholder={t("searchGroup")}
                   disabled={isRunning}
                   singleSelect
                 />
@@ -1435,13 +1436,13 @@ export function BulkOperations() {
             {(selectedOp === "add" || selectedOp === "transfer") && (
               <div data-testid="target-group-section">
                 <label className="mb-2 block text-caption font-medium text-[var(--color-text-secondary)]">
-                  {selectedOp === "transfer" ? "Target Group" : "Group"}
+                  {selectedOp === "transfer" ? t("targetGroup") : t("group")}
                 </label>
                 <GroupPicker
                   selectedGroups={targetGroups}
                   onSelectionChange={setTargetGroups}
                   onSearch={searchGroups}
-                  placeholder="Search group..."
+                  placeholder={t("searchGroup")}
                   disabled={isRunning}
                   singleSelect
                 />
@@ -1453,7 +1454,7 @@ export function BulkOperations() {
           {selectedOp === "add" ? (
             <div data-testid="add-member-search-section">
               <label className="mb-2 block text-caption font-medium text-[var(--color-text-secondary)]">
-                Search Members to Add
+                {t("searchMembersToAdd")}
               </label>
               <div className="relative">
                 <div className="flex items-center gap-2 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2 py-1">
@@ -1462,7 +1463,7 @@ export function BulkOperations() {
                     type="text"
                     value={addMemberSearch}
                     onChange={(e) => setAddMemberSearch(e.target.value)}
-                    placeholder="Search users by name or username (min 3 chars)..."
+                    placeholder={t("searchUsersByName")}
                     className="flex-1 bg-transparent text-body text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-secondary)]"
                     disabled={targetGroups.length === 0 || isRunning}
                   />
@@ -1495,20 +1496,20 @@ export function BulkOperations() {
               </div>
               {targetGroups.length === 0 && (
                 <p className="mt-2 text-caption text-[var(--color-text-secondary)]">
-                  Select a target group first
+                  {t("selectTargetGroupFirst")}
                 </p>
               )}
               {stagedMembers.length > 0 && (
                 <div className="mt-3">
                   <div className="mb-1 flex items-center justify-between">
                     <span className="text-caption font-medium text-[var(--color-text-secondary)]">
-                      Staged ({stagedMembers.length})
+                      {t("staged", { count: stagedMembers.length })}
                     </span>
                     <button
                       className="text-caption text-[var(--color-text-secondary)] underline hover:no-underline"
                       onClick={() => setStagedMembers([])}
                     >
-                      Clear all
+                      {t("clearAll")}
                     </button>
                   </div>
                   <div className="space-y-1 rounded-md border border-[var(--color-border-default)] p-2">
@@ -1561,7 +1562,7 @@ export function BulkOperations() {
                 data-testid="bulk-preview-btn"
               >
                 <Eye size={14} />
-                Preview
+                {t("preview")}
               </button>
               <button
                 className="btn btn-primary btn-sm flex items-center gap-1.5"
@@ -1570,7 +1571,7 @@ export function BulkOperations() {
                 data-testid="bulk-execute-btn"
               >
                 <Play size={14} />
-                Execute
+                {t("execute")}
               </button>
             </div>
           )}
@@ -1580,8 +1581,7 @@ export function BulkOperations() {
               className="text-caption text-[var(--color-text-secondary)]"
               data-testid="bulk-no-permission"
             >
-              AccountOperator or higher permission required to execute bulk
-              operations.
+              {t("permissionRequired")}
             </p>
           )}
         </>
@@ -1594,13 +1594,13 @@ export function BulkOperations() {
         <>
           <div data-testid="source-group-section">
             <label className="mb-2 block text-caption font-medium text-[var(--color-text-secondary)]">
-              Select Group to Export
+              {t("selectGroupToExport")}
             </label>
             <GroupPicker
               selectedGroups={sourceGroups}
               onSelectionChange={setSourceGroups}
               onSearch={searchGroups}
-              placeholder="Search group..."
+              placeholder={t("searchGroup")}
               disabled={isRunning}
             />
           </div>
@@ -1625,7 +1625,7 @@ export function BulkOperations() {
                 data-testid="bulk-export-btn"
               >
                 <Download size={14} />
-                Export to CSV
+                {t("exportToCsv")}
               </button>
             </div>
           )}
@@ -1640,25 +1640,25 @@ export function BulkOperations() {
           <div className="grid grid-cols-2 gap-4">
             <div data-testid="source-user-section">
               <label className="mb-2 block text-caption font-medium text-[var(--color-text-secondary)]">
-                Source User (copy from)
+                {t("sourceUserLabel")}
               </label>
               <UserSearchPicker
                 selected={sourceUser}
                 onSelect={setSourceUser}
                 disabled={isRunning}
-                placeholder="Search user by name..."
+                placeholder={t("searchUserByName")}
                 testId="copy-source-user"
               />
             </div>
             <div data-testid="target-user-section">
               <label className="mb-2 block text-caption font-medium text-[var(--color-text-secondary)]">
-                Target User (copy to)
+                {t("targetUserLabel")}
               </label>
               <UserSearchPicker
                 selected={targetUser}
                 onSelect={setTargetUser}
                 disabled={isRunning}
-                placeholder="Search user by name..."
+                placeholder={t("searchUserByName")}
                 testId="copy-target-user"
               />
             </div>
@@ -1672,7 +1672,7 @@ export function BulkOperations() {
               data-testid="bulk-preview-btn"
             >
               <Eye size={14} />
-              Preview
+              {t("preview")}
             </button>
             <button
               className="btn btn-primary btn-sm flex items-center gap-1.5"
@@ -1681,7 +1681,7 @@ export function BulkOperations() {
               data-testid="bulk-execute-btn"
             >
               <Play size={14} />
-              Execute
+              {t("execute")}
             </button>
           </div>
 
@@ -1691,7 +1691,7 @@ export function BulkOperations() {
               data-testid="bulk-preview-panel"
             >
               <h3 className="mb-2 text-body font-semibold text-[var(--color-text-primary)]">
-                Groups to add ({copyPreviewGroups.length})
+                {t("groupsToAdd", { count: copyPreviewGroups.length })}
               </h3>
               <div className="max-h-48 overflow-auto">
                 {copyPreviewGroups.map((dn) => (
@@ -1713,7 +1713,7 @@ export function BulkOperations() {
 
           {showPreview && copyPreviewGroups.length === 0 && (
             <p className="text-caption text-[var(--color-text-secondary)]">
-              Target user is already a member of all source user groups.
+              {t("targetAlreadyMember")}
             </p>
           )}
         </>
@@ -1726,13 +1726,13 @@ export function BulkOperations() {
         <>
           <div data-testid="source-group-section">
             <label className="mb-2 block text-caption font-medium text-[var(--color-text-secondary)]">
-              Source Group
+              {t("sourceGroupLabel")}
             </label>
             <GroupPicker
               selectedGroups={sourceGroups}
               onSelectionChange={setSourceGroups}
               onSearch={searchGroups}
-              placeholder="Search source group..."
+              placeholder={t("searchSourceGroup")}
               disabled={isRunning}
               singleSelect
             />
@@ -1740,20 +1740,20 @@ export function BulkOperations() {
 
           {members.length > 0 && (
             <p className="text-caption text-[var(--color-text-secondary)]">
-              {members.length} members will be copied to the new group.
+              {t("membersCopiedHint", { count: members.length })}
             </p>
           )}
 
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="mb-2 block text-caption font-medium text-[var(--color-text-secondary)]">
-                New Group Name
+                {t("newGroupName")}
               </label>
               <input
                 type="text"
                 value={cloneNewName}
                 onChange={(e) => setCloneNewName(e.target.value)}
-                placeholder="e.g. IT-Team-Copy"
+                placeholder={t("newGroupNamePlaceholder")}
                 className="w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5 text-body text-[var(--color-text-primary)]"
                 style={{ outline: "none", boxShadow: "none" }}
                 disabled={isRunning}
@@ -1762,7 +1762,7 @@ export function BulkOperations() {
             </div>
             <div>
               <label className="mb-2 block text-caption font-medium text-[var(--color-text-secondary)]">
-                Target OU
+                {t("targetOu")}
               </label>
               <OUPicker
                 value={cloneContainerDn}
@@ -1786,7 +1786,7 @@ export function BulkOperations() {
               data-testid="bulk-execute-btn"
             >
               <Play size={14} />
-              Clone Group
+              {t("cloneGroupBtn")}
             </button>
           </div>
         </>
@@ -1798,30 +1798,30 @@ export function BulkOperations() {
       {selectedOp === "merge-groups" && (
         <>
           <div className="rounded-md border border-[var(--color-info)]/30 bg-[var(--color-info)]/5 px-3 py-2 text-caption text-[var(--color-text-secondary)]">
-            <strong className="text-[var(--color-info)]">How it works:</strong> All members from the source groups will be added to the target group. Source groups are not deleted - only their members are copied. Duplicates are skipped automatically.
+            <strong className="text-[var(--color-info)]">{t("mergeHowItWorks")}</strong> {t("mergeExplanation")}
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div data-testid="source-group-section">
               <label className="mb-2 block text-caption font-medium text-[var(--color-text-secondary)]">
-                Source Groups (merge from)
+                {t("sourceGroupsMergeFrom")}
               </label>
               <GroupPicker
                 selectedGroups={sourceGroups}
                 onSelectionChange={setSourceGroups}
                 onSearch={searchGroups}
-                placeholder="Search source groups..."
+                placeholder={t("searchSourceGroups")}
                 disabled={isRunning}
               />
             </div>
             <div data-testid="target-group-section">
               <label className="mb-2 block text-caption font-medium text-[var(--color-text-secondary)]">
-                Target Group (surviving)
+                {t("targetGroupSurviving")}
               </label>
               <GroupPicker
                 selectedGroups={targetGroups}
                 onSelectionChange={setTargetGroups}
                 onSearch={searchGroups}
-                placeholder="Search target group..."
+                placeholder={t("searchTargetGroup")}
                 disabled={isRunning}
                 singleSelect
               />
@@ -1840,7 +1840,7 @@ export function BulkOperations() {
               data-testid="bulk-execute-btn"
             >
               <Play size={14} />
-              Merge
+              {t("merge")}
             </button>
           </div>
         </>
@@ -1853,20 +1853,20 @@ export function BulkOperations() {
         <>
           <div data-testid="target-group-section">
             <label className="mb-2 block text-caption font-medium text-[var(--color-text-secondary)]">
-              Target Group
+              {t("importTargetGroup")}
             </label>
             <GroupPicker
               selectedGroups={targetGroups}
               onSelectionChange={setTargetGroups}
               onSearch={searchGroups}
-              placeholder="Search target group..."
+              placeholder={t("searchTargetGroup")}
               disabled={isRunning}
             />
           </div>
 
           <div>
             <label className="mb-2 block text-caption font-medium text-[var(--color-text-secondary)]">
-              CSV File (column: samAccountName or DN)
+              {t("csvFileLabel")}
             </label>
             <input
               type="file"
@@ -1880,7 +1880,7 @@ export function BulkOperations() {
 
           {csvData.length > 0 && (
             <p className="text-caption text-[var(--color-text-secondary)]">
-              {csvData.length} rows loaded from CSV.
+              {t("csvRowsLoaded", { count: csvData.length })}
             </p>
           )}
 
@@ -1892,7 +1892,7 @@ export function BulkOperations() {
               data-testid="bulk-preview-btn"
             >
               {csvResolving ? <LoadingSpinner size={14} /> : <Eye size={14} />}
-              Resolve & Preview
+              {t("resolveAndPreview")}
             </button>
             <button
               className="btn btn-primary btn-sm flex items-center gap-1.5"
@@ -1905,7 +1905,7 @@ export function BulkOperations() {
               data-testid="bulk-execute-btn"
             >
               <Play size={14} />
-              Import
+              {t("import")}
             </button>
           </div>
 
@@ -1915,7 +1915,7 @@ export function BulkOperations() {
               data-testid="bulk-preview-panel"
             >
               <h3 className="mb-2 text-body font-semibold text-[var(--color-text-primary)]">
-                Resolved Users ({csvResolvedUsers.length})
+                {t("resolvedUsers", { count: csvResolvedUsers.length })}
               </h3>
               <div className="max-h-48 overflow-auto">
                 {csvResolvedUsers.map((u) => (
@@ -1944,20 +1944,20 @@ export function BulkOperations() {
         <>
           <div data-testid="source-group-section">
             <label className="mb-2 block text-caption font-medium text-[var(--color-text-secondary)]">
-              Groups to Move
+              {t("groupsToMove")}
             </label>
             <GroupPicker
               selectedGroups={sourceGroups}
               onSelectionChange={setSourceGroups}
               onSearch={searchGroups}
-              placeholder="Search groups..."
+              placeholder={t("searchGroups")}
               disabled={isRunning}
             />
           </div>
 
           <div>
             <label className="mb-2 block text-caption font-medium text-[var(--color-text-secondary)]">
-              Target OU
+              {t("targetOu")}
             </label>
             <OUPicker
               value={moveTargetOu}
@@ -1979,7 +1979,7 @@ export function BulkOperations() {
               data-testid="bulk-execute-btn"
             >
               <Play size={14} />
-              Move
+              {t("move")}
             </button>
           </div>
         </>
@@ -1992,7 +1992,7 @@ export function BulkOperations() {
         <>
           <div>
             <label className="mb-2 block text-caption font-medium text-[var(--color-text-secondary)]">
-              CSV File (columns: name, description, scope, category, OU)
+              {t("createGroupsCsvLabel")}
             </label>
             <input
               type="file"
@@ -2010,11 +2010,9 @@ export function BulkOperations() {
               data-testid="bulk-preview-panel"
             >
               <h3 className="mb-2 text-body font-semibold text-[var(--color-text-primary)]">
-                Groups to Create (
-                {createGroupsCsvData[0]?.[0]?.toLowerCase() === "name"
+                {t("groupsToCreate", { count: createGroupsCsvData[0]?.[0]?.toLowerCase() === "name"
                   ? createGroupsCsvData.length - 1
-                  : createGroupsCsvData.length}
-                )
+                  : createGroupsCsvData.length })}
               </h3>
               <div className="max-h-48 overflow-auto">
                 {createGroupsCsvData
@@ -2049,7 +2047,7 @@ export function BulkOperations() {
               data-testid="bulk-execute-btn"
             >
               <Play size={14} />
-              Create Groups
+              {t("createGroupsBtn")}
             </button>
           </div>
         </>
@@ -2062,26 +2060,26 @@ export function BulkOperations() {
         <>
           <div data-testid="source-group-section">
             <label className="mb-2 block text-caption font-medium text-[var(--color-text-secondary)]">
-              Groups to Update
+              {t("groupsToUpdate")}
             </label>
             <GroupPicker
               selectedGroups={sourceGroups}
               onSelectionChange={setSourceGroups}
               onSearch={searchGroups}
-              placeholder="Search groups..."
+              placeholder={t("searchGroups")}
               disabled={isRunning}
             />
           </div>
 
           <div>
             <label className="mb-2 block text-caption font-medium text-[var(--color-text-secondary)]">
-              New Manager
+              {t("newManager")}
             </label>
             <UserSearchPicker
               selected={selectedManager}
               onSelect={setSelectedManager}
               disabled={isRunning}
-              placeholder="Search manager by name..."
+              placeholder={t("searchManagerByName")}
               testId="manager-user"
             />
           </div>
@@ -2096,7 +2094,7 @@ export function BulkOperations() {
               data-testid="bulk-execute-btn"
             >
               <Play size={14} />
-              Update Manager
+              {t("updateManagerBtn")}
             </button>
           </div>
         </>
@@ -2111,7 +2109,7 @@ export function BulkOperations() {
           data-testid="bulk-preview-panel"
         >
           <h3 className="mb-2 text-body font-semibold text-[var(--color-text-primary)]">
-            Planned Changes ({plannedChanges.length})
+            {t("plannedChanges", { count: plannedChanges.length })}
           </h3>
           <div className="max-h-48 overflow-auto">
             {plannedChanges.map((change, index) => (
@@ -2127,7 +2125,7 @@ export function BulkOperations() {
                       : "text-[var(--color-error)]"
                   }`}
                 >
-                  {change.action === "add" ? "ADD" : "REMOVE"}
+                  {change.action === "add" ? t("actionAdd") : t("actionRemove")}
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="text-body text-[var(--color-text-primary)]">
@@ -2221,11 +2219,12 @@ function MemberList({
   onSelectAll,
   onExportCsv,
 }: MemberListProps) {
+  const { t } = useTranslation(["bulkOperations"]);
   return (
     <div data-testid="member-selection-section">
       <div className="mb-2 flex items-center justify-between">
         <label className="text-caption font-medium text-[var(--color-text-secondary)]">
-          Members{members.length > 0 ? ` (${members.length})` : ""}
+          {members.length > 0 ? t("membersCount", { count: members.length }) : t("members")}
         </label>
         <div className="flex items-center gap-2">
           {members.length > 0 && onExportCsv && (
@@ -2241,23 +2240,23 @@ function MemberList({
           )}
           {members.length > 0 && (
             <span className="text-caption text-[var(--color-text-secondary)]">
-              {selectedMembers.size} selected
+              {t("selected", { count: selectedMembers.size })}
             </span>
           )}
         </div>
       </div>
 
-      {membersLoading && <LoadingSpinner message="Loading members..." />}
+      {membersLoading && <LoadingSpinner message={t("common:loading")} />}
 
       {!membersLoading && sourceGroupsEmpty && (
         <p className="text-caption text-[var(--color-text-secondary)]">
-          Select a source group to load members
+          {t("selectSourceGroup")}
         </p>
       )}
 
       {!membersLoading && !sourceGroupsEmpty && members.length === 0 && (
         <p className="text-caption text-[var(--color-text-secondary)]">
-          No members in selected group
+          {t("noMembersInGroup")}
         </p>
       )}
 
@@ -2273,7 +2272,7 @@ function MemberList({
                 data-testid="bulk-select-all"
               />
               <CheckSquare size={14} />
-              Select all
+              {t("selectAll")}
             </label>
           </div>
           <div className="max-h-60 overflow-auto" data-testid="member-list">

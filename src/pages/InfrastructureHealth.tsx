@@ -330,12 +330,12 @@ export function InfrastructureHealth() {
 
           <ExportToolbar<{ dc: string; site: string; status: string; check: string; checkStatus: string; message: string }>
             columns={[
-              { key: "dc", header: "DC" },
-              { key: "site", header: "Site" },
-              { key: "status", header: "Overall" },
-              { key: "check", header: "Check" },
-              { key: "checkStatus", header: "Check Status" },
-              { key: "message", header: "Message" },
+              { key: "dc", header: t("exportDc") },
+              { key: "site", header: t("site") },
+              { key: "status", header: t("exportOverall") },
+              { key: "check", header: t("check") },
+              { key: "checkStatus", header: t("exportCheckStatus") },
+              { key: "message", header: t("exportMessage") },
             ]}
             data={(() => {
               let lastDc = "";
@@ -355,7 +355,7 @@ export function InfrastructureHealth() {
               );
             })()}
             rowMapper={(r) => [r.dc, r.site, r.status, r.check, r.checkStatus, r.message]}
-            title="Infrastructure Health Report"
+            title={t("exportTitle")}
             filenameBase="dc-health"
           />
 

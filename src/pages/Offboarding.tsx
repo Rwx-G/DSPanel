@@ -321,7 +321,7 @@ function OffboardingContent() {
                   onClick={() => setShowSearchHelp((v) => !v)}
                   onBlur={() => setTimeout(() => setShowSearchHelp(false), 150)}
                   className="flex h-5 w-5 items-center justify-center rounded-full text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors"
-                  aria-label="What is sAMAccountName?"
+                  aria-label={t("whatIsSamAriaLabel")}
                 >
                   <Info size={13} />
                 </button>

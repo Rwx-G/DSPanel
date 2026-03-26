@@ -287,11 +287,11 @@ export function ComplianceReports() {
           {scan && (
             <ExportToolbar<CheckResult>
               columns={[
-                { key: "title", header: "Check" },
-                { key: "severity", header: "Severity" },
-                { key: "findingCount", header: "Findings" },
-                { key: "description", header: "Description" },
-                { key: "remediation", header: "Remediation" },
+                { key: "title", header: t("check") },
+                { key: "severity", header: t("severity") },
+                { key: "findingCount", header: t("findings") },
+                { key: "description", header: t("description") },
+                { key: "remediation", header: t("remediation") },
               ]}
               data={scan.checks}
               rowMapper={(c) => [
@@ -301,7 +301,7 @@ export function ComplianceReports() {
                 c.description,
                 c.remediation,
               ]}
-              title="Compliance Scan - All Checks"
+              title={t("exportTitle")}
               filenameBase="compliance-scan"
             />
           )}
