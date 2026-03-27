@@ -169,6 +169,7 @@ jobs:
       - name: Rust coverage (unit tests)
         working-directory: src-tauri
         run: |
+          mkdir -p ../coverage
           cargo llvm-cov --lib --lcov --output-path ../coverage/rust-lcov.info
           cargo llvm-cov --lib --json --output-path ../coverage/rust-coverage.json
           echo "## Rust Coverage (unit tests)" >> $GITHUB_STEP_SUMMARY
