@@ -69,32 +69,13 @@ async fn capture_snapshot(state: &AppState, object_dn: &str, operation: &str) {
         .authenticated_user()
         .unwrap_or_else(|| std::env::var("USERNAME").unwrap_or_else(|_| "Unknown".to_string()));
 
-    // Fetch current object attributes by extracting CN from DN and searching
-    let cn = object_dn
-        .split(',')
-        .next()
-        .and_then(|part| {
-            part.strip_prefix("CN=")
-                .or_else(|| part.strip_prefix("cn="))
-        })
-        .unwrap_or("");
-
-    let attrs_json = if !cn.is_empty() {
-        // Try user search first, then computer, then group
-        let user_result = provider.search_users(cn, 5).await;
-        let entry = user_result.ok().and_then(|entries| {
-            entries
-                .into_iter()
-                .find(|e| e.distinguished_name == object_dn)
-        });
-
-        if let Some(entry) = entry {
-            serde_json::to_string(&entry.attributes).unwrap_or_else(|_| "{}".to_string())
-        } else {
-            "{}".to_string()
+    // Fetch ALL attributes of the object (not just USER_ATTRS subset)
+    // to ensure snapshots capture every attribute that could be modified.
+    let attrs_json = match provider.get_all_attributes(object_dn).await {
+        Ok(attrs) if !attrs.is_empty() => {
+            serde_json::to_string(&attrs).unwrap_or_else(|_| "{}".to_string())
         }
-    } else {
-        "{}".to_string()
+        _ => "{}".to_string(),
     };
 
     state

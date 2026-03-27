@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-03-27
+
+### Fixed
+
+- Fix GSSAPI/Kerberos authentication failing when only domain name is known: `sasl_gssapi_bind` was receiving the domain name (e.g., `DSPANEL.LOCAL`) instead of the DC FQDN (e.g., `dc01.dspanel.local`), causing SPN mismatch. Now resolves DC FQDN via DNS SRV lookup (`_ldap._tcp.<domain>`) with LOGONSERVER fallback.
+- Fix snapshots only capturing 27 predefined attributes: `capture_snapshot()` now fetches all attributes via base-scope LDAP search with `["*"]` wildcard, ensuring Advanced Attributes edits are fully recorded for diff and restore (#15).
+- Replace PowerShell `Get-WinEvent` with `wevtutil` for attack detection event log queries. Supports `/r:` `/u:` `/p:` `/a:Negotiate` for authenticated remote access from non-domain machines (#16).
+- Add Windows-only platform check for Attack Detection page (disabled with message on macOS/Linux).
+
 ## [1.0.0] - 2026-03-27
 
 ### Security

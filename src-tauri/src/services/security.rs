@@ -3077,39 +3077,47 @@ pub async fn detect_attacks(
 ///
 /// Uses `Get-WinEvent -MaxEvents 1` as a language-independent access check.
 #[cfg(target_os = "windows")]
-/// Builds a PowerShell credential snippet from bind DN and password.
-/// Converts DN format "CN=User,CN=Users,DC=domain,DC=local" to "domain.local\User".
+/// Extracts domain\username from a bind DN for wevtutil authentication.
+/// Converts "CN=User,CN=Users,DC=domain,DC=local" to "domain.local\User".
 #[cfg(target_os = "windows")]
-fn build_credential_param(bind_dn: &str, password: &str) -> String {
-    // Extract username from CN=...
+fn dn_to_domain_user(bind_dn: &str) -> String {
     let username = bind_dn
         .split(',')
         .next()
         .and_then(|rdn| rdn.strip_prefix("CN="))
         .unwrap_or(bind_dn);
-
-    // Extract domain from DC= components
     let domain: String = bind_dn
         .split(',')
         .filter_map(|part| part.strip_prefix("DC="))
         .collect::<Vec<_>>()
         .join(".");
-
-    let user = if domain.is_empty() {
+    if domain.is_empty() {
         username.to_string()
     } else {
         format!("{}\\{}", domain, username)
-    };
-
-    // Escape single quotes in password
-    let escaped_pwd = password.replace('\'', "''");
-
-    format!(
-        "$cred=New-Object System.Management.Automation.PSCredential('{}',('{}' | ConvertTo-SecureString -AsPlainText -Force));",
-        user, escaped_pwd
-    )
+    }
 }
 
+/// Builds wevtutil remote arguments: /r:<host> /u:<user> /p:<pass> /a:Negotiate
+#[cfg(target_os = "windows")]
+fn wevtutil_remote_args(
+    dc_host: Option<&str>,
+    credentials: Option<&(String, String)>,
+) -> Vec<String> {
+    let mut args = Vec::new();
+    if let Some(host) = dc_host {
+        args.push(format!("/r:{}", host));
+    }
+    if let Some((bind_dn, password)) = credentials {
+        args.push(format!("/u:{}", dn_to_domain_user(bind_dn)));
+        args.push(format!("/p:{}", password));
+        args.push("/a:Negotiate".to_string());
+    }
+    args
+}
+
+/// Probes whether the Security event log is accessible on the target DC.
+/// Uses `wevtutil qe` with `/c:1` for a language-independent access check.
 #[cfg(target_os = "windows")]
 fn can_read_security_log(dc_host: Option<&str>, credentials: Option<&(String, String)>) -> bool {
     use std::process::Command;
@@ -3119,52 +3127,118 @@ fn can_read_security_log(dc_host: Option<&str>, credentials: Option<&(String, St
         return false;
     };
 
-    let cred_setup = credentials
-        .map(|(dn, pwd)| build_credential_param(dn, pwd))
-        .unwrap_or_default();
-    let cred_param = if credentials.is_some() {
-        " -Credential $cred"
-    } else {
-        ""
-    };
+    let mut args = vec![
+        "qe".to_string(),
+        "Security".to_string(),
+        "/c:1".to_string(),
+        "/f:text".to_string(),
+    ];
+    args.extend(wevtutil_remote_args(Some(host), credentials));
 
-    let cmd = format!(
-        "{}try{{Get-WinEvent -LogName Security -ComputerName '{}'{} -MaxEvents 1 -EA Stop | Out-Null;'true'}}catch{{$_.Exception.Message}}",
-        cred_setup, host, cred_param
-    );
     tracing::debug!(
         dc_host = host,
         has_credentials = credentials.is_some(),
-        "Probing remote Security event log access"
+        "Probing Security event log via wevtutil"
     );
 
-    match Command::new("powershell")
-        .args(["-NoProfile", "-NonInteractive", "-Command", &cmd])
-        .output()
-    {
+    match Command::new("wevtutil").args(&args).output() {
         Ok(o) => {
-            let stdout = String::from_utf8_lossy(&o.stdout);
-            let result = stdout.trim();
-            if result == "true" {
-                tracing::info!(dc_host = host, "Security event log accessible");
+            if o.status.success() {
+                tracing::info!(dc_host = host, "Security event log accessible via wevtutil");
                 return true;
             }
+            let stderr = String::from_utf8_lossy(&o.stderr);
             tracing::warn!(
                 dc_host = host,
-                error = %result,
-                "Security event log probe failed - ensure 'Remote Event Log Management' firewall rule is enabled on the DC"
+                stderr = %stderr.trim(),
+                "wevtutil probe failed"
             );
             false
         }
         Err(e) => {
-            tracing::warn!(error = %e, "Failed to run PowerShell for event log probe");
+            tracing::warn!(error = %e, "Failed to run wevtutil");
             false
         }
     }
 }
 
-/// Runs a PowerShell query for a batch of event IDs and returns parsed event records.
-/// When `dc_host` is provided, queries the remote DC's Security log via `-ComputerName`.
+/// Parses a single `<Event>` XML element from wevtutil output into an EventRecord.
+#[cfg(target_os = "windows")]
+fn parse_wevtutil_event(event_xml: &str) -> Option<EventRecord> {
+    // Extract System/TimeCreated SystemTime attribute
+    let time_created = extract_xml_attr(event_xml, "TimeCreated", "SystemTime");
+    // Extract System/EventID text
+    let id = extract_xml_text(event_xml, "EventID").and_then(|s| s.parse::<u32>().ok());
+    // Extract EventData/Data elements by Name attribute
+    let data = |name: &str| extract_event_data(event_xml, name);
+
+    Some(EventRecord {
+        time_created,
+        id,
+        ip_address: data("IpAddress"),
+        target_user_name: data("TargetUserName"),
+        ticket_encryption_type: data("TicketEncryptionType"),
+        service_name: data("ServiceName"),
+        status: data("Status"),
+        sub_status: data("SubStatus"),
+        logon_type: data("LogonType"),
+        authentication_package_name: data("AuthenticationPackageName"),
+        key_length: data("KeyLength"),
+        object_type: data("ObjectType"),
+        access_mask: data("AccessMask"),
+        subject_user_name: data("SubjectUserName"),
+        attribute_ldap_display_name: data("AttributeLDAPDisplayName"),
+        object_dn: data("ObjectDN"),
+    })
+}
+
+/// Extracts an XML attribute value: `<Tag AttrName="value"` -> `value`
+#[cfg(target_os = "windows")]
+fn extract_xml_attr(xml: &str, tag: &str, attr: &str) -> Option<String> {
+    let pattern = format!("<{}", tag);
+    let tag_start = xml.find(&pattern)?;
+    let rest = &xml[tag_start..];
+    let attr_pattern = format!("{}='", attr);
+    let attr_pattern2 = format!("{}=\"", attr);
+    let attr_start = rest
+        .find(&attr_pattern)
+        .map(|p| p + attr_pattern.len())
+        .or_else(|| rest.find(&attr_pattern2).map(|p| p + attr_pattern2.len()))?;
+    let value_rest = &rest[attr_start..];
+    let end = value_rest.find(['\'', '"'])?;
+    Some(value_rest[..end].to_string())
+}
+
+/// Extracts text content of an XML element: `<Tag>text</Tag>` -> `text`
+#[cfg(target_os = "windows")]
+fn extract_xml_text(xml: &str, tag: &str) -> Option<String> {
+    let open = format!("<{}>", tag);
+    let close = format!("</{}>", tag);
+    let start = xml.find(&open)? + open.len();
+    let end = xml[start..].find(&close)? + start;
+    let text = xml[start..end].trim().to_string();
+    if text.is_empty() { None } else { Some(text) }
+}
+
+/// Extracts EventData/Data value by Name attribute:
+/// `<Data Name="IpAddress">10.0.0.1</Data>` -> `Some("10.0.0.1")`
+#[cfg(target_os = "windows")]
+fn extract_event_data(xml: &str, name: &str) -> Option<String> {
+    let pattern = format!("Name='{}'", name);
+    let pattern2 = format!("Name=\"{}\"", name);
+    let attr_pos = xml.find(&pattern).or_else(|| xml.find(&pattern2))?;
+    let rest = &xml[attr_pos..];
+    let gt = rest.find('>')?;
+    let value_start = gt + 1;
+    let value_rest = &rest[value_start..];
+    let end = value_rest.find('<')?;
+    let text = value_rest[..end].trim().to_string();
+    if text.is_empty() { None } else { Some(text) }
+}
+
+/// Queries the Security event log via `wevtutil qe` with XPath filtering.
+/// Returns parsed EventRecord structs. Uses `/r:` `/u:` `/p:` `/a:Negotiate`
+/// for remote+authenticated access (works from non-domain machines).
 #[cfg(target_os = "windows")]
 fn query_events(
     event_ids: &[u32],
@@ -3174,79 +3248,56 @@ fn query_events(
 ) -> Vec<EventRecord> {
     use std::process::Command;
 
-    let ids_str = event_ids
+    // Build XPath filter: *[System[(EventID=4768 or EventID=4769) and TimeCreated[timediff(@SystemTime) <= N]]]
+    let id_filter = event_ids
         .iter()
-        .map(|id| id.to_string())
+        .map(|id| format!("EventID={}", id))
         .collect::<Vec<_>>()
-        .join(",");
-
-    let computer_param = dc_host
-        .map(|h| format!("-ComputerName '{}'", h))
-        .unwrap_or_default();
-
-    let cred_setup = credentials
-        .map(|(dn, pwd)| build_credential_param(dn, pwd))
-        .unwrap_or_default();
-    let cred_param = if credentials.is_some() {
-        " -Credential $cred"
-    } else {
-        ""
-    };
-
-    let query = format!(
-        r#"{cred_init}Get-WinEvent -FilterHashtable @{{LogName='Security';Id={ids};StartTime=(Get-Date).AddHours(-{hours})}} {computer}{cred_arg} -MaxEvents 200 -ErrorAction SilentlyContinue | ForEach-Object {{
-    $xml = [xml]$_.ToXml()
-    $data = @{{}}
-    $xml.Event.EventData.Data | ForEach-Object {{ $data[$_.Name] = $_.'#text' }}
-    [PSCustomObject]@{{
-        TimeCreated = $_.TimeCreated.ToString('o')
-        Id = $_.Id
-        IpAddress = $data['IpAddress']
-        TargetUserName = $data['TargetUserName']
-        TicketEncryptionType = $data['TicketEncryptionType']
-        ServiceName = $data['ServiceName']
-        Status = $data['Status']
-        SubStatus = $data['SubStatus']
-        LogonType = $data['LogonType']
-        AuthenticationPackageName = $data['AuthenticationPackageName']
-        KeyLength = $data['KeyLength']
-        ObjectType = $data['ObjectType']
-        AccessMask = $data['AccessMask']
-        SubjectUserName = $data['SubjectUserName']
-        AttributeLDAPDisplayName = $data['AttributeLDAPDisplayName']
-        ObjectDN = $data['ObjectDN']
-    }}
-}} | ConvertTo-Json -Compress"#,
-        cred_init = cred_setup,
-        ids = ids_str,
-        hours = time_window_hours,
-        computer = computer_param,
-        cred_arg = cred_param,
+        .join(" or ");
+    let time_ms = time_window_hours as u64 * 3_600_000;
+    let xpath = format!(
+        "*[System[({}) and TimeCreated[timediff(@SystemTime) <= {}]]]",
+        id_filter, time_ms
     );
 
-    let output = Command::new("powershell")
-        .args(["-NoProfile", "-NonInteractive", "-Command", &query])
-        .output();
+    let mut args = vec![
+        "qe".to_string(),
+        "Security".to_string(),
+        format!("/q:{}", xpath),
+        "/f:XML".to_string(),
+        "/c:200".to_string(),
+    ];
+    args.extend(wevtutil_remote_args(dc_host, credentials));
 
-    let output = match output {
+    let output = match Command::new("wevtutil").args(&args).output() {
         Ok(o) if o.status.success() => o,
-        _ => return Vec::new(),
+        Ok(o) => {
+            let stderr = String::from_utf8_lossy(&o.stderr);
+            if !stderr.trim().is_empty() {
+                tracing::warn!(stderr = %stderr.trim(), "wevtutil query returned error");
+            }
+            return Vec::new();
+        }
+        Err(e) => {
+            tracing::warn!(error = %e, "Failed to run wevtutil");
+            return Vec::new();
+        }
     };
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    let trimmed = stdout.trim();
-    if trimmed.is_empty() || trimmed == "null" {
+    if stdout.trim().is_empty() {
         return Vec::new();
     }
 
-    // PowerShell returns a single object (not array) when there's exactly one result.
-    if trimmed.starts_with('[') {
-        serde_json::from_str::<Vec<EventRecord>>(trimmed).unwrap_or_default()
-    } else {
-        serde_json::from_str::<EventRecord>(trimmed)
-            .map(|r| vec![r])
-            .unwrap_or_default()
-    }
+    // wevtutil outputs consecutive <Event>...</Event> blocks (no root element)
+    stdout
+        .split("<Event xmlns")
+        .skip(1) // first split is empty or preamble
+        .filter_map(|chunk| {
+            let event_xml = format!("<Event xmlns{}", chunk);
+            parse_wevtutil_event(&event_xml)
+        })
+        .collect()
 }
 
 /// Analyzes Windows Security event log for attack indicators using structured parsing.
