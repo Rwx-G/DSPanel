@@ -282,7 +282,7 @@ export function Sidebar({ expanded, onToggle }: SidebarProps) {
     "user-comparison": "userComparison",
     groups: "groupManagement",
     "group-hygiene": "groupHygiene",
-    "bulk-operations": "groupsBulkOperation",
+    "bulk-operations": "bulkOperations",
     computers: "computerLookup",
     contacts: "contacts",
     printers: "printers",

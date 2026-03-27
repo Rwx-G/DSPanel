@@ -1,7 +1,7 @@
 {
   "name": "dspanel",
   "private": true,
-  "version": "0.12.0",
+  "version": "1.0.0",
   "type": "module",
   "packageManager": "pnpm@10.28.1",
   "scripts": {

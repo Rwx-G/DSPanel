@@ -1,10 +1,10 @@
 {
-  "pageTitle": "Deteccion de ataques",
+  "pageTitle": "Detección de ataques",
   "scan": "Escanear",
   "scanning": "Escaneando registros de eventos...",
-  "detectionFailed": "Deteccion fallida",
-  "eventLogWarning": "No se puede leer el registro de eventos de seguridad - los resultados pueden estar incompletos. Asegurese de que DSPanel se ejecute con pertenencia a Event Log Readers en el DC de destino.",
-  "check": "Verificacion",
+  "detectionFailed": "Detección fallida",
+  "eventLogWarning": "No se puede leer el registro de eventos de seguridad del DC de destino. Verifique: (1) la cuenta es miembro del grupo Lectores del registro de eventos (Event Log Readers) en el DC, y (2) la regla de firewall 'Administración remota del registro de eventos' (Remote Event Log Management) está habilitada en el DC.",
+  "check": "Verificación",
   "eventIds": "IDs de evento",
   "mitre": "MITRE",
   "alertDetails": "Detalles de la alerta",
@@ -12,8 +12,8 @@
   "alert_other": "{{count}} alertas",
   "resultClear": "Sin hallazgos",
   "resultNa": "N/D",
-  "recommendation": "Recomendacion",
-  "lastScanned": "Ultimo escaneo",
+  "recommendation": "Recomendación",
+  "lastScanned": "Último escaneo",
   "timeWindow6h": "6h",
   "timeWindow12h": "12h",
   "timeWindow24h": "24h",
@@ -34,6 +34,10 @@
   "passTheHash": "Pass-the-Hash",
   "shadowCredentials": "Credenciales en la sombra",
   "rbcdAbuse": "Abuso de RBCD",
-  "adminSdHolderTamper": "Manipulacion de AdminSDHolder",
-  "suspiciousAccount": "Cuenta sospechosa"
+  "adminSdHolderTamper": "Manipulación de AdminSDHolder",
+  "suspiciousAccount": "Cuenta sospechosa",
+  "timeWindow": "Ventana de tiempo",
+  "disclaimer.checks": "14 tipos de ataque mediante el registro de eventos de seguridad de Windows (análisis XML): Golden Ticket, DCSync, DCShadow, Kerberoasting, AS-REP Roasting, Fuerza bruta, Pass-the-Hash, Password Spray, Shadow Credentials, Abuso RBCD, Manipulación AdminSDHolder y más. Mapeado MITRE ATT&CK.",
+  "disclaimer.limitations": "Solo escaneo bajo demanda (no en tiempo real). Lee el registro de eventos local del DC - no consulta DCs remotos. Requiere Windows. No detecta retransmisión NTLM, Skeleton Key, volcados LSASS ni movimiento lateral.",
+  "disclaimer.tools": "Microsoft Defender for Identity (tiempo real, aproximadamente 30 tipos de ataque), CrowdStrike Falcon Identity o Tenable Identity Exposure para monitorización continua."
 }

@@ -32,7 +32,7 @@ import { useTranslation } from "react-i18next";
 type HealthFilter = "all" | "healthy" | "warning" | "critical";
 
 export function UserLookup() {
-  const { t } = useTranslation(["userLookup", "common"]);
+  const { t } = useTranslation(["userLookup", "common", "sidebar"]);
   const {
     items: users,
     loading,
@@ -198,7 +198,7 @@ export function UserLookup() {
         label: t("startOffboarding", { name: targetName }),
         icon: <UserMinus size={14} />,
         onClick: () => {
-          openTab("Offboarding", "offboarding", "user", {
+          openTab(t("sidebar:offboarding"), "offboarding", "user", {
             offboardSam: user.samAccountName,
           });
         },
@@ -257,7 +257,7 @@ export function UserLookup() {
           label: t("compareWith", { name: selectedName, other: targetName }),
           icon: <GitCompareArrows size={14} />,
           onClick: () => {
-            openTab("User Comparison", "user-comparison", "compare", {
+            openTab(t("sidebar:userComparison"), "user-comparison", "compare", {
               compareSamA: selectedUser.samAccountName,
               compareSamB: user.samAccountName,
             });
@@ -432,7 +432,7 @@ export function UserLookup() {
         {!loading && !error && filteredUsers.length > 0 && (
           <>
             <div
-              className="w-64 shrink-0 border-r border-[var(--color-border-subtle)]"
+              className="w-80 shrink-0 border-r border-[var(--color-border-subtle)]"
               data-testid="user-results-list"
             >
               <VirtualizedList

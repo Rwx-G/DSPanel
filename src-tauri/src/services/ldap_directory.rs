@@ -238,6 +238,8 @@ pub struct LdapDirectoryProvider {
     pool: tokio::sync::Mutex<Option<ldap3::Ldap>>,
     /// Authenticated user identity resolved via WhoAmI.
     authenticated_user: Mutex<Option<String>>,
+    /// FQDN of the connected DC, resolved from rootDSE dNSHostName.
+    dc_fqdn: Mutex<Option<String>>,
     /// Timestamp of the last successful LDAP operation.
     last_successful_op: Mutex<Option<std::time::Instant>>,
 }
@@ -287,6 +289,7 @@ impl LdapDirectoryProvider {
             connected: Mutex::new(false),
             pool: tokio::sync::Mutex::new(None),
             authenticated_user: Mutex::new(None),
+            dc_fqdn: Mutex::new(None),
             last_successful_op: Mutex::new(None),
         }
     }
@@ -326,6 +329,7 @@ impl LdapDirectoryProvider {
             connected: Mutex::new(false),
             pool: tokio::sync::Mutex::new(None),
             authenticated_user: Mutex::new(None),
+            dc_fqdn: Mutex::new(None),
             last_successful_op: Mutex::new(None),
         }
     }
@@ -595,7 +599,7 @@ impl LdapDirectoryProvider {
                 "",
                 Scope::Base,
                 "(objectClass=*)",
-                vec!["defaultNamingContext"],
+                vec!["defaultNamingContext", "dnsHostName"],
             )
             .await
             .context("Failed to query rootDSE")?
@@ -611,6 +615,14 @@ impl LdapDirectoryProvider {
             {
                 tracing::info!("Base DN discovered: {}", dn);
                 *self.base_dn.lock().expect("lock poisoned") = Some(dn);
+            }
+            if let Some(fqdn) = se
+                .attrs
+                .get("dnsHostName")
+                .and_then(|v| v.first().cloned())
+            {
+                tracing::info!("DC FQDN resolved from rootDSE: {}", fqdn);
+                *self.dc_fqdn.lock().expect("lock poisoned") = Some(fqdn);
             }
         }
 
@@ -973,6 +985,28 @@ impl DirectoryProvider for LdapDirectoryProvider {
 
     fn domain_name(&self) -> Option<&str> {
         self.domain.as_deref()
+    }
+
+    fn connected_host(&self) -> Option<String> {
+        // Prefer the FQDN resolved from rootDSE dnsHostName (works with remote event log)
+        self.dc_fqdn
+            .lock()
+            .expect("lock poisoned")
+            .clone()
+            .or_else(|| self.server_override.clone())
+            .or_else(|| self.domain.clone())
+    }
+
+    fn simple_bind_credentials(&self) -> Option<(String, String)> {
+        if let LdapAuthMode::SimpleBind {
+            ref bind_dn,
+            ref password,
+        } = self.auth_mode
+        {
+            Some((bind_dn.clone(), password.clone()))
+        } else {
+            None
+        }
     }
 
     fn base_dn(&self) -> Option<String> {
@@ -2276,7 +2310,13 @@ impl DirectoryProvider for LdapDirectoryProvider {
                         .attrs
                         .get("whenChanged")
                         .and_then(|v| v.first())
-                        .cloned()
+                        .and_then(|raw| {
+                            // Parse AD generalized time "20260326141419.0Z" to ISO 8601
+                            let clean = raw.replace(".0Z", "").replace('Z', "");
+                            chrono::NaiveDateTime::parse_from_str(&clean, "%Y%m%d%H%M%S")
+                                .ok()
+                                .map(|naive| naive.and_utc().format("%Y/%m/%d %H:%M:%S").to_string())
+                        })
                         .unwrap_or_default();
                     let original_ou = se
                         .attrs

@@ -253,11 +253,11 @@ export function GpoViewer() {
                 {t("searchLabel")}
               </label>
               <div className="relative">
-                <div className="flex items-center gap-2 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5">
-                  <Search size={16} className="shrink-0 text-[var(--color-text-secondary)]" />
+                <div className="flex items-center gap-2 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2.5 py-1">
+                  <Search size={14} className="shrink-0 text-[var(--color-text-secondary)]" />
                   <input
                     type="text"
-                    className="flex-1 bg-transparent text-body text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-secondary)]"
+                    className="flex-1 bg-transparent text-caption text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-secondary)]"
                     placeholder={t("searchPlaceholder")}
                     value={searchQuery}
                     onChange={(e) => {
@@ -345,7 +345,7 @@ export function GpoViewer() {
                       .finally(() => setLinksLoading(false));
                   }
                 }}
-                className="h-[34px] rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5 text-body text-[var(--color-text-primary)]"
+                className="h-[28px] rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2.5 text-caption text-[var(--color-text-primary)]"
               >
                 <option value="">{t("ouSelectPlaceholder")}</option>
                 {flatOUs.map((ou) => (
@@ -404,7 +404,7 @@ export function GpoViewer() {
                       setScopeLinks([]);
                     }
                   }}
-                  className="h-8 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2 text-caption text-[var(--color-text-primary)]"
+                  className="h-[28px] rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2.5 text-caption text-[var(--color-text-primary)]"
                   data-testid="scope-gpo-dn"
                 >
                   <option value="">{t("chooseGpo")}</option>
@@ -422,7 +422,7 @@ export function GpoViewer() {
                     onChange={(e) => setScopeGpoDn(e.target.value)}
                     onKeyDown={(e) => handleKeyDown(e, fetchScope)}
                     placeholder="CN={GUID},CN=Policies,CN=System,DC=contoso,DC=com"
-                    className="h-8 flex-1 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2 text-caption text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)]"
+                    className="h-[28px] flex-1 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2.5 text-caption text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)]"
                     data-testid="scope-gpo-dn"
                   />
                   <button

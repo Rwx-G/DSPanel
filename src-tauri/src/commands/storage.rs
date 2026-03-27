@@ -67,6 +67,19 @@ pub(crate) async fn restore_deleted_object_inner(
         ));
     }
 
+    // Clean the deleted DN for audit display (strip \0ADEL:<guid> suffix)
+    let clean_dn = deleted_dn
+        .split('\n')
+        .next()
+        .unwrap_or(deleted_dn)
+        .split('\0')
+        .next()
+        .unwrap_or(deleted_dn)
+        .split("\\0A")
+        .next()
+        .unwrap_or(deleted_dn)
+        .to_string();
+
     let provider = state.directory_provider.clone();
     match provider
         .restore_deleted_object(deleted_dn, target_ou_dn)
@@ -75,7 +88,7 @@ pub(crate) async fn restore_deleted_object_inner(
         Ok(()) => {
             state.audit_service.log_success(
                 "ObjectRestored",
-                deleted_dn,
+                &clean_dn,
                 &format!("Restored to {}", target_ou_dn),
             );
             Ok(())
@@ -83,7 +96,7 @@ pub(crate) async fn restore_deleted_object_inner(
         Err(e) => {
             state.audit_service.log_failure(
                 "RestoreObjectFailed",
-                deleted_dn,
+                &clean_dn,
                 &format!("Failed to restore: {}", e),
             );
             Err(AppError::Directory(e.to_string()))

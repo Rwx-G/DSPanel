@@ -15,13 +15,13 @@
   "transport": "Transport",
   "failures": "Fehler",
   "loadingPartnerships": "Replikationspartnerschaften werden geladen...",
-  "checkFailed": "Replikationspruefung fehlgeschlagen",
+  "checkFailed": "Replikationsprüfung fehlgeschlagen",
   "noPartnerships": "Keine Replikationspartnerschaften gefunden",
   "noPartnershipsDescription": "Es wurden keine NTDS-Verbindungsobjekte in der AD-Konfiguration gefunden.",
-  "simpleBindWarning": "Erzwungene Replikation ist im Simple-Bind-Modus nicht verfuegbar. Diese Funktion erfordert einen zur Domaene gehoerenden Computer mit GSSAPI-Authentifizierung, um Replikationsbefehle auf Domain Controllern auszufuehren.",
-  "notAvailableSimpleBind": "Im Simple-Bind-Modus nicht verfuegbar",
+  "simpleBindWarning": "Erzwungene Replikation ist im Simple-Bind-Modus nicht verfügbar. Diese Funktion erfordert einen zur Domäne gehörenden Computer mit GSSAPI-Authentifizierung, um Replikationsbefehle auf Domain Controllern auszuführen.",
+  "notAvailableSimpleBind": "Im Simple-Bind-Modus nicht verfügbar",
   "syncing": "Wird synchronisiert...",
   "sync": "Synchronisieren",
   "forceReplication": "Replikation erzwingen",
-  "forceReplicationDesc": "Replikation von {{source}} nach {{target}} fuer {{context}} erzwingen"
+  "forceReplicationDesc": "Replikation von {{source}} nach {{target}} für {{context}} erzwingen"
 }

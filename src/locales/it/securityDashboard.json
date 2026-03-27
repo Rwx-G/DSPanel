@@ -3,7 +3,7 @@
   "accounts": "account",
   "username": "Nome utente",
   "groups": "Gruppi",
-  "pwdAge": "Eta password",
+  "pwdAge": "Età password",
   "alerts": "Avvisi",
   "dn": "DN:",
   "pwdNeverExpires": "Password senza scadenza:",
@@ -17,7 +17,7 @@
   "serviceAccount": "Account di servizio:",
   "lastScanned": "Ultima scansione:",
   "domainSecurityFindings": "Risultati sicurezza del dominio",
-  "krbtgtPasswordAge": "Eta password KRBTGT:",
+  "krbtgtPasswordAge": "Età password KRBTGT:",
   "days": "giorni",
   "lapsCoverage": "Copertura LAPS:",
   "domainLevel": "Livello dominio:",
@@ -29,6 +29,9 @@
   "scanFailed": "Scansione fallita",
   "noPrivilegedFound": "Nessun account con privilegi trovato",
   "noMembersInGroups": "Nessun membro trovato nei gruppi con privilegi predefiniti.",
-  "passwordAge": "Eta password",
-  "exportTitle": "Rapporto account con privilegi"
+  "passwordAge": "Età password",
+  "exportTitle": "Rapporto account con privilegi",
+  "disclaimer.checks": "Membri dei gruppi di amministrazione noti (per RID), 12 verifiche a livello di account (Kerberoastable, AS-REP, crittografia reversibile, DES, delega, SIDHistory, Utenti protetti, ecc.), risultati del dominio (età KRBTGT, LAPS, PSO, livello funzionale, RBCD).",
+  "disclaimer.limitations": "Verifica solo i gruppi privilegiati predefiniti e gli attributi accessibili tramite LDAP. Non analizza le ACL (nTSecurityDescriptor), le restrizioni applicate da GPO, né le appartenenze di amministratori locali.",
+  "disclaimer.tools": "PingCastle, Purple Knight (Semperis) o BloodHound per un audit completo degli account con privilegi."
 }

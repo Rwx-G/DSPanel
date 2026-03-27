@@ -3,7 +3,7 @@
   "scan": "Scan",
   "scanning": "Scanning event logs...",
   "detectionFailed": "Detection Failed",
-  "eventLogWarning": "Cannot read Security Event Log - results may be incomplete. Ensure DSPanel runs with Event Log Readers membership on the target DC.",
+  "eventLogWarning": "Cannot read Security Event Log on the target DC. Ensure: (1) the account is a member of Event Log Readers on the DC, and (2) the 'Remote Event Log Management' firewall rule is enabled on the DC.",
   "check": "Check",
   "eventIds": "Event IDs",
   "mitre": "MITRE",
@@ -35,5 +35,9 @@
   "shadowCredentials": "Shadow Credentials",
   "rbcdAbuse": "RBCD Abuse",
   "adminSdHolderTamper": "AdminSDHolder Tamper",
-  "suspiciousAccount": "Suspicious Account"
+  "suspiciousAccount": "Suspicious Account",
+  "timeWindow": "Time window",
+  "disclaimer.checks": "14 attack types via Windows Security Event Log (XML parsing): Golden Ticket, DCSync, DCShadow, Kerberoasting, AS-REP Roasting, Brute Force, Pass-the-Hash, Password Spray, Shadow Credentials, RBCD Abuse, AdminSDHolder Tampering, and more. MITRE ATT&CK mapped.",
+  "disclaimer.limitations": "On-demand scanning only (not real-time). Reads local DC event log - does not query remote DCs. Requires Windows. Does not detect NTLM relay, Skeleton Key, LSASS dumps, or lateral movement.",
+  "disclaimer.tools": "Microsoft Defender for Identity (real-time, ~30 attack types), CrowdStrike Falcon Identity, or Tenable Identity Exposure for continuous monitoring."
 }

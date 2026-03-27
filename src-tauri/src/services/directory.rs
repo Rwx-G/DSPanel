@@ -16,6 +16,15 @@ pub trait DirectoryProvider: Send + Sync {
     /// The domain name (e.g. "CORP.LOCAL"), if known.
     fn domain_name(&self) -> Option<&str>;
 
+    /// The hostname or IP of the connected DC/LDAP server.
+    fn connected_host(&self) -> Option<String>;
+
+    /// Returns simple bind credentials (bind_dn, password) if using simple bind auth.
+    /// Used for authenticating remote operations (e.g., event log access from non-domain machines).
+    fn simple_bind_credentials(&self) -> Option<(String, String)> {
+        None
+    }
+
     /// The base DN for searches (e.g. "DC=corp,DC=local"), if known.
     fn base_dn(&self) -> Option<String>;
 
@@ -530,6 +539,10 @@ pub mod tests {
 
         fn domain_name(&self) -> Option<&str> {
             self.domain.as_deref()
+        }
+
+        fn connected_host(&self) -> Option<String> {
+            self.domain.clone()
         }
 
         fn base_dn(&self) -> Option<String> {

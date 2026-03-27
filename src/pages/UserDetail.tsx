@@ -81,7 +81,7 @@ export function UserDetail({
   onDeleted,
   schemaAttributes,
 }: UserDetailProps) {
-  const { t } = useTranslation(["userDetail", "common"]);
+  const { t } = useTranslation(["userDetail", "common", "sidebar"]);
   const [groupFilters, setGroupFilters] = useState<FilterChip[]>([]);
   const [showPasswordReset, setShowPasswordReset] = useState(false);
   const [contextMenuPos, setContextMenuPos] = useState<{
@@ -396,7 +396,7 @@ export function UserDetail({
           label: t("openInGroupManagement"),
           icon: <FolderOpen size={14} />,
           onClick: () => {
-            openTab("Group Management", "groups", "users-group", {
+            openTab(t("sidebar:groupManagement"), "groups", "users-group", {
               selectedGroupDn: contextMenuRow.dn,
             });
           },
@@ -418,13 +418,13 @@ export function UserDetail({
             <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">
               {user.displayName || user.samAccountName}
             </h2>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {healthStatus && <HealthBadge healthStatus={healthStatus} />}
               <StatusBadge
-                text={user.enabled ? "Enabled" : "Disabled"}
+                text={user.enabled ? t("common:enabled") : t("common:disabled")}
                 variant={user.enabled ? "success" : "error"}
               />
-              {user.lockedOut && <StatusBadge text="Locked" variant="warning" />}
+              {user.lockedOut && <StatusBadge text={t("common:locked")} variant="warning" />}
             </div>
           </div>
 

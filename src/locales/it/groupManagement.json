@@ -9,5 +9,9 @@
   "noSecurityGroups": "Nessun gruppo di sicurezza trovato.",
   "noDistributionGroups": "Nessun gruppo di distribuzione trovato.",
   "noGroupsMatch": "Nessun gruppo corrisponde a \"{{query}}\"",
-  "selectGroup": "Selezionare un gruppo per visualizzare i dettagli"
+  "selectGroup": "Selezionare un gruppo per visualizzare i dettagli",
+  "scopeGlobal": "Globale",
+  "scopeDomainLocal": "Dominio locale",
+  "scopeUniversal": "Universale",
+  "scopeUnknown": "Sconosciuto"
 }

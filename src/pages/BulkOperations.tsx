@@ -693,18 +693,19 @@ export function BulkOperations() {
       current: 0,
       total,
       status: "running",
-      message: "Starting...",
+      message: t("progressStarting"),
     });
     setShowPreview(false);
 
     for (let i = 0; i < plannedChanges.length; i++) {
       const change = plannedChanges[i];
-      const actionLabel = change.action === "add" ? "Adding" : "Removing";
       setProgress({
         current: i,
         total,
         status: "running",
-        message: `${actionLabel} ${change.memberName} ${change.action === "add" ? "to" : "from"} ${change.groupName}...`,
+        message: change.action === "add"
+          ? t("progressAddingMember", { member: change.memberName, group: change.groupName })
+          : t("progressRemovingMember", { member: change.memberName, group: change.groupName }),
       });
 
       try {
@@ -727,7 +728,7 @@ export function BulkOperations() {
           current: i,
           total,
           status: "rolling-back",
-          message: `Rolling back ${completedOps.length} completed operations...`,
+          message: t("progressRollingBack", { count: completedOps.length }),
         });
 
         for (let j = completedOps.length - 1; j >= 0; j--) {
@@ -753,7 +754,7 @@ export function BulkOperations() {
           current: i,
           total,
           status: "failed",
-          message: `Failed at step ${i + 1}. Rolled back ${completedOps.length} operations.`,
+          message: t("progressFailedRolledBack", { step: i + 1, count: completedOps.length }),
         });
         return;
       }
@@ -763,7 +764,7 @@ export function BulkOperations() {
       current: total,
       total,
       status: "completed",
-      message: `Successfully completed ${total} operations.`,
+      message: t("progressCompleted", { count: total }),
     });
     setPlannedChanges([]);
     setSelectedMembers(new Set());
@@ -802,7 +803,7 @@ export function BulkOperations() {
       current: 1,
       total: 1,
       status: "completed",
-      message: `Exported ${members.length} members to CSV.`,
+      message: t("progressExported", { count: members.length }),
     });
   }, [members, sourceGroups]);
 
@@ -833,14 +834,14 @@ export function BulkOperations() {
     if (!targetUser || copyPreviewGroups.length === 0) return;
     const total = copyPreviewGroups.length;
     setShowPreview(false);
-    setProgress({ current: 0, total, status: "running", message: "Starting..." });
+    setProgress({ current: 0, total, status: "running", message: t("progressStarting") });
 
     for (let i = 0; i < total; i++) {
       setProgress({
         current: i,
         total,
         status: "running",
-        message: `Adding to group ${i + 1}/${total}...`,
+        message: t("progressAddingToGroup", { current: i + 1, total }),
       });
       try {
         await invoke("add_user_to_group", {
@@ -852,7 +853,7 @@ export function BulkOperations() {
           current: i,
           total,
           status: "failed",
-          message: `Failed at step ${i + 1}: ${extractErrorMessage(err)}`,
+          message: t("progressFailedAtStep", { step: i + 1, error: extractErrorMessage(err) }),
         });
         return;
       }
@@ -861,9 +862,9 @@ export function BulkOperations() {
       current: total,
       total,
       status: "completed",
-      message: `Successfully added ${targetUser.displayName ?? targetUser.samAccountName} to ${total} groups.`,
+      message: t("progressAddedToGroups", { name: targetUser.displayName ?? targetUser.samAccountName, count: total }),
     });
-  }, [targetUser, copyPreviewGroups]);
+  }, [targetUser, copyPreviewGroups, t]);
 
   // ---------------------------------------------------------------------------
   // Clone Group handler
@@ -881,7 +882,7 @@ export function BulkOperations() {
       current: 0,
       total: 1,
       status: "running",
-      message: "Creating group...",
+      message: t("progressCreatingGroup"),
     });
 
     try {
@@ -890,7 +891,7 @@ export function BulkOperations() {
         containerDn: cloneContainerDn.trim(),
         scope: "Global",
         category: "Security",
-        description: `Clone of ${sourceGroups[0].name}`,
+        description: t("cloneOfDescription", { name: sourceGroups[0].name }),
       });
 
       // Add members
@@ -900,7 +901,7 @@ export function BulkOperations() {
           current: i,
           total: total + 1,
           status: "running",
-          message: `Adding member ${i + 1}/${total}...`,
+          message: t("progressAddingMemberCount", { current: i + 1, total }),
         });
         try {
           await invoke("add_user_to_group", {
@@ -916,17 +917,17 @@ export function BulkOperations() {
         current: total + 1,
         total: total + 1,
         status: "completed",
-        message: `Group "${cloneNewName}" created with ${total} members.`,
+        message: t("progressGroupCreated", { name: cloneNewName, count: total }),
       });
     } catch (err) {
       setProgress({
         current: 0,
         total: 1,
         status: "failed",
-        message: `Failed to create group: ${extractErrorMessage(err)}`,
+        message: t("progressFailedCreateGroup", { error: extractErrorMessage(err) }),
       });
     }
-  }, [sourceGroups, cloneNewName, cloneContainerDn, members]);
+  }, [sourceGroups, cloneNewName, cloneContainerDn, members, t]);
 
   // ---------------------------------------------------------------------------
   // Merge Groups handler
@@ -939,7 +940,7 @@ export function BulkOperations() {
       current: 0,
       total: 1,
       status: "running",
-      message: "Loading members from all source groups...",
+      message: t("progressLoadingMembers"),
     });
 
     try {
@@ -971,7 +972,7 @@ export function BulkOperations() {
           current: i,
           total,
           status: "running",
-          message: `Adding member ${i + 1}/${total} to ${targetGroups[0].name}...`,
+          message: t("progressAddingMemberToGroup", { current: i + 1, total, group: targetGroups[0].name }),
         });
         try {
           await invoke("add_user_to_group", {
@@ -987,17 +988,17 @@ export function BulkOperations() {
         current: total,
         total,
         status: "completed",
-        message: `Merged ${total} new members into ${targetGroups[0].name}.`,
+        message: t("progressMerged", { count: total, group: targetGroups[0].name }),
       });
     } catch (err) {
       setProgress({
         current: 0,
         total: 1,
         status: "failed",
-        message: `Merge failed: ${extractErrorMessage(err)}`,
+        message: t("progressMergeFailed", { error: extractErrorMessage(err) }),
       });
     }
-  }, [sourceGroups, targetGroups]);
+  }, [sourceGroups, targetGroups, t]);
 
   // ---------------------------------------------------------------------------
   // Import CSV handler
@@ -1064,7 +1065,7 @@ export function BulkOperations() {
       current: 0,
       total,
       status: "running",
-      message: "Starting import...",
+      message: t("progressStartingImport"),
     });
 
     for (let i = 0; i < total; i++) {
@@ -1072,7 +1073,7 @@ export function BulkOperations() {
         current: i,
         total,
         status: "running",
-        message: `Adding ${csvResolvedUsers[i].displayName ?? csvResolvedUsers[i].samAccountName} to ${targetGroups[0].name}...`,
+        message: t("progressImportingMember", { name: csvResolvedUsers[i].displayName ?? csvResolvedUsers[i].samAccountName, group: targetGroups[0].name }),
       });
       try {
         await invoke("add_user_to_group", {
@@ -1084,7 +1085,7 @@ export function BulkOperations() {
           current: i,
           total,
           status: "failed",
-          message: `Failed at step ${i + 1}: ${extractErrorMessage(err)}`,
+          message: t("progressFailedAtStep", { step: i + 1, error: extractErrorMessage(err) }),
         });
         return;
       }
@@ -1094,9 +1095,9 @@ export function BulkOperations() {
       current: total,
       total,
       status: "completed",
-      message: `Successfully imported ${total} members into ${targetGroups[0].name}.`,
+      message: t("progressImported", { count: total, group: targetGroups[0].name }),
     });
-  }, [csvResolvedUsers, targetGroups]);
+  }, [csvResolvedUsers, targetGroups, t]);
 
   // ---------------------------------------------------------------------------
   // Move Groups handler
@@ -1110,7 +1111,7 @@ export function BulkOperations() {
       current: 0,
       total,
       status: "running",
-      message: "Moving groups...",
+      message: t("progressMovingGroups"),
     });
 
     for (let i = 0; i < total; i++) {
@@ -1118,7 +1119,7 @@ export function BulkOperations() {
         current: i,
         total,
         status: "running",
-        message: `Moving ${sourceGroups[i].name}...`,
+        message: t("progressMoving", { name: sourceGroups[i].name }),
       });
       try {
         await invoke("move_object", {
@@ -1130,7 +1131,7 @@ export function BulkOperations() {
           current: i,
           total,
           status: "failed",
-          message: `Failed to move ${sourceGroups[i].name}: ${extractErrorMessage(err)}`,
+          message: t("progressFailedMove", { name: sourceGroups[i].name, error: extractErrorMessage(err) }),
         });
         return;
       }
@@ -1140,9 +1141,9 @@ export function BulkOperations() {
       current: total,
       total,
       status: "completed",
-      message: `Successfully moved ${total} group(s).`,
+      message: t("progressMoved", { count: total }),
     });
-  }, [sourceGroups, moveTargetOu]);
+  }, [sourceGroups, moveTargetOu, t]);
 
   // ---------------------------------------------------------------------------
   // Create Groups from CSV handler
@@ -1180,7 +1181,7 @@ export function BulkOperations() {
       current: 0,
       total,
       status: "running",
-      message: "Creating groups...",
+      message: t("progressCreatingGroups"),
     });
 
     for (let i = 0; i < total; i++) {
@@ -1196,7 +1197,7 @@ export function BulkOperations() {
           current: i,
           total,
           status: "failed",
-          message: `Row ${i + 1}: missing name or OU.`,
+          message: t("progressRowMissingData", { row: i + 1 }),
         });
         return;
       }
@@ -1205,7 +1206,7 @@ export function BulkOperations() {
         current: i,
         total,
         status: "running",
-        message: `Creating "${name}" (${i + 1}/${total})...`,
+        message: t("progressCreatingNamed", { name, current: i + 1, total }),
       });
 
       try {
@@ -1221,7 +1222,7 @@ export function BulkOperations() {
           current: i,
           total,
           status: "failed",
-          message: `Failed to create "${name}": ${extractErrorMessage(err)}`,
+          message: t("progressFailedCreate", { name, error: extractErrorMessage(err) }),
         });
         return;
       }
@@ -1231,9 +1232,9 @@ export function BulkOperations() {
       current: total,
       total,
       status: "completed",
-      message: `Successfully created ${total} group(s).`,
+      message: t("progressCreated", { count: total }),
     });
-  }, [createGroupsCsvData]);
+  }, [createGroupsCsvData, t]);
 
   // ---------------------------------------------------------------------------
   // Update Manager handler
@@ -1247,7 +1248,7 @@ export function BulkOperations() {
       current: 0,
       total,
       status: "running",
-      message: "Updating managed-by...",
+      message: t("progressUpdatingManager"),
     });
 
     for (let i = 0; i < total; i++) {
@@ -1255,7 +1256,7 @@ export function BulkOperations() {
         current: i,
         total,
         status: "running",
-        message: `Updating ${sourceGroups[i].name}...`,
+        message: t("progressUpdating", { name: sourceGroups[i].name }),
       });
       try {
         await invoke("update_managed_by", {
@@ -1267,7 +1268,7 @@ export function BulkOperations() {
           current: i,
           total,
           status: "failed",
-          message: `Failed to update ${sourceGroups[i].name}: ${extractErrorMessage(err)}`,
+          message: t("progressFailedUpdate", { name: sourceGroups[i].name, error: extractErrorMessage(err) }),
         });
         return;
       }
@@ -1277,9 +1278,9 @@ export function BulkOperations() {
       current: total,
       total,
       status: "completed",
-      message: `Manager updated on ${total} group(s).`,
+      message: t("progressManagerUpdated", { count: total }),
     });
-  }, [sourceGroups, selectedManager]);
+  }, [sourceGroups, selectedManager, t]);
 
   // ---------------------------------------------------------------------------
   // Computed state
@@ -2030,7 +2031,7 @@ export function BulkOperations() {
                         {row[0]}
                       </p>
                       <p className="text-caption text-[var(--color-text-secondary)]">
-                        {row[2] ?? "Global"} / {row[3] ?? "Security"} in{" "}
+                        {row[2] ?? "Global"} / {row[3] ?? "Security"} {t("previewIn")}{" "}
                         {row[4] ?? "N/A"}
                       </p>
                     </div>
@@ -2132,7 +2133,7 @@ export function BulkOperations() {
                     {change.memberName}
                   </p>
                   <p className="text-caption text-[var(--color-text-secondary)]">
-                    {change.action === "add" ? "to" : "from"} {change.groupName}
+                    {change.action === "add" ? t("previewToGroup", { group: change.groupName }) : t("previewFromGroup", { group: change.groupName })}
                   </p>
                 </div>
               </div>

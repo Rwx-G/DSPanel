@@ -150,6 +150,10 @@ where
         self.inner.domain_name()
     }
 
+    fn connected_host(&self) -> Option<String> {
+        self.inner.connected_host()
+    }
+
     fn base_dn(&self) -> Option<String> {
         self.inner.base_dn()
     }

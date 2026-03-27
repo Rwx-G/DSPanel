@@ -141,7 +141,7 @@ function DcHealthCard({
               key={check.name}
               className="flex h-5 w-5 items-center justify-center rounded-full"
               style={{ color: statusColor(check.status) }}
-              title={`${check.name}: ${check.message}`}
+              title={`${t(`checkNames.${check.name}`, { defaultValue: check.name })}: ${check.message}`}
             >
               {checkIcon(check.name, 12)}
             </span>
@@ -191,13 +191,54 @@ function DcHealthCard({
   );
 }
 
+/** Translate a DC health check message using pattern matching on the English text. */
+function useTranslateCheckMessage() {
+  const { t } = useTranslation("infrastructureHealth");
+  return (msg: string): string => {
+    const patterns: [RegExp, string, (m: RegExpMatchArray) => Record<string, string>][] = [
+      [/^Resolved via AD DNS to (.+)$/, "checkMsg.dnsResolved", (m) => ({ ip: m[1] })],
+      [/^No SRV records/, "checkMsg.dnsNoRecords", () => ({})],
+      [/^DNS resolution failed/, "checkMsg.dnsFailed", () => ({})],
+      [/^LDAP response: (\d+)ms$/, "checkMsg.ldapResponse", (m) => ({ ms: m[1] })],
+      [/^LDAP response slow: (\d+)ms$/, "checkMsg.ldapSlow", (m) => ({ ms: m[1] })],
+      [/^LDAP response very slow: (\d+)ms$/, "checkMsg.ldapVerySlow", (m) => ({ ms: m[1] })],
+      [/^LDAP connection failed/, "checkMsg.ldapFailed", () => ({})],
+      [/^All services registered: (.+)$/, "checkMsg.servicesAll", (m) => ({ list: m[1] })],
+      [/^Missing services: (.+)$/, "checkMsg.servicesMissing", (m) => ({ list: m[1] })],
+      [/^Service check failed/, "checkMsg.servicesFailed", () => ({})],
+      [/^(\d+) inbound replication link/, "checkMsg.replLinks", (m) => ({ count: m[1] })],
+      [/^No inbound replication/, "checkMsg.replNone", () => ({})],
+      [/^Replication check failed/, "checkMsg.replFailed", () => ({})],
+      [/^DFSR enabled, SMB reachable \((.+)\)$/, "checkMsg.sysvolOk", (m) => ({ state: m[1] })],
+      [/^DFSR enabled but SMB port 445 unreachable \((.+)\)$/, "checkMsg.sysvolSmbFail", (m) => ({ state: m[1] })],
+      [/^SYSVOL check failed/, "checkMsg.sysvolFailed", () => ({})],
+      [/^(\d+)s skew - exceeds/, "checkMsg.clockCritical", (m) => ({ seconds: m[1] })],
+      [/^(\d+)s skew \(Kerberos/, "checkMsg.clockWarn", (m) => ({ seconds: m[1] })],
+      [/^(\d+)s skew$/, "checkMsg.clockOk", (m) => ({ seconds: m[1] })],
+      [/^Clock skew check failed/, "checkMsg.clockFailed", () => ({})],
+      [/^Machine account OK \((.+)\)$/, "checkMsg.accountOk", (m) => ({ info: m[1] })],
+      [/^Machine account: (.+)$/, "checkMsg.accountWarn", (m) => ({ issues: m[1] })],
+      [/^Machine account check failed/, "checkMsg.accountFailed", () => ({})],
+    ];
+    for (const [re, key, extract] of patterns) {
+      const m = msg.match(re);
+      if (m) return t(key, extract(m));
+    }
+    return msg; // fallback: return original
+  };
+}
+
 function CheckRow({ check }: { check: DcHealthCheck }) {
+  const { t } = useTranslation("infrastructureHealth");
+  const translateMsg = useTranslateCheckMessage();
+  const translatedName = t(`checkNames.${check.name}`, { defaultValue: check.name });
+  const translatedMsg = translateMsg(check.message);
   return (
     <tr className="border-t border-[var(--color-border-subtle)]">
       <td className="py-2 pr-4">
         <div className="flex items-center gap-2 text-[var(--color-text-primary)]">
           {checkIcon(check.name)}
-          {check.name}
+          {translatedName}
         </div>
       </td>
       <td className="py-2 pr-4 text-center">
@@ -205,8 +246,8 @@ function CheckRow({ check }: { check: DcHealthCheck }) {
           <StatusIcon level={check.status} size={14} />
         </span>
       </td>
-      <td className="truncate py-2 pr-4 text-[var(--color-text-secondary)]" title={check.message}>
-        {check.message}
+      <td className="truncate py-2 pr-4 text-[var(--color-text-secondary)]" title={translatedMsg}>
+        {translatedMsg}
       </td>
       <td className="truncate py-2 font-mono text-[var(--color-text-secondary)]" title={check.value ?? "-"}>
         {check.value ?? "-"}

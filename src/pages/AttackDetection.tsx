@@ -42,38 +42,22 @@ function severityColor(severity: AlertSeverity): string {
   }
 }
 
-function attackTypeLabel(type: AttackType): string {
-  switch (type) {
-    case "GoldenTicket":
-      return "Golden Ticket";
-    case "DCSync":
-      return "DCSync";
-    case "DCShadow":
-      return "DCShadow";
-    case "AbnormalKerberos":
-      return "Abnormal Kerberos";
-    case "PasswordSpray":
-      return "Password Spray";
-    case "PrivGroupChange":
-      return "Priv Group Change";
-    case "Kerberoasting":
-      return "Kerberoasting";
-    case "AsrepRoasting":
-      return "AS-REP Roasting";
-    case "BruteForce":
-      return "Brute Force";
-    case "PassTheHash":
-      return "Pass-the-Hash";
-    case "ShadowCredentials":
-      return "Shadow Credentials";
-    case "RbcdAbuse":
-      return "RBCD Abuse";
-    case "AdminSdHolderTamper":
-      return "AdminSDHolder Tamper";
-    case "SuspiciousAccountActivity":
-      return "Suspicious Account";
-  }
-}
+const ATTACK_TYPE_KEYS: Record<AttackType, string> = {
+  GoldenTicket: "goldenTicket",
+  DCSync: "dcSync",
+  DCShadow: "dcShadow",
+  AbnormalKerberos: "abnormalKerberos",
+  PasswordSpray: "passwordSpray",
+  PrivGroupChange: "privGroupChange",
+  Kerberoasting: "kerberoasting",
+  AsrepRoasting: "asRepRoasting",
+  BruteForce: "bruteForce",
+  PassTheHash: "passTheHash",
+  ShadowCredentials: "shadowCredentials",
+  RbcdAbuse: "rbcdAbuse",
+  AdminSdHolderTamper: "adminSdHolderTamper",
+  SuspiciousAccountActivity: "suspiciousAccount",
+};
 
 function SeverityBadge({ severity }: { severity: AlertSeverity }) {
   const { t } = useTranslation(["common"]);
@@ -95,12 +79,13 @@ function SeverityBadge({ severity }: { severity: AlertSeverity }) {
 }
 
 function AttackTypeBadge({ type }: { type: AttackType }) {
+  const { t } = useTranslation(["attackDetection"]);
   return (
     <span
       className="inline-flex items-center rounded bg-[var(--color-surface-hover)] px-1.5 py-0.5 text-[11px] font-medium text-[var(--color-text-primary)]"
       data-testid={`attack-type-badge-${type}`}
     >
-      {attackTypeLabel(type)}
+      {t(ATTACK_TYPE_KEYS[type])}
     </span>
   );
 }
@@ -264,9 +249,9 @@ export function AttackDetection() {
           {t("pageTitle")}
           <SecurityDisclaimer
             coverage="~25%"
-            checks="14 attack types via Windows Security Event Log (XML parsing): Golden Ticket, DCSync, DCShadow, Kerberoasting, AS-REP Roasting, Brute Force, Pass-the-Hash, Password Spray, Shadow Credentials, RBCD Abuse, AdminSDHolder Tampering, and more. MITRE ATT&CK mapped."
-            limitations="On-demand scanning only (not real-time). Reads local DC event log - does not query remote DCs. Requires Windows. Does not detect NTLM relay, Skeleton Key, LSASS dumps, or lateral movement."
-            tools="Microsoft Defender for Identity (real-time, ~30 attack types), CrowdStrike Falcon Identity, or Tenable Identity Exposure for continuous monitoring."
+            checks={t("disclaimer.checks")}
+            limitations={t("disclaimer.limitations")}
+            tools={t("disclaimer.tools")}
           />
         </h2>
         <div className="flex items-center gap-3">
@@ -371,7 +356,7 @@ export function AttackDetection() {
                         data-testid={`check-row-${check.type}`}
                       >
                         <td className="px-3 py-2 font-medium text-[var(--color-text-primary)]">
-                          {attackTypeLabel(check.type)}
+                          {t(ATTACK_TYPE_KEYS[check.type])}
                         </td>
                         <td className="px-3 py-2 font-mono text-[10px] text-[var(--color-text-secondary)]">
                           {check.eventIds}

@@ -282,5 +282,40 @@
   "groupChainTree": {
     "circularReference": "(circular reference)",
     "noMembers": "No members"
+  },
+  "healthBadge": {
+    "healthy": "Healthy",
+    "issue_one": "{{count}} issue",
+    "issue_other": "{{count}} issues",
+    "noIssues": "No issues detected",
+    "flags": {
+      "Disabled": "Disabled",
+      "Locked": "Locked",
+      "Expired": "Expired",
+      "PasswordExpired": "Password Expired",
+      "PasswordNeverExpires": "Password Never Expires",
+      "Inactive90Days": "Inactive 90+ Days",
+      "Inactive30Days": "Inactive 30+ Days",
+      "NeverLoggedOn": "Never Logged On",
+      "PasswordNeverChanged": "Password Never Changed"
+    },
+    "flagDesc": {
+      "Disabled": "Account is disabled",
+      "Locked": "Account is locked out",
+      "Expired": "Account has expired",
+      "PasswordExpired": "Password has expired",
+      "PasswordNeverExpires": "Password is set to never expire",
+      "Inactive90Days": "No logon in over 90 days",
+      "Inactive30Days": "No logon in over 30 days",
+      "NeverLoggedOn": "Account has never been used",
+      "PasswordNeverChanged": "Password has never been changed since account creation"
+    }
+  },
+  "alertBadge": {
+    "ok": "OK",
+    "alert_one": "{{count}} alert",
+    "alert_other": "{{count}} alerts",
+    "noAlerts": "No alerts detected",
+    "summary": "{{count}} alert(s), highest: {{level}}"
   }
 }

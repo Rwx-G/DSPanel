@@ -29,13 +29,13 @@ function parseCnFromDn(dn: string): string {
 }
 
 function PresetEditorWrapper() {
-  const { t } = useTranslation(["presetManagement", "common"]);
+  const { t } = useTranslation(["presetManagement", "common", "sidebar"]);
   const { path: presetPath } = usePresetPath();
   const { openTab } = useNavigation();
 
   const handleOpenSettings = useCallback(() => {
-    openTab("Settings", "settings", undefined, { tab: "presets" });
-  }, [openTab]);
+    openTab(t("sidebar:settings"), "settings", undefined, { tab: "presets" });
+  }, [openTab, t]);
 
   return (
     <div className="flex h-full flex-col gap-4 p-4">
@@ -45,7 +45,7 @@ function PresetEditorWrapper() {
           data-testid="preset-show-settings"
         >
           <FolderOpen size={12} />
-          Storage: {presetPath}
+          {t("storage")} {presetPath}
         </div>
       )}
       {presetPath ? (
@@ -102,10 +102,10 @@ function PresetEditor() {
 
   const validate = useCallback((): string[] => {
     const errs: string[] = [];
-    if (!draft.name.trim()) errs.push("Name is required");
-    if (!draft.targetOu.trim()) errs.push("Target OU is required");
+    if (!draft.name.trim()) errs.push(t("nameRequired"));
+    if (!draft.targetOu.trim()) errs.push(t("ouRequired"));
     if (draft.groups.length === 0 && Object.keys(draft.attributes).length === 0)
-      errs.push("At least one group or attribute is required");
+      errs.push(t("groupOrAttrRequired"));
     // Check name uniqueness for new presets
     if (
       isNew &&
@@ -113,7 +113,7 @@ function PresetEditor() {
         (p) => p.name.toLowerCase() === draft.name.trim().toLowerCase(),
       )
     )
-      errs.push("A preset with this name already exists");
+      errs.push(t("duplicateName"));
     return errs;
   }, [draft, isNew, presets]);
 
@@ -141,9 +141,9 @@ function PresetEditor() {
     if (selectedIndex === null || isNew) return;
     const preset = presets[selectedIndex];
     const confirmed = await showConfirmation(
-      "Delete Preset",
-      `Are you sure you want to delete "${preset.name}"?`,
-      "This action cannot be undone.",
+      t("deletePresetTitle"),
+      t("deletePresetConfirm", { name: preset.name }),
+      t("deletePresetWarning"),
     );
     if (!confirmed) return;
 

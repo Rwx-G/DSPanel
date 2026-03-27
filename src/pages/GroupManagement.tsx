@@ -26,11 +26,11 @@ import {
 import { Users, AlertCircle, Shield, Mail, FolderInput } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-const SCOPE_LABELS: Record<string, string> = {
-  Global: "Global",
-  DomainLocal: "Domain Local",
-  Universal: "Universal",
-  Unknown: "Unknown",
+const SCOPE_KEYS: Record<string, string> = {
+  Global: "scopeGlobal",
+  DomainLocal: "scopeDomainLocal",
+  Universal: "scopeUniversal",
+  Unknown: "scopeUnknown",
 };
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -105,7 +105,7 @@ function GroupBadge({ group }: { group: DirectoryGroup }) {
               <li className="flex items-center gap-1.5">
                 <Users size={12} className="mr-1 shrink-0 text-[var(--color-text-secondary)]" />
                 <div>
-                  <span className="text-caption font-medium text-[var(--color-text-primary)]">{SCOPE_LABELS[group.scope] || group.scope}</span>
+                  <span className="text-caption font-medium text-[var(--color-text-primary)]">{t(SCOPE_KEYS[group.scope] || "scopeUnknown")}</span>
                   <p className="text-[10px] text-[var(--color-text-secondary)]">{t("common:scope")}</p>
                 </div>
               </li>

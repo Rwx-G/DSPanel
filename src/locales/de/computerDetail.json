@@ -1,17 +1,17 @@
 {
-  "deleteComputer": "Computer loeschen",
-  "deleteConfirmation": "Moechten Sie {{name}} wirklich loeschen?",
-  "deleteSuccess": "Computer erfolgreich geloescht",
+  "deleteComputer": "Computer löschen",
+  "deleteConfirmation": "Möchten Sie {{name}} wirklich löschen?",
+  "deleteSuccess": "Computer erfolgreich gelöscht",
   "ping": "Ping",
-  "pinging": "Ping wird ausgefuehrt...",
+  "pinging": "Ping wird ausgeführt...",
   "computerName": "Computername",
   "dnsHostname": "DNS-Hostname",
   "operatingSystem": "Betriebssystem",
   "osVersion": "Betriebssystemversion",
   "ipAddress": "IP-Adresse(n)",
   "pingStatus": "Ping",
-  "resolving": "Wird aufgeloest...",
-  "resolvingSlow": "Wird aufgeloest... (dauert laenger als erwartet)",
+  "resolving": "Wird aufgelöst...",
+  "resolvingSlow": "Wird aufgelöst... (dauert länger als erwartet)",
   "notTested": "Nicht getestet",
   "reachable": "Erreichbar",
   "unreachable": "Nicht erreichbar (Ping fehlgeschlagen)",
@@ -20,5 +20,5 @@
   "filterGroups": "Gruppen filtern...",
   "groupName": "Gruppenname",
   "viewGroupMembers": "Gruppenmitglieder anzeigen",
-  "openMonitoring": "Arbeitsstationsueberwachung oeffnen"
+  "openMonitoring": "Arbeitsstationsüberwachung öffnen"
 }

@@ -23,11 +23,17 @@
   "gpos": "GPO",
   "certTemplates": "modelli certificato",
   "membership": "Appartenenza",
-  "ownership": "Proprieta",
+  "ownership": "Proprietà",
   "delegation": "Delega",
   "unconstrainedDeleg": "Delega non vincolata",
   "rbcd": "RBCD",
   "sidHistoryEdge": "SIDHistory",
   "gpLink": "GPLink",
-  "certEsc": "CertESC"
+  "certEsc": "CertESC",
+  "riskCritical": "Critico",
+  "riskHigh": "Alto",
+  "riskMedium": "Medio",
+  "disclaimer.checks": "8 tipi di arco tramite LDAP: appartenenza ai gruppi (ricorsiva), proprietà managedBy, delega vincolata/non vincolata, RBCD, SIDHistory, link GPO, modelli AD CS ESC1. Ricerca percorso con Dijkstra ponderato.",
+  "disclaimer.limitations": "Non analizza le ACL binarie (WriteDACL, GenericAll, ForceChangePassword, WriteOwner), non raccoglie sessioni di amministratori locali, nessuna analisi di percorsi inter-dominio/foresta.",
+  "disclaimer.tools": "BloodHound CE (circa 35 tipi di arco con analisi completa delle ACL) o Semperis Forest Druid per un'analisi completa dei percorsi di attacco."
 }

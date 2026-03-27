@@ -30,5 +30,7 @@
   "scopeNoLinksDescription": "This GPO is not linked to any OU or domain.",
   "scopeLinkedTo": "Linked to {{count}} container(s)",
   "findLinks": "Find Links",
-  "linksReportTitle": "GPO Links Report"
+  "linksReportTitle": "GPO Links Report",
+  "chooseGpo": "Choose a GPO...",
+  "selectGpo": "Select GPO"
 }

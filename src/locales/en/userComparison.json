@@ -28,5 +28,12 @@
   "addToGroup": "Add {{name}} to this group",
   "selectUserFirst": "Select a user first to compare",
   "vs": "vs",
-  "filterGroups": "Filter groups..."
+  "filterGroups": "Filter groups...",
+  "disabledLocked": "Disabled, Locked",
+  "accountDisabled": "Disabled",
+  "accountLocked": "Locked",
+  "accountActive": "Active",
+  "userOnly": "{{name}} only",
+  "groupCount_one": "{{count}} group",
+  "groupCount_other": "{{count}} groups"
 }

@@ -83,5 +83,59 @@
   "exportColGroupName": "Group Name",
   "exportColScope": "Scope",
   "exportColDetail": "Detail",
-  "identicalMembers": "These groups share identical members"
+  "identicalMembers": "These groups share identical members",
+  "tooltip": {
+    "empty": {
+      "what": "Groups with zero members.",
+      "why": "Empty groups clutter AD and may still be referenced in UNC path ACLs or GPOs, causing confusion during audits.",
+      "fix": "Delete the group if unused, or add the appropriate members. Check UNC permissions before deleting.",
+      "warn": "The group may still be configured on UNC paths or file share ACLs. Verify with NTFS Analyzer before deleting."
+    },
+    "singleMember": {
+      "what": "Groups containing only one member.",
+      "why": "A single-member group adds unnecessary indirection. The user could be assigned permissions directly.",
+      "fix": "Assign the user directly to the resource, then remove the group. Or add more members if the group is meant to grow.",
+      "warn": "Some applications require group-based access even for a single user. Verify before removing."
+    },
+    "stale": {
+      "what": "Groups not modified in over 180 days.",
+      "why": "Stale groups may reflect outdated team structures or completed projects, increasing the attack surface.",
+      "fix": "Review with the group owner. Archive or delete if obsolete, update membership if still needed."
+    },
+    "undescribed": {
+      "what": "Groups missing the description attribute.",
+      "why": "Without a description, administrators cannot determine the group's purpose, making audits and cleanup harder.",
+      "fix": "Add a meaningful description in Group Management (e.g. team name, project, access scope)."
+    },
+    "circular": {
+      "what": "Groups that contain each other in a nesting loop (A contains B contains A).",
+      "why": "Circular nesting causes unexpected permission inheritance and can degrade LDAP query performance.",
+      "fix": "Break the cycle by removing one of the nesting relationships. Decide which group should be the parent.",
+      "warn": "Circular nesting can cause token bloat and authentication delays. Fix as soon as possible."
+    },
+    "deepNesting": {
+      "what": "Groups nested deeper than 3 levels.",
+      "why": "Deep nesting makes permissions hard to audit and can cause Kerberos token size issues (MaxTokenSize).",
+      "fix": "Flatten the group structure by reducing nesting levels. Consider using direct memberships instead."
+    },
+    "duplicate": {
+      "what": "Multiple groups with exactly the same set of members.",
+      "why": "Duplicate groups create confusion about which group to use and increase maintenance burden.",
+      "fix": "Consolidate into a single group. Update all ACLs and GPOs to reference the surviving group, then delete duplicates.",
+      "warn": "Different groups may be used on different resources. Verify all references before merging."
+    }
+  },
+  "exportCategoryEmpty": "Empty",
+  "exportCategorySingleMember": "Single Member",
+  "exportCategoryStale": "Stale",
+  "exportCategoryNoDescription": "No Description",
+  "exportCategoryCircularNesting": "Circular Nesting",
+  "exportCategoryExcessiveDepth": "Excessive Depth",
+  "exportCategoryDuplicateMembers": "Duplicate Members",
+  "exportDetailNoMembers": "No members",
+  "exportDetailOneMember": "1 member",
+  "exportDetailLastModified": "Last modified: {{date}}",
+  "exportDetailGroupsInCycle": "{{count}} groups in cycle",
+  "exportDetailDepthLevels": "Depth: {{depth}} levels",
+  "exportDetailIdenticalMembers": "{{count}} groups with identical members"
 }

@@ -32,17 +32,17 @@ function parseDnOu(dn: string): string {
   return ou || "-";
 }
 
-function formatAccountStatus(entry: DirectoryEntry): string {
+function formatAccountStatus(entry: DirectoryEntry, t: (key: string) => string): string {
   const uac = parseInt(entry.attributes?.userAccountControl?.[0] ?? "0", 10);
   const disabled = (uac & 0x0002) !== 0;
   const locked =
     entry.attributes?.lockoutTime?.[0] !== undefined &&
     entry.attributes.lockoutTime[0] !== "" &&
     entry.attributes.lockoutTime[0] !== "0";
-  if (disabled && locked) return "Disabled, Locked";
-  if (disabled) return "Disabled";
-  if (locked) return "Locked";
-  return "Active";
+  if (disabled && locked) return t("disabledLocked");
+  if (disabled) return t("accountDisabled");
+  if (locked) return t("accountLocked");
+  return t("accountActive");
 }
 
 const CATEGORY_STYLES: Record<
@@ -199,7 +199,7 @@ function UserSearchField({
             <div>
               {t("lastLogonLabel")} {selectedUser.attributes?.lastLogon?.[0] ?? "-"}
             </div>
-            <div>{t("statusLabel")} {formatAccountStatus(selectedUser)}</div>
+            <div>{t("statusLabel")} {formatAccountStatus(selectedUser, t)}</div>
             <div>{t("groupsLabel")} {selectedUser.attributes?.memberOf?.length ?? 0}</div>
           </div>
         </div>
@@ -460,19 +460,19 @@ export function UserComparison() {
               <span className="inline-block h-3 w-3 rounded-full bg-[var(--color-error)]" />
               <span className="text-body text-[var(--color-text-primary)]">
                 <strong>{comparisonResult.onlyAGroups.length}</strong>{" "}
-                {userAName} only
+                {t("userOnly", { name: userAName })}
               </span>
             </div>
             <div className="flex items-center gap-2">
               <span className="inline-block h-3 w-3 rounded-full bg-[var(--color-primary)]" />
               <span className="text-body text-[var(--color-text-primary)]">
                 <strong>{comparisonResult.onlyBGroups.length}</strong>{" "}
-                {userBName} only
+                {t("userOnly", { name: userBName })}
               </span>
             </div>
             <div className="ml-auto text-caption text-[var(--color-text-secondary)]">
-              {userAName}: {comparisonResult.totalA} groups | {userBName}:{" "}
-              {comparisonResult.totalB} groups
+              {userAName}: {t("groupCount", { count: comparisonResult.totalA })} | {userBName}:{" "}
+              {t("groupCount", { count: comparisonResult.totalB })}
             </div>
           </div>
 
@@ -520,7 +520,7 @@ export function UserComparison() {
                 { key: "dn", header: t("common:distinguishedName") },
               ]}
               data={filteredGroups}
-              rowMapper={(g) => [g.name, g.category === "shared" ? "Shared" : g.category === "onlyA" ? `Only ${userAName}` : `Only ${userBName}`, g.dn]}
+              rowMapper={(g) => [g.name, g.category === "shared" ? t("shared") : g.category === "onlyA" ? t("onlyA", { name: userAName }) : t("onlyB", { name: userBName }), g.dn]}
               title={`User Comparison - ${userAName} vs ${userBName}`}
               filenameBase={`comparison_${userA?.samAccountName ?? "a"}_${userB?.samAccountName ?? "b"}`}
             />

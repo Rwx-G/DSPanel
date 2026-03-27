@@ -30,5 +30,8 @@
   "noPrivilegedFound": "No Privileged Accounts Found",
   "noMembersInGroups": "No members were found in the default privileged groups.",
   "passwordAge": "Password Age",
-  "exportTitle": "Privileged Accounts Report"
+  "exportTitle": "Privileged Accounts Report",
+  "disclaimer.checks": "Members of well-known admin groups (by RID), 12 account-level checks (Kerberoastable, AS-REP, reversible encryption, DES, delegation, SIDHistory, Protected Users, etc.), domain findings (KRBTGT age, LAPS, PSO, functional level, RBCD).",
+  "disclaimer.limitations": "Only checks default privileged groups and LDAP-accessible attributes. Does not parse ACLs (nTSecurityDescriptor), GPO-applied restrictions, or local admin memberships.",
+  "disclaimer.tools": "PingCastle, Purple Knight (Semperis), or BloodHound for a comprehensive privileged account audit."
 }

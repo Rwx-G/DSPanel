@@ -8,7 +8,7 @@
   <img src="https://img.shields.io/badge/Rust-2021-orange.svg" alt="Rust">
   <img src="https://img.shields.io/badge/Tauri-v2-blue.svg" alt="Tauri">
   <img src="https://img.shields.io/badge/Platform-Windows%20|%20macOS%20|%20Linux-0078D6.svg" alt="Platform">
-  <img src="https://img.shields.io/badge/Status-v0.12.0-brightgreen.svg" alt="Status">
+  <img src="https://img.shields.io/badge/Status-v1.0.0-brightgreen.svg" alt="Status">
   <img src="https://img.shields.io/badge/Coverage-87%25_Rust_|_88%25_TS-brightgreen.svg" alt="Coverage">
 </p>
 
@@ -137,7 +137,7 @@ pnpm tauri dev
 #### Unit tests
 
 ```bash
-# Frontend (1881 tests, 88% coverage)
+# Frontend (2089 tests, 88% coverage)
 pnpm test
 
 # Rust (1520 tests, 87% coverage)

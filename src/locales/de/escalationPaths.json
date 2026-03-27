@@ -13,7 +13,7 @@
   "noPaths": "Keine Eskalationspfade erkannt.",
   "computedAt": "Berechnet am",
   "hop_one": "{{count}} Sprung",
-  "hop_other": "{{count}} Spruenge",
+  "hop_other": "{{count}} Sprünge",
   "risk": "Risiko",
   "criticalBadge": "KRITISCH",
   "users": "Benutzer",
@@ -25,9 +25,15 @@
   "membership": "Mitgliedschaft",
   "ownership": "Besitz",
   "delegation": "Delegierung",
-  "unconstrainedDeleg": "Uneingeschraenkte Delegierung",
+  "unconstrainedDeleg": "Uneingeschränkte Delegierung",
   "rbcd": "RBCD",
   "sidHistoryEdge": "SIDHistory",
   "gpLink": "GPLink",
-  "certEsc": "CertESC"
+  "certEsc": "CertESC",
+  "riskCritical": "Kritisch",
+  "riskHigh": "Hoch",
+  "riskMedium": "Mittel",
+  "disclaimer.checks": "8 Kantentypen über LDAP: Gruppenmitgliedschaft (rekursiv), managedBy-Besitz, eingeschränkte/uneingeschränkte Delegierung, RBCD, SIDHistory, GPO-Links, AD CS ESC1-Vorlagen. Gewichtete Dijkstra-Pfadsuche.",
+  "disclaimer.limitations": "Parst keine binären ACLs (WriteDACL, GenericAll, ForceChangePassword, WriteOwner), sammelt keine lokalen Admin-Sitzungen, keine domänen-/forstübergreifende Vertrauenspfadanalyse.",
+  "disclaimer.tools": "BloodHound CE (ca. 35 Kantentypen mit vollständiger ACL-Analyse) oder Semperis Forest Druid für umfassende Angriffspfadanalyse."
 }

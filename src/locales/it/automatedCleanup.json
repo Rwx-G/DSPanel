@@ -19,7 +19,7 @@
   "dryRunFailed": "Esecuzione di prova fallita",
   "executing": "Esecuzione...",
   "confirmDelete": "Conferma ELIMINAZIONE",
-  "deleteWarning": "Questa operazione ELIMINERA definitivamente gli account selezionati. Fare clic su Esegui di nuovo per confermare.",
+  "deleteWarning": "Questa operazione ELIMINERÀ definitivamente gli account selezionati. Fare clic su Esegui di nuovo per confermare.",
   "samAccount": "Account SAM",
   "currentState": "Stato attuale",
   "proposedAction": "Azione proposta",
@@ -34,5 +34,10 @@
   "actionMove": "Sposta in OU",
   "actionDelete": "Elimina",
   "excl": "Escl",
-  "exclOus": "OU escl"
+  "exclOus": "OU escl",
+  "disclaimer": {
+    "checks": "3 tipi di condizioni (inattivo da >X giorni, mai connesso + creato da >Y giorni, disabilitato da >Z giorni), 3 azioni (disabilitare, spostare in OU, eliminare). Esecuzione di prova obbligatoria con corrispondenze selezionabili, doppia conferma per le eliminazioni. Esclusione degli account protetti (Administrator, krbtgt, Guest). Esclusione degli account di servizio per pattern SAM (glob) e OU. Tutte le azioni vengono registrate nel log di audit.",
+    "limitations": "Solo esecuzione su richiesta - nessuna esecuzione pianificata. Non rileva account condivisi/generici, SID orfani o account computer obsoleti. Nessun flusso di approvazione (decisione di un singolo amministratore). Non puo valutare le dipendenze degli account di servizio prima della disabilitazione.",
+    "tools": "ManageEngine ADManager Plus (policy di ciclo di vita automatizzate, pulizia pianificata, flussi di approvazione), Quest Active Roles (deprovisioning basato su policy con integrazione HR), o BeyondTrust Privileged Access Management per la gestione del ciclo di vita degli account aziendali."
+  }
 }

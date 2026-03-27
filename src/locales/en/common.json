@@ -25,6 +25,7 @@
   "never": "Never",
   "enabled": "Enabled",
   "disabled": "Disabled",
+  "locked": "Locked",
   "status": "Status",
   "name": "Name",
   "type": "Type",
@@ -112,5 +113,6 @@
   "entry_other": "{{count}} entries",
   "noData": "No data available",
   "result_one": "{{count}} result",
-  "result_other": "{{count}} results"
+  "result_other": "{{count}} results",
+  "present": "Present"
 }

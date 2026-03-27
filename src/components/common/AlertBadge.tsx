@@ -1,6 +1,7 @@
 import { useState, useId, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { CheckCircle, AlertTriangle, AlertCircle, Info } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import type { AlertSeverity, SecurityAlert } from "@/types/security";
 
 const SEVERITY_STYLES: Record<AlertSeverity, string> = {
@@ -40,6 +41,7 @@ function highestSeverity(alerts: SecurityAlert[]): AlertSeverity {
 }
 
 export function AlertBadge({ alerts, compact = false }: AlertBadgeProps) {
+  const { t } = useTranslation("components");
   const [showTooltip, setShowTooltip] = useState(false);
   const tooltipId = useId();
   const badgeRef = useRef<HTMLDivElement>(null);
@@ -93,8 +95,8 @@ export function AlertBadge({ alerts, compact = false }: AlertBadgeProps) {
       role="status"
       aria-label={
         count === 0
-          ? "No alerts"
-          : `${count} alert${count > 1 ? "s" : ""}, highest: ${level}`
+          ? t("alertBadge.noAlerts")
+          : t("alertBadge.summary", { count, level })
       }
       aria-describedby={showTooltip ? tooltipId : undefined}
       data-testid="alert-badge"
@@ -106,8 +108,8 @@ export function AlertBadge({ alerts, compact = false }: AlertBadgeProps) {
         <Icon size={12} />
         {!compact &&
           (count === 0
-            ? "OK"
-            : `${count} alert${count > 1 ? "s" : ""}`)}
+            ? t("alertBadge.ok")
+            : t("alertBadge.alert", { count }))}
       </span>
 
       {showTooltip &&
@@ -126,7 +128,7 @@ export function AlertBadge({ alerts, compact = false }: AlertBadgeProps) {
                   size={12}
                   className="shrink-0 text-[var(--color-success)]"
                 />
-                No alerts detected
+                {t("alertBadge.noAlerts")}
               </div>
             ) : (
               <ul className="space-y-1.5">

@@ -3,8 +3,8 @@
   "scan": "Scannen",
   "scanning": "Ereignisprotokolle werden gescannt...",
   "detectionFailed": "Erkennung fehlgeschlagen",
-  "eventLogWarning": "Sicherheitsereignisprotokoll kann nicht gelesen werden - Ergebnisse sind moglicherweise unvollstandig. Stellen Sie sicher, dass DSPanel mit der Mitgliedschaft in Ereignisprotokollleser auf dem Ziel-Domain Controller ausgefuhrt wird.",
-  "check": "Pruefung",
+  "eventLogWarning": "Sicherheitsereignisprotokoll auf dem Ziel-DC kann nicht gelesen werden. Stellen Sie sicher: (1) Das Konto ist Mitglied der Gruppe Ereignisprotokollleser (Event Log Readers) auf dem DC, und (2) die Firewallregel 'Remoteereignisprotokollverwaltung' (Remote Event Log Management) ist auf dem DC aktiviert.",
+  "check": "Prüfung",
   "eventIds": "Ereignis-IDs",
   "mitre": "MITRE",
   "alertDetails": "Alarmdetails",
@@ -27,7 +27,7 @@
   "dcShadow": "DCShadow",
   "abnormalKerberos": "Anomales Kerberos",
   "passwordSpray": "Passwort-Spray",
-  "privGroupChange": "Privilegierte Gruppenaenderung",
+  "privGroupChange": "Privilegierte Gruppenänderung",
   "kerberoasting": "Kerberoasting",
   "asRepRoasting": "AS-REP Roasting",
   "bruteForce": "Brute Force",
@@ -35,5 +35,9 @@
   "shadowCredentials": "Shadow Credentials",
   "rbcdAbuse": "RBCD-Missbrauch",
   "adminSdHolderTamper": "AdminSDHolder-Manipulation",
-  "suspiciousAccount": "Verdaechtiges Konto"
+  "suspiciousAccount": "Verdächtiges Konto",
+  "timeWindow": "Zeitfenster",
+  "disclaimer.checks": "14 Angriffstypen über Windows-Sicherheitsereignisprotokoll (XML-Analyse): Golden Ticket, DCSync, DCShadow, Kerberoasting, AS-REP Roasting, Brute Force, Pass-the-Hash, Passwort-Spray, Shadow Credentials, RBCD-Missbrauch, AdminSDHolder-Manipulation und mehr. MITRE ATT&CK zugeordnet.",
+  "disclaimer.limitations": "Nur On-Demand-Scan (nicht Echtzeit). Liest lokales DC-Ereignisprotokoll - fragt keine Remote-DCs ab. Erfordert Windows. Erkennt kein NTLM-Relay, Skeleton Key, LSASS-Dumps oder laterale Bewegung.",
+  "disclaimer.tools": "Microsoft Defender for Identity (Echtzeit, ca. 30 Angriffstypen), CrowdStrike Falcon Identity oder Tenable Identity Exposure für kontinuierliche Überwachung."
 }

@@ -3,7 +3,7 @@
   "scan": "Scansiona",
   "scanning": "Scansione registri eventi...",
   "detectionFailed": "Rilevamento fallito",
-  "eventLogWarning": "Impossibile leggere il registro eventi di sicurezza - i risultati potrebbero essere incompleti. Assicurarsi che DSPanel venga eseguito con appartenenza a Event Log Readers sul DC di destinazione.",
+  "eventLogWarning": "Impossibile leggere il registro eventi di sicurezza sul DC di destinazione. Verificare: (1) l'account è membro del gruppo Lettori registri eventi (Event Log Readers) sul DC, e (2) la regola firewall 'Gestione remota registro eventi' (Remote Event Log Management) è abilitata sul DC.",
   "check": "Controllo",
   "eventIds": "ID eventi",
   "mitre": "MITRE",
@@ -35,5 +35,9 @@
   "shadowCredentials": "Shadow Credentials",
   "rbcdAbuse": "Abuso RBCD",
   "adminSdHolderTamper": "Manomissione AdminSDHolder",
-  "suspiciousAccount": "Account sospetto"
+  "suspiciousAccount": "Account sospetto",
+  "timeWindow": "Finestra temporale",
+  "disclaimer.checks": "14 tipi di attacco tramite registro eventi di sicurezza Windows (analisi XML): Golden Ticket, DCSync, DCShadow, Kerberoasting, AS-REP Roasting, Forza bruta, Pass-the-Hash, Password Spray, Shadow Credentials, Abuso RBCD, Manomissione AdminSDHolder e altro. Mappato MITRE ATT&CK.",
+  "disclaimer.limitations": "Solo scansione su richiesta (non in tempo reale). Legge il registro eventi locale del DC - non interroga DC remoti. Richiede Windows. Non rileva relay NTLM, Skeleton Key, dump LSASS né movimento laterale.",
+  "disclaimer.tools": "Microsoft Defender for Identity (tempo reale, circa 30 tipi di attacco), CrowdStrike Falcon Identity o Tenable Identity Exposure per il monitoraggio continuo."
 }

@@ -2,7 +2,7 @@
   "passwordReset": {
     "title": "Reimposta password",
     "successTitle": "Password reimpostata con successo",
-    "successMessage": "La password di {{name}} e stata reimpostata.",
+    "successMessage": "La password di {{name}} è stata reimpostata.",
     "mustChangeAtLogon": "L'utente deve cambiare la password al prossimo accesso.",
     "autoGenerate": "Generazione automatica",
     "manualEntry": "Inserimento manuale",
@@ -12,7 +12,7 @@
     "lowercaseLetter": "Lettera minuscola",
     "digit": "Cifra",
     "specialCharacter": "Carattere speciale",
-    "meetsComplexity": "Soddisfa i requisiti di complessita (3+ categorie)",
+    "meetsComplexity": "Soddisfa i requisiti di complessità (3+ categorie)",
     "needsCategories": "Sono necessarie 3+ categorie di caratteri",
     "generatePassword": "Genera password",
     "breachUnavailable": "Controllo violazioni non disponibile",
@@ -24,7 +24,7 @@
   "moveObject": {
     "titleBulk": "Sposta {{count}} oggetti",
     "titleSingle": "Sposta {{name}}",
-    "selectTargetOu": "Selezionare l'unita organizzativa di destinazione:",
+    "selectTargetOu": "Selezionare l'unità organizzativa di destinazione:",
     "objectsWillBeMoved": "I seguenti oggetti verranno spostati:",
     "from": "Da: {{path}}",
     "to": "A: {{path}}",
@@ -40,7 +40,7 @@
   },
   "mfaSetup": {
     "title": "Configura MFA",
-    "description": "Aggiungere un ulteriore livello di sicurezza abilitando l'autenticazione multi-fattore basata su TOTP. E necessaria un'app di autenticazione (Google Authenticator, Authy, ecc.).",
+    "description": "Aggiungere un ulteriore livello di sicurezza abilitando l'autenticazione multi-fattore basata su TOTP. È necessaria un'app di autenticazione (Google Authenticator, Authy, ecc.).",
     "beginSetup": "Avvia configurazione",
     "step1Title": "Passaggio 1: Scansiona il codice QR",
     "step1Description": "Scansionare questo codice QR con l'app di autenticazione, oppure inserire il segreto manualmente:",
@@ -48,7 +48,7 @@
     "enterCodeDescription": "Inserire il codice a 6 cifre dall'app di autenticazione per la verifica:",
     "invalidCodeRetry": "Codice non valido. Verificare l'app di autenticazione e riprovare.",
     "step2Title": "Passaggio 2: Salva i codici di backup",
-    "step2Description": "MFA configurato con successo! Salvare questi codici di backup in un luogo sicuro. Ogni codice puo essere utilizzato una sola volta."
+    "step2Description": "MFA configurato con successo! Salvare questi codici di backup in un luogo sicuro. Ogni codice può essere utilizzato una sola volta."
   },
   "confirmation": {
     "details": "Dettagli"

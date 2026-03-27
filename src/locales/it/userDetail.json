@@ -9,7 +9,7 @@
   "passwordNeverExpires": "Password senza scadenza",
   "deleteUser": "Elimina utente",
   "deleteConfirmation": "Confermare l'eliminazione di {{name}}?",
-  "deleteNote": "Questa azione non puo essere annullata. L'oggetto verra spostato nel Cestino AD se abilitato.",
+  "deleteNote": "Questa azione non può essere annullata. L'oggetto verrà spostato nel Cestino AD se abilitato.",
   "deleteSuccess": "Utente eliminato con successo",
   "confirmAttributeChanges": "Conferma modifiche attributi",
   "applyChangesTo": "Applicare {{count}} modifica/e a {{name}}",

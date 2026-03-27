@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-03-27
+
 ### Security
 
 - Add DomainAdmin permission check on `purge_audit_entries` command
@@ -19,16 +21,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- i18n infrastructure with i18next and react-i18next (namespace-based)
-- English translation files for all 32 pages, 64 components, and 9 dialogs (36 namespace files)
-- Language selector in Settings > Appearance (English, French, German, Italian, Spanish)
+- i18n infrastructure with i18next and react-i18next (namespace-based, 37 namespaces)
+- Complete translations for 5 languages: English, French, German, Italian, Spanish (1709 keys each)
+- Language selector in Settings > Appearance with runtime hot-switching
 - Locale-aware date, number, and percentage formatting via `Intl` APIs
-- Runtime language switching with persistence to AppSettings
-- Complete translations for French, German, Italian, and Spanish (37 namespace files each)
-- Translation completeness tests (168 tests: key parity, empty values, interpolation, pluralization, dates)
+- Language persistence via AppSettings + localStorage cache for instant reload
+- Translated UI elements: health badges, alert badges, status badges, DC health messages, risk score factors/explanations/recommendations, compliance check titles, security disclaimers, tab titles
+- Bidirectional translation completeness tests (172 tests: key parity, orphan detection, empty values, interpolation, pluralization, dates)
 - Developer documentation for localization (`docs/architecture/localization.md`)
 - Risk score weight configuration UI in Settings > Security
 - Attack detection threshold and exclusion list configuration in Settings > Security
+- Attack detection: remote DC event log access via `-ComputerName` with simple bind credentials
+- DC FQDN resolution from rootDSE `dnsHostName` attribute
 - Click-to-detail expandable panels on topology DC nodes
 - Auto-start service filter toggle in workstation monitoring
 - DC health cards grouped by AD site in Infrastructure Health
@@ -38,12 +42,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - CI now generates coverage reports (Rust + Frontend) with GitHub Actions Summary and LCOV artifacts
-- Test suite expanded from 2922 to 3446 tests (+524): 1881 frontend, 1520 Rust unit, 45 AD integration
-- Coverage: 87% Rust lines, 88% frontend lines (up from 76% and 82%)
-- Integration tests expanded to 45 scenarios against real AD with 2-DC replication (validated before release, not in CI)
+- Test suite expanded to 3654 tests: 2089 frontend, 1520 Rust unit, 45 AD integration
+- Coverage: 87% Rust lines, 88% frontend lines
+- Integration tests expanded to 45 scenarios against real AD with 2-DC replication
+- PropertyGrid label column widened to `min-w-[220px]` for longer translated labels
+- UserLookup sidebar widened to `w-80` (320px) for translated badge text
+- GPO Viewer inputs resized to match app-wide compact style (`h-[28px]`, `text-caption`)
+- Recycle bin deletion date formatted as `YYYY/mm/dd HH:MM:SS` (was raw LDAP generalized time)
+- Recycle bin restore audit entry cleaned of `\0ADEL:<guid>` suffix
 
 ### Fixed
 
+- Fix language not loading at startup (was calling non-existent `get_settings` Tauri command, now uses `get_app_settings`)
+- Fix audit operator showing Windows username instead of authenticated AD identity in simple bind mode
+- Fix cleanup unit tests writing to production `audit.db` (9 tests used `AuditService::new()` instead of `new_in_memory()`)
+- Fix sidebar `bulkOperations` key mismatch causing raw key display in menu
+- Fix `openTab` labels hardcoded in English across 6 pages (UserLookup, UserDetail, GroupDetail, GroupHygiene, NtfsAnalyzer, PresetManagement)
 - Add missing `validate_search_input` to `search_computers_inner`
 - Replace `.expect()` panics in `audit.rs` SQLite operations with graceful error logging
 - Re-detect AD permissions before each critical write operation (password reset, account enable/disable, flag changes)

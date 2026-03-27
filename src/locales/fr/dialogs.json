@@ -1,57 +1,57 @@
 {
   "passwordReset": {
-    "title": "Reinitialiser le mot de passe",
-    "successTitle": "Mot de passe reinitialise avec succes",
-    "successMessage": "Le mot de passe de {{name}} a ete reinitialise.",
-    "mustChangeAtLogon": "L'utilisateur doit changer le mot de passe a la prochaine connexion.",
-    "autoGenerate": "Generation automatique",
+    "title": "Réinitialiser le mot de passe",
+    "successTitle": "Mot de passe réinitialisé avec succès",
+    "successMessage": "Le mot de passe de {{name}} a été réinitialisé.",
+    "mustChangeAtLogon": "L'utilisateur doit changer le mot de passe à la prochaine connexion.",
+    "autoGenerate": "Génération automatique",
     "manualEntry": "Saisie manuelle",
     "enterNewPassword": "Entrez le nouveau mot de passe",
-    "atLeast8Chars": "Au moins 8 caracteres",
+    "atLeast8Chars": "Au moins 8 caractères",
     "uppercaseLetter": "Lettre majuscule",
     "lowercaseLetter": "Lettre minuscule",
     "digit": "Chiffre",
-    "specialCharacter": "Caractere special",
-    "meetsComplexity": "Repond aux exigences de complexite (3+ categories)",
-    "needsCategories": "Necessite 3+ categories de caracteres",
-    "generatePassword": "Generer le mot de passe",
-    "breachUnavailable": "Verification des fuites indisponible",
-    "foundInBreaches": "Trouve dans {{count}} fuites - envisagez de regenerer",
-    "notInBreaches": "Non trouve dans les fuites connues",
-    "mustChangeCheckbox": "Doit changer le mot de passe a la prochaine connexion",
-    "resetButton": "Reinitialiser le mot de passe"
+    "specialCharacter": "Caractère spécial",
+    "meetsComplexity": "Répond aux exigences de complexité (3+ catégories)",
+    "needsCategories": "Nécessite 3+ catégories de caractères",
+    "generatePassword": "Générer le mot de passe",
+    "breachUnavailable": "Vérification des fuites indisponible",
+    "foundInBreaches": "Trouvé dans {{count}} fuites - envisagez de régénérer",
+    "notInBreaches": "Non trouvé dans les fuites connues",
+    "mustChangeCheckbox": "Doit changer le mot de passe à la prochaine connexion",
+    "resetButton": "Réinitialiser le mot de passe"
   },
   "moveObject": {
-    "titleBulk": "Deplacer {{count}} objets",
-    "titleSingle": "Deplacer {{name}}",
-    "selectTargetOu": "Selectionnez l'OU cible :",
-    "objectsWillBeMoved": "Le(s) objet(s) suivant(s) seront deplaces :",
+    "titleBulk": "Déplacer {{count}} objets",
+    "titleSingle": "Déplacer {{name}}",
+    "selectTargetOu": "Sélectionnez l'OU cible :",
+    "objectsWillBeMoved": "Le(s) objet(s) suivant(s) seront déplacés :",
     "from": "De : {{path}}",
     "to": "Vers : {{path}}",
-    "move": "Deplacer",
-    "moving": "Deplacement des objets en cours..."
+    "move": "Déplacer",
+    "moving": "Déplacement des objets en cours..."
   },
   "mfa": {
-    "verificationRequired": "Verification MFA requise",
-    "enterCode": "Entrez le code a 6 chiffres de votre application d'authentification, ou un code de secours.",
-    "invalidCode": "Code invalide. Veuillez reessayer.",
-    "verify": "Verifier",
-    "verifying": "Verification..."
+    "verificationRequired": "Vérification MFA requise",
+    "enterCode": "Entrez le code à 6 chiffres de votre application d'authentification, ou un code de secours.",
+    "invalidCode": "Code invalide. Veuillez réessayer.",
+    "verify": "Vérifier",
+    "verifying": "Vérification..."
   },
   "mfaSetup": {
     "title": "Configurer MFA",
-    "description": "Ajoutez une couche de securite supplementaire en activant l'authentification multi-facteurs basee sur TOTP. Vous aurez besoin d'une application d'authentification (Google Authenticator, Authy, etc.).",
+    "description": "Ajoutez une couche de sécurité supplémentaire en activant l'authentification multi-facteurs basée sur TOTP. Vous aurez besoin d'une application d'authentification (Google Authenticator, Authy, etc.).",
     "beginSetup": "Commencer la configuration",
-    "step1Title": "Etape 1 : Scanner le QR Code",
+    "step1Title": "Étape 1 : Scanner le QR Code",
     "step1Description": "Scannez ce QR code avec votre application d'authentification, ou entrez le secret manuellement :",
     "qrAlt": "QR Code MFA",
-    "enterCodeDescription": "Entrez le code a 6 chiffres de votre application d'authentification pour verifier :",
-    "invalidCodeRetry": "Code invalide. Veuillez verifier votre application d'authentification et reessayer.",
-    "step2Title": "Etape 2 : Enregistrer les codes de secours",
-    "step2Description": "MFA a ete configure avec succes ! Enregistrez ces codes de secours dans un endroit sur. Chaque code ne peut etre utilise qu'une seule fois."
+    "enterCodeDescription": "Entrez le code à 6 chiffres de votre application d'authentification pour vérifier :",
+    "invalidCodeRetry": "Code invalide. Veuillez vérifier votre application d'authentification et réessayer.",
+    "step2Title": "Étape 2 : Enregistrer les codes de secours",
+    "step2Description": "MFA a été configuré avec succès ! Enregistrez ces codes de secours dans un endroit sûr. Chaque code ne peut être utilisé qu'une seule fois."
   },
   "confirmation": {
-    "details": "Details"
+    "details": "Détails"
   },
   "dryRunPreview": {
     "title": "Modifications en attente ({{count}})"
@@ -61,17 +61,17 @@
     "memberCount_one": "({{count}} membre)",
     "memberCount_other": "({{count}} membres)",
     "loadingMembers": "Chargement des membres...",
-    "failedToLoad": "Echec du chargement des membres",
+    "failedToLoad": "Échec du chargement des membres",
     "noMembers": "Aucun membre",
     "noMembersDescription": "Ce groupe n'a aucun membre.",
     "accountName": "Nom du compte",
     "close": "Fermer"
   },
   "memberChangePreview": {
-    "toAdd_one": "{{count}} membre a ajouter",
-    "toAdd_other": "{{count}} membres a ajouter",
-    "toRemove_one": "{{count}} membre a retirer",
-    "toRemove_other": "{{count}} membres a retirer",
+    "toAdd_one": "{{count}} membre à ajouter",
+    "toAdd_other": "{{count}} membres à ajouter",
+    "toRemove_one": "{{count}} membre à retirer",
+    "toRemove_other": "{{count}} membres à retirer",
     "title": "Modifications des membres - {{name}}",
     "applying": "Application..."
   },

@@ -4,17 +4,37 @@
   "reScan": "Erneut scannen",
   "scanningLabel": "Wird gescannt...",
   "emptyTitle": "Compliance-Berichte",
-  "emptyDescription": "Fuehren Sie einen Compliance-Scan durch, um Ihr Active Directory anhand von 9 Frameworks zu bewerten: DSGVO, HIPAA, SOX, PCI-DSS v4.0, ISO 27001, NIST 800-53, CIS v8, NIS2 und ANSSI.",
+  "emptyDescription": "Führen Sie einen Compliance-Scan durch, um Ihr Active Directory anhand von 9 Frameworks zu bewerten: DSGVO, HIPAA, SOX, PCI-DSS v4.0, ISO 27001, NIST 800-53, CIS v8, NIS2 und ANSSI.",
   "globalScore": "Globaler Compliance-Wert",
   "accountsScanned": "Konten gescannt",
   "findingsLabel": "Befunde",
-  "checks": "Pruefungen",
+  "checks": "Prüfungen",
   "checkClear": "Keine Befunde",
-  "check": "Pruefung",
+  "check": "Prüfung",
   "severity": "Schweregrad",
   "findings": "Befunde",
   "description": "Beschreibung",
   "remediation": "Behebung",
   "report": "Bericht",
-  "exportTitle": "Compliance-Scan - Alle Pruefungen"
+  "exportTitle": "Compliance-Scan - Alle Prüfungen",
+  "scanFailed": "Scan fehlgeschlagen",
+  "checkTitles": {
+    "privileged_accounts": "Privilegierte Konten",
+    "inactive_accounts": "Inaktive Konten (>90 Tage)",
+    "password_not_required": "Passwort nicht erforderlich (PASSWD_NOTREQD)",
+    "reversible_encryption": "Reversible Passwortverschlüsselung",
+    "password_expired": "Veraltete Passwörter (>90 Tage)",
+    "password_never_expires": "Passwort läuft nie ab",
+    "disabled_accounts": "Lebenszyklus deaktivierter Konten"
+  },
+  "severityLabels": {
+    "Critical": "Kritisch",
+    "High": "Hoch",
+    "Medium": "Mittel",
+    "Low": "Niedrig"
+  },
+  "andMore": "... und {{count}} weitere (siehe exportierten Bericht)",
+  "disclaimer.checks": "7 Prüfungen über 9 Frameworks (DSGVO, HIPAA, SOX, PCI-DSS v4.0, ISO 27001, NIST 800-53, CIS v8, NIS2, ANSSI). Prüfungen: privilegierte Konten (adminCount), inaktive Konten (>90 Tage), PASSWD_NOTREQD-Flag, umkehrbare Verschlüsselung, veraltete Passwörter (>90 Tage), Passwort läuft nie ab, deaktivierte Konten. Compliance-Bewertung 0-100 mit Aufschlüsselung pro Framework. HTML-Berichtsexport pro Framework mit Kontrollreferenzen und PowerShell-Behebung.",
+  "disclaimer.limitations": "Nur Momentaufnahme - kein Änderungsverlauf oder kontinuierliche Überwachung. Bewertet keine GPO-Einstellungen, Dateiserverberechtigungen, Überwachungsprotokollkonfiguration oder Netzwerksegmentierung. Keine Erkennung gemeinsam genutzter/generischer Konten, keine Analyse der Aufgabentrennung, keine Workflows zur Zugriffsrezertifizierung. Kann Domänen-Passwortrichtlinie nicht lesen (Komplexität, Sperrschwellenwerte).",
+  "disclaimer.tools": "Netwrix Auditor (Änderungsaudit, 30+ Kontrollen/Framework), ManageEngine ADAudit Plus (200+ Berichte, Echtzeit-Alarme), Microsoft Compliance Manager (gemeinsame Kontrollen, Verbesserungsmaßnahmen), Qualys Policy Compliance (CIS-Benchmarks) oder SolarWinds ARM (Visualisierung der Zugriffsrechte) für umfassendes Compliance-Management."
 }

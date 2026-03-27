@@ -526,12 +526,16 @@ pub async fn get_schema_attributes(state: State<'_, AppState>) -> Result<Vec<Str
 /// Returns the authenticated LDAP identity (resolved via WhoAmI or bind DN).
 ///
 /// This may differ from `get_current_username` when using "Run as" or simple bind.
+/// Also ensures the audit service operator is kept in sync.
 #[tauri::command]
 pub fn get_authenticated_identity(state: State<'_, AppState>) -> String {
-    state
+    let name = state
         .permission_service
         .authenticated_user()
-        .unwrap_or_else(super::get_current_username)
+        .unwrap_or_else(super::get_current_username);
+    // Keep audit operator in sync with the resolved identity
+    state.audit_service.set_operator(name.clone());
+    name
 }
 
 /// Searches for contacts matching a query string.

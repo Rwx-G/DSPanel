@@ -9,7 +9,7 @@
   "noUsersFound": "No se encontraron usuarios",
   "failedToLoad": "No se pudieron cargar los usuarios",
   "noUsersWithHealth": "No hay usuarios con estado de salud {{status}}.",
-  "noUsersMatch": "Ningun usuario coincide con \"{{query}}\"",
+  "noUsersMatch": "Ningún usuario coincide con \"{{query}}\"",
   "noUsersAvailable": "No hay usuarios disponibles.",
   "selectUser": "Seleccione un usuario para ver los detalles",
   "startOffboarding": "Iniciar baja para {{name}}",

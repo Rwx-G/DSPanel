@@ -200,7 +200,7 @@ export function PropertyGrid({ groups, onEdit }: PropertyGridProps) {
                       data-testid={`property-item-${item.label}`}
                       data-severity={item.severity ?? undefined}
                     >
-                      <span className="min-w-[140px] shrink-0 text-caption text-[var(--color-text-secondary)]">
+                      <span className="min-w-[220px] shrink-0 text-caption text-[var(--color-text-secondary)]">
                         {item.label}
                       </span>
                       {isEditable ? (

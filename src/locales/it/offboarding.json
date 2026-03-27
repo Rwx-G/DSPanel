@@ -7,9 +7,9 @@
   "stepExecute": "Esecuzione",
   "enterSam": "Inserire sAMAccountName",
   "enterSamAccountName": "Inserire sAMAccountName",
-  "whatIsSam": "Cos'e sAMAccountName?",
-  "samWhat": "sAMAccountName e il login dell'utente (es. mrossi).",
-  "samWhere": "In Ricerca utenti, selezionare un utente - e visualizzato subito sotto il nome visualizzato con un pulsante di copia.",
+  "whatIsSam": "Cos'è sAMAccountName?",
+  "samWhat": "sAMAccountName è il login dell'utente (es. mrossi).",
+  "samWhere": "In Ricerca utenti, selezionare un utente - è visualizzato subito sotto il nome visualizzato con un pulsante di copia.",
   "samPlaceholder": "mrossi",
   "disableAccount": "Disabilita account",
   "disableAccountDesc": "Imposta il flag ACCOUNTDISABLE in userAccountControl",
@@ -26,9 +26,9 @@
   "disabledOu": "OU disabilitati",
   "disabledOULabel": "OU disabilitati",
   "changesToApply": "Modifiche da applicare a {{name}}",
-  "accountWillBeDisabled": "L'account verra disabilitato",
+  "accountWillBeDisabled": "L'account verrà disabilitato",
   "removeFrom": "Rimuovi da:",
-  "passwordWillBeReset": "La password verra reimpostata con un valore casuale",
+  "passwordWillBeReset": "La password verrà reimpostata con un valore casuale",
   "moveTo": "Sposta in:",
   "actionsCompleted": "{{count}} azioni completate",
   "newOffboarding": "Nuovo offboarding",
@@ -39,5 +39,5 @@
   "executingOffboarding": "Esecuzione offboarding...",
   "copySummary": "Copia riepilogo",
   "accessDeniedDescription": "L'offboarding richiede il permesso AccountOperator o superiore.",
-  "whatIsSamAriaLabel": "Cos'e sAMAccountName?"
+  "whatIsSamAriaLabel": "Cos'è sAMAccountName?"
 }

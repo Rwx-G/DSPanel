@@ -185,7 +185,7 @@ function PathAclSection({
 }
 
 export function NtfsAnalyzer() {
-  const { t } = useTranslation(["ntfsAnalyzer", "common"]);
+  const { t } = useTranslation(["ntfsAnalyzer", "common", "sidebar"]);
   const platform = usePlatform();
   const [uncPath, setUncPath] = useState("");
   const [depth, setDepth] = useState(0);
@@ -229,7 +229,7 @@ export function NtfsAnalyzer() {
           label: t("openInGroupManagement"),
           icon: <FolderOpen size={14} />,
           onClick: () => {
-            openTab("Group Management", "groups", "users-group", {
+            openTab(t("sidebar:groupManagement"), "groups", "users-group", {
               selectedGroupDn: groupDn,
             });
           },

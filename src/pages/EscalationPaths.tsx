@@ -282,9 +282,9 @@ export function EscalationPaths() {
           {t("pageTitle")}
           <SecurityDisclaimer
             coverage="~20%"
-            checks="8 edge types via LDAP: group membership (recursive), managedBy ownership, constrained/unconstrained delegation, RBCD, SIDHistory, GPO links, AD CS ESC1 templates. Weighted Dijkstra path-finding."
-            limitations="Does not parse binary ACLs (WriteDACL, GenericAll, ForceChangePassword, WriteOwner), does not collect local admin sessions, no cross-domain/forest trust path analysis."
-            tools="BloodHound CE (~35 edge types with full ACL parsing) or Semperis Forest Druid for comprehensive attack path analysis."
+            checks={t("disclaimer.checks")}
+            limitations={t("disclaimer.limitations")}
+            tools={t("disclaimer.tools")}
           />
         </h2>
         <div className="flex items-center gap-3">

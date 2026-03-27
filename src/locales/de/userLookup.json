@@ -10,9 +10,9 @@
   "failedToLoad": "Benutzer konnten nicht geladen werden",
   "noUsersWithHealth": "Keine Benutzer mit Gesundheitsstatus {{status}}.",
   "noUsersMatch": "Keine Benutzer entsprechen \"{{query}}\"",
-  "noUsersAvailable": "Keine Benutzer verfuegbar.",
-  "selectUser": "Waehlen Sie einen Benutzer, um Details anzuzeigen",
-  "startOffboarding": "Offboarding fuer {{name}} starten",
+  "noUsersAvailable": "Keine Benutzer verfügbar.",
+  "selectUser": "Wählen Sie einen Benutzer, um Details anzuzeigen",
+  "startOffboarding": "Offboarding für {{name}} starten",
   "cannotCompareWithSelf": "Ein Benutzer kann nicht mit sich selbst verglichen werden",
   "compareWith": "{{name}} mit {{other}} vergleichen"
 }

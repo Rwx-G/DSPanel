@@ -81,7 +81,7 @@ describe("HealthBadge", () => {
     await waitFor(() => {
       expect(screen.getByTestId("health-tooltip")).toBeInTheDocument();
       expect(screen.getByTestId("health-flag-Inactive30Days")).toHaveTextContent(
-        "Inactive30Days",
+        "Inactive 30+ Days",
       );
     });
   });
@@ -195,7 +195,7 @@ describe("HealthBadge", () => {
     render(<HealthBadge healthStatus={makeStatus()} />);
     expect(screen.getByTestId("health-badge")).toHaveAttribute(
       "aria-label",
-      "Health: Healthy",
+      "Healthy",
     );
   });
 
@@ -213,7 +213,7 @@ describe("HealthBadge", () => {
     );
     expect(screen.getByTestId("health-badge")).toHaveAttribute(
       "aria-label",
-      "Health: Warning, 2 issues",
+      "2 issues",
     );
   });
 
@@ -230,7 +230,7 @@ describe("HealthBadge", () => {
     );
     expect(screen.getByTestId("health-badge")).toHaveAttribute(
       "aria-label",
-      "Health: Critical, 1 issue",
+      "1 issue",
     );
   });
 

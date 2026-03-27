@@ -1,7 +1,7 @@
 {
   "dashboard": "Panel de control",
   "activeDirectory": "Active Directory",
-  "currentSession": "Sesion actual",
+  "currentSession": "Sesión actual",
   "authenticatedAs": "Autenticado como",
   "level": "Nivel",
   "domainJoined": "Unido al dominio",
@@ -12,7 +12,7 @@
   "setupMfa": "Configurar MFA",
   "revokeMfa": "Revocar MFA",
   "adGroupMemberships": "Pertenencias a grupos AD",
-  "notConnectedWarning": "No conectado a Active Directory. Las busquedas de directorio no estaran disponibles. Verifique que esta maquina este unida al dominio y tenga acceso de red a un Domain Controller.",
+  "notConnectedWarning": "No conectado a Active Directory. Las búsquedas de directorio no estarán disponibles. Verifique que esta máquina esté unida al dominio y tenga acceso de red a un Domain Controller.",
   "generating": "Generando...",
   "permissions": "Permisos",
   "readOnly": "Solo lectura",

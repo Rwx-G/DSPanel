@@ -1,7 +1,7 @@
 {
-  "pageTitle": "Registro attivita",
+  "pageTitle": "Registro attività",
   "pageDescription": "Registro locale di tutte le operazioni di scrittura eseguite tramite DSPanel su questa workstation",
-  "newestFirst": "Piu recenti prima",
+  "newestFirst": "Più recenti prima",
   "oldestFirst": "Meno recenti prima",
   "from": "Da",
   "to": "A",
@@ -22,5 +22,5 @@
   "details": "Dettagli",
   "fullTargetDn": "DN di destinazione completo",
   "none": "(nessuno)",
-  "exportTitle": "Registro attivita DSPanel"
+  "exportTitle": "Registro attività DSPanel"
 }

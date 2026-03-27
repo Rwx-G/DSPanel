@@ -379,9 +379,9 @@ export function AutomatedCleanup() {
           {t("pageTitle")}
           <SecurityDisclaimer
             coverage="~40%"
-            checks="3 condition types (inactive >X days, never logged on + created >Y days, disabled >Z days), 3 actions (disable, move to OU, delete). Mandatory dry-run with selectable matches, double confirmation for deletes. Protected account exclusion (Administrator, krbtgt, Guest). Service account exclusion by SAM pattern (glob) and OU. All actions audit-logged."
-            limitations="On-demand execution only - no scheduled runs. Does not detect shared/generic accounts, orphaned SIDs, or stale computer accounts. No approval workflow (single admin decision). Cannot evaluate service account dependencies before disabling."
-            tools="ManageEngine ADManager Plus (automated lifecycle policies, scheduled cleanup, approval workflows), Quest Active Roles (policy-based deprovisioning with HR integration), or BeyondTrust Privileged Access Management for enterprise account lifecycle management."
+            checks={t("disclaimer.checks")}
+            limitations={t("disclaimer.limitations")}
+            tools={t("disclaimer.tools")}
           />
         </h2>
         <button

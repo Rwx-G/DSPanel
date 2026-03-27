@@ -116,47 +116,50 @@ function HygieneSection({
   );
 }
 
-const HYGIENE_TOOLTIPS = {
-  empty: {
-    what: "Groups with zero members.",
-    why: "Empty groups clutter AD and may still be referenced in UNC path ACLs or GPOs, causing confusion during audits.",
-    fix: "Delete the group if unused, or add the appropriate members. Check UNC permissions before deleting.",
-    warn: "The group may still be configured on UNC paths or file share ACLs. Verify with NTFS Analyzer before deleting.",
-  },
-  singleMember: {
-    what: "Groups containing only one member.",
-    why: "A single-member group adds unnecessary indirection. The user could be assigned permissions directly.",
-    fix: "Assign the user directly to the resource, then remove the group. Or add more members if the group is meant to grow.",
-    warn: "Some applications require group-based access even for a single user. Verify before removing.",
-  },
-  stale: {
-    what: "Groups not modified in over 180 days.",
-    why: "Stale groups may reflect outdated team structures or completed projects, increasing the attack surface.",
-    fix: "Review with the group owner. Archive or delete if obsolete, update membership if still needed.",
-  },
-  undescribed: {
-    what: "Groups missing the description attribute.",
-    why: "Without a description, administrators cannot determine the group's purpose, making audits and cleanup harder.",
-    fix: "Add a meaningful description in Group Management (e.g. team name, project, access scope).",
-  },
-  circular: {
-    what: "Groups that contain each other in a nesting loop (A contains B contains A).",
-    why: "Circular nesting causes unexpected permission inheritance and can degrade LDAP query performance.",
-    fix: "Break the cycle by removing one of the nesting relationships. Decide which group should be the parent.",
-    warn: "Circular nesting can cause token bloat and authentication delays. Fix as soon as possible.",
-  },
-  deepNesting: {
-    what: "Groups nested deeper than 3 levels.",
-    why: "Deep nesting makes permissions hard to audit and can cause Kerberos token size issues (MaxTokenSize).",
-    fix: "Flatten the group structure by reducing nesting levels. Consider using direct memberships instead.",
-  },
-  duplicate: {
-    what: "Multiple groups with exactly the same set of members.",
-    why: "Duplicate groups create confusion about which group to use and increase maintenance burden.",
-    fix: "Consolidate into a single group. Update all ACLs and GPOs to reference the surviving group, then delete duplicates.",
-    warn: "Different groups may be used on different resources. Verify all references before merging.",
-  },
-};
+function useHygieneTooltips() {
+  const { t } = useTranslation(["groupHygiene"]);
+  return {
+    empty: {
+      what: t("groupHygiene:tooltip.empty.what"),
+      why: t("groupHygiene:tooltip.empty.why"),
+      fix: t("groupHygiene:tooltip.empty.fix"),
+      warn: t("groupHygiene:tooltip.empty.warn"),
+    },
+    singleMember: {
+      what: t("groupHygiene:tooltip.singleMember.what"),
+      why: t("groupHygiene:tooltip.singleMember.why"),
+      fix: t("groupHygiene:tooltip.singleMember.fix"),
+      warn: t("groupHygiene:tooltip.singleMember.warn"),
+    },
+    stale: {
+      what: t("groupHygiene:tooltip.stale.what"),
+      why: t("groupHygiene:tooltip.stale.why"),
+      fix: t("groupHygiene:tooltip.stale.fix"),
+    },
+    undescribed: {
+      what: t("groupHygiene:tooltip.undescribed.what"),
+      why: t("groupHygiene:tooltip.undescribed.why"),
+      fix: t("groupHygiene:tooltip.undescribed.fix"),
+    },
+    circular: {
+      what: t("groupHygiene:tooltip.circular.what"),
+      why: t("groupHygiene:tooltip.circular.why"),
+      fix: t("groupHygiene:tooltip.circular.fix"),
+      warn: t("groupHygiene:tooltip.circular.warn"),
+    },
+    deepNesting: {
+      what: t("groupHygiene:tooltip.deepNesting.what"),
+      why: t("groupHygiene:tooltip.deepNesting.why"),
+      fix: t("groupHygiene:tooltip.deepNesting.fix"),
+    },
+    duplicate: {
+      what: t("groupHygiene:tooltip.duplicate.what"),
+      why: t("groupHygiene:tooltip.duplicate.why"),
+      fix: t("groupHygiene:tooltip.duplicate.fix"),
+      warn: t("groupHygiene:tooltip.duplicate.warn"),
+    },
+  };
+}
 
 interface DeleteProgress {
   current: number;
@@ -172,7 +175,8 @@ interface DeepNestingResult {
 }
 
 export function GroupHygiene() {
-  const { t } = useTranslation(["groupHygiene", "common"]);
+  const { t } = useTranslation(["groupHygiene", "common", "sidebar"]);
+  const HYGIENE_TOOLTIPS = useHygieneTooltips();
   const [scanning, setScanning] = useState(false);
   const [emptyGroups, setEmptyGroups] = useState<DirectoryGroup[]>([]);
   const [cycles, setCycles] = useState<string[][]>([]);
@@ -353,7 +357,7 @@ export function GroupHygiene() {
 
   const handleGoToGroup = useCallback(
     (groupDn: string) => {
-      openTab("Group Management", "groups", "users-group", {
+      openTab(t("sidebar:groupManagement"), "groups", "users-group", {
         selectedGroupDn: groupDn,
       });
     },
@@ -576,13 +580,13 @@ export function GroupHygiene() {
               { key: "detail", header: t("exportColDetail") },
             ]}
             data={[
-              ...emptyGroups.map((g) => ({ category: "Empty", name: g.displayName || g.samAccountName, scope: g.scope, detail: "No members" })),
-              ...singleMemberGroups.map((g) => ({ category: "Single Member", name: g.displayName || g.samAccountName, scope: g.scope, detail: "1 member" })),
-              ...staleGroups.map((g) => ({ category: "Stale", name: g.displayName || g.samAccountName, scope: g.scope, detail: `Last modified: ${formatWhenChanged(g)}` })),
-              ...undescribedGroups.map((g) => ({ category: "No Description", name: g.displayName || g.samAccountName, scope: g.scope, detail: "" })),
-              ...cycles.map((chain) => ({ category: "Circular Nesting", name: chain.join(" -> "), scope: "-", detail: `${chain.length} groups in cycle` })),
-              ...deeplyNested.map((d) => ({ category: "Excessive Depth", name: d.groupName, scope: "-", detail: `Depth: ${d.depth} levels` })),
-              ...duplicateGroups.map((pair) => ({ category: "Duplicate Members", name: pair.map((g) => g.displayName || g.samAccountName).join(" = "), scope: pair[0]?.scope ?? "-", detail: `${pair.length} groups with identical members` })),
+              ...emptyGroups.map((g) => ({ category: t("exportCategoryEmpty"), name: g.displayName || g.samAccountName, scope: g.scope, detail: t("exportDetailNoMembers") })),
+              ...singleMemberGroups.map((g) => ({ category: t("exportCategorySingleMember"), name: g.displayName || g.samAccountName, scope: g.scope, detail: t("exportDetailOneMember") })),
+              ...staleGroups.map((g) => ({ category: t("exportCategoryStale"), name: g.displayName || g.samAccountName, scope: g.scope, detail: t("exportDetailLastModified", { date: formatWhenChanged(g) }) })),
+              ...undescribedGroups.map((g) => ({ category: t("exportCategoryNoDescription"), name: g.displayName || g.samAccountName, scope: g.scope, detail: "" })),
+              ...cycles.map((chain) => ({ category: t("exportCategoryCircularNesting"), name: chain.join(" -> "), scope: "-", detail: t("exportDetailGroupsInCycle", { count: chain.length }) })),
+              ...deeplyNested.map((d) => ({ category: t("exportCategoryExcessiveDepth"), name: d.groupName, scope: "-", detail: t("exportDetailDepthLevels", { depth: d.depth }) })),
+              ...duplicateGroups.map((pair) => ({ category: t("exportCategoryDuplicateMembers"), name: pair.map((g) => g.displayName || g.samAccountName).join(" = "), scope: pair[0]?.scope ?? "-", detail: t("exportDetailIdenticalMembers", { count: pair.length }) })),
             ]}
             rowMapper={(row) => [row.category, row.name, row.scope, row.detail]}
             title={t("exportTitle")}
@@ -677,7 +681,7 @@ export function GroupHygiene() {
                   className="btn btn-outline btn-sm flex items-center gap-1 tabular-nums"
                   onClick={() => setShowDeletePreview(true)}
                   disabled={!canDelete || selectedEmpty.size === 0 || deleting}
-                  title={!canDelete ? "Requires Admin permission" : undefined}
+                  title={!canDelete ? t("requiresAdmin") : undefined}
                   data-testid="delete-selected-btn"
                 >
                   <Trash2 size={14} />
@@ -827,7 +831,7 @@ export function GroupHygiene() {
                       className="text-caption text-[var(--color-text-secondary)]"
                       data-testid={`depth-${item.groupName}`}
                     >
-                      Depth: {item.depth}
+                      {t("depth", { depth: item.depth })}
                     </span>
                   </div>
                   <button

@@ -5,16 +5,36 @@
   "scanningLabel": "Escaneando...",
   "emptyTitle": "Informes de cumplimiento",
   "emptyDescription": "Ejecute un escaneo de cumplimiento para evaluar su Active Directory contra 9 marcos: GDPR, HIPAA, SOX, PCI-DSS v4.0, ISO 27001, NIST 800-53, CIS v8, NIS2 y ANSSI.",
-  "globalScore": "Puntuacion global de cumplimiento",
+  "globalScore": "Puntuación global de cumplimiento",
   "accountsScanned": "cuentas escaneadas",
   "findingsLabel": "hallazgos",
   "checks": "Verificaciones",
   "checkClear": "Sin hallazgos",
-  "check": "Verificacion",
+  "check": "Verificación",
   "severity": "Severidad",
   "findings": "Hallazgos",
-  "description": "Descripcion",
-  "remediation": "Remediacion",
+  "description": "Descripción",
+  "remediation": "Remediación",
   "report": "Informe",
-  "exportTitle": "Escaneo de cumplimiento - Todas las verificaciones"
+  "exportTitle": "Escaneo de cumplimiento - Todas las verificaciones",
+  "scanFailed": "Escaneo fallido",
+  "checkTitles": {
+    "privileged_accounts": "Cuentas privilegiadas",
+    "inactive_accounts": "Cuentas inactivas (>90 días)",
+    "password_not_required": "Contraseña no requerida (PASSWD_NOTREQD)",
+    "reversible_encryption": "Cifrado reversible de contraseña",
+    "password_expired": "Contraseñas obsoletas (>90 días)",
+    "password_never_expires": "La contraseña nunca expira",
+    "disabled_accounts": "Ciclo de vida de cuentas deshabilitadas"
+  },
+  "severityLabels": {
+    "Critical": "Crítico",
+    "High": "Alto",
+    "Medium": "Medio",
+    "Low": "Bajo"
+  },
+  "andMore": "... y {{count}} más (ver informe exportado)",
+  "disclaimer.checks": "7 verificaciones en 9 marcos (GDPR, HIPAA, SOX, PCI-DSS v4.0, ISO 27001, NIST 800-53, CIS v8, NIS2, ANSSI). Verificaciones: cuentas privilegiadas (adminCount), cuentas inactivas (>90 días), indicador PASSWD_NOTREQD, cifrado reversible, contraseñas obsoletas (>90 días), contraseña nunca expira, cuentas deshabilitadas. Puntuación de cumplimiento 0-100 con desglose por marco. Exportación de informe HTML por marco con referencias de control y remediación PowerShell.",
+  "disclaimer.limitations": "Solo instantánea puntual - sin historial de cambios ni monitorización continua. No evalúa configuración de GPO, permisos de servidor de archivos, configuración de registro de auditoría ni segmentación de red. Sin detección de cuentas compartidas/genéricas, análisis de separación de funciones ni flujos de recertificación de acceso. No puede leer la política de contraseñas del dominio (complejidad, umbrales de bloqueo).",
+  "disclaimer.tools": "Netwrix Auditor (auditoría de cambios, 30+ controles/marco), ManageEngine ADAudit Plus (200+ informes, alertas en tiempo real), Microsoft Compliance Manager (controles compartidos, acciones de mejora), Qualys Policy Compliance (benchmarks CIS) o SolarWinds ARM (visualización de derechos de acceso) para gestión integral del cumplimiento."
 }

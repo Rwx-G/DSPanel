@@ -1,5 +1,5 @@
 {
-  "pageTitle": "Estado de replicacion AD",
+  "pageTitle": "Estado de replicación AD",
   "autoRefresh60s": "60s",
   "autoRefresh120s": "120s",
   "autoRefresh300s": "300s",
@@ -10,18 +10,18 @@
   "sourceDc": "DC de origen",
   "targetDc": "DC de destino",
   "namingContext": "Contexto de nombres",
-  "lastSync": "Ultima sincronizacion",
+  "lastSync": "Última sincronización",
   "usn": "USN",
   "transport": "Transporte",
   "failures": "Fallos",
-  "loadingPartnerships": "Cargando asociaciones de replicacion...",
-  "checkFailed": "Verificacion de replicacion fallida",
-  "noPartnerships": "No se encontraron asociaciones de replicacion",
-  "noPartnershipsDescription": "No se encontraron objetos de conexion NTDS en la configuracion de AD.",
-  "simpleBindWarning": "La replicacion forzada no esta disponible en modo simple bind. Esta funcion requiere una maquina unida al dominio con autenticacion GSSAPI para ejecutar comandos de replicacion en los controladores de dominio.",
+  "loadingPartnerships": "Cargando asociaciones de replicación...",
+  "checkFailed": "Verificación de replicación fallida",
+  "noPartnerships": "No se encontraron asociaciones de replicación",
+  "noPartnershipsDescription": "No se encontraron objetos de conexión NTDS en la configuración de AD.",
+  "simpleBindWarning": "La replicación forzada no está disponible en modo simple bind. Esta función requiere una máquina unida al dominio con autenticación GSSAPI para ejecutar comandos de replicación en los controladores de dominio.",
   "notAvailableSimpleBind": "No disponible en modo simple bind",
   "syncing": "Sincronizando...",
   "sync": "Sincronizar",
-  "forceReplication": "Forzar replicacion",
-  "forceReplicationDesc": "Forzar replicacion de {{source}} a {{target}} para {{context}}"
+  "forceReplication": "Forzar replicación",
+  "forceReplicationDesc": "Forzar replicación de {{source}} a {{target}} para {{context}}"
 }

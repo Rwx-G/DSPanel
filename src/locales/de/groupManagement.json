@@ -9,5 +9,9 @@
   "noSecurityGroups": "Keine Sicherheitsgruppen gefunden.",
   "noDistributionGroups": "Keine Verteilergruppen gefunden.",
   "noGroupsMatch": "Keine Gruppen entsprechen \"{{query}}\"",
-  "selectGroup": "Waehlen Sie eine Gruppe, um Details anzuzeigen"
+  "selectGroup": "Wählen Sie eine Gruppe, um Details anzuzeigen",
+  "scopeGlobal": "Global",
+  "scopeDomainLocal": "Domänenlokal",
+  "scopeUniversal": "Universell",
+  "scopeUnknown": "Unbekannt"
 }

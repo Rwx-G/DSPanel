@@ -12,7 +12,7 @@
   "showingGposFor": "GPO visualizzate per {{name}}",
   "noGposLinked": "Nessuna GPO collegata",
   "noGposDescription": "Nessun Group Policy Object si applica a questo oggetto.",
-  "blocksInheritance": "Questo contenitore blocca l'ereditarieta dei criteri di gruppo",
+  "blocksInheritance": "Questo contenitore blocca l'ereditarietà dei criteri di gruppo",
   "gposInOrder": "{{count}} GPO in ordine effettivo",
   "number": "#",
   "gpoName": "Nome GPO",
@@ -27,8 +27,10 @@
   "statusActive": "Attiva",
   "statusDisabled": "Disabilitata",
   "scopeNoLinks": "Nessun link trovato",
-  "scopeNoLinksDescription": "Questa GPO non e collegata a nessuna OU o dominio.",
+  "scopeNoLinksDescription": "Questa GPO non è collegata a nessuna OU o dominio.",
   "scopeLinkedTo": "Collegata a {{count}} contenitore/i",
   "findLinks": "Trova link",
-  "linksReportTitle": "Rapporto link GPO"
+  "linksReportTitle": "Rapporto link GPO",
+  "chooseGpo": "Scegli una GPO...",
+  "selectGpo": "Selezionare una GPO"
 }

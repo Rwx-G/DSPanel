@@ -30,5 +30,15 @@
   "duplicateName": "A preset with this name already exists",
   "loadingPresets": "Loading presets...",
   "accessDenied": "Preset management requires AccountOperator permission or higher.",
-  "presetModifiedAriaLabel": "Preset modified externally"
+  "presetModifiedAriaLabel": "Preset modified externally",
+  "noPresetsDescription": "Click 'New' to create your first preset.",
+  "selectPresetDescription": "Choose a preset from the list or create a new one.",
+  "storageNotConfiguredDescription": "Configure the preset storage path in Settings to start managing presets.",
+  "accessDeniedDescription": "Preset management requires AccountOperator permission or higher.",
+  "nameLabel": "Name",
+  "attrNamePlaceholder": "Attribute name",
+  "deletePresetTitle": "Delete Preset",
+  "deletePresetConfirm": "Are you sure you want to delete \"{{name}}\"?",
+  "deletePresetWarning": "This action cannot be undone.",
+  "modifiedOutsideDescription": "The file on the network share has changed since it was last saved by DSPanel. Review the content below, then accept or re-save to clear this warning."
 }

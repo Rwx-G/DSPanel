@@ -111,6 +111,32 @@ describe("Translation completeness", () => {
         ).toHaveLength(0);
       });
 
+      test("has no orphan keys (keys not present in English)", () => {
+        const orphanPaths: string[] = [];
+        for (const ns of namespaces) {
+          const enBundle =
+            en[ns as keyof typeof en] as Record<string, unknown>;
+          const langBundle = (lang.data as Record<string, unknown>)[
+            ns
+          ] as Record<string, unknown> | undefined;
+          if (!langBundle) continue;
+
+          const enKeys = collectKeys(enBundle);
+          const langKeys = collectKeys(langBundle);
+
+          const orphans = langKeys.filter(
+            (key) => !enKeys.includes(key),
+          );
+          for (const key of orphans) {
+            orphanPaths.push(`${ns}:${key}`);
+          }
+        }
+        expect(
+          orphanPaths,
+          `Orphan keys in ${lang.code} (not in EN): ${orphanPaths.join(", ")}`,
+        ).toHaveLength(0);
+      });
+
       test("preserves interpolation variables from English", () => {
         const interpolationRegex = /\{\{(\w+)\}\}/g;
         const issues: string[] = [];

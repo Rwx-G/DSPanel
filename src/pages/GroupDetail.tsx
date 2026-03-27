@@ -66,7 +66,7 @@ function NestedMemberItem({
   onToggleSelect,
   onRowContextMenu,
 }: NestedMemberItemProps) {
-  const { t } = useTranslation(["groupDetail", "common"]);
+  const { t } = useTranslation(["groupDetail", "common", "sidebar"]);
   const name =
     entry.displayName ??
     entry.samAccountName ??
@@ -248,7 +248,7 @@ export function GroupDetail({
   onMembersRefresh,
   onDeleted,
 }: GroupDetailProps) {
-  const { t } = useTranslation(["groupDetail", "common"]);
+  const { t } = useTranslation(["groupDetail", "common", "sidebar"]);
   const { notify } = useNotifications();
   const { showConfirmation } = useDialog();
   const { handleError } = useErrorHandler();
@@ -365,7 +365,7 @@ export function GroupDetail({
               label: t("openInGroups", { name: entryName }),
               icon: <FolderOpen size={14} />,
               onClick: () => {
-                openTab("Group Management", "groups", "users-group", {
+                openTab(t("sidebar:groupManagement"), "groups", "users-group", {
                   selectedGroupDn: entry.distinguishedName,
                 });
               },
@@ -376,7 +376,7 @@ export function GroupDetail({
               label: t("openInUsers", { name: entryName }),
               icon: <User size={14} />,
               onClick: () => {
-                openTab("User Lookup", "users", "user", {
+                openTab(t("sidebar:userLookup"), "users", "user", {
                   selectedUserSam: entry.samAccountName,
                 });
               },

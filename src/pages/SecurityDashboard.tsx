@@ -95,7 +95,7 @@ function AccountRow({
                 {account.reversibleEncryption && <span><strong>{t("reversibleEncryption")}</strong> {t("common:yes")}</span>}
                 {account.desOnly && <span><strong>{t("desOnly")}</strong> {t("common:yes")}</span>}
                 {account.constrainedDelegationTransition && <span><strong>{t("constrainedDelegTransition")}</strong> {t("common:yes")}</span>}
-                {account.hasSidHistory && <span><strong>{t("sidHistory")}</strong> Present</span>}
+                {account.hasSidHistory && <span><strong>{t("sidHistory")}</strong> {t("common:present")}</span>}
                 {account.isServiceAccount && <span><strong>{t("serviceAccount")}</strong> {t("common:yes")}</span>}
               </div>
               {account.alerts.length > 0 && (
@@ -154,9 +154,9 @@ export function SecurityDashboard() {
           {t("privilegedAccounts")}
           <SecurityDisclaimer
             coverage="~35%"
-            checks="Members of well-known admin groups (by RID), 12 account-level checks (Kerberoastable, AS-REP, reversible encryption, DES, delegation, SIDHistory, Protected Users, etc.), domain findings (KRBTGT age, LAPS, PSO, functional level, RBCD)."
-            limitations="Only checks default privileged groups and LDAP-accessible attributes. Does not parse ACLs (nTSecurityDescriptor), GPO-applied restrictions, or local admin memberships."
-            tools="PingCastle, Purple Knight (Semperis), or BloodHound for a comprehensive privileged account audit."
+            checks={t("disclaimer.checks")}
+            limitations={t("disclaimer.limitations")}
+            tools={t("disclaimer.tools")}
           />
         </h2>
         <div className="flex items-center gap-3">
@@ -199,7 +199,7 @@ export function SecurityDashboard() {
               a.samAccountName,
               a.displayName ?? "",
               a.privilegedGroups.join(", "),
-              a.lastLogon ?? "Never",
+              a.lastLogon ?? t("common:never"),
               a.passwordAgeDays != null ? `${a.passwordAgeDays}d` : "-",
               String(a.enabled),
             ]}

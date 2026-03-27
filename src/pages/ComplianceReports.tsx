@@ -149,7 +149,7 @@ function CheckRow({ check }: { check: CheckResult }) {
       >
         {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         <span className="flex-1 text-caption font-medium text-[var(--color-text-primary)]">
-          {check.title}
+          {t(`checkTitles.${check.checkId}`, { defaultValue: check.title })}
         </span>
         <span className="text-caption font-bold" style={{ color: check.findingCount > 0 ? sevColor(check.severity) : "var(--color-success)" }}>
           {check.findingCount}
@@ -159,7 +159,7 @@ function CheckRow({ check }: { check: CheckResult }) {
             className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold text-white"
             style={{ backgroundColor: sevColor(check.severity) }}
           >
-            {check.severity}
+            {t(`severityLabels.${check.severity}`, { defaultValue: check.severity })}
           </span>
         )}
         {check.findingCount === 0 && (
@@ -212,7 +212,7 @@ function CheckRow({ check }: { check: CheckResult }) {
                   {check.rows.length > 30 && (
                     <tr>
                       <td colSpan={check.headers.length} className="px-2 py-1 text-center text-[var(--color-text-secondary)] italic">
-                        ... and {check.rows.length - 30} more (see exported report)
+                        {t("andMore", { count: check.rows.length - 30 })}
                       </td>
                     </tr>
                   )}
@@ -278,9 +278,9 @@ export function ComplianceReports() {
           {t("pageTitle")}
           <SecurityDisclaimer
             coverage="~15-20%"
-            checks="7 checks across 9 frameworks (GDPR, HIPAA, SOX, PCI-DSS v4.0, ISO 27001, NIST 800-53, CIS v8, NIS2, ANSSI). Checks: privileged accounts (adminCount), inactive accounts (>90d), PASSWD_NOTREQD flag, reversible encryption, stale passwords (>90d), password never expires, disabled accounts. Compliance score 0-100 with per-framework breakdown. Per-framework HTML report export with control references and PowerShell remediation."
-            limitations="Point-in-time snapshot only - no change history or continuous monitoring. Does not assess GPO settings, file server permissions, audit log configuration, or network segmentation. No shared/generic account detection, separation of duties analysis, or access recertification workflows. Cannot read domain password policy (complexity, lockout thresholds)."
-            tools="Netwrix Auditor (change auditing, 30+ controls/framework), ManageEngine ADAudit Plus (200+ reports, real-time alerts), Microsoft Compliance Manager (shared controls, improvement actions), Qualys Policy Compliance (CIS benchmarks), or SolarWinds ARM (access rights visualization) for comprehensive compliance management."
+            checks={t("disclaimer.checks")}
+            limitations={t("disclaimer.limitations")}
+            tools={t("disclaimer.tools")}
           />
         </h2>
         <div className="flex items-center gap-2">

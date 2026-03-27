@@ -15,8 +15,8 @@
   "inherited": "Vererbt",
   "explicit": "Explizit",
   "noAces": "Keine ACEs gefunden",
-  "notAvailable": "Auf dieser Plattform nicht verfuegbar",
-  "notAvailableDescription": "Die NTFS-Berechtigungsanalyse erfordert Windows. NTFS ACL-APIs sind unter macOS oder Linux nicht verfuegbar.",
+  "notAvailable": "Auf dieser Plattform nicht verfügbar",
+  "notAvailableDescription": "Die NTFS-Berechtigungsanalyse erfordert Windows. NTFS ACL-APIs sind unter macOS oder Linux nicht verfügbar.",
   "pathsScanned": "Pfad(e) gescannt",
   "acesFound": "ACE(s) gefunden",
   "error_one": "{{count}} Fehler",
@@ -27,7 +27,7 @@
   "conflictsDetected": "Berechtigungskonflikte erkannt",
   "allowAt": "Erlauben bei",
   "denyAt": "vs Verweigern bei",
-  "for": "fuer",
+  "for": "für",
   "viewMembersOf": "Mitglieder anzeigen von",
-  "openInGroupManagement": "In Gruppenverwaltung oeffnen"
+  "openInGroupManagement": "In Gruppenverwaltung öffnen"
 }

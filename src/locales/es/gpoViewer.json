@@ -2,13 +2,13 @@
   "pageTitle": "Visor de GPO",
   "pageDescription": "Ver objetos de directiva de grupo vinculados a usuarios, equipos y OUs - solo lectura",
   "tabLinks": "Enlaces de GPO",
-  "tabScope": "Informe de ambito",
+  "tabScope": "Informe de ámbito",
   "searchLabel": "Buscar usuario o equipo",
   "searchPlaceholder": "Buscar por nombre o SAM...",
   "or": "o",
   "ouSelectLabel": "Seleccionar OU",
   "ouSelectPlaceholder": "Elegir OU...",
-  "searchDescription": "Busque un usuario o equipo para ver que GPOs se le aplican, o seleccione una OU para ver que GPOs se aplicarian a todos los objetos dentro de ella.",
+  "searchDescription": "Busque un usuario o equipo para ver qué GPOs se le aplican, o seleccione una OU para ver qué GPOs se aplicarían a todos los objetos dentro de ella.",
   "showingGposFor": "Mostrando GPOs para {{name}}",
   "noGposLinked": "Sin GPOs vinculados",
   "noGposDescription": "No se aplican objetos de directiva de grupo a este objeto.",
@@ -27,8 +27,10 @@
   "statusActive": "Activo",
   "statusDisabled": "Deshabilitado",
   "scopeNoLinks": "Sin enlaces encontrados",
-  "scopeNoLinksDescription": "Este GPO no esta vinculado a ninguna OU o dominio.",
+  "scopeNoLinksDescription": "Este GPO no está vinculado a ninguna OU o dominio.",
   "scopeLinkedTo": "Vinculado a {{count}} contenedor(es)",
   "findLinks": "Buscar enlaces",
-  "linksReportTitle": "Informe de enlaces de GPO"
+  "linksReportTitle": "Informe de enlaces de GPO",
+  "chooseGpo": "Elegir una GPO...",
+  "selectGpo": "Seleccionar GPO"
 }

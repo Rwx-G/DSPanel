@@ -3051,17 +3051,23 @@ const GUID_DS_REPL_GET_CHANGES_FILTERED: &str = "89e95b76-444d-4c62-991a-0facbed
 /// This queries the event log for suspicious patterns over the configured time window.
 /// On non-Windows platforms, returns an empty report with `event_log_accessible: false`.
 pub async fn detect_attacks(
-    _provider: Arc<dyn DirectoryProvider>,
+    provider: Arc<dyn DirectoryProvider>,
     time_window_hours: u32,
     config: AttackDetectionConfig,
 ) -> Result<AttackDetectionReport> {
+    let dc_host = provider.connected_host();
+    let credentials = provider.simple_bind_credentials();
+
     #[cfg(target_os = "windows")]
-    let (alerts, event_log_accessible) = analyze_windows_event_log(time_window_hours, &config);
+    let (alerts, event_log_accessible) =
+        analyze_windows_event_log(time_window_hours, &config, dc_host.as_deref(), credentials.as_ref());
 
     #[cfg(not(target_os = "windows"))]
     let (alerts, event_log_accessible): (Vec<AttackAlert>, bool) = (Vec::new(), false);
 
     let _ = &config; // suppress unused warning on non-Windows
+    let _ = &dc_host;
+    let _ = &credentials;
 
     Ok(AttackDetectionReport {
         alerts,
@@ -3071,34 +3077,99 @@ pub async fn detect_attacks(
     })
 }
 
-/// Probes whether the current process can read the Windows Security event log.
-/// Uses `Get-WinEvent -MaxEvents 1` as a language-independent access check:
-/// success/failure is determined by exit code, not by parsing localized messages.
+/// Probes whether the current process can read the Windows Security event log
+/// on the target DC via `-ComputerName`.
+///
+/// Requires the "Remote Event Log Management" firewall rule enabled on the DC
+/// and Event Log Readers membership for the running account.
+///
+/// Uses `Get-WinEvent -MaxEvents 1` as a language-independent access check.
 #[cfg(target_os = "windows")]
-fn can_read_security_log() -> bool {
+/// Builds a PowerShell credential snippet from bind DN and password.
+/// Converts DN format "CN=User,CN=Users,DC=domain,DC=local" to "domain.local\User".
+#[cfg(target_os = "windows")]
+fn build_credential_param(bind_dn: &str, password: &str) -> String {
+    // Extract username from CN=...
+    let username = bind_dn
+        .split(',')
+        .next()
+        .and_then(|rdn| rdn.strip_prefix("CN="))
+        .unwrap_or(bind_dn);
+
+    // Extract domain from DC= components
+    let domain: String = bind_dn
+        .split(',')
+        .filter_map(|part| part.strip_prefix("DC="))
+        .collect::<Vec<_>>()
+        .join(".");
+
+    let user = if domain.is_empty() {
+        username.to_string()
+    } else {
+        format!("{}\\{}", domain, username)
+    };
+
+    // Escape single quotes in password
+    let escaped_pwd = password.replace('\'', "''");
+
+    format!(
+        "$cred=New-Object System.Management.Automation.PSCredential('{}',('{}' | ConvertTo-SecureString -AsPlainText -Force));",
+        user, escaped_pwd
+    )
+}
+
+fn can_read_security_log(dc_host: Option<&str>, credentials: Option<&(String, String)>) -> bool {
     use std::process::Command;
 
-    let output = Command::new("powershell")
-        .args([
-            "-NoProfile",
-            "-NonInteractive",
-            "-Command",
-            "try{Get-WinEvent -LogName Security -MaxEvents 1 -EA Stop>$null;'true'}catch{'false'}",
-        ])
-        .output();
+    let Some(host) = dc_host else {
+        tracing::warn!("No DC host available for event log probe");
+        return false;
+    };
 
-    match output {
+    let cred_setup = credentials
+        .map(|(dn, pwd)| build_credential_param(dn, pwd))
+        .unwrap_or_default();
+    let cred_param = if credentials.is_some() {
+        " -Credential $cred"
+    } else {
+        ""
+    };
+
+    let cmd = format!(
+        "{}try{{Get-WinEvent -LogName Security -ComputerName '{}'{} -MaxEvents 1 -EA Stop | Out-Null;'true'}}catch{{$_.Exception.Message}}",
+        cred_setup, host, cred_param
+    );
+    tracing::debug!(dc_host = host, has_credentials = credentials.is_some(), "Probing remote Security event log access");
+
+    match Command::new("powershell")
+        .args(["-NoProfile", "-NonInteractive", "-Command", &cmd])
+        .output()
+    {
         Ok(o) => {
             let stdout = String::from_utf8_lossy(&o.stdout);
-            stdout.trim() == "true"
+            let result = stdout.trim();
+            if result == "true" {
+                tracing::info!(dc_host = host, "Security event log accessible");
+                return true;
+            }
+            tracing::warn!(
+                dc_host = host,
+                error = %result,
+                "Security event log probe failed - ensure 'Remote Event Log Management' firewall rule is enabled on the DC"
+            );
+            false
         }
-        Err(_) => false,
+        Err(e) => {
+            tracing::warn!(error = %e, "Failed to run PowerShell for event log probe");
+            false
+        }
     }
 }
 
 /// Runs a PowerShell query for a batch of event IDs and returns parsed event records.
+/// When `dc_host` is provided, queries the remote DC's Security log via `-ComputerName`.
 #[cfg(target_os = "windows")]
-fn query_events(event_ids: &[u32], time_window_hours: u32) -> Vec<EventRecord> {
+fn query_events(event_ids: &[u32], time_window_hours: u32, dc_host: Option<&str>, credentials: Option<&(String, String)>) -> Vec<EventRecord> {
     use std::process::Command;
 
     let ids_str = event_ids
@@ -3107,8 +3178,21 @@ fn query_events(event_ids: &[u32], time_window_hours: u32) -> Vec<EventRecord> {
         .collect::<Vec<_>>()
         .join(",");
 
+    let computer_param = dc_host
+        .map(|h| format!("-ComputerName '{}'", h))
+        .unwrap_or_default();
+
+    let cred_setup = credentials
+        .map(|(dn, pwd)| build_credential_param(dn, pwd))
+        .unwrap_or_default();
+    let cred_param = if credentials.is_some() {
+        " -Credential $cred"
+    } else {
+        ""
+    };
+
     let query = format!(
-        r#"Get-WinEvent -FilterHashtable @{{LogName='Security';Id={ids};StartTime=(Get-Date).AddHours(-{hours})}} -MaxEvents 200 -ErrorAction SilentlyContinue | ForEach-Object {{
+        r#"{cred_init}Get-WinEvent -FilterHashtable @{{LogName='Security';Id={ids};StartTime=(Get-Date).AddHours(-{hours})}} {computer}{cred_arg} -MaxEvents 200 -ErrorAction SilentlyContinue | ForEach-Object {{
     $xml = [xml]$_.ToXml()
     $data = @{{}}
     $xml.Event.EventData.Data | ForEach-Object {{ $data[$_.Name] = $_.'#text' }}
@@ -3131,8 +3215,11 @@ fn query_events(event_ids: &[u32], time_window_hours: u32) -> Vec<EventRecord> {
         ObjectDN = $data['ObjectDN']
     }}
 }} | ConvertTo-Json -Compress"#,
+        cred_init = cred_setup,
         ids = ids_str,
         hours = time_window_hours,
+        computer = computer_param,
+        cred_arg = cred_param,
     );
 
     let output = Command::new("powershell")
@@ -3166,9 +3253,11 @@ fn query_events(event_ids: &[u32], time_window_hours: u32) -> Vec<EventRecord> {
 fn analyze_windows_event_log(
     time_window_hours: u32,
     config: &AttackDetectionConfig,
+    dc_host: Option<&str>,
+    credentials: Option<&(String, String)>,
 ) -> (Vec<AttackAlert>, bool) {
     // Probe: check if we can read the Security log at all (language-independent).
-    let event_log_accessible = can_read_security_log();
+    let event_log_accessible = can_read_security_log(dc_host, credentials);
     if !event_log_accessible {
         return (Vec::new(), false);
     }
@@ -3176,7 +3265,7 @@ fn analyze_windows_event_log(
     let mut alerts = Vec::new();
 
     // Batch 1: Kerberos events (4768, 4769, 4771)
-    let kerberos_events = query_events(&[4768, 4769, 4771], time_window_hours);
+    let kerberos_events = query_events(&[4768, 4769, 4771], time_window_hours, dc_host, credentials);
     let events_4768: Vec<&EventRecord> = kerberos_events
         .iter()
         .filter(|e| e.id == Some(4768))
@@ -3191,18 +3280,18 @@ fn analyze_windows_event_log(
         .collect();
 
     // Batch 2: Logon events (4624, 4625)
-    let logon_events = query_events(&[4624, 4625], time_window_hours);
+    let logon_events = query_events(&[4624, 4625], time_window_hours, dc_host, credentials);
     let events_4624: Vec<&EventRecord> =
         logon_events.iter().filter(|e| e.id == Some(4624)).collect();
     let events_4625: Vec<&EventRecord> =
         logon_events.iter().filter(|e| e.id == Some(4625)).collect();
 
     // Batch 3: Directory access (4662)
-    let dir_events_raw = query_events(&[4662], time_window_hours);
+    let dir_events_raw = query_events(&[4662], time_window_hours, dc_host, credentials);
     let dir_events: Vec<&EventRecord> = dir_events_raw.iter().collect();
 
     // Batch 4: Group/computer changes (4728, 4732, 4742, 4756)
-    let group_events = query_events(&[4728, 4732, 4742, 4756], time_window_hours);
+    let group_events = query_events(&[4728, 4732, 4742, 4756], time_window_hours, dc_host, credentials);
     let events_4742: Vec<&EventRecord> =
         group_events.iter().filter(|e| e.id == Some(4742)).collect();
     let events_group_change: Vec<&EventRecord> = group_events
@@ -3211,11 +3300,11 @@ fn analyze_windows_event_log(
         .collect();
 
     // Batch 5: Directory changes (5136)
-    let dir_change_events_raw = query_events(&[5136], time_window_hours);
+    let dir_change_events_raw = query_events(&[5136], time_window_hours, dc_host, credentials);
     let dir_change_events: Vec<&EventRecord> = dir_change_events_raw.iter().collect();
 
     // Batch 6: Account management (4720, 4738)
-    let acct_events_raw = query_events(&[4720, 4738], time_window_hours);
+    let acct_events_raw = query_events(&[4720, 4738], time_window_hours, dc_host, credentials);
     let acct_events: Vec<&EventRecord> = acct_events_raw.iter().collect();
 
     // Run detection functions

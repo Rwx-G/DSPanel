@@ -1201,7 +1201,7 @@ mod tests {
         use crate::services::directory::tests::MockDirectoryProvider;
 
         let provider = Arc::new(MockDirectoryProvider::new());
-        let audit = AuditService::new();
+        let audit = AuditService::new_in_memory();
 
         let matches = vec![CleanupMatch {
             dn: "CN=User,DC=test".to_string(),
@@ -1226,7 +1226,7 @@ mod tests {
         use crate::services::directory::tests::MockDirectoryProvider;
 
         let provider = Arc::new(MockDirectoryProvider::new());
-        let audit = AuditService::new();
+        let audit = AuditService::new_in_memory();
 
         let matches = vec![CleanupMatch {
             dn: "CN=User,DC=test".to_string(),
@@ -1249,7 +1249,7 @@ mod tests {
         use crate::services::directory::tests::MockDirectoryProvider;
 
         let provider = Arc::new(MockDirectoryProvider::new().with_failure());
-        let audit = AuditService::new();
+        let audit = AuditService::new_in_memory();
 
         let matches = vec![CleanupMatch {
             dn: "CN=User,DC=test".to_string(),
@@ -1274,7 +1274,7 @@ mod tests {
         use crate::services::directory::tests::MockDirectoryProvider;
 
         let provider = Arc::new(MockDirectoryProvider::new());
-        let audit = AuditService::new();
+        let audit = AuditService::new_in_memory();
 
         let matches = vec![CleanupMatch {
             dn: "CN=User,DC=test".to_string(),
@@ -1298,7 +1298,7 @@ mod tests {
         use crate::services::directory::tests::MockDirectoryProvider;
 
         let provider = Arc::new(MockDirectoryProvider::new().with_failure());
-        let audit = AuditService::new();
+        let audit = AuditService::new_in_memory();
 
         let matches = vec![CleanupMatch {
             dn: "CN=User,DC=test".to_string(),
@@ -1323,7 +1323,7 @@ mod tests {
         use crate::services::directory::tests::MockDirectoryProvider;
 
         let provider = Arc::new(MockDirectoryProvider::new());
-        let audit = AuditService::new();
+        let audit = AuditService::new_in_memory();
 
         let matches = vec![CleanupMatch {
             dn: "CN=User,DC=test".to_string(),
@@ -1347,7 +1347,7 @@ mod tests {
         use crate::services::directory::tests::MockDirectoryProvider;
 
         let provider = Arc::new(MockDirectoryProvider::new());
-        let audit = AuditService::new();
+        let audit = AuditService::new_in_memory();
 
         let matches = vec![CleanupMatch {
             dn: "CN=User,DC=test".to_string(),
@@ -1375,7 +1375,7 @@ mod tests {
         use crate::services::directory::tests::MockDirectoryProvider;
 
         let provider = Arc::new(MockDirectoryProvider::new().with_failure());
-        let audit = AuditService::new();
+        let audit = AuditService::new_in_memory();
 
         let matches = vec![CleanupMatch {
             dn: "CN=User,DC=test".to_string(),
@@ -1400,7 +1400,7 @@ mod tests {
         use crate::services::directory::tests::MockDirectoryProvider;
 
         let provider = Arc::new(MockDirectoryProvider::new());
-        let audit = AuditService::new();
+        let audit = AuditService::new_in_memory();
 
         let matches = vec![
             CleanupMatch {

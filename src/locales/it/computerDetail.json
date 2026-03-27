@@ -11,7 +11,7 @@
   "ipAddress": "Indirizzo/i IP",
   "pingStatus": "Ping",
   "resolving": "Risoluzione...",
-  "resolvingSlow": "Risoluzione... (piu tempo del previsto)",
+  "resolvingSlow": "Risoluzione... (più tempo del previsto)",
   "notTested": "Non testato",
   "reachable": "Raggiungibile",
   "unreachable": "Non raggiungibile (ping fallito)",

@@ -14,7 +14,7 @@
   "uncPermissionsAudit": "Audit permessi percorso UNC",
   "aboutUncAudit": "Informazioni sull'audit dei permessi UNC",
   "permissionsCrossReference": "Riferimento incrociato permessi",
-  "uncDescription": "Inserire un percorso UNC per visualizzare i permessi NTFS incrociati con entrambi gli utenti. Ogni ACE mostra se l'Utente A e l'Utente B hanno accesso tramite le loro appartenenze ai gruppi, aiutando a identificare rapidamente perche un utente puo accedere a una risorsa e l'altro no.",
+  "uncDescription": "Inserire un percorso UNC per visualizzare i permessi NTFS incrociati con entrambi gli utenti. Ogni ACE mostra se l'Utente A e l'Utente B hanno accesso tramite le loro appartenenze ai gruppi, aiutando a identificare rapidamente perché un utente può accedere a una risorsa e l'altro no.",
   "shared": "Condivisi",
   "onlyA": "Solo {{name}}",
   "onlyB": "Solo {{name}}",
@@ -28,5 +28,12 @@
   "addToGroup": "Aggiungi {{name}} a questo gruppo",
   "selectUserFirst": "Selezionare prima un utente per il confronto",
   "vs": "vs",
-  "filterGroups": "Filtra gruppi..."
+  "filterGroups": "Filtra gruppi...",
+  "disabledLocked": "Disabilitato, Bloccato",
+  "accountDisabled": "Disabilitato",
+  "accountLocked": "Bloccato",
+  "accountActive": "Attivo",
+  "userOnly": "Solo {{name}}",
+  "groupCount_one": "{{count}} gruppo",
+  "groupCount_other": "{{count}} gruppi"
 }
