@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { EmptyState } from "@/components/common/EmptyState";
+import { usePlatform } from "@/hooks/usePlatform";
 import {
   RefreshCw,
   ShieldCheck,
@@ -166,14 +167,17 @@ function AlertCard({
 
 export function AttackDetection() {
   const { t } = useTranslation(["attackDetection", "common"]);
+  const platform = usePlatform();
   const [report, setReport] = useState<AttackDetectionReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [timeWindowHours, setTimeWindowHours] = useState(72);
   const [expandedAlerts, setExpandedAlerts] = useState<Set<string>>(new Set());
+  const isWindows = !platform || platform === "windows";
 
   const fetchReport = useCallback(
     async (hours: number) => {
+      if (!isWindows) return;
       try {
         setError(null);
         const data = await invoke<AttackDetectionReport>("detect_ad_attacks", {
@@ -186,12 +190,26 @@ export function AttackDetection() {
         setLoading(false);
       }
     },
-    [],
+    [isWindows],
   );
 
   useEffect(() => {
-    fetchReport(timeWindowHours);
-  }, [fetchReport, timeWindowHours]);
+    if (isWindows) {
+      fetchReport(timeWindowHours);
+    }
+  }, [fetchReport, timeWindowHours, isWindows]);
+
+  if (!isWindows) {
+    return (
+      <div className="flex h-full items-center justify-center p-4">
+        <EmptyState
+          icon={<ShieldCheck size={48} />}
+          title={t("windowsOnly")}
+          description={t("windowsOnlyDescription")}
+        />
+      </div>
+    );
+  }
 
   const handleScan = () => {
     setLoading(true);
