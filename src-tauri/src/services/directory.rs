@@ -178,6 +178,15 @@ pub trait DirectoryProvider: Send + Sync {
         attributes: &std::collections::HashMap<String, Vec<String>>,
     ) -> Result<String>;
 
+    /// Fetches all attributes of an object by DN using a base-scope search with ["*"].
+    /// Used for complete snapshots before modifications.
+    async fn get_all_attributes(
+        &self,
+        _dn: &str,
+    ) -> Result<std::collections::HashMap<String, Vec<String>>> {
+        Ok(std::collections::HashMap::new())
+    }
+
     /// Modifies an attribute on an AD object.
     async fn modify_attribute(
         &self,

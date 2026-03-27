@@ -1888,6 +1888,32 @@ impl DirectoryProvider for LdapDirectoryProvider {
         Ok(dn)
     }
 
+    async fn get_all_attributes(
+        &self,
+        dn: &str,
+    ) -> Result<std::collections::HashMap<String, Vec<String>>> {
+        let dn_owned = dn.to_string();
+        self.with_connection(|mut ldap| {
+            let dn = dn_owned.clone();
+            async move {
+                let (rs, _) = ldap
+                    .search(&dn, ldap3::Scope::Base, "(objectClass=*)", vec!["*"])
+                    .await
+                    .context("Failed to fetch all attributes")?
+                    .success()
+                    .context("All-attributes search returned error")?;
+
+                if let Some(entry) = rs.into_iter().next() {
+                    let se = ldap3::SearchEntry::construct(entry);
+                    Ok(se.attrs)
+                } else {
+                    Ok(std::collections::HashMap::new())
+                }
+            }
+        })
+        .await
+    }
+
     async fn modify_attribute(
         &self,
         dn: &str,
