@@ -7,5 +7,12 @@
   "closeTab": "Chiudi {{title}}",
   "closeOthers": "Chiudi le altre",
   "closeAll": "Chiudi tutte",
-  "tabOptions": "Opzioni scheda"
+  "tabOptions": "Opzioni scheda",
+  "loginServer": "Server",
+  "loginAccount": "Account",
+  "loginSubtitle": "Inserire le credenziali AD per connettersi",
+  "loginPassword": "Password",
+  "loginPasswordPlaceholder": "Inserire la password...",
+  "loginConnect": "Connetti",
+  "loginConnecting": "Connessione in corso..."
 }

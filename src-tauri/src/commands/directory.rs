@@ -13,7 +13,7 @@ pub(crate) async fn search_users_inner(
     query: &str,
 ) -> Result<Vec<DirectoryEntry>, AppError> {
     let sanitized = validate_search_input(query)?;
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     provider
         .search_users(&sanitized, 50)
         .await
@@ -26,7 +26,7 @@ pub(crate) async fn search_groups_inner(
     query: &str,
 ) -> Result<Vec<DirectoryEntry>, AppError> {
     let sanitized = validate_search_input(query)?;
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     provider
         .search_groups(&sanitized, 50)
         .await
@@ -35,7 +35,7 @@ pub(crate) async fn search_groups_inner(
 
 /// Returns the OU tree from Active Directory.
 pub(crate) async fn get_ou_tree_inner(state: &AppState) -> Result<Vec<OUNode>, AppError> {
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     provider
         .get_ou_tree()
         .await
@@ -47,7 +47,7 @@ pub(crate) async fn get_user_inner(
     state: &AppState,
     sam_account_name: &str,
 ) -> Result<Option<DirectoryEntry>, AppError> {
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     provider
         .get_user_by_identity(sam_account_name)
         .await
@@ -60,7 +60,7 @@ pub(crate) async fn search_computers_inner(
     query: &str,
 ) -> Result<Vec<DirectoryEntry>, AppError> {
     let sanitized = validate_search_input(query)?;
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     provider
         .search_computers(&sanitized, 50)
         .await
@@ -91,7 +91,7 @@ pub(crate) async fn browse_users_inner(
     let entries = match cached {
         Some(entries) => entries,
         None => {
-            let provider = state.directory_provider.clone();
+            let provider = state.provider();
             let mut fresh = provider
                 .browse_users(MAX_BROWSE)
                 .await
@@ -145,7 +145,7 @@ pub(crate) async fn browse_computers_inner(
     let entries = match cached {
         Some(entries) => entries,
         None => {
-            let provider = state.directory_provider.clone();
+            let provider = state.provider();
             let mut fresh = provider
                 .browse_computers(MAX_BROWSE)
                 .await
@@ -197,7 +197,7 @@ pub(crate) async fn browse_groups_inner(
     let entries = match cached {
         Some(entries) => entries,
         None => {
-            let provider = state.directory_provider.clone();
+            let provider = state.provider();
             let mut fresh = provider
                 .browse_groups(MAX_BROWSE)
                 .await
@@ -231,7 +231,7 @@ pub(crate) async fn browse_groups_inner(
 
 /// Checks whether the directory provider has an active connection.
 pub(crate) async fn check_connection_inner(state: &AppState) -> Result<bool, AppError> {
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     provider
         .test_connection()
         .await
@@ -240,7 +240,7 @@ pub(crate) async fn check_connection_inner(state: &AppState) -> Result<bool, App
 
 /// Returns domain information from the directory provider.
 pub(crate) fn get_domain_info_inner(state: &AppState) -> DomainInfo {
-    let provider = &state.directory_provider;
+    let provider = state.provider();
     DomainInfo {
         domain_name: provider.domain_name().map(|s| s.to_string()),
         is_connected: provider.is_connected(),
@@ -314,7 +314,7 @@ pub(crate) async fn search_contacts_inner(
     query: &str,
 ) -> Result<Vec<DirectoryEntry>, AppError> {
     let sanitized = validate_search_input(query)?;
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     provider
         .browse_contacts(5000)
         .await
@@ -345,7 +345,7 @@ pub(crate) async fn search_printers_inner(
     query: &str,
 ) -> Result<Vec<DirectoryEntry>, AppError> {
     let sanitized = validate_search_input(query)?;
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     provider
         .browse_printers(5000)
         .await
@@ -474,7 +474,7 @@ pub async fn browse_contacts(
     page_size: usize,
     state: State<'_, AppState>,
 ) -> Result<BrowseResult, AppError> {
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     let all = provider
         .browse_contacts(5000)
         .await
@@ -497,7 +497,7 @@ pub async fn browse_printers(
     page_size: usize,
     state: State<'_, AppState>,
 ) -> Result<BrowseResult, AppError> {
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     let all = provider
         .browse_printers(5000)
         .await
@@ -516,7 +516,7 @@ pub async fn browse_printers(
 /// Returns all attribute names from the AD schema.
 #[tauri::command]
 pub async fn get_schema_attributes(state: State<'_, AppState>) -> Result<Vec<String>, AppError> {
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     provider
         .get_schema_attributes()
         .await

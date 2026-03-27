@@ -26,7 +26,7 @@ pub(crate) async fn get_privileged_accounts_inner(
         ));
     }
 
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
 
     // Load additional configured groups from settings
     let settings = state.app_settings.get();
@@ -64,7 +64,7 @@ pub(crate) async fn get_risk_score_inner(state: &AppState) -> Result<RiskScoreRe
         ));
     }
 
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     let weights = state.app_settings.get().risk_weights.unwrap_or_default();
 
     let result = crate::services::security::compute_risk_score(provider, &weights)
@@ -129,7 +129,7 @@ pub(crate) async fn detect_attacks_inner(
         ));
     }
 
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     let config = state
         .app_settings
         .get()
@@ -166,7 +166,7 @@ pub(crate) async fn get_escalation_paths_inner(
         ));
     }
 
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     crate::services::security::build_escalation_graph(provider)
         .await
         .map_err(|e| AppError::Directory(e.to_string()))

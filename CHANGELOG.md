@@ -33,6 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Attack detection threshold and exclusion list configuration in Settings > Security
 - Attack detection: remote DC event log access via `-ComputerName` with simple bind credentials
 - DC FQDN resolution from rootDSE `dnsHostName` attribute
+- Login prompt when `DSPANEL_LDAP_BIND_PASSWORD` is not set (server and bind DN from env vars, password prompted at startup)
+- Splash screen with spinner on startup (theme-aware, shown before React mounts)
 - Click-to-detail expandable panels on topology DC nodes
 - Auto-start service filter toggle in workstation monitoring
 - DC health cards grouped by AD site in Infrastructure Health
@@ -45,6 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Test suite expanded to 3654 tests: 2089 frontend, 1520 Rust unit, 45 AD integration
 - Coverage: 87% Rust lines, 88% frontend lines
 - Integration tests expanded to 45 scenarios against real AD with 2-DC replication
+- Directory provider is now swappable at runtime via `RwLock` (enables post-startup login)
 - PropertyGrid label column widened to `min-w-[220px]` for longer translated labels
 - UserLookup sidebar widened to `w-80` (320px) for translated badge text
 - GPO Viewer inputs resized to match app-wide compact style (`h-[28px]`, `text-caption`)

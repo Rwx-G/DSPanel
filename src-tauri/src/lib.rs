@@ -88,10 +88,16 @@ pub fn run() {
                 s, d, p, tls_config,
             )),
             (None, None, None) => Arc::new(LdapDirectoryProvider::new()),
+            (Some(_), Some(_), None) => {
+                tracing::info!(
+                    "LDAP server and bind DN set but no password - will prompt user at startup"
+                );
+                Arc::new(LdapDirectoryProvider::new())
+            }
             _ => {
                 tracing::warn!(
-                    "Partial LDAP credentials detected - all three variables must be set: \
-                     DSPANEL_LDAP_SERVER, DSPANEL_LDAP_BIND_DN, DSPANEL_LDAP_BIND_PASSWORD. \
+                    "Partial LDAP credentials detected - DSPANEL_LDAP_SERVER and \
+                     DSPANEL_LDAP_BIND_DN must both be set for simple bind. \
                      Falling back to GSSAPI"
                 );
                 Arc::new(LdapDirectoryProvider::new())
@@ -99,7 +105,15 @@ pub fn run() {
         }
     };
 
+    // Mark as needing credentials if server + bind_dn are set but no password
+    let needs_creds = std::env::var("DSPANEL_LDAP_SERVER").is_ok()
+        && std::env::var("DSPANEL_LDAP_BIND_DN").is_ok()
+        && std::env::var("DSPANEL_LDAP_BIND_PASSWORD").is_err();
+
     let app_state = AppState::new(provider, PermissionConfig::default());
+    if needs_creds {
+        *app_state.needs_credentials.lock().expect("lock poisoned") = true;
+    }
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
@@ -109,7 +123,7 @@ pub fn run() {
             // Detect permissions from AD groups on startup
             use tauri::Manager;
             let state = app.state::<AppState>();
-            let provider = state.directory_provider.clone();
+            let provider = state.provider();
             let permission_svc = &state.permission_service;
             tauri::async_runtime::block_on(async {
                 if let Err(e) = permission_svc.detect_permissions(&*provider).await {
@@ -123,7 +137,7 @@ pub fn run() {
                 }
             });
             // Start LDAP keepalive background task (ping every 5 minutes)
-            let keepalive_provider = state.directory_provider.clone();
+            let keepalive_provider = state.provider();
             tauri::async_runtime::spawn(async move {
                 let interval = std::time::Duration::from_secs(300); // 5 minutes
                 loop {
@@ -236,6 +250,9 @@ pub fn run() {
             commands::evaluate_health_batch,
             commands::get_platform,
             commands::is_simple_bind,
+            commands::needs_credentials,
+            commands::get_bind_info,
+            commands::connect_simple_bind,
             commands::get_current_username,
             commands::get_authenticated_identity,
             commands::get_computer_name,

@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { loadPersistedLanguage } from "./i18n";
+import { LoginDialog } from "@/components/dialogs/LoginDialog";
 import {
   NavigationProvider,
   useNavigation,
@@ -82,11 +83,10 @@ export function App() {
     userGroups: [],
     appVersion: APP_VERSION,
   });
+  const [needsLogin, setNeedsLogin] = useState(false);
+  const [loginChecked, setLoginChecked] = useState(false);
 
-  useEffect(() => {
-    installGlobalErrorHandlers();
-    loadPersistedLanguage();
-
+  const refreshStatus = useCallback(() => {
     invoke<DomainInfo>("get_domain_info")
       .then((info) => {
         setStatus((s) => ({
@@ -119,7 +119,7 @@ export function App() {
       .then((name) => {
         setStatus((s) => ({ ...s, authenticatedUser: name }));
       })
-      .catch((e) => console.warn("Failed to get username:", e));
+      .catch((e) => console.warn("Failed to get authenticated identity:", e));
 
     invoke<string>("get_computer_name")
       .then((name) => {
@@ -139,6 +139,51 @@ export function App() {
       })
       .catch((e) => console.warn("Failed to get user groups:", e));
   }, []);
+
+  useEffect(() => {
+    installGlobalErrorHandlers();
+    loadPersistedLanguage();
+
+    // Check if login prompt is needed
+    invoke<boolean>("needs_credentials")
+      .then((needs) => {
+        setNeedsLogin(needs);
+        setLoginChecked(true);
+        if (!needs) {
+          refreshStatus();
+        }
+      })
+      .catch(() => {
+        setLoginChecked(true);
+        refreshStatus();
+      });
+  }, [refreshStatus]);
+
+  // Show loading screen while checking credentials
+  if (!loginChecked) {
+    return (
+      <div className="flex h-screen w-screen flex-col items-center justify-center gap-4 bg-[var(--color-surface-bg)]">
+        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--color-primary)]/10">
+          <svg className="h-7 w-7 animate-spin text-[var(--color-primary)]" viewBox="0 0 24 24" fill="none">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+        </div>
+        <span className="text-body font-medium text-[var(--color-text-secondary)]">DSPanel</span>
+      </div>
+    );
+  }
+
+  if (needsLogin) {
+    return (
+      <LoginDialog
+        onSuccess={() => {
+          setNeedsLogin(false);
+          refreshStatus();
+        }}
+      />
+    );
+  }
 
   return (
     <ErrorBoundary>

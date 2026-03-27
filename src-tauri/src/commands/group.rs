@@ -31,7 +31,7 @@ pub(crate) async fn remove_group_member_inner(
         .snapshot_service
         .capture(group_dn, "RemoveGroupMember");
 
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     match provider.remove_group_member(group_dn, member_dn).await {
         Ok(()) => {
             state.audit_service.log_success(
@@ -57,7 +57,7 @@ pub(crate) async fn get_group_members_inner(
     state: &AppState,
     group_dn: &str,
 ) -> Result<Vec<DirectoryEntry>, AppError> {
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     provider
         .get_group_members(group_dn, 200)
         .await
@@ -68,7 +68,7 @@ pub(crate) async fn get_group_members_inner(
 pub(crate) async fn detect_empty_groups_inner(
     state: &AppState,
 ) -> Result<Vec<DirectoryEntry>, AppError> {
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     let groups = provider
         .browse_groups(5000)
         .await
@@ -95,7 +95,7 @@ pub(crate) async fn detect_empty_groups_inner(
 pub(crate) async fn detect_circular_groups_inner(
     state: &AppState,
 ) -> Result<Vec<Vec<String>>, AppError> {
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     let groups = provider
         .browse_groups(5000)
         .await
@@ -176,7 +176,7 @@ pub(crate) async fn detect_circular_groups_inner(
 pub(crate) async fn detect_single_member_groups_inner(
     state: &AppState,
 ) -> Result<Vec<DirectoryEntry>, AppError> {
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     let groups = provider
         .browse_groups(5000)
         .await
@@ -211,7 +211,7 @@ pub(crate) async fn detect_stale_groups_inner(
     state: &AppState,
     days_threshold: u64,
 ) -> Result<Vec<DirectoryEntry>, AppError> {
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     let groups = provider
         .browse_groups(5000)
         .await
@@ -253,7 +253,7 @@ pub(crate) async fn detect_stale_groups_inner(
 pub(crate) async fn detect_undescribed_groups_inner(
     state: &AppState,
 ) -> Result<Vec<DirectoryEntry>, AppError> {
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     let groups = provider
         .browse_groups(5000)
         .await
@@ -279,7 +279,7 @@ pub(crate) async fn detect_deep_nesting_inner(
     state: &AppState,
     max_depth: usize,
 ) -> Result<Vec<DeepNestingResult>, AppError> {
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     let groups = provider
         .browse_groups(5000)
         .await
@@ -352,7 +352,7 @@ pub(crate) async fn detect_deep_nesting_inner(
 pub(crate) async fn detect_duplicate_groups_inner(
     state: &AppState,
 ) -> Result<Vec<Vec<DirectoryEntry>>, AppError> {
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     let groups = provider
         .browse_groups(5000)
         .await
@@ -406,7 +406,7 @@ pub(crate) async fn create_group_inner(
     let dn = format!("CN={},{}", name, container_dn);
     capture_snapshot(state, &dn, "GroupCreate").await;
 
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     match provider
         .create_group(name, container_dn, scope, category, description)
         .await
@@ -450,7 +450,7 @@ pub(crate) async fn move_object_inner(
 
     capture_snapshot(state, object_dn, "MoveObject").await;
 
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     match provider.move_object(object_dn, target_container_dn).await {
         Ok(()) => {
             state.audit_service.log_success(
@@ -501,7 +501,7 @@ pub(crate) async fn bulk_move_objects_inner(
     for dn in object_dns {
         capture_snapshot(state, dn, "MoveObject").await;
 
-        let provider = state.directory_provider.clone();
+        let provider = state.provider();
         match provider.move_object(dn, target_container_dn).await {
             Ok(()) => {
                 state.audit_service.log_success(
@@ -548,7 +548,7 @@ pub(crate) async fn update_managed_by_inner(
         ));
     }
 
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     match provider.update_managed_by(group_dn, manager_dn).await {
         Ok(()) => {
             state.audit_service.log_success(
@@ -582,7 +582,7 @@ pub(crate) async fn delete_ad_object_inner(state: &AppState, dn: &str) -> Result
     }
 
     capture_snapshot(state, dn, "ObjectDelete").await;
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     match provider.delete_object(dn).await {
         Ok(()) => {
             state
@@ -610,7 +610,7 @@ pub(crate) async fn delete_group_inner(state: &AppState, group_dn: &str) -> Resu
     }
 
     capture_snapshot(state, group_dn, "GroupDelete").await;
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     match provider.delete_object(group_dn).await {
         Ok(()) => {
             state
@@ -632,7 +632,7 @@ pub(crate) async fn get_replication_metadata_inner(
     state: &AppState,
     object_dn: &str,
 ) -> Result<ReplicationMetadataResult, AppError> {
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     let raw = provider
         .get_replication_metadata(object_dn)
         .await

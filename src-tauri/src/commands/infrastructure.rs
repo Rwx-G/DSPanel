@@ -25,7 +25,7 @@ pub(crate) async fn get_dc_health_inner(state: &AppState) -> Result<Vec<DcHealth
         ));
     }
 
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     crate::services::dc_health::check_all_dc_health(provider)
         .await
         .map_err(|e| AppError::Directory(e.to_string()))
@@ -48,7 +48,7 @@ pub(crate) async fn get_replication_status_inner(
         ));
     }
 
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     crate::services::replication_status::get_replication_partnerships(provider)
         .await
         .map_err(|e| AppError::Directory(e.to_string()))
@@ -98,7 +98,7 @@ pub(crate) async fn get_dns_kerberos_validation_inner(
         ));
     }
 
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     crate::services::dns_validation::run_full_validation(provider, threshold_seconds)
         .await
         .map_err(|e| AppError::Directory(e.to_string()))
@@ -144,7 +144,7 @@ pub(crate) async fn get_topology_inner(state: &AppState) -> Result<TopologyData,
         ));
     }
 
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     crate::services::topology::get_topology(provider)
         .await
         .map_err(|e| AppError::Directory(e.to_string()))
@@ -224,7 +224,7 @@ pub(crate) async fn get_gpo_links_inner(
         ));
     }
 
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     let base_dn = provider
         .base_dn()
         .ok_or_else(|| AppError::Directory("Not connected - no base DN".to_string()))?;
@@ -258,7 +258,7 @@ pub(crate) async fn get_gpo_scope_inner(
         ));
     }
 
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     let base_dn = provider
         .base_dn()
         .ok_or_else(|| AppError::Directory("Not connected - no base DN".to_string()))?;
@@ -518,7 +518,7 @@ pub(crate) async fn get_gpo_list_inner(state: &AppState) -> Result<Vec<GpoInfo>,
         ));
     }
 
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     let base_dn = provider
         .base_dn()
         .ok_or_else(|| AppError::Directory("Not connected - no base DN".to_string()))?;
@@ -893,7 +893,7 @@ mod tests {
     #[tokio::test]
     async fn test_resolve_gpo_names_cached_populates_cache() {
         let state = make_state_with_level(PermissionLevel::DomainAdmin);
-        let provider = state.directory_provider.clone();
+        let provider = state.provider();
         let base_dn = provider.base_dn().unwrap();
 
         let names = resolve_gpo_names_cached(&state, &base_dn, &*provider).await;
@@ -908,7 +908,7 @@ mod tests {
     #[tokio::test]
     async fn test_resolve_gpo_names_cached_returns_cached_value() {
         let state = make_state_with_level(PermissionLevel::DomainAdmin);
-        let provider = state.directory_provider.clone();
+        let provider = state.provider();
         let base_dn = provider.base_dn().unwrap();
 
         // Pre-populate the cache with known data

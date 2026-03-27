@@ -19,7 +19,7 @@ async fn require_fresh_permission(
     operation: &str,
 ) -> Result<(), AppError> {
     let previous_level = state.permission_service.current_level();
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     match state
         .permission_service
         .detect_permissions(&*provider)
@@ -64,7 +64,7 @@ pub(crate) async fn reset_password_inner(
         .map_err(|e| AppError::PermissionDenied(e.to_string()))?;
 
     capture_snapshot(state, user_dn, "PasswordReset").await;
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     match provider
         .reset_password(user_dn, new_password, must_change_at_next_logon)
         .await
@@ -94,7 +94,7 @@ pub(crate) async fn unlock_account_inner(state: &AppState, user_dn: &str) -> Res
     require_fresh_permission(state, PermissionLevel::HelpDesk, "Account unlock").await?;
 
     capture_snapshot(state, user_dn, "AccountUnlock").await;
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     match provider.unlock_account(user_dn).await {
         Ok(()) => {
             state
@@ -116,7 +116,7 @@ pub(crate) async fn enable_account_inner(state: &AppState, user_dn: &str) -> Res
     require_fresh_permission(state, PermissionLevel::HelpDesk, "Account enable").await?;
 
     capture_snapshot(state, user_dn, "AccountEnable").await;
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     match provider.enable_account(user_dn).await {
         Ok(()) => {
             state
@@ -143,7 +143,7 @@ pub(crate) async fn disable_account_inner(state: &AppState, user_dn: &str) -> Re
         .map_err(|e| AppError::PermissionDenied(e.to_string()))?;
 
     capture_snapshot(state, user_dn, "AccountDisable").await;
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     match provider.disable_account(user_dn).await {
         Ok(()) => {
             state
@@ -166,7 +166,7 @@ pub(crate) async fn get_cannot_change_password_inner(
     state: &AppState,
     user_dn: &str,
 ) -> Result<bool, AppError> {
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     provider
         .get_cannot_change_password(user_dn)
         .await
@@ -194,7 +194,7 @@ pub(crate) async fn set_password_flags_inner(
     state
         .snapshot_service
         .capture(user_dn, "PasswordFlagsChange");
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     match provider
         .set_password_flags(user_dn, password_never_expires, user_cannot_change_password)
         .await
@@ -257,7 +257,7 @@ pub(crate) async fn compare_users_inner(
     sam_a: &str,
     sam_b: &str,
 ) -> Result<GroupComparisonResult, AppError> {
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
 
     let user_a = resolve_user(&*provider, sam_a).await?;
     let user_b = resolve_user(&*provider, sam_b).await?;
@@ -294,7 +294,7 @@ pub(crate) async fn add_user_to_group_inner(
 
     capture_snapshot(state, user_dn, "AddToGroup").await;
 
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     match provider.add_user_to_group(user_dn, group_dn).await {
         Ok(()) => {
             state.audit_service.log_success(
@@ -333,7 +333,7 @@ pub(crate) async fn create_user_inner(
         ));
     }
 
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
 
     // Check login uniqueness
     let existing = provider
@@ -390,7 +390,7 @@ pub(crate) async fn modify_attribute_inner(
 
     capture_snapshot(state, dn, "ModifyAttribute").await;
 
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     match provider.modify_attribute(dn, attribute_name, values).await {
         Ok(()) => {
             state.audit_service.log_success(

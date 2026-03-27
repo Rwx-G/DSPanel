@@ -7,5 +7,12 @@
   "closeTab": "Cerrar {{title}}",
   "closeOthers": "Cerrar otras",
   "closeAll": "Cerrar todas",
-  "tabOptions": "Opciones de pestaña"
+  "tabOptions": "Opciones de pestaña",
+  "loginServer": "Servidor",
+  "loginAccount": "Cuenta",
+  "loginSubtitle": "Ingrese sus credenciales AD para conectarse",
+  "loginPassword": "Contraseña",
+  "loginPasswordPlaceholder": "Ingrese la contraseña...",
+  "loginConnect": "Conectar",
+  "loginConnecting": "Conectando..."
 }

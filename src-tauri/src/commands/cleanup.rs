@@ -58,7 +58,7 @@ pub async fn cleanup_dry_run(
         ));
     }
 
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     crate::services::cleanup::evaluate_rule(provider, &rule).await
 }
 
@@ -78,7 +78,7 @@ pub async fn cleanup_execute(
         ));
     }
 
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     let results =
         crate::services::cleanup::execute_cleanup(provider, &state.audit_service, &matches).await;
     Ok(results)
@@ -298,7 +298,7 @@ mod tests {
         };
 
         let result = crate::services::cleanup::evaluate_rule(
-            state.directory_provider.clone(),
+            state.provider(),
             &rule,
         )
         .await
@@ -323,7 +323,7 @@ mod tests {
         };
 
         let result = crate::services::cleanup::evaluate_rule(
-            state.directory_provider.clone(),
+            state.provider(),
             &rule,
         )
         .await
@@ -353,7 +353,7 @@ mod tests {
         }];
 
         let results = crate::services::cleanup::execute_cleanup(
-            state.directory_provider.clone(),
+            state.provider(),
             &state.audit_service,
             &matches,
         )
@@ -379,7 +379,7 @@ mod tests {
         }];
 
         let results = crate::services::cleanup::execute_cleanup(
-            state.directory_provider.clone(),
+            state.provider(),
             &state.audit_service,
             &matches,
         )

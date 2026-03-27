@@ -25,7 +25,7 @@ pub(crate) async fn is_recycle_bin_enabled_inner(state: &AppState) -> Result<boo
         ));
     }
 
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     provider
         .is_recycle_bin_enabled()
         .await
@@ -45,7 +45,7 @@ pub(crate) async fn get_deleted_objects_inner(
         ));
     }
 
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     provider
         .get_deleted_objects()
         .await
@@ -80,7 +80,7 @@ pub(crate) async fn restore_deleted_object_inner(
         .unwrap_or(deleted_dn)
         .to_string();
 
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     match provider
         .restore_deleted_object(deleted_dn, target_ou_dn)
         .await
@@ -123,7 +123,7 @@ pub(crate) async fn create_contact_inner(
         ));
     }
 
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     match provider.create_contact(container_dn, attrs).await {
         Ok(dn) => {
             state.audit_service.log_success(
@@ -161,7 +161,7 @@ pub(crate) async fn update_contact_inner(
 
     capture_snapshot(state, dn, "ContactUpdate").await;
 
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     match provider.update_contact(dn, attrs).await {
         Ok(()) => {
             state
@@ -193,7 +193,7 @@ pub(crate) async fn delete_contact_inner(state: &AppState, dn: &str) -> Result<(
 
     capture_snapshot(state, dn, "ContactDelete").await;
 
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     match provider.delete_contact(dn).await {
         Ok(()) => {
             state
@@ -227,7 +227,7 @@ pub(crate) async fn create_printer_inner(
         ));
     }
 
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     match provider.create_printer(container_dn, attrs).await {
         Ok(dn) => {
             state.audit_service.log_success(
@@ -265,7 +265,7 @@ pub(crate) async fn update_printer_inner(
 
     capture_snapshot(state, dn, "PrinterUpdate").await;
 
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     match provider.update_printer(dn, attrs).await {
         Ok(()) => {
             state
@@ -297,7 +297,7 @@ pub(crate) async fn delete_printer_inner(state: &AppState, dn: &str) -> Result<(
 
     capture_snapshot(state, dn, "PrinterDelete").await;
 
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     match provider.delete_printer(dn).await {
         Ok(()) => {
             state
@@ -325,7 +325,7 @@ pub(crate) async fn get_thumbnail_photo_inner(
     state: &AppState,
     user_dn: &str,
 ) -> Result<Option<String>, AppError> {
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     provider
         .get_thumbnail_photo(user_dn)
         .await
@@ -363,7 +363,7 @@ pub(crate) async fn set_thumbnail_photo_inner(
 
     capture_snapshot(state, user_dn, "SetThumbnailPhoto").await;
 
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     match provider.set_thumbnail_photo(user_dn, photo_base64).await {
         Ok(()) => {
             state
@@ -400,7 +400,7 @@ pub(crate) async fn remove_thumbnail_photo_inner(
         .snapshot_service
         .capture(user_dn, "RemoveThumbnailPhoto");
 
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     match provider.remove_thumbnail_photo(user_dn).await {
         Ok(()) => {
             state.audit_service.log_success(
@@ -532,7 +532,7 @@ pub(crate) async fn capture_object_snapshot_inner(
     object_dn: &str,
     operation_type: &str,
 ) -> Result<i64, AppError> {
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     let operator = provider
         .authenticated_user()
         .unwrap_or_else(|| std::env::var("USERNAME").unwrap_or_else(|_| "Unknown".to_string()));
@@ -592,7 +592,7 @@ pub(crate) async fn compute_snapshot_diff_inner(
         serde_json::from_str(&snapshot.attributes_json).unwrap_or_default();
 
     // Fetch current state from directory by extracting CN and searching
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     let cn = snapshot
         .object_dn
         .split(',')
@@ -694,7 +694,7 @@ pub(crate) async fn restore_from_snapshot_inner(
         "memberOf",
     ];
 
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     let dn = &snapshot.object_dn;
 
     // Fetch current attributes to detect what needs to be cleared
@@ -1099,7 +1099,7 @@ pub(crate) async fn validate_group_exists_inner(
     state: &AppState,
     group_dn: &str,
 ) -> Result<bool, AppError> {
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     // Extract CN from DN to search
     let cn = group_dn
         .split(',')

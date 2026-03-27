@@ -7,5 +7,12 @@
   "closeTab": "{{title}} schließen",
   "closeOthers": "Andere schließen",
   "closeAll": "Alle schließen",
-  "tabOptions": "Tab-Optionen"
+  "tabOptions": "Tab-Optionen",
+  "loginServer": "Server",
+  "loginAccount": "Konto",
+  "loginSubtitle": "Geben Sie Ihre AD-Anmeldedaten ein",
+  "loginPassword": "Passwort",
+  "loginPasswordPlaceholder": "Passwort eingeben...",
+  "loginConnect": "Verbinden",
+  "loginConnecting": "Verbindung wird hergestellt..."
 }

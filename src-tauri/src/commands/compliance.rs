@@ -29,7 +29,7 @@ pub async fn run_compliance_scan(
         ));
     }
 
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     compliance::run_compliance_scan(provider).await
 }
 
@@ -177,7 +177,7 @@ mod tests {
             .has_permission(PermissionLevel::DomainAdmin);
         assert!(has_perm);
 
-        let result = compliance::run_compliance_scan(state.directory_provider.clone())
+        let result = compliance::run_compliance_scan(state.provider())
             .await
             .unwrap();
 
@@ -214,7 +214,7 @@ mod tests {
             .permission_service
             .set_level(PermissionLevel::DomainAdmin);
 
-        let result = compliance::run_compliance_scan(state.directory_provider.clone())
+        let result = compliance::run_compliance_scan(state.provider())
             .await
             .unwrap();
 

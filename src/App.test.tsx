@@ -58,6 +58,7 @@ function mockInvokeResponses(overrides: Record<string, unknown> = {}) {
     get_computer_name: "TESTPC",
     get_platform: "windows",
     get_user_groups: [],
+    needs_credentials: false,
     ...overrides,
   };
   mockedInvoke.mockImplementation((cmd: string) => {
@@ -79,7 +80,9 @@ describe("App", () => {
 
     render(<App />);
 
-    expect(screen.getByTestId("app-shell")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByTestId("app-shell")).toBeInTheDocument();
+    });
     expect(screen.getByTestId("sidebar")).toBeInTheDocument();
     expect(screen.getByTestId("tab-bar")).toBeInTheDocument();
     expect(screen.getByTestId("breadcrumbs")).toBeInTheDocument();
@@ -91,7 +94,9 @@ describe("App", () => {
 
     render(<App />);
 
-    expect(screen.getByTestId("main-content")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByTestId("main-content")).toBeInTheDocument();
+    });
     expect(screen.getByText("Dashboard")).toBeInTheDocument();
   });
 
@@ -110,24 +115,34 @@ describe("App", () => {
     });
   });
 
-  it("should show Disconnected status initially", () => {
-    mockedInvoke.mockImplementation(() => new Promise(() => {}));
+  it("should show Disconnected status initially", async () => {
+    mockedInvoke.mockImplementation((cmd: string) => {
+      if (cmd === "needs_credentials") return Promise.resolve(false);
+      return new Promise(() => {});
+    });
 
     render(<App />);
 
-    expect(screen.getByTestId("status-connection")).toHaveTextContent(
-      "Disconnected",
-    );
+    await waitFor(() => {
+      expect(screen.getByTestId("status-connection")).toHaveTextContent(
+        "Disconnected",
+      );
+    });
   });
 
-  it("should display app version in status bar", () => {
-    mockedInvoke.mockImplementation(() => new Promise(() => {}));
+  it("should display app version in status bar", async () => {
+    mockedInvoke.mockImplementation((cmd: string) => {
+      if (cmd === "needs_credentials") return Promise.resolve(false);
+      return new Promise(() => {});
+    });
 
     render(<App />);
 
-    expect(screen.getByTestId("status-version")).toHaveTextContent(
-      `v${__APP_VERSION__}`,
-    );
+    await waitFor(() => {
+      expect(screen.getByTestId("status-version")).toHaveTextContent(
+        `v${__APP_VERSION__}`,
+      );
+    });
   });
 
   it("should display username on dashboard", async () => {
@@ -167,37 +182,45 @@ describe("App", () => {
     });
   });
 
-  it("should call get_domain_info on mount", () => {
-    mockedInvoke.mockImplementation(() => new Promise(() => {}));
+  it("should call get_domain_info on mount", async () => {
+    mockInvokeResponses();
 
     render(<App />);
 
-    expect(mockedInvoke).toHaveBeenCalledWith("get_domain_info");
+    await waitFor(() => {
+      expect(mockedInvoke).toHaveBeenCalledWith("get_domain_info");
+    });
   });
 
-  it("should call check_connection on mount", () => {
-    mockedInvoke.mockImplementation(() => new Promise(() => {}));
+  it("should call check_connection on mount", async () => {
+    mockInvokeResponses();
 
     render(<App />);
 
-    expect(mockedInvoke).toHaveBeenCalledWith("check_connection");
+    await waitFor(() => {
+      expect(mockedInvoke).toHaveBeenCalledWith("check_connection");
+    });
   });
 
-  it("should call get_current_username on mount", () => {
-    mockedInvoke.mockImplementation(() => new Promise(() => {}));
+  it("should call get_current_username on mount", async () => {
+    mockInvokeResponses();
 
     render(<App />);
 
-    expect(mockedInvoke).toHaveBeenCalledWith("get_current_username");
+    await waitFor(() => {
+      expect(mockedInvoke).toHaveBeenCalledWith("get_current_username");
+    });
   });
 
   describe("ModuleRouter", () => {
-    it("renders HomePage when no tab is active", () => {
+    it("renders HomePage when no tab is active", async () => {
       mockInvokeResponses();
 
       render(<App />);
 
-      expect(screen.getByText("Dashboard")).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText("Dashboard")).toBeInTheDocument();
+      });
       expect(
         screen.queryByTestId("mock-user-lookup"),
       ).not.toBeInTheDocument();
@@ -207,6 +230,11 @@ describe("App", () => {
       mockInvokeResponses();
 
       render(<App />);
+
+      // Wait for app to render after credentials check
+      await waitFor(() => {
+        expect(screen.getByTestId("sidebar-item-users")).toBeInTheDocument();
+      });
 
       // Click the sidebar item for "users" to open that module
       fireEvent.click(screen.getByTestId("sidebar-item-users"));
@@ -220,6 +248,10 @@ describe("App", () => {
       mockInvokeResponses();
 
       render(<App />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("sidebar-item-users")).toBeInTheDocument();
+      });
 
       // Open users module
       fireEvent.click(screen.getByTestId("sidebar-item-users"));
@@ -253,6 +285,10 @@ describe("App", () => {
       mockInvokeResponses();
 
       render(<App />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("sidebar-item-users")).toBeInTheDocument();
+      });
 
       // Open users module
       fireEvent.click(screen.getByTestId("sidebar-item-users"));

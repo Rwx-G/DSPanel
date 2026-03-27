@@ -298,18 +298,6 @@ function RadarChart({ factors }: { factors: RiskFactor[] }) {
   // Score fractions (0-1)
   const scoreFractions = factors.map((f) => Math.max(0, Math.min(1, f.score / 100)));
 
-  // Abbreviate factor name (first 10 chars + ellipsis if longer)
-  // Show up to two words for the radar label
-  function abbreviate(name: string): string {
-    const words = name.split(" ");
-    if (name.length <= 18) return name;
-    if (words.length >= 2) {
-      const twoWords = words[0] + " " + words[1];
-      if (twoWords.length <= 18) return twoWords;
-    }
-    return words[0];
-  }
-
   return (
     <div className="flex flex-col items-center" data-testid="radar-chart">
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
