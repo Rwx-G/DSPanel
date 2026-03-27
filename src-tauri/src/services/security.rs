@@ -3122,6 +3122,7 @@ fn build_credential_param(bind_dn: &str, password: &str) -> String {
     )
 }
 
+#[cfg(target_os = "windows")]
 fn can_read_security_log(dc_host: Option<&str>, credentials: Option<&(String, String)>) -> bool {
     use std::process::Command;
 
