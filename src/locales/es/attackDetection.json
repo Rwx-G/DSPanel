@@ -39,5 +39,7 @@
   "timeWindow": "Ventana de tiempo",
   "disclaimer.checks": "14 tipos de ataque mediante el registro de eventos de seguridad de Windows (análisis XML): Golden Ticket, DCSync, DCShadow, Kerberoasting, AS-REP Roasting, Fuerza bruta, Pass-the-Hash, Password Spray, Shadow Credentials, Abuso RBCD, Manipulación AdminSDHolder y más. Mapeado MITRE ATT&CK.",
   "disclaimer.limitations": "Solo escaneo bajo demanda (no en tiempo real). Lee el registro de eventos local del DC - no consulta DCs remotos. Requiere Windows. No detecta retransmisión NTLM, Skeleton Key, volcados LSASS ni movimiento lateral.",
-  "disclaimer.tools": "Microsoft Defender for Identity (tiempo real, aproximadamente 30 tipos de ataque), CrowdStrike Falcon Identity o Tenable Identity Exposure para monitorización continua."
+  "disclaimer.tools": "Microsoft Defender for Identity (tiempo real, aproximadamente 30 tipos de ataque), CrowdStrike Falcon Identity o Tenable Identity Exposure para monitorización continua.",
+  "windowsOnly": "Solo Windows",
+  "windowsOnlyDescription": "La detección de ataques analiza los registros de eventos de seguridad de Windows y solo está disponible cuando DSPanel se ejecuta en Windows."
 }

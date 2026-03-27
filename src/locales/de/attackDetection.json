@@ -39,5 +39,7 @@
   "timeWindow": "Zeitfenster",
   "disclaimer.checks": "14 Angriffstypen über Windows-Sicherheitsereignisprotokoll (XML-Analyse): Golden Ticket, DCSync, DCShadow, Kerberoasting, AS-REP Roasting, Brute Force, Pass-the-Hash, Passwort-Spray, Shadow Credentials, RBCD-Missbrauch, AdminSDHolder-Manipulation und mehr. MITRE ATT&CK zugeordnet.",
   "disclaimer.limitations": "Nur On-Demand-Scan (nicht Echtzeit). Liest lokales DC-Ereignisprotokoll - fragt keine Remote-DCs ab. Erfordert Windows. Erkennt kein NTLM-Relay, Skeleton Key, LSASS-Dumps oder laterale Bewegung.",
-  "disclaimer.tools": "Microsoft Defender for Identity (Echtzeit, ca. 30 Angriffstypen), CrowdStrike Falcon Identity oder Tenable Identity Exposure für kontinuierliche Überwachung."
+  "disclaimer.tools": "Microsoft Defender for Identity (Echtzeit, ca. 30 Angriffstypen), CrowdStrike Falcon Identity oder Tenable Identity Exposure für kontinuierliche Überwachung.",
+  "windowsOnly": "Nur Windows",
+  "windowsOnlyDescription": "Die Angriffserkennung analysiert Windows-Sicherheitsereignisprotokolle und ist nur verfügbar, wenn DSPanel unter Windows ausgeführt wird."
 }
