@@ -6,8 +6,8 @@ use anyhow::Result;
 use crate::models::topology::{
     SiteNode, TopologyData, TopologyDcNode, TopologyReplicationLink, TopologySiteLink,
 };
-use crate::services::dc_health::{discover_fsmo_roles, resolve_fallback_ip};
 use crate::services::DirectoryProvider;
+use crate::services::dc_health::{discover_fsmo_roles, resolve_fallback_ip};
 
 /// Queries the AD Configuration partition and assembles a complete topology
 /// view including sites, domain controllers, replication connections, and
@@ -391,11 +391,7 @@ fn assemble_topology(
                 .iter()
                 .filter_map(|dn| {
                     let cn = extract_cn_from_dn(dn);
-                    if cn.is_empty() {
-                        None
-                    } else {
-                        Some(cn)
-                    }
+                    if cn.is_empty() { None } else { Some(cn) }
                 })
                 .collect();
 
@@ -655,7 +651,12 @@ mod tests {
         let connections = vec![make_entry(
             "CN=abc-guid,CN=NTDS Settings,CN=DC2,CN=Servers,CN=Site1,CN=Sites,CN=Configuration,DC=example,DC=com",
             vec![
-                ("fromServer", vec!["CN=NTDS Settings,CN=DC1,CN=Servers,CN=Site1,CN=Sites,CN=Configuration,DC=example,DC=com"]),
+                (
+                    "fromServer",
+                    vec![
+                        "CN=NTDS Settings,CN=DC1,CN=Servers,CN=Site1,CN=Sites,CN=Configuration,DC=example,DC=com",
+                    ],
+                ),
                 ("whenChanged", vec!["2026-03-21T10:00:00Z"]),
             ],
         )];
@@ -684,7 +685,12 @@ mod tests {
         let connections = vec![make_entry(
             "CN=abc-guid,CN=NTDS Settings,CN=DC2,CN=Servers,CN=Site1,CN=Sites,CN=Configuration,DC=example,DC=com",
             vec![
-                ("fromServer", vec!["CN=NTDS Settings,CN=DC1,CN=Servers,CN=Site1,CN=Sites,CN=Configuration,DC=example,DC=com"]),
+                (
+                    "fromServer",
+                    vec![
+                        "CN=NTDS Settings,CN=DC1,CN=Servers,CN=Site1,CN=Sites,CN=Configuration,DC=example,DC=com",
+                    ],
+                ),
                 ("msDS-ReplLastSyncResult", vec!["8453"]),
                 ("msDS-ReplConsecutiveSyncFailures", vec!["3"]),
             ],
@@ -713,7 +719,12 @@ mod tests {
     fn test_assemble_replication_links_unknown_status() {
         let connections = vec![make_entry(
             "CN=abc-guid,CN=NTDS Settings,CN=DC2,CN=Servers,CN=Site1,CN=Sites,CN=Configuration,DC=example,DC=com",
-            vec![("fromServer", vec!["CN=NTDS Settings,CN=DC1,CN=Servers,CN=Site1,CN=Sites,CN=Configuration,DC=example,DC=com"])],
+            vec![(
+                "fromServer",
+                vec![
+                    "CN=NTDS Settings,CN=DC1,CN=Servers,CN=Site1,CN=Sites,CN=Configuration,DC=example,DC=com",
+                ],
+            )],
         )];
 
         let result = assemble_topology(
@@ -738,10 +749,13 @@ mod tests {
             vec![
                 ("cost", vec!["100"]),
                 ("replInterval", vec!["180"]),
-                ("siteList", vec![
-                    "CN=Site1,CN=Sites,CN=Configuration,DC=example,DC=com",
-                    "CN=Site2,CN=Sites,CN=Configuration,DC=example,DC=com",
-                ]),
+                (
+                    "siteList",
+                    vec![
+                        "CN=Site1,CN=Sites,CN=Configuration,DC=example,DC=com",
+                        "CN=Site2,CN=Sites,CN=Configuration,DC=example,DC=com",
+                    ],
+                ),
             ],
         )];
 

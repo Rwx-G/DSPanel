@@ -137,8 +137,8 @@ impl AppState {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::services::directory::tests::MockDirectoryProvider;
     use crate::services::PermissionLevel;
+    use crate::services::directory::tests::MockDirectoryProvider;
 
     fn make_state() -> AppState {
         let provider = Arc::new(MockDirectoryProvider::new());
@@ -191,12 +191,16 @@ mod tests {
     #[test]
     fn test_app_state_permission_service_has_permission() {
         let state = make_state();
-        assert!(state
-            .permission_service
-            .has_permission(PermissionLevel::ReadOnly));
-        assert!(!state
-            .permission_service
-            .has_permission(PermissionLevel::HelpDesk));
+        assert!(
+            state
+                .permission_service
+                .has_permission(PermissionLevel::ReadOnly)
+        );
+        assert!(
+            !state
+                .permission_service
+                .has_permission(PermissionLevel::HelpDesk)
+        );
     }
 
     #[test]

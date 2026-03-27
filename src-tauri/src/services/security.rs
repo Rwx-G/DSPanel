@@ -1042,7 +1042,7 @@ async fn compute_privileged_hygiene_factor(provider: Arc<dyn DirectoryProvider>)
             score: 50.0,
             explanation: "Could not assess privileged accounts".to_string(),
             recommendations: vec![
-                "Ensure directory connectivity to scan privileged groups".to_string()
+                "Ensure directory connectivity to scan privileged groups".to_string(),
             ],
             findings: vec![],
         },
@@ -3059,8 +3059,12 @@ pub async fn detect_attacks(
     let credentials = provider.simple_bind_credentials();
 
     #[cfg(target_os = "windows")]
-    let (alerts, event_log_accessible) =
-        analyze_windows_event_log(time_window_hours, &config, dc_host.as_deref(), credentials.as_ref());
+    let (alerts, event_log_accessible) = analyze_windows_event_log(
+        time_window_hours,
+        &config,
+        dc_host.as_deref(),
+        credentials.as_ref(),
+    );
 
     #[cfg(not(target_os = "windows"))]
     let (alerts, event_log_accessible): (Vec<AttackAlert>, bool) = (Vec::new(), false);
@@ -3139,7 +3143,11 @@ fn can_read_security_log(dc_host: Option<&str>, credentials: Option<&(String, St
         "{}try{{Get-WinEvent -LogName Security -ComputerName '{}'{} -MaxEvents 1 -EA Stop | Out-Null;'true'}}catch{{$_.Exception.Message}}",
         cred_setup, host, cred_param
     );
-    tracing::debug!(dc_host = host, has_credentials = credentials.is_some(), "Probing remote Security event log access");
+    tracing::debug!(
+        dc_host = host,
+        has_credentials = credentials.is_some(),
+        "Probing remote Security event log access"
+    );
 
     match Command::new("powershell")
         .args(["-NoProfile", "-NonInteractive", "-Command", &cmd])
@@ -3169,7 +3177,12 @@ fn can_read_security_log(dc_host: Option<&str>, credentials: Option<&(String, St
 /// Runs a PowerShell query for a batch of event IDs and returns parsed event records.
 /// When `dc_host` is provided, queries the remote DC's Security log via `-ComputerName`.
 #[cfg(target_os = "windows")]
-fn query_events(event_ids: &[u32], time_window_hours: u32, dc_host: Option<&str>, credentials: Option<&(String, String)>) -> Vec<EventRecord> {
+fn query_events(
+    event_ids: &[u32],
+    time_window_hours: u32,
+    dc_host: Option<&str>,
+    credentials: Option<&(String, String)>,
+) -> Vec<EventRecord> {
     use std::process::Command;
 
     let ids_str = event_ids
@@ -3265,7 +3278,8 @@ fn analyze_windows_event_log(
     let mut alerts = Vec::new();
 
     // Batch 1: Kerberos events (4768, 4769, 4771)
-    let kerberos_events = query_events(&[4768, 4769, 4771], time_window_hours, dc_host, credentials);
+    let kerberos_events =
+        query_events(&[4768, 4769, 4771], time_window_hours, dc_host, credentials);
     let events_4768: Vec<&EventRecord> = kerberos_events
         .iter()
         .filter(|e| e.id == Some(4768))
@@ -3291,7 +3305,12 @@ fn analyze_windows_event_log(
     let dir_events: Vec<&EventRecord> = dir_events_raw.iter().collect();
 
     // Batch 4: Group/computer changes (4728, 4732, 4742, 4756)
-    let group_events = query_events(&[4728, 4732, 4742, 4756], time_window_hours, dc_host, credentials);
+    let group_events = query_events(
+        &[4728, 4732, 4742, 4756],
+        time_window_hours,
+        dc_host,
+        credentials,
+    );
     let events_4742: Vec<&EventRecord> =
         group_events.iter().filter(|e| e.id == Some(4742)).collect();
     let events_group_change: Vec<&EventRecord> = group_events
@@ -6429,8 +6448,7 @@ mod tests {
             alerts: vec![],
         };
 
-        let provider =
-            Arc::new(crate::services::directory::tests::MockDirectoryProvider::new());
+        let provider = Arc::new(crate::services::directory::tests::MockDirectoryProvider::new());
         let result = compute_infrastructure_hardening_factor(provider, &findings).await;
 
         // LAPS not deployed (-30) + Recycle Bin off (-15) + no PSOs (-10)
@@ -6455,8 +6473,7 @@ mod tests {
             alerts: vec![],
         };
 
-        let provider =
-            Arc::new(crate::services::directory::tests::MockDirectoryProvider::new());
+        let provider = Arc::new(crate::services::directory::tests::MockDirectoryProvider::new());
         let result = compute_infrastructure_hardening_factor(provider, &findings).await;
 
         // Good posture - should be high score

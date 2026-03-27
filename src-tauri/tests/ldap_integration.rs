@@ -35,8 +35,8 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use dspanel_lib::services::directory::DirectoryProvider;
 use dspanel_lib::services::dc_health;
+use dspanel_lib::services::directory::DirectoryProvider;
 use dspanel_lib::services::ldap_directory::{LdapDirectoryProvider, LdapTlsConfig};
 use dspanel_lib::services::replication_status;
 use dspanel_lib::services::topology;
@@ -671,10 +671,7 @@ async fn read_get_cannot_change_password() {
         .await;
     match result {
         Ok(cannot_change) => {
-            println!(
-                "testreadonly cannot change password: {}",
-                cannot_change
-            );
+            println!("testreadonly cannot change password: {}", cannot_change);
             // Just verify it returns a boolean without error
         }
         Err(e) => {
@@ -697,10 +694,7 @@ async fn read_get_replication_metadata() {
         .expect("get_replication_metadata failed");
     match metadata {
         Some(xml) => {
-            println!(
-                "Replication metadata length: {} chars",
-                xml.len()
-            );
+            println!("Replication metadata length: {} chars", xml.len());
             assert!(
                 xml.contains("DS_REPL_ATTR_META_DATA")
                     || xml.contains("pszAttributeName")
@@ -766,10 +760,7 @@ async fn read_is_recycle_bin_enabled() {
         .await
         .expect("is_recycle_bin_enabled failed");
     println!("Recycle Bin enabled: {}", enabled);
-    assert!(
-        enabled,
-        "Modern AD (2016+) should have Recycle Bin enabled"
-    );
+    assert!(enabled, "Modern AD (2016+) should have Recycle Bin enabled");
 }
 
 #[tokio::test]
@@ -792,17 +783,12 @@ async fn read_entry_rootdse() {
         .expect("read_entry('') failed");
     assert!(entry.is_some(), "rootDSE should always be readable");
     let entry = entry.unwrap();
-    let has_naming_ctx = entry
-        .attributes
-        .contains_key("defaultNamingContext");
+    let has_naming_ctx = entry.attributes.contains_key("defaultNamingContext");
     assert!(
         has_naming_ctx,
         "rootDSE should contain defaultNamingContext"
     );
-    println!(
-        "rootDSE has {} attributes",
-        entry.attributes.len()
-    );
+    println!("rootDSE has {} attributes", entry.attributes.len());
 }
 
 #[tokio::test]
@@ -830,10 +816,7 @@ async fn read_search_configuration() {
     let provider = skip_if_no_ad!();
     let base_dn = provider.base_dn().expect("No base DN");
     // Search for Sites in the Configuration partition
-    let config_base = format!(
-        "CN=Sites,CN=Configuration,{}",
-        base_dn
-    );
+    let config_base = format!("CN=Sites,CN=Configuration,{}", base_dn);
     let results = provider
         .search_configuration(&config_base, "(objectClass=site)")
         .await
@@ -875,10 +858,7 @@ async fn write_create_and_delete_contact() {
         "displayName".to_string(),
         "DSPanel Integration Test Contact".to_string(),
     );
-    attrs.insert(
-        "mail".to_string(),
-        "inttest@dspanel.local".to_string(),
-    );
+    attrs.insert("mail".to_string(), "inttest@dspanel.local".to_string());
 
     let result = provider.create_contact(&container, &attrs).await;
     match result {
@@ -891,9 +871,7 @@ async fn write_create_and_delete_contact() {
                 .browse_contacts(500)
                 .await
                 .expect("browse_contacts failed");
-            let found = contacts
-                .iter()
-                .any(|c| c.distinguished_name == dn);
+            let found = contacts.iter().any(|c| c.distinguished_name == dn);
             assert!(found, "Created contact should appear in browse results");
 
             // Delete
@@ -982,11 +960,7 @@ async fn write_set_password_flags() {
 
             // Restore original flags
             provider
-                .set_password_flags(
-                    &user.distinguished_name,
-                    false,
-                    original,
-                )
+                .set_password_flags(&user.distinguished_name, false, original)
                 .await
                 .expect("Failed to restore password flags");
             println!("Restored password flags to original state");
@@ -1011,9 +985,7 @@ async fn admin_unlock_account() {
         .expect("testreadonly not found");
 
     // Unlock should succeed even if the account is not locked
-    let result = provider
-        .unlock_account(&user.distinguished_name)
-        .await;
+    let result = provider.unlock_account(&user.distinguished_name).await;
     match result {
         Ok(()) => {
             println!("unlock_account succeeded for testreadonly");
@@ -1073,10 +1045,7 @@ async fn admin_create_and_delete_user() {
                 .get_user_by_identity("DSPanel-IntTest-TempUser")
                 .await
                 .expect("get_user_by_identity failed");
-            assert!(
-                found.is_none(),
-                "Deleted user should not be findable"
-            );
+            assert!(found.is_none(), "Deleted user should not be findable");
         }
         Err(e) => {
             eprintln!("SKIPPED (permission denied?): {}", e);
@@ -1093,23 +1062,19 @@ async fn admin_get_thumbnail_photo() {
         .expect("get_user failed")
         .expect("testadmin not found");
 
-    let result = provider
-        .get_thumbnail_photo(&user.distinguished_name)
-        .await;
+    let result = provider.get_thumbnail_photo(&user.distinguished_name).await;
     match result {
-        Ok(photo) => {
-            match photo {
-                Some(base64_data) => {
-                    println!(
-                        "testadmin has a thumbnail photo ({} chars base64)",
-                        base64_data.len()
-                    );
-                }
-                None => {
-                    println!("testadmin has no thumbnail photo set");
-                }
+        Ok(photo) => match photo {
+            Some(base64_data) => {
+                println!(
+                    "testadmin has a thumbnail photo ({} chars base64)",
+                    base64_data.len()
+                );
             }
-        }
+            None => {
+                println!("testadmin has no thumbnail photo set");
+            }
+        },
         Err(e) => {
             eprintln!("SKIPPED (permission denied?): {}", e);
         }
@@ -1150,12 +1115,7 @@ async fn read_dc_health_check() {
         "Health check should produce at least one check"
     );
     for check in &result.checks {
-        println!(
-            "  [{:?}] {} - {}",
-            check.status,
-            check.name,
-            check.message
-        );
+        println!("  [{:?}] {} - {}", check.status, check.name, check.message);
     }
     assert!(
         !result.checked_at.is_empty(),

@@ -6,10 +6,10 @@
 #[cfg(target_os = "windows")]
 mod platform {
     use anyhow::{Context, Result};
-    use windows::Win32::Foundation::LocalFree;
     use windows::Win32::Foundation::HLOCAL;
+    use windows::Win32::Foundation::LocalFree;
     use windows::Win32::Security::Cryptography::{
-        CryptProtectData, CryptUnprotectData, CRYPTPROTECT_UI_FORBIDDEN, CRYPT_INTEGER_BLOB,
+        CRYPT_INTEGER_BLOB, CRYPTPROTECT_UI_FORBIDDEN, CryptProtectData, CryptUnprotectData,
     };
 
     /// Encrypts data using DPAPI (tied to current Windows user).

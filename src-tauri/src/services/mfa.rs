@@ -592,10 +592,12 @@ mod tests {
         // 6th attempt should be blocked with an error
         let result = svc.verify("000000");
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("Too many failed MFA attempts"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Too many failed MFA attempts")
+        );
     }
 
     #[test]

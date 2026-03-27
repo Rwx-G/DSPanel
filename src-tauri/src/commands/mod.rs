@@ -274,20 +274,25 @@ pub async fn connect_simple_bind(
         ca_cert_file,
     };
 
-    let provider: Arc<dyn crate::services::DirectoryProvider> =
-        Arc::new(LdapDirectoryProvider::new_with_credentials(
-            server, bind_dn, password, tls_config,
-        ));
+    let provider: Arc<dyn crate::services::DirectoryProvider> = Arc::new(
+        LdapDirectoryProvider::new_with_credentials(server, bind_dn, password, tls_config),
+    );
 
     // Test the connection
     match provider.test_connection().await {
         Ok(true) => {
             // Detect permissions
-            if let Err(e) = state.permission_service.detect_permissions(&*provider).await {
+            if let Err(e) = state
+                .permission_service
+                .detect_permissions(&*provider)
+                .await
+            {
                 tracing::warn!("Permission detection failed after login: {}", e);
             }
             if let Some(ref name) = provider.authenticated_user() {
-                state.permission_service.set_authenticated_user(name.clone());
+                state
+                    .permission_service
+                    .set_authenticated_user(name.clone());
                 state.audit_service.set_operator(name.clone());
                 tracing::info!(operator = %name, "Authenticated after login prompt");
             }
@@ -314,8 +319,8 @@ pub async fn connect_simple_bind(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::services::directory::tests::MockDirectoryProvider;
     use crate::services::PermissionConfig;
+    use crate::services::directory::tests::MockDirectoryProvider;
     use std::sync::Arc;
 
     fn make_state() -> AppState {

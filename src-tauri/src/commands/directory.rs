@@ -5,7 +5,7 @@ use crate::error::AppError;
 use crate::models::{DirectoryEntry, OUNode};
 use crate::state::AppState;
 
-use super::{validate_search_input, BrowseResult, DomainInfo};
+use super::{BrowseResult, DomainInfo, validate_search_input};
 
 /// Searches for user accounts matching the query string.
 pub(crate) async fn search_users_inner(
@@ -286,7 +286,7 @@ pub async fn ping_host(hostname: String) -> Result<String, AppError> {
 #[tauri::command]
 pub async fn resolve_dns(hostname: String) -> Result<Vec<String>, AppError> {
     use tokio::net::lookup_host;
-    use tokio::time::{timeout, Duration};
+    use tokio::time::{Duration, timeout};
 
     let result = timeout(
         Duration::from_secs(5),
@@ -560,8 +560,8 @@ pub async fn search_printers(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::services::directory::tests::MockDirectoryProvider;
     use crate::services::PermissionConfig;
+    use crate::services::directory::tests::MockDirectoryProvider;
     use std::collections::HashMap;
     use std::sync::Arc;
 

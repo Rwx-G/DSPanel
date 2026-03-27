@@ -1266,10 +1266,7 @@ mod tests {
 
     #[test]
     fn format_filetime_zero_shows_never() {
-        assert_eq!(
-            format_ad_attribute("lastLogonTimestamp", "0"),
-            "Never"
-        );
+        assert_eq!(format_ad_attribute("lastLogonTimestamp", "0"), "Never");
     }
 
     #[test]
@@ -1288,10 +1285,7 @@ mod tests {
 
     #[test]
     fn format_when_created_invalid() {
-        assert_eq!(
-            format_ad_attribute("whenCreated", "bad_date"),
-            "bad_date"
-        );
+        assert_eq!(format_ad_attribute("whenCreated", "bad_date"), "bad_date");
     }
 
     #[test]
@@ -1466,8 +1460,7 @@ mod tests {
         normal.sam_account_name = Some("user".to_string());
         normal.object_class = Some("user".to_string());
 
-        let provider =
-            Arc::new(MockDirectoryProvider::new().with_users(vec![admin, normal]));
+        let provider = Arc::new(MockDirectoryProvider::new().with_users(vec![admin, normal]));
 
         let result = execute_query(provider, "privilegedAccounts").await.unwrap();
         assert_eq!(result.len(), 1);

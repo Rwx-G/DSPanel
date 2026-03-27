@@ -2,10 +2,10 @@ use tauri::State;
 
 use crate::error::AppError;
 use crate::models::{DeletedObject, ExchangeOnlineInfo, ObjectSnapshot, Preset, SnapshotDiff};
+use crate::services::PermissionLevel;
 use crate::services::app_settings::AppSettings;
 use crate::services::permissions::PermissionMappings;
 use crate::services::update::{self, UpdateInfo};
-use crate::services::PermissionLevel;
 use crate::state::AppState;
 
 use super::capture_snapshot;
@@ -1380,8 +1380,8 @@ pub async fn pick_folder_dialog() -> Result<Option<String>, AppError> {
 mod tests {
     use super::*;
     use crate::models::DirectoryEntry;
-    use crate::services::directory::tests::MockDirectoryProvider;
     use crate::services::PermissionConfig;
+    use crate::services::directory::tests::MockDirectoryProvider;
     use std::collections::HashMap;
     use std::sync::Arc;
 
@@ -1710,9 +1710,11 @@ mod tests {
         assert!(result.is_err());
 
         let entries = state.audit_service.get_entries();
-        assert!(entries
-            .iter()
-            .any(|e| e.action == "ThumbnailPhotoSetFailed"));
+        assert!(
+            entries
+                .iter()
+                .any(|e| e.action == "ThumbnailPhotoSetFailed")
+        );
     }
 
     #[tokio::test]
@@ -1723,9 +1725,11 @@ mod tests {
         assert!(result.is_err());
 
         let entries = state.audit_service.get_entries();
-        assert!(entries
-            .iter()
-            .any(|e| e.action == "ThumbnailPhotoRemoveFailed"));
+        assert!(
+            entries
+                .iter()
+                .any(|e| e.action == "ThumbnailPhotoRemoveFailed")
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -2122,9 +2126,11 @@ mod tests {
         set_permission_mappings_inner(&state, &mappings).unwrap();
 
         let entries = state.audit_service.get_entries();
-        assert!(entries
-            .iter()
-            .any(|e| e.action == "PermissionMappingUpdate"));
+        assert!(
+            entries
+                .iter()
+                .any(|e| e.action == "PermissionMappingUpdate")
+        );
     }
 
     #[tokio::test]
@@ -2166,8 +2172,7 @@ mod tests {
     async fn test_create_contact_failure_audits() {
         let state = make_state_with_level_and_failure(PermissionLevel::AccountOperator);
         let attrs = HashMap::new();
-        let result =
-            create_contact_inner(&state, "OU=Contacts,DC=example,DC=com", &attrs).await;
+        let result = create_contact_inner(&state, "OU=Contacts,DC=example,DC=com", &attrs).await;
         assert!(result.is_err());
 
         let entries = state.audit_service.get_entries();
@@ -2179,8 +2184,7 @@ mod tests {
         let state = make_state(); // ReadOnly
         let attrs = HashMap::new();
         let result =
-            update_contact_inner(&state, "CN=Contact,OU=Contacts,DC=example,DC=com", &attrs)
-                .await;
+            update_contact_inner(&state, "CN=Contact,OU=Contacts,DC=example,DC=com", &attrs).await;
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), AppError::PermissionDenied(_)));
     }
@@ -2192,12 +2196,8 @@ mod tests {
         let mut attrs = HashMap::new();
         attrs.insert("mail".to_string(), "new@example.com".to_string());
 
-        let result = update_contact_inner(
-            &state,
-            "CN=Contact,OU=Contacts,DC=example,DC=com",
-            &attrs,
-        )
-        .await;
+        let result =
+            update_contact_inner(&state, "CN=Contact,OU=Contacts,DC=example,DC=com", &attrs).await;
         assert!(result.is_ok());
 
         let calls = provider.update_contact_calls.lock().unwrap();
@@ -2211,12 +2211,8 @@ mod tests {
     async fn test_update_contact_failure_audits() {
         let state = make_state_with_level_and_failure(PermissionLevel::AccountOperator);
         let attrs = HashMap::new();
-        let result = update_contact_inner(
-            &state,
-            "CN=Contact,OU=Contacts,DC=example,DC=com",
-            &attrs,
-        )
-        .await;
+        let result =
+            update_contact_inner(&state, "CN=Contact,OU=Contacts,DC=example,DC=com", &attrs).await;
         assert!(result.is_err());
 
         let entries = state.audit_service.get_entries();
@@ -2227,8 +2223,7 @@ mod tests {
     async fn test_delete_contact_success_and_audit() {
         let (state, provider) =
             make_state_with_level_and_provider(PermissionLevel::AccountOperator);
-        let result =
-            delete_contact_inner(&state, "CN=Contact,OU=Contacts,DC=example,DC=com").await;
+        let result = delete_contact_inner(&state, "CN=Contact,OU=Contacts,DC=example,DC=com").await;
         assert!(result.is_ok());
 
         let calls = provider.delete_contact_calls.lock().unwrap();
@@ -2241,8 +2236,7 @@ mod tests {
     #[tokio::test]
     async fn test_delete_contact_failure_audits() {
         let state = make_state_with_level_and_failure(PermissionLevel::AccountOperator);
-        let result =
-            delete_contact_inner(&state, "CN=Contact,OU=Contacts,DC=example,DC=com").await;
+        let result = delete_contact_inner(&state, "CN=Contact,OU=Contacts,DC=example,DC=com").await;
         assert!(result.is_err());
 
         let entries = state.audit_service.get_entries();
@@ -2255,13 +2249,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_printer_success_and_audit() {
-        let (state, provider) =
-            make_state_with_level_and_provider(PermissionLevel::DomainAdmin);
+        let (state, provider) = make_state_with_level_and_provider(PermissionLevel::DomainAdmin);
         let mut attrs = HashMap::new();
         attrs.insert("printerName".to_string(), "HP LaserJet".to_string());
 
-        let result =
-            create_printer_inner(&state, "OU=Printers,DC=example,DC=com", &attrs).await;
+        let result = create_printer_inner(&state, "OU=Printers,DC=example,DC=com", &attrs).await;
         assert!(result.is_ok());
 
         let calls = provider.create_printer_calls.lock().unwrap();
@@ -2275,8 +2267,7 @@ mod tests {
     async fn test_create_printer_failure_audits() {
         let state = make_state_with_level_and_failure(PermissionLevel::DomainAdmin);
         let attrs = HashMap::new();
-        let result =
-            create_printer_inner(&state, "OU=Printers,DC=example,DC=com", &attrs).await;
+        let result = create_printer_inner(&state, "OU=Printers,DC=example,DC=com", &attrs).await;
         assert!(result.is_err());
 
         let entries = state.audit_service.get_entries();
@@ -2287,29 +2278,20 @@ mod tests {
     async fn test_update_printer_requires_domain_admin() {
         let state = make_state_with_level(PermissionLevel::AccountOperator);
         let attrs = HashMap::new();
-        let result = update_printer_inner(
-            &state,
-            "CN=Printer,OU=Printers,DC=example,DC=com",
-            &attrs,
-        )
-        .await;
+        let result =
+            update_printer_inner(&state, "CN=Printer,OU=Printers,DC=example,DC=com", &attrs).await;
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), AppError::PermissionDenied(_)));
     }
 
     #[tokio::test]
     async fn test_update_printer_success_and_audit() {
-        let (state, provider) =
-            make_state_with_level_and_provider(PermissionLevel::DomainAdmin);
+        let (state, provider) = make_state_with_level_and_provider(PermissionLevel::DomainAdmin);
         let mut attrs = HashMap::new();
         attrs.insert("location".to_string(), "Floor 3".to_string());
 
-        let result = update_printer_inner(
-            &state,
-            "CN=Printer,OU=Printers,DC=example,DC=com",
-            &attrs,
-        )
-        .await;
+        let result =
+            update_printer_inner(&state, "CN=Printer,OU=Printers,DC=example,DC=com", &attrs).await;
         assert!(result.is_ok());
 
         let calls = provider.update_printer_calls.lock().unwrap();
@@ -2323,12 +2305,8 @@ mod tests {
     async fn test_update_printer_failure_audits() {
         let state = make_state_with_level_and_failure(PermissionLevel::DomainAdmin);
         let attrs = HashMap::new();
-        let result = update_printer_inner(
-            &state,
-            "CN=Printer,OU=Printers,DC=example,DC=com",
-            &attrs,
-        )
-        .await;
+        let result =
+            update_printer_inner(&state, "CN=Printer,OU=Printers,DC=example,DC=com", &attrs).await;
         assert!(result.is_err());
 
         let entries = state.audit_service.get_entries();
@@ -2337,10 +2315,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_delete_printer_success_and_audit() {
-        let (state, provider) =
-            make_state_with_level_and_provider(PermissionLevel::DomainAdmin);
-        let result =
-            delete_printer_inner(&state, "CN=Printer,OU=Printers,DC=example,DC=com").await;
+        let (state, provider) = make_state_with_level_and_provider(PermissionLevel::DomainAdmin);
+        let result = delete_printer_inner(&state, "CN=Printer,OU=Printers,DC=example,DC=com").await;
         assert!(result.is_ok());
 
         let calls = provider.delete_printer_calls.lock().unwrap();
@@ -2353,8 +2329,7 @@ mod tests {
     #[tokio::test]
     async fn test_delete_printer_failure_audits() {
         let state = make_state_with_level_and_failure(PermissionLevel::DomainAdmin);
-        let result =
-            delete_printer_inner(&state, "CN=Printer,OU=Printers,DC=example,DC=com").await;
+        let result = delete_printer_inner(&state, "CN=Printer,OU=Printers,DC=example,DC=com").await;
         assert!(result.is_err());
 
         let entries = state.audit_service.get_entries();
@@ -2371,12 +2346,9 @@ mod tests {
         // Create a base64 string that decodes to > 100KB
         // 140000 base64 chars ~ 105KB decoded
         let large_photo = "A".repeat(140_000);
-        let result = set_thumbnail_photo_inner(
-            &state,
-            "CN=John,OU=Users,DC=example,DC=com",
-            &large_photo,
-        )
-        .await;
+        let result =
+            set_thumbnail_photo_inner(&state, "CN=John,OU=Users,DC=example,DC=com", &large_photo)
+                .await;
         assert!(result.is_err());
         match result.unwrap_err() {
             AppError::Validation(msg) => {
@@ -2412,9 +2384,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_is_recycle_bin_disabled() {
-        let provider = Arc::new(
-            MockDirectoryProvider::new().with_recycle_bin_disabled(),
-        );
+        let provider = Arc::new(MockDirectoryProvider::new().with_recycle_bin_disabled());
         let state = AppState::new_for_test(provider, PermissionConfig::default());
         state
             .permission_service
@@ -2460,12 +2430,10 @@ mod tests {
         let provider = Arc::new(MockDirectoryProvider::new().with_groups(vec![group]));
         let state = AppState::new_for_test(provider, PermissionConfig::default());
 
-        let result = validate_group_exists_inner(
-            &state,
-            "CN=IT-Support,OU=Groups,DC=example,DC=com",
-        )
-        .await
-        .unwrap();
+        let result =
+            validate_group_exists_inner(&state, "CN=IT-Support,OU=Groups,DC=example,DC=com")
+                .await
+                .unwrap();
         assert!(result);
     }
 
@@ -2546,10 +2514,9 @@ mod tests {
                 object_class: Some("user".to_string()),
                 attributes: HashMap::new(),
             };
-            entry.attributes.insert(
-                "mail".to_string(),
-                vec!["newemail@example.com".to_string()],
-            );
+            entry
+                .attributes
+                .insert("mail".to_string(), vec!["newemail@example.com".to_string()]);
             entry
         }];
         let state = make_state_with_users(users);

@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use crate::error::DirectoryError;
 use crate::models::{ContactInfo, DirectoryEntry, OUNode, PrinterInfo};
 use crate::services::directory::DirectoryProvider;
-use crate::services::resilience::{retry_with_backoff, CircuitBreaker, RetryConfig};
+use crate::services::resilience::{CircuitBreaker, RetryConfig, retry_with_backoff};
 
 /// Executes a directory operation with retry and circuit breaker protection.
 ///
@@ -1466,7 +1466,13 @@ mod tests {
         );
 
         let result = provider
-            .create_group("TestGroup", "OU=Groups,DC=test", "Global", "Security", "A test group")
+            .create_group(
+                "TestGroup",
+                "OU=Groups,DC=test",
+                "Global",
+                "Security",
+                "A test group",
+            )
             .await;
         assert!(result.is_ok());
     }
@@ -1693,8 +1699,7 @@ mod tests {
     #[tokio::test]
     async fn test_resilient_get_thumbnail_photo() {
         let inner = Arc::new(
-            MockDirectoryProvider::new()
-                .with_thumbnail_photo("CN=User,DC=test", "base64data"),
+            MockDirectoryProvider::new().with_thumbnail_photo("CN=User,DC=test", "base64data"),
         );
         let provider = ResilientDirectoryProvider::new(
             inner,
@@ -1761,9 +1766,7 @@ mod tests {
             noop_delay,
         );
 
-        let result = provider
-            .remove_thumbnail_photo("CN=User,DC=test")
-            .await;
+        let result = provider.remove_thumbnail_photo("CN=User,DC=test").await;
         assert!(result.is_ok());
     }
 
@@ -1782,9 +1785,7 @@ mod tests {
         );
 
         let attrs = HashMap::from([("displayName".to_string(), "Test Contact".to_string())]);
-        let result = provider
-            .create_contact("OU=Contacts,DC=test", &attrs)
-            .await;
+        let result = provider.create_contact("OU=Contacts,DC=test", &attrs).await;
         assert!(result.is_ok());
     }
 
@@ -1799,9 +1800,7 @@ mod tests {
         );
 
         let attrs = HashMap::from([("mail".to_string(), "new@test.com".to_string())]);
-        let result = provider
-            .update_contact("CN=Contact,DC=test", &attrs)
-            .await;
+        let result = provider.update_contact("CN=Contact,DC=test", &attrs).await;
         assert!(result.is_ok());
     }
 
@@ -1834,9 +1833,7 @@ mod tests {
         );
 
         let attrs = HashMap::from([("printerName".to_string(), "HP1".to_string())]);
-        let result = provider
-            .create_printer("OU=Printers,DC=test", &attrs)
-            .await;
+        let result = provider.create_printer("OU=Printers,DC=test", &attrs).await;
         assert!(result.is_ok());
     }
 
@@ -1851,9 +1848,7 @@ mod tests {
         );
 
         let attrs = HashMap::from([("location".to_string(), "Room 101".to_string())]);
-        let result = provider
-            .update_printer("CN=HP1,DC=test", &attrs)
-            .await;
+        let result = provider.update_printer("CN=HP1,DC=test", &attrs).await;
         assert!(result.is_ok());
     }
 
@@ -2026,10 +2021,12 @@ mod tests {
         assert!(provider.enable_account("CN=User,DC=test").await.is_err());
         assert!(provider.disable_account("CN=User,DC=test").await.is_err());
         assert!(provider.unlock_account("CN=User,DC=test").await.is_err());
-        assert!(provider
-            .reset_password("CN=User,DC=test", "pass", false)
-            .await
-            .is_err());
+        assert!(
+            provider
+                .reset_password("CN=User,DC=test", "pass", false)
+                .await
+                .is_err()
+        );
     }
 
     // -----------------------------------------------------------------------

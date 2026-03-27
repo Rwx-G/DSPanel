@@ -166,10 +166,7 @@ impl std::fmt::Debug for LdapAuthMode {
 
 impl Drop for LdapAuthMode {
     fn drop(&mut self) {
-        if let LdapAuthMode::SimpleBind {
-            password, ..
-        } = self
-        {
+        if let LdapAuthMode::SimpleBind { password, .. } = self {
             zeroize::Zeroize::zeroize(password);
         }
     }
@@ -616,11 +613,7 @@ impl LdapDirectoryProvider {
                 tracing::info!("Base DN discovered: {}", dn);
                 *self.base_dn.lock().expect("lock poisoned") = Some(dn);
             }
-            if let Some(fqdn) = se
-                .attrs
-                .get("dnsHostName")
-                .and_then(|v| v.first().cloned())
-            {
+            if let Some(fqdn) = se.attrs.get("dnsHostName").and_then(|v| v.first().cloned()) {
                 tracing::info!("DC FQDN resolved from rootDSE: {}", fqdn);
                 *self.dc_fqdn.lock().expect("lock poisoned") = Some(fqdn);
             }
@@ -2315,7 +2308,9 @@ impl DirectoryProvider for LdapDirectoryProvider {
                             let clean = raw.replace(".0Z", "").replace('Z', "");
                             chrono::NaiveDateTime::parse_from_str(&clean, "%Y%m%d%H%M%S")
                                 .ok()
-                                .map(|naive| naive.and_utc().format("%Y/%m/%d %H:%M:%S").to_string())
+                                .map(|naive| {
+                                    naive.and_utc().format("%Y/%m/%d %H:%M:%S").to_string()
+                                })
                         })
                         .unwrap_or_default();
                     let original_ou = se
@@ -2930,10 +2925,12 @@ mod tests {
     fn test_validate_search_input_rejects_control_chars() {
         let result = validate_search_input("hello\x07world");
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("control characters"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("control characters")
+        );
     }
 
     #[test]
@@ -3037,7 +3034,9 @@ mod tests {
     fn test_ldap_provider_new_without_domain() {
         // Temporarily unset USERDNSDOMAIN for this test
         let original = std::env::var("USERDNSDOMAIN").ok();
-        unsafe { std::env::remove_var("USERDNSDOMAIN"); }
+        unsafe {
+            std::env::remove_var("USERDNSDOMAIN");
+        }
 
         let provider = LdapDirectoryProvider::new();
         assert!(provider.domain_name().is_none());
@@ -3045,7 +3044,9 @@ mod tests {
 
         // Restore
         if let Some(val) = original {
-            unsafe { std::env::set_var("USERDNSDOMAIN", val); }
+            unsafe {
+                std::env::set_var("USERDNSDOMAIN", val);
+            }
         }
     }
 
@@ -3053,14 +3054,18 @@ mod tests {
     #[serial]
     fn test_new_defaults_to_gssapi_auth_mode() {
         let original = std::env::var("USERDNSDOMAIN").ok();
-        unsafe { std::env::remove_var("USERDNSDOMAIN"); }
+        unsafe {
+            std::env::remove_var("USERDNSDOMAIN");
+        }
 
         let provider = LdapDirectoryProvider::new();
         assert!(matches!(provider.auth_mode(), LdapAuthMode::Gssapi));
         assert!(provider.server_override.is_none());
 
         if let Some(val) = original {
-            unsafe { std::env::set_var("USERDNSDOMAIN", val); }
+            unsafe {
+                std::env::set_var("USERDNSDOMAIN", val);
+            }
         }
     }
 
@@ -3242,10 +3247,12 @@ mod tests {
     fn test_build_tls_connector_with_ca_invalid_path() {
         let result = build_tls_connector_with_ca("/nonexistent/ca.pem", false);
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("Failed to read CA certificate file"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Failed to read CA certificate file")
+        );
     }
 
     #[test]
@@ -3255,10 +3262,12 @@ mod tests {
         std::fs::write(&tmp, b"not a certificate").unwrap();
         let result = build_tls_connector_with_ca(tmp.to_str().unwrap(), false);
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("Failed to parse CA certificate"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Failed to parse CA certificate")
+        );
         let _ = std::fs::remove_file(&tmp);
     }
 
@@ -3266,14 +3275,18 @@ mod tests {
     #[serial]
     async fn test_search_users_returns_empty_when_not_domain_joined() {
         let original = std::env::var("USERDNSDOMAIN").ok();
-        unsafe { std::env::remove_var("USERDNSDOMAIN"); }
+        unsafe {
+            std::env::remove_var("USERDNSDOMAIN");
+        }
 
         let provider = LdapDirectoryProvider::new();
         let results = provider.search_users("test", 50).await.unwrap();
         assert!(results.is_empty());
 
         if let Some(val) = original {
-            unsafe { std::env::set_var("USERDNSDOMAIN", val); }
+            unsafe {
+                std::env::set_var("USERDNSDOMAIN", val);
+            }
         }
     }
 
@@ -3281,14 +3294,18 @@ mod tests {
     #[serial]
     async fn test_search_computers_returns_empty_when_not_domain_joined() {
         let original = std::env::var("USERDNSDOMAIN").ok();
-        unsafe { std::env::remove_var("USERDNSDOMAIN"); }
+        unsafe {
+            std::env::remove_var("USERDNSDOMAIN");
+        }
 
         let provider = LdapDirectoryProvider::new();
         let results = provider.search_computers("test", 50).await.unwrap();
         assert!(results.is_empty());
 
         if let Some(val) = original {
-            unsafe { std::env::set_var("USERDNSDOMAIN", val); }
+            unsafe {
+                std::env::set_var("USERDNSDOMAIN", val);
+            }
         }
     }
 
@@ -3296,14 +3313,18 @@ mod tests {
     #[serial]
     async fn test_search_groups_returns_empty_when_not_domain_joined() {
         let original = std::env::var("USERDNSDOMAIN").ok();
-        unsafe { std::env::remove_var("USERDNSDOMAIN"); }
+        unsafe {
+            std::env::remove_var("USERDNSDOMAIN");
+        }
 
         let provider = LdapDirectoryProvider::new();
         let results = provider.search_groups("test", 50).await.unwrap();
         assert!(results.is_empty());
 
         if let Some(val) = original {
-            unsafe { std::env::set_var("USERDNSDOMAIN", val); }
+            unsafe {
+                std::env::set_var("USERDNSDOMAIN", val);
+            }
         }
     }
 
@@ -3311,13 +3332,17 @@ mod tests {
     #[serial]
     async fn test_test_connection_returns_false_when_not_domain_joined() {
         let original = std::env::var("USERDNSDOMAIN").ok();
-        unsafe { std::env::remove_var("USERDNSDOMAIN"); }
+        unsafe {
+            std::env::remove_var("USERDNSDOMAIN");
+        }
 
         let provider = LdapDirectoryProvider::new();
         assert!(!provider.test_connection().await.unwrap());
 
         if let Some(val) = original {
-            unsafe { std::env::set_var("USERDNSDOMAIN", val); }
+            unsafe {
+                std::env::set_var("USERDNSDOMAIN", val);
+            }
         }
     }
 }

@@ -3,11 +3,11 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use anyhow::Result;
-use hickory_resolver::config::{NameServerConfigGroup, ResolverConfig, ResolverOpts};
 use hickory_resolver::TokioResolver;
+use hickory_resolver::config::{NameServerConfigGroup, ResolverConfig, ResolverOpts};
 
 use crate::models::dc_health::{
-    compute_overall_status, DcHealthCheck, DcHealthLevel, DcHealthResult, DomainControllerInfo,
+    DcHealthCheck, DcHealthLevel, DcHealthResult, DomainControllerInfo, compute_overall_status,
 };
 use crate::services::DirectoryProvider;
 
@@ -1031,23 +1031,33 @@ mod tests {
     #[test]
     #[serial]
     fn test_resolve_fallback_ip_plain() {
-        unsafe { std::env::set_var("DSPANEL_LDAP_SERVER", "10.0.0.1"); }
+        unsafe {
+            std::env::set_var("DSPANEL_LDAP_SERVER", "10.0.0.1");
+        }
         assert_eq!(resolve_fallback_ip(), Some("10.0.0.1".to_string()));
-        unsafe { std::env::remove_var("DSPANEL_LDAP_SERVER"); }
+        unsafe {
+            std::env::remove_var("DSPANEL_LDAP_SERVER");
+        }
     }
 
     #[test]
     #[serial]
     fn test_resolve_fallback_ip_with_ldaps_prefix() {
-        unsafe { std::env::set_var("DSPANEL_LDAP_SERVER", "ldaps://10.0.0.1:636"); }
+        unsafe {
+            std::env::set_var("DSPANEL_LDAP_SERVER", "ldaps://10.0.0.1:636");
+        }
         assert_eq!(resolve_fallback_ip(), Some("10.0.0.1".to_string()));
-        unsafe { std::env::remove_var("DSPANEL_LDAP_SERVER"); }
+        unsafe {
+            std::env::remove_var("DSPANEL_LDAP_SERVER");
+        }
     }
 
     #[test]
     #[serial]
     fn test_resolve_fallback_ip_not_set() {
-        unsafe { std::env::remove_var("DSPANEL_LDAP_SERVER"); }
+        unsafe {
+            std::env::remove_var("DSPANEL_LDAP_SERVER");
+        }
         assert_eq!(resolve_fallback_ip(), None);
     }
 }

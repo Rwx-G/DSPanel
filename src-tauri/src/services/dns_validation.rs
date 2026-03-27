@@ -2,15 +2,15 @@ use std::net::IpAddr;
 use std::sync::Arc;
 
 use anyhow::Result;
-use hickory_resolver::config::{NameServerConfigGroup, ResolverConfig, ResolverOpts};
 use hickory_resolver::TokioResolver;
+use hickory_resolver::config::{NameServerConfigGroup, ResolverConfig, ResolverOpts};
 
 use crate::models::dns_validation::{
-    compare_dns_hosts, evaluate_clock_skew, ClockSkewResult, ClockSkewStatus, DnsKerberosReport,
-    DnsValidationResult,
+    ClockSkewResult, ClockSkewStatus, DnsKerberosReport, DnsValidationResult, compare_dns_hosts,
+    evaluate_clock_skew,
 };
-use crate::services::dc_health::{discover_domain_controllers, resolve_fallback_ip};
 use crate::services::DirectoryProvider;
+use crate::services::dc_health::{discover_domain_controllers, resolve_fallback_ip};
 
 /// SRV record prefixes to validate for AD DNS.
 const SRV_RECORD_PREFIXES: &[&str] = &[

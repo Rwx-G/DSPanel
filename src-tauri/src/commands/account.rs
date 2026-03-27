@@ -698,8 +698,8 @@ pub async fn modify_attribute(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::services::directory::tests::MockDirectoryProvider;
     use crate::services::PermissionConfig;
+    use crate::services::directory::tests::MockDirectoryProvider;
     use std::collections::HashMap;
     use std::sync::Arc;
 
@@ -821,9 +821,11 @@ mod tests {
         assert!(entries[0].success);
         assert_eq!(entries[0].action, "PasswordReset");
         assert_eq!(entries[0].target_dn, "CN=User1,DC=example,DC=com");
-        assert!(entries[0]
-            .details
-            .contains("must_change_at_next_logon=true"));
+        assert!(
+            entries[0]
+                .details
+                .contains("must_change_at_next_logon=true")
+        );
     }
 
     #[tokio::test]
@@ -962,9 +964,11 @@ mod tests {
         assert!(entries[0].success);
         assert_eq!(entries[0].action, "PasswordFlagsChanged");
         assert!(entries[0].details.contains("password_never_expires=true"));
-        assert!(entries[0]
-            .details
-            .contains("user_cannot_change_password=false"));
+        assert!(
+            entries[0]
+                .details
+                .contains("user_cannot_change_password=false")
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -1334,9 +1338,11 @@ mod tests {
         assert!(calls[0].2); // user_cannot_change_password = true
         let entries = state.audit_service.get_entries();
         assert!(entries[0].details.contains("password_never_expires=false"));
-        assert!(entries[0]
-            .details
-            .contains("user_cannot_change_password=true"));
+        assert!(
+            entries[0]
+                .details
+                .contains("user_cannot_change_password=true")
+        );
     }
 
     #[tokio::test]
@@ -1352,9 +1358,11 @@ mod tests {
         assert!(calls[0].2);
         let entries = state.audit_service.get_entries();
         assert!(entries[0].details.contains("password_never_expires=true"));
-        assert!(entries[0]
-            .details
-            .contains("user_cannot_change_password=true"));
+        assert!(
+            entries[0]
+                .details
+                .contains("user_cannot_change_password=true")
+        );
     }
 
     #[tokio::test]
@@ -1370,9 +1378,11 @@ mod tests {
         assert!(!calls[0].2);
         let entries = state.audit_service.get_entries();
         assert!(entries[0].details.contains("password_never_expires=false"));
-        assert!(entries[0]
-            .details
-            .contains("user_cannot_change_password=false"));
+        assert!(
+            entries[0]
+                .details
+                .contains("user_cannot_change_password=false")
+        );
     }
 
     #[tokio::test]

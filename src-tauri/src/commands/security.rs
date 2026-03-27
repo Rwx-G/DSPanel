@@ -184,8 +184,8 @@ pub async fn get_escalation_paths(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::services::directory::tests::MockDirectoryProvider;
     use crate::services::PermissionConfig;
+    use crate::services::directory::tests::MockDirectoryProvider;
     use std::sync::Arc;
 
     fn make_state() -> AppState {

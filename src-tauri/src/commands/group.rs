@@ -2,12 +2,12 @@ use tauri::State;
 
 use crate::error::AppError;
 use crate::models::DirectoryEntry;
+use crate::services::PermissionLevel;
 use crate::services::ntfs::{AceCrossReference, AceEntry, NtfsAuditResult};
 use crate::services::ntfs_analyzer::NtfsAnalysisResult;
 use crate::services::replication::{
     AttributeChangeDiff, AttributeMetadata, ReplicationMetadataResult,
 };
-use crate::services::PermissionLevel;
 use crate::state::AppState;
 
 use super::capture_snapshot;
@@ -907,8 +907,8 @@ pub fn cross_reference_ntfs(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::services::directory::tests::MockDirectoryProvider;
     use crate::services::PermissionConfig;
+    use crate::services::directory::tests::MockDirectoryProvider;
     use std::collections::HashMap;
     use std::sync::Arc;
 
@@ -1375,9 +1375,11 @@ mod tests {
         let state = make_state_with_groups(groups);
         let result = detect_deep_nesting_inner(&state, 2).await.unwrap();
         assert!(!result.is_empty(), "Should detect GroupA with depth 3");
-        assert!(result
-            .iter()
-            .any(|r| r.group_name == "GroupA" && r.depth == 3));
+        assert!(
+            result
+                .iter()
+                .any(|r| r.group_name == "GroupA" && r.depth == 3)
+        );
     }
 
     // -----------------------------------------------------------------------

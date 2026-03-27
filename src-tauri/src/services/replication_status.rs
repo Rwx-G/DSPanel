@@ -2,7 +2,7 @@ use anyhow::Result;
 use std::sync::Arc;
 
 use crate::models::replication_status::{
-    compute_replication_status, ReplicationPartnership, ReplicationStatus,
+    ReplicationPartnership, ReplicationStatus, compute_replication_status,
 };
 use crate::services::DirectoryProvider;
 
@@ -375,8 +375,8 @@ fn parse_repl_neighbors_xml(xml_values: &[String]) -> Vec<ReplNeighborXml> {
 
 /// Parses a single DS_REPL_NEIGHBORW XML fragment.
 fn parse_single_repl_neighbor_xml(xml: &str) -> Option<ReplNeighborXml> {
-    use quick_xml::events::Event;
     use quick_xml::Reader;
+    use quick_xml::events::Event;
 
     let mut reader = Reader::from_str(xml);
     reader.config_mut().trim_text(true);

@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use serde::Deserialize;
 use std::sync::RwLock;
 
-use crate::models::exchange_online::{compute_usage_percentage, ExchangeOnlineInfo};
+use crate::models::exchange_online::{ExchangeOnlineInfo, compute_usage_percentage};
 
 /// Configuration for Microsoft Graph API integration.
 #[derive(Debug, Clone, Default)]

@@ -1,8 +1,8 @@
 use tauri::State;
 
 use crate::error::AppError;
-use crate::services::compliance::{self, ComplianceScanResult};
 use crate::services::PermissionLevel;
+use crate::services::compliance::{self, ComplianceScanResult};
 use crate::state::AppState;
 
 /// Returns the list of supported frameworks.
@@ -201,14 +201,11 @@ mod tests {
         disabled.sam_account_name = Some("disabled".to_string());
         disabled.display_name = Some("Disabled".to_string());
         disabled.object_class = Some("user".to_string());
-        disabled.attributes.insert(
-            "userAccountControl".to_string(),
-            vec!["514".to_string()],
-        );
+        disabled
+            .attributes
+            .insert("userAccountControl".to_string(), vec!["514".to_string()]);
 
-        let provider = Arc::new(
-            MockDirectoryProvider::new().with_users(vec![admin, disabled]),
-        );
+        let provider = Arc::new(MockDirectoryProvider::new().with_users(vec![admin, disabled]));
         let state = AppState::new_for_test(provider, PermissionConfig::default());
         state
             .permission_service

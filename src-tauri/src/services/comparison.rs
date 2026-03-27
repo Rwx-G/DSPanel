@@ -76,12 +76,16 @@ mod tests {
         let result = compute_group_diff(&groups_a, &groups_b);
 
         assert_eq!(result.shared_groups.len(), 2);
-        assert!(result
-            .shared_groups
-            .contains(&"CN=Group2,DC=example,DC=com".to_string()));
-        assert!(result
-            .shared_groups
-            .contains(&"CN=Group3,DC=example,DC=com".to_string()));
+        assert!(
+            result
+                .shared_groups
+                .contains(&"CN=Group2,DC=example,DC=com".to_string())
+        );
+        assert!(
+            result
+                .shared_groups
+                .contains(&"CN=Group3,DC=example,DC=com".to_string())
+        );
         assert_eq!(result.only_a_groups, vec!["CN=Group1,DC=example,DC=com"]);
         assert_eq!(result.only_b_groups, vec!["CN=Group4,DC=example,DC=com"]);
         assert_eq!(result.total_a, 3);

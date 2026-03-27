@@ -596,14 +596,18 @@ mod tests {
     fn make_state_disconnected() -> AppState {
         let provider = Arc::new(MockDirectoryProvider::disconnected());
         let state = AppState::new_for_test(provider, PermissionConfig::default());
-        state.permission_service.set_level(PermissionLevel::DomainAdmin);
+        state
+            .permission_service
+            .set_level(PermissionLevel::DomainAdmin);
         state
     }
 
     fn make_state_with_config_entries(entries: Vec<crate::models::DirectoryEntry>) -> AppState {
         let provider = Arc::new(MockDirectoryProvider::new().with_configuration_entries(entries));
         let state = AppState::new_for_test(provider, PermissionConfig::default());
-        state.permission_service.set_level(PermissionLevel::DomainAdmin);
+        state
+            .permission_service
+            .set_level(PermissionLevel::DomainAdmin);
         state
     }
 
@@ -669,9 +673,13 @@ mod tests {
     #[tokio::test]
     async fn test_force_replication_requires_domain_admin() {
         let state = make_state();
-        let result =
-            force_replication_inner(&state, "DC1.example.com", "DC2.example.com", "DC=example,DC=com")
-                .await;
+        let result = force_replication_inner(
+            &state,
+            "DC1.example.com",
+            "DC2.example.com",
+            "DC=example,DC=com",
+        )
+        .await;
         assert!(result.is_err());
         match result.unwrap_err() {
             AppError::PermissionDenied(msg) => {
@@ -765,11 +773,8 @@ mod tests {
     #[tokio::test]
     async fn test_get_gpo_scope_requires_domain_admin() {
         let state = make_state();
-        let result = get_gpo_scope_inner(
-            &state,
-            "CN={GUID},CN=Policies,CN=System,DC=example,DC=com",
-        )
-        .await;
+        let result =
+            get_gpo_scope_inner(&state, "CN={GUID},CN=Policies,CN=System,DC=example,DC=com").await;
         assert!(result.is_err());
         match result.unwrap_err() {
             AppError::PermissionDenied(_) => {}
@@ -780,11 +785,8 @@ mod tests {
     #[tokio::test]
     async fn test_get_gpo_scope_succeeds_with_domain_admin() {
         let state = make_state_with_level(PermissionLevel::DomainAdmin);
-        let result = get_gpo_scope_inner(
-            &state,
-            "CN={GUID},CN=Policies,CN=System,DC=example,DC=com",
-        )
-        .await;
+        let result =
+            get_gpo_scope_inner(&state, "CN={GUID},CN=Policies,CN=System,DC=example,DC=com").await;
         assert!(result.is_ok());
     }
 
@@ -934,13 +936,18 @@ mod tests {
         let base_dn = "DC=example,DC=com";
         let object_dn = "CN=User1,OU=Engineering,OU=Departments,DC=example,DC=com";
 
-        let chain = build_ou_chain(object_dn, base_dn, &*provider).await.unwrap();
+        let chain = build_ou_chain(object_dn, base_dn, &*provider)
+            .await
+            .unwrap();
 
         // Should include: domain root, OU=Departments, OU=Engineering
         assert_eq!(chain.len(), 3);
         assert_eq!(chain[0].0, "DC=example,DC=com");
         assert_eq!(chain[1].0, "OU=Departments,DC=example,DC=com");
-        assert_eq!(chain[2].0, "OU=Engineering,OU=Departments,DC=example,DC=com");
+        assert_eq!(
+            chain[2].0,
+            "OU=Engineering,OU=Departments,DC=example,DC=com"
+        );
     }
 
     #[tokio::test]
@@ -949,7 +956,9 @@ mod tests {
         let base_dn = "DC=example,DC=com";
         let object_dn = "CN=User1,DC=example,DC=com";
 
-        let chain = build_ou_chain(object_dn, base_dn, &*provider).await.unwrap();
+        let chain = build_ou_chain(object_dn, base_dn, &*provider)
+            .await
+            .unwrap();
 
         // Should only include the domain root
         assert_eq!(chain.len(), 1);
@@ -963,8 +972,7 @@ mod tests {
     #[tokio::test]
     async fn test_resolve_gpo_names_with_entries() {
         let entries = vec![crate::models::DirectoryEntry {
-            distinguished_name: "CN={GPO-GUID},CN=Policies,CN=System,DC=example,DC=com"
-                .to_string(),
+            distinguished_name: "CN={GPO-GUID},CN=Policies,CN=System,DC=example,DC=com".to_string(),
             sam_account_name: None,
             display_name: None,
             object_class: Some("groupPolicyContainer".to_string()),

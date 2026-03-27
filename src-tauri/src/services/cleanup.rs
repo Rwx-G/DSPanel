@@ -966,12 +966,7 @@ mod tests {
     #[test]
     fn never_logged_on_skips_if_no_when_created() {
         let now = Utc::now();
-        let user = make_user(
-            "CN=NoCreated,DC=test",
-            "nocreated",
-            "No Created",
-            vec![],
-        );
+        let user = make_user("CN=NoCreated,DC=test", "nocreated", "No Created", vec![]);
         let result = evaluate_never_logged_on(&user, 90 * 86400, now);
         assert!(result.is_none());
     }
@@ -1121,9 +1116,11 @@ mod tests {
 
         let result = evaluate_rule(provider, &rule).await.unwrap();
         assert_eq!(result.total_count, 1);
-        assert!(result.matches[0]
-            .proposed_action
-            .contains("OU=Cleanup,DC=test,DC=com"));
+        assert!(
+            result.matches[0]
+                .proposed_action
+                .contains("OU=Cleanup,DC=test,DC=com")
+        );
         assert_eq!(
             result.matches[0].target_ou,
             Some("OU=Cleanup,DC=test,DC=com".to_string())

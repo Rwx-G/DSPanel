@@ -1,10 +1,10 @@
 use tauri::State;
 
 use crate::error::AppError;
+use crate::services::PermissionLevel;
 use crate::services::cleanup::{
     CleanupDryRunResult, CleanupExecutionResult, CleanupMatch, CleanupRule,
 };
-use crate::services::PermissionLevel;
 use crate::state::AppState;
 
 // ---------------------------------------------------------------------------
@@ -270,16 +270,13 @@ mod tests {
         let days_ago = now - chrono::Duration::days(200);
         let ticks = (days_ago.timestamp() + 11_644_473_600) * 10_000_000;
 
-        let mut user = crate::models::DirectoryEntry::new(
-            "CN=Stale,OU=Users,DC=example,DC=com".to_string(),
-        );
+        let mut user =
+            crate::models::DirectoryEntry::new("CN=Stale,OU=Users,DC=example,DC=com".to_string());
         user.sam_account_name = Some("stale".to_string());
         user.display_name = Some("Stale User".to_string());
         user.object_class = Some("user".to_string());
-        user.attributes.insert(
-            "lastLogonTimestamp".to_string(),
-            vec![ticks.to_string()],
-        );
+        user.attributes
+            .insert("lastLogonTimestamp".to_string(), vec![ticks.to_string()]);
 
         let provider = Arc::new(MockDirectoryProvider::new().with_users(vec![user]));
         let state = AppState::new_for_test(provider, PermissionConfig::default());
@@ -297,12 +294,9 @@ mod tests {
             exclude_ous: None,
         };
 
-        let result = crate::services::cleanup::evaluate_rule(
-            state.provider(),
-            &rule,
-        )
-        .await
-        .unwrap();
+        let result = crate::services::cleanup::evaluate_rule(state.provider(), &rule)
+            .await
+            .unwrap();
 
         assert_eq!(result.total_count, 1);
         assert_eq!(result.matches[0].display_name, "Stale User");
@@ -322,12 +316,9 @@ mod tests {
             exclude_ous: None,
         };
 
-        let result = crate::services::cleanup::evaluate_rule(
-            state.provider(),
-            &rule,
-        )
-        .await
-        .unwrap();
+        let result = crate::services::cleanup::evaluate_rule(state.provider(), &rule)
+            .await
+            .unwrap();
 
         assert_eq!(result.total_count, 0);
         assert!(result.matches.is_empty());
@@ -455,7 +446,10 @@ mod tests {
         let saved = state.app_settings.get().cleanup_rules.unwrap();
         assert_eq!(saved.len(), 3);
         assert_eq!(saved[0].condition, CleanupCondition::InactiveDays);
-        assert_eq!(saved[1].condition, CleanupCondition::NeverLoggedOnCreatedDays);
+        assert_eq!(
+            saved[1].condition,
+            CleanupCondition::NeverLoggedOnCreatedDays
+        );
         assert_eq!(saved[2].condition, CleanupCondition::DisabledDays);
         assert_eq!(saved[0].action, CleanupAction::Disable);
         assert_eq!(saved[1].action, CleanupAction::Move);

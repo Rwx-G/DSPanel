@@ -1,8 +1,8 @@
 use tracing_appender::rolling;
+use tracing_subscriber::EnvFilter;
 use tracing_subscriber::fmt;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
-use tracing_subscriber::EnvFilter;
 
 /// Initialize the tracing subscriber with console and rolling file outputs.
 ///

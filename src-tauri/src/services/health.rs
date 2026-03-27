@@ -127,8 +127,7 @@ pub fn evaluate_health(input: &HealthInput, now_ms: i64) -> AccountHealthStatus 
         }
     }
 
-    if let (Some(pwd_set), Some(created)) = (&input.password_last_set, &input.when_created)
-    {
+    if let (Some(pwd_set), Some(created)) = (&input.password_last_set, &input.when_created) {
         if let (Ok(pwd_ms), Ok(created_ms)) = (parse_date_to_ms(pwd_set), parse_date_to_ms(created))
         {
             let diff = (pwd_ms - created_ms).unsigned_abs();
@@ -266,10 +265,12 @@ mod tests {
         };
         let result = evaluate_health(&input, now_ms());
         assert_eq!(result.level, HealthLevel::Critical);
-        assert!(result
-            .active_flags
-            .iter()
-            .any(|f| f.name == "PasswordExpired"));
+        assert!(
+            result
+                .active_flags
+                .iter()
+                .any(|f| f.name == "PasswordExpired")
+        );
     }
 
     #[test]
@@ -280,10 +281,12 @@ mod tests {
         };
         let result = evaluate_health(&input, now_ms());
         assert_eq!(result.level, HealthLevel::Warning);
-        assert!(result
-            .active_flags
-            .iter()
-            .any(|f| f.name == "PasswordNeverExpires"));
+        assert!(
+            result
+                .active_flags
+                .iter()
+                .any(|f| f.name == "PasswordNeverExpires")
+        );
     }
 
     #[test]
@@ -295,10 +298,12 @@ mod tests {
         };
         let result = evaluate_health(&input, now_ms());
         assert_eq!(result.level, HealthLevel::Warning);
-        assert!(result
-            .active_flags
-            .iter()
-            .any(|f| f.name == "Inactive30Days"));
+        assert!(
+            result
+                .active_flags
+                .iter()
+                .any(|f| f.name == "Inactive30Days")
+        );
     }
 
     #[test]
@@ -310,10 +315,12 @@ mod tests {
         };
         let result = evaluate_health(&input, now_ms());
         assert_eq!(result.level, HealthLevel::Critical);
-        assert!(result
-            .active_flags
-            .iter()
-            .any(|f| f.name == "Inactive90Days"));
+        assert!(
+            result
+                .active_flags
+                .iter()
+                .any(|f| f.name == "Inactive90Days")
+        );
     }
 
     #[test]
@@ -325,10 +332,12 @@ mod tests {
         };
         let result = evaluate_health(&input, now_ms());
         assert_eq!(result.level, HealthLevel::Info);
-        assert!(result
-            .active_flags
-            .iter()
-            .any(|f| f.name == "NeverLoggedOn"));
+        assert!(
+            result
+                .active_flags
+                .iter()
+                .any(|f| f.name == "NeverLoggedOn")
+        );
     }
 
     #[test]
@@ -340,10 +349,12 @@ mod tests {
             ..make_healthy_input()
         };
         let result = evaluate_health(&input, now_ms());
-        assert!(!result
-            .active_flags
-            .iter()
-            .any(|f| f.name == "NeverLoggedOn"));
+        assert!(
+            !result
+                .active_flags
+                .iter()
+                .any(|f| f.name == "NeverLoggedOn")
+        );
     }
 
     #[test]
@@ -354,10 +365,12 @@ mod tests {
             ..make_healthy_input()
         };
         let result = evaluate_health(&input, now_ms());
-        assert!(result
-            .active_flags
-            .iter()
-            .any(|f| f.name == "PasswordNeverChanged"));
+        assert!(
+            result
+                .active_flags
+                .iter()
+                .any(|f| f.name == "PasswordNeverChanged")
+        );
     }
 
     #[test]
@@ -368,10 +381,12 @@ mod tests {
             ..make_healthy_input()
         };
         let result = evaluate_health(&input, now_ms());
-        assert!(!result
-            .active_flags
-            .iter()
-            .any(|f| f.name == "PasswordNeverChanged"));
+        assert!(
+            !result
+                .active_flags
+                .iter()
+                .any(|f| f.name == "PasswordNeverChanged")
+        );
     }
 
     #[test]
@@ -401,10 +416,12 @@ mod tests {
             ..make_healthy_input()
         };
         let result = evaluate_health(&input, now_ms());
-        assert!(result
-            .active_flags
-            .iter()
-            .any(|f| f.name == "Inactive30Days"));
+        assert!(
+            result
+                .active_flags
+                .iter()
+                .any(|f| f.name == "Inactive30Days")
+        );
     }
 
     #[test]
@@ -415,10 +432,12 @@ mod tests {
             ..make_healthy_input()
         };
         let result = evaluate_health(&input, now_ms());
-        assert!(result
-            .active_flags
-            .iter()
-            .any(|f| f.name == "Inactive30Days"));
+        assert!(
+            result
+                .active_flags
+                .iter()
+                .any(|f| f.name == "Inactive30Days")
+        );
     }
 
     #[test]
@@ -453,9 +472,11 @@ mod tests {
             ..make_healthy_input()
         };
         let result = evaluate_health(&input, now_ms());
-        assert!(result
-            .active_flags
-            .iter()
-            .any(|f| f.name == "PasswordNeverChanged"));
+        assert!(
+            result
+                .active_flags
+                .iter()
+                .any(|f| f.name == "PasswordNeverChanged")
+        );
     }
 }

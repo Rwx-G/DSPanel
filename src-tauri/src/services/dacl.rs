@@ -301,7 +301,7 @@ mod tests {
         sd[0] = 0x01; // Revision
         sd[2] = 0x04; // Control: SE_DACL_PRESENT (low byte)
         sd[3] = 0x80; // Control: SE_SELF_RELATIVE (high byte)
-                      // DACL offset = 20 (right after header)
+        // DACL offset = 20 (right after header)
         sd[16] = 20;
         sd[17] = 0;
         sd[18] = 0;

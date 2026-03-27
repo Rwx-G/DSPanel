@@ -36,7 +36,7 @@ pub mod workstation_monitor;
 pub use app_settings::AppSettingsService;
 pub use audit::AuditService;
 pub use directory::DirectoryProvider;
-pub use health::{evaluate_health, AccountHealthStatus, HealthInput, HealthLevel};
+pub use health::{AccountHealthStatus, HealthInput, HealthLevel, evaluate_health};
 pub use ldap_directory::LdapDirectoryProvider;
 pub use mfa::MfaService;
 pub use object_snapshot::ObjectSnapshotService;
