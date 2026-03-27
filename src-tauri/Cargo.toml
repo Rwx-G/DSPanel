@@ -2,9 +2,9 @@
 name = "dspanel"
 version = "1.0.0"
 description = "DSPanel - Active Directory management tool"
-authors = ["Romain G."]
+authors = ["Rwx-G"]
 license = "Apache-2.0"
-edition = "2021"
+edition = "2024"
 
 [lib]
 name = "dspanel_lib"

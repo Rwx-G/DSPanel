@@ -167,7 +167,7 @@ impl std::fmt::Debug for LdapAuthMode {
 impl Drop for LdapAuthMode {
     fn drop(&mut self) {
         if let LdapAuthMode::SimpleBind {
-            ref mut password, ..
+            password, ..
         } = self
         {
             zeroize::Zeroize::zeroize(password);
@@ -3037,7 +3037,7 @@ mod tests {
     fn test_ldap_provider_new_without_domain() {
         // Temporarily unset USERDNSDOMAIN for this test
         let original = std::env::var("USERDNSDOMAIN").ok();
-        std::env::remove_var("USERDNSDOMAIN");
+        unsafe { std::env::remove_var("USERDNSDOMAIN"); }
 
         let provider = LdapDirectoryProvider::new();
         assert!(provider.domain_name().is_none());
@@ -3045,7 +3045,7 @@ mod tests {
 
         // Restore
         if let Some(val) = original {
-            std::env::set_var("USERDNSDOMAIN", val);
+            unsafe { std::env::set_var("USERDNSDOMAIN", val); }
         }
     }
 
@@ -3053,14 +3053,14 @@ mod tests {
     #[serial]
     fn test_new_defaults_to_gssapi_auth_mode() {
         let original = std::env::var("USERDNSDOMAIN").ok();
-        std::env::remove_var("USERDNSDOMAIN");
+        unsafe { std::env::remove_var("USERDNSDOMAIN"); }
 
         let provider = LdapDirectoryProvider::new();
         assert!(matches!(provider.auth_mode(), LdapAuthMode::Gssapi));
         assert!(provider.server_override.is_none());
 
         if let Some(val) = original {
-            std::env::set_var("USERDNSDOMAIN", val);
+            unsafe { std::env::set_var("USERDNSDOMAIN", val); }
         }
     }
 
@@ -3266,14 +3266,14 @@ mod tests {
     #[serial]
     async fn test_search_users_returns_empty_when_not_domain_joined() {
         let original = std::env::var("USERDNSDOMAIN").ok();
-        std::env::remove_var("USERDNSDOMAIN");
+        unsafe { std::env::remove_var("USERDNSDOMAIN"); }
 
         let provider = LdapDirectoryProvider::new();
         let results = provider.search_users("test", 50).await.unwrap();
         assert!(results.is_empty());
 
         if let Some(val) = original {
-            std::env::set_var("USERDNSDOMAIN", val);
+            unsafe { std::env::set_var("USERDNSDOMAIN", val); }
         }
     }
 
@@ -3281,14 +3281,14 @@ mod tests {
     #[serial]
     async fn test_search_computers_returns_empty_when_not_domain_joined() {
         let original = std::env::var("USERDNSDOMAIN").ok();
-        std::env::remove_var("USERDNSDOMAIN");
+        unsafe { std::env::remove_var("USERDNSDOMAIN"); }
 
         let provider = LdapDirectoryProvider::new();
         let results = provider.search_computers("test", 50).await.unwrap();
         assert!(results.is_empty());
 
         if let Some(val) = original {
-            std::env::set_var("USERDNSDOMAIN", val);
+            unsafe { std::env::set_var("USERDNSDOMAIN", val); }
         }
     }
 
@@ -3296,14 +3296,14 @@ mod tests {
     #[serial]
     async fn test_search_groups_returns_empty_when_not_domain_joined() {
         let original = std::env::var("USERDNSDOMAIN").ok();
-        std::env::remove_var("USERDNSDOMAIN");
+        unsafe { std::env::remove_var("USERDNSDOMAIN"); }
 
         let provider = LdapDirectoryProvider::new();
         let results = provider.search_groups("test", 50).await.unwrap();
         assert!(results.is_empty());
 
         if let Some(val) = original {
-            std::env::set_var("USERDNSDOMAIN", val);
+            unsafe { std::env::set_var("USERDNSDOMAIN", val); }
         }
     }
 
@@ -3311,13 +3311,13 @@ mod tests {
     #[serial]
     async fn test_test_connection_returns_false_when_not_domain_joined() {
         let original = std::env::var("USERDNSDOMAIN").ok();
-        std::env::remove_var("USERDNSDOMAIN");
+        unsafe { std::env::remove_var("USERDNSDOMAIN"); }
 
         let provider = LdapDirectoryProvider::new();
         assert!(!provider.test_connection().await.unwrap());
 
         if let Some(val) = original {
-            std::env::set_var("USERDNSDOMAIN", val);
+            unsafe { std::env::set_var("USERDNSDOMAIN", val); }
         }
     }
 }

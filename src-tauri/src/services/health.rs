@@ -127,7 +127,7 @@ pub fn evaluate_health(input: &HealthInput, now_ms: i64) -> AccountHealthStatus 
         }
     }
 
-    if let (Some(ref pwd_set), Some(ref created)) = (&input.password_last_set, &input.when_created)
+    if let (Some(pwd_set), Some(created)) = (&input.password_last_set, &input.when_created)
     {
         if let (Ok(pwd_ms), Ok(created_ms)) = (parse_date_to_ms(pwd_set), parse_date_to_ms(created))
         {

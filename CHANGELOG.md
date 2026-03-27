@@ -45,7 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - CI now generates coverage reports (Rust + Frontend) with GitHub Actions Summary and LCOV artifacts
 - Test suite expanded to 3654 tests: 2089 frontend, 1520 Rust unit, 45 AD integration
-- Coverage: 87% Rust lines, 88% frontend lines
+- Coverage: 82% Rust lines, 87% frontend lines
 - Integration tests expanded to 45 scenarios against real AD with 2-DC replication
 - Directory provider is now swappable at runtime via `RwLock` (enables post-startup login)
 - PropertyGrid label column widened to `min-w-[220px]` for longer translated labels

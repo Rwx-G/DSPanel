@@ -1031,23 +1031,23 @@ mod tests {
     #[test]
     #[serial]
     fn test_resolve_fallback_ip_plain() {
-        std::env::set_var("DSPANEL_LDAP_SERVER", "10.0.0.1");
+        unsafe { std::env::set_var("DSPANEL_LDAP_SERVER", "10.0.0.1"); }
         assert_eq!(resolve_fallback_ip(), Some("10.0.0.1".to_string()));
-        std::env::remove_var("DSPANEL_LDAP_SERVER");
+        unsafe { std::env::remove_var("DSPANEL_LDAP_SERVER"); }
     }
 
     #[test]
     #[serial]
     fn test_resolve_fallback_ip_with_ldaps_prefix() {
-        std::env::set_var("DSPANEL_LDAP_SERVER", "ldaps://10.0.0.1:636");
+        unsafe { std::env::set_var("DSPANEL_LDAP_SERVER", "ldaps://10.0.0.1:636"); }
         assert_eq!(resolve_fallback_ip(), Some("10.0.0.1".to_string()));
-        std::env::remove_var("DSPANEL_LDAP_SERVER");
+        unsafe { std::env::remove_var("DSPANEL_LDAP_SERVER"); }
     }
 
     #[test]
     #[serial]
     fn test_resolve_fallback_ip_not_set() {
-        std::env::remove_var("DSPANEL_LDAP_SERVER");
+        unsafe { std::env::remove_var("DSPANEL_LDAP_SERVER"); }
         assert_eq!(resolve_fallback_ip(), None);
     }
 }

@@ -126,7 +126,7 @@ pub fn resolve_effective_gpos(
             normal_links.clear();
         }
 
-        if let Some(ref gp_link) = gp_link_val {
+        if let Some(gp_link) = &gp_link_val {
             let raw_links = parse_gp_link(gp_link);
 
             for (order, raw) in raw_links.iter().enumerate() {

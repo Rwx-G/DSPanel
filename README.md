@@ -5,11 +5,12 @@
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License"></a>
-  <img src="https://img.shields.io/badge/Rust-2021-orange.svg" alt="Rust">
+  <img src="https://img.shields.io/badge/Rust-2024-orange.svg" alt="Rust">
   <img src="https://img.shields.io/badge/Tauri-v2-blue.svg" alt="Tauri">
   <img src="https://img.shields.io/badge/Platform-Windows%20|%20macOS%20|%20Linux-0078D6.svg" alt="Platform">
   <img src="https://img.shields.io/badge/Status-v1.0.0-brightgreen.svg" alt="Status">
-  <img src="https://img.shields.io/badge/Coverage-87%25_Rust_|_88%25_TS-brightgreen.svg" alt="Coverage">
+  <img src="https://img.shields.io/badge/Coverage-82%25_Rust_|_87%25_TS-brightgreen.svg" alt="Coverage">
+  <img src="https://img.shields.io/badge/i18n-EN%20|%20FR%20|%20DE%20|%20ES%20|%20IT-blueviolet.svg" alt="i18n">
 </p>
 
 ---
@@ -18,41 +19,87 @@
 
 DSPanel is an open source cross-platform desktop application (Rust/Tauri v2) that unifies the entire Active Directory support chain into a single tool. It dynamically adapts its interface based on the AD permissions of the current user, covering everything from read-only lookups to full domain administration.
 
-### Key Features
+![DSPanel Overview](docs/screenshots/overview.png)
 
-- **User & Computer Lookup** - Search accounts, view detailed info, healthcheck badges, group memberships
-- **Account Comparison** - Side-by-side user comparison with visual group delta
-- **NTFS Permissions Audit** - Cross-reference folder permissions with AD groups to diagnose access issues
-- **Group Management** - Tree/flat views, drag-and-drop, bulk operations (Add/Delete/Transfer)
+## Features
+
+### Directory
+
+- **User Lookup** - Search accounts, view detailed info, healthcheck badges, group memberships, advanced attributes editor
+- **Computer Lookup** - Search and browse computer accounts with OS info, last logon, health badges
+- **User Comparison** - Side-by-side comparison with visual group delta (shared / only A / only B)
+- **Group Management** - Tree/flat views, drag-and-drop membership, scope/category badges
+- **Group Hygiene** - Detect empty, single-member, stale, undescribed, circular, deeply nested, and duplicate groups
+- **Bulk Operations** - Add/remove members, clone, merge, move, create groups from CSV
 - **Contact & Printer Management** - Browse, search, and edit AD contacts and printers with inline editing
-- **Onboarding/Offboarding Wizards** - Guided workflows with declarative presets (JSON)
-- **Support Actions** - Password reset, unlock, enable/disable with secure password generation
-- **User Photos** - View, upload (auto-resize to 96x96), and remove AD thumbnail photos
-- **Move Objects** - Move users, computers, groups, contacts, printers between OUs with dry-run preview
+- **NTFS Permissions Audit** - Cross-reference UNC path permissions with AD groups for two users
+
+![User Lookup](docs/screenshots/user-lookup.png)
+
+### Workflows
+
+- **Onboarding Wizard** - Guided user creation with declarative presets (JSON)
+- **Offboarding Wizard** - Disable, remove groups, reset password with preset support
+- **Preset Management** - Shared preset files on network storage with integrity checking
+- **Automated Cleanup** - Rules-based detection (inactive, never logged on, disabled) with dry-run, double confirmation for deletes, and service account exclusion
 - **AD Recycle Bin** - Browse and restore deleted objects with type filtering and OU picker
+- **Move Objects** - Move users, computers, groups, contacts, printers between OUs with dry-run preview
+
+### Support Actions
+
+- **Password Reset** - Reset with secure password generation (HIBP breach check)
+- **Account Unlock / Enable / Disable** - One-click with confirmation
+- **Password Flags** - Toggle "Password Never Expires" and "User Cannot Change Password"
+- **User Photos** - View, upload (auto-resize to 96x96), and remove AD thumbnail photos
+- **Password Generator** - Configurable length, character sets, pronounceable mode, HIBP check
 - **Object Snapshots** - SQLite-backed attribute snapshots before every write, with diff viewer and restore
-- **Exchange Diagnostics** - Read-only mailbox info for on-prem (LDAP) and Online (Graph)
-- **Audit Trail** - Full internal action logging for compliance
-- **Infrastructure Health** - 7 cross-platform DC health checks (DNS, LDAP, SPNs, replication, SYSVOL/DFSR, clock skew, machine account), FSMO roles, functional level
-- **Replication Monitoring** - Partnership table with latency, error tracking, and force-replication via repadmin
+
+### Infrastructure
+
+- **DC Health Checks** - 7 cross-platform checks per DC (DNS, LDAP, SPNs, replication, SYSVOL/DFSR, clock skew, machine account), FSMO roles, functional level
+- **Replication Monitoring** - Partnership table with latency, error tracking, USN data, and force-replication via repadmin
 - **DNS & Kerberos Validation** - SRV record validation via AD DNS (cross-platform, hickory-resolver), clock skew detection
 - **AD Topology** - Site/DC/replication/site-link overview with per-DC details (IP, OS, roles, online status, subnets)
-- **Privileged Accounts** - Audit of admin group members with 12 security checks per account (Kerberoastable, AS-REP Roastable, Protected Users, SIDHistory, delegation, etc.), domain findings (KRBTGT age, LAPS coverage, PSO), CSV/HTML export
-- **Domain Risk Score** - Security posture scoring (0-100) with 9 weighted factors and ~70 checks, SVG gauge + radar chart, per-finding CIS/MITRE references, remediation complexity and impact scoring, 30-day trend, HTML report export
+- **GPO Viewer** - GPO links per user/computer/OU with effective order, scope report, enforcement and WMI filter status
+- **Workstation Monitoring** - Real-time CPU, memory, disk, sessions, and services monitoring on remote workstations
+
+![Infrastructure Health](docs/screenshots/infrastructure-health.png)
+
+### Security
+
+- **Privileged Accounts Audit** - Admin group members with 12 security checks per account (Kerberoastable, AS-REP Roastable, Protected Users, SIDHistory, delegation, etc.), domain findings (KRBTGT age, LAPS coverage, PSO), CSV/HTML export
+- **Domain Risk Score** - Security posture scoring (0-100) with 9 weighted factors and ~70 checks, SVG gauge + radar chart, per-finding CIS/MITRE references, remediation with complexity scoring, 30-day trend, HTML report export
 - **Attack Detection** - On-demand Windows Security Event Log analysis for 14 attack types (Golden Ticket, DCSync, Kerberoasting, Pass-the-Hash, etc.) with structured XML parsing and MITRE ATT&CK mapping
 - **Escalation Paths** - Privilege escalation path analysis with 5 node types, 8 edge types (membership, delegation, RBCD, SIDHistory, ADCS, GPO), and weighted Dijkstra path-finding
+- **Compliance Reports** - 7 checks across 9 frameworks (GDPR, HIPAA, SOX, PCI-DSS v4.0, ISO 27001, NIST 800-53, CIS v8, NIS2, ANSSI) with per-framework scoring, control references, and remediation PowerShell commands
+- **MFA Gate** - TOTP verification for sensitive operations (password reset, account disable, etc.)
+- **Audit Trail** - Full internal action logging for compliance with export support
 
-### Adaptive Permissions
+![Risk Score](docs/screenshots/risk-score.png)
 
-The UI adapts dynamically based on the running user's AD permissions. Detection
-uses three strategies (highest wins):
+### Exchange
 
-1. **SID-based** - automatic detection of well-known AD groups (Domain Admins,
-   Account Operators, etc.) via RID matching - works in any AD locale
-2. **Probe-based** - tests effective permissions via `allowedAttributesEffective`
-   and `allowedChildClassesEffective` on representative objects - detects
-   delegated permissions without requiring specific group membership
-3. **Custom groups** - optional AD groups for explicit role assignment
+- **Exchange On-Prem** - Read-only mailbox info from LDAP attributes (msExch*): primary SMTP, aliases, forwarding, delegates
+- **Exchange Online** - Mailbox quota usage, auto-reply status, delegates via Microsoft Graph API with token caching
+
+### Settings & UX
+
+- **Application Settings** - Centralized settings (Connection, Presets, Permissions, Security, Reports, Appearance)
+- **Custom Permission Mapping** - Map AD security groups to DSPanel permission levels via UI
+- **Auto-Update Notifications** - GitHub Releases API check with Download, Skip, Remind Me Later
+- **i18n** - Full localization in 5 languages: English, French, German, Italian, Spanish (1709 keys)
+- **Theme** - Light, Dark, and System theme with live preview
+- **Login Prompt** - Password prompt at startup when credentials are partially configured
+
+![Settings](docs/screenshots/settings.png)
+
+## Adaptive Permissions
+
+The UI adapts dynamically based on the running user's AD permissions. Detection uses three strategies (highest wins):
+
+1. **SID-based** - automatic detection of well-known AD groups (Domain Admins, Account Operators, etc.) via RID matching - works in any AD locale
+2. **Probe-based** - tests effective permissions via `allowedAttributesEffective` and `allowedChildClassesEffective` - detects delegated permissions without requiring specific group membership
+3. **Custom groups** - optional AD group-to-level mapping configurable in Settings > Permissions
 
 | Level               | Access                                                |
 | ------------------- | ----------------------------------------------------- |
@@ -62,40 +109,30 @@ uses three strategies (highest wins):
 | **Admin**           | + Delete/move objects, create users                   |
 | **DomainAdmin**     | + Built-in/sensitive objects, infrastructure           |
 
-#### Custom Permission Groups
-
-Organizations can create these AD security groups for explicit DSPanel role
-assignment (optional - probe-based detection works without them):
-
-| AD Group                | DSPanel Level   |
-| ----------------------- | --------------- |
-| `DSPanel-HelpDesk`      | HelpDesk        |
-| `DSPanel-AccountOps`    | AccountOperator |
-| `DSPanel-Admin`         | Admin           |
-| `DSPanel-DomainAdmin`   | DomainAdmin     |
-
-### Hybrid Support
-
-- **AD on-prem** via LDAP
-- **Entra ID** via Microsoft Graph API
-- **Exchange on-prem** via LDAP attributes (msExch\*)
-- **Exchange Online** via Microsoft Graph API
-
 ## Requirements
 
 - Windows 10/11, macOS 12+, or Linux (x64)
 - Network access to an Active Directory domain
 - (Optional) Azure AD App Registration for Entra ID / Exchange Online features
 
-### Event Log Permissions
+### Authentication
 
-The **Attack Detection** feature reads the Windows Security Event Log on the
-target DC. If the account running DSPanel is not a member of the
-**Event Log Readers** group on that DC, the Security log is silently
-inaccessible and all checks will display **N/A** with a warning banner.
+DSPanel supports two authentication modes:
 
-To grant access, add the DSPanel user to the built-in **Event Log Readers**
-group on each monitored DC (or via Group Policy).
+| Mode | When | How |
+| ---- | ---- | --- |
+| **GSSAPI (Kerberos)** | Domain-joined machine | Automatic - uses current user's ticket |
+| **Simple Bind** | Non-domain machine or explicit credentials | Set `DSPANEL_LDAP_SERVER` + `DSPANEL_LDAP_BIND_DN` env vars. Password is prompted at startup (recommended) or set via env var (not recommended) |
+
+### Event Log Permissions (Attack Detection)
+
+Attack Detection reads the Windows Security Event Log on the target DC remotely. Two prerequisites:
+
+1. The account must be a member of **Event Log Readers** on the DC
+2. The **Remote Event Log Management** firewall rule must be enabled on the DC:
+   ```
+   netsh advfirewall firewall set rule group="Remote Event Log Management" new enable=yes
+   ```
 
 ## Installation
 
@@ -132,22 +169,67 @@ pnpm tauri build
 pnpm tauri dev
 ```
 
-### Testing
+## Configuration
 
-#### Unit tests
+### LDAP Connection
+
+By default, DSPanel uses **GSSAPI (Kerberos)** authentication on the current user's domain. For environments requiring explicit credentials:
+
+| Variable | Description | Default |
+| -------- | ----------- | ------- |
+| `DSPANEL_LDAP_SERVER` | LDAP server hostname or IP. Supports `ldaps://` and `ldap://` prefixes. | Auto-detected from `USERDNSDOMAIN` |
+| `DSPANEL_LDAP_BIND_DN` | Bind DN for simple bind (e.g. `CN=svc,CN=Users,DC=corp,DC=local`) | GSSAPI |
+| `DSPANEL_LDAP_BIND_PASSWORD` | Password for simple bind. If omitted (with SERVER and BIND_DN set), DSPanel prompts at startup. | GSSAPI / prompt |
+| `DSPANEL_LDAP_USE_TLS` | Enable LDAPS (implicit TLS on port 636). Set to `true` or `1`. | `false` |
+| `DSPANEL_LDAP_STARTTLS` | Enable StartTLS (upgrade plaintext on port 389). | `false` |
+| `DSPANEL_LDAP_CA_CERT` | Path to a custom CA certificate file (PEM or DER). | System store only |
+| `DSPANEL_LDAP_TLS_SKIP_VERIFY` | **Dev only.** Skip TLS certificate verification. Never use in production. | `false` |
+
+**Examples:**
 
 ```bash
-# Frontend (2089 tests, 88% coverage)
+# LDAPS with login prompt (recommended for non-domain machines)
+DSPANEL_LDAP_SERVER=dc01.corp.local
+DSPANEL_LDAP_BIND_DN="CN=DSPanel-Svc,CN=Users,DC=corp,DC=local"
+DSPANEL_LDAP_USE_TLS=true
+# Password will be prompted at startup
+
+# LDAPS with password in env var (CI/automation only - not recommended)
+DSPANEL_LDAP_SERVER=dc01.corp.local
+DSPANEL_LDAP_BIND_DN="CN=DSPanel-Svc,CN=Users,DC=corp,DC=local"
+DSPANEL_LDAP_BIND_PASSWORD="s3cur3!"
+DSPANEL_LDAP_USE_TLS=true
+```
+
+### Microsoft Graph (Exchange Online)
+
+Configure in Settings > Connection > Graph Settings. Requires an Azure AD App Registration.
+
+**Required permissions** (Application type, admin consent required):
+
+| Permission | Type | Purpose |
+| ---------- | ---- | ------- |
+| `Mail.Read` | Application | Read mailbox settings, folder sizes |
+| `User.Read.All` | Application | Read user profiles, proxy addresses |
+| `Reports.Read.All` | Application | Read mailbox usage reports (real quota) |
+
+The client secret is stored in the OS credential store (Windows Credential Manager, macOS Keychain, Linux Secret Service).
+
+## Testing
+
+### Unit tests
+
+```bash
+# Frontend (2089 tests, 87% coverage)
 pnpm test
 
-# Rust (1520 tests, 87% coverage)
+# Rust (1520 tests, 82% coverage)
 cargo test --manifest-path src-tauri/Cargo.toml --lib
 ```
 
-#### Coverage reports
+### Coverage reports
 
-Coverage is generated automatically by CI on every PR (GitHub Actions Summary +
-downloadable LCOV artifacts). To generate locally:
+Coverage is generated automatically by CI on every PR (GitHub Actions Summary + downloadable LCOV artifacts). To generate locally:
 
 ```bash
 # Frontend
@@ -157,20 +239,16 @@ pnpm exec vitest run --coverage
 cargo llvm-cov --manifest-path src-tauri/Cargo.toml --lib
 ```
 
-#### Integration tests (Real AD - not in CI)
+### Integration tests (Real AD - not in CI)
 
-Integration tests run against a real Active Directory domain with replication
-(2 DCs). They are **not part of CI** - they require a lab environment with
-network access to domain controllers. All 45 tests are validated manually
-before each release.
+Integration tests run against a real Active Directory domain with replication (2 DCs). They are **not part of CI** - they require a lab environment. All 45 tests are validated manually before each release.
 
 **Lab setup:**
 
 1. 2x Windows Server 2022 VMs (Hyper-V, Internal switch)
 2. Promote both to DCs in the same domain with AD replication
 3. Populate with [BadBlood](https://github.com/davidprowe/BadBlood) for realistic data
-4. Create three test accounts: `TestReadOnly` (standard user), `TestOperator`
-   (Account Operators), `TestAdmin` (Domain Admins + Enterprise Admins)
+4. Create three test accounts: `TestReadOnly` (standard user), `TestOperator` (Account Operators), `TestAdmin` (Domain Admins + Enterprise Admins)
 
 **Test coverage (45 tests):**
 
@@ -198,64 +276,6 @@ cargo test --test ldap_integration -- --nocapture write_
 cargo test --test ldap_integration -- --nocapture admin_
 ```
 
-## Configuration
-
-### LDAP Connection
-
-By default, DSPanel uses **GSSAPI (Kerberos)** authentication on the current
-user's domain. For environments requiring explicit credentials or custom servers:
-
-| Variable | Description | Default |
-| -------- | ----------- | ------- |
-| `DSPANEL_LDAP_SERVER` | LDAP server hostname or IP. Supports `ldaps://` and `ldap://` prefixes. | Auto-detected from `USERDNSDOMAIN` |
-| `DSPANEL_LDAP_BIND_DN` | Bind DN for simple bind authentication (e.g. `CN=svc,CN=Users,DC=corp,DC=local`) | GSSAPI |
-| `DSPANEL_LDAP_BIND_PASSWORD` | Password for simple bind | GSSAPI |
-| `DSPANEL_LDAP_USE_TLS` | Enable LDAPS (implicit TLS on port 636). Set to `true` or `1`. | `false` |
-| `DSPANEL_LDAP_STARTTLS` | Enable StartTLS (upgrade plaintext on port 389). Set to `true` or `1`. Mutually exclusive with LDAPS - if both set, LDAPS wins. | `false` |
-| `DSPANEL_LDAP_CA_CERT` | Path to a custom CA certificate file (PEM or DER). Added as trusted root alongside the system store. | System store only |
-| `DSPANEL_LDAP_TLS_SKIP_VERIFY` | **Development only.** Skip TLS certificate verification. Disables hostname and chain validation, making the connection vulnerable to MITM attacks. Never use in production - use `DSPANEL_LDAP_CA_CERT` instead. | `false` |
-
-All three credential variables (`SERVER`, `BIND_DN`, `BIND_PASSWORD`) must be set
-together. If only some are set, DSPanel falls back to GSSAPI with a warning.
-
-**Examples:**
-
-```bash
-# LDAPS (implicit TLS, port 636)
-DSPANEL_LDAP_SERVER=dc01.corp.local
-DSPANEL_LDAP_BIND_DN="CN=DSPanel-Svc,CN=Users,DC=corp,DC=local"
-DSPANEL_LDAP_BIND_PASSWORD="s3cur3!"
-DSPANEL_LDAP_USE_TLS=true
-
-# StartTLS (upgrade on port 389)
-DSPANEL_LDAP_SERVER=dc01.corp.local
-DSPANEL_LDAP_BIND_DN="CN=DSPanel-Svc,CN=Users,DC=corp,DC=local"
-DSPANEL_LDAP_BIND_PASSWORD="s3cur3!"
-DSPANEL_LDAP_STARTTLS=true
-
-# Internal PKI with custom CA certificate
-DSPANEL_LDAP_CA_CERT=/etc/ssl/certs/corp-ca.pem
-
-# Lab/dev only - skip TLS verification (INSECURE, vulnerable to MITM)
-DSPANEL_LDAP_TLS_SKIP_VERIFY=true
-```
-
-### Microsoft Graph (Exchange Online)
-
-Exchange Online diagnostics require an Azure AD App Registration. Configuration
-is done in-app via the Graph Settings panel (available in a future Settings page,
-Epic 12).
-
-**Required Azure AD permissions** (Application type, admin consent required):
-
-| Permission | Type | Purpose |
-| ---------- | ---- | ------- |
-| `Mail.Read` | Application | Read mailbox settings, folder sizes |
-| `User.Read.All` | Application | Read user profiles, proxy addresses |
-| `Reports.Read.All` | Application | Read mailbox usage reports (real quota) |
-
-The client secret is stored securely in the OS credential store (Windows Credential Manager, macOS Keychain, Linux Secret Service via keyring crate).
-
 ## Project Structure
 
 ```
@@ -271,9 +291,9 @@ DSPanel/
 
 ## Documentation
 
-- [Project Brief](docs/brief.md) - Vision, problem statement, target users
 - [Product Requirements (PRD)](docs/prd.md) - Functional/non-functional requirements, epics, stories
 - [Architecture](docs/architecture.md) - Tech stack, data models, components, workflows
+- [Localization](docs/architecture/localization.md) - i18n guide for adding languages and translation keys
 
 ## Contributing
 
