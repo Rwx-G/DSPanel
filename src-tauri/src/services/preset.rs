@@ -250,15 +250,15 @@ impl PresetService {
                         // Check integrity against known checksums
                         let filename = sanitize_filename(&preset.name);
                         let current_hash = compute_sha256(content.as_bytes());
-                        if let Some(known_hash) = checksums.get(&filename) {
-                            if *known_hash != current_hash {
-                                preset.integrity_warning = true;
-                                tracing::warn!(
-                                    preset = %preset.name,
-                                    file = %path.display(),
-                                    "Preset file was modified externally (checksum mismatch)"
-                                );
-                            }
+                        if let Some(known_hash) = checksums.get(&filename)
+                            && *known_hash != current_hash
+                        {
+                            preset.integrity_warning = true;
+                            tracing::warn!(
+                                preset = %preset.name,
+                                file = %path.display(),
+                                "Preset file was modified externally (checksum mismatch)"
+                            );
                         }
                         // If no known hash, this is a new file - no warning
 

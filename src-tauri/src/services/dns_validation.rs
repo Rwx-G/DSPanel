@@ -45,18 +45,18 @@ fn base_dn_to_domain(base_dn: &str) -> String {
 /// Uses the LDAP server IP (from `DSPANEL_LDAP_SERVER`) as the DNS server.
 /// Falls back to the system resolver if no LDAP server is configured.
 fn create_ad_resolver() -> TokioResolver {
-    if let Some(dc_ip_str) = resolve_fallback_ip() {
-        if let Ok(ip) = dc_ip_str.parse::<IpAddr>() {
-            let ns_group = NameServerConfigGroup::from_ips_clear(&[ip], 53, true);
-            let config = ResolverConfig::from_parts(None, vec![], ns_group);
-            let mut opts = ResolverOpts::default();
-            opts.timeout = std::time::Duration::from_secs(5);
-            opts.attempts = 2;
-            tracing::info!(dns_server = %ip, "Using AD DC as DNS server for SRV lookups");
-            return TokioResolver::builder_with_config(config, Default::default())
-                .with_options(opts)
-                .build();
-        }
+    if let Some(dc_ip_str) = resolve_fallback_ip()
+        && let Ok(ip) = dc_ip_str.parse::<IpAddr>()
+    {
+        let ns_group = NameServerConfigGroup::from_ips_clear(&[ip], 53, true);
+        let config = ResolverConfig::from_parts(None, vec![], ns_group);
+        let mut opts = ResolverOpts::default();
+        opts.timeout = std::time::Duration::from_secs(5);
+        opts.attempts = 2;
+        tracing::info!(dns_server = %ip, "Using AD DC as DNS server for SRV lookups");
+        return TokioResolver::builder_with_config(config, Default::default())
+            .with_options(opts)
+            .build();
     }
 
     tracing::info!("No LDAP server configured, using system DNS resolver");

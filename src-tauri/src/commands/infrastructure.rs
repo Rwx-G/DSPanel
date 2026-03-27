@@ -425,10 +425,10 @@ async fn resolve_gpo_names_cached(
     // Check cache
     {
         let cache = state.gpo_name_cache.lock().expect("lock poisoned");
-        if let Some((fetched_at, ref names)) = *cache {
-            if fetched_at.elapsed() < GPO_NAME_CACHE_TTL {
-                return names.clone();
-            }
+        if let Some((fetched_at, ref names)) = *cache
+            && fetched_at.elapsed() < GPO_NAME_CACHE_TTL
+        {
+            return names.clone();
         }
     }
 

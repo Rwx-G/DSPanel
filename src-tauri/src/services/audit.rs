@@ -222,23 +222,23 @@ impl AuditService {
             where_clauses.push(format!("timestamp <= ?{}", params.len() + 1));
             params.push(Box::new(to.clone()));
         }
-        if let Some(ref user) = filter.operator {
-            if !user.is_empty() {
-                where_clauses.push(format!("operator LIKE ?{}", params.len() + 1));
-                params.push(Box::new(format!("%{}%", user)));
-            }
+        if let Some(ref user) = filter.operator
+            && !user.is_empty()
+        {
+            where_clauses.push(format!("operator LIKE ?{}", params.len() + 1));
+            params.push(Box::new(format!("%{}%", user)));
         }
-        if let Some(ref action) = filter.action {
-            if !action.is_empty() {
-                where_clauses.push(format!("action = ?{}", params.len() + 1));
-                params.push(Box::new(action.clone()));
-            }
+        if let Some(ref action) = filter.action
+            && !action.is_empty()
+        {
+            where_clauses.push(format!("action = ?{}", params.len() + 1));
+            params.push(Box::new(action.clone()));
         }
-        if let Some(ref target) = filter.target_dn {
-            if !target.is_empty() {
-                where_clauses.push(format!("target_dn LIKE ?{}", params.len() + 1));
-                params.push(Box::new(format!("%{}%", target)));
-            }
+        if let Some(ref target) = filter.target_dn
+            && !target.is_empty()
+        {
+            where_clauses.push(format!("target_dn LIKE ?{}", params.len() + 1));
+            params.push(Box::new(format!("%{}%", target)));
         }
         if let Some(success) = filter.success {
             where_clauses.push(format!("success = ?{}", params.len() + 1));

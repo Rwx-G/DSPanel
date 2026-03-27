@@ -169,10 +169,10 @@ impl GraphExchangeService {
         // Check cache first
         {
             let cache = self.token_cache.read().expect("lock poisoned");
-            if let Some(ref cached) = *cache {
-                if cached.expires_at > std::time::Instant::now() {
-                    return Ok(cached.access_token.clone());
-                }
+            if let Some(ref cached) = *cache
+                && cached.expires_at > std::time::Instant::now()
+            {
+                return Ok(cached.access_token.clone());
             }
         }
 

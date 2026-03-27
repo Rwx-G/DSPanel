@@ -131,10 +131,10 @@ pub async fn discover_fsmo_roles(
     ];
 
     for (role, dn) in fsmo_objects {
-        if let Ok(Some(entry)) = provider.read_entry(dn).await {
-            if let Some(owner) = entry.get_attribute("fSMORoleOwner") {
-                roles.push((*role, owner.to_string()));
-            }
+        if let Ok(Some(entry)) = provider.read_entry(dn).await
+            && let Some(owner) = entry.get_attribute("fSMORoleOwner")
+        {
+            roles.push((*role, owner.to_string()));
         }
     }
 
@@ -273,19 +273,19 @@ async fn check_dns_with_ad_fallback(
 ) -> (DcHealthCheck, Option<String>) {
     // Try system DNS first
     let addr = format!("{}:389", hostname);
-    if let Ok(mut addrs) = tokio::net::lookup_host(&addr).await {
-        if let Some(resolved) = addrs.next() {
-            let ip = resolved.ip().to_string();
-            return (
-                DcHealthCheck {
-                    name: "DNS".to_string(),
-                    status: DcHealthLevel::Healthy,
-                    message: format!("Resolved to {}", ip),
-                    value: Some(ip.clone()),
-                },
-                Some(ip),
-            );
-        }
+    if let Ok(mut addrs) = tokio::net::lookup_host(&addr).await
+        && let Some(resolved) = addrs.next()
+    {
+        let ip = resolved.ip().to_string();
+        return (
+            DcHealthCheck {
+                name: "DNS".to_string(),
+                status: DcHealthLevel::Healthy,
+                message: format!("Resolved to {}", ip),
+                value: Some(ip.clone()),
+            },
+            Some(ip),
+        );
     }
 
     // System DNS failed - try AD DNS resolver
@@ -295,36 +295,36 @@ async fn check_dns_with_ad_fallback(
         } else {
             format!("{}.", hostname)
         };
-        if let Ok(lookup) = resolver.lookup_ip(&fqdn).await {
-            if let Some(ip) = lookup.iter().next() {
-                let ip_str = ip.to_string();
-                // In simple bind mode, AD DNS resolution is fully sufficient
-                // (no Kerberos dependency on system DNS). In GSSAPI mode,
-                // system DNS is critical for SRV/KDC discovery -> warn.
-                let (status, msg) = if is_simple_bind_mode() {
-                    (
-                        DcHealthLevel::Healthy,
-                        format!("Resolved via AD DNS to {}", ip_str),
-                    )
-                } else {
-                    (
-                        DcHealthLevel::Warning,
-                        format!(
-                            "System DNS failed, resolved via AD DNS to {} (Kerberos may require system DNS)",
-                            ip_str
-                        ),
-                    )
-                };
-                return (
-                    DcHealthCheck {
-                        name: "DNS".to_string(),
-                        status,
-                        message: msg,
-                        value: Some(ip_str.clone()),
-                    },
-                    Some(ip_str),
-                );
-            }
+        if let Ok(lookup) = resolver.lookup_ip(&fqdn).await
+            && let Some(ip) = lookup.iter().next()
+        {
+            let ip_str = ip.to_string();
+            // In simple bind mode, AD DNS resolution is fully sufficient
+            // (no Kerberos dependency on system DNS). In GSSAPI mode,
+            // system DNS is critical for SRV/KDC discovery -> warn.
+            let (status, msg) = if is_simple_bind_mode() {
+                (
+                    DcHealthLevel::Healthy,
+                    format!("Resolved via AD DNS to {}", ip_str),
+                )
+            } else {
+                (
+                    DcHealthLevel::Warning,
+                    format!(
+                        "System DNS failed, resolved via AD DNS to {} (Kerberos may require system DNS)",
+                        ip_str
+                    ),
+                )
+            };
+            return (
+                DcHealthCheck {
+                    name: "DNS".to_string(),
+                    status,
+                    message: msg,
+                    value: Some(ip_str.clone()),
+                },
+                Some(ip_str),
+            );
         }
     }
 

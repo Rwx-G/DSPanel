@@ -273,7 +273,7 @@ mod tests {
 
     #[test]
     fn test_keyring_default() {
-        let _store = KeyringCredentialStore::default();
+        let _store = KeyringCredentialStore;
         // Just verify it can be constructed
     }
 }

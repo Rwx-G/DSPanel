@@ -343,10 +343,10 @@ impl MfaService {
 
 impl Drop for MfaService {
     fn drop(&mut self) {
-        if let Ok(mut secret) = self.secret.lock() {
-            if let Some(ref mut s) = *secret {
-                s.zeroize();
-            }
+        if let Ok(mut secret) = self.secret.lock()
+            && let Some(ref mut s) = *secret
+        {
+            s.zeroize();
         }
     }
 }

@@ -53,12 +53,12 @@ pub fn compute_replication_status(
         return ReplicationStatus::Failed;
     }
 
-    if let Some(sync_time) = last_sync_time {
-        if let Ok(sync_ms) = parse_date_to_ms(sync_time) {
-            let elapsed_minutes = (now_ms - sync_ms) / 60_000;
-            if elapsed_minutes > 60 {
-                return ReplicationStatus::Warning;
-            }
+    if let Some(sync_time) = last_sync_time
+        && let Ok(sync_ms) = parse_date_to_ms(sync_time)
+    {
+        let elapsed_minutes = (now_ms - sync_ms) / 60_000;
+        if elapsed_minutes > 60 {
+            return ReplicationStatus::Warning;
         }
     }
 

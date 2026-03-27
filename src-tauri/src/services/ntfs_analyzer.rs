@@ -114,12 +114,12 @@ pub fn enumerate_directories(base_path: &str, max_depth: usize) -> Vec<Result<St
                 for entry in entries {
                     match entry {
                         Ok(e) => {
-                            if let Ok(ft) = e.file_type() {
-                                if ft.is_dir() {
-                                    let dir_path = e.path().to_string_lossy().to_string();
-                                    results.push(Ok(dir_path.clone()));
-                                    recurse(&dir_path, depth + 1, max_depth, results);
-                                }
+                            if let Ok(ft) = e.file_type()
+                                && ft.is_dir()
+                            {
+                                let dir_path = e.path().to_string_lossy().to_string();
+                                results.push(Ok(dir_path.clone()));
+                                recurse(&dir_path, depth + 1, max_depth, results);
                             }
                         }
                         Err(e) => {

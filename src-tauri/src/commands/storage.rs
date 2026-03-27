@@ -1177,11 +1177,11 @@ pub(crate) async fn check_for_update_inner(state: &AppState) -> Option<UpdateInf
     }
 
     // Check if this version was skipped
-    if let Some(ref skipped) = update_settings.skipped_version {
-        if skipped == &info.version {
-            tracing::debug!(version = %info.version, "Update skipped by user");
-            return None;
-        }
+    if let Some(ref skipped) = update_settings.skipped_version
+        && skipped == &info.version
+    {
+        tracing::debug!(version = %info.version, "Update skipped by user");
+        return None;
     }
 
     // Check if it's actually newer

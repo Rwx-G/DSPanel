@@ -341,10 +341,10 @@ fn extract_powershell_error(raw: &str) -> String {
                 return after[start + 2..start + 2 + end].trim().to_string();
             }
         }
-        if let Some(start) = after.find('"') {
-            if let Some(end) = after[start + 1..].find('"') {
-                return after[start + 1..start + 1 + end].trim().to_string();
-            }
+        if let Some(start) = after.find('"')
+            && let Some(end) = after[start + 1..].find('"')
+        {
+            return after[start + 1..start + 1 + end].trim().to_string();
         }
     }
     // Fallback: take just the first line, trimmed

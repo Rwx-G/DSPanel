@@ -1497,10 +1497,10 @@ impl DirectoryProvider for LdapDirectoryProvider {
 
                 if let Some(entry) = entries.into_iter().next() {
                     let se = ldap3::SearchEntry::construct(entry);
-                    if let Some(values) = se.attrs.get("msDS-ReplAttributeMetaData") {
-                        if let Some(raw) = values.first() {
-                            return Ok(Some(raw.clone()));
-                        }
+                    if let Some(values) = se.attrs.get("msDS-ReplAttributeMetaData")
+                        && let Some(raw) = values.first()
+                    {
+                        return Ok(Some(raw.clone()));
                     }
                 }
 
@@ -1530,10 +1530,10 @@ impl DirectoryProvider for LdapDirectoryProvider {
 
                 if let Some(entry) = entries.into_iter().next() {
                     let se = ldap3::SearchEntry::construct(entry);
-                    if let Some(values) = se.attrs.get("msDS-ReplValueMetaData") {
-                        if let Some(raw) = values.first() {
-                            return Ok(Some(raw.clone()));
-                        }
+                    if let Some(values) = se.attrs.get("msDS-ReplValueMetaData")
+                        && let Some(raw) = values.first()
+                    {
+                        return Ok(Some(raw.clone()));
                     }
                 }
 
@@ -1909,15 +1909,14 @@ impl DirectoryProvider for LdapDirectoryProvider {
                             )
                             .await;
 
-                        if let Ok(result) = search_result {
-                            if let Some(entry) = result.0.into_iter().next() {
-                                let se = SearchEntry::construct(entry);
-                                if let Some(classes) = se.attrs.get("allowedChildClassesEffective")
-                                {
-                                    if classes.iter().any(|c| c.eq_ignore_ascii_case("user")) {
-                                        return Ok(true);
-                                    }
-                                }
+                        if let Ok(result) = search_result
+                            && let Some(entry) = result.0.into_iter().next()
+                        {
+                            let se = SearchEntry::construct(entry);
+                            if let Some(classes) = se.attrs.get("allowedChildClassesEffective")
+                                && classes.iter().any(|c| c.eq_ignore_ascii_case("user"))
+                            {
+                                return Ok(true);
                             }
                         }
                     }
@@ -1949,10 +1948,10 @@ impl DirectoryProvider for LdapDirectoryProvider {
                         if let Ok(result) = search_result {
                             for entry in result.0 {
                                 let se = SearchEntry::construct(entry);
-                                if let Some(attrs) = se.attrs.get("allowedAttributesEffective") {
-                                    if attrs.iter().any(|a| a.eq_ignore_ascii_case("lockoutTime")) {
-                                        return Ok(true);
-                                    }
+                                if let Some(attrs) = se.attrs.get("allowedAttributesEffective")
+                                    && attrs.iter().any(|a| a.eq_ignore_ascii_case("lockoutTime"))
+                                {
+                                    return Ok(true);
                                 }
                             }
                         }
@@ -1982,10 +1981,10 @@ impl DirectoryProvider for LdapDirectoryProvider {
                         if let Ok(result) = search_result {
                             for entry in result.0 {
                                 let se = SearchEntry::construct(entry);
-                                if let Some(attrs) = se.attrs.get("allowedAttributesEffective") {
-                                    if attrs.iter().any(|a| a.eq_ignore_ascii_case("member")) {
-                                        return Ok(true);
-                                    }
+                                if let Some(attrs) = se.attrs.get("allowedAttributesEffective")
+                                    && attrs.iter().any(|a| a.eq_ignore_ascii_case("member"))
+                                {
+                                    return Ok(true);
                                 }
                             }
                         }
@@ -2273,11 +2272,10 @@ impl DirectoryProvider for LdapDirectoryProvider {
                         cn[..pos].to_string()
                     } else {
                         // Fallback: strip anything after " DEL:" or any DEL:<guid> pattern
-                        let re_stripped = cn
-                            .find("DEL:")
+
+                        cn.find("DEL:")
                             .map(|pos| cn[..pos].trim_end().to_string())
-                            .unwrap_or_else(|| cn.clone());
-                        re_stripped
+                            .unwrap_or_else(|| cn.clone())
                     };
                     let object_type = se
                         .attrs
@@ -2617,11 +2615,11 @@ impl DirectoryProvider for LdapDirectoryProvider {
 
                 if let Some(entry) = entries.into_iter().next() {
                     let se = SearchEntry::construct(entry);
-                    if let Some(bin_values) = se.bin_attrs.get("thumbnailPhoto") {
-                        if let Some(bytes) = bin_values.first() {
-                            let encoded = base64::engine::general_purpose::STANDARD.encode(bytes);
-                            return Ok(Some(encoded));
-                        }
+                    if let Some(bin_values) = se.bin_attrs.get("thumbnailPhoto")
+                        && let Some(bytes) = bin_values.first()
+                    {
+                        let encoded = base64::engine::general_purpose::STANDARD.encode(bytes);
+                        return Ok(Some(encoded));
                     }
                 }
                 Ok(None)
@@ -2810,11 +2808,11 @@ impl DirectoryProvider for LdapDirectoryProvider {
                         for result_entry in rs {
                             let se = ldap3::SearchEntry::construct(result_entry);
                             // Check objectSid binary attribute for matching RID
-                            if let Some(sid_values) = se.bin_attrs.get("objectSid") {
-                                if let Some(sid_bytes) = sid_values.first() {
+                            if let Some(sid_values) = se.bin_attrs.get("objectSid")
+                                && let Some(sid_bytes) = sid_values.first() {
                                     let sid_str = sid_bytes_to_string(sid_bytes);
-                                    if let Some(entry_rid) = sid_str.rsplit('-').next().and_then(|s| s.parse::<u32>().ok()) {
-                                        if entry_rid == rid {
+                                    if let Some(entry_rid) = sid_str.rsplit('-').next().and_then(|s| s.parse::<u32>().ok())
+                                        && entry_rid == rid {
                                             let mut entry = DirectoryEntry::new(se.dn);
                                             entry.sam_account_name = se.attrs.get("sAMAccountName").and_then(|v| v.first().cloned());
                                             entry.display_name = se.attrs.get("displayName").and_then(|v| v.first().cloned());
@@ -2824,9 +2822,7 @@ impl DirectoryProvider for LdapDirectoryProvider {
                                             }
                                             return Ok(Some(entry));
                                         }
-                                    }
                                 }
-                            }
                         }
                         Ok(None)
                     }

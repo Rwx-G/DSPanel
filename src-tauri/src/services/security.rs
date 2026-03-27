@@ -62,15 +62,15 @@ pub async fn get_privileged_accounts_report(
 
     // Also resolve additional groups configured by name (these are user-specified)
     for group_name in additional_groups {
-        if let Ok(groups) = provider.search_groups(group_name, 1).await {
-            if let Some(group) = groups.first() {
-                let name = group
-                    .display_name
-                    .clone()
-                    .or_else(|| group.sam_account_name.clone())
-                    .unwrap_or_else(|| group_name.clone());
-                resolved_groups.push((group.distinguished_name.clone(), name));
-            }
+        if let Ok(groups) = provider.search_groups(group_name, 1).await
+            && let Some(group) = groups.first()
+        {
+            let name = group
+                .display_name
+                .clone()
+                .or_else(|| group.sam_account_name.clone())
+                .unwrap_or_else(|| group_name.clone());
+            resolved_groups.push((group.distinguished_name.clone(), name));
         }
     }
 
@@ -97,10 +97,9 @@ pub async fn get_privileged_accounts_report(
                 if let Some(existing) = all_accounts
                     .iter_mut()
                     .find(|a| a.distinguished_name == member.distinguished_name)
+                    && !existing.privileged_groups.contains(group_name)
                 {
-                    if !existing.privileged_groups.contains(group_name) {
-                        existing.privileged_groups.push(group_name.clone());
-                    }
+                    existing.privileged_groups.push(group_name.clone());
                 }
                 continue;
             }
@@ -294,22 +293,21 @@ async fn get_domain_security_findings(
             .map(functional_level_label);
 
         // Check if domain level is low (< 2012 R2 = level 6)
-        if let Some(level_str) = root_dse.get_attribute("domainFunctionality") {
-            if let Ok(level) = level_str.parse::<u32>() {
-                if level < 6 {
-                    findings.alerts.push(SecurityAlert {
-                        severity: AlertSeverity::Medium,
-                        message: format!(
-                            "Domain functional level is {} - consider upgrading for security features",
-                            findings
-                                .domain_functional_level
-                                .as_deref()
-                                .unwrap_or("unknown")
-                        ),
-                        alert_type: "low_functional_level".to_string(),
-                    });
-                }
-            }
+        if let Some(level_str) = root_dse.get_attribute("domainFunctionality")
+            && let Ok(level) = level_str.parse::<u32>()
+            && level < 6
+        {
+            findings.alerts.push(SecurityAlert {
+                severity: AlertSeverity::Medium,
+                message: format!(
+                    "Domain functional level is {} - consider upgrading for security features",
+                    findings
+                        .domain_functional_level
+                        .as_deref()
+                        .unwrap_or("unknown")
+                ),
+                alert_type: "low_functional_level".to_string(),
+            });
         }
     }
 
@@ -430,17 +428,17 @@ pub fn compute_alerts(
     // --- Critical severity ---
 
     // Password older than 90 days
-    if let Some(age) = account.password_age_days {
-        if age > PASSWORD_AGE_THRESHOLD_DAYS {
-            alerts.push(SecurityAlert {
-                severity: AlertSeverity::Critical,
-                message: format!(
-                    "Password not changed for {} days (threshold: {})",
-                    age, PASSWORD_AGE_THRESHOLD_DAYS
-                ),
-                alert_type: "password_age".to_string(),
-            });
-        }
+    if let Some(age) = account.password_age_days
+        && age > PASSWORD_AGE_THRESHOLD_DAYS
+    {
+        alerts.push(SecurityAlert {
+            severity: AlertSeverity::Critical,
+            message: format!(
+                "Password not changed for {} days (threshold: {})",
+                age, PASSWORD_AGE_THRESHOLD_DAYS
+            ),
+            alert_type: "password_age".to_string(),
+        });
     }
 
     // Reversible encryption enabled
@@ -555,14 +553,14 @@ pub fn compute_alerts(
     }
 
     // Inactive admin (last logon > 90 days but did log on at some point)
-    if let Some(age) = last_logon_age_days {
-        if age > 90 {
-            alerts.push(SecurityAlert {
-                severity: AlertSeverity::Medium,
-                message: format!("Inactive admin account - last logon {} days ago", age),
-                alert_type: "inactive_admin".to_string(),
-            });
-        }
+    if let Some(age) = last_logon_age_days
+        && age > 90
+    {
+        alerts.push(SecurityAlert {
+            severity: AlertSeverity::Medium,
+            message: format!("Inactive admin account - last logon {} days ago", age),
+            alert_type: "inactive_admin".to_string(),
+        });
     }
 
     // AdminCount orphaned
@@ -1509,36 +1507,29 @@ async fn compute_dangerous_configs_factor(provider: Arc<dyn DirectoryProvider>) 
             }
 
             // Domain functional level check
-            if let Ok(Some(root_dse)) = provider.read_entry("").await {
-                if let Some(level_str) = root_dse.get_attribute("domainFunctionality") {
-                    if let Ok(level) = level_str.parse::<u32>() {
-                        if level < 6 {
-                            score -= 10.0;
-                            issues.push(format!(
-                                "Domain functional level < 2012 R2 (level {})",
-                                level
-                            ));
-                            recommendations.push(
-                                "Upgrade domain functional level for modern security features"
-                                    .to_string(),
-                            );
-                            findings.push(RiskFinding {
-                                id: "CONF-008".to_string(),
-                                description: format!(
-                                    "Domain functional level < 2012 R2 (level {})",
-                                    level
-                                ),
-                                severity: severity_from_points(10.0),
-                                points_deducted: 10.0,
-                                remediation:
-                                    "Upgrade domain functional level for modern security features"
-                                        .to_string(),
-                                complexity: RemediationComplexity::Hard,
-                                framework_ref: Some("CIS 18.1".to_string()),
-                            });
-                        }
-                    }
-                }
+            if let Ok(Some(root_dse)) = provider.read_entry("").await
+                && let Some(level_str) = root_dse.get_attribute("domainFunctionality")
+                && let Ok(level) = level_str.parse::<u32>()
+                && level < 6
+            {
+                score -= 10.0;
+                issues.push(format!(
+                    "Domain functional level < 2012 R2 (level {})",
+                    level
+                ));
+                recommendations.push(
+                    "Upgrade domain functional level for modern security features".to_string(),
+                );
+                findings.push(RiskFinding {
+                    id: "CONF-008".to_string(),
+                    description: format!("Domain functional level < 2012 R2 (level {})", level),
+                    severity: severity_from_points(10.0),
+                    points_deducted: 10.0,
+                    remediation: "Upgrade domain functional level for modern security features"
+                        .to_string(),
+                    complexity: RemediationComplexity::Hard,
+                    framework_ref: Some("CIS 18.1".to_string()),
+                });
             }
 
             // Count orphaned adminCount accounts (adminCount=1 not in admin groups)
@@ -2295,33 +2286,30 @@ async fn compute_gpo_security_factor(provider: Arc<dyn DirectoryProvider>) -> Fa
     }
 
     // Check domain behavior version for advanced audit support
-    if let Ok(Some(root_dse)) = provider.read_entry("").await {
-        if let Some(level_str) = root_dse.get_attribute("domainFunctionality") {
-            if let Ok(level) = level_str.parse::<u32>() {
-                if level < 3 {
-                    score -= 20.0;
-                    issues.push(format!(
-                        "Domain functional level {} - pre-2008, no advanced audit",
-                        level
-                    ));
-                    recommendations.push("Upgrade domain to at least Windows Server 2008 functional level for advanced audit policy support".to_string());
-                    findings.push(RiskFinding {
-                        id: "GPO-002".to_string(),
-                        description: format!(
-                            "Domain functional level {} does not support advanced audit policies",
-                            level
-                        ),
-                        severity: severity_from_points(20.0),
-                        points_deducted: 20.0,
-                        remediation:
-                            "Upgrade domain to at least Windows Server 2008 functional level"
-                                .to_string(),
-                        complexity: RemediationComplexity::Hard,
-                        framework_ref: Some("CIS 1.1.6".to_string()),
-                    });
-                }
-            }
-        }
+    if let Ok(Some(root_dse)) = provider.read_entry("").await
+        && let Some(level_str) = root_dse.get_attribute("domainFunctionality")
+        && let Ok(level) = level_str.parse::<u32>()
+        && level < 3
+    {
+        score -= 20.0;
+        issues.push(format!(
+            "Domain functional level {} - pre-2008, no advanced audit",
+            level
+        ));
+        recommendations.push("Upgrade domain to at least Windows Server 2008 functional level for advanced audit policy support".to_string());
+        findings.push(RiskFinding {
+            id: "GPO-002".to_string(),
+            description: format!(
+                "Domain functional level {} does not support advanced audit policies",
+                level
+            ),
+            severity: severity_from_points(20.0),
+            points_deducted: 20.0,
+            remediation: "Upgrade domain to at least Windows Server 2008 functional level"
+                .to_string(),
+            complexity: RemediationComplexity::Hard,
+            framework_ref: Some("CIS 1.1.6".to_string()),
+        });
     }
 
     // Note: reversible encryption check is already covered in dangerous_configs factor
@@ -4075,32 +4063,32 @@ pub async fn build_escalation_graph(
         }
 
         // D. Ownership (managedBy) edges
-        if let Some(managed_by_vals) = group.attributes.get("managedBy") {
-            if let Some(manager_dn) = managed_by_vals.first() {
-                if !manager_dn.is_empty() && !privileged_group_dns.contains(manager_dn) {
-                    // Add manager node if not already present
-                    if node_dns.insert(manager_dn.clone()) {
-                        let manager_name = manager_dn
-                            .split(',')
-                            .next()
-                            .and_then(|cn| cn.strip_prefix("CN="))
-                            .unwrap_or("Unknown")
-                            .to_string();
-                        nodes.push(GraphNode {
-                            dn: manager_dn.clone(),
-                            display_name: manager_name,
-                            node_type: NodeType::User,
-                            is_privileged: false,
-                        });
-                    }
-                    edges.push(GraphEdge {
-                        source_dn: manager_dn.clone(),
-                        target_dn: group.distinguished_name.clone(),
-                        edge_type: EdgeType::Ownership,
-                        label: Some("Manages group".to_string()),
-                    });
-                }
+        if let Some(managed_by_vals) = group.attributes.get("managedBy")
+            && let Some(manager_dn) = managed_by_vals.first()
+            && !manager_dn.is_empty()
+            && !privileged_group_dns.contains(manager_dn)
+        {
+            // Add manager node if not already present
+            if node_dns.insert(manager_dn.clone()) {
+                let manager_name = manager_dn
+                    .split(',')
+                    .next()
+                    .and_then(|cn| cn.strip_prefix("CN="))
+                    .unwrap_or("Unknown")
+                    .to_string();
+                nodes.push(GraphNode {
+                    dn: manager_dn.clone(),
+                    display_name: manager_name,
+                    node_type: NodeType::User,
+                    is_privileged: false,
+                });
             }
+            edges.push(GraphEdge {
+                source_dn: manager_dn.clone(),
+                target_dn: group.distinguished_name.clone(),
+                edge_type: EdgeType::Ownership,
+                label: Some("Manages group".to_string()),
+            });
         }
     }
 
@@ -4128,17 +4116,16 @@ pub async fn build_escalation_graph(
         }
 
         // E. SIDHistory edges
-        if let Some(sid_history_vals) = member.attributes.get("sIDHistory") {
-            if !sid_history_vals.is_empty() {
-                if let Some(target_dn) = privileged_group_dns.first() {
-                    edges.push(GraphEdge {
-                        source_dn: member.distinguished_name.clone(),
-                        target_dn: target_dn.clone(),
-                        edge_type: EdgeType::SIDHistory,
-                        label: Some("SIDHistory".to_string()),
-                    });
-                }
-            }
+        if let Some(sid_history_vals) = member.attributes.get("sIDHistory")
+            && !sid_history_vals.is_empty()
+            && let Some(target_dn) = privileged_group_dns.first()
+        {
+            edges.push(GraphEdge {
+                source_dn: member.distinguished_name.clone(),
+                target_dn: target_dn.clone(),
+                edge_type: EdgeType::SIDHistory,
+                label: Some("SIDHistory".to_string()),
+            });
         }
     }
 
@@ -4183,28 +4170,28 @@ pub async fn build_escalation_graph(
             if let Some(rbcd_vals) = computer
                 .attributes
                 .get("msDS-AllowedToActOnBehalfOfOtherIdentity")
+                && !rbcd_vals.is_empty()
+                && rbcd_vals.iter().any(|v| !v.is_empty())
             {
-                if !rbcd_vals.is_empty() && rbcd_vals.iter().any(|v| !v.is_empty()) {
-                    if node_dns.insert(computer.distinguished_name.clone()) {
-                        nodes.push(GraphNode {
-                            dn: computer.distinguished_name.clone(),
-                            display_name: computer
-                                .display_name
-                                .clone()
-                                .or_else(|| computer.sam_account_name.clone())
-                                .unwrap_or_else(|| "Unknown Computer".to_string()),
-                            node_type: NodeType::Computer,
-                            is_privileged: false,
-                        });
-                    }
-                    for priv_dn in &privileged_group_dns {
-                        edges.push(GraphEdge {
-                            source_dn: computer.distinguished_name.clone(),
-                            target_dn: priv_dn.clone(),
-                            edge_type: EdgeType::RBCD,
-                            label: Some("RBCD".to_string()),
-                        });
-                    }
+                if node_dns.insert(computer.distinguished_name.clone()) {
+                    nodes.push(GraphNode {
+                        dn: computer.distinguished_name.clone(),
+                        display_name: computer
+                            .display_name
+                            .clone()
+                            .or_else(|| computer.sam_account_name.clone())
+                            .unwrap_or_else(|| "Unknown Computer".to_string()),
+                        node_type: NodeType::Computer,
+                        is_privileged: false,
+                    });
+                }
+                for priv_dn in &privileged_group_dns {
+                    edges.push(GraphEdge {
+                        source_dn: computer.distinguished_name.clone(),
+                        target_dn: priv_dn.clone(),
+                        edge_type: EdgeType::RBCD,
+                        label: Some("RBCD".to_string()),
+                    });
                 }
             }
         }
@@ -4237,26 +4224,26 @@ pub async fn build_escalation_graph(
                     });
 
                 // Check if the domain root links this GPO
-                if let Ok(Some(domain_root)) = provider.read_entry(&base_dn).await {
-                    if let Some(gplink_vals) = domain_root.attributes.get("gPLink") {
-                        let gplink_str = gplink_vals.join("");
-                        if gplink_str.to_uppercase().contains(&gpo_dn.to_uppercase()) {
-                            if node_dns.insert(gpo_dn.clone()) {
-                                nodes.push(GraphNode {
-                                    dn: gpo_dn.clone(),
-                                    display_name: gpo_name.clone(),
-                                    node_type: NodeType::GPO,
-                                    is_privileged: false,
-                                });
-                            }
-                            for priv_dn in &privileged_group_dns {
-                                edges.push(GraphEdge {
-                                    source_dn: gpo_dn.clone(),
-                                    target_dn: priv_dn.clone(),
-                                    edge_type: EdgeType::GPLink,
-                                    label: Some("GPO linked to OU".to_string()),
-                                });
-                            }
+                if let Ok(Some(domain_root)) = provider.read_entry(&base_dn).await
+                    && let Some(gplink_vals) = domain_root.attributes.get("gPLink")
+                {
+                    let gplink_str = gplink_vals.join("");
+                    if gplink_str.to_uppercase().contains(&gpo_dn.to_uppercase()) {
+                        if node_dns.insert(gpo_dn.clone()) {
+                            nodes.push(GraphNode {
+                                dn: gpo_dn.clone(),
+                                display_name: gpo_name.clone(),
+                                node_type: NodeType::GPO,
+                                is_privileged: false,
+                            });
+                        }
+                        for priv_dn in &privileged_group_dns {
+                            edges.push(GraphEdge {
+                                source_dn: gpo_dn.clone(),
+                                target_dn: priv_dn.clone(),
+                                edge_type: EdgeType::GPLink,
+                                label: Some("GPO linked to OU".to_string()),
+                            });
                         }
                     }
                 }
@@ -4425,10 +4412,11 @@ pub fn find_critical_paths(nodes: &[GraphNode], edges: &[GraphEdge]) -> Vec<Esca
         }) = heap.pop()
         {
             // Skip if we already found a cheaper path to this node
-            if let Some(&best) = dist.get(node) {
-                if cost > best && path.len() > 1 {
-                    continue;
-                }
+            if let Some(&best) = dist.get(node)
+                && cost > best
+                && path.len() > 1
+            {
+                continue;
             }
 
             // Check if we reached a privileged node

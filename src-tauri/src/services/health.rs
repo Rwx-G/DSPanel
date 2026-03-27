@@ -69,16 +69,15 @@ pub fn evaluate_health(input: &HealthInput, now_ms: i64) -> AccountHealthStatus 
         });
     }
 
-    if let Some(ref expires) = input.account_expires {
-        if let Ok(expiry_ms) = parse_date_to_ms(expires) {
-            if expiry_ms <= now_ms {
-                flags.push(HealthFlag {
-                    name: "Expired".to_string(),
-                    severity: HealthLevel::Critical,
-                    description: "Account has expired".to_string(),
-                });
-            }
-        }
+    if let Some(ref expires) = input.account_expires
+        && let Ok(expiry_ms) = parse_date_to_ms(expires)
+        && expiry_ms <= now_ms
+    {
+        flags.push(HealthFlag {
+            name: "Expired".to_string(),
+            severity: HealthLevel::Critical,
+            description: "Account has expired".to_string(),
+        });
     }
 
     if input.password_expired {
@@ -114,31 +113,29 @@ pub fn evaluate_health(input: &HealthInput, now_ms: i64) -> AccountHealthStatus 
                 });
             }
         }
-    } else if let Some(ref when_created) = input.when_created {
-        if let Ok(created_ms) = parse_date_to_ms(when_created) {
-            let days_since = (now_ms - created_ms) / MS_PER_DAY;
-            if days_since >= 1 {
-                flags.push(HealthFlag {
-                    name: "NeverLoggedOn".to_string(),
-                    severity: HealthLevel::Info,
-                    description: "Account has never been used".to_string(),
-                });
-            }
+    } else if let Some(ref when_created) = input.when_created
+        && let Ok(created_ms) = parse_date_to_ms(when_created)
+    {
+        let days_since = (now_ms - created_ms) / MS_PER_DAY;
+        if days_since >= 1 {
+            flags.push(HealthFlag {
+                name: "NeverLoggedOn".to_string(),
+                severity: HealthLevel::Info,
+                description: "Account has never been used".to_string(),
+            });
         }
     }
 
-    if let (Some(pwd_set), Some(created)) = (&input.password_last_set, &input.when_created) {
-        if let (Ok(pwd_ms), Ok(created_ms)) = (parse_date_to_ms(pwd_set), parse_date_to_ms(created))
-        {
-            let diff = (pwd_ms - created_ms).unsigned_abs();
-            if diff <= 60_000 {
-                flags.push(HealthFlag {
-                    name: "PasswordNeverChanged".to_string(),
-                    severity: HealthLevel::Warning,
-                    description: "Password has never been changed since account creation"
-                        .to_string(),
-                });
-            }
+    if let (Some(pwd_set), Some(created)) = (&input.password_last_set, &input.when_created)
+        && let (Ok(pwd_ms), Ok(created_ms)) = (parse_date_to_ms(pwd_set), parse_date_to_ms(created))
+    {
+        let diff = (pwd_ms - created_ms).unsigned_abs();
+        if diff <= 60_000 {
+            flags.push(HealthFlag {
+                name: "PasswordNeverChanged".to_string(),
+                severity: HealthLevel::Warning,
+                description: "Password has never been changed since account creation".to_string(),
+            });
         }
     }
 

@@ -124,7 +124,7 @@ mod tests {
     #[test]
     fn test_save_cleanup_rules_requires_domain_admin() {
         let state = make_state(); // ReadOnly by default
-        let _rules = vec![CleanupRule {
+        let _rules = [CleanupRule {
             name: "Test Rule".to_string(),
             condition: CleanupCondition::InactiveDays,
             threshold_days: 90,
