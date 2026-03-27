@@ -1,7 +1,7 @@
 <p align="center">
   <img src="docs/logo.png" alt="DSPanel" width="120">
   <h1 align="center">DSPanel</h1>
-  <p align="center">Active Directory support and administration tool for Windows, macOS, and Linux.</p>
+  <p align="center">Active Directory support and administration tool for Windows, macOS, and Linux - lightweight native binary (~10 MB), no subscription, no agent.</p>
 </p>
 
 <p align="center">
@@ -19,6 +19,14 @@
 ## Overview
 
 DSPanel is an open source cross-platform desktop application (Rust/Tauri v2) that unifies the entire Active Directory support chain into a single tool. It dynamically adapts its interface based on the AD permissions of the current user, covering everything from read-only lookups to full domain administration.
+
+### Why DSPanel?
+
+- **No subscription** - Apache 2.0, self-hosted, zero telemetry
+- **Cross-platform** - native Rust/Tauri binary, runs on Windows, macOS, and Linux
+- **Compliance-ready** - 9 frameworks (GDPR, ANSSI, NIS2, CIS v8...) with PowerShell remediation built-in
+- **Adaptive** - UI automatically adjusts to the user's AD permissions (read-only to domain admin)
+- **Multilingual** - 5 languages (EN, FR, DE, ES, IT) with runtime switching
 
 ![DSPanel Overview](docs/screenshots/overview.png)
 
