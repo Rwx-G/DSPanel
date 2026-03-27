@@ -1,4 +1,5 @@
 import { useEffect, useCallback, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigation } from "@/contexts/NavigationContext";
 import { Sidebar } from "./Sidebar";
 import { TabBar } from "./TabBar";
@@ -14,6 +15,7 @@ interface AppShellProps {
 }
 
 export function AppShell({ statusBarProps, children }: AppShellProps) {
+  const { t } = useTranslation("layout");
   const {
     sidebarExpanded,
     toggleSidebar,
@@ -156,13 +158,13 @@ export function AppShell({ statusBarProps, children }: AppShellProps) {
         className="sr-only focus:not-sr-only focus:absolute focus:z-[100] focus:rounded-md focus:bg-[var(--color-primary)] focus:px-4 focus:py-2 focus:text-white"
         data-testid="skip-to-main"
       >
-        Skip to main content
+        {t("skipToMain")}
       </a>
       <div className="flex flex-1 overflow-hidden">
         <Sidebar expanded={sidebarExpanded} onToggle={handleToggleSidebar} />
         <main
           id="main-content"
-          aria-label="Main content"
+          aria-label={t("mainContent")}
           className="flex flex-1 flex-col overflow-hidden"
         >
           <UpdateNotificationBar />

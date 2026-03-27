@@ -1,0 +1,18 @@
+{
+  "skipToMain": "Aller au contenu principal",
+  "mainContent": "Contenu principal",
+  "breadcrumb": "Fil d'Ariane",
+  "scrollTabsLeft": "Défiler les onglets vers la gauche",
+  "scrollTabsRight": "Défiler les onglets vers la droite",
+  "closeTab": "Fermer {{title}}",
+  "closeOthers": "Fermer les autres",
+  "closeAll": "Tout fermer",
+  "tabOptions": "Options de l'onglet",
+  "loginServer": "Serveur",
+  "loginAccount": "Compte",
+  "loginSubtitle": "Entrez vos identifiants AD pour vous connecter",
+  "loginPassword": "Mot de passe",
+  "loginPasswordPlaceholder": "Saisir le mot de passe...",
+  "loginConnect": "Connexion",
+  "loginConnecting": "Connexion en cours..."
+}

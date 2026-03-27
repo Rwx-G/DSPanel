@@ -1,0 +1,22 @@
+{
+  "searchPlaceholder": "Search deleted objects by name...",
+  "all": "All",
+  "users": "Users",
+  "computers": "Computers",
+  "groups": "Groups",
+  "contacts": "Contacts",
+  "printers": "Printers",
+  "noDeletedObjects": "No deleted objects",
+  "noObjectsMatch": "No objects match the current filters.",
+  "recycleBinEmpty": "The Recycle Bin is empty.",
+  "deleted": "Deleted",
+  "originalOu": "Original OU",
+  "restore": "Restore",
+  "failedToLoad": "Failed to load Recycle Bin",
+  "notEnabled": "AD Recycle Bin Not Enabled",
+  "notEnabledDescription": "The Active Directory Recycle Bin optional feature is not enabled on this domain. Contact your domain administrator to enable it.",
+  "loadingRecycleBin": "Loading Recycle Bin...",
+  "restoreObject": "Restore \"{{name}}\"",
+  "selectTargetOu": "Select the target OU for restoration:",
+  "restoring": "Restoring..."
+}

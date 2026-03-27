@@ -1,0 +1,22 @@
+{
+  "searchPlaceholder": "Gelöschte Objekte nach Name suchen...",
+  "all": "Alle",
+  "users": "Benutzer",
+  "computers": "Computer",
+  "groups": "Gruppen",
+  "contacts": "Kontakte",
+  "printers": "Drucker",
+  "noDeletedObjects": "Keine gelöschten Objekte",
+  "noObjectsMatch": "Keine Objekte entsprechen den aktuellen Filtern.",
+  "recycleBinEmpty": "Der Papierkorb ist leer.",
+  "deleted": "Gelöscht",
+  "originalOu": "Ursprüngliche OU",
+  "restore": "Wiederherstellen",
+  "failedToLoad": "Papierkorb konnte nicht geladen werden",
+  "notEnabled": "AD-Papierkorb nicht aktiviert",
+  "notEnabledDescription": "Das optionale Feature Active Directory-Papierkorb ist für diese Domäne nicht aktiviert. Wenden Sie sich an Ihren Domänenadministrator, um es zu aktivieren.",
+  "loadingRecycleBin": "Papierkorb wird geladen...",
+  "restoreObject": "\"{{name}}\" wiederherstellen",
+  "selectTargetOu": "Wählen Sie die Ziel-OU für die Wiederherstellung:",
+  "restoring": "Wird wiederhergestellt..."
+}

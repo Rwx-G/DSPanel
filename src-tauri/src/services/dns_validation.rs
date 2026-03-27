@@ -2,15 +2,15 @@ use std::net::IpAddr;
 use std::sync::Arc;
 
 use anyhow::Result;
-use hickory_resolver::config::{NameServerConfigGroup, ResolverConfig, ResolverOpts};
 use hickory_resolver::TokioResolver;
+use hickory_resolver::config::{NameServerConfigGroup, ResolverConfig, ResolverOpts};
 
 use crate::models::dns_validation::{
-    compare_dns_hosts, evaluate_clock_skew, ClockSkewResult, ClockSkewStatus, DnsKerberosReport,
-    DnsValidationResult,
+    ClockSkewResult, ClockSkewStatus, DnsKerberosReport, DnsValidationResult, compare_dns_hosts,
+    evaluate_clock_skew,
 };
-use crate::services::dc_health::{discover_domain_controllers, resolve_fallback_ip};
 use crate::services::DirectoryProvider;
+use crate::services::dc_health::{discover_domain_controllers, resolve_fallback_ip};
 
 /// SRV record prefixes to validate for AD DNS.
 const SRV_RECORD_PREFIXES: &[&str] = &[
@@ -45,18 +45,18 @@ fn base_dn_to_domain(base_dn: &str) -> String {
 /// Uses the LDAP server IP (from `DSPANEL_LDAP_SERVER`) as the DNS server.
 /// Falls back to the system resolver if no LDAP server is configured.
 fn create_ad_resolver() -> TokioResolver {
-    if let Some(dc_ip_str) = resolve_fallback_ip() {
-        if let Ok(ip) = dc_ip_str.parse::<IpAddr>() {
-            let ns_group = NameServerConfigGroup::from_ips_clear(&[ip], 53, true);
-            let config = ResolverConfig::from_parts(None, vec![], ns_group);
-            let mut opts = ResolverOpts::default();
-            opts.timeout = std::time::Duration::from_secs(5);
-            opts.attempts = 2;
-            tracing::info!(dns_server = %ip, "Using AD DC as DNS server for SRV lookups");
-            return TokioResolver::builder_with_config(config, Default::default())
-                .with_options(opts)
-                .build();
-        }
+    if let Some(dc_ip_str) = resolve_fallback_ip()
+        && let Ok(ip) = dc_ip_str.parse::<IpAddr>()
+    {
+        let ns_group = NameServerConfigGroup::from_ips_clear(&[ip], 53, true);
+        let config = ResolverConfig::from_parts(None, vec![], ns_group);
+        let mut opts = ResolverOpts::default();
+        opts.timeout = std::time::Duration::from_secs(5);
+        opts.attempts = 2;
+        tracing::info!(dns_server = %ip, "Using AD DC as DNS server for SRV lookups");
+        return TokioResolver::builder_with_config(config, Default::default())
+            .with_options(opts)
+            .build();
     }
 
     tracing::info!("No LDAP server configured, using system DNS resolver");

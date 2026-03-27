@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { AlertCircle, AlertTriangle, Info } from "lucide-react";
 import { DialogShell } from "@/components/dialogs/DialogShell";
+import { useTranslation } from "react-i18next";
 
 type DialogSeverity = "info" | "warning" | "error";
 
@@ -32,11 +33,12 @@ export function ConfirmationDialog({
   message,
   detail,
   severity = "info",
-  confirmLabel = "OK",
+  confirmLabel,
   cancelLabel,
   onConfirm,
   onCancel,
 }: ConfirmationDialogProps) {
+  const { t } = useTranslation(["dialogs", "common"]);
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Enter") {
@@ -84,7 +86,7 @@ export function ConfirmationDialog({
         {detail && (
           <details className="mt-2" data-testid="dialog-detail">
             <summary className="cursor-pointer text-caption text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]">
-              Details
+              {t("common:details")}
             </summary>
             <pre className="mt-1 max-h-32 overflow-auto rounded bg-[var(--color-surface-bg)] p-2 text-caption text-[var(--color-text-secondary)]">
               {detail}
@@ -108,7 +110,7 @@ export function ConfirmationDialog({
           onClick={onConfirm}
           data-testid="dialog-confirm"
         >
-          {confirmLabel}
+          {confirmLabel ?? t("common:ok")}
         </button>
       </div>
     </DialogShell>

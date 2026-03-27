@@ -30,6 +30,7 @@ import {
   Trash2,
   FolderInput,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 function useContactBrowse() {
   return useBrowse<ContactInfo>({
@@ -48,6 +49,7 @@ function useContactBrowse() {
 }
 
 export function ContactLookup() {
+  const { t } = useTranslation(["contactLookup", "common"]);
   const {
     items: contacts,
     loading,
@@ -82,14 +84,14 @@ export function ContactLookup() {
   const handleDelete = useCallback(
     async (contact: ContactInfo) => {
       const confirmed = await showConfirmation(
-        "Delete Contact",
-        `Are you sure you want to delete "${contact.displayName || contact.dn}"?`,
-        "This action cannot be undone.",
+        t("deleteContact"),
+        t("deleteConfirmation", { name: contact.displayName || contact.dn }),
+        t("common:cannotBeUndone"),
       );
       if (!confirmed) return;
       try {
         await invoke("delete_contact", { dn: contact.dn });
-        notify("Contact deleted successfully", "success");
+        notify(t("deleteSuccess"), "success");
         refresh();
         if (selectedContact?.dn === contact.dn) {
           setSelectedContact(null);
@@ -111,8 +113,8 @@ export function ContactLookup() {
   const handleSaveChanges = useCallback(async () => {
     if (!selectedContact) return;
     const confirmed = await showConfirmation(
-      "Save Changes",
-      `Apply ${pendingChanges.length} change(s) to "${selectedContact.displayName || selectedContact.dn}"?`,
+      t("common:save"),
+      t("common:pendingChanges", { count: pendingChanges.length, name: selectedContact.displayName || selectedContact.dn }),
       pendingChanges.map((c) => `${c.attributeName}: ${c.newValue}`).join("\n"),
     );
     if (!confirmed) return;
@@ -129,7 +131,7 @@ export function ContactLookup() {
       const items: ContextMenuItem[] = [];
       if (canEdit) {
         items.push({
-          label: "Move to OU",
+          label: t("common:moveToOu"),
           icon: <FolderInput size={14} />,
           onClick: () => {
             setMoveTargets([
@@ -154,28 +156,28 @@ export function ContactLookup() {
       const isEditable = canEdit;
       return [
         {
-          category: "Identity",
+          category: t("common:identity"),
           items: [
-            { label: "Display Name", value: contact.displayName, editable: isEditable, attributeName: "displayName" },
-            { label: "First Name", value: contact.firstName, editable: isEditable, attributeName: "givenName" },
-            { label: "Last Name", value: contact.lastName, editable: isEditable, attributeName: "sn" },
-            { label: "Distinguished Name", value: contact.dn },
+            { label: t("common:displayName"), value: contact.displayName, editable: isEditable, attributeName: "displayName" },
+            { label: t("common:firstName"), value: contact.firstName, editable: isEditable, attributeName: "givenName" },
+            { label: t("common:lastName"), value: contact.lastName, editable: isEditable, attributeName: "sn" },
+            { label: t("common:distinguishedName"), value: contact.dn },
           ],
         },
         {
-          category: "Contact Info",
+          category: t("contactInfo"),
           items: [
-            { label: "Email", value: contact.email, editable: isEditable, attributeName: "mail" },
-            { label: "Phone", value: contact.phone, editable: isEditable, attributeName: "telephoneNumber" },
-            { label: "Mobile", value: contact.mobile, editable: isEditable, attributeName: "mobile" },
+            { label: t("common:email"), value: contact.email, editable: isEditable, attributeName: "mail" },
+            { label: t("common:phone"), value: contact.phone, editable: isEditable, attributeName: "telephoneNumber" },
+            { label: t("common:mobile"), value: contact.mobile, editable: isEditable, attributeName: "mobile" },
           ],
         },
         {
-          category: "Organization",
+          category: t("organization"),
           items: [
-            { label: "Company", value: contact.company, editable: isEditable, attributeName: "company" },
-            { label: "Department", value: contact.department, editable: isEditable, attributeName: "department" },
-            { label: "Description", value: contact.description, editable: isEditable, attributeName: "description" },
+            { label: t("common:company"), value: contact.company, editable: isEditable, attributeName: "company" },
+            { label: t("common:department"), value: contact.department, editable: isEditable, attributeName: "department" },
+            { label: t("common:description"), value: contact.description, editable: isEditable, attributeName: "description" },
           ],
         },
       ];
@@ -204,7 +206,7 @@ export function ContactLookup() {
             {contact.displayName || `${contact.firstName} ${contact.lastName}`.trim() || contact.dn}
           </p>
           <p className="truncate text-caption text-[var(--color-text-secondary)]">
-            {contact.email || contact.company || "No email"}
+            {contact.email || contact.company || t("noEmail")}
           </p>
         </div>
       </button>
@@ -220,7 +222,7 @@ export function ContactLookup() {
             value={filterText}
             onChange={setFilterText}
             onSearch={setFilterText}
-            placeholder="Search contacts by name, email, or company..."
+            placeholder={t("searchPlaceholder")}
             debounceMs={300}
           />
         </div>
@@ -231,12 +233,12 @@ export function ContactLookup() {
         aria-live="polite"
         data-testid="contact-lookup-status"
       >
-        {loading && "Loading contacts..."}
+        {loading && t("loadingContacts")}
         {!loading &&
           contacts.length > 0 &&
-          `${contacts.length} contact${contacts.length > 1 ? "s" : ""} found`}
-        {!loading && contacts.length === 0 && !error && "No contacts found"}
-        {error && `Error: ${error}`}
+          t("found", { count: contacts.length })}
+        {!loading && contacts.length === 0 && !error && t("noContactsFound")}
+        {error && `${t("common:error")}: ${error}`}
       </div>
 
       <div className="flex flex-1 overflow-hidden">
@@ -245,7 +247,7 @@ export function ContactLookup() {
             className="flex flex-1 items-center justify-center"
             data-testid="contact-lookup-loading"
           >
-            <LoadingSpinner message="Loading contacts..." />
+            <LoadingSpinner message={t("loadingContacts")} />
           </div>
         )}
 
@@ -256,9 +258,9 @@ export function ContactLookup() {
           >
             <EmptyState
               icon={<AlertCircle size={48} />}
-              title="Failed to load contacts"
+              title={t("failedToLoad")}
               description={error}
-              action={{ label: "Retry", onClick: refresh }}
+              action={{ label: t("common:retry"), onClick: refresh }}
             />
           </div>
         )}
@@ -267,11 +269,11 @@ export function ContactLookup() {
           <div className="flex flex-1 items-center justify-center">
             <EmptyState
               icon={<UserX size={48} />}
-              title="No contacts found"
+              title={t("noContactsFound")}
               description={
                 filterText
-                  ? `No contacts match "${filterText}".`
-                  : "No contacts available."
+                  ? t("noContactsMatch", { query: filterText })
+                  : t("noContactsFound")
               }
             />
           </div>
@@ -316,7 +318,7 @@ export function ContactLookup() {
                         data-testid="contact-delete-btn"
                       >
                         <Trash2 size={14} />
-                        Delete
+                        {t("common:delete")}
                       </button>
                     )}
 
@@ -328,7 +330,7 @@ export function ContactLookup() {
                           data-testid="pending-changes-bar"
                         >
                           <span className="text-caption text-[var(--color-text-primary)]">
-                            {pendingChanges.length} change(s)
+                            {t("common:change", { count: pendingChanges.length })}
                             {pendingChanges.map((c) => (
                               <span
                                 key={c.attributeName}
@@ -343,7 +345,7 @@ export function ContactLookup() {
                             className="btn btn-sm btn-ghost"
                             data-testid="discard-changes-btn"
                           >
-                            Discard
+                            {t("common:discard")}
                           </button>
                           <button
                             onClick={handleSaveChanges}
@@ -351,7 +353,7 @@ export function ContactLookup() {
                             className="btn btn-sm btn-primary"
                             data-testid="save-changes-btn"
                           >
-                            {saving ? "Saving..." : "Save"}
+                            {saving ? t("common:saving") : t("common:save")}
                           </button>
                         </div>
                       </>
@@ -366,7 +368,7 @@ export function ContactLookup() {
               ) : (
                 <div className="flex h-full items-center justify-center">
                   <p className="text-body text-[var(--color-text-secondary)]">
-                    Select a contact to view details
+                    {t("selectContact")}
                   </p>
                 </div>
               )}

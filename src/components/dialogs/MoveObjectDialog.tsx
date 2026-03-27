@@ -7,6 +7,7 @@ import { useOUTree } from "@/hooks/useOUTree";
 import { parseCnFromDn, formatOuPath } from "@/utils/dn";
 import { useErrorHandler } from "@/hooks/useErrorHandler";
 import { useNotifications } from "@/contexts/NotificationContext";
+import { useTranslation } from "react-i18next";
 
 export interface MoveTarget {
   distinguishedName: string;
@@ -30,6 +31,7 @@ export function MoveObjectDialog({
   onClose,
   onMoved,
 }: MoveObjectDialogProps) {
+  const { t } = useTranslation(["dialogs", "common"]);
   // Pre-select the current parent OU of the first target
   const currentOU = targets[0]?.distinguishedName.split(",").slice(1).join(",") || undefined;
   const [selectedOU, setSelectedOU] = useState<string | undefined>(currentOU);
@@ -41,8 +43,8 @@ export function MoveObjectDialog({
 
   const isBulk = targets.length > 1;
   const title = isBulk
-    ? `Move ${targets.length} Objects`
-    : `Move ${targets[0]?.displayName || parseCnFromDn(targets[0]?.distinguishedName ?? "")}`;
+    ? t("dialogs:moveObject.titleBulk", { count: targets.length })
+    : t("dialogs:moveObject.titleSingle", { name: targets[0]?.displayName || parseCnFromDn(targets[0]?.distinguishedName ?? "") });
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -130,7 +132,7 @@ export function MoveObjectDialog({
         <>
           <div className="px-4 py-3">
             <p className="mb-3 text-caption text-[var(--color-text-secondary)]">
-              Select the target Organizational Unit:
+              {t("dialogs:moveObject.selectTargetOu")}
             </p>
             <OUPicker
               nodes={nodes}
@@ -146,7 +148,7 @@ export function MoveObjectDialog({
               onClick={onClose}
               data-testid="move-cancel"
             >
-              Cancel
+              {t("common:cancel")}
             </button>
             <button
               className="btn btn-sm btn-primary"
@@ -154,7 +156,7 @@ export function MoveObjectDialog({
               disabled={!selectedOU}
               data-testid="move-next"
             >
-              Next
+              {t("common:next")}
             </button>
           </div>
         </>
@@ -164,7 +166,7 @@ export function MoveObjectDialog({
         <>
           <div className="max-h-64 overflow-auto px-4 py-3">
             <p className="mb-2 text-caption text-[var(--color-text-secondary)]">
-              The following object(s) will be moved:
+              {t("dialogs:moveObject.objectsWillBeMoved")}
             </p>
             {targets.map((target) => (
               <div
@@ -177,10 +179,10 @@ export function MoveObjectDialog({
                     parseCnFromDn(target.distinguishedName)}
                 </span>
                 <span className="text-caption text-[var(--color-text-secondary)]">
-                  From: {formatOuPath(target.distinguishedName)}
+                  {t("dialogs:moveObject.from", { path: formatOuPath(target.distinguishedName) })}
                 </span>
                 <span className="text-caption text-[var(--color-info)]">
-                  To: {formatOuPath(selectedOU)}
+                  {t("dialogs:moveObject.to", { path: formatOuPath(selectedOU) })}
                 </span>
               </div>
             ))}
@@ -191,14 +193,14 @@ export function MoveObjectDialog({
               onClick={() => setStep("pick")}
               data-testid="move-back"
             >
-              Back
+              {t("common:back")}
             </button>
             <button
               className="btn btn-sm btn-primary"
               onClick={handleExecute}
               data-testid="move-execute"
             >
-              Move
+              {t("dialogs:moveObject.move")}
             </button>
           </div>
         </>
@@ -207,7 +209,7 @@ export function MoveObjectDialog({
       {step === "moving" && (
         <div className="flex items-center justify-center px-4 py-8">
           <div className="text-caption text-[var(--color-text-secondary)]">
-            Moving object(s)...
+            {t("dialogs:moveObject.moving")}
           </div>
         </div>
       )}

@@ -1,0 +1,18 @@
+{
+  "searchPlaceholder": "Search by name, username, or email...",
+  "all": "All",
+  "healthy": "Healthy",
+  "warning": "Warning",
+  "loadingUsers": "Loading users...",
+  "found_one": "{{count}} user found",
+  "found_other": "{{count}} users found",
+  "noUsersFound": "No users found",
+  "failedToLoad": "Failed to load users",
+  "noUsersWithHealth": "No users with {{status}} health status.",
+  "noUsersMatch": "No users match \"{{query}}\"",
+  "noUsersAvailable": "No users available.",
+  "selectUser": "Select a user to view details",
+  "startOffboarding": "Start Offboarding for {{name}}",
+  "cannotCompareWithSelf": "Cannot compare a user with itself",
+  "compareWith": "Compare {{name}} with {{other}}"
+}

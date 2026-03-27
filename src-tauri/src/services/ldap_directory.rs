@@ -164,6 +164,14 @@ impl std::fmt::Debug for LdapAuthMode {
     }
 }
 
+impl Drop for LdapAuthMode {
+    fn drop(&mut self) {
+        if let LdapAuthMode::SimpleBind { password, .. } = self {
+            zeroize::Zeroize::zeroize(password);
+        }
+    }
+}
+
 /// `DirectoryProvider` implementation using on-premises Active Directory via LDAP.
 ///
 /// Supports both GSSAPI (Kerberos) and simple bind authentication. The auth mode
@@ -227,6 +235,8 @@ pub struct LdapDirectoryProvider {
     pool: tokio::sync::Mutex<Option<ldap3::Ldap>>,
     /// Authenticated user identity resolved via WhoAmI.
     authenticated_user: Mutex<Option<String>>,
+    /// FQDN of the connected DC, resolved from rootDSE dNSHostName.
+    dc_fqdn: Mutex<Option<String>>,
     /// Timestamp of the last successful LDAP operation.
     last_successful_op: Mutex<Option<std::time::Instant>>,
 }
@@ -276,6 +286,7 @@ impl LdapDirectoryProvider {
             connected: Mutex::new(false),
             pool: tokio::sync::Mutex::new(None),
             authenticated_user: Mutex::new(None),
+            dc_fqdn: Mutex::new(None),
             last_successful_op: Mutex::new(None),
         }
     }
@@ -315,6 +326,7 @@ impl LdapDirectoryProvider {
             connected: Mutex::new(false),
             pool: tokio::sync::Mutex::new(None),
             authenticated_user: Mutex::new(None),
+            dc_fqdn: Mutex::new(None),
             last_successful_op: Mutex::new(None),
         }
     }
@@ -584,7 +596,7 @@ impl LdapDirectoryProvider {
                 "",
                 Scope::Base,
                 "(objectClass=*)",
-                vec!["defaultNamingContext"],
+                vec!["defaultNamingContext", "dnsHostName"],
             )
             .await
             .context("Failed to query rootDSE")?
@@ -600,6 +612,10 @@ impl LdapDirectoryProvider {
             {
                 tracing::info!("Base DN discovered: {}", dn);
                 *self.base_dn.lock().expect("lock poisoned") = Some(dn);
+            }
+            if let Some(fqdn) = se.attrs.get("dnsHostName").and_then(|v| v.first().cloned()) {
+                tracing::info!("DC FQDN resolved from rootDSE: {}", fqdn);
+                *self.dc_fqdn.lock().expect("lock poisoned") = Some(fqdn);
             }
         }
 
@@ -962,6 +978,28 @@ impl DirectoryProvider for LdapDirectoryProvider {
 
     fn domain_name(&self) -> Option<&str> {
         self.domain.as_deref()
+    }
+
+    fn connected_host(&self) -> Option<String> {
+        // Prefer the FQDN resolved from rootDSE dnsHostName (works with remote event log)
+        self.dc_fqdn
+            .lock()
+            .expect("lock poisoned")
+            .clone()
+            .or_else(|| self.server_override.clone())
+            .or_else(|| self.domain.clone())
+    }
+
+    fn simple_bind_credentials(&self) -> Option<(String, String)> {
+        if let LdapAuthMode::SimpleBind {
+            ref bind_dn,
+            ref password,
+        } = self.auth_mode
+        {
+            Some((bind_dn.clone(), password.clone()))
+        } else {
+            None
+        }
     }
 
     fn base_dn(&self) -> Option<String> {
@@ -1459,10 +1497,10 @@ impl DirectoryProvider for LdapDirectoryProvider {
 
                 if let Some(entry) = entries.into_iter().next() {
                     let se = ldap3::SearchEntry::construct(entry);
-                    if let Some(values) = se.attrs.get("msDS-ReplAttributeMetaData") {
-                        if let Some(raw) = values.first() {
-                            return Ok(Some(raw.clone()));
-                        }
+                    if let Some(values) = se.attrs.get("msDS-ReplAttributeMetaData")
+                        && let Some(raw) = values.first()
+                    {
+                        return Ok(Some(raw.clone()));
                     }
                 }
 
@@ -1492,10 +1530,10 @@ impl DirectoryProvider for LdapDirectoryProvider {
 
                 if let Some(entry) = entries.into_iter().next() {
                     let se = ldap3::SearchEntry::construct(entry);
-                    if let Some(values) = se.attrs.get("msDS-ReplValueMetaData") {
-                        if let Some(raw) = values.first() {
-                            return Ok(Some(raw.clone()));
-                        }
+                    if let Some(values) = se.attrs.get("msDS-ReplValueMetaData")
+                        && let Some(raw) = values.first()
+                    {
+                        return Ok(Some(raw.clone()));
                     }
                 }
 
@@ -1871,15 +1909,14 @@ impl DirectoryProvider for LdapDirectoryProvider {
                             )
                             .await;
 
-                        if let Ok(result) = search_result {
-                            if let Some(entry) = result.0.into_iter().next() {
-                                let se = SearchEntry::construct(entry);
-                                if let Some(classes) = se.attrs.get("allowedChildClassesEffective")
-                                {
-                                    if classes.iter().any(|c| c.eq_ignore_ascii_case("user")) {
-                                        return Ok(true);
-                                    }
-                                }
+                        if let Ok(result) = search_result
+                            && let Some(entry) = result.0.into_iter().next()
+                        {
+                            let se = SearchEntry::construct(entry);
+                            if let Some(classes) = se.attrs.get("allowedChildClassesEffective")
+                                && classes.iter().any(|c| c.eq_ignore_ascii_case("user"))
+                            {
+                                return Ok(true);
                             }
                         }
                     }
@@ -1911,10 +1948,10 @@ impl DirectoryProvider for LdapDirectoryProvider {
                         if let Ok(result) = search_result {
                             for entry in result.0 {
                                 let se = SearchEntry::construct(entry);
-                                if let Some(attrs) = se.attrs.get("allowedAttributesEffective") {
-                                    if attrs.iter().any(|a| a.eq_ignore_ascii_case("lockoutTime")) {
-                                        return Ok(true);
-                                    }
+                                if let Some(attrs) = se.attrs.get("allowedAttributesEffective")
+                                    && attrs.iter().any(|a| a.eq_ignore_ascii_case("lockoutTime"))
+                                {
+                                    return Ok(true);
                                 }
                             }
                         }
@@ -1944,10 +1981,10 @@ impl DirectoryProvider for LdapDirectoryProvider {
                         if let Ok(result) = search_result {
                             for entry in result.0 {
                                 let se = SearchEntry::construct(entry);
-                                if let Some(attrs) = se.attrs.get("allowedAttributesEffective") {
-                                    if attrs.iter().any(|a| a.eq_ignore_ascii_case("member")) {
-                                        return Ok(true);
-                                    }
+                                if let Some(attrs) = se.attrs.get("allowedAttributesEffective")
+                                    && attrs.iter().any(|a| a.eq_ignore_ascii_case("member"))
+                                {
+                                    return Ok(true);
                                 }
                             }
                         }
@@ -2235,11 +2272,10 @@ impl DirectoryProvider for LdapDirectoryProvider {
                         cn[..pos].to_string()
                     } else {
                         // Fallback: strip anything after " DEL:" or any DEL:<guid> pattern
-                        let re_stripped = cn
-                            .find("DEL:")
+
+                        cn.find("DEL:")
                             .map(|pos| cn[..pos].trim_end().to_string())
-                            .unwrap_or_else(|| cn.clone());
-                        re_stripped
+                            .unwrap_or_else(|| cn.clone())
                     };
                     let object_type = se
                         .attrs
@@ -2265,7 +2301,15 @@ impl DirectoryProvider for LdapDirectoryProvider {
                         .attrs
                         .get("whenChanged")
                         .and_then(|v| v.first())
-                        .cloned()
+                        .and_then(|raw| {
+                            // Parse AD generalized time "20260326141419.0Z" to ISO 8601
+                            let clean = raw.replace(".0Z", "").replace('Z', "");
+                            chrono::NaiveDateTime::parse_from_str(&clean, "%Y%m%d%H%M%S")
+                                .ok()
+                                .map(|naive| {
+                                    naive.and_utc().format("%Y/%m/%d %H:%M:%S").to_string()
+                                })
+                        })
                         .unwrap_or_default();
                     let original_ou = se
                         .attrs
@@ -2571,11 +2615,11 @@ impl DirectoryProvider for LdapDirectoryProvider {
 
                 if let Some(entry) = entries.into_iter().next() {
                     let se = SearchEntry::construct(entry);
-                    if let Some(bin_values) = se.bin_attrs.get("thumbnailPhoto") {
-                        if let Some(bytes) = bin_values.first() {
-                            let encoded = base64::engine::general_purpose::STANDARD.encode(bytes);
-                            return Ok(Some(encoded));
-                        }
+                    if let Some(bin_values) = se.bin_attrs.get("thumbnailPhoto")
+                        && let Some(bytes) = bin_values.first()
+                    {
+                        let encoded = base64::engine::general_purpose::STANDARD.encode(bytes);
+                        return Ok(Some(encoded));
                     }
                 }
                 Ok(None)
@@ -2705,7 +2749,13 @@ impl DirectoryProvider for LdapDirectoryProvider {
                         &dn,
                         ldap3::Scope::Base,
                         "(objectClass=*)",
-                        vec!["*", "currentTime", "fSMORoleOwner", "msDS-Behavior-Version"],
+                        vec![
+                            "*",
+                            "currentTime",
+                            "fSMORoleOwner",
+                            "msDS-Behavior-Version",
+                            "msDS-ReplAllInboundNeighbors",
+                        ],
                     )
                     .await
                     .context("Base scope read failed")?
@@ -2758,11 +2808,11 @@ impl DirectoryProvider for LdapDirectoryProvider {
                         for result_entry in rs {
                             let se = ldap3::SearchEntry::construct(result_entry);
                             // Check objectSid binary attribute for matching RID
-                            if let Some(sid_values) = se.bin_attrs.get("objectSid") {
-                                if let Some(sid_bytes) = sid_values.first() {
+                            if let Some(sid_values) = se.bin_attrs.get("objectSid")
+                                && let Some(sid_bytes) = sid_values.first() {
                                     let sid_str = sid_bytes_to_string(sid_bytes);
-                                    if let Some(entry_rid) = sid_str.rsplit('-').next().and_then(|s| s.parse::<u32>().ok()) {
-                                        if entry_rid == rid {
+                                    if let Some(entry_rid) = sid_str.rsplit('-').next().and_then(|s| s.parse::<u32>().ok())
+                                        && entry_rid == rid {
                                             let mut entry = DirectoryEntry::new(se.dn);
                                             entry.sam_account_name = se.attrs.get("sAMAccountName").and_then(|v| v.first().cloned());
                                             entry.display_name = se.attrs.get("displayName").and_then(|v| v.first().cloned());
@@ -2772,9 +2822,7 @@ impl DirectoryProvider for LdapDirectoryProvider {
                                             }
                                             return Ok(Some(entry));
                                         }
-                                    }
                                 }
-                            }
                         }
                         Ok(None)
                     }
@@ -2873,10 +2921,12 @@ mod tests {
     fn test_validate_search_input_rejects_control_chars() {
         let result = validate_search_input("hello\x07world");
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("control characters"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("control characters")
+        );
     }
 
     #[test]
@@ -2980,7 +3030,9 @@ mod tests {
     fn test_ldap_provider_new_without_domain() {
         // Temporarily unset USERDNSDOMAIN for this test
         let original = std::env::var("USERDNSDOMAIN").ok();
-        std::env::remove_var("USERDNSDOMAIN");
+        unsafe {
+            std::env::remove_var("USERDNSDOMAIN");
+        }
 
         let provider = LdapDirectoryProvider::new();
         assert!(provider.domain_name().is_none());
@@ -2988,7 +3040,9 @@ mod tests {
 
         // Restore
         if let Some(val) = original {
-            std::env::set_var("USERDNSDOMAIN", val);
+            unsafe {
+                std::env::set_var("USERDNSDOMAIN", val);
+            }
         }
     }
 
@@ -2996,14 +3050,18 @@ mod tests {
     #[serial]
     fn test_new_defaults_to_gssapi_auth_mode() {
         let original = std::env::var("USERDNSDOMAIN").ok();
-        std::env::remove_var("USERDNSDOMAIN");
+        unsafe {
+            std::env::remove_var("USERDNSDOMAIN");
+        }
 
         let provider = LdapDirectoryProvider::new();
         assert!(matches!(provider.auth_mode(), LdapAuthMode::Gssapi));
         assert!(provider.server_override.is_none());
 
         if let Some(val) = original {
-            std::env::set_var("USERDNSDOMAIN", val);
+            unsafe {
+                std::env::set_var("USERDNSDOMAIN", val);
+            }
         }
     }
 
@@ -3185,10 +3243,12 @@ mod tests {
     fn test_build_tls_connector_with_ca_invalid_path() {
         let result = build_tls_connector_with_ca("/nonexistent/ca.pem", false);
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("Failed to read CA certificate file"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Failed to read CA certificate file")
+        );
     }
 
     #[test]
@@ -3198,10 +3258,12 @@ mod tests {
         std::fs::write(&tmp, b"not a certificate").unwrap();
         let result = build_tls_connector_with_ca(tmp.to_str().unwrap(), false);
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("Failed to parse CA certificate"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Failed to parse CA certificate")
+        );
         let _ = std::fs::remove_file(&tmp);
     }
 
@@ -3209,14 +3271,18 @@ mod tests {
     #[serial]
     async fn test_search_users_returns_empty_when_not_domain_joined() {
         let original = std::env::var("USERDNSDOMAIN").ok();
-        std::env::remove_var("USERDNSDOMAIN");
+        unsafe {
+            std::env::remove_var("USERDNSDOMAIN");
+        }
 
         let provider = LdapDirectoryProvider::new();
         let results = provider.search_users("test", 50).await.unwrap();
         assert!(results.is_empty());
 
         if let Some(val) = original {
-            std::env::set_var("USERDNSDOMAIN", val);
+            unsafe {
+                std::env::set_var("USERDNSDOMAIN", val);
+            }
         }
     }
 
@@ -3224,14 +3290,18 @@ mod tests {
     #[serial]
     async fn test_search_computers_returns_empty_when_not_domain_joined() {
         let original = std::env::var("USERDNSDOMAIN").ok();
-        std::env::remove_var("USERDNSDOMAIN");
+        unsafe {
+            std::env::remove_var("USERDNSDOMAIN");
+        }
 
         let provider = LdapDirectoryProvider::new();
         let results = provider.search_computers("test", 50).await.unwrap();
         assert!(results.is_empty());
 
         if let Some(val) = original {
-            std::env::set_var("USERDNSDOMAIN", val);
+            unsafe {
+                std::env::set_var("USERDNSDOMAIN", val);
+            }
         }
     }
 
@@ -3239,14 +3309,18 @@ mod tests {
     #[serial]
     async fn test_search_groups_returns_empty_when_not_domain_joined() {
         let original = std::env::var("USERDNSDOMAIN").ok();
-        std::env::remove_var("USERDNSDOMAIN");
+        unsafe {
+            std::env::remove_var("USERDNSDOMAIN");
+        }
 
         let provider = LdapDirectoryProvider::new();
         let results = provider.search_groups("test", 50).await.unwrap();
         assert!(results.is_empty());
 
         if let Some(val) = original {
-            std::env::set_var("USERDNSDOMAIN", val);
+            unsafe {
+                std::env::set_var("USERDNSDOMAIN", val);
+            }
         }
     }
 
@@ -3254,13 +3328,17 @@ mod tests {
     #[serial]
     async fn test_test_connection_returns_false_when_not_domain_joined() {
         let original = std::env::var("USERDNSDOMAIN").ok();
-        std::env::remove_var("USERDNSDOMAIN");
+        unsafe {
+            std::env::remove_var("USERDNSDOMAIN");
+        }
 
         let provider = LdapDirectoryProvider::new();
         assert!(!provider.test_connection().await.unwrap());
 
         if let Some(val) = original {
-            std::env::set_var("USERDNSDOMAIN", val);
+            unsafe {
+                std::env::set_var("USERDNSDOMAIN", val);
+            }
         }
     }
 }

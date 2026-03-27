@@ -183,4 +183,97 @@ mod tests {
         assert!(store.retrieve("bad_key").is_err());
         assert!(store.delete("bad_key").is_err());
     }
+
+    // -- validate_key edge cases --
+
+    #[test]
+    fn test_validate_key_empty_string() {
+        assert!(validate_key("").is_err());
+    }
+
+    #[test]
+    fn test_validate_key_similar_but_different() {
+        assert!(validate_key("graph_client_secrets").is_err());
+        assert!(validate_key("Graph_Client_Secret").is_err());
+        assert!(validate_key("GRAPH_CLIENT_SECRET").is_err());
+    }
+
+    #[test]
+    fn test_validate_key_with_spaces() {
+        assert!(validate_key("graph client secret").is_err());
+    }
+
+    #[test]
+    fn test_validate_key_error_message_contains_key() {
+        let result = validate_key("my_invalid_key");
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("my_invalid_key"));
+    }
+
+    // -- InMemoryCredentialStore comprehensive --
+
+    #[test]
+    fn test_in_memory_store_empty_value() {
+        let store = InMemoryCredentialStore::new();
+        store.store("graph_client_secret", "").unwrap();
+        let retrieved = store.retrieve("graph_client_secret").unwrap();
+        assert_eq!(retrieved, Some("".to_string()));
+    }
+
+    #[test]
+    fn test_in_memory_store_long_value() {
+        let store = InMemoryCredentialStore::new();
+        let long_value = "x".repeat(10000);
+        store.store("graph_client_secret", &long_value).unwrap();
+        let retrieved = store.retrieve("graph_client_secret").unwrap();
+        assert_eq!(retrieved, Some(long_value));
+    }
+
+    #[test]
+    fn test_in_memory_store_special_characters() {
+        let store = InMemoryCredentialStore::new();
+        let special = "p@$$w0rd!#%^&*(){}[]|\\:\";<>?,./~`";
+        store.store("graph_client_secret", special).unwrap();
+        let retrieved = store.retrieve("graph_client_secret").unwrap();
+        assert_eq!(retrieved, Some(special.to_string()));
+    }
+
+    #[test]
+    fn test_in_memory_delete_then_store_again() {
+        let store = InMemoryCredentialStore::new();
+        store.store("graph_client_secret", "v1").unwrap();
+        store.delete("graph_client_secret").unwrap();
+        assert_eq!(store.retrieve("graph_client_secret").unwrap(), None);
+
+        store.store("graph_client_secret", "v2").unwrap();
+        assert_eq!(
+            store.retrieve("graph_client_secret").unwrap(),
+            Some("v2".to_string())
+        );
+    }
+
+    #[test]
+    fn test_in_memory_multiple_deletes_ok() {
+        let store = InMemoryCredentialStore::new();
+        store.store("graph_client_secret", "value").unwrap();
+        store.delete("graph_client_secret").unwrap();
+        // Second delete should still be OK
+        assert!(store.delete("graph_client_secret").is_ok());
+    }
+
+    // -- Default trait --
+
+    #[test]
+    fn test_in_memory_default() {
+        let store = InMemoryCredentialStore::default();
+        let retrieved = store.retrieve("graph_client_secret").unwrap();
+        assert_eq!(retrieved, None);
+    }
+
+    #[test]
+    fn test_keyring_default() {
+        let _store = KeyringCredentialStore;
+        // Just verify it can be constructed
+    }
 }

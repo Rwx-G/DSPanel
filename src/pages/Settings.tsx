@@ -14,19 +14,25 @@ import { GraphSettings } from "@/components/common/GraphSettings";
 import { PresetSettings } from "@/components/common/PresetSettings";
 import { PermissionMappingSettings } from "@/components/common/PermissionMappingSettings";
 import { useTheme, type ThemeMode } from "@/hooks/useTheme";
+import {
+  changeLanguage,
+  supportedLanguages,
+  type LanguageCode,
+} from "../i18n";
 import { useNavigation } from "@/contexts/NavigationContext";
 import { useNotifications } from "@/contexts/NotificationContext";
 import { OUPicker } from "@/components/form/OUPicker";
 import { useOUTree } from "@/hooks/useOUTree";
+import { useTranslation } from "react-i18next";
 
 /** Tab definitions for the settings page. */
 const TABS = [
-  { id: "connection", label: "Connection", icon: Link },
-  { id: "presets", label: "Presets", icon: FolderOpen },
-  { id: "permissions", label: "Permissions", icon: Shield },
-  { id: "security", label: "Security", icon: Lock },
-  { id: "reports", label: "Reports", icon: FileText },
-  { id: "appearance", label: "Appearance", icon: Palette },
+  { id: "connection", label: "connection", icon: Link },
+  { id: "presets", label: "presets", icon: FolderOpen },
+  { id: "permissions", label: "permissions", icon: Shield },
+  { id: "security", label: "common:security", icon: Lock },
+  { id: "reports", label: "reports", icon: FileText },
+  { id: "appearance", label: "appearance", icon: Palette },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -38,6 +44,23 @@ interface AppSettings {
   privilegedGroups?: string[] | null;
   cleanupRules?: unknown[] | null;
   auditRetentionDays?: number | null;
+  riskWeights?: {
+    privilegedHygiene?: number;
+    passwordPolicy?: number;
+    staleAccounts?: number;
+    kerberosSecurity?: number;
+    dangerousConfigs?: number;
+    infrastructureHardening?: number;
+    gpoSecurity?: number;
+    trustSecurity?: number;
+    certificateSecurity?: number;
+  } | null;
+  attackDetectionConfig?: {
+    bruteForceThreshold?: number;
+    kerberoastingThreshold?: number;
+    excludedIps?: string[];
+    excludedAccounts?: string[];
+  } | null;
   connection?: {
     domainOverride?: string | null;
     preferredDc?: string | null;
@@ -48,6 +71,7 @@ interface AppSettings {
   } | null;
   appearance?: {
     theme?: string | null;
+    language?: string | null;
   } | null;
   update?: {
     checkFrequency?: string | null;
@@ -57,6 +81,7 @@ interface AppSettings {
 }
 
 export function Settings() {
+  const { t } = useTranslation(["settings", "common"]);
   const { openTabs, activeTabId, clearTabData } = useNavigation();
   const [activeTab, setActiveTab] = useState<TabId>("connection");
   const [settings, setSettings] = useState<AppSettings>({});
@@ -87,7 +112,7 @@ export function Settings() {
   useEffect(() => {
     invoke<AppSettings>("get_app_settings")
       .then((s) => setSettings(s))
-      .catch((e) => notify(`Failed to load settings: ${e}`, "error"))
+      .catch((e) => notify(t("failedToLoad", { error: e }), "error"))
       .finally(() => setLoading(false));
   }, []);
 
@@ -139,9 +164,9 @@ export function Settings() {
     try {
       await invoke("set_app_settings", { settings });
       setDirty(false);
-      notify("Settings saved successfully", "success");
+      notify(t("savedSuccessfully"), "success");
     } catch (e) {
-      notify(`Failed to save settings: ${e}`, "error");
+      notify(t("failedToSave", { error: e }), "error");
     } finally {
       setSaving(false);
     }
@@ -161,6 +186,8 @@ export function Settings() {
           ...prev,
           auditRetentionDays: 365,
           disabledOu: null,
+          riskWeights: null,
+          attackDetectionConfig: null,
         }));
         break;
       case "reports":
@@ -172,7 +199,7 @@ export function Settings() {
       case "appearance":
         setSettings((prev) => ({
           ...prev,
-          appearance: { theme: "system" },
+          appearance: { theme: "system", language: "en" },
         }));
         // Apply system theme directly
         {
@@ -202,6 +229,14 @@ export function Settings() {
     [applyTheme, updateNested],
   );
 
+  const handleLanguageChange = useCallback(
+    (lang: string) => {
+      updateNested("appearance", "language", lang);
+      changeLanguage(lang as LanguageCode);
+    },
+    [updateNested],
+  );
+
   const handlePickExportDir = useCallback(async () => {
     try {
       const path = await invoke<string | null>("pick_folder_dialog");
@@ -214,7 +249,7 @@ export function Settings() {
   }, [updateNested]);
 
   if (loading) {
-    return <LoadingSpinner message="Loading settings..." />;
+    return <LoadingSpinner message={t("loadingSettings")} />;
   }
 
   return (
@@ -222,7 +257,7 @@ export function Settings() {
       {/* Header */}
       <div className="flex items-center gap-2">
         <SettingsIcon size={20} className="text-[var(--color-text-primary)]" />
-        <h1 className="text-heading font-semibold text-[var(--color-text-primary)]">Settings</h1>
+        <h1 className="text-heading font-semibold text-[var(--color-text-primary)]">{t("pageTitle")}</h1>
       </div>
 
       {/* Tabs */}
@@ -242,7 +277,7 @@ export function Settings() {
               data-testid={`tab-${tab.id}`}
             >
               <Icon size={14} />
-              {tab.label}
+              {t(tab.label)}
             </button>
           );
         })}
@@ -254,31 +289,31 @@ export function Settings() {
           <div className="space-y-4" data-testid="tab-content-connection">
             <div className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-4">
               <h3 className="mb-3 text-body font-semibold text-[var(--color-text-primary)]">
-                Domain Connection
+                {t("domainConnection")}
               </h3>
               <div className="space-y-3">
                 <div>
                   <label className="mb-1 block text-caption text-[var(--color-text-secondary)]">
-                    Domain Override
+                    {t("domainOverride")}
                   </label>
                   <input
                     type="text"
                     value={settings.connection?.domainOverride ?? ""}
                     onChange={(e) => updateNested("connection", "domainOverride", e.target.value)}
-                    placeholder="Leave empty for auto-detection"
+                    placeholder={t("domainOverrideHint")}
                     className="w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5 text-body text-[var(--color-text-primary)] placeholder-[var(--color-text-secondary)] focus:border-[var(--color-primary)] focus:outline-none"
                     data-testid="setting-domain-override"
                   />
                 </div>
                 <div>
                   <label className="mb-1 block text-caption text-[var(--color-text-secondary)]">
-                    Preferred Domain Controller
+                    {t("preferredDc")}
                   </label>
                   <input
                     type="text"
                     value={settings.connection?.preferredDc ?? ""}
                     onChange={(e) => updateNested("connection", "preferredDc", e.target.value)}
-                    placeholder="Leave empty for auto-selection"
+                    placeholder={t("preferredDcHint")}
                     className="w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5 text-body text-[var(--color-text-primary)] placeholder-[var(--color-text-secondary)] focus:border-[var(--color-primary)] focus:outline-none"
                     data-testid="setting-preferred-dc"
                   />
@@ -288,11 +323,11 @@ export function Settings() {
             <GraphSettings />
             <div className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-4">
               <h3 className="mb-3 text-body font-semibold text-[var(--color-text-primary)]">
-                Update Checks
+                {t("updateChecks")}
               </h3>
               <div>
                 <label className="mb-1 block text-caption text-[var(--color-text-secondary)]">
-                  Check Frequency
+                  {t("checkFrequency")}
                 </label>
                 <select
                   value={settings.update?.checkFrequency ?? "startup"}
@@ -300,10 +335,10 @@ export function Settings() {
                   className="w-48 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5 text-body text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
                   data-testid="setting-update-frequency"
                 >
-                  <option value="startup">Every Startup</option>
-                  <option value="daily">Daily</option>
-                  <option value="weekly">Weekly</option>
-                  <option value="never">Never</option>
+                  <option value="startup">{t("everyStartup")}</option>
+                  <option value="daily">{t("daily")}</option>
+                  <option value="weekly">{t("weekly")}</option>
+                  <option value="never">{t("common:never")}</option>
                 </select>
               </div>
             </div>
@@ -326,11 +361,11 @@ export function Settings() {
           <div className="space-y-4" data-testid="tab-content-security">
             <div className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-4">
               <h3 className="mb-3 text-body font-semibold text-[var(--color-text-primary)]">
-                Audit Log
+                {t("auditLog")}
               </h3>
               <div>
                 <label className="mb-1 block text-caption text-[var(--color-text-secondary)]">
-                  Retention Period (days)
+                  {t("retentionPeriod")}
                 </label>
                 <input
                   type="number"
@@ -352,17 +387,17 @@ export function Settings() {
                   </p>
                 )}
                 <p className="mt-1 text-caption text-[var(--color-text-secondary)]">
-                  Audit entries older than this will be purged at startup. Minimum: 30 days.
+                  {t("retentionHint")}
                 </p>
               </div>
             </div>
             <div className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-4">
               <h3 className="mb-3 text-body font-semibold text-[var(--color-text-primary)]">
-                Offboarding
+                {t("offboarding")}
               </h3>
               <div>
                 <label className="mb-1 block text-caption text-[var(--color-text-secondary)]">
-                  Disabled Users OU
+                  {t("disabledUsersOu")}
                 </label>
                 {settings.disabledOu && (
                   <div className="mb-2 flex items-center gap-2">
@@ -374,7 +409,7 @@ export function Settings() {
                       className="text-caption text-[var(--color-error)] hover:underline"
                       data-testid="setting-disabled-ou-clear"
                     >
-                      Clear
+                      {t("common:clear")}
                     </button>
                   </div>
                 )}
@@ -388,9 +423,163 @@ export function Settings() {
                   />
                 </div>
                 <p className="mt-1 text-caption text-[var(--color-text-secondary)]">
-                  Target OU where disabled user accounts are moved during offboarding.
-                  Select an OU or clear to skip the move step.
+                  {t("disabledUsersOuHint")}
                 </p>
+              </div>
+            </div>
+
+            {/* Risk Score Weights */}
+            <div className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-4">
+              <h3 className="mb-3 text-body font-semibold text-[var(--color-text-primary)]">
+                {t("riskScoreWeights")}
+              </h3>
+              <p className="mb-3 text-caption text-[var(--color-text-secondary)]">
+                {t("riskWeightsHint")}
+              </p>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {([
+                  ["privilegedHygiene", t("privilegedHygiene"), 15],
+                  ["passwordPolicy", t("passwordPolicy"), 10],
+                  ["staleAccounts", t("staleAccounts"), 10],
+                  ["kerberosSecurity", t("kerberosSecurity"), 20],
+                  ["dangerousConfigs", t("dangerousConfigs"), 10],
+                  ["infrastructureHardening", t("infrastructureHardening"), 10],
+                  ["gpoSecurity", t("gpoSecurity"), 10],
+                  ["trustSecurity", t("trustSecurity"), 10],
+                  ["certificateSecurity", t("certificateSecurity"), 5],
+                ] as const).map(([key, label, defaultVal]) => (
+                  <div key={key} className="flex items-center gap-2">
+                    <label className="w-44 text-caption text-[var(--color-text-secondary)]">{label}</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      step={1}
+                      value={settings.riskWeights?.[key] ?? defaultVal}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value);
+                        setSettings((prev) => ({
+                          ...prev,
+                          riskWeights: {
+                            ...{
+                              privilegedHygiene: 15, passwordPolicy: 10, staleAccounts: 10,
+                              kerberosSecurity: 20, dangerousConfigs: 10, infrastructureHardening: 10,
+                              gpoSecurity: 10, trustSecurity: 10, certificateSecurity: 5,
+                            },
+                            ...prev.riskWeights,
+                            [key]: isNaN(val) ? defaultVal : val,
+                          },
+                        }));
+                        setDirty(true);
+                      }}
+                      className="w-20 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2 py-1 text-body text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+                      data-testid={`setting-weight-${key}`}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Attack Detection Config */}
+            <div className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-4">
+              <h3 className="mb-3 text-body font-semibold text-[var(--color-text-primary)]">
+                {t("attackDetection")}
+              </h3>
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <label className="w-44 text-caption text-[var(--color-text-secondary)]">{t("bruteForceThreshold")}</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={settings.attackDetectionConfig?.bruteForceThreshold ?? 10}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10);
+                      setSettings((prev) => ({
+                        ...prev,
+                        attackDetectionConfig: {
+                          ...{ bruteForceThreshold: 10, kerberoastingThreshold: 3, excludedIps: [], excludedAccounts: [] },
+                          ...prev.attackDetectionConfig,
+                          bruteForceThreshold: isNaN(val) ? 10 : val,
+                        },
+                      }));
+                      setDirty(true);
+                    }}
+                    className="w-20 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2 py-1 text-body text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+                    data-testid="setting-brute-force-threshold"
+                  />
+                  <span className="text-caption text-[var(--color-text-secondary)]">{t("failedLoginsFromSameIp")}</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <label className="w-44 text-caption text-[var(--color-text-secondary)]">{t("kerberoastingThreshold")}</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={settings.attackDetectionConfig?.kerberoastingThreshold ?? 3}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10);
+                      setSettings((prev) => ({
+                        ...prev,
+                        attackDetectionConfig: {
+                          ...{ bruteForceThreshold: 10, kerberoastingThreshold: 3, excludedIps: [], excludedAccounts: [] },
+                          ...prev.attackDetectionConfig,
+                          kerberoastingThreshold: isNaN(val) ? 3 : val,
+                        },
+                      }));
+                      setDirty(true);
+                    }}
+                    className="w-20 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2 py-1 text-body text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
+                    data-testid="setting-kerberoasting-threshold"
+                  />
+                  <span className="text-caption text-[var(--color-text-secondary)]">{t("tgsRequestsWithRc4")}</span>
+                </div>
+                <div>
+                  <label className="mb-1 block text-caption text-[var(--color-text-secondary)]">
+                    {t("excludedIps")}
+                  </label>
+                  <input
+                    type="text"
+                    value={(settings.attackDetectionConfig?.excludedIps ?? []).join(", ")}
+                    onChange={(e) => {
+                      const ips = e.target.value.split(",").map((s) => s.trim()).filter(Boolean);
+                      setSettings((prev) => ({
+                        ...prev,
+                        attackDetectionConfig: {
+                          ...{ bruteForceThreshold: 10, kerberoastingThreshold: 3, excludedIps: [], excludedAccounts: [] },
+                          ...prev.attackDetectionConfig,
+                          excludedIps: ips,
+                        },
+                      }));
+                      setDirty(true);
+                    }}
+                    placeholder={t("excludedIpsPlaceholder")}
+                    className="w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5 text-body text-[var(--color-text-primary)] placeholder-[var(--color-text-secondary)] focus:border-[var(--color-primary)] focus:outline-none"
+                    data-testid="setting-excluded-ips"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-caption text-[var(--color-text-secondary)]">
+                    {t("excludedAccounts")}
+                  </label>
+                  <input
+                    type="text"
+                    value={(settings.attackDetectionConfig?.excludedAccounts ?? []).join(", ")}
+                    onChange={(e) => {
+                      const accts = e.target.value.split(",").map((s) => s.trim()).filter(Boolean);
+                      setSettings((prev) => ({
+                        ...prev,
+                        attackDetectionConfig: {
+                          ...{ bruteForceThreshold: 10, kerberoastingThreshold: 3, excludedIps: [], excludedAccounts: [] },
+                          ...prev.attackDetectionConfig,
+                          excludedAccounts: accts,
+                        },
+                      }));
+                      setDirty(true);
+                    }}
+                    placeholder={t("excludedAccountsPlaceholder")}
+                    className="w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5 text-body text-[var(--color-text-primary)] placeholder-[var(--color-text-secondary)] focus:border-[var(--color-primary)] focus:outline-none"
+                    data-testid="setting-excluded-accounts"
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -400,12 +589,12 @@ export function Settings() {
           <div className="space-y-4" data-testid="tab-content-reports">
             <div className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-4">
               <h3 className="mb-3 text-body font-semibold text-[var(--color-text-primary)]">
-                Export Defaults
+                {t("exportDefaults")}
               </h3>
               <div className="space-y-3">
                 <div>
                   <label className="mb-1 block text-caption text-[var(--color-text-secondary)]">
-                    Default Export Format
+                    {t("defaultExportFormat")}
                   </label>
                   <select
                     value={settings.reports?.defaultFormat ?? "CSV"}
@@ -413,15 +602,15 @@ export function Settings() {
                     className="w-48 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5 text-body text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
                     data-testid="setting-export-format"
                   >
-                    <option value="CSV">CSV</option>
-                    <option value="PDF">PDF</option>
-                    <option value="HTML">HTML</option>
-                    <option value="XLSX">Excel (XLSX)</option>
+                    <option value="CSV">{t("common:csv")}</option>
+                    <option value="PDF">{t("common:pdf")}</option>
+                    <option value="HTML">{t("common:html")}</option>
+                    <option value="XLSX">{t("common:excel")}</option>
                   </select>
                 </div>
                 <div>
                   <label className="mb-1 block text-caption text-[var(--color-text-secondary)]">
-                    Default Export Directory
+                    {t("defaultExportDirectory")}
                   </label>
                   <div className="flex gap-2">
                     <input
@@ -430,7 +619,7 @@ export function Settings() {
                       onChange={(e) =>
                         updateNested("reports", "defaultExportPath", e.target.value)
                       }
-                      placeholder="Leave empty for system default"
+                      placeholder={t("exportDirHint")}
                       className="flex-1 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5 text-body text-[var(--color-text-primary)] placeholder-[var(--color-text-secondary)] focus:border-[var(--color-primary)] focus:outline-none"
                       data-testid="setting-export-path"
                     />
@@ -439,7 +628,7 @@ export function Settings() {
                       className="btn btn-sm rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2.5 py-1 text-caption font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors"
                       data-testid="setting-export-path-browse"
                     >
-                      Browse...
+                      {t("common:browse")}
                     </button>
                   </div>
                   {validationErrors.defaultExportPath && (
@@ -460,7 +649,7 @@ export function Settings() {
           <div className="space-y-4" data-testid="tab-content-appearance">
             <div className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-4">
               <h3 className="mb-3 text-body font-semibold text-[var(--color-text-primary)]">
-                Theme
+                {t("theme")}
               </h3>
               <div className="flex gap-3">
                 {(["light", "dark", "system"] as const).map((mode) => {
@@ -476,14 +665,31 @@ export function Settings() {
                       }`}
                       data-testid={`theme-${mode}`}
                     >
-                      {mode === "light" ? "Light" : mode === "dark" ? "Dark" : "System"}
+                      {mode === "light" ? t("light") : mode === "dark" ? t("dark") : t("system")}
                     </button>
                   );
                 })}
               </div>
               <p className="mt-2 text-caption text-[var(--color-text-secondary)]">
-                System follows your OS preference.
+                {t("systemThemeHint")}
               </p>
+            </div>
+            <div className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-4">
+              <h3 className="mb-3 text-body font-semibold text-[var(--color-text-primary)]">
+                {t("language")}
+              </h3>
+              <select
+                value={settings.appearance?.language ?? "en"}
+                onChange={(e) => handleLanguageChange(e.target.value)}
+                className="rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-2 text-body text-[var(--color-text-primary)]"
+                data-testid="language-select"
+              >
+                {supportedLanguages.map((lang) => (
+                  <option key={lang.code} value={lang.code}>
+                    {lang.label}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
         )}
@@ -502,17 +708,17 @@ export function Settings() {
             className="btn btn-sm btn-primary"
             data-testid="settings-save"
           >
-            {saving ? "Saving..." : "Save Settings"}
+            {saving ? t("common:saving") : t("saveSettings")}
           </button>
           <button
             onClick={handleResetDefaults}
             className="btn btn-sm rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2.5 py-1 text-caption font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors"
             data-testid="settings-reset"
           >
-            Reset to Defaults
+            {t("resetToDefaults")}
           </button>
           {dirty && (
-            <span className="text-caption text-[var(--color-warning)]">Unsaved changes</span>
+            <span className="text-caption text-[var(--color-warning)]">{t("common:unsavedChanges")}</span>
           )}
         </div>
       )}

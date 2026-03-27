@@ -1,28 +1,31 @@
 import { ExternalLink } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 export function About() {
+  const { t } = useTranslation(["about", "common"]);
+
   return (
     <div className="space-y-4 p-4" data-testid="about-page">
       <div className="space-y-2 text-center">
         <h2 className="text-heading font-bold text-[var(--color-text-primary)]">DSPanel</h2>
         <p className="text-body text-[var(--color-text-secondary)]">
-          Active Directory Management
+          {t("subtitle")}
         </p>
         <p
           className="text-caption text-[var(--color-text-secondary)]"
           data-testid="about-version"
         >
-          Version {__APP_VERSION__}
+          {t("common:version")} {__APP_VERSION__}
         </p>
       </div>
 
       <div className="space-y-2 rounded-md bg-[var(--color-surface-hover)] p-3">
         <div className="flex justify-between text-caption">
-          <span className="text-[var(--color-text-secondary)]">License</span>
+          <span className="text-[var(--color-text-secondary)]">{t("license")}</span>
           <span className="text-[var(--color-text-primary)]">Apache-2.0</span>
         </div>
         <div className="flex justify-between text-caption">
-          <span className="text-[var(--color-text-secondary)]">Author</span>
+          <span className="text-[var(--color-text-secondary)]">{t("author")}</span>
           <span className="text-[var(--color-text-primary)]">Rwx-G</span>
         </div>
       </div>
@@ -36,7 +39,7 @@ export function About() {
           data-testid="about-github-link"
         >
           <ExternalLink size={14} />
-          GitHub Repository
+          {t("githubRepository")}
         </a>
         <a
           href="https://github.com/Rwx-G/DSPanel/releases"
@@ -46,7 +49,7 @@ export function About() {
           data-testid="about-releases-link"
         >
           <ExternalLink size={14} />
-          Releases & Changelog
+          {t("releasesChangelog")}
         </a>
       </div>
     </div>

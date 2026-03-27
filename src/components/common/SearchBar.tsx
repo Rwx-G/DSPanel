@@ -1,5 +1,6 @@
 import { useEffect, useCallback, useRef, useState } from "react";
 import { Search, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 interface SearchBarProps {
   value: string;
@@ -13,9 +14,11 @@ export function SearchBar({
   value,
   onChange,
   onSearch,
-  placeholder = "Search...",
+  placeholder,
   debounceMs = 300,
 }: SearchBarProps) {
+  const { t } = useTranslation(["components"]);
+  const resolvedPlaceholder = placeholder ?? t("components:searchBar.placeholder");
   // Stabilize callbacks via refs so the debounce effect only fires
   // when `value` changes, not when the parent re-renders with a new
   // callback reference.
@@ -44,7 +47,7 @@ export function SearchBar({
 
   // Show shortcut hint in placeholder when not focused
   const [focused, setFocused] = useState(false);
-  const displayPlaceholder = focused ? placeholder : `${placeholder} (Ctrl+F)`;
+  const displayPlaceholder = focused ? resolvedPlaceholder : `${resolvedPlaceholder} (Ctrl+F)`;
 
   return (
     <div
@@ -64,7 +67,7 @@ export function SearchBar({
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
         placeholder={displayPlaceholder}
-        aria-label={placeholder}
+        aria-label={resolvedPlaceholder}
         className="flex-1 bg-transparent text-body text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-secondary)]"
         data-testid="search-input"
       />
@@ -72,7 +75,7 @@ export function SearchBar({
         <button
           onClick={handleClear}
           className="rounded-sm p-0.5 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
-          aria-label="Clear search"
+          aria-label={t("components:searchBar.clearSearch")}
           data-testid="search-clear"
         >
           <X size={14} />

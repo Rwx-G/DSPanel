@@ -1,10 +1,10 @@
 [package]
 name = "dspanel"
-version = "0.12.0"
+version = "1.0.0"
 description = "DSPanel - Active Directory management tool"
-authors = ["Romain G."]
+authors = ["Rwx-G"]
 license = "Apache-2.0"
-edition = "2021"
+edition = "2024"
 
 [lib]
 name = "dspanel_lib"
@@ -44,6 +44,7 @@ csv = "1"
 printpdf = "0.3"
 rust_xlsxwriter = "0.82"
 rusqlite = { version = "0.39", features = ["bundled"] }
+zeroize = "1"
 notify = { version = "8", features = ["macos_fsevent"] }
 notify-debouncer-mini = "0.7"
 keyring = { version = "3", features = ["sync-secret-service"] }

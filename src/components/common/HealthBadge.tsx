@@ -1,6 +1,7 @@
 import { useState, useId, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { CheckCircle, AlertTriangle, AlertCircle, Info } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import type { AccountHealthStatus, HealthLevel } from "@/types/health";
 
 const LEVEL_STYLES: Record<HealthLevel, string> = {
@@ -24,6 +25,7 @@ interface HealthBadgeProps {
 }
 
 export function HealthBadge({ healthStatus, compact = false }: HealthBadgeProps) {
+  const { t } = useTranslation("components");
   const [showTooltip, setShowTooltip] = useState(false);
   const tooltipId = useId();
   const badgeRef = useRef<HTMLDivElement>(null);
@@ -76,7 +78,7 @@ export function HealthBadge({ healthStatus, compact = false }: HealthBadgeProps)
       }}
       tabIndex={0}
       role="status"
-      aria-label={`Health: ${healthStatus.level}${flagCount > 0 ? `, ${flagCount} issue${flagCount > 1 ? "s" : ""}` : ""}`}
+      aria-label={flagCount === 0 ? t("healthBadge.healthy") : t("healthBadge.issue", { count: flagCount })}
       aria-describedby={showTooltip ? tooltipId : undefined}
       data-testid="health-badge"
       data-level={healthStatus.level}
@@ -87,8 +89,8 @@ export function HealthBadge({ healthStatus, compact = false }: HealthBadgeProps)
         <Icon size={12} />
         {!compact &&
           (flagCount === 0
-            ? "Healthy"
-            : `${flagCount} issue${flagCount > 1 ? "s" : ""}`)}
+            ? t("healthBadge.healthy")
+            : t("healthBadge.issue", { count: flagCount }))}
       </span>
 
       {showTooltip &&
@@ -104,7 +106,7 @@ export function HealthBadge({ healthStatus, compact = false }: HealthBadgeProps)
             {flagCount === 0 ? (
               <div className="flex items-center gap-1.5 text-caption text-[var(--color-text-secondary)]">
                 <CheckCircle size={12} className="shrink-0 text-[var(--color-success)]" />
-                No issues detected
+                {t("healthBadge.noIssues")}
               </div>
             ) : (
               <ul className="space-y-1">
@@ -122,10 +124,10 @@ export function HealthBadge({ healthStatus, compact = false }: HealthBadgeProps)
                       />
                       <div>
                         <span className="text-caption font-medium text-[var(--color-text-primary)]">
-                          {flag.name}
+                          {t(`healthBadge.flags.${flag.name}`, { defaultValue: flag.name })}
                         </span>
                         <p className="text-[10px] text-[var(--color-text-secondary)]">
-                          {flag.description}
+                          {t(`healthBadge.flagDesc.${flag.name}`, { defaultValue: flag.description })}
                         </p>
                       </div>
                     </li>

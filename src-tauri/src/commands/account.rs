@@ -11,6 +11,44 @@ use crate::state::AppState;
 
 use super::capture_snapshot;
 
+/// Re-detects AD permissions and verifies the required level before a critical write.
+/// If re-detection fails or would lower the current level, the existing level is preserved.
+async fn require_fresh_permission(
+    state: &AppState,
+    required: PermissionLevel,
+    operation: &str,
+) -> Result<(), AppError> {
+    let previous_level = state.permission_service.current_level();
+    let provider = state.provider();
+    match state
+        .permission_service
+        .detect_permissions(&*provider)
+        .await
+    {
+        Ok(()) => {
+            // If re-detection returned a lower level, keep the previous one
+            // to avoid false negatives from transient AD query issues
+            if state.permission_service.current_level() < previous_level {
+                tracing::warn!(
+                    "Permission re-detection returned lower level than cached; keeping {:?}",
+                    previous_level
+                );
+                state.permission_service.set_level(previous_level);
+            }
+        }
+        Err(e) => {
+            tracing::warn!("Permission re-detection failed before {}: {}", operation, e);
+        }
+    }
+    if !state.permission_service.has_permission(required) {
+        return Err(AppError::PermissionDenied(format!(
+            "{} requires {:?} permission or higher",
+            operation, required
+        )));
+    }
+    Ok(())
+}
+
 /// Resets a user's password via the directory provider.
 pub(crate) async fn reset_password_inner(
     state: &AppState,
@@ -18,14 +56,7 @@ pub(crate) async fn reset_password_inner(
     new_password: &str,
     must_change_at_next_logon: bool,
 ) -> Result<(), AppError> {
-    if !state
-        .permission_service
-        .has_permission(PermissionLevel::HelpDesk)
-    {
-        return Err(AppError::PermissionDenied(
-            "Password reset requires HelpDesk permission or higher".to_string(),
-        ));
-    }
+    require_fresh_permission(state, PermissionLevel::HelpDesk, "Password reset").await?;
 
     state
         .mfa_service
@@ -33,7 +64,7 @@ pub(crate) async fn reset_password_inner(
         .map_err(|e| AppError::PermissionDenied(e.to_string()))?;
 
     capture_snapshot(state, user_dn, "PasswordReset").await;
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     match provider
         .reset_password(user_dn, new_password, must_change_at_next_logon)
         .await
@@ -60,17 +91,10 @@ pub(crate) async fn reset_password_inner(
 
 /// Unlocks a user account via the directory provider.
 pub(crate) async fn unlock_account_inner(state: &AppState, user_dn: &str) -> Result<(), AppError> {
-    if !state
-        .permission_service
-        .has_permission(PermissionLevel::HelpDesk)
-    {
-        return Err(AppError::PermissionDenied(
-            "Account unlock requires HelpDesk permission or higher".to_string(),
-        ));
-    }
+    require_fresh_permission(state, PermissionLevel::HelpDesk, "Account unlock").await?;
 
     capture_snapshot(state, user_dn, "AccountUnlock").await;
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     match provider.unlock_account(user_dn).await {
         Ok(()) => {
             state
@@ -89,17 +113,10 @@ pub(crate) async fn unlock_account_inner(state: &AppState, user_dn: &str) -> Res
 
 /// Enables a user account via the directory provider.
 pub(crate) async fn enable_account_inner(state: &AppState, user_dn: &str) -> Result<(), AppError> {
-    if !state
-        .permission_service
-        .has_permission(PermissionLevel::HelpDesk)
-    {
-        return Err(AppError::PermissionDenied(
-            "Account enable requires HelpDesk permission or higher".to_string(),
-        ));
-    }
+    require_fresh_permission(state, PermissionLevel::HelpDesk, "Account enable").await?;
 
     capture_snapshot(state, user_dn, "AccountEnable").await;
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     match provider.enable_account(user_dn).await {
         Ok(()) => {
             state
@@ -118,14 +135,7 @@ pub(crate) async fn enable_account_inner(state: &AppState, user_dn: &str) -> Res
 
 /// Disables a user account via the directory provider.
 pub(crate) async fn disable_account_inner(state: &AppState, user_dn: &str) -> Result<(), AppError> {
-    if !state
-        .permission_service
-        .has_permission(PermissionLevel::HelpDesk)
-    {
-        return Err(AppError::PermissionDenied(
-            "Account disable requires HelpDesk permission or higher".to_string(),
-        ));
-    }
+    require_fresh_permission(state, PermissionLevel::HelpDesk, "Account disable").await?;
 
     state
         .mfa_service
@@ -133,7 +143,7 @@ pub(crate) async fn disable_account_inner(state: &AppState, user_dn: &str) -> Re
         .map_err(|e| AppError::PermissionDenied(e.to_string()))?;
 
     capture_snapshot(state, user_dn, "AccountDisable").await;
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     match provider.disable_account(user_dn).await {
         Ok(()) => {
             state
@@ -156,7 +166,7 @@ pub(crate) async fn get_cannot_change_password_inner(
     state: &AppState,
     user_dn: &str,
 ) -> Result<bool, AppError> {
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     provider
         .get_cannot_change_password(user_dn)
         .await
@@ -169,14 +179,12 @@ pub(crate) async fn set_password_flags_inner(
     password_never_expires: bool,
     user_cannot_change_password: bool,
 ) -> Result<(), AppError> {
-    if !state
-        .permission_service
-        .has_permission(PermissionLevel::AccountOperator)
-    {
-        return Err(AppError::PermissionDenied(
-            "Password flag management requires AccountOperator permission or higher".to_string(),
-        ));
-    }
+    require_fresh_permission(
+        state,
+        PermissionLevel::AccountOperator,
+        "Password flag management",
+    )
+    .await?;
 
     state
         .mfa_service
@@ -186,7 +194,7 @@ pub(crate) async fn set_password_flags_inner(
     state
         .snapshot_service
         .capture(user_dn, "PasswordFlagsChange");
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     match provider
         .set_password_flags(user_dn, password_never_expires, user_cannot_change_password)
         .await
@@ -249,7 +257,7 @@ pub(crate) async fn compare_users_inner(
     sam_a: &str,
     sam_b: &str,
 ) -> Result<GroupComparisonResult, AppError> {
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
 
     let user_a = resolve_user(&*provider, sam_a).await?;
     let user_b = resolve_user(&*provider, sam_b).await?;
@@ -286,7 +294,7 @@ pub(crate) async fn add_user_to_group_inner(
 
     capture_snapshot(state, user_dn, "AddToGroup").await;
 
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     match provider.add_user_to_group(user_dn, group_dn).await {
         Ok(()) => {
             state.audit_service.log_success(
@@ -325,7 +333,7 @@ pub(crate) async fn create_user_inner(
         ));
     }
 
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
 
     // Check login uniqueness
     let existing = provider
@@ -382,7 +390,7 @@ pub(crate) async fn modify_attribute_inner(
 
     capture_snapshot(state, dn, "ModifyAttribute").await;
 
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     match provider.modify_attribute(dn, attribute_name, values).await {
         Ok(()) => {
             state.audit_service.log_success(
@@ -491,26 +499,6 @@ pub fn get_audit_entries(state: State<'_, AppState>) -> Vec<AuditEntry> {
     get_audit_entries_inner(&state)
 }
 
-/// Logs an audit event from the frontend (for operations not backed by a write command).
-#[tauri::command]
-pub fn audit_log(
-    action: String,
-    target_dn: String,
-    details: String,
-    success: bool,
-    state: State<'_, AppState>,
-) {
-    if success {
-        state
-            .audit_service
-            .log_success(&action, &target_dn, &details);
-    } else {
-        state
-            .audit_service
-            .log_failure(&action, &target_dn, &details);
-    }
-}
-
 /// Queries audit log entries with filters and pagination.
 #[tauri::command]
 pub fn query_audit_log(filter: AuditFilter, state: State<'_, AppState>) -> AuditQueryResult {
@@ -532,13 +520,28 @@ pub(crate) fn get_audit_action_types_inner(state: &AppState) -> Vec<String> {
 }
 
 /// Purges audit entries older than the specified number of days.
-/// Returns the number of deleted entries.
+/// Returns the number of deleted entries. Requires DomainAdmin permission.
 #[tauri::command]
-pub fn purge_audit_entries(retention_days: i64, state: State<'_, AppState>) -> usize {
+pub fn purge_audit_entries(
+    retention_days: i64,
+    state: State<'_, AppState>,
+) -> Result<usize, AppError> {
     purge_audit_entries_inner(&state, retention_days)
 }
 
-pub(crate) fn purge_audit_entries_inner(state: &AppState, retention_days: i64) -> usize {
+pub(crate) fn purge_audit_entries_inner(
+    state: &AppState,
+    retention_days: i64,
+) -> Result<usize, AppError> {
+    if !state
+        .permission_service
+        .has_permission(PermissionLevel::DomainAdmin)
+    {
+        return Err(AppError::PermissionDenied(
+            "Audit purge requires DomainAdmin permission".to_string(),
+        ));
+    }
+
     let deleted = state.audit_service.purge_older_than(retention_days);
     if deleted > 0 {
         tracing::info!(
@@ -547,7 +550,7 @@ pub(crate) fn purge_audit_entries_inner(state: &AppState, retention_days: i64) -
             "Audit log: purged old entries"
         );
     }
-    deleted
+    Ok(deleted)
 }
 
 /// Adds a user to a group.
@@ -695,8 +698,8 @@ pub async fn modify_attribute(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::services::directory::tests::MockDirectoryProvider;
     use crate::services::PermissionConfig;
+    use crate::services::directory::tests::MockDirectoryProvider;
     use std::collections::HashMap;
     use std::sync::Arc;
 
@@ -818,9 +821,11 @@ mod tests {
         assert!(entries[0].success);
         assert_eq!(entries[0].action, "PasswordReset");
         assert_eq!(entries[0].target_dn, "CN=User1,DC=example,DC=com");
-        assert!(entries[0]
-            .details
-            .contains("must_change_at_next_logon=true"));
+        assert!(
+            entries[0]
+                .details
+                .contains("must_change_at_next_logon=true")
+        );
     }
 
     #[tokio::test]
@@ -959,9 +964,11 @@ mod tests {
         assert!(entries[0].success);
         assert_eq!(entries[0].action, "PasswordFlagsChanged");
         assert!(entries[0].details.contains("password_never_expires=true"));
-        assert!(entries[0]
-            .details
-            .contains("user_cannot_change_password=false"));
+        assert!(
+            entries[0]
+                .details
+                .contains("user_cannot_change_password=false")
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -1331,9 +1338,11 @@ mod tests {
         assert!(calls[0].2); // user_cannot_change_password = true
         let entries = state.audit_service.get_entries();
         assert!(entries[0].details.contains("password_never_expires=false"));
-        assert!(entries[0]
-            .details
-            .contains("user_cannot_change_password=true"));
+        assert!(
+            entries[0]
+                .details
+                .contains("user_cannot_change_password=true")
+        );
     }
 
     #[tokio::test]
@@ -1349,9 +1358,11 @@ mod tests {
         assert!(calls[0].2);
         let entries = state.audit_service.get_entries();
         assert!(entries[0].details.contains("password_never_expires=true"));
-        assert!(entries[0]
-            .details
-            .contains("user_cannot_change_password=true"));
+        assert!(
+            entries[0]
+                .details
+                .contains("user_cannot_change_password=true")
+        );
     }
 
     #[tokio::test]
@@ -1367,9 +1378,11 @@ mod tests {
         assert!(!calls[0].2);
         let entries = state.audit_service.get_entries();
         assert!(entries[0].details.contains("password_never_expires=false"));
-        assert!(entries[0]
-            .details
-            .contains("user_cannot_change_password=false"));
+        assert!(
+            entries[0]
+                .details
+                .contains("user_cannot_change_password=false")
+        );
     }
 
     #[tokio::test]

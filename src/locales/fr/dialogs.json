@@ -1,0 +1,81 @@
+{
+  "passwordReset": {
+    "title": "Réinitialiser le mot de passe",
+    "successTitle": "Mot de passe réinitialisé avec succès",
+    "successMessage": "Le mot de passe de {{name}} a été réinitialisé.",
+    "mustChangeAtLogon": "L'utilisateur doit changer le mot de passe à la prochaine connexion.",
+    "autoGenerate": "Génération automatique",
+    "manualEntry": "Saisie manuelle",
+    "enterNewPassword": "Entrez le nouveau mot de passe",
+    "atLeast8Chars": "Au moins 8 caractères",
+    "uppercaseLetter": "Lettre majuscule",
+    "lowercaseLetter": "Lettre minuscule",
+    "digit": "Chiffre",
+    "specialCharacter": "Caractère spécial",
+    "meetsComplexity": "Répond aux exigences de complexité (3+ catégories)",
+    "needsCategories": "Nécessite 3+ catégories de caractères",
+    "generatePassword": "Générer le mot de passe",
+    "breachUnavailable": "Vérification des fuites indisponible",
+    "foundInBreaches": "Trouvé dans {{count}} fuites - envisagez de régénérer",
+    "notInBreaches": "Non trouvé dans les fuites connues",
+    "mustChangeCheckbox": "Doit changer le mot de passe à la prochaine connexion",
+    "resetButton": "Réinitialiser le mot de passe"
+  },
+  "moveObject": {
+    "titleBulk": "Déplacer {{count}} objets",
+    "titleSingle": "Déplacer {{name}}",
+    "selectTargetOu": "Sélectionnez l'OU cible :",
+    "objectsWillBeMoved": "Le(s) objet(s) suivant(s) seront déplacés :",
+    "from": "De : {{path}}",
+    "to": "Vers : {{path}}",
+    "move": "Déplacer",
+    "moving": "Déplacement des objets en cours..."
+  },
+  "mfa": {
+    "verificationRequired": "Vérification MFA requise",
+    "enterCode": "Entrez le code à 6 chiffres de votre application d'authentification, ou un code de secours.",
+    "invalidCode": "Code invalide. Veuillez réessayer.",
+    "verify": "Vérifier",
+    "verifying": "Vérification..."
+  },
+  "mfaSetup": {
+    "title": "Configurer MFA",
+    "description": "Ajoutez une couche de sécurité supplémentaire en activant l'authentification multi-facteurs basée sur TOTP. Vous aurez besoin d'une application d'authentification (Google Authenticator, Authy, etc.).",
+    "beginSetup": "Commencer la configuration",
+    "step1Title": "Étape 1 : Scanner le QR Code",
+    "step1Description": "Scannez ce QR code avec votre application d'authentification, ou entrez le secret manuellement :",
+    "qrAlt": "QR Code MFA",
+    "enterCodeDescription": "Entrez le code à 6 chiffres de votre application d'authentification pour vérifier :",
+    "invalidCodeRetry": "Code invalide. Veuillez vérifier votre application d'authentification et réessayer.",
+    "step2Title": "Étape 2 : Enregistrer les codes de secours",
+    "step2Description": "MFA a été configuré avec succès ! Enregistrez ces codes de secours dans un endroit sûr. Chaque code ne peut être utilisé qu'une seule fois."
+  },
+  "confirmation": {
+    "details": "Détails"
+  },
+  "dryRunPreview": {
+    "title": "Modifications en attente ({{count}})"
+  },
+  "groupMembers": {
+    "title": "Membres de {{name}}",
+    "memberCount_one": "({{count}} membre)",
+    "memberCount_other": "({{count}} membres)",
+    "loadingMembers": "Chargement des membres...",
+    "failedToLoad": "Échec du chargement des membres",
+    "noMembers": "Aucun membre",
+    "noMembersDescription": "Ce groupe n'a aucun membre.",
+    "accountName": "Nom du compte",
+    "close": "Fermer"
+  },
+  "memberChangePreview": {
+    "toAdd_one": "{{count}} membre à ajouter",
+    "toAdd_other": "{{count}} membres à ajouter",
+    "toRemove_one": "{{count}} membre à retirer",
+    "toRemove_other": "{{count}} membres à retirer",
+    "title": "Modifications des membres - {{name}}",
+    "applying": "Application..."
+  },
+  "progress": {
+    "percentage": "{{value}} %"
+  }
+}

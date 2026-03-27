@@ -3,7 +3,7 @@ use tauri::State;
 use crate::error::AppError;
 use crate::models::security::{
     AttackDetectionReport, EscalationGraphResult, PrivilegedAccountsReport, RiskScoreHistory,
-    RiskScoreResult, RiskWeights,
+    RiskScoreResult,
 };
 use crate::services::PermissionLevel;
 use crate::state::AppState;
@@ -26,7 +26,7 @@ pub(crate) async fn get_privileged_accounts_inner(
         ));
     }
 
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
 
     // Load additional configured groups from settings
     let settings = state.app_settings.get();
@@ -64,8 +64,8 @@ pub(crate) async fn get_risk_score_inner(state: &AppState) -> Result<RiskScoreRe
         ));
     }
 
-    let provider = state.directory_provider.clone();
-    let weights = RiskWeights::default();
+    let provider = state.provider();
+    let weights = state.app_settings.get().risk_weights.unwrap_or_default();
 
     let result = crate::services::security::compute_risk_score(provider, &weights)
         .await
@@ -129,8 +129,13 @@ pub(crate) async fn detect_attacks_inner(
         ));
     }
 
-    let provider = state.directory_provider.clone();
-    crate::services::security::detect_attacks(provider, time_window_hours)
+    let provider = state.provider();
+    let config = state
+        .app_settings
+        .get()
+        .attack_detection_config
+        .unwrap_or_default();
+    crate::services::security::detect_attacks(provider, time_window_hours, config)
         .await
         .map_err(|e| AppError::Directory(e.to_string()))
 }
@@ -161,7 +166,7 @@ pub(crate) async fn get_escalation_paths_inner(
         ));
     }
 
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     crate::services::security::build_escalation_graph(provider)
         .await
         .map_err(|e| AppError::Directory(e.to_string()))
@@ -179,8 +184,8 @@ pub async fn get_escalation_paths(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::services::directory::tests::MockDirectoryProvider;
     use crate::services::PermissionConfig;
+    use crate::services::directory::tests::MockDirectoryProvider;
     use std::sync::Arc;
 
     fn make_state() -> AppState {

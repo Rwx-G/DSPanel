@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { ChevronDown } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 export interface ComboBoxOption {
   value: string;
@@ -34,10 +35,11 @@ export function ComboBox({
   options,
   value,
   onChange,
-  placeholder = "Select...",
+  placeholder,
   disabled = false,
   error = false,
 }: ComboBoxProps) {
+  const { t } = useTranslation(["components"]);
   const [isOpen, setIsOpen] = useState(false);
   const [searchText, setSearchText] = useState("");
   const [highlightIndex, setHighlightIndex] = useState(-1);
@@ -154,7 +156,7 @@ export function ComboBox({
               : "text-[var(--color-text-secondary)]"
           }
         >
-          {selectedOption?.label ?? placeholder}
+          {selectedOption?.label ?? (placeholder ?? t("components:comboBox.placeholder"))}
         </span>
         <ChevronDown
           size={16}
@@ -177,9 +179,9 @@ export function ComboBox({
                 setSearchText(e.target.value);
                 setHighlightIndex(-1);
               }}
-              placeholder="Search..."
+              placeholder={t("components:comboBox.searchPlaceholder")}
               className="w-full bg-transparent px-2 py-1 text-body text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-secondary)]"
-              aria-label="Search options"
+              aria-label={t("components:comboBox.searchOptions")}
               data-testid="combobox-search"
             />
           </div>
@@ -189,7 +191,7 @@ export function ComboBox({
                 className="px-3 py-2 text-caption text-[var(--color-text-secondary)]"
                 data-testid="combobox-no-results"
               >
-                No results
+                {t("components:comboBox.noResults")}
               </div>
             ) : (
               filteredOptions.map((opt, index) => (

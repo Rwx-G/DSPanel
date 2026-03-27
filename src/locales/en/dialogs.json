@@ -1,0 +1,81 @@
+{
+  "passwordReset": {
+    "title": "Reset Password",
+    "successTitle": "Password Reset Successful",
+    "successMessage": "Password for {{name}} has been reset.",
+    "mustChangeAtLogon": "User must change password at next logon.",
+    "autoGenerate": "Auto-generate",
+    "manualEntry": "Manual entry",
+    "enterNewPassword": "Enter new password",
+    "atLeast8Chars": "At least 8 characters",
+    "uppercaseLetter": "Uppercase letter",
+    "lowercaseLetter": "Lowercase letter",
+    "digit": "Digit",
+    "specialCharacter": "Special character",
+    "meetsComplexity": "Meets complexity requirements (3+ categories)",
+    "needsCategories": "Needs 3+ character categories",
+    "generatePassword": "Generate Password",
+    "breachUnavailable": "Breach check unavailable",
+    "foundInBreaches": "Found in {{count}} breaches - consider regenerating",
+    "notInBreaches": "Not found in any known breach",
+    "mustChangeCheckbox": "Must change password at next logon",
+    "resetButton": "Reset Password"
+  },
+  "moveObject": {
+    "titleBulk": "Move {{count}} Objects",
+    "titleSingle": "Move {{name}}",
+    "selectTargetOu": "Select the target Organizational Unit:",
+    "objectsWillBeMoved": "The following object(s) will be moved:",
+    "from": "From: {{path}}",
+    "to": "To: {{path}}",
+    "move": "Move",
+    "moving": "Moving object(s)..."
+  },
+  "mfa": {
+    "verificationRequired": "MFA Verification Required",
+    "enterCode": "Enter the 6-digit code from your authenticator app, or a backup code.",
+    "invalidCode": "Invalid code. Please try again.",
+    "verify": "Verify",
+    "verifying": "Verifying..."
+  },
+  "mfaSetup": {
+    "title": "Set Up MFA",
+    "description": "Add an extra layer of security by enabling TOTP-based multi-factor authentication. You will need an authenticator app (Google Authenticator, Authy, etc.).",
+    "beginSetup": "Begin Setup",
+    "step1Title": "Step 1: Scan QR Code",
+    "step1Description": "Scan this QR code with your authenticator app, or enter the secret manually:",
+    "qrAlt": "MFA QR Code",
+    "enterCodeDescription": "Enter the 6-digit code from your authenticator app to verify:",
+    "invalidCodeRetry": "Invalid code. Please check your authenticator app and try again.",
+    "step2Title": "Step 2: Save Backup Codes",
+    "step2Description": "MFA has been set up successfully! Save these backup codes in a safe place. Each code can only be used once."
+  },
+  "confirmation": {
+    "details": "Details"
+  },
+  "dryRunPreview": {
+    "title": "Pending Changes ({{count}})"
+  },
+  "groupMembers": {
+    "title": "Members of {{name}}",
+    "memberCount_one": "({{count}} member)",
+    "memberCount_other": "({{count}} members)",
+    "loadingMembers": "Loading members...",
+    "failedToLoad": "Failed to load members",
+    "noMembers": "No members",
+    "noMembersDescription": "This group has no members.",
+    "accountName": "Account Name",
+    "close": "Close"
+  },
+  "memberChangePreview": {
+    "toAdd_one": "{{count}} member to add",
+    "toAdd_other": "{{count}} members to add",
+    "toRemove_one": "{{count}} member to remove",
+    "toRemove_other": "{{count}} members to remove",
+    "title": "Member Changes - {{name}}",
+    "applying": "Applying..."
+  },
+  "progress": {
+    "percentage": "{{value}}%"
+  }
+}

@@ -13,32 +13,18 @@ import {
   KeyRound,
   Users,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 interface HomePageProps {
   status: AppStatus;
 }
 
-const PERM_LABELS: Record<string, { label: string; color: string }> = {
-  ReadOnly: {
-    label: "Read Only",
-    color: "var(--color-perm-readonly)",
-  },
-  HelpDesk: {
-    label: "Help Desk",
-    color: "var(--color-perm-helpdesk)",
-  },
-  AccountOperator: {
-    label: "Account Operator",
-    color: "var(--color-perm-accountops)",
-  },
-  Admin: {
-    label: "Admin",
-    color: "var(--color-perm-domainadmin)",
-  },
-  DomainAdmin: {
-    label: "Domain Admin",
-    color: "var(--color-perm-domainadmin)",
-  },
+const PERM_COLORS: Record<string, string> = {
+  ReadOnly: "var(--color-perm-readonly)",
+  HelpDesk: "var(--color-perm-helpdesk)",
+  AccountOperator: "var(--color-perm-accountops)",
+  Admin: "var(--color-perm-domainadmin)",
+  DomainAdmin: "var(--color-perm-domainadmin)",
 };
 
 const PLATFORM_LABELS: Record<string, string> = {
@@ -53,8 +39,19 @@ function formatPlatform(platform: string): string {
 }
 
 export function HomePage({ status }: HomePageProps) {
+  const { t } = useTranslation(["home", "common"]);
   const platform = usePlatform();
-  const perm = PERM_LABELS[status.permissionLevel] ?? PERM_LABELS.ReadOnly;
+
+  const PERM_LABELS: Record<string, string> = {
+    ReadOnly: t("readOnly"),
+    HelpDesk: t("helpDesk"),
+    AccountOperator: t("accountOperator"),
+    Admin: t("admin"),
+    DomainAdmin: t("domainAdmin"),
+  };
+
+  const permColor = PERM_COLORS[status.permissionLevel] ?? PERM_COLORS.ReadOnly;
+  const permLabel = PERM_LABELS[status.permissionLevel] ?? PERM_LABELS.ReadOnly;
   const [mfaConfigured, setMfaConfigured] = useState(false);
   const [showMfaSetup, setShowMfaSetup] = useState(false);
 
@@ -83,7 +80,7 @@ export function HomePage({ status }: HomePageProps) {
           </div>
           <div>
             <h1 className="text-h2 text-[var(--color-text-primary)]">
-              Dashboard
+              {t("dashboard")}
             </h1>
             <p className="text-caption text-[var(--color-text-secondary)]">
               DSPanel v{status.appVersion}
@@ -98,27 +95,27 @@ export function HomePage({ status }: HomePageProps) {
             icon={
               status.isConnected ? <Wifi size={18} /> : <WifiOff size={18} />
             }
-            title="Active Directory"
+            title={t("activeDirectory")}
             iconColor={
               status.isConnected ? "var(--color-success)" : "var(--color-error)"
             }
           >
             <StatusRow
-              label="Status"
-              value={status.isConnected ? "Connected" : "Disconnected"}
+              label={t("common:status")}
+              value={status.isConnected ? t("common:connected") : t("common:disconnected")}
               valueColor={
                 status.isConnected
                   ? "var(--color-success)"
                   : "var(--color-error)"
               }
             />
-            <StatusRow label="Domain" value={status.domainName ?? "N/A"} />
+            <StatusRow label={t("common:domain")} value={status.domainName ?? t("common:na")} />
           </DashboardCard>
 
           {/* Current Session */}
           <DashboardCard
             icon={<User size={18} />}
-            title="Current Session"
+            title={t("currentSession")}
             iconColor="var(--color-primary)"
           >
             <StatusRow label="User" value={status.username || "..."} />
@@ -128,21 +125,21 @@ export function HomePage({ status }: HomePageProps) {
           {/* Permissions */}
           <DashboardCard
             icon={<KeyRound size={18} />}
-            title="Permissions"
-            iconColor={perm.color}
+            title={t("permissions")}
+            iconColor={permColor}
           >
             <StatusRow
-              label="Authenticated as"
+              label={t("authenticatedAs")}
               value={status.authenticatedUser || status.username || "..."}
             />
             <StatusRow
-              label="Level"
-              value={perm.label}
-              valueColor={perm.color}
+              label={t("level")}
+              value={permLabel}
+              valueColor={permColor}
             />
             <StatusRow
-              label="Domain joined"
-              value={status.domainName ? "Yes" : "No"}
+              label={t("domainJoined")}
+              value={status.domainName ? t("common:yes") : t("common:no")}
               valueColor={
                 status.domainName
                   ? "var(--color-success)"
@@ -154,11 +151,11 @@ export function HomePage({ status }: HomePageProps) {
           {/* Environment */}
           <DashboardCard
             icon={<Globe size={18} />}
-            title="Environment"
+            title={t("environment")}
             iconColor="var(--color-info)"
           >
-            <StatusRow label="Version" value={`v${status.appVersion}`} />
-            <StatusRow label="Platform" value={`${formatPlatform(platform)} (Tauri v2)`} />
+            <StatusRow label={t("common:version")} value={`v${status.appVersion}`} />
+            <StatusRow label={t("common:platform")} value={`${formatPlatform(platform)} (Tauri v2)`} />
           </DashboardCard>
         </div>
 
@@ -166,7 +163,7 @@ export function HomePage({ status }: HomePageProps) {
         <div className="mt-4">
           <DashboardCard
             icon={<ShieldCheck size={18} />}
-            title="MFA Security"
+            title={t("mfaSecurity")}
             iconColor={
               mfaConfigured
                 ? "var(--color-success)"
@@ -174,8 +171,8 @@ export function HomePage({ status }: HomePageProps) {
             }
           >
             <StatusRow
-              label="Status"
-              value={mfaConfigured ? "Configured" : "Not configured"}
+              label={t("common:status")}
+              value={mfaConfigured ? t("configured") : t("notConfigured")}
               valueColor={
                 mfaConfigured
                   ? "var(--color-success)"
@@ -189,7 +186,7 @@ export function HomePage({ status }: HomePageProps) {
                   onClick={() => setShowMfaSetup(true)}
                   data-testid="mfa-setup-btn"
                 >
-                  Setup MFA
+                  {t("setupMfa")}
                 </button>
               ) : (
                 <button
@@ -197,7 +194,7 @@ export function HomePage({ status }: HomePageProps) {
                   onClick={handleMfaRevoke}
                   data-testid="mfa-revoke-btn"
                 >
-                  Revoke MFA
+                  {t("revokeMfa")}
                 </button>
               )}
             </div>
@@ -209,7 +206,7 @@ export function HomePage({ status }: HomePageProps) {
           <div className="mt-4">
             <DashboardCard
               icon={<Users size={18} />}
-              title="AD Group Memberships"
+              title={t("adGroupMemberships")}
               iconColor="var(--color-primary)"
             >
               <div className="flex flex-wrap gap-1.5">
@@ -230,9 +227,7 @@ export function HomePage({ status }: HomePageProps) {
         {!status.isConnected && (
           <div className="mt-4 rounded-lg border border-[var(--color-warning-bg)] bg-[var(--color-warning-bg)] p-3">
             <p className="text-caption text-[var(--color-warning)]">
-              Not connected to Active Directory. Directory lookups will not be
-              available. Check that this machine is domain-joined and has
-              network access to a domain controller.
+              {t("notConnectedWarning")}
             </p>
           </div>
         )}

@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 use std::time::Instant;
 
 use crate::models::DirectoryEntry;
@@ -18,8 +18,11 @@ pub struct AppState {
     pub title: Mutex<String>,
     /// Whether the app has completed initialization.
     pub initialized: Mutex<bool>,
-    /// Directory provider for AD operations (trait object behind Arc for sharing).
-    pub directory_provider: Arc<dyn DirectoryProvider>,
+    /// Directory provider for AD operations. Wrapped in RwLock to allow
+    /// runtime replacement (e.g., after login prompt provides credentials).
+    pub directory_provider: RwLock<Arc<dyn DirectoryProvider>>,
+    /// Whether the app is waiting for simple bind credentials from the user.
+    pub needs_credentials: Mutex<bool>,
     /// Permission service for checking user authorization levels.
     pub permission_service: PermissionService,
     /// Audit service for logging sensitive operations.
@@ -61,7 +64,8 @@ impl AppState {
         Self {
             title: Mutex::new("DSPanel".to_string()),
             initialized: Mutex::new(false),
-            directory_provider: provider,
+            directory_provider: RwLock::new(provider),
+            needs_credentials: Mutex::new(false),
             permission_service: PermissionService::new(permission_config),
             audit_service: AuditService::new(),
             mfa_service: MfaService::new(),
@@ -81,6 +85,22 @@ impl AppState {
         }
     }
 
+    /// Returns a cloned Arc to the current directory provider.
+    pub fn provider(&self) -> Arc<dyn DirectoryProvider> {
+        self.directory_provider
+            .read()
+            .expect("directory_provider lock poisoned")
+            .clone()
+    }
+
+    /// Replaces the directory provider at runtime (e.g., after login prompt).
+    pub fn set_provider(&self, provider: Arc<dyn DirectoryProvider>) {
+        *self
+            .directory_provider
+            .write()
+            .expect("directory_provider lock poisoned") = provider;
+    }
+
     /// Creates an AppState with in-memory services (no file I/O) for testing.
     #[allow(clippy::unwrap_used)]
     #[cfg(test)]
@@ -91,7 +111,8 @@ impl AppState {
         Self {
             title: Mutex::new("DSPanel".to_string()),
             initialized: Mutex::new(false),
-            directory_provider: provider,
+            directory_provider: RwLock::new(provider),
+            needs_credentials: Mutex::new(false),
             permission_service: PermissionService::new(permission_config),
             audit_service: AuditService::new_in_memory(),
             mfa_service: MfaService::new_in_memory(),
@@ -116,8 +137,8 @@ impl AppState {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::services::directory::tests::MockDirectoryProvider;
     use crate::services::PermissionLevel;
+    use crate::services::directory::tests::MockDirectoryProvider;
 
     fn make_state() -> AppState {
         let provider = Arc::new(MockDirectoryProvider::new());
@@ -148,14 +169,14 @@ mod tests {
     #[test]
     fn test_app_state_has_directory_provider() {
         let state = make_state();
-        assert!(state.directory_provider.is_connected());
+        assert!(state.provider().is_connected());
     }
 
     #[test]
     fn test_app_state_with_disconnected_provider() {
         let provider = Arc::new(MockDirectoryProvider::disconnected());
         let state = AppState::new_for_test(provider, PermissionConfig::default());
-        assert!(!state.directory_provider.is_connected());
+        assert!(!state.provider().is_connected());
     }
 
     #[test]
@@ -170,12 +191,16 @@ mod tests {
     #[test]
     fn test_app_state_permission_service_has_permission() {
         let state = make_state();
-        assert!(state
-            .permission_service
-            .has_permission(PermissionLevel::ReadOnly));
-        assert!(!state
-            .permission_service
-            .has_permission(PermissionLevel::HelpDesk));
+        assert!(
+            state
+                .permission_service
+                .has_permission(PermissionLevel::ReadOnly)
+        );
+        assert!(
+            !state
+                .permission_service
+                .has_permission(PermissionLevel::HelpDesk)
+        );
     }
 
     #[test]

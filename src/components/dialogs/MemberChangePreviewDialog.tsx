@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Plus, Minus } from "lucide-react";
 import { DialogShell } from "@/components/dialogs/DialogShell";
+import { useTranslation } from "react-i18next";
 
 export interface MemberChange {
   memberDn: string;
@@ -35,6 +36,7 @@ export function MemberChangePreviewDialog({
   onCancel,
   loading = false,
 }: MemberChangePreviewDialogProps) {
+  const { t } = useTranslation(["dialogs", "common"]);
   useEffect(() => {
     if (!open) return;
 
@@ -55,11 +57,9 @@ export function MemberChangePreviewDialog({
 
   const summaryParts: string[] = [];
   if (addCount > 0)
-    summaryParts.push(`${addCount} member${addCount > 1 ? "s" : ""} to add`);
+    summaryParts.push(t("dialogs:memberChangePreview.toAdd", { count: addCount }));
   if (removeCount > 0)
-    summaryParts.push(
-      `${removeCount} member${removeCount > 1 ? "s" : ""} to remove`,
-    );
+    summaryParts.push(t("dialogs:memberChangePreview.toRemove", { count: removeCount }));
   const summary = summaryParts.join(", ");
 
   return (
@@ -76,7 +76,7 @@ export function MemberChangePreviewDialog({
           className="text-body font-semibold text-[var(--color-text-primary)]"
           data-testid="member-change-title"
         >
-          Member Changes - {groupName}
+          {t("dialogs:memberChangePreview.title", { name: groupName })}
         </h2>
         <p
           className="mt-1 text-caption text-[var(--color-text-secondary)]"
@@ -119,7 +119,7 @@ export function MemberChangePreviewDialog({
           disabled={loading}
           data-testid="member-change-cancel"
         >
-          Cancel
+          {t("common:cancel")}
         </button>
         <button
           className="btn btn-primary"
@@ -127,7 +127,7 @@ export function MemberChangePreviewDialog({
           disabled={loading}
           data-testid="member-change-apply"
         >
-          {loading ? "Applying..." : "Apply"}
+          {loading ? t("dialogs:memberChangePreview.applying") : t("common:apply")}
         </button>
       </div>
     </DialogShell>

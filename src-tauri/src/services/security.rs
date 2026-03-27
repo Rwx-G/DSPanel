@@ -62,15 +62,15 @@ pub async fn get_privileged_accounts_report(
 
     // Also resolve additional groups configured by name (these are user-specified)
     for group_name in additional_groups {
-        if let Ok(groups) = provider.search_groups(group_name, 1).await {
-            if let Some(group) = groups.first() {
-                let name = group
-                    .display_name
-                    .clone()
-                    .or_else(|| group.sam_account_name.clone())
-                    .unwrap_or_else(|| group_name.clone());
-                resolved_groups.push((group.distinguished_name.clone(), name));
-            }
+        if let Ok(groups) = provider.search_groups(group_name, 1).await
+            && let Some(group) = groups.first()
+        {
+            let name = group
+                .display_name
+                .clone()
+                .or_else(|| group.sam_account_name.clone())
+                .unwrap_or_else(|| group_name.clone());
+            resolved_groups.push((group.distinguished_name.clone(), name));
         }
     }
 
@@ -97,10 +97,9 @@ pub async fn get_privileged_accounts_report(
                 if let Some(existing) = all_accounts
                     .iter_mut()
                     .find(|a| a.distinguished_name == member.distinguished_name)
+                    && !existing.privileged_groups.contains(group_name)
                 {
-                    if !existing.privileged_groups.contains(group_name) {
-                        existing.privileged_groups.push(group_name.clone());
-                    }
+                    existing.privileged_groups.push(group_name.clone());
                 }
                 continue;
             }
@@ -294,22 +293,21 @@ async fn get_domain_security_findings(
             .map(functional_level_label);
 
         // Check if domain level is low (< 2012 R2 = level 6)
-        if let Some(level_str) = root_dse.get_attribute("domainFunctionality") {
-            if let Ok(level) = level_str.parse::<u32>() {
-                if level < 6 {
-                    findings.alerts.push(SecurityAlert {
-                        severity: AlertSeverity::Medium,
-                        message: format!(
-                            "Domain functional level is {} - consider upgrading for security features",
-                            findings
-                                .domain_functional_level
-                                .as_deref()
-                                .unwrap_or("unknown")
-                        ),
-                        alert_type: "low_functional_level".to_string(),
-                    });
-                }
-            }
+        if let Some(level_str) = root_dse.get_attribute("domainFunctionality")
+            && let Ok(level) = level_str.parse::<u32>()
+            && level < 6
+        {
+            findings.alerts.push(SecurityAlert {
+                severity: AlertSeverity::Medium,
+                message: format!(
+                    "Domain functional level is {} - consider upgrading for security features",
+                    findings
+                        .domain_functional_level
+                        .as_deref()
+                        .unwrap_or("unknown")
+                ),
+                alert_type: "low_functional_level".to_string(),
+            });
         }
     }
 
@@ -430,17 +428,17 @@ pub fn compute_alerts(
     // --- Critical severity ---
 
     // Password older than 90 days
-    if let Some(age) = account.password_age_days {
-        if age > PASSWORD_AGE_THRESHOLD_DAYS {
-            alerts.push(SecurityAlert {
-                severity: AlertSeverity::Critical,
-                message: format!(
-                    "Password not changed for {} days (threshold: {})",
-                    age, PASSWORD_AGE_THRESHOLD_DAYS
-                ),
-                alert_type: "password_age".to_string(),
-            });
-        }
+    if let Some(age) = account.password_age_days
+        && age > PASSWORD_AGE_THRESHOLD_DAYS
+    {
+        alerts.push(SecurityAlert {
+            severity: AlertSeverity::Critical,
+            message: format!(
+                "Password not changed for {} days (threshold: {})",
+                age, PASSWORD_AGE_THRESHOLD_DAYS
+            ),
+            alert_type: "password_age".to_string(),
+        });
     }
 
     // Reversible encryption enabled
@@ -555,14 +553,14 @@ pub fn compute_alerts(
     }
 
     // Inactive admin (last logon > 90 days but did log on at some point)
-    if let Some(age) = last_logon_age_days {
-        if age > 90 {
-            alerts.push(SecurityAlert {
-                severity: AlertSeverity::Medium,
-                message: format!("Inactive admin account - last logon {} days ago", age),
-                alert_type: "inactive_admin".to_string(),
-            });
-        }
+    if let Some(age) = last_logon_age_days
+        && age > 90
+    {
+        alerts.push(SecurityAlert {
+            severity: AlertSeverity::Medium,
+            message: format!("Inactive admin account - last logon {} days ago", age),
+            alert_type: "inactive_admin".to_string(),
+        });
     }
 
     // AdminCount orphaned
@@ -1042,7 +1040,7 @@ async fn compute_privileged_hygiene_factor(provider: Arc<dyn DirectoryProvider>)
             score: 50.0,
             explanation: "Could not assess privileged accounts".to_string(),
             recommendations: vec![
-                "Ensure directory connectivity to scan privileged groups".to_string()
+                "Ensure directory connectivity to scan privileged groups".to_string(),
             ],
             findings: vec![],
         },
@@ -1509,36 +1507,29 @@ async fn compute_dangerous_configs_factor(provider: Arc<dyn DirectoryProvider>) 
             }
 
             // Domain functional level check
-            if let Ok(Some(root_dse)) = provider.read_entry("").await {
-                if let Some(level_str) = root_dse.get_attribute("domainFunctionality") {
-                    if let Ok(level) = level_str.parse::<u32>() {
-                        if level < 6 {
-                            score -= 10.0;
-                            issues.push(format!(
-                                "Domain functional level < 2012 R2 (level {})",
-                                level
-                            ));
-                            recommendations.push(
-                                "Upgrade domain functional level for modern security features"
-                                    .to_string(),
-                            );
-                            findings.push(RiskFinding {
-                                id: "CONF-008".to_string(),
-                                description: format!(
-                                    "Domain functional level < 2012 R2 (level {})",
-                                    level
-                                ),
-                                severity: severity_from_points(10.0),
-                                points_deducted: 10.0,
-                                remediation:
-                                    "Upgrade domain functional level for modern security features"
-                                        .to_string(),
-                                complexity: RemediationComplexity::Hard,
-                                framework_ref: Some("CIS 18.1".to_string()),
-                            });
-                        }
-                    }
-                }
+            if let Ok(Some(root_dse)) = provider.read_entry("").await
+                && let Some(level_str) = root_dse.get_attribute("domainFunctionality")
+                && let Ok(level) = level_str.parse::<u32>()
+                && level < 6
+            {
+                score -= 10.0;
+                issues.push(format!(
+                    "Domain functional level < 2012 R2 (level {})",
+                    level
+                ));
+                recommendations.push(
+                    "Upgrade domain functional level for modern security features".to_string(),
+                );
+                findings.push(RiskFinding {
+                    id: "CONF-008".to_string(),
+                    description: format!("Domain functional level < 2012 R2 (level {})", level),
+                    severity: severity_from_points(10.0),
+                    points_deducted: 10.0,
+                    remediation: "Upgrade domain functional level for modern security features"
+                        .to_string(),
+                    complexity: RemediationComplexity::Hard,
+                    framework_ref: Some("CIS 18.1".to_string()),
+                });
             }
 
             // Count orphaned adminCount accounts (adminCount=1 not in admin groups)
@@ -2295,33 +2286,30 @@ async fn compute_gpo_security_factor(provider: Arc<dyn DirectoryProvider>) -> Fa
     }
 
     // Check domain behavior version for advanced audit support
-    if let Ok(Some(root_dse)) = provider.read_entry("").await {
-        if let Some(level_str) = root_dse.get_attribute("domainFunctionality") {
-            if let Ok(level) = level_str.parse::<u32>() {
-                if level < 3 {
-                    score -= 20.0;
-                    issues.push(format!(
-                        "Domain functional level {} - pre-2008, no advanced audit",
-                        level
-                    ));
-                    recommendations.push("Upgrade domain to at least Windows Server 2008 functional level for advanced audit policy support".to_string());
-                    findings.push(RiskFinding {
-                        id: "GPO-002".to_string(),
-                        description: format!(
-                            "Domain functional level {} does not support advanced audit policies",
-                            level
-                        ),
-                        severity: severity_from_points(20.0),
-                        points_deducted: 20.0,
-                        remediation:
-                            "Upgrade domain to at least Windows Server 2008 functional level"
-                                .to_string(),
-                        complexity: RemediationComplexity::Hard,
-                        framework_ref: Some("CIS 1.1.6".to_string()),
-                    });
-                }
-            }
-        }
+    if let Ok(Some(root_dse)) = provider.read_entry("").await
+        && let Some(level_str) = root_dse.get_attribute("domainFunctionality")
+        && let Ok(level) = level_str.parse::<u32>()
+        && level < 3
+    {
+        score -= 20.0;
+        issues.push(format!(
+            "Domain functional level {} - pre-2008, no advanced audit",
+            level
+        ));
+        recommendations.push("Upgrade domain to at least Windows Server 2008 functional level for advanced audit policy support".to_string());
+        findings.push(RiskFinding {
+            id: "GPO-002".to_string(),
+            description: format!(
+                "Domain functional level {} does not support advanced audit policies",
+                level
+            ),
+            severity: severity_from_points(20.0),
+            points_deducted: 20.0,
+            remediation: "Upgrade domain to at least Windows Server 2008 functional level"
+                .to_string(),
+            complexity: RemediationComplexity::Hard,
+            framework_ref: Some("CIS 1.1.6".to_string()),
+        });
     }
 
     // Note: reversible encryption check is already covered in dangerous_configs factor
@@ -3051,18 +3039,27 @@ const GUID_DS_REPL_GET_CHANGES_FILTERED: &str = "89e95b76-444d-4c62-991a-0facbed
 /// This queries the event log for suspicious patterns over the configured time window.
 /// On non-Windows platforms, returns an empty report with `event_log_accessible: false`.
 pub async fn detect_attacks(
-    _provider: Arc<dyn DirectoryProvider>,
+    provider: Arc<dyn DirectoryProvider>,
     time_window_hours: u32,
+    config: AttackDetectionConfig,
 ) -> Result<AttackDetectionReport> {
-    let config = AttackDetectionConfig::default();
+    let dc_host = provider.connected_host();
+    let credentials = provider.simple_bind_credentials();
 
     #[cfg(target_os = "windows")]
-    let (alerts, event_log_accessible) = analyze_windows_event_log(time_window_hours, &config);
+    let (alerts, event_log_accessible) = analyze_windows_event_log(
+        time_window_hours,
+        &config,
+        dc_host.as_deref(),
+        credentials.as_ref(),
+    );
 
     #[cfg(not(target_os = "windows"))]
     let (alerts, event_log_accessible): (Vec<AttackAlert>, bool) = (Vec::new(), false);
 
     let _ = &config; // suppress unused warning on non-Windows
+    let _ = &dc_host;
+    let _ = &credentials;
 
     Ok(AttackDetectionReport {
         alerts,
@@ -3072,34 +3069,109 @@ pub async fn detect_attacks(
     })
 }
 
-/// Probes whether the current process can read the Windows Security event log.
-/// Uses `Get-WinEvent -MaxEvents 1` as a language-independent access check:
-/// success/failure is determined by exit code, not by parsing localized messages.
+/// Probes whether the current process can read the Windows Security event log
+/// on the target DC via `-ComputerName`.
+///
+/// Requires the "Remote Event Log Management" firewall rule enabled on the DC
+/// and Event Log Readers membership for the running account.
+///
+/// Uses `Get-WinEvent -MaxEvents 1` as a language-independent access check.
 #[cfg(target_os = "windows")]
-fn can_read_security_log() -> bool {
+/// Builds a PowerShell credential snippet from bind DN and password.
+/// Converts DN format "CN=User,CN=Users,DC=domain,DC=local" to "domain.local\User".
+#[cfg(target_os = "windows")]
+fn build_credential_param(bind_dn: &str, password: &str) -> String {
+    // Extract username from CN=...
+    let username = bind_dn
+        .split(',')
+        .next()
+        .and_then(|rdn| rdn.strip_prefix("CN="))
+        .unwrap_or(bind_dn);
+
+    // Extract domain from DC= components
+    let domain: String = bind_dn
+        .split(',')
+        .filter_map(|part| part.strip_prefix("DC="))
+        .collect::<Vec<_>>()
+        .join(".");
+
+    let user = if domain.is_empty() {
+        username.to_string()
+    } else {
+        format!("{}\\{}", domain, username)
+    };
+
+    // Escape single quotes in password
+    let escaped_pwd = password.replace('\'', "''");
+
+    format!(
+        "$cred=New-Object System.Management.Automation.PSCredential('{}',('{}' | ConvertTo-SecureString -AsPlainText -Force));",
+        user, escaped_pwd
+    )
+}
+
+#[cfg(target_os = "windows")]
+fn can_read_security_log(dc_host: Option<&str>, credentials: Option<&(String, String)>) -> bool {
     use std::process::Command;
 
-    let output = Command::new("powershell")
-        .args([
-            "-NoProfile",
-            "-NonInteractive",
-            "-Command",
-            "try{Get-WinEvent -LogName Security -MaxEvents 1 -EA Stop>$null;'true'}catch{'false'}",
-        ])
-        .output();
+    let Some(host) = dc_host else {
+        tracing::warn!("No DC host available for event log probe");
+        return false;
+    };
 
-    match output {
+    let cred_setup = credentials
+        .map(|(dn, pwd)| build_credential_param(dn, pwd))
+        .unwrap_or_default();
+    let cred_param = if credentials.is_some() {
+        " -Credential $cred"
+    } else {
+        ""
+    };
+
+    let cmd = format!(
+        "{}try{{Get-WinEvent -LogName Security -ComputerName '{}'{} -MaxEvents 1 -EA Stop | Out-Null;'true'}}catch{{$_.Exception.Message}}",
+        cred_setup, host, cred_param
+    );
+    tracing::debug!(
+        dc_host = host,
+        has_credentials = credentials.is_some(),
+        "Probing remote Security event log access"
+    );
+
+    match Command::new("powershell")
+        .args(["-NoProfile", "-NonInteractive", "-Command", &cmd])
+        .output()
+    {
         Ok(o) => {
             let stdout = String::from_utf8_lossy(&o.stdout);
-            stdout.trim() == "true"
+            let result = stdout.trim();
+            if result == "true" {
+                tracing::info!(dc_host = host, "Security event log accessible");
+                return true;
+            }
+            tracing::warn!(
+                dc_host = host,
+                error = %result,
+                "Security event log probe failed - ensure 'Remote Event Log Management' firewall rule is enabled on the DC"
+            );
+            false
         }
-        Err(_) => false,
+        Err(e) => {
+            tracing::warn!(error = %e, "Failed to run PowerShell for event log probe");
+            false
+        }
     }
 }
 
 /// Runs a PowerShell query for a batch of event IDs and returns parsed event records.
+/// When `dc_host` is provided, queries the remote DC's Security log via `-ComputerName`.
 #[cfg(target_os = "windows")]
-fn query_events(event_ids: &[u32], time_window_hours: u32) -> Vec<EventRecord> {
+fn query_events(
+    event_ids: &[u32],
+    time_window_hours: u32,
+    dc_host: Option<&str>,
+    credentials: Option<&(String, String)>,
+) -> Vec<EventRecord> {
     use std::process::Command;
 
     let ids_str = event_ids
@@ -3108,8 +3180,21 @@ fn query_events(event_ids: &[u32], time_window_hours: u32) -> Vec<EventRecord> {
         .collect::<Vec<_>>()
         .join(",");
 
+    let computer_param = dc_host
+        .map(|h| format!("-ComputerName '{}'", h))
+        .unwrap_or_default();
+
+    let cred_setup = credentials
+        .map(|(dn, pwd)| build_credential_param(dn, pwd))
+        .unwrap_or_default();
+    let cred_param = if credentials.is_some() {
+        " -Credential $cred"
+    } else {
+        ""
+    };
+
     let query = format!(
-        r#"Get-WinEvent -FilterHashtable @{{LogName='Security';Id={ids};StartTime=(Get-Date).AddHours(-{hours})}} -MaxEvents 200 -ErrorAction SilentlyContinue | ForEach-Object {{
+        r#"{cred_init}Get-WinEvent -FilterHashtable @{{LogName='Security';Id={ids};StartTime=(Get-Date).AddHours(-{hours})}} {computer}{cred_arg} -MaxEvents 200 -ErrorAction SilentlyContinue | ForEach-Object {{
     $xml = [xml]$_.ToXml()
     $data = @{{}}
     $xml.Event.EventData.Data | ForEach-Object {{ $data[$_.Name] = $_.'#text' }}
@@ -3132,8 +3217,11 @@ fn query_events(event_ids: &[u32], time_window_hours: u32) -> Vec<EventRecord> {
         ObjectDN = $data['ObjectDN']
     }}
 }} | ConvertTo-Json -Compress"#,
+        cred_init = cred_setup,
         ids = ids_str,
         hours = time_window_hours,
+        computer = computer_param,
+        cred_arg = cred_param,
     );
 
     let output = Command::new("powershell")
@@ -3167,9 +3255,11 @@ fn query_events(event_ids: &[u32], time_window_hours: u32) -> Vec<EventRecord> {
 fn analyze_windows_event_log(
     time_window_hours: u32,
     config: &AttackDetectionConfig,
+    dc_host: Option<&str>,
+    credentials: Option<&(String, String)>,
 ) -> (Vec<AttackAlert>, bool) {
     // Probe: check if we can read the Security log at all (language-independent).
-    let event_log_accessible = can_read_security_log();
+    let event_log_accessible = can_read_security_log(dc_host, credentials);
     if !event_log_accessible {
         return (Vec::new(), false);
     }
@@ -3177,7 +3267,8 @@ fn analyze_windows_event_log(
     let mut alerts = Vec::new();
 
     // Batch 1: Kerberos events (4768, 4769, 4771)
-    let kerberos_events = query_events(&[4768, 4769, 4771], time_window_hours);
+    let kerberos_events =
+        query_events(&[4768, 4769, 4771], time_window_hours, dc_host, credentials);
     let events_4768: Vec<&EventRecord> = kerberos_events
         .iter()
         .filter(|e| e.id == Some(4768))
@@ -3192,18 +3283,23 @@ fn analyze_windows_event_log(
         .collect();
 
     // Batch 2: Logon events (4624, 4625)
-    let logon_events = query_events(&[4624, 4625], time_window_hours);
+    let logon_events = query_events(&[4624, 4625], time_window_hours, dc_host, credentials);
     let events_4624: Vec<&EventRecord> =
         logon_events.iter().filter(|e| e.id == Some(4624)).collect();
     let events_4625: Vec<&EventRecord> =
         logon_events.iter().filter(|e| e.id == Some(4625)).collect();
 
     // Batch 3: Directory access (4662)
-    let dir_events_raw = query_events(&[4662], time_window_hours);
+    let dir_events_raw = query_events(&[4662], time_window_hours, dc_host, credentials);
     let dir_events: Vec<&EventRecord> = dir_events_raw.iter().collect();
 
     // Batch 4: Group/computer changes (4728, 4732, 4742, 4756)
-    let group_events = query_events(&[4728, 4732, 4742, 4756], time_window_hours);
+    let group_events = query_events(
+        &[4728, 4732, 4742, 4756],
+        time_window_hours,
+        dc_host,
+        credentials,
+    );
     let events_4742: Vec<&EventRecord> =
         group_events.iter().filter(|e| e.id == Some(4742)).collect();
     let events_group_change: Vec<&EventRecord> = group_events
@@ -3212,11 +3308,11 @@ fn analyze_windows_event_log(
         .collect();
 
     // Batch 5: Directory changes (5136)
-    let dir_change_events_raw = query_events(&[5136], time_window_hours);
+    let dir_change_events_raw = query_events(&[5136], time_window_hours, dc_host, credentials);
     let dir_change_events: Vec<&EventRecord> = dir_change_events_raw.iter().collect();
 
     // Batch 6: Account management (4720, 4738)
-    let acct_events_raw = query_events(&[4720, 4738], time_window_hours);
+    let acct_events_raw = query_events(&[4720, 4738], time_window_hours, dc_host, credentials);
     let acct_events: Vec<&EventRecord> = acct_events_raw.iter().collect();
 
     // Run detection functions
@@ -3967,32 +4063,32 @@ pub async fn build_escalation_graph(
         }
 
         // D. Ownership (managedBy) edges
-        if let Some(managed_by_vals) = group.attributes.get("managedBy") {
-            if let Some(manager_dn) = managed_by_vals.first() {
-                if !manager_dn.is_empty() && !privileged_group_dns.contains(manager_dn) {
-                    // Add manager node if not already present
-                    if node_dns.insert(manager_dn.clone()) {
-                        let manager_name = manager_dn
-                            .split(',')
-                            .next()
-                            .and_then(|cn| cn.strip_prefix("CN="))
-                            .unwrap_or("Unknown")
-                            .to_string();
-                        nodes.push(GraphNode {
-                            dn: manager_dn.clone(),
-                            display_name: manager_name,
-                            node_type: NodeType::User,
-                            is_privileged: false,
-                        });
-                    }
-                    edges.push(GraphEdge {
-                        source_dn: manager_dn.clone(),
-                        target_dn: group.distinguished_name.clone(),
-                        edge_type: EdgeType::Ownership,
-                        label: Some("Manages group".to_string()),
-                    });
-                }
+        if let Some(managed_by_vals) = group.attributes.get("managedBy")
+            && let Some(manager_dn) = managed_by_vals.first()
+            && !manager_dn.is_empty()
+            && !privileged_group_dns.contains(manager_dn)
+        {
+            // Add manager node if not already present
+            if node_dns.insert(manager_dn.clone()) {
+                let manager_name = manager_dn
+                    .split(',')
+                    .next()
+                    .and_then(|cn| cn.strip_prefix("CN="))
+                    .unwrap_or("Unknown")
+                    .to_string();
+                nodes.push(GraphNode {
+                    dn: manager_dn.clone(),
+                    display_name: manager_name,
+                    node_type: NodeType::User,
+                    is_privileged: false,
+                });
             }
+            edges.push(GraphEdge {
+                source_dn: manager_dn.clone(),
+                target_dn: group.distinguished_name.clone(),
+                edge_type: EdgeType::Ownership,
+                label: Some("Manages group".to_string()),
+            });
         }
     }
 
@@ -4020,17 +4116,16 @@ pub async fn build_escalation_graph(
         }
 
         // E. SIDHistory edges
-        if let Some(sid_history_vals) = member.attributes.get("sIDHistory") {
-            if !sid_history_vals.is_empty() {
-                if let Some(target_dn) = privileged_group_dns.first() {
-                    edges.push(GraphEdge {
-                        source_dn: member.distinguished_name.clone(),
-                        target_dn: target_dn.clone(),
-                        edge_type: EdgeType::SIDHistory,
-                        label: Some("SIDHistory".to_string()),
-                    });
-                }
-            }
+        if let Some(sid_history_vals) = member.attributes.get("sIDHistory")
+            && !sid_history_vals.is_empty()
+            && let Some(target_dn) = privileged_group_dns.first()
+        {
+            edges.push(GraphEdge {
+                source_dn: member.distinguished_name.clone(),
+                target_dn: target_dn.clone(),
+                edge_type: EdgeType::SIDHistory,
+                label: Some("SIDHistory".to_string()),
+            });
         }
     }
 
@@ -4075,28 +4170,28 @@ pub async fn build_escalation_graph(
             if let Some(rbcd_vals) = computer
                 .attributes
                 .get("msDS-AllowedToActOnBehalfOfOtherIdentity")
+                && !rbcd_vals.is_empty()
+                && rbcd_vals.iter().any(|v| !v.is_empty())
             {
-                if !rbcd_vals.is_empty() && rbcd_vals.iter().any(|v| !v.is_empty()) {
-                    if node_dns.insert(computer.distinguished_name.clone()) {
-                        nodes.push(GraphNode {
-                            dn: computer.distinguished_name.clone(),
-                            display_name: computer
-                                .display_name
-                                .clone()
-                                .or_else(|| computer.sam_account_name.clone())
-                                .unwrap_or_else(|| "Unknown Computer".to_string()),
-                            node_type: NodeType::Computer,
-                            is_privileged: false,
-                        });
-                    }
-                    for priv_dn in &privileged_group_dns {
-                        edges.push(GraphEdge {
-                            source_dn: computer.distinguished_name.clone(),
-                            target_dn: priv_dn.clone(),
-                            edge_type: EdgeType::RBCD,
-                            label: Some("RBCD".to_string()),
-                        });
-                    }
+                if node_dns.insert(computer.distinguished_name.clone()) {
+                    nodes.push(GraphNode {
+                        dn: computer.distinguished_name.clone(),
+                        display_name: computer
+                            .display_name
+                            .clone()
+                            .or_else(|| computer.sam_account_name.clone())
+                            .unwrap_or_else(|| "Unknown Computer".to_string()),
+                        node_type: NodeType::Computer,
+                        is_privileged: false,
+                    });
+                }
+                for priv_dn in &privileged_group_dns {
+                    edges.push(GraphEdge {
+                        source_dn: computer.distinguished_name.clone(),
+                        target_dn: priv_dn.clone(),
+                        edge_type: EdgeType::RBCD,
+                        label: Some("RBCD".to_string()),
+                    });
                 }
             }
         }
@@ -4129,26 +4224,26 @@ pub async fn build_escalation_graph(
                     });
 
                 // Check if the domain root links this GPO
-                if let Ok(Some(domain_root)) = provider.read_entry(&base_dn).await {
-                    if let Some(gplink_vals) = domain_root.attributes.get("gPLink") {
-                        let gplink_str = gplink_vals.join("");
-                        if gplink_str.to_uppercase().contains(&gpo_dn.to_uppercase()) {
-                            if node_dns.insert(gpo_dn.clone()) {
-                                nodes.push(GraphNode {
-                                    dn: gpo_dn.clone(),
-                                    display_name: gpo_name.clone(),
-                                    node_type: NodeType::GPO,
-                                    is_privileged: false,
-                                });
-                            }
-                            for priv_dn in &privileged_group_dns {
-                                edges.push(GraphEdge {
-                                    source_dn: gpo_dn.clone(),
-                                    target_dn: priv_dn.clone(),
-                                    edge_type: EdgeType::GPLink,
-                                    label: Some("GPO linked to OU".to_string()),
-                                });
-                            }
+                if let Ok(Some(domain_root)) = provider.read_entry(&base_dn).await
+                    && let Some(gplink_vals) = domain_root.attributes.get("gPLink")
+                {
+                    let gplink_str = gplink_vals.join("");
+                    if gplink_str.to_uppercase().contains(&gpo_dn.to_uppercase()) {
+                        if node_dns.insert(gpo_dn.clone()) {
+                            nodes.push(GraphNode {
+                                dn: gpo_dn.clone(),
+                                display_name: gpo_name.clone(),
+                                node_type: NodeType::GPO,
+                                is_privileged: false,
+                            });
+                        }
+                        for priv_dn in &privileged_group_dns {
+                            edges.push(GraphEdge {
+                                source_dn: gpo_dn.clone(),
+                                target_dn: priv_dn.clone(),
+                                edge_type: EdgeType::GPLink,
+                                label: Some("GPO linked to OU".to_string()),
+                            });
                         }
                     }
                 }
@@ -4317,10 +4412,11 @@ pub fn find_critical_paths(nodes: &[GraphNode], edges: &[GraphEdge]) -> Vec<Esca
         }) = heap.pop()
         {
             // Skip if we already found a cheaper path to this node
-            if let Some(&best) = dist.get(node) {
-                if cost > best && path.len() > 1 {
-                    continue;
-                }
+            if let Some(&best) = dist.get(node)
+                && cost > best
+                && path.len() > 1
+            {
+                continue;
             }
 
             // Check if we reached a privileged node
@@ -5728,5 +5824,764 @@ mod tests {
         assert_eq!(record.id, Some(4662));
         assert_eq!(record.ip_address.as_deref(), Some("10.0.0.1"));
         assert_eq!(record.subject_user_name.as_deref(), Some("attacker"));
+    }
+
+    // -----------------------------------------------------------------------
+    // Exclusion helper tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_is_excluded_ip_match() {
+        let mut config = default_config();
+        config.excluded_ips = vec!["10.0.0.1".to_string(), "192.168.1.1".to_string()];
+        assert!(is_excluded_ip("10.0.0.1", &config));
+        assert!(is_excluded_ip("192.168.1.1", &config));
+    }
+
+    #[test]
+    fn test_is_excluded_ip_no_match() {
+        let mut config = default_config();
+        config.excluded_ips = vec!["10.0.0.1".to_string()];
+        assert!(!is_excluded_ip("10.0.0.2", &config));
+    }
+
+    #[test]
+    fn test_is_excluded_ip_empty_or_dash() {
+        let config = default_config();
+        assert!(!is_excluded_ip("", &config));
+        assert!(!is_excluded_ip("-", &config));
+    }
+
+    #[test]
+    fn test_is_excluded_account_case_insensitive() {
+        let mut config = default_config();
+        config.excluded_accounts = vec!["SvcBackup".to_string()];
+        assert!(is_excluded_account("svcbackup", &config));
+        assert!(is_excluded_account("SVCBACKUP", &config));
+        assert!(is_excluded_account("SvcBackup", &config));
+    }
+
+    #[test]
+    fn test_is_excluded_account_empty() {
+        let mut config = default_config();
+        config.excluded_accounts = vec!["admin".to_string()];
+        assert!(!is_excluded_account("", &config));
+    }
+
+    #[test]
+    fn test_is_excluded_account_no_match() {
+        let mut config = default_config();
+        config.excluded_accounts = vec!["admin".to_string()];
+        assert!(!is_excluded_account("attacker", &config));
+    }
+
+    // -----------------------------------------------------------------------
+    // DCShadow detection tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_detect_dcshadow_gc_spn() {
+        let config = default_config();
+        let mut event = make_event(4742);
+        event.service_name = Some("GC/rogue.domain.com".to_string());
+        event.subject_user_name = Some("attacker".to_string());
+        event.target_user_name = Some("ROGUE$".to_string());
+
+        let events: Vec<&EventRecord> = vec![&event];
+        let alerts = detect_dcshadow(&events, &config);
+        assert_eq!(alerts.len(), 1);
+        assert_eq!(alerts[0].attack_type, AttackType::DCShadow);
+        assert_eq!(alerts[0].mitre_ref.as_deref(), Some("T1207"));
+    }
+
+    #[test]
+    fn test_detect_dcshadow_repl_guid_spn() {
+        let config = default_config();
+        let mut event = make_event(4742);
+        event.service_name =
+            Some("e3514235-4b06-11d1-ab04-00c04fc2dcd2/rogue.domain.com".to_string());
+        event.subject_user_name = Some("attacker".to_string());
+        event.target_user_name = Some("ROGUE$".to_string());
+
+        let events: Vec<&EventRecord> = vec![&event];
+        let alerts = detect_dcshadow(&events, &config);
+        assert_eq!(alerts.len(), 1);
+        assert_eq!(alerts[0].attack_type, AttackType::DCShadow);
+    }
+
+    #[test]
+    fn test_detect_dcshadow_non_suspicious_spn() {
+        let config = default_config();
+        let mut event = make_event(4742);
+        event.service_name = Some("HOST/server.domain.com".to_string());
+        event.subject_user_name = Some("admin".to_string());
+        event.target_user_name = Some("SERVER$".to_string());
+
+        let events: Vec<&EventRecord> = vec![&event];
+        let alerts = detect_dcshadow(&events, &config);
+        assert!(alerts.is_empty());
+    }
+
+    #[test]
+    fn test_detect_dcshadow_excluded_account() {
+        let mut config = default_config();
+        config.excluded_accounts = vec!["admin".to_string()];
+        let mut event = make_event(4742);
+        event.service_name = Some("GC/rogue.domain.com".to_string());
+        event.subject_user_name = Some("admin".to_string());
+        event.target_user_name = Some("ROGUE$".to_string());
+
+        let events: Vec<&EventRecord> = vec![&event];
+        let alerts = detect_dcshadow(&events, &config);
+        assert!(alerts.is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // Priv group change tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_detect_priv_group_change_local() {
+        let config = default_config();
+        let mut event = make_event(4732);
+        event.subject_user_name = Some("admin".to_string());
+        event.target_user_name = Some("newmember".to_string());
+
+        let events: Vec<&EventRecord> = vec![&event];
+        let alerts = detect_priv_group_change(&events, &config);
+        assert_eq!(alerts.len(), 1);
+        assert!(alerts[0].description.contains("local"));
+    }
+
+    #[test]
+    fn test_detect_priv_group_change_universal() {
+        let config = default_config();
+        let mut event = make_event(4756);
+        event.subject_user_name = Some("admin".to_string());
+        event.target_user_name = Some("newmember".to_string());
+
+        let events: Vec<&EventRecord> = vec![&event];
+        let alerts = detect_priv_group_change(&events, &config);
+        assert_eq!(alerts.len(), 1);
+        assert!(alerts[0].description.contains("universal"));
+        assert_eq!(alerts[0].mitre_ref.as_deref(), Some("T1098.001"));
+    }
+
+    #[test]
+    fn test_detect_priv_group_change_excluded_account() {
+        let mut config = default_config();
+        config.excluded_accounts = vec!["svc_mgmt".to_string()];
+        let mut event = make_event(4728);
+        event.subject_user_name = Some("svc_mgmt".to_string());
+        event.target_user_name = Some("user1".to_string());
+
+        let events: Vec<&EventRecord> = vec![&event];
+        let alerts = detect_priv_group_change(&events, &config);
+        assert!(alerts.is_empty());
+    }
+
+    #[test]
+    fn test_detect_priv_group_change_unknown_event_id() {
+        let config = default_config();
+        let mut event = make_event(9999);
+        event.subject_user_name = Some("admin".to_string());
+        event.target_user_name = Some("user1".to_string());
+
+        let events: Vec<&EventRecord> = vec![&event];
+        let alerts = detect_priv_group_change(&events, &config);
+        assert!(alerts.is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // compute_summary additional tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_compute_summary_empty() {
+        let empty_findings = DomainSecurityFindings {
+            krbtgt_password_age_days: None,
+            laps_coverage_percent: None,
+            laps_deployed_count: 0,
+            total_computer_count: 0,
+            pso_count: 0,
+            domain_functional_level: None,
+            forest_functional_level: None,
+            ldap_signing_enforced: None,
+            recycle_bin_enabled: None,
+            rbcd_configured_count: 0,
+            alerts: vec![],
+        };
+        let summary = compute_summary(&[], &empty_findings);
+        assert_eq!(summary.critical, 0);
+        assert_eq!(summary.high, 0);
+        assert_eq!(summary.medium, 0);
+        assert_eq!(summary.info, 0);
+    }
+
+    #[test]
+    fn test_compute_summary_domain_findings_only() {
+        let findings = DomainSecurityFindings {
+            krbtgt_password_age_days: None,
+            laps_coverage_percent: None,
+            laps_deployed_count: 0,
+            total_computer_count: 0,
+            pso_count: 0,
+            domain_functional_level: None,
+            forest_functional_level: None,
+            ldap_signing_enforced: None,
+            recycle_bin_enabled: None,
+            rbcd_configured_count: 0,
+            alerts: vec![
+                SecurityAlert {
+                    severity: AlertSeverity::Critical,
+                    message: "KRBTGT old".to_string(),
+                    alert_type: "krbtgt_password_age".to_string(),
+                },
+                SecurityAlert {
+                    severity: AlertSeverity::High,
+                    message: "LAPS low".to_string(),
+                    alert_type: "laps_low_coverage".to_string(),
+                },
+                SecurityAlert {
+                    severity: AlertSeverity::Info,
+                    message: "Info".to_string(),
+                    alert_type: "info".to_string(),
+                },
+            ],
+        };
+        let summary = compute_summary(&[], &findings);
+        assert_eq!(summary.critical, 1);
+        assert_eq!(summary.high, 1);
+        assert_eq!(summary.medium, 0);
+        assert_eq!(summary.info, 1);
+    }
+
+    // -----------------------------------------------------------------------
+    // RiskScoreStore additional tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_risk_score_store_history_limit() {
+        let store = RiskScoreStore::new_in_memory();
+        let result = RiskScoreResult {
+            total_score: 85.0,
+            zone: RiskZone::Green,
+            worst_factor_name: "Test".to_string(),
+            worst_factor_score: 85.0,
+            factors: vec![],
+            computed_at: Utc::now().to_rfc3339(),
+        };
+        store.store_score(&result);
+
+        // Requesting 0 days should return empty
+        let history = store.get_history(0);
+        assert!(history.is_empty());
+
+        // Requesting 1 day should return the score
+        let history = store.get_history(1);
+        assert_eq!(history.len(), 1);
+    }
+
+    #[test]
+    fn test_risk_score_store_multiple_scores_different_values() {
+        let store = RiskScoreStore::new_in_memory();
+        // Store first score
+        let result1 = RiskScoreResult {
+            total_score: 50.0,
+            zone: RiskZone::Orange,
+            worst_factor_name: "Test".to_string(),
+            worst_factor_score: 30.0,
+            factors: vec![],
+            computed_at: Utc::now().to_rfc3339(),
+        };
+        store.store_score(&result1);
+
+        // Store second score same day - should upsert
+        let result2 = RiskScoreResult {
+            total_score: 90.0,
+            zone: RiskZone::Green,
+            worst_factor_name: "Better".to_string(),
+            worst_factor_score: 85.0,
+            factors: vec![],
+            computed_at: Utc::now().to_rfc3339(),
+        };
+        store.store_score(&result2);
+
+        let history = store.get_history(30);
+        assert_eq!(history.len(), 1);
+        assert!((history[0].total_score - 90.0).abs() < f64::EPSILON);
+    }
+
+    // -----------------------------------------------------------------------
+    // build_risk_factor additional tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_build_risk_factor_perfect_score() {
+        let result = FactorResult {
+            score: 100.0,
+            explanation: "Perfect".to_string(),
+            recommendations: vec![],
+            findings: vec![],
+        };
+        let factor = build_risk_factor("test", "Test", 10.0, result);
+        assert!((factor.score - 100.0).abs() < f64::EPSILON);
+        assert!((factor.impact_if_fixed - 0.0).abs() < f64::EPSILON);
+        assert!(factor.findings.is_empty());
+    }
+
+    #[test]
+    fn test_build_risk_factor_impact_capped_at_deficit() {
+        // Score is 80, but findings total 50 points - impact should be capped at 20 (100 - 80)
+        let result = FactorResult {
+            score: 80.0,
+            explanation: "Test".to_string(),
+            recommendations: vec![],
+            findings: vec![RiskFinding {
+                id: "X-001".to_string(),
+                description: "Big issue".to_string(),
+                severity: AlertSeverity::Critical,
+                points_deducted: 50.0,
+                remediation: "Fix".to_string(),
+                complexity: RemediationComplexity::Hard,
+                framework_ref: None,
+            }],
+        };
+        let factor = build_risk_factor("test", "Test", 15.0, result);
+        assert!((factor.impact_if_fixed - 20.0).abs() < f64::EPSILON);
+    }
+
+    // -----------------------------------------------------------------------
+    // severity_from_points additional boundary tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_severity_from_points_boundaries() {
+        // Exact boundaries
+        assert_eq!(severity_from_points(19.9), AlertSeverity::High);
+        assert_eq!(severity_from_points(20.0), AlertSeverity::Critical);
+        assert_eq!(severity_from_points(9.9), AlertSeverity::Medium);
+        assert_eq!(severity_from_points(10.0), AlertSeverity::High);
+        assert_eq!(severity_from_points(4.9), AlertSeverity::Info);
+        assert_eq!(severity_from_points(5.0), AlertSeverity::Medium);
+    }
+
+    // -----------------------------------------------------------------------
+    // functional_level_label additional tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_functional_level_label_all_values() {
+        assert_eq!(functional_level_label("0"), "Windows 2000");
+        assert_eq!(functional_level_label("1"), "Windows Server 2003 Interim");
+        assert_eq!(functional_level_label("2"), "Windows Server 2003");
+        assert_eq!(functional_level_label("4"), "Windows Server 2008 R2");
+        assert_eq!(functional_level_label("5"), "Windows Server 2012");
+        assert_eq!(functional_level_label("6"), "Windows Server 2012 R2");
+    }
+
+    // -----------------------------------------------------------------------
+    // parse_ad_timestamp edge cases
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_parse_ad_timestamp_epoch_boundary() {
+        // Value equal to FILETIME_EPOCH_OFFSET should resolve to Unix epoch (1970-01-01)
+        let result = parse_ad_timestamp(Some(&FILETIME_EPOCH_OFFSET.to_string()));
+        assert!(result.is_some());
+        let dt = result.unwrap();
+        assert_eq!(dt.format("%Y-%m-%d").to_string(), "1970-01-01");
+    }
+
+    #[test]
+    fn test_parse_ad_timestamp_pre_epoch() {
+        // Value before FILETIME_EPOCH_OFFSET should return None (negative unix time check)
+        let pre_epoch = FILETIME_EPOCH_OFFSET - 1;
+        let result = parse_ad_timestamp(Some(&pre_epoch.to_string()));
+        // unix_100ns would be -1, which is < 0
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_parse_ad_timestamp_empty_string() {
+        assert!(parse_ad_timestamp(Some("")).is_none());
+    }
+
+    // -----------------------------------------------------------------------
+    // find_critical_paths additional tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_find_critical_paths_diamond_graph() {
+        // User -> GroupA -> Domain Admins
+        // User -> GroupB -> Domain Admins
+        // Should find paths through both intermediate groups
+        let nodes = vec![
+            GraphNode {
+                dn: "CN=User1,DC=test".to_string(),
+                display_name: "User 1".to_string(),
+                node_type: NodeType::User,
+                is_privileged: false,
+            },
+            GraphNode {
+                dn: "CN=GroupA,DC=test".to_string(),
+                display_name: "Group A".to_string(),
+                node_type: NodeType::Group,
+                is_privileged: false,
+            },
+            GraphNode {
+                dn: "CN=GroupB,DC=test".to_string(),
+                display_name: "Group B".to_string(),
+                node_type: NodeType::Group,
+                is_privileged: false,
+            },
+            GraphNode {
+                dn: "CN=Domain Admins,DC=test".to_string(),
+                display_name: "Domain Admins".to_string(),
+                node_type: NodeType::Group,
+                is_privileged: true,
+            },
+        ];
+        let edges = vec![
+            GraphEdge {
+                source_dn: "CN=User1,DC=test".to_string(),
+                target_dn: "CN=GroupA,DC=test".to_string(),
+                edge_type: EdgeType::Membership,
+                label: Some("Member of".to_string()),
+            },
+            GraphEdge {
+                source_dn: "CN=User1,DC=test".to_string(),
+                target_dn: "CN=GroupB,DC=test".to_string(),
+                edge_type: EdgeType::Membership,
+                label: Some("Member of".to_string()),
+            },
+            GraphEdge {
+                source_dn: "CN=GroupA,DC=test".to_string(),
+                target_dn: "CN=Domain Admins,DC=test".to_string(),
+                edge_type: EdgeType::Membership,
+                label: Some("Member of".to_string()),
+            },
+            GraphEdge {
+                source_dn: "CN=GroupB,DC=test".to_string(),
+                target_dn: "CN=Domain Admins,DC=test".to_string(),
+                edge_type: EdgeType::Membership,
+                label: Some("Member of".to_string()),
+            },
+        ];
+
+        let paths = find_critical_paths(&nodes, &edges);
+        // GroupA -> DA, GroupB -> DA (1 hop each), User1 -> GroupA -> DA, User1 -> GroupB -> DA
+        assert!(paths.len() >= 3);
+        // All 1-hop paths should have score 1.0
+        let one_hop_paths: Vec<_> = paths.iter().filter(|p| p.hop_count == 1).collect();
+        assert!(one_hop_paths.len() >= 2);
+    }
+
+    #[test]
+    fn test_find_critical_paths_mixed_edge_types() {
+        let nodes = vec![
+            GraphNode {
+                dn: "CN=Attacker,DC=test".to_string(),
+                display_name: "Attacker".to_string(),
+                node_type: NodeType::User,
+                is_privileged: false,
+            },
+            GraphNode {
+                dn: "CN=Server,DC=test".to_string(),
+                display_name: "Server".to_string(),
+                node_type: NodeType::Computer,
+                is_privileged: false,
+            },
+            GraphNode {
+                dn: "CN=Domain Admins,DC=test".to_string(),
+                display_name: "Domain Admins".to_string(),
+                node_type: NodeType::Group,
+                is_privileged: true,
+            },
+        ];
+        let edges = vec![
+            GraphEdge {
+                source_dn: "CN=Attacker,DC=test".to_string(),
+                target_dn: "CN=Server,DC=test".to_string(),
+                edge_type: EdgeType::RBCD,
+                label: Some("RBCD to".to_string()),
+            },
+            GraphEdge {
+                source_dn: "CN=Server,DC=test".to_string(),
+                target_dn: "CN=Domain Admins,DC=test".to_string(),
+                edge_type: EdgeType::UnconstrainedDeleg,
+                label: Some("Unconstrained delegation".to_string()),
+            },
+        ];
+
+        let paths = find_critical_paths(&nodes, &edges);
+        assert!(!paths.is_empty());
+        // Server -> DA via UnconstrainedDeleg (weight 2.5)
+        let server_path = paths.iter().find(|p| p.hop_count == 1);
+        assert!(server_path.is_some());
+        assert!((server_path.unwrap().risk_score - 2.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_find_critical_paths_only_privileged_nodes() {
+        // No non-privileged nodes - should produce no paths
+        let nodes = vec![GraphNode {
+            dn: "CN=Domain Admins,DC=test".to_string(),
+            display_name: "Domain Admins".to_string(),
+            node_type: NodeType::Group,
+            is_privileged: true,
+        }];
+        let paths = find_critical_paths(&nodes, &[]);
+        assert!(paths.is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // compute_alerts edge-case combinations
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_compute_alerts_all_flags_set_disabled() {
+        // Disabled account - not_in_protected_users requires enabled=true
+        let mut account = make_account(false, true, Some(200), None);
+        account.kerberoastable = true;
+        account.asrep_roastable = true;
+        account.reversible_encryption = true;
+        account.des_only = true;
+        account.constrained_delegation_transition = true;
+        account.has_sid_history = true;
+        account.is_service_account = true;
+        account.in_protected_users = false;
+        account.admin_count_orphaned = true;
+
+        let alerts = compute_alerts(&account, Some(120));
+        let types: Vec<&str> = alerts.iter().map(|a| a.alert_type.as_str()).collect();
+
+        assert!(types.contains(&"password_age"));
+        assert!(types.contains(&"reversible_encryption"));
+        assert!(types.contains(&"asrep_roastable"));
+        assert!(types.contains(&"kerberoastable"));
+        assert!(types.contains(&"password_never_expires"));
+        assert!(types.contains(&"disabled_in_privileged_group"));
+        assert!(types.contains(&"constrained_delegation_transition"));
+        assert!(types.contains(&"sid_history"));
+        assert!(types.contains(&"des_only"));
+        assert!(types.contains(&"service_account_in_admins"));
+        // not_in_protected_users only fires when enabled=true
+        assert!(!types.contains(&"not_in_protected_users"));
+        assert!(types.contains(&"inactive_admin"));
+        assert!(types.contains(&"never_logged_on"));
+        assert!(types.contains(&"admin_count_orphaned"));
+    }
+
+    #[test]
+    fn test_compute_alerts_all_flags_set_enabled() {
+        // Enabled account - should trigger not_in_protected_users
+        let mut account = make_account(true, true, Some(200), None);
+        account.kerberoastable = true;
+        account.asrep_roastable = true;
+        account.reversible_encryption = true;
+        account.des_only = true;
+        account.constrained_delegation_transition = true;
+        account.has_sid_history = true;
+        account.is_service_account = true;
+        account.in_protected_users = false;
+
+        let alerts = compute_alerts(&account, Some(120));
+        let types: Vec<&str> = alerts.iter().map(|a| a.alert_type.as_str()).collect();
+
+        assert!(types.contains(&"password_age"));
+        assert!(types.contains(&"reversible_encryption"));
+        assert!(types.contains(&"asrep_roastable"));
+        assert!(types.contains(&"kerberoastable"));
+        assert!(types.contains(&"password_never_expires"));
+        assert!(types.contains(&"constrained_delegation_transition"));
+        assert!(types.contains(&"sid_history"));
+        assert!(types.contains(&"des_only"));
+        assert!(types.contains(&"service_account_in_admins"));
+        assert!(types.contains(&"not_in_protected_users"));
+        assert!(types.contains(&"inactive_admin"));
+        assert!(types.contains(&"never_logged_on"));
+        // enabled=true so no disabled_in_privileged_group
+        assert!(!types.contains(&"disabled_in_privileged_group"));
+    }
+
+    #[test]
+    fn test_compute_alerts_inactive_admin_boundary() {
+        // Exactly at 90 days should trigger
+        let account = make_account(true, false, Some(10), Some("2026-03-20T00:00:00Z"));
+        let alerts_at_90 = compute_alerts(&account, Some(90));
+        let _types_90: Vec<&str> = alerts_at_90.iter().map(|a| a.alert_type.as_str()).collect();
+        // 90 days exactly may or may not trigger depending on threshold (> 90 vs >= 90)
+        let alerts_at_91 = compute_alerts(&account, Some(91));
+        let types_91: Vec<&str> = alerts_at_91.iter().map(|a| a.alert_type.as_str()).collect();
+        assert!(types_91.contains(&"inactive_admin"));
+    }
+
+    // -----------------------------------------------------------------------
+    // Infrastructure hardening factor tests
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_infra_hardening_no_laps_no_recyclebin() {
+        let findings = DomainSecurityFindings {
+            krbtgt_password_age_days: None,
+            laps_coverage_percent: None,
+            laps_deployed_count: 0,
+            total_computer_count: 10,
+            pso_count: 0,
+            domain_functional_level: Some("Windows Server 2008".to_string()),
+            forest_functional_level: None,
+            ldap_signing_enforced: None,
+            recycle_bin_enabled: Some(false),
+            rbcd_configured_count: 2,
+            alerts: vec![],
+        };
+
+        let provider = Arc::new(crate::services::directory::tests::MockDirectoryProvider::new());
+        let result = compute_infrastructure_hardening_factor(provider, &findings).await;
+
+        // LAPS not deployed (-30) + Recycle Bin off (-15) + no PSOs (-10)
+        // + old functional level (-20) + RBCD (2 * 5 = -10)
+        assert!(result.score <= 20.0);
+        assert!(!result.findings.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_infra_hardening_good_posture() {
+        let findings = DomainSecurityFindings {
+            krbtgt_password_age_days: Some(30),
+            laps_coverage_percent: Some(95.0),
+            laps_deployed_count: 95,
+            total_computer_count: 100,
+            pso_count: 3,
+            domain_functional_level: Some("Windows Server 2016".to_string()),
+            forest_functional_level: Some("Windows Server 2016".to_string()),
+            ldap_signing_enforced: Some(true),
+            recycle_bin_enabled: Some(true),
+            rbcd_configured_count: 0,
+            alerts: vec![],
+        };
+
+        let provider = Arc::new(crate::services::directory::tests::MockDirectoryProvider::new());
+        let result = compute_infrastructure_hardening_factor(provider, &findings).await;
+
+        // Good posture - should be high score
+        assert!(result.score >= 90.0);
+    }
+
+    // -----------------------------------------------------------------------
+    // Password spray detection additional tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_detect_password_spray_below_threshold() {
+        let config = default_config();
+        let mut events_owned = Vec::new();
+        // Only 2 distinct users from same IP - below threshold of 5
+        for i in 0..2 {
+            let mut event = make_event(4771);
+            event.ip_address = Some("10.0.0.42".to_string());
+            event.target_user_name = Some(format!("user{}", i));
+            events_owned.push(event);
+        }
+        let events: Vec<&EventRecord> = events_owned.iter().collect();
+        let alerts = detect_password_spray(&events, &config);
+        assert!(alerts.is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // Event record edge cases
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_event_record_all_null_fields() {
+        let json = r#"{
+            "TimeCreated": null,
+            "Id": null,
+            "IpAddress": null,
+            "TargetUserName": null,
+            "TicketEncryptionType": null,
+            "ServiceName": null,
+            "Status": null,
+            "SubStatus": null,
+            "LogonType": null,
+            "AuthenticationPackageName": null,
+            "KeyLength": null,
+            "ObjectType": null,
+            "AccessMask": null,
+            "SubjectUserName": null,
+            "AttributeLDAPDisplayName": null,
+            "ObjectDN": null
+        }"#;
+        let record: EventRecord = serde_json::from_str(json).unwrap();
+        assert!(record.id.is_none());
+        assert!(record.time_created.is_none());
+        assert!(record.ip_address.is_none());
+    }
+
+    // -----------------------------------------------------------------------
+    // Stale accounts factor with mixed data
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_stale_accounts_no_stale() {
+        use std::collections::HashMap;
+        let recent_filetime =
+            (Utc::now().timestamp() * 10_000_000 + FILETIME_EPOCH_OFFSET).to_string();
+
+        let mut attrs = HashMap::new();
+        attrs.insert(
+            "lastLogonTimestamp".to_string(),
+            vec![recent_filetime.clone()],
+        );
+        attrs.insert("userAccountControl".to_string(), vec!["512".to_string()]);
+        attrs.insert("pwdLastSet".to_string(), vec![recent_filetime]);
+        let user = crate::models::DirectoryEntry {
+            distinguished_name: "CN=Active,OU=Users,DC=test".to_string(),
+            sam_account_name: Some("active".to_string()),
+            display_name: Some("Active User".to_string()),
+            object_class: Some("user".to_string()),
+            attributes: attrs,
+        };
+
+        let provider = Arc::new(
+            crate::services::directory::tests::MockDirectoryProvider::new().with_users(vec![user]),
+        );
+        let result = compute_stale_accounts_factor(provider).await;
+        // No stale accounts - score should be high
+        assert!(result.score >= 90.0);
+    }
+
+    // -----------------------------------------------------------------------
+    // Trust factor with selective auth
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_trust_factor_with_selective_auth() {
+        use std::collections::HashMap;
+        let mut attrs = HashMap::new();
+        attrs.insert("name".to_string(), vec!["SECURED.COM".to_string()]);
+        attrs.insert("trustDirection".to_string(), vec!["2".to_string()]); // outbound only
+        // TRUST_ATTRIBUTE_CROSS_ORGANIZATION (0x10) = selective auth
+        // TRUST_ATTRIBUTE_QUARANTINED_DOMAIN (0x4) = SID filtering
+        attrs.insert(
+            "trustAttributes".to_string(),
+            vec![format!("{}", 0x10 | 0x4)],
+        );
+        let trust_entry = crate::models::DirectoryEntry {
+            distinguished_name: "CN=SECURED.COM,CN=System,DC=example,DC=com".to_string(),
+            sam_account_name: None,
+            display_name: None,
+            object_class: Some("trustedDomain".to_string()),
+            attributes: attrs,
+        };
+
+        let provider = Arc::new(
+            crate::services::directory::tests::MockDirectoryProvider::new()
+                .with_configuration_entries(vec![trust_entry]),
+        );
+        let result = compute_trust_security_factor(provider).await;
+        // Outbound trust with selective auth and SID filtering - should be high score
+        assert!(result.score >= 80.0);
     }
 }

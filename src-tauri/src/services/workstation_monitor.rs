@@ -134,8 +134,7 @@ async fn collect_metrics_windows(hostname: &str, timestamp: &str) -> Result<Syst
 
 #[cfg(target_os = "windows")]
 async fn query_cpu(hostname: &str) -> Result<f64, String> {
-    let script =
-        "(Get-CimInstance Win32_Processor | Measure-Object -Property LoadPercentage -Average).Average";
+    let script = "(Get-CimInstance Win32_Processor | Measure-Object -Property LoadPercentage -Average).Average";
     let output = run_ps_command(hostname, script).await?;
     parse_cpu(&output)
 }

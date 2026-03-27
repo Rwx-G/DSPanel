@@ -945,6 +945,10 @@ impl DirectoryProvider for DemoDirectoryProvider {
         Some("CONTOSO.COM")
     }
 
+    fn connected_host(&self) -> Option<String> {
+        Some("dc01.contoso.com".to_string())
+    }
+
     fn base_dn(&self) -> Option<String> {
         Some("DC=contoso,DC=com".to_string())
     }

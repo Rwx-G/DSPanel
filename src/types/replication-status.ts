@@ -13,4 +13,8 @@ export interface ReplicationPartnership {
   consecutiveFailures: number;
   lastSyncMessage: string | null;
   status: ReplicationPartnershipStatus;
+  usnLastObjChangeSynced?: number | null;
+  lastSyncAttempt?: string | null;
+  transport?: string | null;
+  replicaFlags?: number | null;
 }

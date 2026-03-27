@@ -17,6 +17,7 @@ import {
   type MoveTarget,
 } from "@/components/dialogs/MoveObjectDialog";
 import { MonitorX, AlertCircle, Monitor, FolderInput } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 type StatusFilter = "all" | "enabled" | "disabled";
 type OsFilter = "all" | "windows" | "other";
@@ -35,6 +36,7 @@ function useComputerBrowse() {
 }
 
 export function ComputerLookup() {
+  const { t } = useTranslation(["computerLookup", "common"]);
   const {
     items: computers,
     loading,
@@ -108,7 +110,7 @@ export function ComputerLookup() {
       const items: ContextMenuItem[] = [];
       if (canMove) {
         items.push({
-          label: "Move to OU",
+          label: t("common:moveToOu"),
           icon: <FolderInput size={14} />,
           onClick: () => {
             setMoveTargets([
@@ -149,11 +151,11 @@ export function ComputerLookup() {
             {computer.name}
           </p>
           <p className="truncate text-caption text-[var(--color-text-secondary)]">
-            {computer.operatingSystem || "Unknown OS"}
+            {computer.operatingSystem || t("unknownOs")}
           </p>
         </div>
         <StatusBadge
-          text={computer.enabled ? "Active" : "Disabled"}
+          text={computer.enabled ? t("common:active") : t("common:disabled")}
           variant={computer.enabled ? "success" : "error"}
         />
       </button>
@@ -169,16 +171,16 @@ export function ComputerLookup() {
             value={filterText}
             onChange={handleFilterChange}
             onSearch={handleFilterChange}
-            placeholder="Search by computer name..."
+            placeholder={t("searchPlaceholder")}
             debounceMs={300}
           />
         </div>
         <div className="flex items-center gap-1">
           {(
             [
-              { key: "all", label: "All" },
-              { key: "enabled", label: "Enabled" },
-              { key: "disabled", label: "Disabled" },
+              { key: "all", label: t("all") },
+              { key: "enabled", label: t("common:enabled") },
+              { key: "disabled", label: t("common:disabled") },
             ] as const
           ).map(({ key, label }) => (
             <button
@@ -197,9 +199,9 @@ export function ComputerLookup() {
         <div className="flex items-center gap-1">
           {(
             [
-              { key: "all", label: "All OS" },
-              { key: "windows", label: "Windows" },
-              { key: "other", label: "Other" },
+              { key: "all", label: t("allOs") },
+              { key: "windows", label: t("windows") },
+              { key: "other", label: t("otherOs") },
             ] as const
           ).map(({ key, label }) => (
             <button
@@ -221,12 +223,12 @@ export function ComputerLookup() {
         aria-live="polite"
         data-testid="computer-lookup-status"
       >
-        {loading && "Loading computers..."}
+        {loading && t("loadingComputers")}
         {!loading &&
           filteredComputers.length > 0 &&
-          `${filteredComputers.length} computer${filteredComputers.length > 1 ? "s" : ""} found`}
-        {!loading && filteredComputers.length === 0 && !error && "No computers found"}
-        {error && `Error: ${error}`}
+          t("found", { count: filteredComputers.length })}
+        {!loading && filteredComputers.length === 0 && !error && t("noComputersFound")}
+        {error && `${t("common:error")}: ${error}`}
       </div>
 
       <div className="flex flex-1 overflow-hidden">
@@ -235,7 +237,7 @@ export function ComputerLookup() {
             className="flex flex-1 items-center justify-center"
             data-testid="computer-lookup-loading"
           >
-            <LoadingSpinner message="Loading computers..." />
+            <LoadingSpinner message={t("loadingComputers")} />
           </div>
         )}
 
@@ -246,9 +248,9 @@ export function ComputerLookup() {
           >
             <EmptyState
               icon={<AlertCircle size={48} />}
-              title="Failed to load computers"
+              title={t("failedToLoad")}
               description={error}
-              action={{ label: "Retry", onClick: refresh }}
+              action={{ label: t("common:retry"), onClick: refresh }}
             />
           </div>
         )}
@@ -257,13 +259,13 @@ export function ComputerLookup() {
           <div className="flex flex-1 items-center justify-center">
             <EmptyState
               icon={<MonitorX size={48} />}
-              title="No computers found"
+              title={t("noComputersFound")}
               description={
                 statusFilter !== "all" || osFilter !== "all"
-                  ? "No computers match the selected filters."
+                  ? t("noFilterResults")
                   : filterText
-                    ? `No computers match "${filterText}".`
-                    : "No computers available."
+                    ? t("noComputersMatch", { query: filterText })
+                    : t("noComputersFound")
               }
             />
           </div>
@@ -301,7 +303,7 @@ export function ComputerLookup() {
               ) : (
                 <div className="flex h-full items-center justify-center">
                   <p className="text-body text-[var(--color-text-secondary)]">
-                    Select a computer to view details
+                    {t("selectComputer")}
                   </p>
                 </div>
               )}

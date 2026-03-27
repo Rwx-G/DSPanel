@@ -208,15 +208,12 @@ impl CircuitBreaker {
 
     /// Checks if recovery timeout has elapsed and transitions Open -> HalfOpen.
     fn maybe_transition_to_half_open(inner: &mut CircuitBreakerInner) {
-        if inner.state == CircuitState::Open {
-            if let Some(last_failure) = inner.last_failure_time {
-                if last_failure.elapsed() >= inner.config.recovery_timeout {
-                    tracing::info!(
-                        "Circuit breaker recovery timeout elapsed - transitioning to HalfOpen"
-                    );
-                    inner.state = CircuitState::HalfOpen;
-                }
-            }
+        if inner.state == CircuitState::Open
+            && let Some(last_failure) = inner.last_failure_time
+            && last_failure.elapsed() >= inner.config.recovery_timeout
+        {
+            tracing::info!("Circuit breaker recovery timeout elapsed - transitioning to HalfOpen");
+            inner.state = CircuitState::HalfOpen;
         }
     }
 }

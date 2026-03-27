@@ -1,0 +1,18 @@
+{
+  "searchPlaceholder": "Drucker nach Name, Standort oder Server suchen...",
+  "loadingPrinters": "Drucker werden geladen...",
+  "found_one": "{{count}} Drucker gefunden",
+  "found_other": "{{count}} Drucker gefunden",
+  "noPrintersFound": "Keine Drucker gefunden",
+  "failedToLoad": "Drucker konnten nicht geladen werden",
+  "noPrintersAvailable": "Keine Drucker verfügbar.",
+  "selectPrinter": "Wählen Sie einen Drucker, um Details anzuzeigen",
+  "deletePrinter": "Drucker löschen",
+  "deleteConfirmation": "Möchten Sie {{name}} wirklich löschen?",
+  "deleteSuccess": "Drucker erfolgreich gelöscht",
+  "general": "Allgemein",
+  "serverInfo": "Serverinformationen",
+  "server": "Server",
+  "sharePath": "Freigabepfad",
+  "driver": "Treiber"
+}

@@ -14,6 +14,7 @@ import {
   ChevronRight,
   ArrowUpDown,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -51,14 +52,17 @@ interface AuditQueryResult {
 
 const PAGE_SIZE = 50;
 
-const EXPORT_COLUMNS: ExportColumn[] = [
-  { key: "timestamp", header: "Timestamp" },
-  { key: "operator", header: "Operator" },
-  { key: "action", header: "Action" },
-  { key: "targetDn", header: "Target" },
-  { key: "details", header: "Details" },
-  { key: "result", header: "Result" },
-];
+function useExportColumns(): ExportColumn[] {
+  const { t } = useTranslation(["auditLog", "common"]);
+  return [
+    { key: "timestamp", header: t("timestamp") },
+    { key: "operator", header: t("operator") },
+    { key: "action", header: t("action") },
+    { key: "targetDn", header: t("target") },
+    { key: "details", header: t("common:details") },
+    { key: "result", header: t("result") },
+  ];
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -83,6 +87,8 @@ function formatDn(dn: string): string {
 // ---------------------------------------------------------------------------
 
 export function AuditLog() {
+  const { t } = useTranslation(["auditLog", "common"]);
+  const exportColumns = useExportColumns();
   const [entries, setEntries] = useState<AuditEntry[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [page, setPage] = useState(0);
@@ -180,16 +186,15 @@ export function AuditLog() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-heading font-semibold text-[var(--color-text-primary)]">
-            Activity Journal
+            {t("pageTitle")}
           </h1>
           <p className="text-caption text-[var(--color-text-secondary)]">
-            Local log of all write operations performed through DSPanel on this
-            workstation
+            {t("pageDescription")}
           </p>
         </div>
         <div className="flex items-center gap-2">
           <ExportToolbar
-            columns={EXPORT_COLUMNS}
+            columns={exportColumns}
             data={entries}
             rowMapper={(e) => [
               formatTimestamp(e.timestamp),
@@ -197,9 +202,9 @@ export function AuditLog() {
               e.action,
               e.targetDn,
               e.details,
-              e.success ? "Success" : "Failure",
+              e.success ? t("success") : t("failure"),
             ]}
-            title="DSPanel Activity Journal"
+            title={t("exportTitle")}
             filenameBase="audit_log"
           />
           <button
@@ -209,7 +214,7 @@ export function AuditLog() {
             data-testid="refresh-button"
           >
             <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-            Refresh
+            {t("common:refresh")}
           </button>
         </div>
       </div>
@@ -221,7 +226,7 @@ export function AuditLog() {
       >
         <div className="flex flex-col gap-1">
           <label className="text-[11px] font-medium text-[var(--color-text-secondary)]">
-            From
+            {t("from")}
           </label>
           <input
             type="date"
@@ -234,7 +239,7 @@ export function AuditLog() {
         </div>
         <div className="flex flex-col gap-1">
           <label className="text-[11px] font-medium text-[var(--color-text-secondary)]">
-            To
+            {t("to")}
           </label>
           <input
             type="date"
@@ -247,21 +252,21 @@ export function AuditLog() {
         </div>
         <div className="flex flex-col gap-1">
           <label className="text-[11px] font-medium text-[var(--color-text-secondary)]">
-            Operator
+            {t("operator")}
           </label>
           <input
             type="text"
             value={operatorFilter}
             onChange={(e) => setOperatorFilter(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="e.g. admin"
+            placeholder={t("operatorPlaceholder")}
             className="h-8 w-32 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2 text-caption text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)]"
             data-testid="filter-operator"
           />
         </div>
         <div className="flex flex-col gap-1">
           <label className="text-[11px] font-medium text-[var(--color-text-secondary)]">
-            Action
+            {t("action")}
           </label>
           <select
             value={actionFilter}
@@ -269,7 +274,7 @@ export function AuditLog() {
             className="h-8 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2 text-caption text-[var(--color-text-primary)]"
             data-testid="filter-action"
           >
-            <option value="">All</option>
+            <option value="">{t("all")}</option>
             {actionTypes.map((a) => (
               <option key={a} value={a}>
                 {a}
@@ -279,21 +284,21 @@ export function AuditLog() {
         </div>
         <div className="flex flex-col gap-1">
           <label className="text-[11px] font-medium text-[var(--color-text-secondary)]">
-            Target DN
+            {t("targetDn")}
           </label>
           <input
             type="text"
             value={targetFilter}
             onChange={(e) => setTargetFilter(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="partial match"
+            placeholder={t("targetPlaceholder")}
             className="h-8 w-40 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2 text-caption text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)]"
             data-testid="filter-target"
           />
         </div>
         <div className="flex flex-col gap-1">
           <label className="text-[11px] font-medium text-[var(--color-text-secondary)]">
-            Result
+            {t("result")}
           </label>
           <select
             value={resultFilter}
@@ -303,9 +308,9 @@ export function AuditLog() {
             className="h-8 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2 text-caption text-[var(--color-text-primary)]"
             data-testid="filter-result"
           >
-            <option value="">All</option>
-            <option value="success">Success</option>
-            <option value="failure">Failure</option>
+            <option value="">{t("all")}</option>
+            <option value="success">{t("success")}</option>
+            <option value="failure">{t("failure")}</option>
           </select>
         </div>
         <div className="flex gap-2">
@@ -316,14 +321,14 @@ export function AuditLog() {
             data-testid="search-button"
           >
             <Search size={14} />
-            Search
+            {t("common:search")}
           </button>
           <button
             className="btn btn-sm rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2.5 py-1 text-caption font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors"
             onClick={handleReset}
             data-testid="reset-button"
           >
-            Reset
+            {t("common:reset")}
           </button>
           <button
             className="btn btn-sm rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2.5 py-1 text-caption font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors flex items-center gap-1"
@@ -332,10 +337,10 @@ export function AuditLog() {
               fetchEntries(0);
             }}
             data-testid="sort-toggle"
-            title={sortAscending ? "Oldest first" : "Newest first"}
+            title={sortAscending ? t("oldestFirst") : t("newestFirst")}
           >
             <ArrowUpDown size={14} />
-            {sortAscending ? "Oldest first" : "Newest first"}
+            {sortAscending ? t("oldestFirst") : t("newestFirst")}
           </button>
         </div>
       </div>
@@ -355,18 +360,18 @@ export function AuditLog() {
       ) : entries.length === 0 && !loading ? (
         <EmptyState
           icon={<ClipboardList size={40} />}
-          title="No audit entries found"
-          description="Write operations performed through DSPanel will appear here. Adjust your filters if you expect results."
+          title={t("emptyTitle")}
+          description={t("emptyDescription")}
         />
       ) : (
         <>
           {/* Results count */}
           <div className="text-caption text-[var(--color-text-secondary)]">
-            {totalCount} {totalCount === 1 ? "entry" : "entries"} found
+            {t("common:entry", { count: totalCount })}
             {totalPages > 1 && (
               <span>
                 {" "}
-                - page {page + 1} of {totalPages}
+                - {t("page")} {page + 1} / {totalPages}
               </span>
             )}
           </div>
@@ -376,11 +381,11 @@ export function AuditLog() {
             <table className="w-full text-caption" data-testid="audit-table">
               <thead>
                 <tr className="bg-[var(--color-surface-card)] text-left text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">
-                  <th className="px-3 py-2 w-[160px]">Timestamp</th>
-                  <th className="px-3 py-2 w-[120px]">Operator</th>
-                  <th className="px-3 py-2 w-[160px]">Action</th>
-                  <th className="px-3 py-2">Target</th>
-                  <th className="px-3 py-2 w-[70px] text-center">Result</th>
+                  <th className="px-3 py-2 w-[160px]">{t("timestamp")}</th>
+                  <th className="px-3 py-2 w-[120px]">{t("operator")}</th>
+                  <th className="px-3 py-2 w-[160px]">{t("action")}</th>
+                  <th className="px-3 py-2">{t("target")}</th>
+                  <th className="px-3 py-2 w-[70px] text-center">{t("result")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -439,6 +444,7 @@ function AuditRow({
   isExpanded: boolean;
   onToggle: () => void;
 }) {
+  const { t } = useTranslation(["auditLog"]);
   return (
     <>
       <tr
@@ -478,7 +484,7 @@ function AuditRow({
             <div className="flex flex-col gap-1.5 text-caption">
               <div>
                 <span className="font-medium text-[var(--color-text-secondary)]">
-                  Full Target DN:{" "}
+                  {t("fullTargetDn")}:{" "}
                 </span>
                 <span className="text-[var(--color-text-primary)] select-all">
                   {entry.targetDn}
@@ -486,15 +492,15 @@ function AuditRow({
               </div>
               <div>
                 <span className="font-medium text-[var(--color-text-secondary)]">
-                  Details:{" "}
+                  {t("details")}:{" "}
                 </span>
                 <span className="text-[var(--color-text-primary)]">
-                  {entry.details || "(none)"}
+                  {entry.details || t("none")}
                 </span>
               </div>
               <div>
                 <span className="font-medium text-[var(--color-text-secondary)]">
-                  Result:{" "}
+                  {t("result")}:{" "}
                 </span>
                 <span
                   className={
@@ -503,7 +509,7 @@ function AuditRow({
                       : "text-[var(--color-error)]"
                   }
                 >
-                  {entry.success ? "Success" : "Failure"}
+                  {entry.success ? t("success") : t("failure")}
                 </span>
               </div>
             </div>

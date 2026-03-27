@@ -36,3 +36,14 @@ DSPanel interacts directly with Active Directory and can perform privileged oper
 - All write operations are logged in the internal audit trail
 - Permission levels are enforced at the service layer, not just the UI
 - Object snapshots are taken before any modification for rollback capability
+- Sensitive data in memory (LDAP passwords, TOTP secrets) is zeroized on drop
+
+### MFA secret storage by platform
+
+| Platform | Protection | Notes |
+| -------- | ---------- | ----- |
+| Windows  | DPAPI (CryptProtectData) | Secret tied to current user profile |
+| macOS    | Base64 only | **Not encrypted at rest** |
+| Linux    | Base64 only | **Not encrypted at rest** |
+
+On non-Windows platforms, the TOTP shared secret stored in `mfa.dat` is **not encrypted at rest**. A warning is logged at application startup when MFA is configured on a non-Windows host. Native keychain integration (macOS Keychain, Linux Secret Service) is planned for a future release.

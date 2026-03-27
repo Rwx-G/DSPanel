@@ -42,6 +42,12 @@ pub struct AppSettings {
     /// Update check settings.
     #[serde(default)]
     pub update: Option<UpdateSettings>,
+    /// Custom risk score weights (overrides defaults when set).
+    #[serde(default)]
+    pub risk_weights: Option<crate::models::security::RiskWeights>,
+    /// Attack detection thresholds and exclusion lists.
+    #[serde(default)]
+    pub attack_detection_config: Option<crate::models::security::AttackDetectionConfig>,
 }
 
 /// Update check settings.
@@ -90,6 +96,9 @@ pub struct AppearanceSettings {
     /// Theme mode: "light", "dark", or "system".
     #[serde(default)]
     pub theme: Option<String>,
+    /// UI language: "en", "fr", "de", "it", or "es".
+    #[serde(default)]
+    pub language: Option<String>,
 }
 
 /// Service for managing persisted application settings.
@@ -279,6 +288,7 @@ mod tests {
             }),
             appearance: Some(AppearanceSettings {
                 theme: Some("dark".to_string()),
+                language: Some("fr".to_string()),
             }),
             ..Default::default()
         };

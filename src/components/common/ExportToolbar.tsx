@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Download, FileSpreadsheet, FileText, Globe, ChevronDown } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 export interface ExportColumn {
   key: string;
@@ -47,6 +48,7 @@ export function ExportToolbar<T>({
   filenameBase,
   disabled,
 }: ExportToolbarProps<T>) {
+  const { t } = useTranslation(["components", "common"]);
   const [exporting, setExporting] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -103,7 +105,7 @@ export function ExportToolbar<T>({
         data-testid="export-button"
       >
         <Download size={14} />
-        {exporting ? "Exporting..." : "Export"}
+        {exporting ? t("components:exportToolbar.exporting") : t("components:exportToolbar.export")}
         <ChevronDown size={12} />
       </button>
 

@@ -12,6 +12,7 @@ import {
   CheckCircle,
   FolderTree,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -60,14 +61,17 @@ type ViewMode = "links" | "scope";
 // Constants
 // ---------------------------------------------------------------------------
 
-const EXPORT_COLUMNS: ExportColumn[] = [
-  { key: "gpoName", header: "GPO Name" },
-  { key: "linkOrder", header: "Link Order" },
-  { key: "linkedAt", header: "Linked At" },
-  { key: "enforced", header: "Enforced" },
-  { key: "inherited", header: "Inherited" },
-  { key: "wmiFilter", header: "WMI Filter" },
-];
+function useGpoExportColumns(): ExportColumn[] {
+  const { t } = useTranslation(["gpoViewer", "common"]);
+  return [
+    { key: "gpoName", header: t("gpoName") },
+    { key: "linkOrder", header: t("linkOrder") },
+    { key: "linkedAt", header: t("linkedAt") },
+    { key: "enforced", header: t("enforced") },
+    { key: "inherited", header: t("statusInherited") },
+    { key: "wmiFilter", header: t("wmiFilter") },
+  ];
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -86,6 +90,8 @@ function formatDn(dn: string): string {
 // ---------------------------------------------------------------------------
 
 export function GpoViewer() {
+  const { t } = useTranslation(["gpoViewer", "common"]);
+  const gpoExportColumns = useGpoExportColumns();
   const [viewMode, setViewMode] = useState<ViewMode>("links");
 
   // Links view state
@@ -191,25 +197,24 @@ export function GpoViewer() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-heading font-semibold text-[var(--color-text-primary)]">
-            GPO Viewer
+            {t("pageTitle")}
           </h1>
           <p className="text-caption text-[var(--color-text-secondary)]">
-            View Group Policy Objects linked to users, computers, and OUs -
-            read-only
+            {t("pageDescription")}
           </p>
         </div>
         <ExportToolbar
-          columns={EXPORT_COLUMNS}
+          columns={gpoExportColumns}
           data={currentLinks}
           rowMapper={(l) => [
             l.gpoName,
             String(l.linkOrder),
             l.linkedAt,
-            l.isEnforced ? "Yes" : "No",
-            l.isInherited ? "Yes" : "No",
+            l.isEnforced ? t("common:yes") : t("common:no"),
+            l.isInherited ? t("common:yes") : t("common:no"),
             l.wmiFilter ?? "",
           ]}
-          title="GPO Links Report"
+          title={t("linksReportTitle")}
           filenameBase="gpo_links"
         />
       </div>
@@ -218,8 +223,8 @@ export function GpoViewer() {
       <div className="flex gap-1 border-b border-[var(--color-border-default)]" data-testid="view-mode-tabs">
         {(
           [
-            { id: "links", label: "GPO Links", icon: <Shield size={14} /> },
-            { id: "scope", label: "Scope Report", icon: <FolderTree size={14} /> },
+            { id: "links", label: t("tabLinks"), icon: <Shield size={14} /> },
+            { id: "scope", label: t("tabScope"), icon: <FolderTree size={14} /> },
           ] as const
         ).map((tab) => (
           <button
@@ -245,15 +250,15 @@ export function GpoViewer() {
             {/* Search user/computer - autocomplete dropdown like UserComparison */}
             <div className="flex flex-col gap-1.5 min-w-[280px]" data-testid="links-search-input">
               <label className="text-[11px] font-medium text-[var(--color-text-secondary)]">
-                Search user or computer
+                {t("searchLabel")}
               </label>
               <div className="relative">
-                <div className="flex items-center gap-2 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5">
-                  <Search size={16} className="shrink-0 text-[var(--color-text-secondary)]" />
+                <div className="flex items-center gap-2 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2.5 py-1">
+                  <Search size={14} className="shrink-0 text-[var(--color-text-secondary)]" />
                   <input
                     type="text"
-                    className="flex-1 bg-transparent text-body text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-secondary)]"
-                    placeholder="Search by name or SAM..."
+                    className="flex-1 bg-transparent text-caption text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-secondary)]"
+                    placeholder={t("searchPlaceholder")}
                     value={searchQuery}
                     onChange={(e) => {
                       setSearchQuery(e.target.value);
@@ -314,13 +319,13 @@ export function GpoViewer() {
 
             {/* Separator */}
             <div className="flex items-end pb-2">
-              <span className="text-caption text-[var(--color-text-secondary)]">or</span>
+              <span className="text-caption text-[var(--color-text-secondary)]">{t("or")}</span>
             </div>
 
             {/* OU picker */}
             <div className="flex flex-col gap-1.5" data-testid="links-ou-select">
               <label className="text-[11px] font-medium text-[var(--color-text-secondary)]">
-                Select OU
+                {t("ouSelectLabel")}
               </label>
               <select
                 value={objectDn}
@@ -340,9 +345,9 @@ export function GpoViewer() {
                       .finally(() => setLinksLoading(false));
                   }
                 }}
-                className="h-[34px] rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5 text-body text-[var(--color-text-primary)]"
+                className="h-[28px] rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2.5 text-caption text-[var(--color-text-primary)]"
               >
-                <option value="">Choose OU...</option>
+                <option value="">{t("ouSelectPlaceholder")}</option>
                 {flatOUs.map((ou) => (
                   <option key={ou.dn} value={ou.dn}>
                     {ou.label}
@@ -353,13 +358,13 @@ export function GpoViewer() {
           </div>
 
           <p className="text-caption text-[var(--color-text-secondary)]">
-            Search for a user or computer to see which GPOs apply to it, or select an OU to see which GPOs would apply to all objects inside it.
+            {t("searchDescription")}
           </p>
 
           {/* Selected object indicator */}
           {objectDn && (
             <div className="text-caption text-[var(--color-text-secondary)]">
-              Showing GPOs for: <span className="font-medium text-[var(--color-text-primary)]">{formatDn(objectDn)}</span>
+              {t("showingGposFor")}: <span className="font-medium text-[var(--color-text-primary)]">{formatDn(objectDn)}</span>
             </div>
           )}
 
@@ -380,7 +385,7 @@ export function GpoViewer() {
           <div className="flex items-end gap-3">
             <div className="flex flex-1 flex-col gap-1">
               <label className="text-[11px] font-medium text-[var(--color-text-secondary)]">
-                Select GPO
+                {t("selectGpo")}
               </label>
               {gpoList.length > 0 ? (
                 <select
@@ -399,10 +404,10 @@ export function GpoViewer() {
                       setScopeLinks([]);
                     }
                   }}
-                  className="h-8 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2 text-caption text-[var(--color-text-primary)]"
+                  className="h-[28px] rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2.5 text-caption text-[var(--color-text-primary)]"
                   data-testid="scope-gpo-dn"
                 >
-                  <option value="">Choose a GPO...</option>
+                  <option value="">{t("chooseGpo")}</option>
                   {gpoList.map((gpo) => (
                     <option key={gpo.dn} value={gpo.dn}>
                       {gpo.displayName}{gpo.wmiFilter ? ` [WMI: ${gpo.wmiFilter}]` : ""}
@@ -417,7 +422,7 @@ export function GpoViewer() {
                     onChange={(e) => setScopeGpoDn(e.target.value)}
                     onKeyDown={(e) => handleKeyDown(e, fetchScope)}
                     placeholder="CN={GUID},CN=Policies,CN=System,DC=contoso,DC=com"
-                    className="h-8 flex-1 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2 text-caption text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)]"
+                    className="h-[28px] flex-1 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2.5 text-caption text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)]"
                     data-testid="scope-gpo-dn"
                   />
                   <button
@@ -427,7 +432,7 @@ export function GpoViewer() {
                     data-testid="scope-search-button"
                   >
                     <Search size={14} />
-                    Find Links
+                    {t("findLinks")}
                   </button>
                 </div>
               )}
@@ -442,8 +447,8 @@ export function GpoViewer() {
           {!scopeLoading && scopeLinks.length === 0 && scopeGpoDn && !scopeError && (
             <EmptyState
               icon={<FolderTree size={40} />}
-              title="No links found"
-              description="This GPO is not linked to any OU or domain."
+              title={t("scopeNoLinks")}
+              description={t("scopeNoLinksDescription")}
             />
           )}
         </div>
@@ -475,12 +480,13 @@ function GpoLinksTable({
   links: GpoLink[];
   blocksInheritance: boolean;
 }) {
+  const { t } = useTranslation(["gpoViewer", "common"]);
   if (links.length === 0) {
     return (
       <EmptyState
         icon={<Shield size={40} />}
-        title="No GPOs linked"
-        description="No Group Policy Objects apply to this object."
+        title={t("noGposLinked")}
+        description={t("noGposDescription")}
       />
     );
   }
@@ -490,24 +496,24 @@ function GpoLinksTable({
       {blocksInheritance && (
         <div className="flex items-center gap-2 rounded-md border border-[var(--color-warning)] bg-[var(--color-warning)]/10 px-3 py-2 text-caption text-[var(--color-text-primary)]">
           <ShieldOff size={14} className="text-[var(--color-warning)]" />
-          This container blocks Group Policy inheritance
+          {t("blocksInheritance")}
         </div>
       )}
 
       <div className="text-caption text-[var(--color-text-secondary)]">
-        {links.length} GPO(s) in effective order
+        {t("gposInOrder", { count: links.length })}
       </div>
 
       <div className="overflow-auto rounded-lg border border-[var(--color-border-default)]">
         <table className="w-full text-caption" data-testid="gpo-table">
           <thead>
             <tr className="bg-[var(--color-surface-card)] text-left text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">
-              <th className="px-3 py-2">#</th>
-              <th className="px-3 py-2">GPO Name</th>
-              <th className="px-3 py-2">Linked At</th>
-              <th className="px-3 py-2 text-center">Enforced</th>
-              <th className="px-3 py-2 text-center">Inherited</th>
-              <th className="px-3 py-2">WMI Filter</th>
+              <th className="px-3 py-2">{t("number")}</th>
+              <th className="px-3 py-2">{t("gpoName")}</th>
+              <th className="px-3 py-2">{t("linkedAt")}</th>
+              <th className="px-3 py-2 text-center">{t("enforced")}</th>
+              <th className="px-3 py-2 text-center">{t("statusInherited")}</th>
+              <th className="px-3 py-2">{t("wmiFilter")}</th>
             </tr>
           </thead>
           <tbody>
@@ -563,11 +569,11 @@ function GpoLinksTable({
                 <td className="px-3 py-2 text-center">
                   {link.isInherited ? (
                     <span className="inline-flex rounded-full bg-[var(--color-primary)]/10 px-2 py-0.5 text-[10px] font-medium text-[var(--color-primary)]">
-                      Inherited
+                      {t("statusInherited")}
                     </span>
                   ) : (
                     <span className="inline-flex rounded-full bg-[var(--color-success)]/10 px-2 py-0.5 text-[10px] font-medium text-[var(--color-success)]">
-                      Direct
+                      {t("statusDirect")}
                     </span>
                   )}
                 </td>
@@ -584,20 +590,21 @@ function GpoLinksTable({
 }
 
 function ScopeTable({ links }: { links: GpoLink[] }) {
+  const { t } = useTranslation(["gpoViewer", "common"]);
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between">
         <div className="text-caption text-[var(--color-text-secondary)]">
-          Linked to {links.length} container(s)
+          {t("scopeLinkedTo", { count: links.length })}
         </div>
       </div>
       <div className="overflow-auto rounded-lg border border-[var(--color-border-default)]">
         <table className="w-full text-caption" data-testid="scope-table">
           <thead>
             <tr className="bg-[var(--color-surface-card)] text-left text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">
-              <th className="px-3 py-2">Container</th>
-              <th className="px-3 py-2 text-center">Enforced</th>
-              <th className="px-3 py-2 text-center">Status</th>
+              <th className="px-3 py-2">{t("container")}</th>
+              <th className="px-3 py-2 text-center">{t("enforced")}</th>
+              <th className="px-3 py-2 text-center">{t("common:status")}</th>
             </tr>
           </thead>
           <tbody>
@@ -616,7 +623,7 @@ function ScopeTable({ links }: { links: GpoLink[] }) {
                 <td className="px-3 py-2 text-center">
                   {link.isEnforced ? (
                     <span className="inline-flex rounded-full bg-[var(--color-warning)]/10 px-2 py-0.5 text-[10px] font-medium text-[var(--color-warning)]">
-                      Enforced
+                      {t("statusEnforced")}
                     </span>
                   ) : (
                     <span className="text-[var(--color-text-secondary)]">-</span>
@@ -625,11 +632,11 @@ function ScopeTable({ links }: { links: GpoLink[] }) {
                 <td className="px-3 py-2 text-center">
                   {link.isDisabled ? (
                     <span className="inline-flex rounded-full bg-[var(--color-error)]/10 px-2 py-0.5 text-[10px] font-medium text-[var(--color-error)]">
-                      Disabled
+                      {t("statusDisabled")}
                     </span>
                   ) : (
                     <span className="inline-flex rounded-full bg-[var(--color-success)]/10 px-2 py-0.5 text-[10px] font-medium text-[var(--color-success)]">
-                      Active
+                      {t("statusActive")}
                     </span>
                   )}
                 </td>

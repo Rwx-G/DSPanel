@@ -195,7 +195,7 @@ describe("ComputerLookup", () => {
     });
 
     expect(screen.getByText("Identity")).toBeInTheDocument();
-    expect(screen.getByText("Status")).toBeInTheDocument();
+    expect(screen.getAllByText("Status").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Location")).toBeInTheDocument();
     expect(screen.getByText("Network")).toBeInTheDocument();
   });
@@ -226,7 +226,7 @@ describe("ComputerLookup", () => {
       expect(screen.getByTestId("empty-state-title")).toHaveTextContent(
         "No computers found",
       );
-      expect(screen.getByText("No computers available.")).toBeInTheDocument();
+      expect(screen.getAllByText("No computers found").length).toBeGreaterThanOrEqual(1);
     });
   });
 
@@ -402,7 +402,7 @@ describe("ComputerLookup", () => {
     render(<ComputerLookup />);
 
     await waitFor(() => {
-      expect(screen.getByText("No computers available.")).toBeInTheDocument();
+      expect(screen.getByTestId("empty-state-title")).toHaveTextContent("No computers found");
     });
   });
 
@@ -442,6 +442,316 @@ describe("ComputerLookup", () => {
     await waitFor(() => {
       const status = screen.getByTestId("computer-lookup-status");
       expect(status).toHaveTextContent(/Error/);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Status filter tests
+  // ---------------------------------------------------------------------------
+
+  it("filters computers by Enabled status", async () => {
+    const entries = [
+      makeComputerEntry("WS001"), // enabled (UAC 4096)
+      makeComputerEntry("WS002", { userAccountControl: ["4098"] }), // disabled
+      makeComputerEntry("WS003"), // enabled
+    ];
+    mockBrowseWith(entries);
+
+    render(<ComputerLookup />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("computer-results-list")).toBeInTheDocument();
+    });
+
+    // Click the Enabled filter button
+    fireEvent.click(screen.getByText("Enabled", { selector: "button" }));
+
+    // Only enabled computers should remain
+    expect(screen.getByTestId("computer-result-WS001")).toBeInTheDocument();
+    expect(screen.getByTestId("computer-result-WS003")).toBeInTheDocument();
+    expect(
+      screen.queryByTestId("computer-result-WS002"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("filters computers by Disabled status", async () => {
+    const entries = [
+      makeComputerEntry("WS001"),
+      makeComputerEntry("WS002", { userAccountControl: ["4098"] }),
+    ];
+    mockBrowseWith(entries);
+
+    render(<ComputerLookup />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("computer-results-list")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText("Disabled", { selector: "button" }));
+
+    expect(
+      screen.queryByTestId("computer-result-WS001"),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("computer-result-WS002")).toBeInTheDocument();
+  });
+
+  it("shows All computers when All status filter is clicked after Enabled", async () => {
+    const entries = [
+      makeComputerEntry("WS001"),
+      makeComputerEntry("WS002", { userAccountControl: ["4098"] }),
+    ];
+    mockBrowseWith(entries);
+
+    render(<ComputerLookup />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("computer-results-list")).toBeInTheDocument();
+    });
+
+    // Filter to Enabled only
+    fireEvent.click(screen.getByText("Enabled", { selector: "button" }));
+    expect(
+      screen.queryByTestId("computer-result-WS002"),
+    ).not.toBeInTheDocument();
+
+    // Switch back to All
+    const allButtons = screen.getAllByText("All");
+    const statusAllButton = allButtons.find(
+      (btn) => btn.tagName === "BUTTON" || btn.closest("button"),
+    );
+    fireEvent.click(statusAllButton!.closest("button") ?? statusAllButton!);
+
+    expect(screen.getByTestId("computer-result-WS001")).toBeInTheDocument();
+    expect(screen.getByTestId("computer-result-WS002")).toBeInTheDocument();
+  });
+
+  // ---------------------------------------------------------------------------
+  // OS filter tests
+  // ---------------------------------------------------------------------------
+
+  it("filters computers by Windows OS", async () => {
+    const entries = [
+      makeComputerEntry("WS001"), // Windows 11 Enterprise
+      makeComputerEntry("LINUX01", { operatingSystem: ["Ubuntu 22.04"] }),
+    ];
+    mockBrowseWith(entries);
+
+    render(<ComputerLookup />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("computer-results-list")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText("Windows", { selector: "button" }));
+
+    expect(screen.getByTestId("computer-result-WS001")).toBeInTheDocument();
+    expect(
+      screen.queryByTestId("computer-result-LINUX01"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("filters computers by Other OS", async () => {
+    const entries = [
+      makeComputerEntry("WS001"),
+      makeComputerEntry("LINUX01", { operatingSystem: ["Ubuntu 22.04"] }),
+    ];
+    mockBrowseWith(entries);
+
+    render(<ComputerLookup />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("computer-results-list")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText("Other", { selector: "button" }));
+
+    expect(
+      screen.queryByTestId("computer-result-WS001"),
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("computer-result-LINUX01")).toBeInTheDocument();
+  });
+
+  // ---------------------------------------------------------------------------
+  // Filter badge counts
+  // ---------------------------------------------------------------------------
+
+  it("displays correct status filter badge counts", async () => {
+    const entries = [
+      makeComputerEntry("WS001"), // enabled
+      makeComputerEntry("WS002"), // enabled
+      makeComputerEntry("WS003", { userAccountControl: ["4098"] }), // disabled
+    ];
+    mockBrowseWith(entries);
+
+    render(<ComputerLookup />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("computer-results-list")).toBeInTheDocument();
+    });
+
+    // Enabled count should be 2, Disabled count should be 1
+    expect(screen.getByText("(2)")).toBeInTheDocument();
+    expect(screen.getByText("(1)")).toBeInTheDocument();
+  });
+
+  it("displays correct OS filter badge counts", async () => {
+    const entries = [
+      makeComputerEntry("WS001"), // Windows
+      makeComputerEntry("WS002"), // Windows
+      makeComputerEntry("LINUX01", { operatingSystem: ["Ubuntu 22.04"] }),
+    ];
+    mockBrowseWith(entries);
+
+    render(<ComputerLookup />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("computer-results-list")).toBeInTheDocument();
+    });
+
+    // Windows button should show (2), Other button should show (1)
+    const windowsButton = screen.getByText("Windows", { selector: "button" });
+    expect(windowsButton.parentElement?.textContent).toContain("(2)");
+    const otherButton = screen.getByText("Other", { selector: "button" });
+    expect(otherButton.parentElement?.textContent).toContain("(1)");
+  });
+
+  // ---------------------------------------------------------------------------
+  // Combined status + OS filters
+  // ---------------------------------------------------------------------------
+
+  it("applies both status and OS filters simultaneously", async () => {
+    const entries = [
+      makeComputerEntry("WS001"), // enabled, Windows
+      makeComputerEntry("WS002", { userAccountControl: ["4098"] }), // disabled, Windows
+      makeComputerEntry("LINUX01", { operatingSystem: ["Ubuntu 22.04"] }), // enabled, other
+    ];
+    mockBrowseWith(entries);
+
+    render(<ComputerLookup />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("computer-results-list")).toBeInTheDocument();
+    });
+
+    // Filter to Enabled + Windows
+    fireEvent.click(screen.getByText("Enabled", { selector: "button" }));
+    fireEvent.click(screen.getByText("Windows", { selector: "button" }));
+
+    expect(screen.getByTestId("computer-result-WS001")).toBeInTheDocument();
+    expect(
+      screen.queryByTestId("computer-result-WS002"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("computer-result-LINUX01"),
+    ).not.toBeInTheDocument();
+  });
+
+  // ---------------------------------------------------------------------------
+  // Empty state with active filters
+  // ---------------------------------------------------------------------------
+
+  it("shows filter-specific empty state when filters produce no results", async () => {
+    const entries = [
+      makeComputerEntry("WS001"), // enabled, Windows
+    ];
+    mockBrowseWith(entries);
+
+    render(<ComputerLookup />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("computer-results-list")).toBeInTheDocument();
+    });
+
+    // Filter to disabled - no computers should match
+    fireEvent.click(screen.getByText("Disabled", { selector: "button" }));
+
+    expect(
+      screen.getByText("No computers match the selected filters."),
+    ).toBeInTheDocument();
+  });
+
+  // ---------------------------------------------------------------------------
+  // Move to OU dialog (requires AccountOperator permission)
+  // ---------------------------------------------------------------------------
+
+  it("shows Move to OU context menu for users with AccountOperator permission", async () => {
+    // Override usePermissions to grant canMove
+    const permMod = await import("@/hooks/usePermissions");
+    vi.spyOn(permMod, "usePermissions").mockReturnValue({
+      hasPermission: () => true,
+      level: "AccountOperator" as import("@/types/permissions").PermissionLevel,
+      groups: [],
+      loading: false,
+    });
+
+    const entries = [makeComputerEntry("WS001")];
+    mockBrowseWith(entries);
+
+    render(<ComputerLookup />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("computer-result-WS001")).toBeInTheDocument();
+    });
+
+    // Right-click on the computer item
+    fireEvent.contextMenu(screen.getByTestId("computer-result-WS001"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Move to OU")).toBeInTheDocument();
+    });
+  });
+
+  it("does not show Move to OU for ReadOnly users on right-click", async () => {
+    // Ensure usePermissions returns ReadOnly (no canMove)
+    const permMod = await import("@/hooks/usePermissions");
+    vi.spyOn(permMod, "usePermissions").mockReturnValue({
+      hasPermission: () => false,
+      level: "ReadOnly" as import("@/types/permissions").PermissionLevel,
+      groups: [],
+      loading: false,
+    });
+
+    const entries = [makeComputerEntry("WS001")];
+    mockBrowseWith(entries);
+
+    render(<ComputerLookup />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("computer-result-WS001")).toBeInTheDocument();
+    });
+
+    // Right-click should not produce a context menu with "Move to OU"
+    fireEvent.contextMenu(screen.getByTestId("computer-result-WS001"));
+
+    // The context menu should have no items so "Move to OU" should not appear
+    expect(screen.queryByText("Move to OU")).not.toBeInTheDocument();
+  });
+
+  // ---------------------------------------------------------------------------
+  // Accessibility status with filters active
+  // ---------------------------------------------------------------------------
+
+  it("updates accessibility status when filters reduce count", async () => {
+    const entries = [
+      makeComputerEntry("WS001"),
+      makeComputerEntry("WS002"),
+      makeComputerEntry("WS003", { userAccountControl: ["4098"] }),
+    ];
+    mockBrowseWith(entries);
+
+    render(<ComputerLookup />);
+
+    await waitFor(() => {
+      const status = screen.getByTestId("computer-lookup-status");
+      expect(status).toHaveTextContent("3 computers found");
+    });
+
+    // Filter to Enabled only (should leave 2)
+    fireEvent.click(screen.getByText("Enabled", { selector: "button" }));
+
+    await waitFor(() => {
+      const status = screen.getByTestId("computer-lookup-status");
+      expect(status).toHaveTextContent("2 computers found");
     });
   });
 });

@@ -131,7 +131,7 @@ describe("ComputerDetail", () => {
   it("renders property groups for Identity, Status, Location, Network", () => {
     render(<ComputerDetail computer={makeComputer()} />);
     expect(screen.getByText("Identity")).toBeInTheDocument();
-    expect(screen.getByText("Status")).toBeInTheDocument();
+    expect(screen.getAllByText("Status").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Location")).toBeInTheDocument();
     expect(screen.getByText("Network")).toBeInTheDocument();
   });
@@ -254,5 +254,176 @@ describe("ComputerDetail", () => {
       "resolve_dns",
       expect.anything(),
     );
+  });
+
+  describe("Group memberships - filter", () => {
+    it("filters groups by text input", async () => {
+      render(<ComputerDetail computer={makeComputer()} />);
+
+      // Both groups should be visible initially
+      expect(screen.getByText("Domain Computers")).toBeInTheDocument();
+      expect(screen.getByText("IT Workstations")).toBeInTheDocument();
+
+      // Filter to only show IT Workstations
+      const filterInput = screen.getByTestId("filter-text-input");
+      fireEvent.change(filterInput, { target: { value: "IT" } });
+
+      await waitFor(() => {
+        expect(screen.getByText("IT Workstations")).toBeInTheDocument();
+        expect(screen.queryByText("Domain Computers")).not.toBeInTheDocument();
+      });
+    });
+
+    it("shows no rows when filter matches nothing", async () => {
+      render(<ComputerDetail computer={makeComputer()} />);
+
+      const filterInput = screen.getByTestId("filter-text-input");
+      fireEvent.change(filterInput, { target: { value: "zzz-nonexistent" } });
+
+      await waitFor(() => {
+        expect(screen.queryByText("Domain Computers")).not.toBeInTheDocument();
+        expect(screen.queryByText("IT Workstations")).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("Group memberships - export", () => {
+    it("renders export toolbar in groups section", () => {
+      render(<ComputerDetail computer={makeComputer()} />);
+      const groupsSection = screen.getByTestId("computer-groups-section");
+      const exportToolbar = groupsSection.querySelector('[data-testid="export-toolbar"]');
+      expect(exportToolbar).toBeInTheDocument();
+    });
+
+    it("shows export menu when clicking export button", async () => {
+      render(<ComputerDetail computer={makeComputer()} />);
+
+      const exportBtn = screen.getByTestId("export-button");
+      fireEvent.click(exportBtn);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("export-menu")).toBeInTheDocument();
+      });
+    });
+
+    it("disables export button when no groups", () => {
+      render(<ComputerDetail computer={makeComputer({ memberOf: [] })} />);
+      const exportBtn = screen.getByTestId("export-button");
+      expect(exportBtn).toBeDisabled();
+    });
+  });
+
+  describe("Group memberships - context menu", () => {
+    it("opens context menu on right-click of a group row", async () => {
+      render(<ComputerDetail computer={makeComputer()} />);
+
+      const groupRow = screen.getByText("Domain Computers").closest("tr");
+      expect(groupRow).not.toBeNull();
+      fireEvent.contextMenu(groupRow!);
+
+      await waitFor(() => {
+        expect(screen.getByText("View group members")).toBeInTheDocument();
+      });
+    });
+
+    it("opens GroupMembersDialog when clicking view group members", async () => {
+      render(<ComputerDetail computer={makeComputer()} />);
+
+      // Find "IT Workstations" text and locate the parent row element
+      const itText = screen.getByText("IT Workstations");
+      const groupRow = itText.closest("tr") ?? itText.closest("[data-testid]")?.parentElement;
+      expect(groupRow).not.toBeNull();
+      fireEvent.contextMenu(groupRow!);
+
+      await waitFor(() => {
+        expect(screen.getByText("View group members")).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText("View group members"));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("group-members-dialog")).toBeInTheDocument();
+      });
+    });
+
+    it("closes GroupMembersDialog on close button click", async () => {
+      render(<ComputerDetail computer={makeComputer()} />);
+
+      const itText = screen.getByText("IT Workstations");
+      const groupRow = itText.closest("tr") ?? itText.closest("[data-testid]")?.parentElement;
+      fireEvent.contextMenu(groupRow!);
+
+      await waitFor(() => {
+        expect(screen.getByText("View group members")).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText("View group members"));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("group-members-dialog")).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByTestId("close-group-dialog"));
+
+      await waitFor(() => {
+        expect(screen.queryByTestId("group-members-dialog")).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("DNS cache and timeout indicator", () => {
+    it("uses DNS cache on re-render with same hostname", async () => {
+      const { rerender } = render(
+        <ComputerDetail computer={makeComputer()} />,
+      );
+
+      // Wait for initial DNS resolution
+      await waitFor(() => {
+        expect(screen.getByText("10.0.0.1")).toBeInTheDocument();
+      });
+
+      const callCountBefore = mockInvoke.mock.calls.filter(
+        (c) => c[0] === "resolve_dns",
+      ).length;
+
+      // Re-render with same hostname - should use cache
+      rerender(
+        <ComputerDetail computer={makeComputer()} />,
+      );
+
+      // Wait a tick and verify no additional resolve_dns call
+      await waitFor(() => {
+        const callCountAfter = mockInvoke.mock.calls.filter(
+          (c) => c[0] === "resolve_dns",
+        ).length;
+        expect(callCountAfter).toBe(callCountBefore);
+      });
+    });
+
+    it("shows Resolving text while DNS is in progress", () => {
+      // Use a DNS resolve that never completes
+      mockInvoke.mockImplementation(((cmd: string) => {
+        if (cmd === "resolve_dns") return new Promise(() => {});
+        if (cmd === "get_platform") return Promise.resolve("unknown");
+        return Promise.resolve(null);
+      }) as typeof invoke);
+
+      render(<ComputerDetail computer={makeComputer()} />);
+
+      // While resolving, should show "Resolving..."
+      expect(screen.getByText("Resolving...")).toBeInTheDocument();
+    });
+
+    it("clears DNS state when hostname is empty", () => {
+      render(<ComputerDetail computer={makeComputer({ dnsHostName: "" })} />);
+      expect(screen.getByText("N/A")).toBeInTheDocument();
+    });
+  });
+
+  describe("Delete computer", () => {
+    it("does not show delete button for ReadOnly users", () => {
+      render(<ComputerDetail computer={makeComputer()} />);
+      expect(screen.queryByTestId("computer-delete-btn")).not.toBeInTheDocument();
+    });
   });
 });

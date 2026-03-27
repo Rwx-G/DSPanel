@@ -1,0 +1,17 @@
+{
+  "pageTitle": "Búsqueda de equipos",
+  "searchPlaceholder": "Buscar por nombre de equipo...",
+  "all": "Todos",
+  "allOs": "Todos los SO",
+  "windows": "Windows",
+  "otherOs": "Otro",
+  "loadingComputers": "Cargando equipos...",
+  "found_one": "{{count}} equipo encontrado",
+  "found_other": "{{count}} equipos encontrados",
+  "noComputersFound": "No se encontraron equipos",
+  "failedToLoad": "No se pudieron cargar los equipos",
+  "noComputersMatch": "Ningún equipo coincide con \"{{query}}\"",
+  "noFilterResults": "Ningún equipo coincide con los filtros seleccionados.",
+  "selectComputer": "Seleccione un equipo para ver los detalles",
+  "unknownOs": "SO desconocido"
+}

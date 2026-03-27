@@ -12,6 +12,7 @@ import { OUPicker } from "@/components/form/OUPicker";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { EmptyState } from "@/components/common/EmptyState";
 import type { Preset, PresetType } from "@/types/preset";
+import { useTranslation } from "react-i18next";
 
 const EMPTY_PRESET: Preset = {
   name: "",
@@ -28,12 +29,13 @@ function parseCnFromDn(dn: string): string {
 }
 
 function PresetEditorWrapper() {
+  const { t } = useTranslation(["presetManagement", "common", "sidebar"]);
   const { path: presetPath } = usePresetPath();
   const { openTab } = useNavigation();
 
   const handleOpenSettings = useCallback(() => {
-    openTab("Settings", "settings", undefined, { tab: "presets" });
-  }, [openTab]);
+    openTab(t("sidebar:settings"), "settings", undefined, { tab: "presets" });
+  }, [openTab, t]);
 
   return (
     <div className="flex h-full flex-col gap-4 p-4">
@@ -43,7 +45,7 @@ function PresetEditorWrapper() {
           data-testid="preset-show-settings"
         >
           <FolderOpen size={12} />
-          Storage: {presetPath}
+          {t("storage")} {presetPath}
         </div>
       )}
       {presetPath ? (
@@ -51,9 +53,9 @@ function PresetEditorWrapper() {
       ) : (
         <EmptyState
           icon={<FolderOpen size={40} />}
-          title="Preset Storage Not Configured"
-          description="Configure the preset storage path in Settings to start managing presets."
-          action={{ label: "Open Settings", onClick: handleOpenSettings }}
+          title={t("storageNotConfigured")}
+          description={t("storageNotConfiguredDescription")}
+          action={{ label: t("openSettings"), onClick: handleOpenSettings }}
         />
       )}
     </div>
@@ -61,6 +63,7 @@ function PresetEditorWrapper() {
 }
 
 function PresetEditor() {
+  const { t } = useTranslation(["presetManagement", "common"]);
   const { presets, loading, savePreset, deletePreset, acceptChecksum } = usePresets();
   const searchGroups = useGroupSearch();
   const { nodes: ouNodes, loading: ouLoading, error: ouError } = useOUTree({ silent: true });
@@ -99,10 +102,10 @@ function PresetEditor() {
 
   const validate = useCallback((): string[] => {
     const errs: string[] = [];
-    if (!draft.name.trim()) errs.push("Name is required");
-    if (!draft.targetOu.trim()) errs.push("Target OU is required");
+    if (!draft.name.trim()) errs.push(t("nameRequired"));
+    if (!draft.targetOu.trim()) errs.push(t("ouRequired"));
     if (draft.groups.length === 0 && Object.keys(draft.attributes).length === 0)
-      errs.push("At least one group or attribute is required");
+      errs.push(t("groupOrAttrRequired"));
     // Check name uniqueness for new presets
     if (
       isNew &&
@@ -110,7 +113,7 @@ function PresetEditor() {
         (p) => p.name.toLowerCase() === draft.name.trim().toLowerCase(),
       )
     )
-      errs.push("A preset with this name already exists");
+      errs.push(t("duplicateName"));
     return errs;
   }, [draft, isNew, presets]);
 
@@ -138,9 +141,9 @@ function PresetEditor() {
     if (selectedIndex === null || isNew) return;
     const preset = presets[selectedIndex];
     const confirmed = await showConfirmation(
-      "Delete Preset",
-      `Are you sure you want to delete "${preset.name}"?`,
-      "This action cannot be undone.",
+      t("deletePresetTitle"),
+      t("deletePresetConfirm", { name: preset.name }),
+      t("deletePresetWarning"),
     );
     if (!confirmed) return;
 
@@ -181,7 +184,7 @@ function PresetEditor() {
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
-        <LoadingSpinner message="Loading presets..." />
+        <LoadingSpinner message={t("common:loading")} />
       </div>
     );
   }
@@ -199,7 +202,7 @@ function PresetEditor() {
             className="btn btn-sm btn-primary"
             data-testid="preset-new-btn"
           >
-            <Plus size={14} /> New
+            <Plus size={14} /> {t("new")}
           </button>
           <button
             onClick={handleSave}
@@ -207,7 +210,7 @@ function PresetEditor() {
             className="btn btn-sm btn-secondary"
             data-testid="preset-save-btn"
           >
-            <Save size={14} /> Save
+            <Save size={14} /> {t("common:save")}
           </button>
           <button
             onClick={handleDelete}
@@ -215,7 +218,7 @@ function PresetEditor() {
             className="btn btn-sm btn-ghost text-[var(--color-error)] hover:bg-[var(--color-error-bg)]"
             data-testid="preset-delete-btn"
           >
-            <Trash2 size={14} /> Delete
+            <Trash2 size={14} /> {t("common:delete")}
           </button>
         </div>
 
@@ -223,8 +226,8 @@ function PresetEditor() {
         <div className="flex-1 overflow-auto">
           {presets.length === 0 && !isNew ? (
             <EmptyState
-              title="No presets"
-              description="Click 'New' to create your first preset."
+              title={t("noPresets")}
+              description={t("noPresetsDescription")}
             />
           ) : (
             <div className="divide-y divide-[var(--color-border-default)]">
@@ -256,7 +259,7 @@ function PresetEditor() {
                       <AlertTriangle
                         size={14}
                         className="shrink-0 text-[var(--color-warning)]"
-                        aria-label="Preset modified externally"
+                        aria-label={t("presetModifiedAriaLabel")}
                       />
                     )}
                   </div>
@@ -276,8 +279,8 @@ function PresetEditor() {
       <div className="flex-1 rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-4 overflow-auto">
         {!hasEditor ? (
           <EmptyState
-            title="Select a preset"
-            description="Choose a preset from the list or create a new one."
+            title={t("selectPreset")}
+            description={t("selectPresetDescription")}
           />
         ) : (
           <div className="space-y-4" data-testid="preset-editor-form">
@@ -290,18 +293,17 @@ function PresetEditor() {
                 <AlertTriangle size={16} className="shrink-0 mt-0.5 text-[var(--color-warning)]" />
                 <div className="flex-1">
                   <div className="text-caption font-semibold text-[var(--color-warning)]">
-                    This preset was modified outside DSPanel
+                    {t("modifiedOutside")}
                   </div>
                   <div className="mt-0.5 text-caption text-[var(--color-text-secondary)]">
-                    The file on the network share has changed since it was last saved by DSPanel.
-                    Review the content below, then accept or re-save to clear this warning.
+                    {t("modifiedOutsideDescription")}
                   </div>
                   <button
                     className="btn btn-sm mt-2"
                     onClick={() => acceptChecksum(presets[selectedIndex].name)}
                     data-testid="preset-accept-checksum"
                   >
-                    Accept changes
+                    {t("acceptChanges")}
                   </button>
                 </div>
               </div>
@@ -327,14 +329,14 @@ function PresetEditor() {
             {/* Name */}
             <div>
               <label className="mb-1 block text-caption font-semibold text-[var(--color-text-secondary)]">
-                Name
+                {t("nameLabel")}
               </label>
               <input
                 type="text"
                 value={draft.name}
                 onChange={(e) => setDraft({ ...draft, name: e.target.value })}
                 className="w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5 text-body text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
-                placeholder="Preset name"
+                placeholder={t("presetNamePlaceholder")}
                 data-testid="preset-name-input"
               />
             </div>
@@ -342,7 +344,7 @@ function PresetEditor() {
             {/* Description */}
             <div>
               <label className="mb-1 block text-caption font-semibold text-[var(--color-text-secondary)]">
-                Description
+                {t("common:description")}
               </label>
               <textarea
                 value={draft.description}
@@ -351,7 +353,7 @@ function PresetEditor() {
                 }
                 rows={2}
                 className="w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5 text-body text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none resize-none"
-                placeholder="What this preset does..."
+                placeholder={t("descriptionPlaceholder")}
                 data-testid="preset-description-input"
               />
             </div>
@@ -359,7 +361,7 @@ function PresetEditor() {
             {/* Type */}
             <div>
               <label className="mb-1 block text-caption font-semibold text-[var(--color-text-secondary)]">
-                Type
+                {t("typeLabel")}
               </label>
               <select
                 value={draft.type}
@@ -372,15 +374,15 @@ function PresetEditor() {
                 className="w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5 text-body text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
                 data-testid="preset-type-select"
               >
-                <option value="Onboarding">Onboarding</option>
-                <option value="Offboarding">Offboarding</option>
+                <option value="Onboarding">{t("typeOnboarding")}</option>
+                <option value="Offboarding">{t("typeOffboarding")}</option>
               </select>
             </div>
 
             {/* Target OU */}
             <div>
               <label className="mb-1 block text-caption font-semibold text-[var(--color-text-secondary)]">
-                Target OU
+                {t("targetOU")}
               </label>
               <OUPicker
                 nodes={ouNodes}
@@ -394,20 +396,20 @@ function PresetEditor() {
             {/* Groups */}
             <div>
               <label className="mb-1 block text-caption font-semibold text-[var(--color-text-secondary)]">
-                Groups
+                {t("groupsLabel")}
               </label>
               <GroupPicker
                 selectedGroups={selectedGroups}
                 onSelectionChange={handleGroupChange}
                 onSearch={searchGroups}
-                placeholder="Search AD groups..."
+                placeholder={t("searchGroupsPlaceholder")}
               />
             </div>
 
             {/* Custom Attributes */}
             <div>
               <label className="mb-1 block text-caption font-semibold text-[var(--color-text-secondary)]">
-                Custom Attributes
+                {t("customAttributes")}
               </label>
               {Object.entries(draft.attributes).length > 0 && (
                 <div className="mb-2 space-y-1">
@@ -438,7 +440,7 @@ function PresetEditor() {
                   type="text"
                   value={attrKey}
                   onChange={(e) => setAttrKey(e.target.value)}
-                  placeholder="Attribute name"
+                  placeholder={t("attrNamePlaceholder")}
                   className="flex-1 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1 text-caption text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
                   data-testid="attr-key-input"
                 />
@@ -446,7 +448,7 @@ function PresetEditor() {
                   type="text"
                   value={attrValue}
                   onChange={(e) => setAttrValue(e.target.value)}
-                  placeholder="Value"
+                  placeholder={t("valuePlaceholder")}
                   className="flex-1 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1 text-caption text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
                   data-testid="attr-value-input"
                 />
@@ -456,7 +458,7 @@ function PresetEditor() {
                   className="btn btn-sm btn-secondary"
                   data-testid="attr-add-btn"
                 >
-                  Add
+                  {t("common:add")}
                 </button>
               </div>
             </div>
@@ -468,14 +470,15 @@ function PresetEditor() {
 }
 
 export function PresetManagement() {
+  const { t } = useTranslation(["presetManagement", "common"]);
   return (
     <PermissionGate
       requiredLevel="AccountOperator"
       fallback={
         <div className="flex h-full items-center justify-center p-8">
           <EmptyState
-            title="Access Denied"
-            description="Preset management requires AccountOperator permission or higher."
+            title={t("common:accessDenied")}
+            description={t("accessDeniedDescription")}
           />
         </div>
       }

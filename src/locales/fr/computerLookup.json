@@ -1,0 +1,17 @@
+{
+  "pageTitle": "Recherche d'ordinateurs",
+  "searchPlaceholder": "Rechercher par nom d'ordinateur...",
+  "all": "Tous",
+  "allOs": "Tous les SE",
+  "windows": "Windows",
+  "otherOs": "Autre",
+  "loadingComputers": "Chargement des ordinateurs...",
+  "found_one": "{{count}} ordinateur trouvé",
+  "found_other": "{{count}} ordinateurs trouvés",
+  "noComputersFound": "Aucun ordinateur trouvé",
+  "failedToLoad": "Échec du chargement des ordinateurs",
+  "noComputersMatch": "Aucun ordinateur ne correspond à \"{{query}}\"",
+  "noFilterResults": "Aucun ordinateur ne correspond aux filtres sélectionnés.",
+  "selectComputer": "Sélectionnez un ordinateur pour voir les détails",
+  "unknownOs": "SE inconnu"
+}

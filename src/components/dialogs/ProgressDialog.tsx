@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { DialogShell } from "@/components/dialogs/DialogShell";
+import { useTranslation } from "react-i18next";
 
 interface ProgressDialogProps {
   statusMessage: string;
@@ -16,6 +17,7 @@ export function ProgressDialog({
   cancellable = false,
   onCancel,
 }: ProgressDialogProps) {
+  const { t } = useTranslation(["dialogs", "common"]);
   useEffect(() => {
     if (!cancellable || !onCancel) return;
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -71,7 +73,7 @@ export function ProgressDialog({
             className="mt-1 text-right text-caption text-[var(--color-text-secondary)]"
             data-testid="progress-percentage"
           >
-            {Math.round(percentage)}%
+            {t("dialogs:progress.percentage", { value: Math.round(percentage) })}
           </p>
         )}
 
@@ -82,7 +84,7 @@ export function ProgressDialog({
               onClick={onCancel}
               data-testid="progress-cancel"
             >
-              Cancel
+              {t("common:cancel")}
             </button>
           </div>
         )}

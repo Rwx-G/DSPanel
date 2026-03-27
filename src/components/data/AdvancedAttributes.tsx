@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback } from "react";
 import { Star, ChevronDown, ChevronRight, Filter, X, Pencil, Check } from "lucide-react";
 import { CopyButton } from "@/components/common/CopyButton";
+import { useTranslation } from "react-i18next";
 
 const STORAGE_KEY = "dspanel-favorite-attributes";
 
@@ -59,6 +60,7 @@ function EditableValue({
   displayValue: string;
   onEdit: (attributeName: string, oldValue: string, newValue: string) => void;
 }) {
+  const { t } = useTranslation(["components"]);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(displayValue);
 
@@ -92,7 +94,7 @@ function EditableValue({
         <button
           onClick={handleConfirm}
           className="rounded p-0.5 text-[var(--color-success)] hover:bg-[var(--color-success-bg)]"
-          aria-label="Confirm edit"
+          aria-label={t("components:advancedAttributes.confirmEdit")}
           data-testid={`adv-edit-confirm-${attrKey}`}
         >
           <Check size={14} />
@@ -100,7 +102,7 @@ function EditableValue({
         <button
           onClick={handleCancel}
           className="rounded p-0.5 text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]"
-          aria-label="Cancel edit"
+          aria-label={t("components:advancedAttributes.cancelEdit")}
           data-testid={`adv-edit-cancel-${attrKey}`}
         >
           <X size={14} />
@@ -113,7 +115,7 @@ function EditableValue({
     <>
       <span className="flex-1 text-body text-[var(--color-text-primary)] break-all font-mono">
         {displayValue || (
-          <span className="text-[var(--color-text-disabled)]">(empty)</span>
+          <span className="text-[var(--color-text-disabled)]">{t("components:advancedAttributes.empty")}</span>
         )}
       </span>
       <button
@@ -132,6 +134,7 @@ function EditableValue({
 }
 
 export function AdvancedAttributes({ rawAttributes, schemaAttributes, onEdit }: AdvancedAttributesProps) {
+  const { t } = useTranslation(["components"]);
   const [favorites, setFavorites] = useState<Set<string>>(loadFavorites);
   const [collapsed, setCollapsed] = useState(false);
   const [searchText, setSearchText] = useState("");
@@ -237,7 +240,7 @@ export function AdvancedAttributes({ rawAttributes, schemaAttributes, onEdit }: 
         ) : (
           <span className="flex-1 text-body text-[var(--color-text-primary)] break-all font-mono">
             {displayValue || (
-              <span className="text-[var(--color-text-disabled)]">(empty)</span>
+              <span className="text-[var(--color-text-disabled)]">{t("components:advancedAttributes.empty")}</span>
             )}
           </span>
         )}
@@ -257,13 +260,13 @@ export function AdvancedAttributes({ rawAttributes, schemaAttributes, onEdit }: 
       >
         {collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
         <h3 className="text-body font-semibold text-[var(--color-text-primary)]">
-          Advanced Attributes ({totalCount})
+          {t("components:advancedAttributes.title", { count: totalCount })}
         </h3>
       </button>
 
       {!collapsed && totalCount === 0 && (
         <p className="py-3 text-center text-caption text-[var(--color-text-secondary)]">
-          No advanced attributes available
+          {t("components:advancedAttributes.noAttributes")}
         </p>
       )}
 
@@ -278,7 +281,7 @@ export function AdvancedAttributes({ rawAttributes, schemaAttributes, onEdit }: 
               type="text"
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
-              placeholder="Filter attributes..."
+              placeholder={t("components:advancedAttributes.filterPlaceholder")}
               className="flex-1 bg-transparent text-body text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-secondary)]"
               data-testid="advanced-attributes-search"
             />
@@ -286,7 +289,7 @@ export function AdvancedAttributes({ rawAttributes, schemaAttributes, onEdit }: 
               <button
                 onClick={() => setSearchText("")}
                 className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
-                aria-label="Clear filter"
+                aria-label={t("components:advancedAttributes.clearFilter")}
               >
                 <X size={14} />
               </button>
@@ -299,13 +302,13 @@ export function AdvancedAttributes({ rawAttributes, schemaAttributes, onEdit }: 
                 className="accent-[var(--color-primary)]"
                 data-testid="show-empty-toggle"
               />
-              Show empty
+              {t("components:advancedAttributes.showEmpty")}
             </label>
           </div>
 
           {filteredCount === 0 && (
             <p className="py-3 text-center text-caption text-[var(--color-text-secondary)]">
-              No attributes match "{searchText}"
+              {t("components:advancedAttributes.noMatch", { query: searchText })}
             </p>
           )}
 
@@ -314,7 +317,7 @@ export function AdvancedAttributes({ rawAttributes, schemaAttributes, onEdit }: 
               {favoriteAttrs.length > 0 && (
                 <>
                   <div className="px-3 py-1.5 text-[10px] font-medium uppercase tracking-wider text-[var(--color-warning)] bg-[var(--color-surface-card)]">
-                    Favorites
+                    {t("components:advancedAttributes.favorites")}
                   </div>
                   {favoriteAttrs.map(([key, values]) =>
                     renderRow(key, values, true),
@@ -327,7 +330,7 @@ export function AdvancedAttributes({ rawAttributes, schemaAttributes, onEdit }: 
                     <div className="border-t border-[var(--color-border-default)]" />
                   )}
                   <div className="px-3 py-1.5 text-[10px] font-medium uppercase tracking-wider text-[var(--color-text-secondary)] bg-[var(--color-surface-card)]">
-                    All Attributes
+                    {t("components:advancedAttributes.allAttributes")}
                   </div>
                   {otherAttrs.map(([key, values]) =>
                     renderRow(key, values, false),

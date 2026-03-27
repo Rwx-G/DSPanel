@@ -2,10 +2,10 @@ use tauri::State;
 
 use crate::error::AppError;
 use crate::models::{DeletedObject, ExchangeOnlineInfo, ObjectSnapshot, Preset, SnapshotDiff};
+use crate::services::PermissionLevel;
 use crate::services::app_settings::AppSettings;
 use crate::services::permissions::PermissionMappings;
 use crate::services::update::{self, UpdateInfo};
-use crate::services::PermissionLevel;
 use crate::state::AppState;
 
 use super::capture_snapshot;
@@ -25,7 +25,7 @@ pub(crate) async fn is_recycle_bin_enabled_inner(state: &AppState) -> Result<boo
         ));
     }
 
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     provider
         .is_recycle_bin_enabled()
         .await
@@ -45,7 +45,7 @@ pub(crate) async fn get_deleted_objects_inner(
         ));
     }
 
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     provider
         .get_deleted_objects()
         .await
@@ -67,7 +67,20 @@ pub(crate) async fn restore_deleted_object_inner(
         ));
     }
 
-    let provider = state.directory_provider.clone();
+    // Clean the deleted DN for audit display (strip \0ADEL:<guid> suffix)
+    let clean_dn = deleted_dn
+        .split('\n')
+        .next()
+        .unwrap_or(deleted_dn)
+        .split('\0')
+        .next()
+        .unwrap_or(deleted_dn)
+        .split("\\0A")
+        .next()
+        .unwrap_or(deleted_dn)
+        .to_string();
+
+    let provider = state.provider();
     match provider
         .restore_deleted_object(deleted_dn, target_ou_dn)
         .await
@@ -75,7 +88,7 @@ pub(crate) async fn restore_deleted_object_inner(
         Ok(()) => {
             state.audit_service.log_success(
                 "ObjectRestored",
-                deleted_dn,
+                &clean_dn,
                 &format!("Restored to {}", target_ou_dn),
             );
             Ok(())
@@ -83,7 +96,7 @@ pub(crate) async fn restore_deleted_object_inner(
         Err(e) => {
             state.audit_service.log_failure(
                 "RestoreObjectFailed",
-                deleted_dn,
+                &clean_dn,
                 &format!("Failed to restore: {}", e),
             );
             Err(AppError::Directory(e.to_string()))
@@ -110,7 +123,7 @@ pub(crate) async fn create_contact_inner(
         ));
     }
 
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     match provider.create_contact(container_dn, attrs).await {
         Ok(dn) => {
             state.audit_service.log_success(
@@ -148,7 +161,7 @@ pub(crate) async fn update_contact_inner(
 
     capture_snapshot(state, dn, "ContactUpdate").await;
 
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     match provider.update_contact(dn, attrs).await {
         Ok(()) => {
             state
@@ -180,7 +193,7 @@ pub(crate) async fn delete_contact_inner(state: &AppState, dn: &str) -> Result<(
 
     capture_snapshot(state, dn, "ContactDelete").await;
 
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     match provider.delete_contact(dn).await {
         Ok(()) => {
             state
@@ -214,7 +227,7 @@ pub(crate) async fn create_printer_inner(
         ));
     }
 
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     match provider.create_printer(container_dn, attrs).await {
         Ok(dn) => {
             state.audit_service.log_success(
@@ -252,7 +265,7 @@ pub(crate) async fn update_printer_inner(
 
     capture_snapshot(state, dn, "PrinterUpdate").await;
 
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     match provider.update_printer(dn, attrs).await {
         Ok(()) => {
             state
@@ -284,7 +297,7 @@ pub(crate) async fn delete_printer_inner(state: &AppState, dn: &str) -> Result<(
 
     capture_snapshot(state, dn, "PrinterDelete").await;
 
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     match provider.delete_printer(dn).await {
         Ok(()) => {
             state
@@ -312,7 +325,7 @@ pub(crate) async fn get_thumbnail_photo_inner(
     state: &AppState,
     user_dn: &str,
 ) -> Result<Option<String>, AppError> {
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     provider
         .get_thumbnail_photo(user_dn)
         .await
@@ -350,7 +363,7 @@ pub(crate) async fn set_thumbnail_photo_inner(
 
     capture_snapshot(state, user_dn, "SetThumbnailPhoto").await;
 
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     match provider.set_thumbnail_photo(user_dn, photo_base64).await {
         Ok(()) => {
             state
@@ -387,7 +400,7 @@ pub(crate) async fn remove_thumbnail_photo_inner(
         .snapshot_service
         .capture(user_dn, "RemoveThumbnailPhoto");
 
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     match provider.remove_thumbnail_photo(user_dn).await {
         Ok(()) => {
             state.audit_service.log_success(
@@ -519,7 +532,7 @@ pub(crate) async fn capture_object_snapshot_inner(
     object_dn: &str,
     operation_type: &str,
 ) -> Result<i64, AppError> {
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     let operator = provider
         .authenticated_user()
         .unwrap_or_else(|| std::env::var("USERNAME").unwrap_or_else(|_| "Unknown".to_string()));
@@ -579,7 +592,7 @@ pub(crate) async fn compute_snapshot_diff_inner(
         serde_json::from_str(&snapshot.attributes_json).unwrap_or_default();
 
     // Fetch current state from directory by extracting CN and searching
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     let cn = snapshot
         .object_dn
         .split(',')
@@ -681,7 +694,7 @@ pub(crate) async fn restore_from_snapshot_inner(
         "memberOf",
     ];
 
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     let dn = &snapshot.object_dn;
 
     // Fetch current attributes to detect what needs to be cleared
@@ -1086,7 +1099,7 @@ pub(crate) async fn validate_group_exists_inner(
     state: &AppState,
     group_dn: &str,
 ) -> Result<bool, AppError> {
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     // Extract CN from DN to search
     let cn = group_dn
         .split(',')
@@ -1164,11 +1177,11 @@ pub(crate) async fn check_for_update_inner(state: &AppState) -> Option<UpdateInf
     }
 
     // Check if this version was skipped
-    if let Some(ref skipped) = update_settings.skipped_version {
-        if skipped == &info.version {
-            tracing::debug!(version = %info.version, "Update skipped by user");
-            return None;
-        }
+    if let Some(ref skipped) = update_settings.skipped_version
+        && skipped == &info.version
+    {
+        tracing::debug!(version = %info.version, "Update skipped by user");
+        return None;
     }
 
     // Check if it's actually newer
@@ -1367,8 +1380,8 @@ pub async fn pick_folder_dialog() -> Result<Option<String>, AppError> {
 mod tests {
     use super::*;
     use crate::models::DirectoryEntry;
-    use crate::services::directory::tests::MockDirectoryProvider;
     use crate::services::PermissionConfig;
+    use crate::services::directory::tests::MockDirectoryProvider;
     use std::collections::HashMap;
     use std::sync::Arc;
 
@@ -1697,9 +1710,11 @@ mod tests {
         assert!(result.is_err());
 
         let entries = state.audit_service.get_entries();
-        assert!(entries
-            .iter()
-            .any(|e| e.action == "ThumbnailPhotoSetFailed"));
+        assert!(
+            entries
+                .iter()
+                .any(|e| e.action == "ThumbnailPhotoSetFailed")
+        );
     }
 
     #[tokio::test]
@@ -1710,9 +1725,11 @@ mod tests {
         assert!(result.is_err());
 
         let entries = state.audit_service.get_entries();
-        assert!(entries
-            .iter()
-            .any(|e| e.action == "ThumbnailPhotoRemoveFailed"));
+        assert!(
+            entries
+                .iter()
+                .any(|e| e.action == "ThumbnailPhotoRemoveFailed")
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -2109,9 +2126,11 @@ mod tests {
         set_permission_mappings_inner(&state, &mappings).unwrap();
 
         let entries = state.audit_service.get_entries();
-        assert!(entries
-            .iter()
-            .any(|e| e.action == "PermissionMappingUpdate"));
+        assert!(
+            entries
+                .iter()
+                .any(|e| e.action == "PermissionMappingUpdate")
+        );
     }
 
     #[tokio::test]
@@ -2143,5 +2162,383 @@ mod tests {
         let diffs = compute_snapshot_diff_inner(&state, 1).await.unwrap();
         assert!(!diffs.is_empty());
         assert!(diffs.iter().any(|d| d.attribute == "mail"));
+    }
+
+    // -----------------------------------------------------------------------
+    // Contact CRUD - success/failure paths
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_create_contact_failure_audits() {
+        let state = make_state_with_level_and_failure(PermissionLevel::AccountOperator);
+        let attrs = HashMap::new();
+        let result = create_contact_inner(&state, "OU=Contacts,DC=example,DC=com", &attrs).await;
+        assert!(result.is_err());
+
+        let entries = state.audit_service.get_entries();
+        assert!(entries.iter().any(|e| e.action == "ContactCreateFailed"));
+    }
+
+    #[tokio::test]
+    async fn test_update_contact_requires_account_operator() {
+        let state = make_state(); // ReadOnly
+        let attrs = HashMap::new();
+        let result =
+            update_contact_inner(&state, "CN=Contact,OU=Contacts,DC=example,DC=com", &attrs).await;
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), AppError::PermissionDenied(_)));
+    }
+
+    #[tokio::test]
+    async fn test_update_contact_success_and_audit() {
+        let (state, provider) =
+            make_state_with_level_and_provider(PermissionLevel::AccountOperator);
+        let mut attrs = HashMap::new();
+        attrs.insert("mail".to_string(), "new@example.com".to_string());
+
+        let result =
+            update_contact_inner(&state, "CN=Contact,OU=Contacts,DC=example,DC=com", &attrs).await;
+        assert!(result.is_ok());
+
+        let calls = provider.update_contact_calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+
+        let entries = state.audit_service.get_entries();
+        assert!(entries.iter().any(|e| e.action == "ContactUpdated"));
+    }
+
+    #[tokio::test]
+    async fn test_update_contact_failure_audits() {
+        let state = make_state_with_level_and_failure(PermissionLevel::AccountOperator);
+        let attrs = HashMap::new();
+        let result =
+            update_contact_inner(&state, "CN=Contact,OU=Contacts,DC=example,DC=com", &attrs).await;
+        assert!(result.is_err());
+
+        let entries = state.audit_service.get_entries();
+        assert!(entries.iter().any(|e| e.action == "ContactUpdateFailed"));
+    }
+
+    #[tokio::test]
+    async fn test_delete_contact_success_and_audit() {
+        let (state, provider) =
+            make_state_with_level_and_provider(PermissionLevel::AccountOperator);
+        let result = delete_contact_inner(&state, "CN=Contact,OU=Contacts,DC=example,DC=com").await;
+        assert!(result.is_ok());
+
+        let calls = provider.delete_contact_calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+
+        let entries = state.audit_service.get_entries();
+        assert!(entries.iter().any(|e| e.action == "ContactDeleted"));
+    }
+
+    #[tokio::test]
+    async fn test_delete_contact_failure_audits() {
+        let state = make_state_with_level_and_failure(PermissionLevel::AccountOperator);
+        let result = delete_contact_inner(&state, "CN=Contact,OU=Contacts,DC=example,DC=com").await;
+        assert!(result.is_err());
+
+        let entries = state.audit_service.get_entries();
+        assert!(entries.iter().any(|e| e.action == "ContactDeleteFailed"));
+    }
+
+    // -----------------------------------------------------------------------
+    // Printer CRUD - success/failure paths
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_create_printer_success_and_audit() {
+        let (state, provider) = make_state_with_level_and_provider(PermissionLevel::DomainAdmin);
+        let mut attrs = HashMap::new();
+        attrs.insert("printerName".to_string(), "HP LaserJet".to_string());
+
+        let result = create_printer_inner(&state, "OU=Printers,DC=example,DC=com", &attrs).await;
+        assert!(result.is_ok());
+
+        let calls = provider.create_printer_calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+
+        let entries = state.audit_service.get_entries();
+        assert!(entries.iter().any(|e| e.action == "PrinterCreated"));
+    }
+
+    #[tokio::test]
+    async fn test_create_printer_failure_audits() {
+        let state = make_state_with_level_and_failure(PermissionLevel::DomainAdmin);
+        let attrs = HashMap::new();
+        let result = create_printer_inner(&state, "OU=Printers,DC=example,DC=com", &attrs).await;
+        assert!(result.is_err());
+
+        let entries = state.audit_service.get_entries();
+        assert!(entries.iter().any(|e| e.action == "PrinterCreateFailed"));
+    }
+
+    #[tokio::test]
+    async fn test_update_printer_requires_domain_admin() {
+        let state = make_state_with_level(PermissionLevel::AccountOperator);
+        let attrs = HashMap::new();
+        let result =
+            update_printer_inner(&state, "CN=Printer,OU=Printers,DC=example,DC=com", &attrs).await;
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), AppError::PermissionDenied(_)));
+    }
+
+    #[tokio::test]
+    async fn test_update_printer_success_and_audit() {
+        let (state, provider) = make_state_with_level_and_provider(PermissionLevel::DomainAdmin);
+        let mut attrs = HashMap::new();
+        attrs.insert("location".to_string(), "Floor 3".to_string());
+
+        let result =
+            update_printer_inner(&state, "CN=Printer,OU=Printers,DC=example,DC=com", &attrs).await;
+        assert!(result.is_ok());
+
+        let calls = provider.update_printer_calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+
+        let entries = state.audit_service.get_entries();
+        assert!(entries.iter().any(|e| e.action == "PrinterUpdated"));
+    }
+
+    #[tokio::test]
+    async fn test_update_printer_failure_audits() {
+        let state = make_state_with_level_and_failure(PermissionLevel::DomainAdmin);
+        let attrs = HashMap::new();
+        let result =
+            update_printer_inner(&state, "CN=Printer,OU=Printers,DC=example,DC=com", &attrs).await;
+        assert!(result.is_err());
+
+        let entries = state.audit_service.get_entries();
+        assert!(entries.iter().any(|e| e.action == "PrinterUpdateFailed"));
+    }
+
+    #[tokio::test]
+    async fn test_delete_printer_success_and_audit() {
+        let (state, provider) = make_state_with_level_and_provider(PermissionLevel::DomainAdmin);
+        let result = delete_printer_inner(&state, "CN=Printer,OU=Printers,DC=example,DC=com").await;
+        assert!(result.is_ok());
+
+        let calls = provider.delete_printer_calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+
+        let entries = state.audit_service.get_entries();
+        assert!(entries.iter().any(|e| e.action == "PrinterDeleted"));
+    }
+
+    #[tokio::test]
+    async fn test_delete_printer_failure_audits() {
+        let state = make_state_with_level_and_failure(PermissionLevel::DomainAdmin);
+        let result = delete_printer_inner(&state, "CN=Printer,OU=Printers,DC=example,DC=com").await;
+        assert!(result.is_err());
+
+        let entries = state.audit_service.get_entries();
+        assert!(entries.iter().any(|e| e.action == "PrinterDeleteFailed"));
+    }
+
+    // -----------------------------------------------------------------------
+    // Thumbnail photo - size validation
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_set_thumbnail_photo_rejects_oversized() {
+        let state = make_state_with_level(PermissionLevel::AccountOperator);
+        // Create a base64 string that decodes to > 100KB
+        // 140000 base64 chars ~ 105KB decoded
+        let large_photo = "A".repeat(140_000);
+        let result =
+            set_thumbnail_photo_inner(&state, "CN=John,OU=Users,DC=example,DC=com", &large_photo)
+                .await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            AppError::Validation(msg) => {
+                assert!(msg.contains("exceeds maximum size"));
+            }
+            other => panic!("Expected Validation, got: {:?}", other),
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Credential store - via inner functions
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_delete_credential_rejects_invalid_key() {
+        let state = make_state();
+        let result = delete_credential_inner(&state, "bad_key");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_credential_store_overwrite() {
+        let state = make_state();
+        store_credential_inner(&state, "graph_client_secret", "v1").unwrap();
+        store_credential_inner(&state, "graph_client_secret", "v2").unwrap();
+        let result = get_credential_inner(&state, "graph_client_secret").unwrap();
+        assert_eq!(result, Some("v2".to_string()));
+    }
+
+    // -----------------------------------------------------------------------
+    // Recycle bin - disabled state
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_is_recycle_bin_disabled() {
+        let provider = Arc::new(MockDirectoryProvider::new().with_recycle_bin_disabled());
+        let state = AppState::new_for_test(provider, PermissionConfig::default());
+        state
+            .permission_service
+            .set_level(PermissionLevel::DomainAdmin);
+
+        let result = is_recycle_bin_enabled_inner(&state).await.unwrap();
+        assert!(!result);
+    }
+
+    // -----------------------------------------------------------------------
+    // Snapshot - delete single
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_delete_single_snapshot() {
+        let state = make_state();
+        let id = state
+            .object_snapshot_service
+            .capture("dn1", "Op1", "{}", "test");
+        assert!(state.object_snapshot_service.delete_snapshot(id));
+        assert!(get_snapshot_inner(&state, id).is_none());
+    }
+
+    #[test]
+    fn test_delete_nonexistent_snapshot() {
+        let state = make_state();
+        assert!(!state.object_snapshot_service.delete_snapshot(999));
+    }
+
+    // -----------------------------------------------------------------------
+    // validate_group_exists - with matching group
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_validate_group_exists_returns_true_for_existing() {
+        let group = DirectoryEntry {
+            distinguished_name: "CN=IT-Support,OU=Groups,DC=example,DC=com".to_string(),
+            sam_account_name: Some("IT-Support".to_string()),
+            display_name: Some("IT Support".to_string()),
+            object_class: Some("group".to_string()),
+            attributes: HashMap::new(),
+        };
+        let provider = Arc::new(MockDirectoryProvider::new().with_groups(vec![group]));
+        let state = AppState::new_for_test(provider, PermissionConfig::default());
+
+        let result =
+            validate_group_exists_inner(&state, "CN=IT-Support,OU=Groups,DC=example,DC=com")
+                .await
+                .unwrap();
+        assert!(result);
+    }
+
+    // -----------------------------------------------------------------------
+    // App settings - get/set
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_get_app_settings_default() {
+        let state = make_state();
+        let settings = state.app_settings.get();
+        // Default settings should have no graph config
+        assert!(settings.graph_tenant_id.is_none());
+        assert!(settings.graph_client_id.is_none());
+    }
+
+    #[test]
+    fn test_set_app_settings_roundtrip() {
+        let state = make_state();
+        let mut settings = state.app_settings.get();
+        settings.graph_tenant_id = Some("test-tenant".to_string());
+        settings.graph_client_id = Some("test-client".to_string());
+        state.app_settings.update(settings);
+
+        let loaded = state.app_settings.get();
+        assert_eq!(loaded.graph_tenant_id, Some("test-tenant".to_string()));
+        assert_eq!(loaded.graph_client_id, Some("test-client".to_string()));
+    }
+
+    // -----------------------------------------------------------------------
+    // skip_update_version
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_skip_update_version_persists() {
+        let state = make_state();
+        skip_update_version_inner(&state, "1.2.3");
+
+        let settings = state.app_settings.get();
+        let update = settings.update.unwrap();
+        assert_eq!(update.skipped_version, Some("1.2.3".to_string()));
+    }
+
+    #[test]
+    fn test_skip_update_version_overwrites_previous() {
+        let state = make_state();
+        skip_update_version_inner(&state, "1.0.0");
+        skip_update_version_inner(&state, "2.0.0");
+
+        let settings = state.app_settings.get();
+        let update = settings.update.unwrap();
+        assert_eq!(update.skipped_version, Some("2.0.0".to_string()));
+    }
+
+    // -----------------------------------------------------------------------
+    // Preset accept checksum
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_accept_preset_checksum_nonexistent() {
+        let (state, _dir) = make_state_with_preset_dir(PermissionLevel::AccountOperator);
+        let result = accept_preset_checksum_inner(&state, "NonExistent");
+        // Should fail since preset does not exist
+        assert!(result.is_err());
+    }
+
+    // -----------------------------------------------------------------------
+    // Snapshot - compute diff with matching entry
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_compute_snapshot_diff_detects_changes() {
+        let users = vec![{
+            let mut entry = DirectoryEntry {
+                distinguished_name: "CN=John Doe,OU=Users,DC=example,DC=com".to_string(),
+                sam_account_name: Some("jdoe".to_string()),
+                display_name: Some("John Doe".to_string()),
+                object_class: Some("user".to_string()),
+                attributes: HashMap::new(),
+            };
+            entry
+                .attributes
+                .insert("mail".to_string(), vec!["newemail@example.com".to_string()]);
+            entry
+        }];
+        let state = make_state_with_users(users);
+
+        // Snapshot has old email
+        state.object_snapshot_service.capture(
+            "CN=John Doe,OU=Users,DC=example,DC=com",
+            "Op",
+            r#"{"mail":["oldemail@example.com"]}"#,
+            "TestAdmin",
+        );
+
+        let diffs = compute_snapshot_diff_inner(&state, 1).await.unwrap();
+        let mail_diff = diffs.iter().find(|d| d.attribute == "mail").unwrap();
+        assert!(mail_diff.changed);
+        assert_eq!(
+            mail_diff.snapshot_value,
+            Some("oldemail@example.com".to_string())
+        );
+        assert_eq!(
+            mail_diff.current_value,
+            Some("newemail@example.com".to_string())
+        );
     }
 }

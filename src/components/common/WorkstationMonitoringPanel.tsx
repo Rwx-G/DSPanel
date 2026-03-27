@@ -11,9 +11,11 @@ import {
   Pause,
   Play,
   AlertCircle,
+  Filter,
 } from "lucide-react";
 import { type SystemMetrics } from "@/types/system-metrics";
 import { extractErrorMessage } from "@/utils/errorMapping";
+import { useTranslation } from "react-i18next";
 
 interface WorkstationMonitoringPanelProps {
   hostname: string;
@@ -54,11 +56,13 @@ function usageColor(percent: number): string {
 export function WorkstationMonitoringPanel({
   hostname,
 }: WorkstationMonitoringPanelProps) {
+  const { t } = useTranslation(["components"]);
   const [metrics, setMetrics] = useState<SystemMetrics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshInterval, setRefreshInterval] = useState(5);
   const [paused, setPaused] = useState(false);
+  const [autoStartOnly, setAutoStartOnly] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchMetrics = useCallback(async () => {
@@ -110,7 +114,7 @@ export function WorkstationMonitoringPanel({
       {/* Header */}
       <div className="flex items-center justify-between border-b border-[var(--color-border-default)] px-3 py-2">
         <h3 className="text-body font-semibold text-[var(--color-text-primary)]">
-          Monitoring: {hostname}
+          {t("components:workstationMonitoring.title", { hostname })}
         </h3>
         <div className="flex items-center gap-2">
           <select
@@ -128,7 +132,7 @@ export function WorkstationMonitoringPanel({
           <button
             className="btn btn-sm p-1"
             onClick={() => setPaused(!paused)}
-            title={paused ? "Resume" : "Pause"}
+            title={paused ? t("components:workstationMonitoring.resume") : t("components:workstationMonitoring.pause")}
             data-testid="monitor-pause"
           >
             {paused ? <Play size={14} /> : <Pause size={14} />}
@@ -150,7 +154,7 @@ export function WorkstationMonitoringPanel({
       {/* Content */}
       <div className="p-3">
         {loading && !metrics ? (
-          <LoadingSpinner message="Connecting to workstation..." />
+          <LoadingSpinner message={t("components:workstationMonitoring.connecting")} />
         ) : error && !metrics ? (
           <div className="flex items-center gap-2 text-caption text-[var(--color-error)]">
             <AlertCircle size={16} />
@@ -161,7 +165,7 @@ export function WorkstationMonitoringPanel({
             {/* CPU */}
             <div className="space-y-1" data-testid="cpu-section">
               <div className="flex items-center gap-1.5 text-caption font-medium text-[var(--color-text-primary)]">
-                <Cpu size={14} /> CPU
+                <Cpu size={14} /> {t("components:workstationMonitoring.cpu")}
               </div>
               <ProgressBar
                 value={metrics.cpuUsagePercent}
@@ -175,7 +179,7 @@ export function WorkstationMonitoringPanel({
             {/* Memory */}
             <div className="space-y-1" data-testid="memory-section">
               <div className="flex items-center gap-1.5 text-caption font-medium text-[var(--color-text-primary)]">
-                <MemoryStick size={14} /> Memory
+                <MemoryStick size={14} /> {t("components:workstationMonitoring.memory")}
               </div>
               <ProgressBar
                 value={memoryPercent}
@@ -191,7 +195,7 @@ export function WorkstationMonitoringPanel({
             {/* Disks */}
             <div className="space-y-1" data-testid="disk-section">
               <div className="flex items-center gap-1.5 text-caption font-medium text-[var(--color-text-primary)]">
-                <HardDrive size={14} /> Disks
+                <HardDrive size={14} /> {t("components:workstationMonitoring.disks")}
               </div>
               {metrics.disks.length > 0 ? (
                 metrics.disks.map((disk) => (
@@ -211,7 +215,7 @@ export function WorkstationMonitoringPanel({
                 ))
               ) : (
                 <span className="text-caption text-[var(--color-text-secondary)]">
-                  Unavailable
+                  {t("components:workstationMonitoring.unavailable")}
                 </span>
               )}
             </div>
@@ -219,7 +223,7 @@ export function WorkstationMonitoringPanel({
             {/* Sessions */}
             <div className="space-y-1" data-testid="sessions-section">
               <div className="flex items-center gap-1.5 text-caption font-medium text-[var(--color-text-primary)]">
-                <Users size={14} /> Sessions ({metrics.sessions.length})
+                <Users size={14} /> {t("components:workstationMonitoring.sessions", { count: metrics.sessions.length })}
               </div>
               {metrics.sessions.length > 0 ? (
                 <ul className="space-y-0.5 text-caption text-[var(--color-text-secondary)]">
@@ -229,7 +233,7 @@ export function WorkstationMonitoringPanel({
                 </ul>
               ) : (
                 <span className="text-caption text-[var(--color-text-secondary)]">
-                  No active sessions
+                  {t("components:workstationMonitoring.noActiveSessions")}
                 </span>
               )}
             </div>
@@ -240,13 +244,27 @@ export function WorkstationMonitoringPanel({
               data-testid="services-section"
             >
               <div className="flex items-center gap-1.5 text-caption font-medium text-[var(--color-text-primary)]">
-                <Server size={14} /> Services ({metrics.services.length})
+                <Server size={14} /> {t("components:workstationMonitoring.services", { count: metrics.services.length })}
+                <button
+                  onClick={() => setAutoStartOnly(!autoStartOnly)}
+                  className={`ml-auto flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors ${
+                    autoStartOnly
+                      ? "bg-[var(--color-primary)] text-white"
+                      : "bg-[var(--color-surface-hover)] text-[var(--color-text-secondary)]"
+                  }`}
+                  title={t("components:workstationMonitoring.showAutoStart")}
+                  data-testid="filter-auto-start"
+                >
+                  <Filter size={10} /> {t("components:workstationMonitoring.autoStart")}
+                </button>
               </div>
               {metrics.services.length > 0 ? (
                 <div className="max-h-32 overflow-y-auto">
                   <table className="w-full text-caption">
                     <tbody>
-                      {metrics.services.map((svc) => (
+                      {metrics.services
+                        .filter((svc) => !autoStartOnly || svc.startMode === "Auto")
+                        .map((svc) => (
                         <tr
                           key={svc.name}
                           className="border-b border-[var(--color-border-subtle)]"
@@ -273,7 +291,7 @@ export function WorkstationMonitoringPanel({
                 </div>
               ) : (
                 <span className="text-caption text-[var(--color-text-secondary)]">
-                  Unavailable
+                  {t("components:workstationMonitoring.unavailable")}
                 </span>
               )}
             </div>

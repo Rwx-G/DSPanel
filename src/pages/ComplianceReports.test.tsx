@@ -113,7 +113,7 @@ describe("ComplianceReports", () => {
       expect(screen.getByTestId("checks-list")).toBeInTheDocument();
     });
     expect(screen.getByText("Privileged Accounts")).toBeInTheDocument();
-    expect(screen.getByText("Password Not Required")).toBeInTheDocument();
+    expect(screen.getByText("Password Not Required (PASSWD_NOTREQD)")).toBeInTheDocument();
   });
 
   it("shows finding count and severity on checks", async () => {

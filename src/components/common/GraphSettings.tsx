@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { useTranslation } from "react-i18next";
 
 interface GraphSettingsState {
   tenantId: string;
@@ -8,6 +9,7 @@ interface GraphSettingsState {
 }
 
 export function GraphSettings() {
+  const { t } = useTranslation(["components", "common"]);
   const [config, setConfig] = useState<GraphSettingsState>({
     tenantId: "",
     clientId: "",
@@ -105,18 +107,16 @@ export function GraphSettings() {
       data-testid="graph-settings"
     >
       <h3 className="mb-3 text-body font-semibold text-[var(--color-text-primary)]">
-        Microsoft Graph Integration
+        {t("components:graphSettings.title")}
       </h3>
       <p className="mb-3 text-caption text-[var(--color-text-secondary)]">
-        Configure Azure AD App Registration for Exchange Online diagnostics.
-        Requires <code>Mail.Read</code> and <code>User.Read.All</code>{" "}
-        application permissions with admin consent.
+        {t("components:graphSettings.description")}
       </p>
 
       <div className="space-y-3">
         <div>
           <label className="mb-1 block text-caption text-[var(--color-text-secondary)]">
-            Tenant ID
+            {t("components:graphSettings.tenantId")}
           </label>
           <input
             type="text"
@@ -133,7 +133,7 @@ export function GraphSettings() {
 
         <div>
           <label className="mb-1 block text-caption text-[var(--color-text-secondary)]">
-            Application (Client) ID
+            {t("components:graphSettings.clientId")}
           </label>
           <input
             type="text"
@@ -150,7 +150,7 @@ export function GraphSettings() {
 
         <div>
           <label className="mb-1 block text-caption text-[var(--color-text-secondary)]">
-            Client Secret
+            {t("components:graphSettings.clientSecret")}
           </label>
           <input
             type="password"
@@ -160,7 +160,7 @@ export function GraphSettings() {
               setConfig((c) => ({ ...c, clientSecret: e.target.value }));
               setTestResult(null);
             }}
-            placeholder={hasStoredSecret && !secretTouched ? "Stored in OS credential store" : "Client secret value"}
+            placeholder={hasStoredSecret && !secretTouched ? t("components:graphSettings.clientSecretStored") : t("components:graphSettings.clientSecretPlaceholder")}
             className="w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5 text-body text-[var(--color-text-primary)] placeholder-[var(--color-text-secondary)] focus:border-[var(--color-primary)] focus:outline-none"
             data-testid="graph-client-secret"
           />
@@ -174,7 +174,7 @@ export function GraphSettings() {
           className="btn btn-sm btn-secondary"
           data-testid="graph-test-btn"
         >
-          {testing ? "Testing..." : "Test Connection"}
+          {testing ? t("common:testing") : t("components:graphSettings.testConnection")}
         </button>
         <button
           onClick={handleSave}
@@ -182,7 +182,7 @@ export function GraphSettings() {
           className="btn btn-sm btn-primary"
           data-testid="graph-save-btn"
         >
-          {saving ? "Saving..." : "Save"}
+          {saving ? t("common:saving") : t("common:save")}
         </button>
       </div>
 
@@ -192,8 +192,8 @@ export function GraphSettings() {
           data-testid="graph-test-status"
         >
           {testResult
-            ? "Connection successful."
-            : "Connection failed. Check tenant ID, client ID, and client secret."}
+            ? t("components:graphSettings.connectionSuccess")
+            : t("components:graphSettings.connectionFailed")}
         </div>
       )}
     </div>

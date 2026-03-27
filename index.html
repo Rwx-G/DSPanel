@@ -13,7 +13,22 @@
     <title>DSPanel</title>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Splash screen shown until React mounts -->
+      <style>
+        @keyframes spin{to{transform:rotate(360deg)}}
+        #splash{display:flex;flex-direction:column;align-items:center;justify-content:center;position:fixed;inset:0;gap:16px;background:#f8f9fa}
+        @media(prefers-color-scheme:dark){#splash{background:#0f1117}}
+        html,body{margin:0;overflow:hidden}
+      </style>
+      <div id="splash">
+        <svg width="56" height="56" viewBox="0 0 24 24" fill="none" style="animation:spin 1s linear infinite">
+          <circle cx="12" cy="12" r="10" stroke="#3b82f6" stroke-width="3" opacity="0.25"/>
+          <path fill="#3b82f6" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" opacity="0.75"/>
+        </svg>
+        <span style="font-family:Inter,sans-serif;font-size:14px;font-weight:500;color:#6b7280">DSPanel</span>
+      </div>
+    </div>
     <script>
       document.addEventListener(
         "contextmenu",

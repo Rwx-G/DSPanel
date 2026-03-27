@@ -37,6 +37,7 @@ import { UserPhoto } from "@/components/common/UserPhoto";
 import { extractExchangeInfo } from "@/types/exchange";
 import { type ExchangeOnlineInfo } from "@/types/exchange-online";
 import { invoke } from "@tauri-apps/api/core";
+import { useTranslation } from "react-i18next";
 
 /** Maps health flag names to the PropertyGrid label they correspond to. */
 const FLAG_TO_LABEL: Record<string, string> = {
@@ -80,6 +81,7 @@ export function UserDetail({
   onDeleted,
   schemaAttributes,
 }: UserDetailProps) {
+  const { t } = useTranslation(["userDetail", "common", "sidebar"]);
   const [groupFilters, setGroupFilters] = useState<FilterChip[]>([]);
   const [showPasswordReset, setShowPasswordReset] = useState(false);
   const [contextMenuPos, setContextMenuPos] = useState<{
@@ -108,14 +110,14 @@ export function UserDetail({
 
   const handleDeleteUser = useCallback(async () => {
     const confirmed = await showConfirmation(
-      "Delete User",
-      `Are you sure you want to delete "${user.displayName || user.samAccountName}"?`,
-      "This action cannot be undone. The object will be moved to the AD Recycle Bin if enabled.",
+      t("deleteUser"),
+      t("deleteConfirmation", { name: user.displayName || user.samAccountName }),
+      t("deleteNote"),
     );
     if (!confirmed) return;
     try {
       await invoke("delete_ad_object", { dn: user.distinguishedName });
-      notify("User deleted successfully", "success");
+      notify(t("deleteSuccess"), "success");
       onDeleted?.();
     } catch (err) {
       handleError(err, "deleting user");
@@ -142,13 +144,12 @@ export function UserDetail({
                   className="text-[var(--color-warning)]"
                 />
                 <h2 className="text-body font-semibold text-[var(--color-text-primary)]">
-                  Confirm Attribute Changes
+                  {t("confirmAttributeChanges")}
                 </h2>
               </div>
               <div className="px-4 py-3 space-y-3">
                 <p className="text-body text-[var(--color-text-primary)]">
-                  Apply {pendingChanges.length} change(s) to{" "}
-                  {user.displayName || user.samAccountName}?
+                  {t("applyChangesTo", { count: pendingChanges.length, name: user.displayName || user.samAccountName })}
                 </p>
                 <div className="flex items-start gap-2 rounded-md border border-[var(--color-warning)] bg-[var(--color-warning-bg)] px-3 py-2">
                   <AlertTriangle
@@ -156,13 +157,12 @@ export function UserDetail({
                     className="mt-0.5 shrink-0 text-[var(--color-warning)]"
                   />
                   <p className="text-caption text-[var(--color-warning)]">
-                    You are modifying advanced attributes. Incorrect values may
-                    break authentication, group resolution, or mail delivery.
+                    {t("attributeWarning")}
                   </p>
                 </div>
                 <details>
                   <summary className="cursor-pointer text-caption text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]">
-                    Details
+                    {t("common:details")}
                   </summary>
                   <pre className="mt-1 max-h-32 overflow-auto rounded bg-[var(--color-surface-bg)] p-2 text-caption text-[var(--color-text-secondary)]">
                     {pendingChanges
@@ -179,13 +179,13 @@ export function UserDetail({
                   className="btn btn-secondary"
                   onClick={() => resolve(false)}
                 >
-                  Cancel
+                  {t("common:cancel")}
                 </button>
                 <button
                   className="btn btn-primary"
                   onClick={() => resolve(true)}
                 >
-                  Apply Changes
+                  {t("applyChanges")}
                 </button>
               </div>
             </div>
@@ -199,8 +199,8 @@ export function UserDetail({
         )
         .join("\n");
       confirmed = await showConfirmation(
-        "Confirm Attribute Changes",
-        `Apply ${pendingChanges.length} change(s) to ${user.displayName || user.samAccountName}?`,
+        t("confirmAttributeChanges"),
+        t("applyChangesTo", { count: pendingChanges.length, name: user.displayName || user.samAccountName }),
         detail,
       );
     }
@@ -289,80 +289,80 @@ export function UserDetail({
 
   const propertyGroups: PropertyGroup[] = [
     {
-      category: "Identity",
+      category: t("common:identity"),
       items: [
-        { label: "Display Name", value: user.displayName, editable: canEdit, attributeName: "displayName" },
-        { label: "SAM Account Name", value: user.samAccountName },
-        { label: "User Principal Name", value: user.userPrincipalName },
-        { label: "First Name", value: user.givenName, editable: canEdit, attributeName: "givenName" },
-        { label: "Last Name", value: user.surname, editable: canEdit, attributeName: "sn" },
-        { label: "Email", value: user.email, editable: canEdit, attributeName: "mail" },
-        { label: "Department", value: user.department, editable: canEdit, attributeName: "department" },
-        { label: "Title", value: user.title, editable: canEdit, attributeName: "title" },
+        { label: t("common:displayName"), value: user.displayName, editable: canEdit, attributeName: "displayName" },
+        { label: t("common:samAccountName"), value: user.samAccountName },
+        { label: t("userPrincipalName"), value: user.userPrincipalName },
+        { label: t("common:firstName"), value: user.givenName, editable: canEdit, attributeName: "givenName" },
+        { label: t("common:lastName"), value: user.surname, editable: canEdit, attributeName: "sn" },
+        { label: t("common:email"), value: user.email, editable: canEdit, attributeName: "mail" },
+        { label: t("common:department"), value: user.department, editable: canEdit, attributeName: "department" },
+        { label: t("common:title"), value: user.title, editable: canEdit, attributeName: "title" },
       ],
     },
     {
-      category: "Location",
+      category: t("common:location"),
       items: [
-        { label: "OU Path", value: user.organizationalUnit },
-        { label: "Distinguished Name", value: user.distinguishedName },
+        { label: t("common:ouPath"), value: user.organizationalUnit },
+        { label: t("common:distinguishedName"), value: user.distinguishedName },
       ],
     },
     {
-      category: "Account Status",
+      category: t("common:accountStatus"),
       items: [
         {
-          label: "Status",
-          value: user.enabled ? "Enabled" : "Disabled",
+          label: t("common:status"),
+          value: user.enabled ? t("common:enabled") : t("common:disabled"),
           severity: s("Status"),
         },
         {
-          label: "Locked Out",
-          value: user.lockedOut ? "Yes" : "No",
+          label: t("lockedOut"),
+          value: user.lockedOut ? t("common:yes") : t("common:no"),
           severity: s("Locked Out"),
         },
         {
-          label: "Account Expires",
-          value: user.accountExpires ?? "Never",
+          label: t("accountExpires"),
+          value: user.accountExpires ?? t("common:never"),
           severity: s("Account Expires"),
         },
       ],
     },
     {
-      category: "Authentication",
+      category: t("common:authentication"),
       items: [
-        { label: "Bad Password Count", value: String(user.badPasswordCount) },
+        { label: t("badPasswordCount"), value: String(user.badPasswordCount) },
         {
-          label: "Last Logon",
-          value: user.lastLogon ?? "Never",
+          label: t("common:lastLogon"),
+          value: user.lastLogon ?? t("common:never"),
           severity: s("Last Logon"),
         },
         {
-          label: "Last Logon Workstation",
-          value: user.lastLogonWorkstation || "N/A",
+          label: t("lastLogonWorkstation"),
+          value: user.lastLogonWorkstation || t("common:na"),
         },
       ],
     },
     {
-      category: "Dates",
+      category: t("common:dates"),
       items: [
         {
-          label: "Password Last Set",
-          value: user.passwordLastSet ?? "Never",
+          label: t("passwordLastSet"),
+          value: user.passwordLastSet ?? t("common:never"),
           severity: s("Password Last Set"),
         },
         {
-          label: "Password Expired",
-          value: user.passwordExpired ? "Yes" : "No",
+          label: t("passwordExpired"),
+          value: user.passwordExpired ? t("common:yes") : t("common:no"),
           severity: s("Password Expired"),
         },
         {
-          label: "Password Never Expires",
-          value: user.passwordNeverExpires ? "Yes" : "No",
+          label: t("passwordNeverExpires"),
+          value: user.passwordNeverExpires ? t("common:yes") : t("common:no"),
           severity: s("Password Never Expires"),
         },
-        { label: "Created", value: user.whenCreated || "N/A" },
-        { label: "Modified", value: user.whenChanged || "N/A" },
+        { label: t("common:created"), value: user.whenCreated || t("common:na") },
+        { label: t("common:modified"), value: user.whenChanged || t("common:na") },
       ],
     },
   ];
@@ -383,7 +383,7 @@ export function UserDetail({
   const contextMenuItems: ContextMenuItem[] = contextMenuRow
     ? [
         {
-          label: "View group members",
+          label: t("viewGroupMembers"),
           icon: <Users size={14} />,
           onClick: () => {
             setGroupMembersDialog({
@@ -393,10 +393,10 @@ export function UserDetail({
           },
         },
         {
-          label: "Open in Group Management",
+          label: t("openInGroupManagement"),
           icon: <FolderOpen size={14} />,
           onClick: () => {
-            openTab("Group Management", "groups", "users-group", {
+            openTab(t("sidebar:groupManagement"), "groups", "users-group", {
               selectedGroupDn: contextMenuRow.dn,
             });
           },
@@ -418,13 +418,13 @@ export function UserDetail({
             <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">
               {user.displayName || user.samAccountName}
             </h2>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {healthStatus && <HealthBadge healthStatus={healthStatus} />}
               <StatusBadge
-                text={user.enabled ? "Enabled" : "Disabled"}
+                text={user.enabled ? t("common:enabled") : t("common:disabled")}
                 variant={user.enabled ? "success" : "error"}
               />
-              {user.lockedOut && <StatusBadge text="Locked" variant="warning" />}
+              {user.lockedOut && <StatusBadge text={t("common:locked")} variant="warning" />}
             </div>
           </div>
 
@@ -455,7 +455,7 @@ export function UserDetail({
             data-testid="user-delete-btn"
           >
             <Trash2 size={14} />
-            Delete
+            {t("common:delete")}
           </button>
         )}
 
@@ -467,7 +467,7 @@ export function UserDetail({
               data-testid="pending-changes-bar"
             >
               <span className="text-caption text-[var(--color-text-primary)]">
-                {pendingChanges.length} change(s)
+                {t("unsavedChanges", { count: pendingChanges.length })}
                 {pendingChanges.map((c) => (
                   <span
                     key={c.attributeName}
@@ -482,7 +482,7 @@ export function UserDetail({
                 className="btn btn-sm btn-ghost"
                 data-testid="discard-changes-btn"
               >
-                Discard
+                {t("common:discard")}
               </button>
               <button
                 onClick={handleSaveChanges}
@@ -491,7 +491,7 @@ export function UserDetail({
                 data-testid="save-changes-btn"
               >
                 <Save size={12} />
-                {saving ? "Saving..." : "Save"}
+                {saving ? t("common:saving") : t("common:save")}
               </button>
             </div>
           </>
@@ -528,7 +528,7 @@ export function UserDetail({
       <div data-testid="user-groups-section">
         <div className="mb-2 flex items-center justify-between">
           <h3 className="text-body font-semibold text-[var(--color-text-primary)]">
-            Group Memberships ({user.memberOf.length})
+            {t("groupMemberships", { count: user.memberOf.length })}
           </h3>
           <ExportToolbar<{ name: string; dn: string }>
             columns={groupColumns.map((c): ExportColumn => ({ key: c.key, header: c.header }))}
@@ -542,7 +542,7 @@ export function UserDetail({
           filters={groupFilters}
           onFilterChange={setGroupFilters}
           onTextFilter={onGroupFilterText}
-          placeholder="Filter groups..."
+          placeholder={t("filterGroups")}
         />
         <DataTable
           columns={groupColumns}
@@ -560,7 +560,7 @@ export function UserDetail({
 
       <div data-testid="user-history-section">
         <h3 className="mb-2 text-body font-semibold text-[var(--color-text-primary)]">
-          Replication History
+          {t("replicationHistory")}
         </h3>
         <StateInTimeView objectDn={user.distinguishedName} objectType="user" />
       </div>
@@ -569,7 +569,7 @@ export function UserDetail({
 
       <div data-testid="user-snapshot-section">
         <h3 className="mb-2 text-body font-semibold text-[var(--color-text-primary)]">
-          Object Snapshots
+          {t("objectSnapshots")}
         </h3>
         <SnapshotHistory
           objectDn={user.distinguishedName}
@@ -609,7 +609,7 @@ export function UserDetail({
           data-testid="floating-changes-indicator"
         >
           <span className="text-caption font-medium text-[var(--color-text-primary)]">
-            {pendingChanges.length} unsaved change(s)
+            {t("unsavedChanges", { count: pendingChanges.length })}
           </span>
           <button
             onClick={handleSaveChanges}
@@ -618,14 +618,14 @@ export function UserDetail({
             data-testid="floating-save-btn"
           >
             <Save size={12} />
-            {saving ? "Saving..." : "Save"}
+            {saving ? t("common:saving") : t("common:save")}
           </button>
           <button
             onClick={() =>
               actionBarRef.current?.scrollIntoView({ behavior: "smooth" })
             }
             className="btn btn-sm btn-ghost"
-            title="Scroll to action bar"
+            title={t("scrollToActionBar")}
             data-testid="floating-scroll-btn"
           >
             <ArrowUp size={12} />

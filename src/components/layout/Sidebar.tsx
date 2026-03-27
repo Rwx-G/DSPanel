@@ -26,6 +26,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigation } from "@/contexts/NavigationContext";
 import { type SidebarModule } from "@/types/navigation";
 import { About } from "@/pages/About";
@@ -262,9 +263,50 @@ interface SidebarProps {
 }
 
 export function Sidebar({ expanded, onToggle }: SidebarProps) {
+  const { t } = useTranslation(["sidebar", "common"]);
   const { openTab, activeTabId, openTabs, goHome } = useNavigation();
   const [showAbout, setShowAbout] = useState(false);
   const activeModuleId = openTabs.find((t) => t.id === activeTabId)?.moduleId;
+
+  const GROUP_LABEL_KEYS: Record<string, string> = {
+    Directory: "directory",
+    Infrastructure: "infrastructure",
+    Security: "security",
+    Tools: "tools",
+    Workflows: "workflows",
+    Settings: "settings",
+  };
+
+  const MODULE_LABEL_KEYS: Record<string, string> = {
+    users: "userLookup",
+    "user-comparison": "userComparison",
+    groups: "groupManagement",
+    "group-hygiene": "groupHygiene",
+    "bulk-operations": "bulkOperations",
+    computers: "computerLookup",
+    contacts: "contacts",
+    printers: "printers",
+    "recycle-bin": "recycleBin",
+    "automated-cleanup": "automatedCleanup",
+    "infrastructure-health": "infrastructureHealth",
+    "replication-status": "replicationStatus",
+    "dns-kerberos": "dnsKerberos",
+    topology: "adTopology",
+    "gpo-viewer": "gpoViewer",
+    "security-dashboard": "privilegedAccounts",
+    "risk-score": "riskScore",
+    "attack-detection": "attackDetection",
+    "escalation-paths": "escalationPaths",
+    "compliance-reports": "complianceReports",
+    "ntfs-analyzer": "ntfsAnalyzer",
+    "password-generator": "passwordGenerator",
+    presets: "presetManagement",
+    onboarding: "onboarding",
+    offboarding: "offboarding",
+    "audit-log": "activityJournal",
+    settings: "settings",
+    about: "about",
+  };
 
   const groups = MODULES.reduce(
     (acc, mod) => {
@@ -293,15 +335,15 @@ export function Sidebar({ expanded, onToggle }: SidebarProps) {
           <button
             className="flex-1 truncate px-2 text-left text-body font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)] transition-colors duration-150"
             onClick={goHome}
-            title="Go to Home"
+            title={t("sidebar:goToHome")}
           >
-            DSPanel
+            {t("sidebar:appTitle")}
           </button>
         )}
         <button
           className="btn btn-ghost flex h-8 w-8 shrink-0 items-center justify-center rounded-md p-0"
           onClick={onToggle}
-          aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
+          aria-label={expanded ? t("sidebar:collapseSidebar") : t("sidebar:expandSidebar")}
           data-testid="sidebar-toggle"
         >
           <span className="text-[16px] leading-none text-[var(--color-text-secondary)]">
@@ -312,7 +354,7 @@ export function Sidebar({ expanded, onToggle }: SidebarProps) {
 
       {/* Navigation */}
       <nav
-        aria-label="Main navigation"
+        aria-label={t("sidebar:mainNavigation")}
         className="flex-1 overflow-y-auto overflow-x-hidden py-2"
       >
         {Object.entries(groups).map(([groupName, modules], groupIndex) => (
@@ -320,11 +362,11 @@ export function Sidebar({ expanded, onToggle }: SidebarProps) {
             key={groupName}
             className="mb-1"
             role="group"
-            aria-label={groupName}
+            aria-label={t(`sidebar:${GROUP_LABEL_KEYS[groupName] ?? groupName.toLowerCase()}`)}
           >
             {expanded && (
               <div className="px-4 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-sidebar-group-label)]">
-                {groupName}
+                {t(`sidebar:${GROUP_LABEL_KEYS[groupName] ?? groupName.toLowerCase()}`)}
               </div>
             )}
             {/* Separator in collapsed mode - skip for first group (header border-b is enough) */}
@@ -347,21 +389,21 @@ export function Sidebar({ expanded, onToggle }: SidebarProps) {
                     if (mod.id === "about") {
                       setShowAbout(true);
                     } else {
-                      openTab(mod.label, mod.id, mod.icon);
+                      openTab(t(`sidebar:${MODULE_LABEL_KEYS[mod.id] ?? mod.id}`), mod.id, mod.icon);
                     }
                   }}
-                  title={expanded ? undefined : mod.label}
+                  title={expanded ? undefined : t(`sidebar:${MODULE_LABEL_KEYS[mod.id] ?? mod.id}`)}
                   data-testid={`sidebar-item-${mod.id}`}
                 >
                   {isActive && (
                     <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-[var(--color-primary)]" />
                   )}
                   <IconComp size={18} className="shrink-0" />
-                  {expanded && <span className="truncate">{mod.label}</span>}
+                  {expanded && <span className="truncate">{t(`sidebar:${MODULE_LABEL_KEYS[mod.id] ?? mod.id}`)}</span>}
                   {/* Tooltip for collapsed mode */}
                   {!expanded && (
                     <span className="pointer-events-none absolute left-full z-50 ml-2 whitespace-nowrap rounded-md bg-[var(--color-surface-elevated)] px-2.5 py-1.5 text-caption font-medium text-[var(--color-text-primary)] opacity-0 shadow-md transition-opacity duration-150 group-hover:opacity-100">
-                      {mod.label}
+                      {t(`sidebar:${MODULE_LABEL_KEYS[mod.id] ?? mod.id}`)}
                     </span>
                   )}
                 </button>
@@ -387,7 +429,7 @@ export function Sidebar({ expanded, onToggle }: SidebarProps) {
                 className="btn btn-sm btn-primary"
                 data-testid="about-dialog-close"
               >
-                Close
+                {t("common:close")}
               </button>
             </div>
           </div>

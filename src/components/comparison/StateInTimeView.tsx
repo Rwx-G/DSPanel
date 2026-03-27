@@ -16,6 +16,7 @@ import {
   type AttributeChangeDiff,
 } from "@/types/replication";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
+import { useTranslation } from "react-i18next";
 
 interface ObjectSnapshot {
   id: number;
@@ -35,6 +36,7 @@ export function StateInTimeView({
   objectDn,
   objectType: _objectType,
 }: StateInTimeViewProps) {
+  const { t } = useTranslation(["components", "common"]);
   const [metadata, setMetadata] = useState<ReplicationMetadataResult | null>(
     null,
   );
@@ -144,7 +146,7 @@ export function StateInTimeView({
           data-testid="load-metadata-button"
         >
           {isLoading ? <LoadingSpinner size={16} /> : <History size={14} />}
-          Load Replication History
+          {t("components:stateInTimeView.loadHistory")}
         </button>
       )}
 
@@ -169,7 +171,7 @@ export function StateInTimeView({
             className="mr-1 inline text-[var(--color-warning)]"
           />
           {metadata.message ??
-            "Replication metadata is not available for this object."}
+            t("components:stateInTimeView.notAvailable")}
         </div>
       )}
 
@@ -178,7 +180,7 @@ export function StateInTimeView({
         <>
           <div className="flex items-center justify-between gap-3">
             <div className="text-caption text-[var(--color-text-secondary)]">
-              {filteredAttributes.length} of {metadata.attributes.length} attribute(s)
+              {t("components:stateInTimeView.attributeCount", { filtered: filteredAttributes.length, total: metadata.attributes.length })}
             </div>
             <div className="relative">
               <Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-[var(--color-text-secondary)]" />
@@ -186,7 +188,7 @@ export function StateInTimeView({
                 type="text"
                 value={attributeFilter}
                 onChange={(e) => setAttributeFilter(e.target.value)}
-                placeholder="Filter attributes..."
+                placeholder={t("components:stateInTimeView.filterPlaceholder")}
                 className="h-7 w-48 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] pl-7 pr-2 text-caption text-[var(--color-text-primary)] placeholder:text-[var(--color-text-secondary)]"
                 data-testid="attribute-filter-input"
               />
@@ -202,24 +204,24 @@ export function StateInTimeView({
               <thead className="sticky top-0">
                 <tr className="border-b border-[var(--color-border-default)] bg-[var(--color-surface-card)]">
                   <th className="px-3 py-2 text-left text-caption font-medium text-[var(--color-text-secondary)]">
-                    Attribute
+                    {t("components:stateInTimeView.attribute")}
                   </th>
                   <th className="px-3 py-2 text-left text-caption font-medium text-[var(--color-text-secondary)]">
                     <Clock size={12} className="mr-1 inline" />
-                    Last Changed
+                    {t("components:stateInTimeView.lastChanged")}
                   </th>
                   <th className="px-3 py-2 text-center text-caption font-medium text-[var(--color-text-secondary)]">
                     <Hash size={12} className="mr-1 inline" />
-                    Version
+                    {t("components:stateInTimeView.version")}
                   </th>
                   <th className="px-3 py-2 text-left text-caption font-medium text-[var(--color-text-secondary)]">
                     <Server size={12} className="mr-1 inline" />
-                    Originating DC
+                    {t("components:stateInTimeView.originatingDc")}
                   </th>
                   {snapshotValues && (
                     <th className="px-3 py-2 text-left text-caption font-medium text-[var(--color-text-secondary)]">
                       <Database size={12} className="mr-1 inline" />
-                      Snapshot Value
+                      {t("components:stateInTimeView.snapshotValue")}
                     </th>
                   )}
                 </tr>
@@ -262,7 +264,7 @@ export function StateInTimeView({
           {timestamps.length >= 2 && (
             <div className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-3">
               <h3 className="mb-2 text-body font-semibold text-[var(--color-text-primary)]">
-                Compare Time Ranges
+                {t("components:stateInTimeView.compareTimeRanges")}
               </h3>
               <div className="flex items-center gap-2">
                 <select
@@ -271,7 +273,7 @@ export function StateInTimeView({
                   onChange={(e) => setSelectedFrom(e.target.value)}
                   data-testid="diff-from-select"
                 >
-                  <option value="">From...</option>
+                  <option value="">{t("components:stateInTimeView.from")}</option>
                   {timestamps.map((ts) => (
                     <option key={ts} value={ts}>
                       {ts}
@@ -288,7 +290,7 @@ export function StateInTimeView({
                   onChange={(e) => setSelectedTo(e.target.value)}
                   data-testid="diff-to-select"
                 >
-                  <option value="">To...</option>
+                  <option value="">{t("components:stateInTimeView.to")}</option>
                   {timestamps.map((ts) => (
                     <option key={ts} value={ts}>
                       {ts}
@@ -301,7 +303,7 @@ export function StateInTimeView({
                   disabled={!selectedFrom || !selectedTo}
                   data-testid="compute-diff-button"
                 >
-                  Compare
+                  {t("components:stateInTimeView.compare")}
                 </button>
               </div>
 
@@ -310,7 +312,7 @@ export function StateInTimeView({
                 <div className="mt-3" data-testid="diff-results">
                   {diff.length === 0 ? (
                     <div className="text-caption text-[var(--color-text-secondary)]">
-                      No attribute changes detected in this time range.
+                      {t("components:stateInTimeView.noChanges")}
                     </div>
                   ) : (
                     <div className="rounded-md border border-[var(--color-border-default)] overflow-hidden">
@@ -318,16 +320,16 @@ export function StateInTimeView({
                         <thead>
                           <tr className="bg-[var(--color-surface-bg)] border-b border-[var(--color-border-default)]">
                             <th className="px-3 py-1.5 text-left text-caption font-medium text-[var(--color-text-secondary)]">
-                              Attribute
+                              {t("components:stateInTimeView.attribute")}
                             </th>
                             <th className="px-3 py-1.5 text-center text-caption font-medium text-[var(--color-text-secondary)]">
-                              Version Before
+                              {t("components:stateInTimeView.versionBefore")}
                             </th>
                             <th className="px-3 py-1.5 text-center text-caption font-medium text-[var(--color-text-secondary)]">
-                              Version After
+                              {t("components:stateInTimeView.versionAfter")}
                             </th>
                             <th className="px-3 py-1.5 text-left text-caption font-medium text-[var(--color-text-secondary)]">
-                              Changed At
+                              {t("components:stateInTimeView.changedAt")}
                             </th>
                           </tr>
                         </thead>
@@ -366,7 +368,7 @@ export function StateInTimeView({
             <div data-testid="value-metadata-section">
               <h3 className="mb-2 mt-4 text-body font-semibold text-[var(--color-text-primary)] flex items-center gap-1.5">
                 <Link size={14} />
-                Linked Attribute Changes ({metadata.valueMetadata.length})
+                {t("components:stateInTimeView.linkedAttributeChanges", { count: metadata.valueMetadata.length })}
               </h3>
               <div
                 className="max-h-[300px] overflow-y-auto rounded-lg border border-[var(--color-border-default)]"
@@ -376,17 +378,17 @@ export function StateInTimeView({
                   <thead className="sticky top-0">
                     <tr className="border-b border-[var(--color-border-default)] bg-[var(--color-surface-card)]">
                       <th className="px-3 py-2 text-left text-caption font-medium text-[var(--color-text-secondary)]">
-                        Attribute
+                        {t("components:stateInTimeView.attribute")}
                       </th>
                       <th className="px-3 py-2 text-left text-caption font-medium text-[var(--color-text-secondary)]">
-                        Linked Object
+                        {t("components:stateInTimeView.linkedObject")}
                       </th>
                       <th className="px-3 py-2 text-left text-caption font-medium text-[var(--color-text-secondary)]">
                         <Clock size={12} className="mr-1 inline" />
-                        Changed
+                        {t("components:stateInTimeView.changed")}
                       </th>
                       <th className="px-3 py-2 text-center text-caption font-medium text-[var(--color-text-secondary)]">
-                        Status
+                        {t("common:status")}
                       </th>
                     </tr>
                   </thead>
@@ -420,7 +422,7 @@ export function StateInTimeView({
                                 : "bg-[var(--color-success)]/10 text-[var(--color-success)]"
                             }`}
                           >
-                            {vm.isDeleted ? "Removed" : "Active"}
+                            {vm.isDeleted ? t("components:stateInTimeView.removed") : t("common:active")}
                           </span>
                         </td>
                       </tr>

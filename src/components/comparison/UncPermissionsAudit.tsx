@@ -2,6 +2,7 @@ import { useState, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { parseBackendError } from "@/utils/errorMapping";
 import { usePlatform } from "@/hooks/usePlatform";
+import { useTranslation } from "react-i18next";
 import { EmptyState } from "@/components/common/EmptyState";
 import {
   FolderSearch,
@@ -78,6 +79,7 @@ export function UncPermissionsAudit({
   userA,
   userB,
 }: UncPermissionsAuditProps) {
+  const { t } = useTranslation(["components"]);
   const platform = usePlatform();
   const [uncPath, setUncPath] = useState("");
   const [isAuditing, setIsAuditing] = useState(false);
@@ -154,8 +156,8 @@ export function UncPermissionsAudit({
       <div data-testid="unc-permissions-audit">
         <EmptyState
           icon={<Monitor size={40} />}
-          title="Not available on this platform"
-          description="UNC path permissions audit requires Windows. NTFS ACL APIs are not available on macOS or Linux."
+          title={t("components:uncPermissionsAudit.notAvailable")}
+          description={t("components:uncPermissionsAudit.notAvailableDescription")}
         />
       </div>
     );
@@ -385,6 +387,7 @@ function AccessSummary({
   userAName: string;
   userBName: string;
 }) {
+  const { t } = useTranslation(["components"]);
   const userAAllowed = crossRef.filter((r) => r.userAAccess === "Allowed");
   const userADenied = crossRef.filter((r) => r.userAAccess === "Denied");
   const userBAllowed = crossRef.filter((r) => r.userBAccess === "Allowed");
@@ -403,7 +406,7 @@ function AccessSummary({
       data-testid="access-summary"
     >
       <p className="text-caption font-semibold text-[var(--color-text-primary)]">
-        Access Summary
+        {t("components:uncPermissionsAudit.accessSummary")}
       </p>
 
       <div className="grid grid-cols-2 gap-3 text-caption">
@@ -412,7 +415,7 @@ function AccessSummary({
             {userAName}
           </p>
           <p className="text-[var(--color-success)]">
-            {userAAllowed.length} rule(s) grant access
+            {t("components:uncPermissionsAudit.rulesGrantAccess", { count: userAAllowed.length })}
             {userAAllowed.length > 0 && (
               <span className="text-[var(--color-text-secondary)]">
                 {" "}
@@ -425,7 +428,7 @@ function AccessSummary({
           </p>
           {userADenied.length > 0 && (
             <p className="text-[var(--color-error)]">
-              {userADenied.length} rule(s) deny access
+              {t("components:uncPermissionsAudit.rulesDenyAccess", { count: userADenied.length })}
               <span className="text-[var(--color-text-secondary)]">
                 {" "}
                 via{" "}
@@ -441,7 +444,7 @@ function AccessSummary({
             {userBName}
           </p>
           <p className="text-[var(--color-success)]">
-            {userBAllowed.length} rule(s) grant access
+            {t("components:uncPermissionsAudit.rulesGrantAccess", { count: userBAllowed.length })}
             {userBAllowed.length > 0 && (
               <span className="text-[var(--color-text-secondary)]">
                 {" "}
@@ -454,7 +457,7 @@ function AccessSummary({
           </p>
           {userBDenied.length > 0 && (
             <p className="text-[var(--color-error)]">
-              {userBDenied.length} rule(s) deny access
+              {t("components:uncPermissionsAudit.rulesDenyAccess", { count: userBDenied.length })}
               <span className="text-[var(--color-text-secondary)]">
                 {" "}
                 via{" "}
@@ -471,7 +474,7 @@ function AccessSummary({
       {(onlyA.length > 0 || onlyB.length > 0) && (
         <div className="border-t border-[var(--color-border-subtle)] pt-2">
           <p className="font-medium text-[var(--color-text-primary)] mb-1">
-            Differences
+            {t("components:uncPermissionsAudit.differences")}
           </p>
           {onlyA.map((r, i) => (
             <p key={`a-${i}`} className="text-[var(--color-text-secondary)]">

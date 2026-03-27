@@ -1,7 +1,7 @@
 {
   "name": "dspanel",
   "private": true,
-  "version": "0.12.0",
+  "version": "1.0.0",
   "type": "module",
   "packageManager": "pnpm@10.28.1",
   "scripts": {
@@ -22,9 +22,11 @@
     "@tanstack/react-virtual": "^3.13.23",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-opener": "^2",
+    "i18next": "^25.10.10",
     "lucide-react": "^1.0.1",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
+    "react-i18next": "^16.6.6",
     "tailwindcss": "^4.2.2"
   },
   "devDependencies": {

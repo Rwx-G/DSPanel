@@ -1,5 +1,5 @@
-use quick_xml::events::Event;
 use quick_xml::Reader;
+use quick_xml::events::Event;
 use serde::{Deserialize, Serialize};
 
 /// Metadata about a single attribute from AD replication data.

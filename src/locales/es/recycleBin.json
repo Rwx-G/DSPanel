@@ -1,0 +1,22 @@
+{
+  "searchPlaceholder": "Buscar objetos eliminados por nombre...",
+  "all": "Todos",
+  "users": "Usuarios",
+  "computers": "Equipos",
+  "groups": "Grupos",
+  "contacts": "Contactos",
+  "printers": "Impresoras",
+  "noDeletedObjects": "Sin objetos eliminados",
+  "noObjectsMatch": "Ningún objeto coincide con los filtros actuales.",
+  "recycleBinEmpty": "La papelera de reciclaje está vacía.",
+  "deleted": "Eliminado",
+  "originalOu": "OU original",
+  "restore": "Restaurar",
+  "failedToLoad": "No se pudo cargar la papelera de reciclaje",
+  "notEnabled": "Papelera de reciclaje de AD no habilitada",
+  "notEnabledDescription": "La función opcional de papelera de reciclaje de Active Directory no está habilitada en este dominio. Contacte a su administrador de dominio para habilitarla.",
+  "loadingRecycleBin": "Cargando papelera de reciclaje...",
+  "restoreObject": "Restaurar \"{{name}}\"",
+  "selectTargetOu": "Seleccione la OU de destino para la restauración:",
+  "restoring": "Restaurando..."
+}

@@ -1,0 +1,18 @@
+{
+  "skipToMain": "Skip to main content",
+  "mainContent": "Main content",
+  "breadcrumb": "Breadcrumb",
+  "scrollTabsLeft": "Scroll tabs left",
+  "scrollTabsRight": "Scroll tabs right",
+  "closeTab": "Close {{title}}",
+  "closeOthers": "Close Others",
+  "closeAll": "Close All",
+  "tabOptions": "Tab options",
+  "loginSubtitle": "Enter your AD credentials to connect",
+  "loginServer": "Server",
+  "loginAccount": "Account",
+  "loginPassword": "Password",
+  "loginPasswordPlaceholder": "Enter password...",
+  "loginConnect": "Connect",
+  "loginConnecting": "Connecting..."
+}

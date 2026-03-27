@@ -1,0 +1,40 @@
+{
+  "pageTitle": "Compliance Reports",
+  "runScan": "Run Compliance Scan",
+  "reScan": "Re-scan",
+  "scanningLabel": "Scanning...",
+  "emptyTitle": "Compliance Reports",
+  "emptyDescription": "Run a compliance scan to assess your Active Directory against 9 frameworks: GDPR, HIPAA, SOX, PCI-DSS v4.0, ISO 27001, NIST 800-53, CIS v8, NIS2, and ANSSI.",
+  "globalScore": "Global Compliance Score",
+  "accountsScanned": "accounts scanned",
+  "findingsLabel": "findings",
+  "checks": "Checks",
+  "checkClear": "Clear",
+  "check": "Check",
+  "severity": "Severity",
+  "findings": "Findings",
+  "description": "Description",
+  "remediation": "Remediation",
+  "report": "Report",
+  "exportTitle": "Compliance Scan - All Checks",
+  "scanFailed": "Scan Failed",
+  "checkTitles": {
+    "privileged_accounts": "Privileged Accounts",
+    "inactive_accounts": "Inactive Accounts (>90 days)",
+    "password_not_required": "Password Not Required (PASSWD_NOTREQD)",
+    "reversible_encryption": "Reversible Password Encryption",
+    "password_expired": "Stale Passwords (>90 days)",
+    "password_never_expires": "Password Never Expires",
+    "disabled_accounts": "Disabled Accounts Lifecycle"
+  },
+  "severityLabels": {
+    "Critical": "Critical",
+    "High": "High",
+    "Medium": "Medium",
+    "Low": "Low"
+  },
+  "andMore": "... and {{count}} more (see exported report)",
+  "disclaimer.checks": "7 checks across 9 frameworks (GDPR, HIPAA, SOX, PCI-DSS v4.0, ISO 27001, NIST 800-53, CIS v8, NIS2, ANSSI). Checks: privileged accounts (adminCount), inactive accounts (>90d), PASSWD_NOTREQD flag, reversible encryption, stale passwords (>90d), password never expires, disabled accounts. Compliance score 0-100 with per-framework breakdown. Per-framework HTML report export with control references and PowerShell remediation.",
+  "disclaimer.limitations": "Point-in-time snapshot only - no change history or continuous monitoring. Does not assess GPO settings, file server permissions, audit log configuration, or network segmentation. No shared/generic account detection, separation of duties analysis, or access recertification workflows. Cannot read domain password policy (complexity, lockout thresholds).",
+  "disclaimer.tools": "Netwrix Auditor (change auditing, 30+ controls/framework), ManageEngine ADAudit Plus (200+ reports, real-time alerts), Microsoft Compliance Manager (shared controls, improvement actions), Qualys Policy Compliance (CIS benchmarks), or SolarWinds ARM (access rights visualization) for comprehensive compliance management."
+}

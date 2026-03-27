@@ -21,6 +21,7 @@ import {
   Info,
   ThumbsUp,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 /** Wrapper for hygiene result sections - shows green "all clear" when count is 0 */
 function HygieneSection({
@@ -44,6 +45,7 @@ function HygieneSection({
   actions?: React.ReactNode;
   children?: React.ReactNode;
 }) {
+  const { t } = useTranslation(["groupHygiene"]);
   const [showTip, setShowTip] = useState(false);
   const isClean = count === 0;
   return (
@@ -75,20 +77,20 @@ function HygieneSection({
                 className="flex h-5 w-5 items-center justify-center rounded-full text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors"
                 onClick={() => setShowTip(!showTip)}
                 onBlur={() => setTimeout(() => setShowTip(false), 150)}
-                aria-label={`About ${title}`}
+                aria-label={t("aboutGroupHygiene")}
               >
                 <Info size={13} />
               </button>
               {showTip && (
                 <div className={`absolute left-0 z-50 w-80 rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-3 shadow-lg ${tooltipPosition === "above" ? "bottom-full mb-1" : "top-full mt-1"}`}>
                   <p className="text-caption text-[var(--color-text-primary)]">
-                    <strong>What:</strong> {tooltip.what}
+                    <strong>{t("what")}</strong> {tooltip.what}
                   </p>
                   <p className="mt-1 text-caption text-[var(--color-text-primary)]">
-                    <strong>Why:</strong> {tooltip.why}
+                    <strong>{t("why")}</strong> {tooltip.why}
                   </p>
                   <p className="mt-1 text-caption text-[var(--color-text-primary)]">
-                    <strong>Fix:</strong> {tooltip.fix}
+                    <strong>{t("fix")}</strong> {tooltip.fix}
                   </p>
                   {tooltip.warn && (
                     <p className="mt-1.5 flex items-start gap-1 text-caption text-[var(--color-warning)]">
@@ -105,7 +107,7 @@ function HygieneSection({
       </div>
       {isClean ? (
         <p className="mt-2 text-caption text-[var(--color-success)]">
-          All clear - no issues detected
+          {t("allClear")}
         </p>
       ) : (
         <div className="mt-3">{children}</div>
@@ -114,47 +116,50 @@ function HygieneSection({
   );
 }
 
-const HYGIENE_TOOLTIPS = {
-  empty: {
-    what: "Groups with zero members.",
-    why: "Empty groups clutter AD and may still be referenced in UNC path ACLs or GPOs, causing confusion during audits.",
-    fix: "Delete the group if unused, or add the appropriate members. Check UNC permissions before deleting.",
-    warn: "The group may still be configured on UNC paths or file share ACLs. Verify with NTFS Analyzer before deleting.",
-  },
-  singleMember: {
-    what: "Groups containing only one member.",
-    why: "A single-member group adds unnecessary indirection. The user could be assigned permissions directly.",
-    fix: "Assign the user directly to the resource, then remove the group. Or add more members if the group is meant to grow.",
-    warn: "Some applications require group-based access even for a single user. Verify before removing.",
-  },
-  stale: {
-    what: "Groups not modified in over 180 days.",
-    why: "Stale groups may reflect outdated team structures or completed projects, increasing the attack surface.",
-    fix: "Review with the group owner. Archive or delete if obsolete, update membership if still needed.",
-  },
-  undescribed: {
-    what: "Groups missing the description attribute.",
-    why: "Without a description, administrators cannot determine the group's purpose, making audits and cleanup harder.",
-    fix: "Add a meaningful description in Group Management (e.g. team name, project, access scope).",
-  },
-  circular: {
-    what: "Groups that contain each other in a nesting loop (A contains B contains A).",
-    why: "Circular nesting causes unexpected permission inheritance and can degrade LDAP query performance.",
-    fix: "Break the cycle by removing one of the nesting relationships. Decide which group should be the parent.",
-    warn: "Circular nesting can cause token bloat and authentication delays. Fix as soon as possible.",
-  },
-  deepNesting: {
-    what: "Groups nested deeper than 3 levels.",
-    why: "Deep nesting makes permissions hard to audit and can cause Kerberos token size issues (MaxTokenSize).",
-    fix: "Flatten the group structure by reducing nesting levels. Consider using direct memberships instead.",
-  },
-  duplicate: {
-    what: "Multiple groups with exactly the same set of members.",
-    why: "Duplicate groups create confusion about which group to use and increase maintenance burden.",
-    fix: "Consolidate into a single group. Update all ACLs and GPOs to reference the surviving group, then delete duplicates.",
-    warn: "Different groups may be used on different resources. Verify all references before merging.",
-  },
-};
+function useHygieneTooltips() {
+  const { t } = useTranslation(["groupHygiene"]);
+  return {
+    empty: {
+      what: t("groupHygiene:tooltip.empty.what"),
+      why: t("groupHygiene:tooltip.empty.why"),
+      fix: t("groupHygiene:tooltip.empty.fix"),
+      warn: t("groupHygiene:tooltip.empty.warn"),
+    },
+    singleMember: {
+      what: t("groupHygiene:tooltip.singleMember.what"),
+      why: t("groupHygiene:tooltip.singleMember.why"),
+      fix: t("groupHygiene:tooltip.singleMember.fix"),
+      warn: t("groupHygiene:tooltip.singleMember.warn"),
+    },
+    stale: {
+      what: t("groupHygiene:tooltip.stale.what"),
+      why: t("groupHygiene:tooltip.stale.why"),
+      fix: t("groupHygiene:tooltip.stale.fix"),
+    },
+    undescribed: {
+      what: t("groupHygiene:tooltip.undescribed.what"),
+      why: t("groupHygiene:tooltip.undescribed.why"),
+      fix: t("groupHygiene:tooltip.undescribed.fix"),
+    },
+    circular: {
+      what: t("groupHygiene:tooltip.circular.what"),
+      why: t("groupHygiene:tooltip.circular.why"),
+      fix: t("groupHygiene:tooltip.circular.fix"),
+      warn: t("groupHygiene:tooltip.circular.warn"),
+    },
+    deepNesting: {
+      what: t("groupHygiene:tooltip.deepNesting.what"),
+      why: t("groupHygiene:tooltip.deepNesting.why"),
+      fix: t("groupHygiene:tooltip.deepNesting.fix"),
+    },
+    duplicate: {
+      what: t("groupHygiene:tooltip.duplicate.what"),
+      why: t("groupHygiene:tooltip.duplicate.why"),
+      fix: t("groupHygiene:tooltip.duplicate.fix"),
+      warn: t("groupHygiene:tooltip.duplicate.warn"),
+    },
+  };
+}
 
 interface DeleteProgress {
   current: number;
@@ -170,6 +175,8 @@ interface DeepNestingResult {
 }
 
 export function GroupHygiene() {
+  const { t } = useTranslation(["groupHygiene", "common", "sidebar"]);
+  const HYGIENE_TOOLTIPS = useHygieneTooltips();
   const [scanning, setScanning] = useState(false);
   const [emptyGroups, setEmptyGroups] = useState<DirectoryGroup[]>([]);
   const [cycles, setCycles] = useState<string[][]>([]);
@@ -246,21 +253,7 @@ export function GroupHygiene() {
       );
       setScanned(true);
 
-      // Audit log the scan completion
-      const totalIssues =
-        emptyEntries.length +
-        detectedCycles.length +
-        singleEntries.length +
-        staleEntries.length +
-        undescribedEntries.length +
-        nestingResults.length +
-        duplicateEntries.length;
-      invoke("audit_log", {
-        action: "HygieneScanCompleted",
-        targetDn: "",
-        details: `Scan complete: ${totalIssues} issue(s) found (${emptyEntries.length} empty, ${detectedCycles.length} circular, ${singleEntries.length} single-member, ${staleEntries.length} stale, ${undescribedEntries.length} undescribed, ${nestingResults.length} deep-nested, ${duplicateEntries.length} duplicate)`,
-        success: true,
-      }).catch(() => {});
+      // Audit logging handled internally by the backend
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       setScanError(message);
@@ -364,7 +357,7 @@ export function GroupHygiene() {
 
   const handleGoToGroup = useCallback(
     (groupDn: string) => {
-      openTab("Group Management", "groups", "users-group", {
+      openTab(t("sidebar:groupManagement"), "groups", "users-group", {
         selectedGroupDn: groupDn,
       });
     },
@@ -406,17 +399,17 @@ export function GroupHygiene() {
     cols.push(
       {
         key: "name",
-        header: "Name",
+        header: t("common:name"),
         sortable: true,
       },
       {
         key: "scope",
-        header: "Scope",
+        header: t("common:scope"),
         sortable: true,
       },
       {
         key: "ou",
-        header: "Organizational Unit",
+        header: t("organizationalUnit"),
         sortable: true,
       },
       {
@@ -430,17 +423,17 @@ export function GroupHygiene() {
             className="btn btn-ghost btn-sm flex items-center gap-1 whitespace-nowrap"
             onClick={() => handleGoToGroup(row.dn)}
             data-testid={`go-to-group-${row.name}`}
-            title="Open in Group Management"
+            title={t("openInGroupManagement")}
           >
             <ExternalLink size={12} />
-            Go to
+            {t("goTo")}
           </button>
         ),
       },
     );
 
     return cols;
-  }, [canDelete, selectedEmpty, handleSelectEmpty, handleGoToGroup]);
+  }, [canDelete, selectedEmpty, handleSelectEmpty, handleGoToGroup, t]);
 
   const emptyGroupRows: EmptyGroupRow[] = emptyGroups.map((g) => ({
     select: "",
@@ -464,8 +457,8 @@ export function GroupHygiene() {
 
   const simpleGroupColumns: Column<SimpleGroupRow>[] = useMemo(
     () => [
-      { key: "name", header: "Name", sortable: true },
-      { key: "scope", header: "Scope", sortable: true },
+      { key: "name", header: t("common:name"), sortable: true },
+      { key: "scope", header: t("common:scope"), sortable: true },
       {
         key: "actions",
         header: "",
@@ -477,15 +470,15 @@ export function GroupHygiene() {
             className="btn btn-ghost btn-sm flex items-center gap-1 whitespace-nowrap"
             onClick={() => handleGoToGroup(row.dn)}
             data-testid={`go-to-group-${row.name}`}
-            title="Open in Group Management"
+            title={t("openInGroupManagement")}
           >
             <ExternalLink size={12} />
-            Go to
+            {t("goTo")}
           </button>
         ),
       },
     ],
-    [handleGoToGroup],
+    [handleGoToGroup, t],
   );
 
   type StaleGroupRow = {
@@ -498,9 +491,9 @@ export function GroupHygiene() {
 
   const staleGroupColumns: Column<StaleGroupRow>[] = useMemo(
     () => [
-      { key: "name", header: "Name", sortable: true },
-      { key: "scope", header: "Scope", sortable: true },
-      { key: "lastModified", header: "Last Modified", sortable: true },
+      { key: "name", header: t("common:name"), sortable: true },
+      { key: "scope", header: t("common:scope"), sortable: true },
+      { key: "lastModified", header: t("common:modified"), sortable: true },
       {
         key: "actions",
         header: "",
@@ -512,15 +505,15 @@ export function GroupHygiene() {
             className="btn btn-ghost btn-sm flex items-center gap-1 whitespace-nowrap"
             onClick={() => handleGoToGroup(row.dn)}
             data-testid={`go-to-group-${row.name}`}
-            title="Open in Group Management"
+            title={t("openInGroupManagement")}
           >
             <ExternalLink size={12} />
-            Go to
+            {t("goTo")}
           </button>
         ),
       },
     ],
-    [handleGoToGroup],
+    [handleGoToGroup, t],
   );
 
   function formatWhenChanged(group: DirectoryGroup): string {
@@ -542,14 +535,14 @@ export function GroupHygiene() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">
-            Group Hygiene
+            {t("pageTitle")}
           </h2>
           <div className="relative">
             <button
               className="flex h-5 w-5 items-center justify-center rounded-full text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors"
               onClick={() => setShowInfo(!showInfo)}
               onBlur={() => setTimeout(() => setShowInfo(false), 150)}
-              aria-label="About group hygiene"
+              aria-label={t("aboutGroupHygiene")}
               data-testid="hygiene-info-btn"
             >
               <Info size={13} />
@@ -560,19 +553,19 @@ export function GroupHygiene() {
                 data-testid="hygiene-info-popup"
               >
                 <p className="text-caption font-semibold text-[var(--color-text-primary)] mb-1.5">
-                  Group Hygiene Scanner
+                  {t("scannerTitle")}
                 </p>
                 <ul className="space-y-1 text-caption text-[var(--color-text-secondary)]">
-                  <li><strong>Empty groups</strong> - no members at all</li>
-                  <li><strong>Single-member groups</strong> - only one member, possibly redundant</li>
-                  <li><strong>Stale groups</strong> - not modified in over 180 days</li>
-                  <li><strong>No description</strong> - missing documentation</li>
-                  <li><strong>Circular nesting</strong> - Group A contains B contains A</li>
-                  <li><strong>Excessive depth</strong> - nested deeper than 3 levels</li>
-                  <li><strong>Duplicate groups</strong> - identical member sets</li>
+                  <li>{t("scannerDesc1")}</li>
+                  <li>{t("scannerDesc2")}</li>
+                  <li>{t("scannerDesc3")}</li>
+                  <li>{t("scannerDesc4")}</li>
+                  <li>{t("scannerDesc5")}</li>
+                  <li>{t("scannerDesc6")}</li>
+                  <li>{t("scannerDesc7")}</li>
                 </ul>
                 <p className="mt-1.5 text-caption text-[var(--color-text-disabled)]">
-                  Empty groups can be deleted in bulk (DomainAdmin required).
+                  {t("scannerBulkDelete")}
                 </p>
               </div>
             )}
@@ -581,22 +574,22 @@ export function GroupHygiene() {
         <div className="flex items-center gap-2">
           <ExportToolbar<{ category: string; name: string; scope: string; detail: string }>
             columns={[
-              { key: "category", header: "Category" },
-              { key: "name", header: "Group Name" },
-              { key: "scope", header: "Scope" },
-              { key: "detail", header: "Detail" },
+              { key: "category", header: t("exportColCategory") },
+              { key: "name", header: t("exportColGroupName") },
+              { key: "scope", header: t("exportColScope") },
+              { key: "detail", header: t("exportColDetail") },
             ]}
             data={[
-              ...emptyGroups.map((g) => ({ category: "Empty", name: g.displayName || g.samAccountName, scope: g.scope, detail: "No members" })),
-              ...singleMemberGroups.map((g) => ({ category: "Single Member", name: g.displayName || g.samAccountName, scope: g.scope, detail: "1 member" })),
-              ...staleGroups.map((g) => ({ category: "Stale", name: g.displayName || g.samAccountName, scope: g.scope, detail: `Last modified: ${formatWhenChanged(g)}` })),
-              ...undescribedGroups.map((g) => ({ category: "No Description", name: g.displayName || g.samAccountName, scope: g.scope, detail: "" })),
-              ...cycles.map((chain) => ({ category: "Circular Nesting", name: chain.join(" -> "), scope: "-", detail: `${chain.length} groups in cycle` })),
-              ...deeplyNested.map((d) => ({ category: "Excessive Depth", name: d.groupName, scope: "-", detail: `Depth: ${d.depth} levels` })),
-              ...duplicateGroups.map((pair) => ({ category: "Duplicate Members", name: pair.map((g) => g.displayName || g.samAccountName).join(" = "), scope: pair[0]?.scope ?? "-", detail: `${pair.length} groups with identical members` })),
+              ...emptyGroups.map((g) => ({ category: t("exportCategoryEmpty"), name: g.displayName || g.samAccountName, scope: g.scope, detail: t("exportDetailNoMembers") })),
+              ...singleMemberGroups.map((g) => ({ category: t("exportCategorySingleMember"), name: g.displayName || g.samAccountName, scope: g.scope, detail: t("exportDetailOneMember") })),
+              ...staleGroups.map((g) => ({ category: t("exportCategoryStale"), name: g.displayName || g.samAccountName, scope: g.scope, detail: t("exportDetailLastModified", { date: formatWhenChanged(g) }) })),
+              ...undescribedGroups.map((g) => ({ category: t("exportCategoryNoDescription"), name: g.displayName || g.samAccountName, scope: g.scope, detail: "" })),
+              ...cycles.map((chain) => ({ category: t("exportCategoryCircularNesting"), name: chain.join(" -> "), scope: "-", detail: t("exportDetailGroupsInCycle", { count: chain.length }) })),
+              ...deeplyNested.map((d) => ({ category: t("exportCategoryExcessiveDepth"), name: d.groupName, scope: "-", detail: t("exportDetailDepthLevels", { depth: d.depth }) })),
+              ...duplicateGroups.map((pair) => ({ category: t("exportCategoryDuplicateMembers"), name: pair.map((g) => g.displayName || g.samAccountName).join(" = "), scope: pair[0]?.scope ?? "-", detail: t("exportDetailIdenticalMembers", { count: pair.length }) })),
             ]}
             rowMapper={(row) => [row.category, row.name, row.scope, row.detail]}
-            title="Group Hygiene Report"
+            title={t("exportTitle")}
             filenameBase="group-hygiene"
             disabled={!scanned}
           />
@@ -607,7 +600,7 @@ export function GroupHygiene() {
             data-testid="scan-button"
           >
             <Search size={14} />
-            {scanning ? "Scanning..." : "Run Scan"}
+            {scanning ? t("scanning") : t("runScan")}
           </button>
         </div>
       </div>
@@ -616,13 +609,13 @@ export function GroupHygiene() {
       {!scanned && !scanning && !scanError && (
         <div className="space-y-4 opacity-50 pointer-events-none">
           {[
-            { title: "Empty Groups", hint: "No members at all" },
-            { title: "Single-Member Groups", hint: "Only one member, possibly redundant" },
-            { title: "Stale Groups", hint: "Not modified in over 180 days" },
-            { title: "Groups Without Description", hint: "Missing documentation" },
-            { title: "Circular Nesting", hint: "Circular group nesting detected" },
-            { title: "Excessive Nesting Depth", hint: "Nested deeper than 3 levels" },
-            { title: "Duplicate Groups", hint: "Identical member sets" },
+            { title: t("emptyGroups"), hint: t("emptyGroupsHint") },
+            { title: t("singleMemberGroups"), hint: t("singleMemberGroupsHint") },
+            { title: t("staleGroups"), hint: t("staleGroupsHint") },
+            { title: t("undescribedGroups"), hint: t("undescribedGroupsHint") },
+            { title: t("circularNesting"), hint: t("circularNestingHint") },
+            { title: t("excessiveDepth"), hint: t("excessiveDepthHint") },
+            { title: t("duplicateGroups"), hint: t("duplicateGroupsHint") },
           ].map((section) => (
             <div
               key={section.title}
@@ -635,7 +628,7 @@ export function GroupHygiene() {
                 </span>
               </h3>
               <p className="text-caption text-[var(--color-text-secondary)]">
-                Run scan to detect: {section.hint}
+                {t("runScanToDetect")}: {section.hint}
               </p>
             </div>
           ))}
@@ -647,7 +640,7 @@ export function GroupHygiene() {
           className="flex items-center justify-center py-8"
           data-testid="scan-loading"
         >
-          <LoadingSpinner message="Scanning for group issues..." />
+          <LoadingSpinner message={t("scanningMessage")} />
         </div>
       )}
 
@@ -655,9 +648,9 @@ export function GroupHygiene() {
         <div data-testid="scan-error">
           <EmptyState
             icon={<AlertCircle size={48} />}
-            title="Scan failed"
+            title={t("scanFailed")}
             description={scanError}
-            action={{ label: "Retry", onClick: handleScan }}
+            action={{ label: t("common:retry"), onClick: handleScan }}
           />
         </div>
       )}
@@ -667,7 +660,7 @@ export function GroupHygiene() {
         <>
           {/* Empty Groups */}
           <HygieneSection
-            title="Empty Groups"
+            title={t("emptyGroups")}
             count={emptyGroups.length}
             testId="empty-groups-section"
             countTestId="empty-groups-count"
@@ -682,17 +675,17 @@ export function GroupHygiene() {
                     disabled={!canDelete}
                     data-testid="select-all-empty"
                   />
-                  Select all
+                  {t("selectAll")}
                 </label>
                 <button
                   className="btn btn-outline btn-sm flex items-center gap-1 tabular-nums"
                   onClick={() => setShowDeletePreview(true)}
                   disabled={!canDelete || selectedEmpty.size === 0 || deleting}
-                  title={!canDelete ? "Requires Admin permission" : undefined}
+                  title={!canDelete ? t("requiresAdmin") : undefined}
                   data-testid="delete-selected-btn"
                 >
                   <Trash2 size={14} />
-                  Delete Selected ({selectedEmpty.size})
+                  {t("deleteSelected", { count: selectedEmpty.size })}
                 </button>
               </div>
             }
@@ -712,7 +705,7 @@ export function GroupHygiene() {
 
           {/* Single-Member Groups */}
           <HygieneSection
-            title="Single-Member Groups"
+            title={t("singleMemberGroups")}
             count={singleMemberGroups.length}
             testId="single-member-groups-section"
             countTestId="single-member-groups-count"
@@ -732,7 +725,7 @@ export function GroupHygiene() {
 
           {/* Stale Groups */}
           <HygieneSection
-            title="Stale Groups"
+            title={t("staleGroups")}
             count={staleGroups.length}
             testId="stale-groups-section"
             countTestId="stale-groups-count"
@@ -753,7 +746,7 @@ export function GroupHygiene() {
 
           {/* Groups Without Description */}
           <HygieneSection
-            title="Groups Without Description"
+            title={t("undescribedGroups")}
             count={undescribedGroups.length}
             testId="undescribed-groups-section"
             countTestId="undescribed-groups-count"
@@ -773,7 +766,7 @@ export function GroupHygiene() {
 
           {/* Circular Nesting */}
           <HygieneSection
-            title="Circular Nesting"
+            title={t("circularNesting")}
             count={cycles.length}
             testId="circular-groups-section"
             countTestId="cycles-count"
@@ -816,7 +809,7 @@ export function GroupHygiene() {
 
           {/* Excessive Nesting Depth */}
           <HygieneSection
-            title="Excessive Nesting Depth"
+            title={t("excessiveDepth")}
             count={deeplyNested.length}
             testId="deep-nesting-section"
             countTestId="deep-nesting-count"
@@ -838,17 +831,17 @@ export function GroupHygiene() {
                       className="text-caption text-[var(--color-text-secondary)]"
                       data-testid={`depth-${item.groupName}`}
                     >
-                      Depth: {item.depth}
+                      {t("depth", { depth: item.depth })}
                     </span>
                   </div>
                   <button
                     className="btn btn-ghost btn-sm flex items-center gap-1 whitespace-nowrap"
                     onClick={() => handleGoToGroup(item.groupDn)}
                     data-testid={`go-to-group-${item.groupName}`}
-                    title="Open in Group Management"
+                    title={t("openInGroupManagement")}
                   >
                     <ExternalLink size={12} />
-                    Go to
+                    {t("goTo")}
                   </button>
                 </div>
               ))}
@@ -857,7 +850,7 @@ export function GroupHygiene() {
 
           {/* Duplicate Groups */}
           <HygieneSection
-            title="Duplicate Groups"
+            title={t("duplicateGroups")}
             count={duplicateGroups.length}
             testId="duplicate-groups-section"
             countTestId="duplicate-groups-count"
@@ -872,7 +865,7 @@ export function GroupHygiene() {
                   data-testid={`duplicate-cluster-${idx}`}
                 >
                   <p className="mb-1 text-caption text-[var(--color-text-secondary)]">
-                    These groups share identical members:
+                    {t("identicalMembers")}:
                   </p>
                   <div className="flex flex-wrap gap-2">
                     {cluster.map((g) => (
@@ -901,11 +894,10 @@ export function GroupHygiene() {
         >
           <div className="max-h-96 w-full max-w-md overflow-auto rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-4 shadow-lg">
             <h3 className="mb-3 text-body font-semibold text-[var(--color-text-primary)]">
-              Delete {selectedGroupsForPreview.length} Empty Group(s)?
+              {t("deleteConfirmTitle", { count: selectedGroupsForPreview.length })}
             </h3>
             <p className="mb-3 text-caption text-[var(--color-text-secondary)]">
-              This action cannot be undone. The following groups will be
-              permanently deleted:
+              {t("deleteConfirmMessage")}
             </p>
             <ul className="mb-4 max-h-48 space-y-1 overflow-auto">
               {selectedGroupsForPreview.map((g) => (
@@ -926,14 +918,14 @@ export function GroupHygiene() {
                 onClick={() => setShowDeletePreview(false)}
                 data-testid="delete-preview-cancel"
               >
-                Cancel
+                {t("common:cancel")}
               </button>
               <button
                 className="btn bg-[var(--color-error)] text-white hover:opacity-90"
                 onClick={handleDeleteSelected}
                 data-testid="delete-preview-confirm"
               >
-                Delete
+                {t("common:delete")}
               </button>
             </div>
           </div>

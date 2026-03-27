@@ -253,13 +253,12 @@ impl PermissionService {
 
         // 1. Match by well-known RID (language-independent)
         for sid in &sids {
-            if let Some(rid) = extract_rid(sid) {
-                if let Some(&level) = self.rid_mappings.get(&rid) {
-                    if level > detected_level {
-                        tracing::info!(sid = %sid, rid, level = %level, "RID match");
-                        detected_level = level;
-                    }
-                }
+            if let Some(rid) = extract_rid(sid)
+                && let Some(&level) = self.rid_mappings.get(&rid)
+                && level > detected_level
+            {
+                tracing::info!(sid = %sid, rid, level = %level, "RID match");
+                detected_level = level;
             }
         }
 
@@ -267,11 +266,11 @@ impl PermissionService {
         {
             let mappings = self.group_mappings.lock().expect("lock poisoned");
             for group_name in &group_names {
-                if let Some(&level) = mappings.get(group_name) {
-                    if level > detected_level {
-                        tracing::info!(group = %group_name, level = %level, "Group name match");
-                        detected_level = level;
-                    }
+                if let Some(&level) = mappings.get(group_name)
+                    && level > detected_level
+                {
+                    tracing::info!(group = %group_name, level = %level, "Group name match");
+                    detected_level = level;
                 }
             }
         }

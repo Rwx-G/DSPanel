@@ -17,7 +17,7 @@ pub mod topology;
 pub use contact::ContactInfo;
 pub use deleted_object::DeletedObject;
 pub use directory_entry::DirectoryEntry;
-pub use exchange_mailbox::{extract_exchange_info, has_exchange_attributes, ExchangeMailboxInfo};
+pub use exchange_mailbox::{ExchangeMailboxInfo, extract_exchange_info, has_exchange_attributes};
 pub use exchange_online::ExchangeOnlineInfo;
 pub use object_snapshot::{ObjectSnapshot, SnapshotDiff};
 pub use ou_node::OUNode;

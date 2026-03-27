@@ -1,0 +1,18 @@
+{
+  "skipToMain": "Vai al contenuto principale",
+  "mainContent": "Contenuto principale",
+  "breadcrumb": "Breadcrumb",
+  "scrollTabsLeft": "Scorri schede a sinistra",
+  "scrollTabsRight": "Scorri schede a destra",
+  "closeTab": "Chiudi {{title}}",
+  "closeOthers": "Chiudi le altre",
+  "closeAll": "Chiudi tutte",
+  "tabOptions": "Opzioni scheda",
+  "loginServer": "Server",
+  "loginAccount": "Account",
+  "loginSubtitle": "Inserire le credenziali AD per connettersi",
+  "loginPassword": "Password",
+  "loginPasswordPlaceholder": "Inserire la password...",
+  "loginConnect": "Connetti",
+  "loginConnecting": "Connessione in corso..."
+}

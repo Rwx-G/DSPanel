@@ -2,6 +2,7 @@ import { useState, useCallback } from "react";
 import { ChevronDown, ChevronRight, Pencil, Check, X } from "lucide-react";
 import { AlertTriangle, AlertCircle, CheckCircle } from "lucide-react";
 import { CopyButton } from "@/components/common/CopyButton";
+import { useTranslation } from "react-i18next";
 
 export type PropertySeverity = "Warning" | "Critical" | "Success" | "Error";
 
@@ -47,6 +48,7 @@ function EditableCell({
   item: PropertyItem;
   onEdit: (attributeName: string, oldValue: string, newValue: string) => void;
 }) {
+  const { t } = useTranslation(["components"]);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(item.value);
 
@@ -85,7 +87,7 @@ function EditableCell({
         <button
           onClick={handleConfirm}
           className="rounded p-0.5 text-[var(--color-success)] hover:bg-[var(--color-success-bg)]"
-          aria-label="Confirm edit"
+          aria-label={t("components:propertyGrid.confirmEdit")}
           data-testid={`edit-confirm-${item.attributeName}`}
         >
           <Check size={14} />
@@ -93,7 +95,7 @@ function EditableCell({
         <button
           onClick={handleCancel}
           className="rounded p-0.5 text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]"
-          aria-label="Cancel edit"
+          aria-label={t("components:propertyGrid.cancelEdit")}
           data-testid={`edit-cancel-${item.attributeName}`}
         >
           <X size={14} />
@@ -123,6 +125,7 @@ function EditableCell({
 }
 
 export function PropertyGrid({ groups, onEdit }: PropertyGridProps) {
+  const { t } = useTranslation(["components"]);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
   const toggleGroup = (category: string) => {
@@ -143,7 +146,7 @@ export function PropertyGrid({ groups, onEdit }: PropertyGridProps) {
         className="py-4 text-center text-caption text-[var(--color-text-secondary)]"
         data-testid="property-grid-empty"
       >
-        No properties to display
+        {t("components:propertyGrid.noProperties")}
       </div>
     );
   }
@@ -197,7 +200,7 @@ export function PropertyGrid({ groups, onEdit }: PropertyGridProps) {
                       data-testid={`property-item-${item.label}`}
                       data-severity={item.severity ?? undefined}
                     >
-                      <span className="min-w-[140px] shrink-0 text-caption text-[var(--color-text-secondary)]">
+                      <span className="min-w-[220px] shrink-0 text-caption text-[var(--color-text-secondary)]">
                         {item.label}
                       </span>
                       {isEditable ? (

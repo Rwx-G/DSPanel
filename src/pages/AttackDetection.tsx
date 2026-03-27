@@ -18,6 +18,7 @@ import {
 } from "@/types/security";
 import { SecurityDisclaimer } from "@/components/common/SecurityDisclaimer";
 import { extractErrorMessage } from "@/utils/errorMapping";
+import { useTranslation } from "react-i18next";
 
 const TIME_WINDOWS = [
   { label: "6h", value: 6 },
@@ -41,40 +42,26 @@ function severityColor(severity: AlertSeverity): string {
   }
 }
 
-function attackTypeLabel(type: AttackType): string {
-  switch (type) {
-    case "GoldenTicket":
-      return "Golden Ticket";
-    case "DCSync":
-      return "DCSync";
-    case "DCShadow":
-      return "DCShadow";
-    case "AbnormalKerberos":
-      return "Abnormal Kerberos";
-    case "PasswordSpray":
-      return "Password Spray";
-    case "PrivGroupChange":
-      return "Priv Group Change";
-    case "Kerberoasting":
-      return "Kerberoasting";
-    case "AsrepRoasting":
-      return "AS-REP Roasting";
-    case "BruteForce":
-      return "Brute Force";
-    case "PassTheHash":
-      return "Pass-the-Hash";
-    case "ShadowCredentials":
-      return "Shadow Credentials";
-    case "RbcdAbuse":
-      return "RBCD Abuse";
-    case "AdminSdHolderTamper":
-      return "AdminSDHolder Tamper";
-    case "SuspiciousAccountActivity":
-      return "Suspicious Account";
-  }
-}
+const ATTACK_TYPE_KEYS: Record<AttackType, string> = {
+  GoldenTicket: "goldenTicket",
+  DCSync: "dcSync",
+  DCShadow: "dcShadow",
+  AbnormalKerberos: "abnormalKerberos",
+  PasswordSpray: "passwordSpray",
+  PrivGroupChange: "privGroupChange",
+  Kerberoasting: "kerberoasting",
+  AsrepRoasting: "asRepRoasting",
+  BruteForce: "bruteForce",
+  PassTheHash: "passTheHash",
+  ShadowCredentials: "shadowCredentials",
+  RbcdAbuse: "rbcdAbuse",
+  AdminSdHolderTamper: "adminSdHolderTamper",
+  SuspiciousAccountActivity: "suspiciousAccount",
+};
 
 function SeverityBadge({ severity }: { severity: AlertSeverity }) {
+  const { t } = useTranslation(["common"]);
+  const severityKey = severity.toLowerCase() as "critical" | "high" | "medium" | "info";
   return (
     <span
       className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium"
@@ -86,18 +73,19 @@ function SeverityBadge({ severity }: { severity: AlertSeverity }) {
     >
       {severity === "Critical" && <AlertCircle size={10} />}
       {(severity === "High" || severity === "Medium") && <AlertTriangle size={10} />}
-      {severity}
+      {t(`common:${severityKey}`)}
     </span>
   );
 }
 
 function AttackTypeBadge({ type }: { type: AttackType }) {
+  const { t } = useTranslation(["attackDetection"]);
   return (
     <span
       className="inline-flex items-center rounded bg-[var(--color-surface-hover)] px-1.5 py-0.5 text-[11px] font-medium text-[var(--color-text-primary)]"
       data-testid={`attack-type-badge-${type}`}
     >
-      {attackTypeLabel(type)}
+      {t(ATTACK_TYPE_KEYS[type])}
     </span>
   );
 }
@@ -111,6 +99,7 @@ function AlertCard({
   isExpanded: boolean;
   onToggle: () => void;
 }) {
+  const { t } = useTranslation(["attackDetection"]);
   const borderColor = severityColor(alert.severity);
 
   return (
@@ -130,7 +119,7 @@ function AlertCard({
             <SeverityBadge severity={alert.severity} />
             {alert.eventId != null && (
               <span className="text-[10px] font-mono text-[var(--color-text-secondary)]">
-                Event {alert.eventId}
+                {t("event")} {alert.eventId}
               </span>
             )}
             {alert.mitreRef != null && (
@@ -138,7 +127,7 @@ function AlertCard({
                 className="inline-flex items-center rounded bg-[var(--color-surface-hover)] px-1 py-0.5 text-[10px] font-mono text-[var(--color-text-secondary)]"
                 data-testid="mitre-ref-badge"
               >
-                MITRE {alert.mitreRef}
+                {t("mitre")} {alert.mitreRef}
               </span>
             )}
           </div>
@@ -146,7 +135,7 @@ function AlertCard({
             {alert.description}
           </div>
           <div className="mt-0.5 flex items-center gap-3 text-[10px] text-[var(--color-text-secondary)]">
-            <span>Source: {alert.source}</span>
+            <span>{t("source")}: {alert.source}</span>
             <span>{new Date(alert.timestamp).toLocaleString()}</span>
           </div>
         </div>
@@ -164,7 +153,7 @@ function AlertCard({
           data-testid="alert-card-detail"
         >
           <div className="text-caption font-medium text-[var(--color-text-primary)]">
-            Recommendation
+            {t("recommendation")}
           </div>
           <p className="mt-1 text-caption text-[var(--color-text-secondary)]">
             {alert.recommendation}
@@ -176,6 +165,7 @@ function AlertCard({
 }
 
 export function AttackDetection() {
+  const { t } = useTranslation(["attackDetection", "common"]);
   const [report, setReport] = useState<AttackDetectionReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -256,12 +246,12 @@ export function AttackDetection() {
       {/* Toolbar */}
       <div className="flex items-center justify-between border-b border-[var(--color-border-default)] px-4 py-2">
         <h2 className="flex items-center gap-1.5 text-body font-semibold text-[var(--color-text-primary)]">
-          Attack Detection
+          {t("pageTitle")}
           <SecurityDisclaimer
             coverage="~25%"
-            checks="14 attack types via Windows Security Event Log (XML parsing): Golden Ticket, DCSync, DCShadow, Kerberoasting, AS-REP Roasting, Brute Force, Pass-the-Hash, Password Spray, Shadow Credentials, RBCD Abuse, AdminSDHolder Tampering, and more. MITRE ATT&CK mapped."
-            limitations="On-demand scanning only (not real-time). Reads local DC event log - does not query remote DCs. Requires Windows. Does not detect NTLM relay, Skeleton Key, LSASS dumps, or lateral movement."
-            tools="Microsoft Defender for Identity (real-time, ~30 attack types), CrowdStrike Falcon Identity, or Tenable Identity Exposure for continuous monitoring."
+            checks={t("disclaimer.checks")}
+            limitations={t("disclaimer.limitations")}
+            tools={t("disclaimer.tools")}
           />
         </h2>
         <div className="flex items-center gap-3">
@@ -270,17 +260,17 @@ export function AttackDetection() {
             <div className="flex items-center gap-2 text-caption" data-testid="alert-summary">
               {criticalCount > 0 && (
                 <span className="flex items-center gap-1" style={{ color: "var(--color-error)" }}>
-                  <AlertCircle size={12} /> {criticalCount} Critical
+                  <AlertCircle size={12} /> {criticalCount} {t("common:critical")}
                 </span>
               )}
               {highCount > 0 && (
                 <span className="flex items-center gap-1" style={{ color: "var(--color-warning)" }}>
-                  <AlertTriangle size={12} /> {highCount} High
+                  <AlertTriangle size={12} /> {highCount} {t("common:high")}
                 </span>
               )}
               {mediumCount > 0 && (
                 <span className="flex items-center gap-1" style={{ color: "var(--color-text-secondary)" }}>
-                  <AlertTriangle size={12} /> {mediumCount} Medium
+                  <AlertTriangle size={12} /> {mediumCount} {t("common:medium")}
                 </span>
               )}
             </div>
@@ -308,7 +298,7 @@ export function AttackDetection() {
             data-testid="scan-button"
           >
             <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-            Scan
+            {t("scan")}
           </button>
         </div>
       </div>
@@ -316,11 +306,11 @@ export function AttackDetection() {
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4">
         {loading && !report ? (
-          <LoadingSpinner message="Scanning event logs..." />
+          <LoadingSpinner message={t("scanning")} />
         ) : error ? (
           <EmptyState
             icon={<AlertCircle size={40} />}
-            title="Detection Failed"
+            title={t("detectionFailed")}
             description={error}
           />
         ) : (
@@ -333,8 +323,7 @@ export function AttackDetection() {
               >
                 <AlertTriangle size={14} className="shrink-0" />
                 <span>
-                  Cannot read Security Event Log - results may be incomplete. Ensure DSPanel runs
-                  with <strong>Event Log Readers</strong> membership on the target DC.
+                  {t("eventLogWarning")}
                 </span>
               </div>
             )}
@@ -343,10 +332,10 @@ export function AttackDetection() {
               <table className="w-full text-caption">
                 <thead>
                   <tr className="border-b border-[var(--color-border-default)] text-left text-[var(--color-text-secondary)]">
-                    <th className="px-3 py-2 font-medium">Check</th>
-                    <th className="px-3 py-2 font-medium">Event IDs</th>
-                    <th className="px-3 py-2 font-medium">MITRE</th>
-                    <th className="px-3 py-2 text-center font-medium">Result</th>
+                    <th className="px-3 py-2 font-medium">{t("check")}</th>
+                    <th className="px-3 py-2 font-medium">{t("eventIds")}</th>
+                    <th className="px-3 py-2 font-medium">{t("mitre")}</th>
+                    <th className="px-3 py-2 text-center font-medium">{t("result")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -367,7 +356,7 @@ export function AttackDetection() {
                         data-testid={`check-row-${check.type}`}
                       >
                         <td className="px-3 py-2 font-medium text-[var(--color-text-primary)]">
-                          {attackTypeLabel(check.type)}
+                          {t(ATTACK_TYPE_KEYS[check.type])}
                         </td>
                         <td className="px-3 py-2 font-mono text-[10px] text-[var(--color-text-secondary)]">
                           {check.eventIds}
@@ -386,17 +375,17 @@ export function AttackDetection() {
                             >
                               {highestSeverity === "Critical" && <AlertCircle size={10} />}
                               {(highestSeverity === "High" || highestSeverity === "Medium") && <AlertTriangle size={10} />}
-                              {alertsForType.length} alert{alertsForType.length > 1 ? "s" : ""}
+                              {t("alert", { count: alertsForType.length })}
                             </span>
                           ) : report && !report.eventLogAccessible ? (
                             <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-warning)]/10 px-2 py-0.5 text-[11px] font-medium text-[var(--color-warning)]">
                               <AlertTriangle size={10} />
-                              N/A
+                              {t("resultNa")}
                             </span>
                           ) : (
                             <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-success)]/10 px-2 py-0.5 text-[11px] font-medium text-[var(--color-success)]">
                               <ShieldCheck size={10} />
-                              Clear
+                              {t("resultClear")}
                             </span>
                           )}
                         </td>
@@ -411,7 +400,7 @@ export function AttackDetection() {
             {report && report.alerts.length > 0 && (
               <>
                 <h3 className="text-caption font-semibold text-[var(--color-text-primary)]">
-                  Alert Details ({report.alerts.length})
+                  {t("alertDetails")} ({report.alerts.length})
                 </h3>
                 <div className="flex flex-col gap-3">
                   {report.alerts.map((alert, index) => {
@@ -431,7 +420,7 @@ export function AttackDetection() {
 
             {report && (
               <div className="text-[10px] text-[var(--color-text-secondary)]">
-                Last scanned: {new Date(report.scannedAt).toLocaleString()} - Window: {report.timeWindowHours}h
+                {t("lastScanned")}: {new Date(report.scannedAt).toLocaleString()} - {t("timeWindow")}: {report.timeWindowHours}h
               </div>
             )}
           </div>

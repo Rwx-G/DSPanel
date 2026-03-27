@@ -688,7 +688,7 @@ describe("UserDetail", () => {
     await waitFor(() => {
       expect(screen.getByTestId("pending-changes-bar")).toBeInTheDocument();
     });
-    expect(screen.getByText(/1 change\(s\)/)).toBeInTheDocument();
+    expect(screen.getByText(/1 unsaved change/)).toBeInTheDocument();
   });
 
   it("clears pending changes when Discard button is clicked", async () => {
@@ -721,5 +721,280 @@ describe("UserDetail", () => {
         screen.queryByTestId("pending-changes-bar"),
       ).not.toBeInTheDocument();
     });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Snapshot history section
+  // ---------------------------------------------------------------------------
+
+  it("renders Object Snapshots section with SnapshotHistory component", () => {
+    render(<UserDetail {...makeProps()} />, { wrapper: TestProviders });
+    expect(screen.getByTestId("user-snapshot-section")).toBeInTheDocument();
+    expect(screen.getByText("Object Snapshots")).toBeInTheDocument();
+    expect(screen.getByTestId("snapshot-history-mock")).toBeInTheDocument();
+  });
+
+  // ---------------------------------------------------------------------------
+  // Exchange panels
+  // ---------------------------------------------------------------------------
+
+  it("does not render ExchangeOnlinePanel when invoke rejects", async () => {
+    const { invoke } = await import("@tauri-apps/api/core");
+    const mockedInvoke = vi.mocked(invoke);
+    mockedInvoke.mockImplementation((cmd: string) => {
+      if (cmd === "get_exchange_online_info") {
+        return Promise.reject(new Error("Graph API not configured"));
+      }
+      return Promise.resolve(null) as ReturnType<typeof invoke>;
+    });
+
+    render(<UserDetail {...makeProps()} />, { wrapper: TestProviders });
+
+    // Wait for the effect to settle
+    await waitFor(() => {
+      expect(screen.getByTestId("user-detail")).toBeInTheDocument();
+    });
+    expect(
+      screen.queryByTestId("exchange-online-panel"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("does not fetch Exchange Online info when userPrincipalName is empty", async () => {
+    const { invoke } = await import("@tauri-apps/api/core");
+    const mockedInvoke = vi.mocked(invoke);
+    mockedInvoke.mockClear();
+
+    const user = makeUser({ userPrincipalName: "" });
+    render(<UserDetail {...makeProps({ user })} />, {
+      wrapper: TestProviders,
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("user-detail")).toBeInTheDocument();
+    });
+
+    // Should not have called get_exchange_online_info at all
+    const exchangeCalls = mockedInvoke.mock.calls.filter(
+      (c) => c[0] === "get_exchange_online_info",
+    );
+    expect(exchangeCalls.length).toBe(0);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Delete user button visibility
+  // ---------------------------------------------------------------------------
+
+  it("shows delete button when user has AccountOperator permission", async () => {
+    const permMod = await import("@/hooks/usePermissions");
+    vi.spyOn(permMod, "usePermissions").mockReturnValue({
+      hasPermission: () => true,
+      level: "AccountOperator" as import("@/types/permissions").PermissionLevel,
+      groups: [],
+      loading: false,
+    });
+
+    render(<UserDetail {...makeProps()} />, { wrapper: TestProviders });
+    expect(screen.getByTestId("user-delete-btn")).toBeInTheDocument();
+  });
+
+  it("hides delete button for ReadOnly users", async () => {
+    // Explicitly set ReadOnly permissions (previous tests may have spied)
+    const permMod = await import("@/hooks/usePermissions");
+    vi.spyOn(permMod, "usePermissions").mockReturnValue({
+      hasPermission: () => false,
+      level: "ReadOnly" as import("@/types/permissions").PermissionLevel,
+      groups: [],
+      loading: false,
+    });
+
+    render(<UserDetail {...makeProps()} />, { wrapper: TestProviders });
+    expect(screen.queryByTestId("user-delete-btn")).not.toBeInTheDocument();
+  });
+
+  // ---------------------------------------------------------------------------
+  // Intersection observer for floating action bar
+  // ---------------------------------------------------------------------------
+
+  it("does not show floating changes indicator when action bar is visible and no changes", () => {
+    render(<UserDetail {...makeProps()} />, { wrapper: TestProviders });
+    expect(
+      screen.queryByTestId("floating-changes-indicator"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows floating changes indicator when action bar scrolls out of view with pending changes", async () => {
+    // Replace IntersectionObserver with one that immediately reports not intersecting
+    const callbacks: IntersectionObserverCallback[] = [];
+    class NotVisibleObserver {
+      constructor(cb: IntersectionObserverCallback) {
+        callbacks.push(cb);
+      }
+      observe() {
+        // Immediately fire with isIntersecting = false
+        for (const cb of callbacks) {
+          cb(
+            [{ isIntersecting: false } as IntersectionObserverEntry],
+            {} as IntersectionObserver,
+          );
+        }
+      }
+      unobserve() {}
+      disconnect() {}
+    }
+    globalThis.IntersectionObserver =
+      NotVisibleObserver as unknown as typeof IntersectionObserver;
+
+    const permMod = await import("@/hooks/usePermissions");
+    vi.spyOn(permMod, "usePermissions").mockReturnValue({
+      hasPermission: () => true,
+      level: "AccountOperator" as import("@/types/permissions").PermissionLevel,
+      groups: [],
+      loading: false,
+    });
+
+    render(<UserDetail {...makeProps()} />, { wrapper: TestProviders });
+
+    // Stage a change to trigger pending changes bar
+    fireEvent.click(screen.getByTestId("edit-btn-displayName"));
+    fireEvent.change(screen.getByTestId("edit-input-displayName"), {
+      target: { value: "New Name" },
+    });
+    fireEvent.click(screen.getByTestId("edit-confirm-displayName"));
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId("floating-changes-indicator"),
+      ).toBeInTheDocument();
+    });
+
+    // Floating indicator should show save button and scroll button
+    expect(screen.getByTestId("floating-save-btn")).toBeInTheDocument();
+    expect(screen.getByTestId("floating-scroll-btn")).toBeInTheDocument();
+    expect(screen.getAllByText(/unsaved change/).length).toBeGreaterThanOrEqual(1);
+
+    // Restore original mock
+    globalThis.IntersectionObserver =
+      MockIntersectionObserver as unknown as typeof IntersectionObserver;
+  });
+
+  // ---------------------------------------------------------------------------
+  // Group context menu - Open in Group Management
+  // ---------------------------------------------------------------------------
+
+  it("opens Group Management tab via context menu", async () => {
+    const props = makeProps();
+    render(<UserDetail {...props} />, { wrapper: TestProviders });
+
+    const rows = screen.getAllByRole("row");
+    const dataRow = rows.find((r) => r.querySelector("td"));
+    fireEvent.contextMenu(dataRow!);
+
+    await waitFor(() => {
+      expect(screen.getByText("Open in Group Management")).toBeInTheDocument();
+    });
+
+    // Clicking it should not throw
+    fireEvent.click(screen.getByText("Open in Group Management"));
+  });
+
+  // ---------------------------------------------------------------------------
+  // Health severity edge cases
+  // ---------------------------------------------------------------------------
+
+  it("ignores health flags with Healthy severity", () => {
+    const healthStatus: AccountHealthStatus = {
+      level: "Healthy",
+      activeFlags: [
+        {
+          name: "Locked",
+          severity: "Healthy",
+          description: "Not locked",
+        },
+      ],
+    };
+    render(
+      <UserDetail
+        {...makeProps({
+          healthStatus,
+        })}
+      />,
+      { wrapper: TestProviders },
+    );
+    // Should render without error - Healthy severity does not produce property severity
+    expect(screen.getByTestId("user-detail")).toBeInTheDocument();
+  });
+
+  it("ignores health flags with unknown names not in FLAG_TO_LABEL", () => {
+    const healthStatus: AccountHealthStatus = {
+      level: "Warning",
+      activeFlags: [
+        {
+          name: "UnknownFlag",
+          severity: "Warning",
+          description: "Some unknown flag",
+        },
+      ],
+    };
+    render(
+      <UserDetail
+        {...makeProps({
+          healthStatus,
+        })}
+      />,
+      { wrapper: TestProviders },
+    );
+    expect(screen.getByTestId("user-detail")).toBeInTheDocument();
+  });
+
+  // ---------------------------------------------------------------------------
+  // Multiple pending changes display
+  // ---------------------------------------------------------------------------
+
+  it("shows multiple attribute names in pending changes bar", async () => {
+    const permMod = await import("@/hooks/usePermissions");
+    vi.spyOn(permMod, "usePermissions").mockReturnValue({
+      hasPermission: () => true,
+      level: "AccountOperator" as import("@/types/permissions").PermissionLevel,
+      groups: [],
+      loading: false,
+    });
+
+    render(<UserDetail {...makeProps()} />, { wrapper: TestProviders });
+
+    // Stage first change
+    fireEvent.click(screen.getByTestId("edit-btn-displayName"));
+    fireEvent.change(screen.getByTestId("edit-input-displayName"), {
+      target: { value: "New Name" },
+    });
+    fireEvent.click(screen.getByTestId("edit-confirm-displayName"));
+
+    // Stage second change
+    fireEvent.click(screen.getByTestId("edit-btn-department"));
+    fireEvent.change(screen.getByTestId("edit-input-department"), {
+      target: { value: "HR" },
+    });
+    fireEvent.click(screen.getByTestId("edit-confirm-department"));
+
+    await waitFor(() => {
+      expect(screen.getByText(/2 unsaved change/)).toBeInTheDocument();
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // whenCreated / whenChanged N/A fallback
+  // ---------------------------------------------------------------------------
+
+  it("shows N/A for empty whenCreated and whenChanged", () => {
+    render(
+      <UserDetail
+        {...makeProps({
+          user: makeUser({ whenCreated: "", whenChanged: "" }),
+        })}
+      />,
+      { wrapper: TestProviders },
+    );
+    const naTexts = screen.getAllByText("N/A");
+    // At least 2 N/A: whenCreated + whenChanged (and possibly lastLogonWorkstation)
+    expect(naTexts.length).toBeGreaterThanOrEqual(2);
   });
 });

@@ -9,6 +9,7 @@ import { parseCnFromDn } from "@/utils/dn";
 import { formatCsv, downloadCsv } from "@/utils/csvExport";
 import { extractErrorMessage } from "@/utils/errorMapping";
 import { type DirectoryEntry } from "@/types/directory";
+import { useTranslation } from "react-i18next";
 import {
   Trash2,
   UserPlus,
@@ -67,112 +68,124 @@ export interface BulkProgress {
 
 interface OperationCard {
   id: BulkOperationType;
-  label: string;
+  labelKey: string;
   icon: typeof Trash2;
-  description: string;
+  descriptionKey: string;
   minPermission: PermissionLevel;
+  minPermissionLabel: string;
 }
 
 interface OperationCategory {
-  label: string;
+  labelKey: string;
   cards: OperationCard[];
 }
 
 const OPERATION_CATEGORIES: OperationCategory[] = [
   {
-    label: "Members",
+    labelKey: "categoryMembers",
     cards: [
       {
         id: "add",
-        label: "Add Members",
+        labelKey: "addMembers",
         icon: UserPlus,
-        description: "Add members to a target group",
+        descriptionKey: "addDescription",
         minPermission: "HelpDesk",
+        minPermissionLabel: "helpDesk",
       },
       {
         id: "delete",
-        label: "Remove Members",
+        labelKey: "removeMembers",
         icon: Trash2,
-        description: "Remove members from a group",
+        descriptionKey: "removeDescription",
         minPermission: "AccountOperator",
+        minPermissionLabel: "accountOperator",
       },
       {
         id: "transfer",
-        label: "Transfer Members",
+        labelKey: "transferMembers",
         icon: ArrowRightLeft,
-        description: "Move members from one group to another",
+        descriptionKey: "transferDescription",
         minPermission: "AccountOperator",
+        minPermissionLabel: "accountOperator",
       },
       {
         id: "copy-memberships",
-        label: "Copy User Groups",
+        labelKey: "copyUserGroups",
         icon: Users,
-        description: "Copy group memberships from one user to another",
+        descriptionKey: "copyDescription",
         minPermission: "HelpDesk",
+        minPermissionLabel: "helpDesk",
       },
       {
         id: "import-csv",
-        label: "Import CSV",
+        labelKey: "importCsv",
         icon: Upload,
-        description: "Add members to a group from a CSV file",
+        descriptionKey: "importDescription",
         minPermission: "HelpDesk",
+        minPermissionLabel: "helpDesk",
       },
     ],
   },
   {
-    label: "Groups",
+    labelKey: "categoryGroups",
     cards: [
       {
         id: "create-groups",
-        label: "Create Groups",
+        labelKey: "createGroups",
         icon: FilePlus2,
-        description: "Bulk create groups from CSV template",
+        descriptionKey: "createDescription",
         minPermission: "AccountOperator",
+        minPermissionLabel: "accountOperator",
       },
       {
         id: "clone-group",
-        label: "Clone Group",
+        labelKey: "cloneGroup",
         icon: Copy,
-        description: "Create a copy of a group with its members",
+        descriptionKey: "cloneDescription",
         minPermission: "AccountOperator",
+        minPermissionLabel: "accountOperator",
       },
       {
         id: "merge-groups",
-        label: "Merge Groups",
+        labelKey: "mergeGroups",
         icon: Merge,
-        description: "Combine members from multiple groups into one",
+        descriptionKey: "mergeDescription",
         minPermission: "AccountOperator",
+        minPermissionLabel: "accountOperator",
       },
       {
         id: "move-groups",
-        label: "Move Groups",
+        labelKey: "moveGroups",
         icon: FolderInput,
-        description: "Move groups to a different OU",
+        descriptionKey: "moveDescription",
         minPermission: "Admin",
+        minPermissionLabel: "admin",
       },
     ],
   },
   {
-    label: "Properties",
+    labelKey: "categoryProperties",
     cards: [
       {
         id: "update-manager",
-        label: "Set ManagedBy",
+        labelKey: "updateManager",
         icon: Shield,
-        description: "Set the managedBy attribute on groups",
+        descriptionKey: "managerDescription",
         minPermission: "AccountOperator",
+        minPermissionLabel: "accountOperator",
       },
     ],
   },
   {
-    label: "Export",
+    labelKey: "categoryExport",
     cards: [
       {
         id: "export-csv",
-        label: "Export CSV",
+        labelKey: "exportCsv",
         icon: Download,
-        description: "Export group members to a CSV file",
+        descriptionKey: "exportDescription",
         minPermission: "ReadOnly",
+        minPermissionLabel: "readOnly",
       },
     ],
   },
@@ -236,6 +249,7 @@ function OUPicker({
   disabled?: boolean;
   testId?: string;
 }) {
+  const { t } = useTranslation(["bulkOperations"]);
   const [ous, setOus] = useState<OUNode[]>([]);
   const [loading, setLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
@@ -279,7 +293,7 @@ function OUPicker({
         type="button"
       >
         <span className={value ? "text-[var(--color-text-primary)]" : "text-[var(--color-text-secondary)]"}>
-          {loading ? "Loading OUs..." : selectedLabel || value || "Select an OU..."}
+          {loading ? t("bulkOperations:loadingOus") : selectedLabel || value || t("bulkOperations:selectOu")}
         </span>
         <ChevronDown size={14} className="shrink-0 text-[var(--color-text-secondary)]" />
       </button>
@@ -310,7 +324,7 @@ function UserSearchPicker({
   selected,
   onSelect,
   disabled = false,
-  placeholder = "Search user...",
+  placeholder,
   testId = "user-search-picker",
 }: {
   selected: DirectoryEntry | null;
@@ -413,6 +427,7 @@ function UserSearchPicker({
 }
 
 export function BulkOperations() {
+  const { t } = useTranslation(["bulkOperations", "common"]);
   const { hasPermission } = usePermissions();
   const searchGroups = useGroupSearch();
 
@@ -678,18 +693,19 @@ export function BulkOperations() {
       current: 0,
       total,
       status: "running",
-      message: "Starting...",
+      message: t("progressStarting"),
     });
     setShowPreview(false);
 
     for (let i = 0; i < plannedChanges.length; i++) {
       const change = plannedChanges[i];
-      const actionLabel = change.action === "add" ? "Adding" : "Removing";
       setProgress({
         current: i,
         total,
         status: "running",
-        message: `${actionLabel} ${change.memberName} ${change.action === "add" ? "to" : "from"} ${change.groupName}...`,
+        message: change.action === "add"
+          ? t("progressAddingMember", { member: change.memberName, group: change.groupName })
+          : t("progressRemovingMember", { member: change.memberName, group: change.groupName }),
       });
 
       try {
@@ -712,7 +728,7 @@ export function BulkOperations() {
           current: i,
           total,
           status: "rolling-back",
-          message: `Rolling back ${completedOps.length} completed operations...`,
+          message: t("progressRollingBack", { count: completedOps.length }),
         });
 
         for (let j = completedOps.length - 1; j >= 0; j--) {
@@ -738,7 +754,7 @@ export function BulkOperations() {
           current: i,
           total,
           status: "failed",
-          message: `Failed at step ${i + 1}. Rolled back ${completedOps.length} operations.`,
+          message: t("progressFailedRolledBack", { step: i + 1, count: completedOps.length }),
         });
         return;
       }
@@ -748,7 +764,7 @@ export function BulkOperations() {
       current: total,
       total,
       status: "completed",
-      message: `Successfully completed ${total} operations.`,
+      message: t("progressCompleted", { count: total }),
     });
     setPlannedChanges([]);
     setSelectedMembers(new Set());
@@ -771,7 +787,7 @@ export function BulkOperations() {
 
   const handleExportCsv = useCallback(async () => {
     if (members.length === 0) return;
-    const headers = ["Display Name", "SAM Account Name", "Distinguished Name"];
+    const headers = [t("headerDisplayName"), t("headerSamAccountName"), t("headerDistinguishedName")];
     const rows = members.map((m) => [
       m.displayName ?? "",
       m.samAccountName ?? "",
@@ -787,7 +803,7 @@ export function BulkOperations() {
       current: 1,
       total: 1,
       status: "completed",
-      message: `Exported ${members.length} members to CSV.`,
+      message: t("progressExported", { count: members.length }),
     });
   }, [members, sourceGroups]);
 
@@ -818,14 +834,14 @@ export function BulkOperations() {
     if (!targetUser || copyPreviewGroups.length === 0) return;
     const total = copyPreviewGroups.length;
     setShowPreview(false);
-    setProgress({ current: 0, total, status: "running", message: "Starting..." });
+    setProgress({ current: 0, total, status: "running", message: t("progressStarting") });
 
     for (let i = 0; i < total; i++) {
       setProgress({
         current: i,
         total,
         status: "running",
-        message: `Adding to group ${i + 1}/${total}...`,
+        message: t("progressAddingToGroup", { current: i + 1, total }),
       });
       try {
         await invoke("add_user_to_group", {
@@ -837,7 +853,7 @@ export function BulkOperations() {
           current: i,
           total,
           status: "failed",
-          message: `Failed at step ${i + 1}: ${extractErrorMessage(err)}`,
+          message: t("progressFailedAtStep", { step: i + 1, error: extractErrorMessage(err) }),
         });
         return;
       }
@@ -846,9 +862,9 @@ export function BulkOperations() {
       current: total,
       total,
       status: "completed",
-      message: `Successfully added ${targetUser.displayName ?? targetUser.samAccountName} to ${total} groups.`,
+      message: t("progressAddedToGroups", { name: targetUser.displayName ?? targetUser.samAccountName, count: total }),
     });
-  }, [targetUser, copyPreviewGroups]);
+  }, [targetUser, copyPreviewGroups, t]);
 
   // ---------------------------------------------------------------------------
   // Clone Group handler
@@ -866,7 +882,7 @@ export function BulkOperations() {
       current: 0,
       total: 1,
       status: "running",
-      message: "Creating group...",
+      message: t("progressCreatingGroup"),
     });
 
     try {
@@ -875,7 +891,7 @@ export function BulkOperations() {
         containerDn: cloneContainerDn.trim(),
         scope: "Global",
         category: "Security",
-        description: `Clone of ${sourceGroups[0].name}`,
+        description: t("cloneOfDescription", { name: sourceGroups[0].name }),
       });
 
       // Add members
@@ -885,7 +901,7 @@ export function BulkOperations() {
           current: i,
           total: total + 1,
           status: "running",
-          message: `Adding member ${i + 1}/${total}...`,
+          message: t("progressAddingMemberCount", { current: i + 1, total }),
         });
         try {
           await invoke("add_user_to_group", {
@@ -901,17 +917,17 @@ export function BulkOperations() {
         current: total + 1,
         total: total + 1,
         status: "completed",
-        message: `Group "${cloneNewName}" created with ${total} members.`,
+        message: t("progressGroupCreated", { name: cloneNewName, count: total }),
       });
     } catch (err) {
       setProgress({
         current: 0,
         total: 1,
         status: "failed",
-        message: `Failed to create group: ${extractErrorMessage(err)}`,
+        message: t("progressFailedCreateGroup", { error: extractErrorMessage(err) }),
       });
     }
-  }, [sourceGroups, cloneNewName, cloneContainerDn, members]);
+  }, [sourceGroups, cloneNewName, cloneContainerDn, members, t]);
 
   // ---------------------------------------------------------------------------
   // Merge Groups handler
@@ -924,7 +940,7 @@ export function BulkOperations() {
       current: 0,
       total: 1,
       status: "running",
-      message: "Loading members from all source groups...",
+      message: t("progressLoadingMembers"),
     });
 
     try {
@@ -956,7 +972,7 @@ export function BulkOperations() {
           current: i,
           total,
           status: "running",
-          message: `Adding member ${i + 1}/${total} to ${targetGroups[0].name}...`,
+          message: t("progressAddingMemberToGroup", { current: i + 1, total, group: targetGroups[0].name }),
         });
         try {
           await invoke("add_user_to_group", {
@@ -972,17 +988,17 @@ export function BulkOperations() {
         current: total,
         total,
         status: "completed",
-        message: `Merged ${total} new members into ${targetGroups[0].name}.`,
+        message: t("progressMerged", { count: total, group: targetGroups[0].name }),
       });
     } catch (err) {
       setProgress({
         current: 0,
         total: 1,
         status: "failed",
-        message: `Merge failed: ${extractErrorMessage(err)}`,
+        message: t("progressMergeFailed", { error: extractErrorMessage(err) }),
       });
     }
-  }, [sourceGroups, targetGroups]);
+  }, [sourceGroups, targetGroups, t]);
 
   // ---------------------------------------------------------------------------
   // Import CSV handler
@@ -1049,7 +1065,7 @@ export function BulkOperations() {
       current: 0,
       total,
       status: "running",
-      message: "Starting import...",
+      message: t("progressStartingImport"),
     });
 
     for (let i = 0; i < total; i++) {
@@ -1057,7 +1073,7 @@ export function BulkOperations() {
         current: i,
         total,
         status: "running",
-        message: `Adding ${csvResolvedUsers[i].displayName ?? csvResolvedUsers[i].samAccountName} to ${targetGroups[0].name}...`,
+        message: t("progressImportingMember", { name: csvResolvedUsers[i].displayName ?? csvResolvedUsers[i].samAccountName, group: targetGroups[0].name }),
       });
       try {
         await invoke("add_user_to_group", {
@@ -1069,7 +1085,7 @@ export function BulkOperations() {
           current: i,
           total,
           status: "failed",
-          message: `Failed at step ${i + 1}: ${extractErrorMessage(err)}`,
+          message: t("progressFailedAtStep", { step: i + 1, error: extractErrorMessage(err) }),
         });
         return;
       }
@@ -1079,9 +1095,9 @@ export function BulkOperations() {
       current: total,
       total,
       status: "completed",
-      message: `Successfully imported ${total} members into ${targetGroups[0].name}.`,
+      message: t("progressImported", { count: total, group: targetGroups[0].name }),
     });
-  }, [csvResolvedUsers, targetGroups]);
+  }, [csvResolvedUsers, targetGroups, t]);
 
   // ---------------------------------------------------------------------------
   // Move Groups handler
@@ -1095,7 +1111,7 @@ export function BulkOperations() {
       current: 0,
       total,
       status: "running",
-      message: "Moving groups...",
+      message: t("progressMovingGroups"),
     });
 
     for (let i = 0; i < total; i++) {
@@ -1103,7 +1119,7 @@ export function BulkOperations() {
         current: i,
         total,
         status: "running",
-        message: `Moving ${sourceGroups[i].name}...`,
+        message: t("progressMoving", { name: sourceGroups[i].name }),
       });
       try {
         await invoke("move_object", {
@@ -1115,7 +1131,7 @@ export function BulkOperations() {
           current: i,
           total,
           status: "failed",
-          message: `Failed to move ${sourceGroups[i].name}: ${extractErrorMessage(err)}`,
+          message: t("progressFailedMove", { name: sourceGroups[i].name, error: extractErrorMessage(err) }),
         });
         return;
       }
@@ -1125,9 +1141,9 @@ export function BulkOperations() {
       current: total,
       total,
       status: "completed",
-      message: `Successfully moved ${total} group(s).`,
+      message: t("progressMoved", { count: total }),
     });
-  }, [sourceGroups, moveTargetOu]);
+  }, [sourceGroups, moveTargetOu, t]);
 
   // ---------------------------------------------------------------------------
   // Create Groups from CSV handler
@@ -1165,7 +1181,7 @@ export function BulkOperations() {
       current: 0,
       total,
       status: "running",
-      message: "Creating groups...",
+      message: t("progressCreatingGroups"),
     });
 
     for (let i = 0; i < total; i++) {
@@ -1181,7 +1197,7 @@ export function BulkOperations() {
           current: i,
           total,
           status: "failed",
-          message: `Row ${i + 1}: missing name or OU.`,
+          message: t("progressRowMissingData", { row: i + 1 }),
         });
         return;
       }
@@ -1190,7 +1206,7 @@ export function BulkOperations() {
         current: i,
         total,
         status: "running",
-        message: `Creating "${name}" (${i + 1}/${total})...`,
+        message: t("progressCreatingNamed", { name, current: i + 1, total }),
       });
 
       try {
@@ -1206,7 +1222,7 @@ export function BulkOperations() {
           current: i,
           total,
           status: "failed",
-          message: `Failed to create "${name}": ${extractErrorMessage(err)}`,
+          message: t("progressFailedCreate", { name, error: extractErrorMessage(err) }),
         });
         return;
       }
@@ -1216,9 +1232,9 @@ export function BulkOperations() {
       current: total,
       total,
       status: "completed",
-      message: `Successfully created ${total} group(s).`,
+      message: t("progressCreated", { count: total }),
     });
-  }, [createGroupsCsvData]);
+  }, [createGroupsCsvData, t]);
 
   // ---------------------------------------------------------------------------
   // Update Manager handler
@@ -1232,7 +1248,7 @@ export function BulkOperations() {
       current: 0,
       total,
       status: "running",
-      message: "Updating managed-by...",
+      message: t("progressUpdatingManager"),
     });
 
     for (let i = 0; i < total; i++) {
@@ -1240,7 +1256,7 @@ export function BulkOperations() {
         current: i,
         total,
         status: "running",
-        message: `Updating ${sourceGroups[i].name}...`,
+        message: t("progressUpdating", { name: sourceGroups[i].name }),
       });
       try {
         await invoke("update_managed_by", {
@@ -1252,7 +1268,7 @@ export function BulkOperations() {
           current: i,
           total,
           status: "failed",
-          message: `Failed to update ${sourceGroups[i].name}: ${extractErrorMessage(err)}`,
+          message: t("progressFailedUpdate", { name: sourceGroups[i].name, error: extractErrorMessage(err) }),
         });
         return;
       }
@@ -1262,9 +1278,9 @@ export function BulkOperations() {
       current: total,
       total,
       status: "completed",
-      message: `Manager updated on ${total} group(s).`,
+      message: t("progressManagerUpdated", { count: total }),
     });
-  }, [sourceGroups, selectedManager]);
+  }, [sourceGroups, selectedManager, t]);
 
   // ---------------------------------------------------------------------------
   // Computed state
@@ -1307,14 +1323,14 @@ export function BulkOperations() {
         data-testid="bulk-operations"
       >
         <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">
-          Groups Bulk Operations
+          {t("pageTitle")}
         </h2>
 
         <div className="space-y-4" data-testid="operation-picker">
           {OPERATION_CATEGORIES.map((category) => (
-            <div key={category.label}>
+            <div key={category.labelKey}>
               <h3 className="mb-2 text-caption font-semibold uppercase tracking-wider text-[var(--color-text-secondary)]">
-                {category.label}
+                {t(category.labelKey)}
               </h3>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                 {category.cards.map((card) => {
@@ -1325,7 +1341,7 @@ export function BulkOperations() {
                       key={card.id}
                       onClick={() => setSelectedOp(card.id)}
                       disabled={!permitted}
-                      title={!permitted ? `Requires ${card.minPermission} permission` : undefined}
+                      title={!permitted ? t(card.minPermissionLabel) : undefined}
                       className={`flex flex-col items-start gap-2 rounded-lg border p-3 text-left transition-colors ${
                         permitted
                           ? "border-[var(--color-border-default)] bg-[var(--color-surface-card)] hover:border-[var(--color-primary)] hover:bg-[var(--color-surface-hover)] cursor-pointer"
@@ -1339,11 +1355,11 @@ export function BulkOperations() {
                           className="text-[var(--color-primary)]"
                         />
                         <span className="text-body font-medium text-[var(--color-text-primary)]">
-                          {card.label}
+                          {t(card.labelKey)}
                         </span>
                       </div>
                       <p className="text-caption text-[var(--color-text-secondary)]">
-                        {card.description}
+                        {t(card.descriptionKey)}
                       </p>
                     </button>
                   );
@@ -1380,11 +1396,13 @@ export function BulkOperations() {
           data-testid="bulk-back-btn"
         >
           <ArrowLeft size={14} />
-          Back
+          {t("back")}
         </button>
         <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">
-          {OPERATION_CATEGORIES.flatMap((cat) => cat.cards).find((c) => c.id === selectedOp)?.label ??
-            "Bulk Operation"}
+          {(() => {
+            const card = OPERATION_CATEGORIES.flatMap((cat) => cat.cards).find((c) => c.id === selectedOp);
+            return card ? t(card.labelKey) : t("pageTitle");
+          })()}
         </h2>
       </div>
 
@@ -1402,13 +1420,13 @@ export function BulkOperations() {
             {(selectedOp === "delete" || selectedOp === "transfer") && (
               <div data-testid="source-group-section">
                 <label className="mb-2 block text-caption font-medium text-[var(--color-text-secondary)]">
-                  {selectedOp === "transfer" ? "Source Group" : "Group"}
+                  {selectedOp === "transfer" ? t("sourceGroup") : t("group")}
                 </label>
                 <GroupPicker
                   selectedGroups={sourceGroups}
                   onSelectionChange={setSourceGroups}
                   onSearch={searchGroups}
-                  placeholder="Search group..."
+                  placeholder={t("searchGroup")}
                   disabled={isRunning}
                   singleSelect
                 />
@@ -1419,13 +1437,13 @@ export function BulkOperations() {
             {(selectedOp === "add" || selectedOp === "transfer") && (
               <div data-testid="target-group-section">
                 <label className="mb-2 block text-caption font-medium text-[var(--color-text-secondary)]">
-                  {selectedOp === "transfer" ? "Target Group" : "Group"}
+                  {selectedOp === "transfer" ? t("targetGroup") : t("group")}
                 </label>
                 <GroupPicker
                   selectedGroups={targetGroups}
                   onSelectionChange={setTargetGroups}
                   onSearch={searchGroups}
-                  placeholder="Search group..."
+                  placeholder={t("searchGroup")}
                   disabled={isRunning}
                   singleSelect
                 />
@@ -1437,7 +1455,7 @@ export function BulkOperations() {
           {selectedOp === "add" ? (
             <div data-testid="add-member-search-section">
               <label className="mb-2 block text-caption font-medium text-[var(--color-text-secondary)]">
-                Search Members to Add
+                {t("searchMembersToAdd")}
               </label>
               <div className="relative">
                 <div className="flex items-center gap-2 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2 py-1">
@@ -1446,7 +1464,7 @@ export function BulkOperations() {
                     type="text"
                     value={addMemberSearch}
                     onChange={(e) => setAddMemberSearch(e.target.value)}
-                    placeholder="Search users by name or username (min 3 chars)..."
+                    placeholder={t("searchUsersByName")}
                     className="flex-1 bg-transparent text-body text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-secondary)]"
                     disabled={targetGroups.length === 0 || isRunning}
                   />
@@ -1479,20 +1497,20 @@ export function BulkOperations() {
               </div>
               {targetGroups.length === 0 && (
                 <p className="mt-2 text-caption text-[var(--color-text-secondary)]">
-                  Select a target group first
+                  {t("selectTargetGroupFirst")}
                 </p>
               )}
               {stagedMembers.length > 0 && (
                 <div className="mt-3">
                   <div className="mb-1 flex items-center justify-between">
                     <span className="text-caption font-medium text-[var(--color-text-secondary)]">
-                      Staged ({stagedMembers.length})
+                      {t("staged", { count: stagedMembers.length })}
                     </span>
                     <button
                       className="text-caption text-[var(--color-text-secondary)] underline hover:no-underline"
                       onClick={() => setStagedMembers([])}
                     >
-                      Clear all
+                      {t("clearAll")}
                     </button>
                   </div>
                   <div className="space-y-1 rounded-md border border-[var(--color-border-default)] p-2">
@@ -1545,7 +1563,7 @@ export function BulkOperations() {
                 data-testid="bulk-preview-btn"
               >
                 <Eye size={14} />
-                Preview
+                {t("preview")}
               </button>
               <button
                 className="btn btn-primary btn-sm flex items-center gap-1.5"
@@ -1554,7 +1572,7 @@ export function BulkOperations() {
                 data-testid="bulk-execute-btn"
               >
                 <Play size={14} />
-                Execute
+                {t("execute")}
               </button>
             </div>
           )}
@@ -1564,8 +1582,7 @@ export function BulkOperations() {
               className="text-caption text-[var(--color-text-secondary)]"
               data-testid="bulk-no-permission"
             >
-              AccountOperator or higher permission required to execute bulk
-              operations.
+              {t("permissionRequired")}
             </p>
           )}
         </>
@@ -1578,13 +1595,13 @@ export function BulkOperations() {
         <>
           <div data-testid="source-group-section">
             <label className="mb-2 block text-caption font-medium text-[var(--color-text-secondary)]">
-              Select Group to Export
+              {t("selectGroupToExport")}
             </label>
             <GroupPicker
               selectedGroups={sourceGroups}
               onSelectionChange={setSourceGroups}
               onSearch={searchGroups}
-              placeholder="Search group..."
+              placeholder={t("searchGroup")}
               disabled={isRunning}
             />
           </div>
@@ -1609,7 +1626,7 @@ export function BulkOperations() {
                 data-testid="bulk-export-btn"
               >
                 <Download size={14} />
-                Export to CSV
+                {t("exportToCsv")}
               </button>
             </div>
           )}
@@ -1624,25 +1641,25 @@ export function BulkOperations() {
           <div className="grid grid-cols-2 gap-4">
             <div data-testid="source-user-section">
               <label className="mb-2 block text-caption font-medium text-[var(--color-text-secondary)]">
-                Source User (copy from)
+                {t("sourceUserLabel")}
               </label>
               <UserSearchPicker
                 selected={sourceUser}
                 onSelect={setSourceUser}
                 disabled={isRunning}
-                placeholder="Search user by name..."
+                placeholder={t("searchUserByName")}
                 testId="copy-source-user"
               />
             </div>
             <div data-testid="target-user-section">
               <label className="mb-2 block text-caption font-medium text-[var(--color-text-secondary)]">
-                Target User (copy to)
+                {t("targetUserLabel")}
               </label>
               <UserSearchPicker
                 selected={targetUser}
                 onSelect={setTargetUser}
                 disabled={isRunning}
-                placeholder="Search user by name..."
+                placeholder={t("searchUserByName")}
                 testId="copy-target-user"
               />
             </div>
@@ -1656,7 +1673,7 @@ export function BulkOperations() {
               data-testid="bulk-preview-btn"
             >
               <Eye size={14} />
-              Preview
+              {t("preview")}
             </button>
             <button
               className="btn btn-primary btn-sm flex items-center gap-1.5"
@@ -1665,7 +1682,7 @@ export function BulkOperations() {
               data-testid="bulk-execute-btn"
             >
               <Play size={14} />
-              Execute
+              {t("execute")}
             </button>
           </div>
 
@@ -1675,7 +1692,7 @@ export function BulkOperations() {
               data-testid="bulk-preview-panel"
             >
               <h3 className="mb-2 text-body font-semibold text-[var(--color-text-primary)]">
-                Groups to add ({copyPreviewGroups.length})
+                {t("groupsToAdd", { count: copyPreviewGroups.length })}
               </h3>
               <div className="max-h-48 overflow-auto">
                 {copyPreviewGroups.map((dn) => (
@@ -1697,7 +1714,7 @@ export function BulkOperations() {
 
           {showPreview && copyPreviewGroups.length === 0 && (
             <p className="text-caption text-[var(--color-text-secondary)]">
-              Target user is already a member of all source user groups.
+              {t("targetAlreadyMember")}
             </p>
           )}
         </>
@@ -1710,13 +1727,13 @@ export function BulkOperations() {
         <>
           <div data-testid="source-group-section">
             <label className="mb-2 block text-caption font-medium text-[var(--color-text-secondary)]">
-              Source Group
+              {t("sourceGroupLabel")}
             </label>
             <GroupPicker
               selectedGroups={sourceGroups}
               onSelectionChange={setSourceGroups}
               onSearch={searchGroups}
-              placeholder="Search source group..."
+              placeholder={t("searchSourceGroup")}
               disabled={isRunning}
               singleSelect
             />
@@ -1724,20 +1741,20 @@ export function BulkOperations() {
 
           {members.length > 0 && (
             <p className="text-caption text-[var(--color-text-secondary)]">
-              {members.length} members will be copied to the new group.
+              {t("membersCopiedHint", { count: members.length })}
             </p>
           )}
 
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="mb-2 block text-caption font-medium text-[var(--color-text-secondary)]">
-                New Group Name
+                {t("newGroupName")}
               </label>
               <input
                 type="text"
                 value={cloneNewName}
                 onChange={(e) => setCloneNewName(e.target.value)}
-                placeholder="e.g. IT-Team-Copy"
+                placeholder={t("newGroupNamePlaceholder")}
                 className="w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5 text-body text-[var(--color-text-primary)]"
                 style={{ outline: "none", boxShadow: "none" }}
                 disabled={isRunning}
@@ -1746,7 +1763,7 @@ export function BulkOperations() {
             </div>
             <div>
               <label className="mb-2 block text-caption font-medium text-[var(--color-text-secondary)]">
-                Target OU
+                {t("targetOu")}
               </label>
               <OUPicker
                 value={cloneContainerDn}
@@ -1770,7 +1787,7 @@ export function BulkOperations() {
               data-testid="bulk-execute-btn"
             >
               <Play size={14} />
-              Clone Group
+              {t("cloneGroupBtn")}
             </button>
           </div>
         </>
@@ -1782,30 +1799,30 @@ export function BulkOperations() {
       {selectedOp === "merge-groups" && (
         <>
           <div className="rounded-md border border-[var(--color-info)]/30 bg-[var(--color-info)]/5 px-3 py-2 text-caption text-[var(--color-text-secondary)]">
-            <strong className="text-[var(--color-info)]">How it works:</strong> All members from the source groups will be added to the target group. Source groups are not deleted - only their members are copied. Duplicates are skipped automatically.
+            <strong className="text-[var(--color-info)]">{t("mergeHowItWorks")}</strong> {t("mergeExplanation")}
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div data-testid="source-group-section">
               <label className="mb-2 block text-caption font-medium text-[var(--color-text-secondary)]">
-                Source Groups (merge from)
+                {t("sourceGroupsMergeFrom")}
               </label>
               <GroupPicker
                 selectedGroups={sourceGroups}
                 onSelectionChange={setSourceGroups}
                 onSearch={searchGroups}
-                placeholder="Search source groups..."
+                placeholder={t("searchSourceGroups")}
                 disabled={isRunning}
               />
             </div>
             <div data-testid="target-group-section">
               <label className="mb-2 block text-caption font-medium text-[var(--color-text-secondary)]">
-                Target Group (surviving)
+                {t("targetGroupSurviving")}
               </label>
               <GroupPicker
                 selectedGroups={targetGroups}
                 onSelectionChange={setTargetGroups}
                 onSearch={searchGroups}
-                placeholder="Search target group..."
+                placeholder={t("searchTargetGroup")}
                 disabled={isRunning}
                 singleSelect
               />
@@ -1824,7 +1841,7 @@ export function BulkOperations() {
               data-testid="bulk-execute-btn"
             >
               <Play size={14} />
-              Merge
+              {t("merge")}
             </button>
           </div>
         </>
@@ -1837,20 +1854,20 @@ export function BulkOperations() {
         <>
           <div data-testid="target-group-section">
             <label className="mb-2 block text-caption font-medium text-[var(--color-text-secondary)]">
-              Target Group
+              {t("importTargetGroup")}
             </label>
             <GroupPicker
               selectedGroups={targetGroups}
               onSelectionChange={setTargetGroups}
               onSearch={searchGroups}
-              placeholder="Search target group..."
+              placeholder={t("searchTargetGroup")}
               disabled={isRunning}
             />
           </div>
 
           <div>
             <label className="mb-2 block text-caption font-medium text-[var(--color-text-secondary)]">
-              CSV File (column: samAccountName or DN)
+              {t("csvFileLabel")}
             </label>
             <input
               type="file"
@@ -1864,7 +1881,7 @@ export function BulkOperations() {
 
           {csvData.length > 0 && (
             <p className="text-caption text-[var(--color-text-secondary)]">
-              {csvData.length} rows loaded from CSV.
+              {t("csvRowsLoaded", { count: csvData.length })}
             </p>
           )}
 
@@ -1876,7 +1893,7 @@ export function BulkOperations() {
               data-testid="bulk-preview-btn"
             >
               {csvResolving ? <LoadingSpinner size={14} /> : <Eye size={14} />}
-              Resolve & Preview
+              {t("resolveAndPreview")}
             </button>
             <button
               className="btn btn-primary btn-sm flex items-center gap-1.5"
@@ -1889,7 +1906,7 @@ export function BulkOperations() {
               data-testid="bulk-execute-btn"
             >
               <Play size={14} />
-              Import
+              {t("import")}
             </button>
           </div>
 
@@ -1899,7 +1916,7 @@ export function BulkOperations() {
               data-testid="bulk-preview-panel"
             >
               <h3 className="mb-2 text-body font-semibold text-[var(--color-text-primary)]">
-                Resolved Users ({csvResolvedUsers.length})
+                {t("resolvedUsers", { count: csvResolvedUsers.length })}
               </h3>
               <div className="max-h-48 overflow-auto">
                 {csvResolvedUsers.map((u) => (
@@ -1928,20 +1945,20 @@ export function BulkOperations() {
         <>
           <div data-testid="source-group-section">
             <label className="mb-2 block text-caption font-medium text-[var(--color-text-secondary)]">
-              Groups to Move
+              {t("groupsToMove")}
             </label>
             <GroupPicker
               selectedGroups={sourceGroups}
               onSelectionChange={setSourceGroups}
               onSearch={searchGroups}
-              placeholder="Search groups..."
+              placeholder={t("searchGroups")}
               disabled={isRunning}
             />
           </div>
 
           <div>
             <label className="mb-2 block text-caption font-medium text-[var(--color-text-secondary)]">
-              Target OU
+              {t("targetOu")}
             </label>
             <OUPicker
               value={moveTargetOu}
@@ -1963,7 +1980,7 @@ export function BulkOperations() {
               data-testid="bulk-execute-btn"
             >
               <Play size={14} />
-              Move
+              {t("move")}
             </button>
           </div>
         </>
@@ -1976,7 +1993,7 @@ export function BulkOperations() {
         <>
           <div>
             <label className="mb-2 block text-caption font-medium text-[var(--color-text-secondary)]">
-              CSV File (columns: name, description, scope, category, OU)
+              {t("createGroupsCsvLabel")}
             </label>
             <input
               type="file"
@@ -1994,11 +2011,9 @@ export function BulkOperations() {
               data-testid="bulk-preview-panel"
             >
               <h3 className="mb-2 text-body font-semibold text-[var(--color-text-primary)]">
-                Groups to Create (
-                {createGroupsCsvData[0]?.[0]?.toLowerCase() === "name"
+                {t("groupsToCreate", { count: createGroupsCsvData[0]?.[0]?.toLowerCase() === "name"
                   ? createGroupsCsvData.length - 1
-                  : createGroupsCsvData.length}
-                )
+                  : createGroupsCsvData.length })}
               </h3>
               <div className="max-h-48 overflow-auto">
                 {createGroupsCsvData
@@ -2016,7 +2031,7 @@ export function BulkOperations() {
                         {row[0]}
                       </p>
                       <p className="text-caption text-[var(--color-text-secondary)]">
-                        {row[2] ?? "Global"} / {row[3] ?? "Security"} in{" "}
+                        {row[2] ?? "Global"} / {row[3] ?? "Security"} {t("previewIn")}{" "}
                         {row[4] ?? "N/A"}
                       </p>
                     </div>
@@ -2033,7 +2048,7 @@ export function BulkOperations() {
               data-testid="bulk-execute-btn"
             >
               <Play size={14} />
-              Create Groups
+              {t("createGroupsBtn")}
             </button>
           </div>
         </>
@@ -2046,26 +2061,26 @@ export function BulkOperations() {
         <>
           <div data-testid="source-group-section">
             <label className="mb-2 block text-caption font-medium text-[var(--color-text-secondary)]">
-              Groups to Update
+              {t("groupsToUpdate")}
             </label>
             <GroupPicker
               selectedGroups={sourceGroups}
               onSelectionChange={setSourceGroups}
               onSearch={searchGroups}
-              placeholder="Search groups..."
+              placeholder={t("searchGroups")}
               disabled={isRunning}
             />
           </div>
 
           <div>
             <label className="mb-2 block text-caption font-medium text-[var(--color-text-secondary)]">
-              New Manager
+              {t("newManager")}
             </label>
             <UserSearchPicker
               selected={selectedManager}
               onSelect={setSelectedManager}
               disabled={isRunning}
-              placeholder="Search manager by name..."
+              placeholder={t("searchManagerByName")}
               testId="manager-user"
             />
           </div>
@@ -2080,7 +2095,7 @@ export function BulkOperations() {
               data-testid="bulk-execute-btn"
             >
               <Play size={14} />
-              Update Manager
+              {t("updateManagerBtn")}
             </button>
           </div>
         </>
@@ -2095,7 +2110,7 @@ export function BulkOperations() {
           data-testid="bulk-preview-panel"
         >
           <h3 className="mb-2 text-body font-semibold text-[var(--color-text-primary)]">
-            Planned Changes ({plannedChanges.length})
+            {t("plannedChanges", { count: plannedChanges.length })}
           </h3>
           <div className="max-h-48 overflow-auto">
             {plannedChanges.map((change, index) => (
@@ -2111,14 +2126,14 @@ export function BulkOperations() {
                       : "text-[var(--color-error)]"
                   }`}
                 >
-                  {change.action === "add" ? "ADD" : "REMOVE"}
+                  {change.action === "add" ? t("actionAdd") : t("actionRemove")}
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="text-body text-[var(--color-text-primary)]">
                     {change.memberName}
                   </p>
                   <p className="text-caption text-[var(--color-text-secondary)]">
-                    {change.action === "add" ? "to" : "from"} {change.groupName}
+                    {change.action === "add" ? t("previewToGroup", { group: change.groupName }) : t("previewFromGroup", { group: change.groupName })}
                   </p>
                 </div>
               </div>
@@ -2205,11 +2220,12 @@ function MemberList({
   onSelectAll,
   onExportCsv,
 }: MemberListProps) {
+  const { t } = useTranslation(["bulkOperations"]);
   return (
     <div data-testid="member-selection-section">
       <div className="mb-2 flex items-center justify-between">
         <label className="text-caption font-medium text-[var(--color-text-secondary)]">
-          Members{members.length > 0 ? ` (${members.length})` : ""}
+          {members.length > 0 ? t("membersCount", { count: members.length }) : t("members")}
         </label>
         <div className="flex items-center gap-2">
           {members.length > 0 && onExportCsv && (
@@ -2225,23 +2241,23 @@ function MemberList({
           )}
           {members.length > 0 && (
             <span className="text-caption text-[var(--color-text-secondary)]">
-              {selectedMembers.size} selected
+              {t("selected", { count: selectedMembers.size })}
             </span>
           )}
         </div>
       </div>
 
-      {membersLoading && <LoadingSpinner message="Loading members..." />}
+      {membersLoading && <LoadingSpinner message={t("common:loading")} />}
 
       {!membersLoading && sourceGroupsEmpty && (
         <p className="text-caption text-[var(--color-text-secondary)]">
-          Select a source group to load members
+          {t("selectSourceGroup")}
         </p>
       )}
 
       {!membersLoading && !sourceGroupsEmpty && members.length === 0 && (
         <p className="text-caption text-[var(--color-text-secondary)]">
-          No members in selected group
+          {t("noMembersInGroup")}
         </p>
       )}
 
@@ -2257,7 +2273,7 @@ function MemberList({
                 data-testid="bulk-select-all"
               />
               <CheckSquare size={14} />
-              Select all
+              {t("selectAll")}
             </label>
           </div>
           <div className="max-h-60 overflow-auto" data-testid="member-list">

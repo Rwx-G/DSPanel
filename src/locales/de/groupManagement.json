@@ -1,0 +1,17 @@
+{
+  "searchPlaceholder": "Gruppen nach Name oder Beschreibung suchen...",
+  "all": "Alle",
+  "loadingGroups": "Gruppen werden geladen...",
+  "found_one": "{{count}} Gruppe gefunden",
+  "found_other": "{{count}} Gruppen gefunden",
+  "noGroupsFound": "Keine Gruppen gefunden",
+  "failedToLoad": "Gruppen konnten nicht geladen werden",
+  "noSecurityGroups": "Keine Sicherheitsgruppen gefunden.",
+  "noDistributionGroups": "Keine Verteilergruppen gefunden.",
+  "noGroupsMatch": "Keine Gruppen entsprechen \"{{query}}\"",
+  "selectGroup": "Wählen Sie eine Gruppe, um Details anzuzeigen",
+  "scopeGlobal": "Global",
+  "scopeDomainLocal": "Domänenlokal",
+  "scopeUniversal": "Universell",
+  "scopeUnknown": "Unbekannt"
+}

@@ -1,0 +1,26 @@
+schema: 1
+story: "13.2"
+story_title: "Translations"
+gate: PASS
+status_reason: >
+  All 6 acceptance criteria fully met. 1709 translation keys across 5 languages (EN/FR/DE/ES/IT)
+  with 100% key parity. Diacritical marks correct. 80+ previously hardcoded strings externalized
+  including health badges, DC health messages, risk score factors/recommendations, compliance checks,
+  and security disclaimers. Language persistence and hot reload working correctly.
+reviewer: "Quinn"
+updated: "2026-03-27T05:20:00Z"
+
+top_issues:
+  - id: "MNT-001"
+    severity: low
+    finding: "Tests only check EN->lang direction; orphan keys in translated files are not detected"
+    suggested_action: "Add reverse key check to translations.test.ts"
+  - id: "DOC-001"
+    severity: low
+    finding: "Story dev notes reference flat file layout (src/locales/fr.json) but actual is directory-based (src/locales/fr/)"
+    suggested_action: "Update dev notes to match actual directory structure"
+  - id: "MNT-002"
+    severity: low
+    finding: "Some backend-generated strings (risk score finding descriptions, compliance remediation text) remain in English as they contain AD attribute names and PowerShell commands"
+    suggested_action: "Consider adding pattern-matching translation for additional backend strings in future iterations"
+waiver: { active: false }

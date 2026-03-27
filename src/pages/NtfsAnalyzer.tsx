@@ -28,6 +28,7 @@ import {
 import { GroupMembersDialog } from "@/components/dialogs/GroupMembersDialog";
 import { GroupChainTree } from "@/components/comparison/GroupChainTree";
 import { formatCsv, downloadCsv } from "@/utils/csvExport";
+import { useTranslation } from "react-i18next";
 
 function PathAclSection({
   result,
@@ -36,6 +37,7 @@ function PathAclSection({
   result: PathAclResult;
   onTrusteeContextMenu: (e: React.MouseEvent, ace: AceEntry) => void;
 }) {
+  const { t } = useTranslation(["ntfsAnalyzer", "common"]);
   const [expanded, setExpanded] = useState(true);
   const [expandedTrustees, setExpandedTrustees] = useState<Set<number>>(
     new Set(),
@@ -92,16 +94,16 @@ function PathAclSection({
               <thead>
                 <tr className="border-t border-[var(--color-border-default)] bg-[var(--color-surface-bg)]">
                   <th className="px-3 py-1.5 text-left text-caption font-medium text-[var(--color-text-secondary)]">
-                    Trustee
+                    {t("trustee")}
                   </th>
                   <th className="px-3 py-1.5 text-left text-caption font-medium text-[var(--color-text-secondary)]">
-                    Type
+                    {t("common:type")}
                   </th>
                   <th className="px-3 py-1.5 text-left text-caption font-medium text-[var(--color-text-secondary)]">
-                    Permissions
+                    {t("permissions")}
                   </th>
                   <th className="px-3 py-1.5 text-center text-caption font-medium text-[var(--color-text-secondary)]">
-                    Source
+                    {t("source")}
                   </th>
                 </tr>
               </thead>
@@ -163,7 +165,7 @@ function PathAclSection({
                         {ace.permissions.join(", ")}
                       </td>
                       <td className="px-3 py-1.5 text-center text-caption text-[var(--color-text-secondary)]">
-                        {ace.isInherited ? "Inherited" : "Explicit"}
+                        {ace.isInherited ? t("inherited") : t("explicit")}
                       </td>
                     </tr>
                   );
@@ -173,7 +175,7 @@ function PathAclSection({
           )}
           {result.aces.length === 0 && !result.error && (
             <div className="border-t border-[var(--color-border-subtle)] px-3 py-2 text-caption text-[var(--color-text-secondary)]">
-              No ACEs found
+              {t("noAces")}
             </div>
           )}
         </div>
@@ -183,6 +185,7 @@ function PathAclSection({
 }
 
 export function NtfsAnalyzer() {
+  const { t } = useTranslation(["ntfsAnalyzer", "common", "sidebar"]);
   const platform = usePlatform();
   const [uncPath, setUncPath] = useState("");
   const [depth, setDepth] = useState(0);
@@ -218,15 +221,15 @@ export function NtfsAnalyzer() {
 
       setContextMenuItems([
         {
-          label: `View members of ${name}`,
+          label: t("viewMembersOf", { name }),
           icon: <Users size={14} />,
           onClick: () => setGroupMembersDialog({ dn: groupDn, name }),
         },
         {
-          label: "Open in Group Management",
+          label: t("openInGroupManagement"),
           icon: <FolderOpen size={14} />,
           onClick: () => {
-            openTab("Group Management", "groups", "users-group", {
+            openTab(t("sidebar:groupManagement"), "groups", "users-group", {
               selectedGroupDn: groupDn,
             });
           },
@@ -302,8 +305,8 @@ export function NtfsAnalyzer() {
       >
         <EmptyState
           icon={<Monitor size={48} />}
-          title="Not available on this platform"
-          description="NTFS Permissions Analyzer requires Windows. NTFS ACL APIs are not available on macOS or Linux."
+          title={t("notAvailable")}
+          description={t("notAvailableDescription")}
         />
       </div>
     );
@@ -315,7 +318,7 @@ export function NtfsAnalyzer() {
       data-testid="ntfs-analyzer-page"
     >
       <h1 className="text-lg font-semibold text-[var(--color-text-primary)]">
-        NTFS Permissions Analyzer
+        {t("pageTitle")}
       </h1>
 
       {/* Controls */}
@@ -323,7 +326,7 @@ export function NtfsAnalyzer() {
         <div className="flex items-end gap-3">
           <div className="flex-1">
             <label className="mb-1 block text-caption font-medium text-[var(--color-text-secondary)]">
-              UNC Path
+              {t("uncPath")}
             </label>
             <div className="flex items-center gap-2 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5">
               <FolderSearch
@@ -334,7 +337,7 @@ export function NtfsAnalyzer() {
               <input
                 type="text"
                 className="flex-1 bg-transparent text-body text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-secondary)]"
-                placeholder="\\server\share\folder"
+                placeholder={t("uncPlaceholder")}
                 value={uncPath}
                 onChange={(e) => setUncPath(e.target.value)}
                 onKeyDown={(e) => {
@@ -348,7 +351,7 @@ export function NtfsAnalyzer() {
           </div>
           <div>
             <label className="mb-1 block text-caption font-medium text-[var(--color-text-secondary)]">
-              Depth
+              {t("depth")}
             </label>
             <select
               className="w-40 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-bg)] px-3 py-1.5 text-body text-[var(--color-text-primary)]"
@@ -356,11 +359,11 @@ export function NtfsAnalyzer() {
               onChange={(e) => setDepth(Number(e.target.value))}
               data-testid="depth-selector"
             >
-              <option value={0}>Current only</option>
-              <option value={1}>1 level</option>
-              <option value={2}>2 levels</option>
-              <option value={3}>3 levels</option>
-              <option value={5}>5 levels</option>
+              <option value={0}>{t("currentOnly")}</option>
+              <option value={1}>{t("level1")}</option>
+              <option value={2}>{t("level2")}</option>
+              <option value={3}>{t("level3")}</option>
+              <option value={5}>{t("level5")}</option>
             </select>
           </div>
           <button
@@ -375,7 +378,7 @@ export function NtfsAnalyzer() {
             ) : (
               <FolderSearch size={14} />
             )}
-            Analyze
+            {t("analyze")}
           </button>
         </div>
       </div>
@@ -399,21 +402,21 @@ export function NtfsAnalyzer() {
           {/* Summary */}
           <div className="flex items-center gap-4 rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-4 py-3">
             <span className="text-body text-[var(--color-text-primary)]">
-              <strong>{result.totalPathsScanned}</strong> path(s) scanned
+              <strong>{result.totalPathsScanned}</strong> {t("pathsScanned")}
             </span>
             <span className="text-body text-[var(--color-text-primary)]">
-              <strong>{result.totalAces}</strong> ACE(s) found
+              <strong>{result.totalAces}</strong> {t("acesFound")}
             </span>
             {result.totalErrors > 0 && (
               <span className="text-body text-[var(--color-warning)]">
                 <AlertTriangle size={14} className="mr-1 inline" />
-                <strong>{result.totalErrors}</strong> error(s)
+                <strong>{result.totalErrors}</strong> {t("error", { count: result.totalErrors })}
               </span>
             )}
             {result.conflicts.length > 0 && (
               <span className="text-body text-[var(--color-error)]">
                 <ShieldX size={14} className="mr-1 inline" />
-                <strong>{result.conflicts.length}</strong> conflict(s)
+                <strong>{result.conflicts.length}</strong> {t("conflict", { count: result.conflicts.length })}
               </span>
             )}
             <div className="ml-auto flex items-center gap-3">
@@ -424,7 +427,7 @@ export function NtfsAnalyzer() {
                   onChange={(e) => setShowExplicitOnly(e.target.checked)}
                   data-testid="explicit-only-toggle"
                 />
-                Explicit only
+                {t("explicitOnly")}
               </label>
               <button
                 className="btn btn-ghost flex items-center gap-1.5 text-caption"
@@ -432,7 +435,7 @@ export function NtfsAnalyzer() {
                 data-testid="export-csv-btn"
               >
                 <Download size={14} />
-                CSV
+                {t("common:csv")}
               </button>
             </div>
           </div>
@@ -445,7 +448,7 @@ export function NtfsAnalyzer() {
             >
               <h3 className="mb-2 text-body font-semibold text-[var(--color-error)]">
                 <AlertTriangle size={14} className="mr-1 inline" />
-                Permission Conflicts Detected
+                {t("conflictsDetected")}
               </h3>
               {result.conflicts.map((c, idx) => (
                 <div
@@ -454,15 +457,15 @@ export function NtfsAnalyzer() {
                   data-testid={`conflict-${idx}`}
                 >
                   <strong>{c.trusteeDisplayName}</strong> ({c.trusteeSid}):
-                  Allow at{" "}
+                  {t("allowAt")}{" "}
                   <code className="text-[var(--color-success)]">
                     {c.allowPath}
                   </code>{" "}
-                  vs Deny at{" "}
+                  vs {t("denyAt")}{" "}
                   <code className="text-[var(--color-error)]">
                     {c.denyPath}
                   </code>{" "}
-                  for {c.denyPermissions.join(", ")}
+                  {t("for")} {c.denyPermissions.join(", ")}
                 </div>
               ))}
             </div>

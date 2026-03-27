@@ -6,6 +6,7 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { type DirectoryUser } from "@/types/directory";
 import { extractErrorMessage } from "@/utils/errorMapping";
 import { type DryRunChange } from "@/components/dialogs/DryRunPreviewDialog";
+import { useTranslation } from "react-i18next";
 
 interface PasswordFlagsEditorProps {
   user: DirectoryUser;
@@ -16,6 +17,7 @@ export function PasswordFlagsEditor({
   user,
   onRefresh,
 }: PasswordFlagsEditorProps) {
+  const { t } = useTranslation(["components", "common"]);
   const { hasPermission } = usePermissions();
   const { showDryRunPreview } = useDialog();
   const { notify } = useNotifications();
@@ -124,7 +126,7 @@ export function PasswordFlagsEditor({
   return (
     <div className="space-y-2" data-testid="password-flags-editor">
       <h4 className="text-caption font-semibold text-[var(--color-text-primary)]">
-        Password Flags
+        {t("components:passwordFlags.title")}
       </h4>
 
       <label className="flex items-center gap-2 cursor-pointer">
@@ -137,7 +139,7 @@ export function PasswordFlagsEditor({
           data-testid="password-never-expires-checkbox"
         />
         <span className="text-body text-[var(--color-text-primary)]">
-          Password Never Expires
+          {t("components:passwordFlags.neverExpires")}
         </span>
       </label>
 
@@ -151,11 +153,11 @@ export function PasswordFlagsEditor({
           data-testid="user-cannot-change-password-checkbox"
         />
         <span className="text-body text-[var(--color-text-primary)]">
-          User Cannot Change Password
+          {t("components:passwordFlags.cannotChange")}
         </span>
         {cannotChangePasswordUnavailable && (
           <span className="text-caption text-[var(--color-text-secondary)]">
-            (insufficient permissions to read)
+            {t("components:passwordFlags.insufficientPermissions")}
           </span>
         )}
       </label>
@@ -164,10 +166,10 @@ export function PasswordFlagsEditor({
         className="btn btn-sm btn-primary text-caption"
         onClick={handleSave}
         disabled={!canEdit || !isDirty || saving}
-        title={!canEdit ? "Requires AccountOperator permission" : undefined}
+        title={!canEdit ? t("components:passwordFlags.requiresAccountOperator") : undefined}
         data-testid="save-flags-btn"
       >
-        {saving ? "Saving..." : "Save Changes"}
+        {saving ? t("common:saving") : t("components:passwordFlags.saveChanges")}
       </button>
     </div>
   );

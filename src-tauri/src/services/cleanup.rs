@@ -798,4 +798,675 @@ mod tests {
         let svc = make_user("CN=svc_SQL,DC=test", "svc_SQL", "SQL", vec![]);
         assert!(is_excluded(&svc, &rule));
     }
+
+    // -- Additional glob matching tests --
+
+    #[test]
+    fn glob_match_double_star() {
+        assert!(glob_match("*test*", "mytest123"));
+        assert!(glob_match("*test*", "test"));
+        assert!(!glob_match("*test*", "other"));
+    }
+
+    #[test]
+    fn glob_match_empty_pattern() {
+        assert!(glob_match("", ""));
+        assert!(!glob_match("", "notempty"));
+    }
+
+    // -- Protected account edge cases --
+
+    #[test]
+    fn protected_defaultaccount() {
+        let entry = make_user(
+            "CN=DefaultAccount,DC=test,DC=com",
+            "DefaultAccount",
+            "Default Account",
+            vec![],
+        );
+        assert!(is_protected(&entry));
+    }
+
+    #[test]
+    fn protected_case_insensitive() {
+        let entry = make_user(
+            "CN=ADMINISTRATOR,DC=test,DC=com",
+            "ADMINISTRATOR",
+            "Admin",
+            vec![],
+        );
+        assert!(is_protected(&entry));
+    }
+
+    #[test]
+    fn is_protected_no_sam() {
+        let mut entry = DirectoryEntry::new("CN=NoSam,DC=test".to_string());
+        entry.sam_account_name = None;
+        assert!(!is_protected(&entry));
+    }
+
+    // -- Exclusion edge cases --
+
+    #[test]
+    fn exclude_no_patterns_or_ous() {
+        let rule = CleanupRule {
+            name: "test".to_string(),
+            condition: CleanupCondition::InactiveDays,
+            threshold_days: 90,
+            action: CleanupAction::Disable,
+            target_ou: None,
+            exclude_patterns: None,
+            exclude_ous: None,
+        };
+        let user = make_user("CN=john,DC=test", "john", "John", vec![]);
+        assert!(!is_excluded(&user, &rule));
+    }
+
+    #[test]
+    fn exclude_by_both_pattern_and_ou() {
+        let rule = CleanupRule {
+            name: "test".to_string(),
+            condition: CleanupCondition::InactiveDays,
+            threshold_days: 90,
+            action: CleanupAction::Disable,
+            target_ou: None,
+            exclude_patterns: Some(vec!["admin*".to_string()]),
+            exclude_ous: Some(vec!["OU=VIP".to_string()]),
+        };
+        // Matches pattern
+        let admin = make_user("CN=admin1,OU=Users,DC=test", "admin1", "Admin 1", vec![]);
+        assert!(is_excluded(&admin, &rule));
+
+        // Matches OU
+        let vip = make_user("CN=ceo,OU=VIP,DC=test", "ceo", "CEO", vec![]);
+        assert!(is_excluded(&vip, &rule));
+
+        // Matches neither
+        let normal = make_user("CN=john,OU=Users,DC=test", "john", "John", vec![]);
+        assert!(!is_excluded(&normal, &rule));
+    }
+
+    // -- Timestamp parsing edge cases --
+
+    #[test]
+    fn parse_ad_timestamp_negative() {
+        assert!(parse_ad_timestamp("-1").is_none());
+    }
+
+    #[test]
+    fn parse_ad_generalized_time_without_fractional() {
+        // Format without .0Z - just Z suffix
+        let ts = parse_ad_generalized_time("20240315143022Z");
+        assert!(ts.is_some());
+        let dt = ts.unwrap();
+        assert_eq!(
+            dt.format("%Y-%m-%d %H:%M:%S").to_string(),
+            "2024-03-15 14:30:22"
+        );
+    }
+
+    // -- Condition evaluation edge cases --
+
+    #[test]
+    fn inactive_days_no_logon_attribute() {
+        let now = Utc::now();
+        let user = make_user("CN=NoLogon,DC=test", "nologon", "No Logon", vec![]);
+        let result = evaluate_inactive_days(&user, 180 * 86400, now);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn never_logged_on_with_zero_logon_timestamp() {
+        let now = Utc::now();
+        let created = now - chrono::Duration::days(100);
+        let when_created = created.format("%Y%m%d%H%M%S.0Z").to_string();
+
+        let user = make_user(
+            "CN=Zero,DC=test",
+            "zero",
+            "Zero Logon",
+            vec![("lastLogonTimestamp", "0"), ("whenCreated", &when_created)],
+        );
+        let result = evaluate_never_logged_on(&user, 90 * 86400, now);
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn never_logged_on_with_empty_logon_timestamp() {
+        let now = Utc::now();
+        let created = now - chrono::Duration::days(100);
+        let when_created = created.format("%Y%m%d%H%M%S.0Z").to_string();
+
+        let user = make_user(
+            "CN=Empty,DC=test",
+            "empty",
+            "Empty Logon",
+            vec![("lastLogonTimestamp", "  "), ("whenCreated", &when_created)],
+        );
+        let result = evaluate_never_logged_on(&user, 90 * 86400, now);
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn never_logged_on_skips_if_has_logon() {
+        let now = Utc::now();
+        let days_ago = now - chrono::Duration::days(10);
+        let ticks = (days_ago.timestamp() + 11_644_473_600) * 10_000_000;
+
+        let user = make_user(
+            "CN=HasLogon,DC=test",
+            "haslogon",
+            "Has Logon",
+            vec![("lastLogonTimestamp", &ticks.to_string())],
+        );
+        let result = evaluate_never_logged_on(&user, 90 * 86400, now);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn never_logged_on_skips_if_no_when_created() {
+        let now = Utc::now();
+        let user = make_user("CN=NoCreated,DC=test", "nocreated", "No Created", vec![]);
+        let result = evaluate_never_logged_on(&user, 90 * 86400, now);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn disabled_days_no_uac() {
+        let now = Utc::now();
+        let user = make_user("CN=NoUac,DC=test", "nouac", "No UAC", vec![]);
+        let result = evaluate_disabled_days(&user, 90 * 86400, now);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn disabled_days_invalid_uac() {
+        let now = Utc::now();
+        let user = make_user(
+            "CN=BadUac,DC=test",
+            "baduac",
+            "Bad UAC",
+            vec![("userAccountControl", "not_a_number")],
+        );
+        let result = evaluate_disabled_days(&user, 90 * 86400, now);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn disabled_days_recently_disabled() {
+        let now = Utc::now();
+        let changed = now - chrono::Duration::days(5);
+        let when_changed = changed.format("%Y%m%d%H%M%S.0Z").to_string();
+
+        let user = make_user(
+            "CN=Recent,DC=test",
+            "recent",
+            "Recently Disabled",
+            vec![
+                ("userAccountControl", "514"),
+                ("whenChanged", &when_changed),
+            ],
+        );
+        let result = evaluate_disabled_days(&user, 90 * 86400, now);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn disabled_days_no_when_changed() {
+        let now = Utc::now();
+        let user = make_user(
+            "CN=NoChanged,DC=test",
+            "nochanged",
+            "No Changed",
+            vec![("userAccountControl", "514")],
+        );
+        let result = evaluate_disabled_days(&user, 90 * 86400, now);
+        assert!(result.is_none());
+    }
+
+    // -- evaluate_rule async tests --
+
+    #[tokio::test]
+    async fn evaluate_rule_skips_protected_accounts() {
+        use crate::services::directory::tests::MockDirectoryProvider;
+
+        let admin = make_user(
+            "CN=Administrator,DC=test,DC=com",
+            "Administrator",
+            "Administrator",
+            vec![],
+        );
+        let provider = Arc::new(MockDirectoryProvider::new().with_users(vec![admin]));
+
+        let rule = CleanupRule {
+            name: "Test".to_string(),
+            condition: CleanupCondition::InactiveDays,
+            threshold_days: 1,
+            action: CleanupAction::Disable,
+            target_ou: None,
+            exclude_patterns: None,
+            exclude_ous: None,
+        };
+
+        let result = evaluate_rule(provider, &rule).await.unwrap();
+        assert_eq!(result.total_count, 0);
+    }
+
+    #[tokio::test]
+    async fn evaluate_rule_matches_inactive_user() {
+        use crate::services::directory::tests::MockDirectoryProvider;
+
+        let now = Utc::now();
+        let days_ago = now - chrono::Duration::days(200);
+        let ticks = (days_ago.timestamp() + 11_644_473_600) * 10_000_000;
+
+        let mut user = make_user(
+            "CN=Stale,OU=Users,DC=test,DC=com",
+            "stale",
+            "Stale User",
+            vec![("lastLogonTimestamp", &ticks.to_string())],
+        );
+        user.display_name = Some("Stale User".to_string());
+
+        let provider = Arc::new(MockDirectoryProvider::new().with_users(vec![user]));
+
+        let rule = CleanupRule {
+            name: "Inactive 180d".to_string(),
+            condition: CleanupCondition::InactiveDays,
+            threshold_days: 180,
+            action: CleanupAction::Delete,
+            target_ou: None,
+            exclude_patterns: None,
+            exclude_ous: None,
+        };
+
+        let result = evaluate_rule(provider, &rule).await.unwrap();
+        assert_eq!(result.total_count, 1);
+        assert_eq!(result.rule_name, "Inactive 180d");
+        assert_eq!(result.matches[0].proposed_action, "Delete account");
+        assert!(result.matches[0].selected);
+    }
+
+    #[tokio::test]
+    async fn evaluate_rule_move_action_proposed() {
+        use crate::services::directory::tests::MockDirectoryProvider;
+
+        let now = Utc::now();
+        let days_ago = now - chrono::Duration::days(200);
+        let ticks = (days_ago.timestamp() + 11_644_473_600) * 10_000_000;
+
+        let user = make_user(
+            "CN=Stale,OU=Users,DC=test,DC=com",
+            "stale",
+            "Stale User",
+            vec![("lastLogonTimestamp", &ticks.to_string())],
+        );
+
+        let provider = Arc::new(MockDirectoryProvider::new().with_users(vec![user]));
+
+        let rule = CleanupRule {
+            name: "Move inactive".to_string(),
+            condition: CleanupCondition::InactiveDays,
+            threshold_days: 180,
+            action: CleanupAction::Move,
+            target_ou: Some("OU=Cleanup,DC=test,DC=com".to_string()),
+            exclude_patterns: None,
+            exclude_ous: None,
+        };
+
+        let result = evaluate_rule(provider, &rule).await.unwrap();
+        assert_eq!(result.total_count, 1);
+        assert!(
+            result.matches[0]
+                .proposed_action
+                .contains("OU=Cleanup,DC=test,DC=com")
+        );
+        assert_eq!(
+            result.matches[0].target_ou,
+            Some("OU=Cleanup,DC=test,DC=com".to_string())
+        );
+    }
+
+    #[tokio::test]
+    async fn evaluate_rule_move_action_no_target_ou() {
+        use crate::services::directory::tests::MockDirectoryProvider;
+
+        let now = Utc::now();
+        let days_ago = now - chrono::Duration::days(200);
+        let ticks = (days_ago.timestamp() + 11_644_473_600) * 10_000_000;
+
+        let user = make_user(
+            "CN=Stale,OU=Users,DC=test,DC=com",
+            "stale",
+            "Stale User",
+            vec![("lastLogonTimestamp", &ticks.to_string())],
+        );
+
+        let provider = Arc::new(MockDirectoryProvider::new().with_users(vec![user]));
+
+        let rule = CleanupRule {
+            name: "Move no target".to_string(),
+            condition: CleanupCondition::InactiveDays,
+            threshold_days: 180,
+            action: CleanupAction::Move,
+            target_ou: None,
+            exclude_patterns: None,
+            exclude_ous: None,
+        };
+
+        let result = evaluate_rule(provider, &rule).await.unwrap();
+        assert_eq!(result.total_count, 1);
+        assert!(result.matches[0].proposed_action.contains("(not set)"));
+    }
+
+    #[tokio::test]
+    async fn evaluate_rule_uses_sam_when_no_display_name() {
+        use crate::services::directory::tests::MockDirectoryProvider;
+
+        let now = Utc::now();
+        let days_ago = now - chrono::Duration::days(200);
+        let ticks = (days_ago.timestamp() + 11_644_473_600) * 10_000_000;
+
+        let mut user = DirectoryEntry::new("CN=NoDisplay,DC=test,DC=com".to_string());
+        user.sam_account_name = Some("nodisplay".to_string());
+        user.display_name = None;
+        user.object_class = Some("user".to_string());
+        user.attributes
+            .insert("lastLogonTimestamp".to_string(), vec![ticks.to_string()]);
+
+        let provider = Arc::new(MockDirectoryProvider::new().with_users(vec![user]));
+
+        let rule = CleanupRule {
+            name: "Test".to_string(),
+            condition: CleanupCondition::InactiveDays,
+            threshold_days: 180,
+            action: CleanupAction::Disable,
+            target_ou: None,
+            exclude_patterns: None,
+            exclude_ous: None,
+        };
+
+        let result = evaluate_rule(provider, &rule).await.unwrap();
+        assert_eq!(result.matches[0].display_name, "nodisplay");
+    }
+
+    // -- execute_cleanup async tests --
+
+    #[tokio::test]
+    async fn execute_cleanup_disable_success() {
+        use crate::services::audit::AuditService;
+        use crate::services::directory::tests::MockDirectoryProvider;
+
+        let provider = Arc::new(MockDirectoryProvider::new());
+        let audit = AuditService::new_in_memory();
+
+        let matches = vec![CleanupMatch {
+            dn: "CN=User,DC=test".to_string(),
+            display_name: "User".to_string(),
+            sam_account_name: "user".to_string(),
+            current_state: "Inactive 200 days".to_string(),
+            proposed_action: "Disable account".to_string(),
+            action: CleanupAction::Disable,
+            target_ou: None,
+            selected: true,
+        }];
+
+        let results = execute_cleanup(provider, &audit, &matches).await;
+        assert_eq!(results.len(), 1);
+        assert!(results[0].success);
+        assert!(results[0].error.is_none());
+    }
+
+    #[tokio::test]
+    async fn execute_cleanup_skips_unselected() {
+        use crate::services::audit::AuditService;
+        use crate::services::directory::tests::MockDirectoryProvider;
+
+        let provider = Arc::new(MockDirectoryProvider::new());
+        let audit = AuditService::new_in_memory();
+
+        let matches = vec![CleanupMatch {
+            dn: "CN=User,DC=test".to_string(),
+            display_name: "User".to_string(),
+            sam_account_name: "user".to_string(),
+            current_state: "Inactive 200 days".to_string(),
+            proposed_action: "Disable account".to_string(),
+            action: CleanupAction::Disable,
+            target_ou: None,
+            selected: false,
+        }];
+
+        let results = execute_cleanup(provider, &audit, &matches).await;
+        assert!(results.is_empty());
+    }
+
+    #[tokio::test]
+    async fn execute_cleanup_disable_failure() {
+        use crate::services::audit::AuditService;
+        use crate::services::directory::tests::MockDirectoryProvider;
+
+        let provider = Arc::new(MockDirectoryProvider::new().with_failure());
+        let audit = AuditService::new_in_memory();
+
+        let matches = vec![CleanupMatch {
+            dn: "CN=User,DC=test".to_string(),
+            display_name: "User".to_string(),
+            sam_account_name: "user".to_string(),
+            current_state: "Inactive 200 days".to_string(),
+            proposed_action: "Disable account".to_string(),
+            action: CleanupAction::Disable,
+            target_ou: None,
+            selected: true,
+        }];
+
+        let results = execute_cleanup(provider, &audit, &matches).await;
+        assert_eq!(results.len(), 1);
+        assert!(!results[0].success);
+        assert!(results[0].error.is_some());
+    }
+
+    #[tokio::test]
+    async fn execute_cleanup_delete_success() {
+        use crate::services::audit::AuditService;
+        use crate::services::directory::tests::MockDirectoryProvider;
+
+        let provider = Arc::new(MockDirectoryProvider::new());
+        let audit = AuditService::new_in_memory();
+
+        let matches = vec![CleanupMatch {
+            dn: "CN=User,DC=test".to_string(),
+            display_name: "User".to_string(),
+            sam_account_name: "user".to_string(),
+            current_state: "Inactive 200 days".to_string(),
+            proposed_action: "Delete account".to_string(),
+            action: CleanupAction::Delete,
+            target_ou: None,
+            selected: true,
+        }];
+
+        let results = execute_cleanup(provider, &audit, &matches).await;
+        assert_eq!(results.len(), 1);
+        assert!(results[0].success);
+    }
+
+    #[tokio::test]
+    async fn execute_cleanup_delete_failure() {
+        use crate::services::audit::AuditService;
+        use crate::services::directory::tests::MockDirectoryProvider;
+
+        let provider = Arc::new(MockDirectoryProvider::new().with_failure());
+        let audit = AuditService::new_in_memory();
+
+        let matches = vec![CleanupMatch {
+            dn: "CN=User,DC=test".to_string(),
+            display_name: "User".to_string(),
+            sam_account_name: "user".to_string(),
+            current_state: "Inactive 200 days".to_string(),
+            proposed_action: "Delete account".to_string(),
+            action: CleanupAction::Delete,
+            target_ou: None,
+            selected: true,
+        }];
+
+        let results = execute_cleanup(provider, &audit, &matches).await;
+        assert_eq!(results.len(), 1);
+        assert!(!results[0].success);
+        assert!(results[0].error.is_some());
+    }
+
+    #[tokio::test]
+    async fn execute_cleanup_move_success() {
+        use crate::services::audit::AuditService;
+        use crate::services::directory::tests::MockDirectoryProvider;
+
+        let provider = Arc::new(MockDirectoryProvider::new());
+        let audit = AuditService::new_in_memory();
+
+        let matches = vec![CleanupMatch {
+            dn: "CN=User,DC=test".to_string(),
+            display_name: "User".to_string(),
+            sam_account_name: "user".to_string(),
+            current_state: "Inactive 200 days".to_string(),
+            proposed_action: "Move to OU=Cleanup".to_string(),
+            action: CleanupAction::Move,
+            target_ou: Some("OU=Cleanup,DC=test".to_string()),
+            selected: true,
+        }];
+
+        let results = execute_cleanup(provider, &audit, &matches).await;
+        assert_eq!(results.len(), 1);
+        assert!(results[0].success);
+    }
+
+    #[tokio::test]
+    async fn execute_cleanup_move_no_target_ou() {
+        use crate::services::audit::AuditService;
+        use crate::services::directory::tests::MockDirectoryProvider;
+
+        let provider = Arc::new(MockDirectoryProvider::new());
+        let audit = AuditService::new_in_memory();
+
+        let matches = vec![CleanupMatch {
+            dn: "CN=User,DC=test".to_string(),
+            display_name: "User".to_string(),
+            sam_account_name: "user".to_string(),
+            current_state: "Inactive 200 days".to_string(),
+            proposed_action: "Move to (not set)".to_string(),
+            action: CleanupAction::Move,
+            target_ou: None,
+            selected: true,
+        }];
+
+        let results = execute_cleanup(provider, &audit, &matches).await;
+        assert_eq!(results.len(), 1);
+        assert!(!results[0].success);
+        assert_eq!(
+            results[0].error.as_deref(),
+            Some("Target OU not configured")
+        );
+    }
+
+    #[tokio::test]
+    async fn execute_cleanup_move_failure() {
+        use crate::services::audit::AuditService;
+        use crate::services::directory::tests::MockDirectoryProvider;
+
+        let provider = Arc::new(MockDirectoryProvider::new().with_failure());
+        let audit = AuditService::new_in_memory();
+
+        let matches = vec![CleanupMatch {
+            dn: "CN=User,DC=test".to_string(),
+            display_name: "User".to_string(),
+            sam_account_name: "user".to_string(),
+            current_state: "Inactive 200 days".to_string(),
+            proposed_action: "Move to OU=Cleanup".to_string(),
+            action: CleanupAction::Move,
+            target_ou: Some("OU=Cleanup,DC=test".to_string()),
+            selected: true,
+        }];
+
+        let results = execute_cleanup(provider, &audit, &matches).await;
+        assert_eq!(results.len(), 1);
+        assert!(!results[0].success);
+        assert!(results[0].error.is_some());
+    }
+
+    #[tokio::test]
+    async fn execute_cleanup_multiple_mixed() {
+        use crate::services::audit::AuditService;
+        use crate::services::directory::tests::MockDirectoryProvider;
+
+        let provider = Arc::new(MockDirectoryProvider::new());
+        let audit = AuditService::new_in_memory();
+
+        let matches = vec![
+            CleanupMatch {
+                dn: "CN=User1,DC=test".to_string(),
+                display_name: "User 1".to_string(),
+                sam_account_name: "user1".to_string(),
+                current_state: "Inactive".to_string(),
+                proposed_action: "Disable".to_string(),
+                action: CleanupAction::Disable,
+                target_ou: None,
+                selected: true,
+            },
+            CleanupMatch {
+                dn: "CN=User2,DC=test".to_string(),
+                display_name: "User 2".to_string(),
+                sam_account_name: "user2".to_string(),
+                current_state: "Inactive".to_string(),
+                proposed_action: "Delete".to_string(),
+                action: CleanupAction::Delete,
+                target_ou: None,
+                selected: true,
+            },
+            CleanupMatch {
+                dn: "CN=User3,DC=test".to_string(),
+                display_name: "User 3".to_string(),
+                sam_account_name: "user3".to_string(),
+                current_state: "Inactive".to_string(),
+                proposed_action: "Disable".to_string(),
+                action: CleanupAction::Disable,
+                target_ou: None,
+                selected: false, // skipped
+            },
+        ];
+
+        let results = execute_cleanup(provider, &audit, &matches).await;
+        assert_eq!(results.len(), 2);
+        assert!(results.iter().all(|r| r.success));
+    }
+
+    // -- CleanupExecutionResult serde --
+
+    #[test]
+    fn cleanup_execution_result_serde() {
+        let r = CleanupExecutionResult {
+            dn: "CN=Test,DC=com".to_string(),
+            display_name: "Test".to_string(),
+            action: CleanupAction::Delete,
+            success: true,
+            error: None,
+        };
+        let json = serde_json::to_string(&r).unwrap();
+        assert!(json.contains("\"success\":true"));
+        let loaded: CleanupExecutionResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(loaded.dn, "CN=Test,DC=com");
+        assert!(loaded.success);
+    }
+
+    // -- DryRunResult serde --
+
+    #[test]
+    fn cleanup_dry_run_result_serde() {
+        let r = CleanupDryRunResult {
+            rule_name: "Test Rule".to_string(),
+            matches: vec![],
+            total_count: 0,
+        };
+        let json = serde_json::to_string(&r).unwrap();
+        let loaded: CleanupDryRunResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(loaded.rule_name, "Test Rule");
+        assert_eq!(loaded.total_count, 0);
+    }
 }

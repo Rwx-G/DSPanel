@@ -1,0 +1,17 @@
+{
+  "searchPlaceholder": "Rechercher des groupes par nom ou description...",
+  "all": "Tous",
+  "loadingGroups": "Chargement des groupes...",
+  "found_one": "{{count}} groupe trouvé",
+  "found_other": "{{count}} groupes trouvés",
+  "noGroupsFound": "Aucun groupe trouvé",
+  "failedToLoad": "Échec du chargement des groupes",
+  "noSecurityGroups": "Aucun groupe de sécurité trouvé.",
+  "noDistributionGroups": "Aucun groupe de distribution trouvé.",
+  "noGroupsMatch": "Aucun groupe ne correspond à \"{{query}}\"",
+  "selectGroup": "Sélectionnez un groupe pour voir les détails",
+  "scopeGlobal": "Globale",
+  "scopeDomainLocal": "Domaine local",
+  "scopeUniversal": "Universelle",
+  "scopeUnknown": "Inconnue"
+}

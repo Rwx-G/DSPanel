@@ -4,6 +4,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 const PAGE_SIZES = [25, 50, 100] as const;
 
@@ -22,6 +23,7 @@ export function Pagination({
   onPageChange,
   onPageSizeChange,
 }: PaginationProps) {
+  const { t } = useTranslation(["components"]);
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
   const startItem = totalItems === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const endItem = Math.min(currentPage * pageSize, totalItems);
@@ -36,13 +38,13 @@ export function Pagination({
     >
       <span data-testid="pagination-info">
         {totalItems === 0
-          ? "No items"
-          : `Showing ${startItem}-${endItem} of ${totalItems} items`}
+          ? t("components:pagination.noItems")
+          : t("components:pagination.showing", { start: startItem, end: endItem, total: totalItems })}
       </span>
 
       <div className="flex items-center gap-2">
         <label className="flex items-center gap-1">
-          <span>Page size:</span>
+          <span>{t("components:pagination.pageSize")}</span>
           <select
             value={pageSize}
             onChange={(e) => onPageSizeChange(Number(e.target.value))}
@@ -62,7 +64,7 @@ export function Pagination({
             onClick={() => onPageChange(1)}
             disabled={isFirstPage}
             className="rounded p-1 hover:bg-[var(--color-surface-hover)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-            aria-label="First page"
+            aria-label={t("components:pagination.firstPage")}
             data-testid="pagination-first"
           >
             <ChevronFirst size={16} />
@@ -71,7 +73,7 @@ export function Pagination({
             onClick={() => onPageChange(currentPage - 1)}
             disabled={isFirstPage}
             className="rounded p-1 hover:bg-[var(--color-surface-hover)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-            aria-label="Previous page"
+            aria-label={t("components:pagination.previousPage")}
             data-testid="pagination-prev"
           >
             <ChevronLeft size={16} />
@@ -88,7 +90,7 @@ export function Pagination({
             onClick={() => onPageChange(currentPage + 1)}
             disabled={isLastPage}
             className="rounded p-1 hover:bg-[var(--color-surface-hover)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-            aria-label="Next page"
+            aria-label={t("components:pagination.nextPage")}
             data-testid="pagination-next"
           >
             <ChevronRight size={16} />
@@ -97,7 +99,7 @@ export function Pagination({
             onClick={() => onPageChange(totalPages)}
             disabled={isLastPage}
             className="rounded p-1 hover:bg-[var(--color-surface-hover)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-            aria-label="Last page"
+            aria-label={t("components:pagination.lastPage")}
             data-testid="pagination-last"
           >
             <ChevronLast size={16} />

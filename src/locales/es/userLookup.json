@@ -1,0 +1,18 @@
+{
+  "searchPlaceholder": "Buscar por nombre, nombre de usuario o correo...",
+  "all": "Todos",
+  "healthy": "Saludable",
+  "warning": "Advertencia",
+  "loadingUsers": "Cargando usuarios...",
+  "found_one": "{{count}} usuario encontrado",
+  "found_other": "{{count}} usuarios encontrados",
+  "noUsersFound": "No se encontraron usuarios",
+  "failedToLoad": "No se pudieron cargar los usuarios",
+  "noUsersWithHealth": "No hay usuarios con estado de salud {{status}}.",
+  "noUsersMatch": "Ningún usuario coincide con \"{{query}}\"",
+  "noUsersAvailable": "No hay usuarios disponibles.",
+  "selectUser": "Seleccione un usuario para ver los detalles",
+  "startOffboarding": "Iniciar baja para {{name}}",
+  "cannotCompareWithSelf": "No se puede comparar un usuario consigo mismo",
+  "compareWith": "Comparar {{name}} con {{other}}"
+}

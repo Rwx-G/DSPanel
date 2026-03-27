@@ -1,5 +1,6 @@
 import { useRef, useCallback, useState, useEffect, memo } from "react";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { useNavigation } from "@/contexts/NavigationContext";
 import { useTabDrag } from "@/hooks/useTabDrag";
 import { type TabItem as TabItemType } from "@/types/navigation";
@@ -11,6 +12,7 @@ interface ContextMenuState {
 }
 
 export function TabBar() {
+  const { t } = useTranslation(["layout", "common"]);
   const {
     openTabs,
     activeTabId,
@@ -124,7 +126,7 @@ export function TabBar() {
         <button
           className="flex h-full w-6 shrink-0 items-center justify-center text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]"
           onClick={() => scrollTabs("left")}
-          aria-label="Scroll tabs left"
+          aria-label={t("layout:scrollTabsLeft")}
           data-testid="tab-scroll-left"
         >
           <ChevronLeft size={14} />
@@ -155,7 +157,7 @@ export function TabBar() {
         <button
           className="flex h-full w-6 shrink-0 items-center justify-center text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]"
           onClick={() => scrollTabs("right")}
-          aria-label="Scroll tabs right"
+          aria-label={t("layout:scrollTabsRight")}
           data-testid="tab-scroll-right"
         >
           <ChevronRight size={14} />
@@ -167,7 +169,7 @@ export function TabBar() {
           className="fixed z-50 min-w-[160px] rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] py-1 shadow-lg"
           style={{ left: contextMenu.x, top: contextMenu.y }}
           role="menu"
-          aria-label="Tab options"
+          aria-label={t("layout:tabOptions")}
           data-testid="tab-context-menu"
         >
           <button
@@ -179,7 +181,7 @@ export function TabBar() {
             }}
             data-testid="tab-ctx-close"
           >
-            Close
+            {t("common:close")}
           </button>
           <button
             role="menuitem"
@@ -190,7 +192,7 @@ export function TabBar() {
             }}
             data-testid="tab-ctx-close-others"
           >
-            Close Others
+            {t("layout:closeOthers")}
           </button>
           <div
             className="mx-2 my-1 border-t border-[var(--color-border-subtle)]"
@@ -205,7 +207,7 @@ export function TabBar() {
             }}
             data-testid="tab-ctx-close-all"
           >
-            Close All
+            {t("layout:closeAll")}
           </button>
         </div>
       )}
@@ -240,6 +242,8 @@ const TabItem = memo(function TabItem({
   onContextMenu,
   onClose,
 }: TabItemProps) {
+  const { t } = useTranslation("layout");
+
   return (
     <div
       className={`group relative flex h-full items-center gap-1.5 px-3 select-none transition-colors duration-150 ${
@@ -278,7 +282,7 @@ const TabItem = memo(function TabItem({
             e.stopPropagation();
             onClose(tab.id);
           }}
-          aria-label={`Close ${tab.title}`}
+          aria-label={t("layout:closeTab", { title: tab.title })}
           data-testid={`tab-close-${tab.moduleId}`}
         >
           <X size={12} />

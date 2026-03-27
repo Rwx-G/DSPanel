@@ -83,7 +83,7 @@ async function waitForEditorReady() {
   await waitFor(
     () => {
       // Editor is ready when the loading spinner is gone
-      expect(screen.queryByText("Loading presets...")).toBeNull();
+      expect(screen.queryByText("Loading...")).toBeNull();
       // And the preset management testid is present
       expect(screen.getByTestId("preset-management")).toBeDefined();
     },
@@ -368,6 +368,306 @@ describe("PresetManagement", () => {
         "preset-delete-btn",
       ) as HTMLButtonElement;
       expect(deleteBtn.disabled).toBe(true);
+    });
+  });
+
+  it("shows external modification warning with accept button", async () => {
+    const presetsWithWarning: Preset[] = [
+      {
+        ...samplePresets[0],
+        integrityWarning: true,
+      },
+      samplePresets[1],
+    ];
+
+    mockInvoke.mockImplementation(((cmd: string) => {
+      switch (cmd) {
+        case "get_permission_level":
+          return Promise.resolve("AccountOperator");
+        case "get_user_groups":
+          return Promise.resolve([]);
+        case "has_permission":
+          return Promise.resolve(true);
+        case "get_preset_path":
+          return Promise.resolve("C:\\presets");
+        case "list_presets":
+          return Promise.resolve(presetsWithWarning);
+        case "get_ou_tree":
+          return Promise.resolve([]);
+        default:
+          return Promise.resolve(null);
+      }
+    }) as typeof invoke);
+
+    render(
+      <Wrapper>
+        <PresetManagement />
+      </Wrapper>,
+    );
+
+    await waitForEditorReady();
+
+    // Wait for preset items to render
+    await waitFor(() => {
+      expect(screen.getByTestId("preset-item-0")).toBeDefined();
+    });
+
+    // The warning icon should be visible in the preset list item
+    const presetItem = screen.getByTestId("preset-item-0");
+    expect(presetItem.querySelector('[aria-label="Preset modified externally"]')).toBeDefined();
+
+    // Click the preset to open editor
+    fireEvent.click(presetItem);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("preset-integrity-warning")).toBeDefined();
+      expect(screen.getByText("This preset was modified outside DSPanel")).toBeDefined();
+    });
+  });
+
+  it("accept checksum calls accept_preset_checksum", async () => {
+    const presetsWithWarning: Preset[] = [
+      {
+        ...samplePresets[0],
+        integrityWarning: true,
+      },
+    ];
+
+    mockInvoke.mockImplementation(((cmd: string) => {
+      switch (cmd) {
+        case "get_permission_level":
+          return Promise.resolve("AccountOperator");
+        case "get_user_groups":
+          return Promise.resolve([]);
+        case "has_permission":
+          return Promise.resolve(true);
+        case "get_preset_path":
+          return Promise.resolve("C:\\presets");
+        case "list_presets":
+          return Promise.resolve(presetsWithWarning);
+        case "get_ou_tree":
+          return Promise.resolve([]);
+        case "accept_preset_checksum":
+          return Promise.resolve(null);
+        default:
+          return Promise.resolve(null);
+      }
+    }) as typeof invoke);
+
+    render(
+      <Wrapper>
+        <PresetManagement />
+      </Wrapper>,
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByText("Loading...")).toBeNull();
+      expect(screen.getByTestId("preset-item-0")).toBeDefined();
+    }, { timeout: 5000 });
+
+    fireEvent.click(screen.getByTestId("preset-item-0"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("preset-accept-checksum")).toBeDefined();
+    });
+
+    fireEvent.click(screen.getByTestId("preset-accept-checksum"));
+
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith("accept_preset_checksum", {
+        name: "Dev Onboarding",
+      });
+    });
+  });
+
+  it("type select changes preset type to Offboarding", async () => {
+    setupDefaultMocks();
+
+    render(
+      <Wrapper>
+        <PresetManagement />
+      </Wrapper>,
+    );
+
+    await waitForEditorReady();
+    fireEvent.click(screen.getByTestId("preset-new-btn"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("preset-type-select")).toBeDefined();
+    });
+
+    const typeSelect = screen.getByTestId("preset-type-select") as HTMLSelectElement;
+    expect(typeSelect.value).toBe("Onboarding");
+
+    fireEvent.change(typeSelect, { target: { value: "Offboarding" } });
+    expect(typeSelect.value).toBe("Offboarding");
+  });
+
+  it("description textarea updates draft", async () => {
+    setupDefaultMocks();
+
+    render(
+      <Wrapper>
+        <PresetManagement />
+      </Wrapper>,
+    );
+
+    await waitForEditorReady();
+    fireEvent.click(screen.getByTestId("preset-new-btn"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("preset-description-input")).toBeDefined();
+    });
+
+    const descInput = screen.getByTestId("preset-description-input") as HTMLTextAreaElement;
+    fireEvent.change(descInput, { target: { value: "New description" } });
+    expect(descInput.value).toBe("New description");
+  });
+
+  it("remove attribute button removes the attribute from draft", async () => {
+    setupDefaultMocks();
+
+    render(
+      <Wrapper>
+        <PresetManagement />
+      </Wrapper>,
+    );
+
+    await waitForEditorReady();
+    fireEvent.click(screen.getByTestId("preset-new-btn"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("preset-editor-form")).toBeDefined();
+    });
+
+    // Add an attribute
+    fireEvent.change(screen.getByTestId("attr-key-input"), {
+      target: { value: "title" },
+    });
+    fireEvent.change(screen.getByTestId("attr-value-input"), {
+      target: { value: "Engineer" },
+    });
+    fireEvent.click(screen.getByTestId("attr-add-btn"));
+
+    expect(screen.getByText("title")).toBeDefined();
+    expect(screen.getByText("= Engineer")).toBeDefined();
+
+    // Remove the attribute
+    fireEvent.click(screen.getByTestId("attr-remove-title"));
+
+    await waitFor(() => {
+      expect(screen.queryByText("= Engineer")).toBeNull();
+    });
+  });
+
+  it("add attribute button is disabled when key is empty", async () => {
+    setupDefaultMocks();
+
+    render(
+      <Wrapper>
+        <PresetManagement />
+      </Wrapper>,
+    );
+
+    await waitForEditorReady();
+    fireEvent.click(screen.getByTestId("preset-new-btn"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("attr-add-btn")).toBeDefined();
+    });
+
+    const addBtn = screen.getByTestId("attr-add-btn") as HTMLButtonElement;
+    expect(addBtn.disabled).toBe(true);
+  });
+
+  it("validates at least one group or attribute is required", async () => {
+    setupDefaultMocks();
+
+    render(
+      <Wrapper>
+        <PresetManagement />
+      </Wrapper>,
+    );
+
+    await waitForEditorReady();
+    fireEvent.click(screen.getByTestId("preset-new-btn"));
+
+    // Fill name and target OU (but no groups or attributes)
+    fireEvent.change(screen.getByTestId("preset-name-input"), {
+      target: { value: "Empty Preset" },
+    });
+
+    // We need to save - but targetOu is also required
+    // The validation will catch both targetOu and groups/attributes
+    fireEvent.click(screen.getByTestId("preset-save-btn"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("preset-editor-errors")).toBeDefined();
+      expect(
+        screen.getByText("At least one group or attribute is required"),
+      ).toBeDefined();
+    });
+  });
+
+  it("save button is disabled when no editor is active", async () => {
+    setupDefaultMocks();
+
+    render(
+      <Wrapper>
+        <PresetManagement />
+      </Wrapper>,
+    );
+
+    await waitForEditorReady();
+
+    // No preset selected, no new preset - save should be disabled
+    const saveBtn = screen.getByTestId("preset-save-btn") as HTMLButtonElement;
+    expect(saveBtn.disabled).toBe(true);
+  });
+
+  it("shows preset storage path when configured", async () => {
+    setupDefaultMocks();
+
+    render(
+      <Wrapper>
+        <PresetManagement />
+      </Wrapper>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("preset-show-settings")).toBeDefined();
+      expect(screen.getByText(/C:\\presets/)).toBeDefined();
+    });
+  });
+
+  it("shows empty state when preset path is not configured", async () => {
+    mockInvoke.mockImplementation(((cmd: string) => {
+      switch (cmd) {
+        case "get_permission_level":
+          return Promise.resolve("AccountOperator");
+        case "get_user_groups":
+          return Promise.resolve([]);
+        case "has_permission":
+          return Promise.resolve(true);
+        case "get_preset_path":
+          return Promise.resolve(null);
+        case "list_presets":
+          return Promise.resolve([]);
+        case "get_ou_tree":
+          return Promise.resolve([]);
+        default:
+          return Promise.resolve(null);
+      }
+    }) as typeof invoke);
+
+    render(
+      <Wrapper>
+        <PresetManagement />
+      </Wrapper>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Preset Storage Not Configured")).toBeDefined();
     });
   });
 

@@ -1,0 +1,17 @@
+{
+  "pageTitle": "Contact Lookup",
+  "searchPlaceholder": "Search contacts by name, email, or company...",
+  "loadingContacts": "Loading contacts...",
+  "found_one": "{{count}} contact found",
+  "found_other": "{{count}} contacts found",
+  "noContactsFound": "No contacts found",
+  "failedToLoad": "Failed to load contacts",
+  "noContactsMatch": "No contacts match \"{{query}}\"",
+  "selectContact": "Select a contact to view details",
+  "deleteContact": "Delete Contact",
+  "deleteConfirmation": "Are you sure you want to delete {{name}}?",
+  "deleteSuccess": "Contact deleted successfully",
+  "noEmail": "No email",
+  "contactInfo": "Contact Info",
+  "organization": "Organization"
+}

@@ -1,0 +1,17 @@
+{
+  "pageTitle": "Computer Lookup",
+  "searchPlaceholder": "Search by computer name...",
+  "all": "All",
+  "allOs": "All OS",
+  "windows": "Windows",
+  "otherOs": "Other",
+  "loadingComputers": "Loading computers...",
+  "found_one": "{{count}} computer found",
+  "found_other": "{{count}} computers found",
+  "noComputersFound": "No computers found",
+  "failedToLoad": "Failed to load computers",
+  "noComputersMatch": "No computers match \"{{query}}\"",
+  "noFilterResults": "No computers match the selected filters.",
+  "selectComputer": "Select a computer to view details",
+  "unknownOs": "Unknown OS"
+}

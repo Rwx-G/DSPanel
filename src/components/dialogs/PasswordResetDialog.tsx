@@ -5,6 +5,7 @@ import { PasswordInput } from "@/components/form/PasswordInput";
 import { CopyButton } from "@/components/common/CopyButton";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { useMfaGate } from "@/hooks/useMfaGate";
+import { useTranslation } from "react-i18next";
 
 interface HibpResult {
   isBreached: boolean;
@@ -55,6 +56,7 @@ export function PasswordResetDialog({
   onClose,
   onSuccess,
 }: PasswordResetDialogProps) {
+  const { t } = useTranslation(["dialogs", "common"]);
   const [mode, setMode] = useState<ResetMode>("generate");
   const [manualPassword, setManualPassword] = useState("");
   const [generatedPassword, setGeneratedPassword] = useState<string | null>(
@@ -142,12 +144,12 @@ export function PasswordResetDialog({
       >
         <div className="px-4 py-3 border-b border-[var(--color-border-subtle)]">
           <h2 className="text-body font-semibold text-[var(--color-text-primary)]">
-            Password Reset Successful
+            {t("dialogs:passwordReset.successTitle")}
           </h2>
         </div>
         <div className="px-4 py-3 space-y-3">
           <p className="text-body text-[var(--color-text-primary)]">
-            Password for <strong>{displayName}</strong> has been reset.
+            {t("dialogs:passwordReset.successMessage", { name: displayName })}
           </p>
           <div className="flex items-center gap-2 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-bg)] px-3 py-2">
             <code
@@ -160,7 +162,7 @@ export function PasswordResetDialog({
           </div>
           {mustChangeAtNextLogon && (
             <p className="text-caption text-[var(--color-text-secondary)]">
-              User must change password at next logon.
+              {t("dialogs:passwordReset.mustChangeAtLogon")}
             </p>
           )}
         </div>
@@ -170,7 +172,7 @@ export function PasswordResetDialog({
             onClick={onClose}
             data-testid="close-result"
           >
-            Close
+            {t("common:close")}
           </button>
         </div>
       </DialogShell>
@@ -185,7 +187,7 @@ export function PasswordResetDialog({
     >
       <div className="px-4 py-3 border-b border-[var(--color-border-subtle)]">
         <h2 className="text-body font-semibold text-[var(--color-text-primary)]">
-          Reset Password
+          {t("dialogs:passwordReset.title")}
         </h2>
         <p className="text-caption text-[var(--color-text-secondary)]">
           {displayName}
@@ -203,7 +205,7 @@ export function PasswordResetDialog({
             onClick={() => setMode("generate")}
             data-testid="mode-generate"
           >
-            Auto-generate
+            {t("dialogs:passwordReset.autoGenerate")}
           </button>
           <button
             className={`px-3 py-1 rounded-md text-caption font-medium transition-colors ${
@@ -214,7 +216,7 @@ export function PasswordResetDialog({
             onClick={() => setMode("manual")}
             data-testid="mode-manual"
           >
-            Manual entry
+            {t("dialogs:passwordReset.manualEntry")}
           </button>
         </div>
 
@@ -223,7 +225,7 @@ export function PasswordResetDialog({
             <PasswordInput
               value={manualPassword}
               onChange={(e) => setManualPassword(e.target.value)}
-              placeholder="Enter new password"
+              placeholder={t("dialogs:passwordReset.enterNewPassword")}
               error={manualPassword.length > 0 && !manualValid}
               data-testid="manual-password-input"
             />
@@ -233,20 +235,20 @@ export function PasswordResetDialog({
                 data-testid="password-validation"
               >
                 <ValidationItem
-                  label="At least 8 characters"
+                  label={t("dialogs:passwordReset.atLeast8Chars")}
                   valid={validation.minLength}
                 />
                 <ValidationItem
-                  label="Uppercase letter"
+                  label={t("dialogs:passwordReset.uppercaseLetter")}
                   valid={validation.hasUppercase}
                 />
                 <ValidationItem
-                  label="Lowercase letter"
+                  label={t("dialogs:passwordReset.lowercaseLetter")}
                   valid={validation.hasLowercase}
                 />
-                <ValidationItem label="Digit" valid={validation.hasDigit} />
+                <ValidationItem label={t("dialogs:passwordReset.digit")} valid={validation.hasDigit} />
                 <ValidationItem
-                  label="Special character"
+                  label={t("dialogs:passwordReset.specialCharacter")}
                   valid={validation.hasSpecial}
                 />
                 <li
@@ -257,8 +259,8 @@ export function PasswordResetDialog({
                   }
                 >
                   {isPasswordValid(validation)
-                    ? "Meets complexity requirements (3+ categories)"
-                    : "Needs 3+ character categories"}
+                    ? t("dialogs:passwordReset.meetsComplexity")
+                    : t("dialogs:passwordReset.needsCategories")}
                 </li>
               </ul>
             )}
@@ -275,7 +277,7 @@ export function PasswordResetDialog({
                 {generating ? (
                   <LoadingSpinner size={16} />
                 ) : (
-                  "Generate Password"
+                  t("dialogs:passwordReset.generatePassword")
                 )}
               </button>
             </div>
@@ -294,16 +296,15 @@ export function PasswordResetDialog({
                   <div data-testid="hibp-status">
                     {!hibpResult.checked ? (
                       <span className="text-caption text-[var(--color-warning)]">
-                        Breach check unavailable
+                        {t("dialogs:passwordReset.breachUnavailable")}
                       </span>
                     ) : hibpResult.isBreached ? (
                       <span className="text-caption text-[var(--color-error)]">
-                        Found in {hibpResult.breachCount.toLocaleString()}{" "}
-                        breaches - consider regenerating
+                        {t("dialogs:passwordReset.foundInBreaches", { count: hibpResult.breachCount })}
                       </span>
                     ) : (
                       <span className="text-caption text-[var(--color-success)]">
-                        Not found in any known breach
+                        {t("dialogs:passwordReset.notInBreaches")}
                       </span>
                     )}
                   </div>
@@ -322,7 +323,7 @@ export function PasswordResetDialog({
             data-testid="must-change-checkbox"
           />
           <span className="text-body text-[var(--color-text-primary)]">
-            Must change password at next logon
+            {t("dialogs:passwordReset.mustChangeCheckbox")}
           </span>
         </label>
 
@@ -342,7 +343,7 @@ export function PasswordResetDialog({
           onClick={onClose}
           data-testid="cancel-btn"
         >
-          Cancel
+          {t("common:cancel")}
         </button>
         <button
           className="btn btn-primary"
@@ -350,7 +351,7 @@ export function PasswordResetDialog({
           disabled={!canReset || loading}
           data-testid="reset-btn"
         >
-          {loading ? <LoadingSpinner size={16} /> : "Reset Password"}
+          {loading ? <LoadingSpinner size={16} /> : t("dialogs:passwordReset.resetButton")}
         </button>
       </div>
     </DialogShell>

@@ -15,15 +15,9 @@ import { PermissionGate } from "@/components/common/PermissionGate";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { EmptyState } from "@/components/common/EmptyState";
 import type { Preset } from "@/types/preset";
+import { useTranslation } from "react-i18next";
 
 type WizardStep = "details" | "preset" | "preview" | "execute";
-
-const STEPS: { id: WizardStep; label: string }[] = [
-  { id: "details", label: "User Details" },
-  { id: "preset", label: "Preset Selection" },
-  { id: "preview", label: "Preview" },
-  { id: "execute", label: "Execute" },
-];
 
 function generateLogin(firstName: string, lastName: string): string {
   if (!firstName.trim() || !lastName.trim()) return "";
@@ -64,6 +58,15 @@ interface ExecutionResult {
 }
 
 function OnboardingContent() {
+  const { t } = useTranslation(["onboarding", "common"]);
+
+  const STEPS: { id: WizardStep; label: string }[] = [
+    { id: "details", label: t("stepDetails") },
+    { id: "preset", label: t("stepPreset") },
+    { id: "preview", label: t("stepPreview") },
+    { id: "execute", label: t("stepExecute") },
+  ];
+
   const { presets } = usePresets();
   const { handleError } = useErrorHandler();
   const { showConfirmation } = useDialog();
@@ -297,7 +300,7 @@ function OnboardingContent() {
           <div className="mx-auto max-w-lg space-y-4" data-testid="step-details">
             <div>
               <label className="mb-1 block text-caption font-semibold text-[var(--color-text-secondary)]">
-                First Name *
+                {t("firstName")} *
               </label>
               <input
                 type="text"
@@ -311,7 +314,7 @@ function OnboardingContent() {
             </div>
             <div>
               <label className="mb-1 block text-caption font-semibold text-[var(--color-text-secondary)]">
-                Last Name *
+                {t("lastName")} *
               </label>
               <input
                 type="text"
@@ -325,7 +328,7 @@ function OnboardingContent() {
             </div>
             <div>
               <label className="mb-1 block text-caption font-semibold text-[var(--color-text-secondary)]">
-                Display Name
+                {t("common:displayName")}
               </label>
               <input
                 type="text"
@@ -340,7 +343,7 @@ function OnboardingContent() {
             </div>
             <div>
               <label className="mb-1 block text-caption font-semibold text-[var(--color-text-secondary)]">
-                Login (sAMAccountName) *
+                {t("loginLabel")} *
               </label>
               <div className="flex items-center gap-2">
                 <input
@@ -365,7 +368,7 @@ function OnboardingContent() {
             </div>
             <div>
               <label className="mb-1 block text-caption font-semibold text-[var(--color-text-secondary)]">
-                Password *
+                {t("passwordLabel")} *
               </label>
               <div className="flex items-center gap-2">
                 <input
@@ -384,7 +387,7 @@ function OnboardingContent() {
                   className="btn btn-sm btn-secondary"
                   data-testid="btn-regenerate-password"
                 >
-                  Regenerate
+                  {t("regenerate")}
                 </button>
               </div>
             </div>
@@ -396,8 +399,8 @@ function OnboardingContent() {
           <div className="mx-auto max-w-xl" data-testid="step-preset">
             {onboardingPresets.length === 0 ? (
               <EmptyState
-                title="No onboarding presets"
-                description="Create an onboarding preset in the Preset Management page first."
+                title={t("noPresets")}
+                description={t("noPresetsDescription")}
               />
             ) : (
               <div className="grid gap-3 sm:grid-cols-2">
@@ -418,13 +421,13 @@ function OnboardingContent() {
                         <AlertTriangle
                           size={14}
                           className="shrink-0 text-[var(--color-warning)]"
-                          aria-label="Preset modified externally"
+                          aria-label={t("presetModifiedAriaLabel")}
                         />
                       )}
                     </div>
                     {preset.integrityWarning && (
                       <div className="mt-1 text-caption text-[var(--color-warning)]">
-                        Modified outside DSPanel - review before use
+                        {t("modifiedOutside")}
                       </div>
                     )}
                     <div className="mt-1 text-caption text-[var(--color-text-secondary)]">
@@ -444,12 +447,12 @@ function OnboardingContent() {
         {step === "preview" && selectedPreset && (
           <div className="mx-auto max-w-lg space-y-3" data-testid="step-preview">
             <h3 className="text-body font-semibold text-[var(--color-text-primary)]">
-              Changes to apply
+              {t("changesToApply")}
             </h3>
             <div className="space-y-2 rounded-md bg-[var(--color-surface-hover)] p-3">
               <div className="flex justify-between text-caption">
                 <span className="text-[var(--color-text-secondary)]">
-                  Login
+                  {t("login")}
                 </span>
                 <span className="font-mono text-[var(--color-text-primary)]">
                   {currentLogin}
@@ -457,7 +460,7 @@ function OnboardingContent() {
               </div>
               <div className="flex justify-between text-caption">
                 <span className="text-[var(--color-text-secondary)]">
-                  Display Name
+                  {t("common:displayName")}
                 </span>
                 <span className="text-[var(--color-text-primary)]">
                   {currentDisplayName}
@@ -465,7 +468,7 @@ function OnboardingContent() {
               </div>
               <div className="flex justify-between text-caption">
                 <span className="text-[var(--color-text-secondary)]">
-                  Target OU
+                  {t("targetOU")}
                 </span>
                 <span className="text-[var(--color-text-primary)] truncate ml-4">
                   {selectedPreset.targetOu}
@@ -473,7 +476,7 @@ function OnboardingContent() {
               </div>
               <div className="flex justify-between text-caption">
                 <span className="text-[var(--color-text-secondary)]">
-                  Preset
+                  {t("preset")}
                 </span>
                 <span className="text-[var(--color-text-primary)]">
                   {selectedPreset.name}
@@ -482,7 +485,7 @@ function OnboardingContent() {
               {selectedPreset.groups.length > 0 && (
                 <div>
                   <span className="text-caption text-[var(--color-text-secondary)]">
-                    Groups:
+                    {t("groups")}:
                   </span>
                   <ul className="ml-4 mt-1 space-y-0.5">
                     {selectedPreset.groups.map((g) => (
@@ -499,7 +502,7 @@ function OnboardingContent() {
               {Object.keys(selectedPreset.attributes).length > 0 && (
                 <div>
                   <span className="text-caption text-[var(--color-text-secondary)]">
-                    Attributes:
+                    {t("attributes")}:
                   </span>
                   <ul className="ml-4 mt-1 space-y-0.5">
                     {Object.entries(selectedPreset.attributes).map(
@@ -523,7 +526,7 @@ function OnboardingContent() {
         {step === "execute" && (
           <div className="mx-auto max-w-lg" data-testid="step-execute">
             {executing && (
-              <LoadingSpinner message="Creating user account..." />
+              <LoadingSpinner message={t("creatingUser")} />
             )}
             {result && !executing && (
               <div className="space-y-4">
@@ -532,19 +535,19 @@ function OnboardingContent() {
                     <div className="flex items-center gap-2 text-[var(--color-success)]">
                       <Check size={20} />
                       <span className="text-body font-semibold">
-                        User created successfully
+                        {t("userCreated")}
                       </span>
                     </div>
                     <div
                       className="rounded-md bg-[var(--color-surface-hover)] p-4 font-mono text-caption space-y-1"
                       data-testid="onboarding-summary"
                     >
-                      <div>Login: {result.login}</div>
-                      <div>Password: {result.password}</div>
-                      <div>DN: {result.userDn}</div>
-                      <div>OU: {result.targetOu}</div>
+                      <div>{t("summaryLogin")} {result.login}</div>
+                      <div>{t("summaryPassword")} {result.password}</div>
+                      <div>{t("dnLabel")} {result.userDn}</div>
+                      <div>{t("ouLabel")} {result.targetOu}</div>
                       {result.groups.map((g) => (
-                        <div key={g}>Group: {g}</div>
+                        <div key={g}>{t("groupLabel")} {g}</div>
                       ))}
                     </div>
                     <div className="flex gap-2">
@@ -561,7 +564,7 @@ function OnboardingContent() {
                         ) : (
                           <Copy size={14} />
                         )}
-                        Copy Summary
+                        {t("common:copySummary")}
                       </button>
                       <button
                         onClick={() => handleCopy(result.password, "password")}
@@ -573,7 +576,7 @@ function OnboardingContent() {
                         ) : (
                           <Copy size={14} />
                         )}
-                        Copy Password
+                        {t("copyPassword")}
                       </button>
                     </div>
                   </>
@@ -581,7 +584,7 @@ function OnboardingContent() {
                   <div className="flex items-center gap-2 text-[var(--color-error)]">
                     <AlertTriangle size={20} />
                     <span className="text-body font-semibold">
-                      Failed to create user
+                      {t("failedToCreate")}
                     </span>
                   </div>
                 )}
@@ -591,7 +594,7 @@ function OnboardingContent() {
                   data-testid="btn-new-onboarding"
                 >
                   <UserPlus size={14} />
-                  Start New Onboarding
+                  {t("startNewOnboarding")}
                 </button>
               </div>
             )}
@@ -608,7 +611,7 @@ function OnboardingContent() {
             className="btn btn-sm btn-secondary"
             data-testid="btn-back"
           >
-            <ChevronLeft size={14} /> Back
+            <ChevronLeft size={14} /> {t("common:back")}
           </button>
           {step === "preview" ? (
             <button
@@ -622,7 +625,7 @@ function OnboardingContent() {
               ) : (
                 <UserPlus size={14} />
               )}
-              Create User
+              {t("createUser")}
             </button>
           ) : (
             <button
@@ -631,7 +634,7 @@ function OnboardingContent() {
               className="btn btn-sm btn-primary"
               data-testid="btn-next"
             >
-              Next <ChevronRight size={14} />
+              {t("common:next")} <ChevronRight size={14} />
             </button>
           )}
         </div>
@@ -641,14 +644,15 @@ function OnboardingContent() {
 }
 
 export function OnboardingWizard() {
+  const { t } = useTranslation(["onboarding", "common"]);
   return (
     <PermissionGate
       requiredLevel="AccountOperator"
       fallback={
         <div className="flex h-full items-center justify-center p-8">
           <EmptyState
-            title="Access Denied"
-            description="Onboarding requires AccountOperator permission or higher."
+            title={t("common:accessDenied")}
+            description={t("accessDeniedDescription")}
           />
         </div>
       }

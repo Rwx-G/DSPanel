@@ -10,6 +10,7 @@ import {
   RefreshCw,
   Info,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 interface HibpResult {
   isBreached: boolean;
@@ -18,6 +19,7 @@ interface HibpResult {
 }
 
 export function PasswordGenerator() {
+  const { t } = useTranslation(["passwordGenerator", "common"]);
   const [length, setLength] = useState(20);
   const [includeUppercase, setIncludeUppercase] = useState(true);
   const [includeLowercase, setIncludeLowercase] = useState(true);
@@ -75,7 +77,7 @@ export function PasswordGenerator() {
     }
   }, [password]);
 
-  const strengthLabel = getStrengthLabel(length);
+  const strengthLabel = getStrengthLabel(length, t);
 
   return (
     <div
@@ -90,10 +92,10 @@ export function PasswordGenerator() {
           </div>
           <div>
             <h2 className="text-h3 text-[var(--color-text-primary)]">
-              Password Generator
+              {t("pageTitle")}
             </h2>
             <p className="text-caption text-[var(--color-text-secondary)]">
-              Generate strong, unique passwords with breach detection
+              {t("pageDescription")}
             </p>
           </div>
         </div>
@@ -110,7 +112,7 @@ export function PasswordGenerator() {
               </code>
             ) : (
               <span className="flex-1 text-body text-[var(--color-text-disabled)] italic">
-                Generating...
+                {t("generating")}
               </span>
             )}
             {password && <CopyButton text={password} />}
@@ -123,7 +125,7 @@ export function PasswordGenerator() {
               data-testid="generate-btn"
             >
               <RefreshCw size={14} />
-              Regenerate
+              {t("regenerate")}
             </button>
             <button
               className="btn btn-outline btn-sm"
@@ -136,7 +138,7 @@ export function PasswordGenerator() {
               ) : (
                 <>
                   <ShieldCheck size={14} />
-                  Check Breach Database
+                  {t("checkBreachDb")}
                 </>
               )}
             </button>
@@ -152,7 +154,7 @@ export function PasswordGenerator() {
               <HibpStatusBadge result={hibpResult} />
             ) : (
               <span className="text-caption text-[var(--color-text-disabled)]">
-                Click "Check Breach Database" to verify against known breaches
+                {t("clickToCheck")}
               </span>
             )}
           </div>
@@ -173,7 +175,7 @@ export function PasswordGenerator() {
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <label className="text-body font-medium text-[var(--color-text-primary)]">
-                Length
+                {t("length")}
               </label>
               <div className="flex items-center gap-2">
                 <span
@@ -207,36 +209,36 @@ export function PasswordGenerator() {
           {/* Character options */}
           <div className="space-y-1.5">
             <p className="text-caption font-medium text-[var(--color-text-secondary)] uppercase tracking-wider">
-              Character sets
+              {t("characterSets")}
             </p>
             <div className="grid grid-cols-2 gap-2">
               <CheckboxOption
-                label="Uppercase (A-Z)"
+                label={t("uppercase")}
                 checked={includeUppercase}
                 onChange={setIncludeUppercase}
                 testId="opt-uppercase"
               />
               <CheckboxOption
-                label="Lowercase (a-z)"
+                label={t("lowercase")}
                 checked={includeLowercase}
                 onChange={setIncludeLowercase}
                 testId="opt-lowercase"
               />
               <CheckboxOption
-                label="Digits (0-9)"
+                label={t("digits")}
                 checked={includeDigits}
                 onChange={setIncludeDigits}
                 testId="opt-digits"
               />
               <CheckboxOption
-                label="Special (!@#$%...)"
+                label={t("special")}
                 checked={includeSpecial}
                 onChange={setIncludeSpecial}
                 testId="opt-special"
               />
             </div>
             <CheckboxOption
-              label="Exclude ambiguous characters (0, O, l, I, 1, |)"
+              label={t("excludeAmbiguous")}
               checked={excludeAmbiguous}
               onChange={setExcludeAmbiguous}
               testId="opt-ambiguous"
@@ -249,35 +251,17 @@ export function PasswordGenerator() {
           <div className="flex items-center gap-2">
             <Info size={16} className="text-[var(--color-info)] shrink-0" />
             <p className="text-caption font-semibold text-[var(--color-text-primary)]">
-              Password Best Practices
+              {t("bestPracticesTitle")}
             </p>
           </div>
           <ul className="text-caption text-[var(--color-text-secondary)] space-y-1 ml-6 list-disc">
-            <li>
-              Use at least <strong>20 characters</strong> for administrative
-              accounts (16 minimum for standard users)
-            </li>
-            <li>
-              Include <strong>3+ character categories</strong> (uppercase,
-              lowercase, digits, special)
-            </li>
-            <li>Never reuse passwords across different accounts or services</li>
-            <li>
-              Use the <strong>breach check</strong> to verify the password has
-              not appeared in known data breaches (HIBP k-anonymity - your
-              password never leaves your machine)
-            </li>
-            <li>
-              Enable <strong>"Must change at next logon"</strong> when resetting
-              passwords for other users
-            </li>
-            <li>
-              Avoid dictionary words, personal info, or common patterns (abc123,
-              qwerty)
-            </li>
-            <li>
-              Consider using a password manager for storing generated passwords
-            </li>
+            <li>{t("bestPractice1")}</li>
+            <li>{t("bestPractice2")}</li>
+            <li>{t("bestPractice3")}</li>
+            <li>{t("bestPractice4")}</li>
+            <li>{t("bestPractice5")}</li>
+            <li>{t("bestPractice6")}</li>
+            <li>{t("bestPractice7")}</li>
           </ul>
         </div>
       </div>
@@ -285,19 +269,19 @@ export function PasswordGenerator() {
   );
 }
 
-function getStrengthLabel(length: number): { text: string; class: string } {
+function getStrengthLabel(length: number, t: (key: string) => string): { text: string; class: string } {
   if (length >= 24)
     return {
-      text: "Excellent",
+      text: t("excellent"),
       class: "bg-[var(--color-success-bg)] text-[var(--color-success)]",
     };
   if (length >= 20)
-    return { text: "Strong", class: "bg-[var(--color-info-bg)] text-[var(--color-info)]" };
+    return { text: t("strong"), class: "bg-[var(--color-info-bg)] text-[var(--color-info)]" };
   if (length >= 16)
-    return { text: "Good", class: "bg-[var(--color-success-bg)] text-[var(--color-success)]" };
+    return { text: t("good"), class: "bg-[var(--color-success-bg)] text-[var(--color-success)]" };
   if (length >= 12)
-    return { text: "Fair", class: "bg-[var(--color-warning-bg)] text-[var(--color-warning)]" };
-  return { text: "Weak", class: "bg-[var(--color-error-bg)] text-[var(--color-error)]" };
+    return { text: t("fair"), class: "bg-[var(--color-warning-bg)] text-[var(--color-warning)]" };
+  return { text: t("weak"), class: "bg-[var(--color-error-bg)] text-[var(--color-error)]" };
 }
 
 function CheckboxOption({
@@ -328,6 +312,7 @@ function CheckboxOption({
 }
 
 function HibpInfoTooltip() {
+  const { t } = useTranslation(["passwordGenerator"]);
   const [open, setOpen] = useState(false);
 
   return (
@@ -336,7 +321,7 @@ function HibpInfoTooltip() {
         className="flex h-6 w-6 items-center justify-center rounded-full text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors"
         onClick={() => setOpen(!open)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
-        aria-label="About breach database"
+        aria-label={t("aboutBreachDbAriaLabel")}
         data-testid="hibp-info-btn"
       >
         <Info size={14} />
@@ -347,7 +332,7 @@ function HibpInfoTooltip() {
           data-testid="hibp-info-popup"
         >
           <p className="text-caption font-semibold text-[var(--color-text-primary)] mb-1">
-            Have I Been Pwned (HIBP)
+            {t("hibpTitle")}
           </p>
           <p className="text-caption text-[var(--color-text-secondary)] mb-2">
             Breach data is provided by <strong>haveibeenpwned.com</strong>, a
@@ -374,6 +359,7 @@ function HibpInfoTooltip() {
 }
 
 function HibpStatusBadge({ result }: { result: HibpResult }) {
+  const { t } = useTranslation(["passwordGenerator"]);
   if (!result.checked) {
     return (
       <span
@@ -381,7 +367,7 @@ function HibpStatusBadge({ result }: { result: HibpResult }) {
         data-testid="hibp-unchecked"
       >
         <ShieldQuestion size={14} />
-        Breach check unavailable
+        {t("breachUnavailable")}
       </span>
     );
   }
@@ -392,7 +378,7 @@ function HibpStatusBadge({ result }: { result: HibpResult }) {
         data-testid="hibp-breached"
       >
         <ShieldAlert size={14} />
-        Found in {result.breachCount.toLocaleString()} breaches
+        {t("foundInBreaches", { count: result.breachCount })}
       </span>
     );
   }
@@ -402,7 +388,7 @@ function HibpStatusBadge({ result }: { result: HibpResult }) {
       data-testid="hibp-clean"
     >
       <ShieldCheck size={14} />
-      Not found in any known breach
+      {t("notFoundInBreaches")}
     </span>
   );
 }

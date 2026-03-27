@@ -1,0 +1,321 @@
+{
+  "errorBoundary": {
+    "title": "Une erreur s'est produite",
+    "description": "Une erreur inattendue s'est produite. Elle a été enregistrée pour investigation.",
+    "showDetails": "Afficher les détails de l'erreur",
+    "tryAgain": "Réessayer"
+  },
+  "exportToolbar": {
+    "export": "Exporter",
+    "exporting": "Exportation..."
+  },
+  "searchBar": {
+    "placeholder": "Rechercher...",
+    "clearSearch": "Effacer la recherche"
+  },
+  "loadingSpinner": {
+    "loading": "Chargement"
+  },
+  "notificationHost": {
+    "dismiss": "Fermer la notification"
+  },
+  "securityDisclaimer": {
+    "aboutModule": "À propos de ce module",
+    "coverage": "Analyse indicative - couverture estimée à {{coverage}}",
+    "whatWeCheck": "Ce que nous vérifions :",
+    "limitations": "Limitations :",
+    "forCompleteAudit": "Pour un audit complet :"
+  },
+  "snapshotHistory": {
+    "loading": "Chargement de l'historique des instantanés...",
+    "noSnapshots": "Aucun instantané",
+    "snapshotsDescription": "Les instantanés sont capturés automatiquement avant les modifications.",
+    "timestamp": "Horodatage",
+    "operation": "Opération",
+    "operator": "Opérateur",
+    "objectDn": "DN de l'objet",
+    "restoreTitle": "Restaurer depuis l'instantané",
+    "restoreConfirm": "Restaurer \"{{name}}\" à son état du {{timestamp}} ?",
+    "restoreNote": "Cela écrasera les valeurs d'attributs actuelles avec celles de l'instantané. Les attributs en lecture seule (objectClass, memberOf, horodatages, etc.) seront ignorés.",
+    "restoreSuccess": "Objet restauré depuis l'instantané avec succès.",
+    "restoreButton": "Restaurer depuis cet instantané",
+    "deleteTitle": "Supprimer l'instantané",
+    "deleteConfirm": "Supprimer l'instantané \"{{operation}}\" du {{timestamp}} ?",
+    "deleteNote": "Ce point de restauration sera définitivement supprimé.",
+    "deleteButton": "Supprimer l'instantané",
+    "deleteFailed": "Échec de la suppression de l'instantané",
+    "computingDiff": "Calcul des différences...",
+    "noDifferences": "Aucune différence trouvée - l'objet correspond à l'instantané.",
+    "attributesDiffer": "Attribut(s) différant de l'état actuel",
+    "attribute": "Attribut",
+    "snapshot": "Instantané",
+    "current": "Actuel",
+    "diffFailed": "Échec du calcul des différences."
+  },
+  "updateBar": {
+    "versionAvailable": "DSPanel v{{version}} est disponible.",
+    "download": "Télécharger",
+    "skip": "Ignorer",
+    "remindLater": "Me rappeler plus tard"
+  },
+  "userActions": {
+    "resetPassword": "Réinitialiser le mot de passe",
+    "requiresHelpDesk": "Nécessite la permission HelpDesk",
+    "unlock": "Déverrouiller",
+    "disable": "Désactiver",
+    "enable": "Activer",
+    "unlockAccount": "Déverrouiller le compte",
+    "enableAccount": "Activer le compte",
+    "disableAccount": "Désactiver le compte",
+    "unlockConfirm": "Êtes-vous sûr de vouloir déverrouiller le compte de {{name}} ({{sam}}) ?",
+    "enableConfirm": "Êtes-vous sûr de vouloir activer le compte de {{name}} ({{sam}}) ?",
+    "disableConfirm": "Êtes-vous sûr de vouloir désactiver le compte de {{name}} ({{sam}}) ? L'utilisateur ne pourra plus se connecter.",
+    "actionSuccess": "{{action}} réussi pour {{name}}"
+  },
+  "graphSettings": {
+    "title": "Intégration Microsoft Graph",
+    "description": "Configurez l'inscription d'application Azure AD pour les diagnostics Exchange Online. Nécessite les permissions applicatives Mail.Read et User.Read.All avec consentement administrateur.",
+    "tenantId": "ID du locataire",
+    "tenantPlaceholder": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+    "clientId": "ID d'application (Client)",
+    "clientSecret": "Secret client",
+    "clientSecretStored": "Stocké dans le coffre d'identifiants du système",
+    "clientSecretPlaceholder": "Valeur du secret client",
+    "testConnection": "Tester la connexion",
+    "connectionSuccess": "Connexion réussie.",
+    "connectionFailed": "Connexion échouée. Vérifiez l'ID du locataire, l'ID client et le secret client."
+  },
+  "presetSettings": {
+    "title": "Chemin de stockage des presets",
+    "description": "Configurez le partage réseau ou le répertoire local où les fichiers JSON de presets sont stockés. Toutes les instances DSPanel partageant ce chemin verront les mêmes presets.",
+    "placeholder": "\\\\serveur\\partage\\presets ou C:\\presets",
+    "browseFolder": "Parcourir les dossiers",
+    "pathValid": "Le chemin est accessible et valide.",
+    "pathInvalid": "Le chemin n'est pas accessible. Vérifiez le chemin et les permissions.",
+    "currentlyConfigured": "Actuellement configuré : {{path}}",
+    "configFailed": "Échec de la configuration du chemin. Vérifiez le chemin et réessayez."
+  },
+  "passwordFlags": {
+    "title": "Indicateurs de mot de passe",
+    "neverExpires": "Le mot de passe n'expire jamais",
+    "cannotChange": "L'utilisateur ne peut pas changer le mot de passe",
+    "insufficientPermissions": "(permissions insuffisantes pour la lecture)",
+    "saveChanges": "Enregistrer les modifications",
+    "requiresAccountOperator": "Nécessite la permission AccountOperator"
+  },
+  "pagination": {
+    "firstPage": "Première page",
+    "previousPage": "Page précédente",
+    "nextPage": "Page suivante",
+    "lastPage": "Dernière page",
+    "noItems": "Aucun élément",
+    "showing": "Affichage de {{start}}-{{end}} sur {{total}} éléments",
+    "pageSize": "Éléments par page :"
+  },
+  "permissionMapping": {
+    "domainAdminRequired": "L'accès DomainAdmin est requis pour gérer les mappages de permissions.",
+    "description": "Associez des groupes de sécurité AD aux niveaux de permission DSPanel. Lorsqu'un utilisateur appartient à plusieurs groupes mappés, le niveau le plus élevé s'applique. La détection par défaut (basée sur le RID + groupes DSPanel-*) reste active en parallèle des mappages personnalisés.",
+    "readOnly": "Lecture seule",
+    "helpDesk": "Help Desk",
+    "accountOperator": "Opérateur de comptes",
+    "admin": "Admin",
+    "domainAdmin": "Administrateur du domaine",
+    "readOnlyHint": "Accès en lecture seule aux données de l'annuaire",
+    "helpDeskHint": "Réinitialisation de mots de passe et déverrouillage de comptes",
+    "accountOperatorHint": "Gestion des groupes et modification des comptes",
+    "adminHint": "Administration complète (création d'objets, gestion des OU)",
+    "domainAdminHint": "Accès complet incluant sécurité et infrastructure",
+    "addGroup": "Ajouter un groupe",
+    "searchGroupsPlaceholder": "Rechercher des groupes AD par nom...",
+    "noCustomGroups": "Aucun groupe personnalisé mappé. La détection par défaut s'applique.",
+    "alreadyMapped": "(déjà mappé)",
+    "searchFailed": "Recherche échouée. Veuillez réessayer.",
+    "noGroupsFound": "Aucun groupe trouvé",
+    "savedSuccessfully": "Mappages de permissions enregistrés avec succès.",
+    "saveMappings": "Enregistrer les mappages",
+    "groupNotFoundInAd": "Groupe introuvable dans AD",
+    "validateGroupExists": "Vérifier l'existence du groupe dans AD",
+    "removeGroup": "Retirer le groupe"
+  },
+  "workstationMonitoring": {
+    "title": "Surveillance : {{hostname}}",
+    "refresh5s": "5s",
+    "refresh10s": "10s",
+    "refresh30s": "30s",
+    "resume": "Reprendre",
+    "pause": "Pause",
+    "connecting": "Connexion au poste de travail...",
+    "cpu": "CPU",
+    "memory": "Mémoire",
+    "disks": "Disques",
+    "sessions": "Sessions ({{count}})",
+    "noActiveSessions": "Aucune session active",
+    "unavailable": "Indisponible",
+    "services": "Services ({{count}})",
+    "autoStart": "Démarrage automatique",
+    "showAutoStart": "Afficher uniquement les services à démarrage automatique"
+  },
+  "dataTable": {
+    "noData": "Aucune donnée disponible",
+    "exportCsv": "Exporter en CSV"
+  },
+  "filterBar": {
+    "placeholder": "Filtrer...",
+    "clearAll": "Effacer tous les filtres",
+    "removeFilter": "Retirer le filtre {{label}}"
+  },
+  "propertyGrid": {
+    "noProperties": "Aucune propriété à afficher",
+    "confirmEdit": "Confirmer la modification",
+    "cancelEdit": "Annuler la modification"
+  },
+  "diffViewer": {
+    "noDifferences": "Aucune différence",
+    "inline": "En ligne",
+    "sideBySide": "Côte à côte"
+  },
+  "advancedAttributes": {
+    "title": "Attributs avancés ({{count}})",
+    "noAttributes": "Aucun attribut avancé disponible",
+    "filterPlaceholder": "Filtrer les attributs...",
+    "showEmpty": "Afficher les vides",
+    "noMatch": "Aucun attribut ne correspond à \"{{query}}\"",
+    "favorites": "Favoris",
+    "allAttributes": "Tous les attributs",
+    "empty": "(vide)",
+    "confirmEdit": "Confirmer la modification",
+    "cancelEdit": "Annuler la modification",
+    "clearFilter": "Effacer le filtre"
+  },
+  "exchangePanel": {
+    "title": "Boîte aux lettres Exchange",
+    "mailboxGuid": "GUID de la boîte aux lettres",
+    "recipientType": "Type de destinataire",
+    "primarySmtp": "SMTP principal",
+    "forwardingTo": "Transfert vers",
+    "emailAliases": "Alias de messagerie ({{count}})",
+    "delegates": "Délégués ({{count}})"
+  },
+  "groupPicker": {
+    "placeholder": "Rechercher des groupes...",
+    "clearSearch": "Effacer la recherche",
+    "searchFailed": "Recherche échouée. Veuillez réessayer.",
+    "noGroups": "Aucun groupe trouvé"
+  },
+  "ouPicker": {
+    "loading": "Chargement des OU...",
+    "loadFailed": "Échec du chargement des OU",
+    "loadFailedHint": "Vérifiez votre connexion AD et réessayez.",
+    "noOus": "Aucune OU disponible",
+    "selected": "Sélectionnée : {{ou}}"
+  },
+  "passwordInput": {
+    "hide": "Masquer le mot de passe",
+    "show": "Afficher le mot de passe"
+  },
+  "comboBox": {
+    "placeholder": "Sélectionner...",
+    "searchPlaceholder": "Rechercher...",
+    "searchOptions": "Rechercher des options",
+    "noResults": "Aucun résultat"
+  },
+  "dateTimePicker": {
+    "placeholder": "Sélectionner une date...",
+    "previousMonth": "Mois précédent",
+    "nextMonth": "Mois suivant",
+    "decreaseHours": "Diminuer les heures",
+    "increaseHours": "Augmenter les heures",
+    "decreaseMinutes": "Diminuer les minutes",
+    "increaseMinutes": "Augmenter les minutes",
+    "months": ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
+  },
+  "validationSummary": {
+    "error_one": "{{count}} erreur de validation",
+    "error_other": "{{count}} erreurs de validation"
+  },
+  "stateInTimeView": {
+    "loadHistory": "Charger l'historique de réplication",
+    "notAvailable": "Les métadonnées de réplication ne sont pas disponibles pour cet objet.",
+    "attributeCount": "{{filtered}} sur {{total}} attribut(s)",
+    "filterPlaceholder": "Filtrer les attributs...",
+    "attribute": "Attribut",
+    "lastChanged": "Dernière modification",
+    "version": "Version",
+    "originatingDc": "DC d'origine",
+    "snapshotValue": "Valeur de l'instantané",
+    "compareTimeRanges": "Comparer les périodes",
+    "from": "Du...",
+    "to": "Au...",
+    "compare": "Comparer",
+    "noChanges": "Aucune modification d'attribut détectée dans cette période.",
+    "versionBefore": "Version avant",
+    "versionAfter": "Version après",
+    "changedAt": "Modifié le",
+    "linkedAttributeChanges": "Modifications d'attributs liés ({{count}})",
+    "linkedObject": "Objet lié",
+    "changed": "Modifié",
+    "removed": "Supprimé"
+  },
+  "uncPermissionsAudit": {
+    "notAvailable": "Non disponible sur cette plateforme",
+    "notAvailableDescription": "L'audit des permissions de chemin UNC nécessite Windows. Les API NTFS ACL ne sont pas disponibles sur macOS ou Linux.",
+    "uncPath": "Chemin UNC",
+    "uncPlaceholder": "\\\\serveur\\partage\\dossier",
+    "audit": "Auditer",
+    "acesFound": "{{count}} ACE trouvée(s) pour {{path}}",
+    "exportCsv": "Exporter CSV",
+    "bothUsers": "Les deux utilisateurs",
+    "onlyUser": "{{name}} uniquement",
+    "trustee": "Bénéficiaire",
+    "permissions": "Permissions",
+    "accessSummary": "Résumé des accès",
+    "rulesGrantAccess": "{{count}} règle(s) accordant l'accès",
+    "rulesDenyAccess": "{{count}} règle(s) refusant l'accès",
+    "via": "via {{groups}}",
+    "differences": "Différences",
+    "hasAccessVia": "{{userA}} a l'accès {{permissions}} via {{trustee}} - {{userB}} ne l'a pas",
+    "errorsCount": "{{count}} erreur(s) lors de l'audit",
+    "userHasAccess": "{{name}} a accès via {{trustee}}",
+    "userDenied": "{{name}} est refusé via {{trustee}}",
+    "noMatchingGroup": "Aucun groupe correspondant pour {{name}}"
+  },
+  "groupChainTree": {
+    "circularReference": "(référence circulaire)",
+    "noMembers": "Aucun membre"
+  },
+  "healthBadge": {
+    "healthy": "En bonne santé",
+    "issue_one": "{{count}} problème",
+    "issue_other": "{{count}} problèmes",
+    "noIssues": "Aucun problème détecté",
+    "flags": {
+      "Disabled": "Désactivé",
+      "Locked": "Verrouillé",
+      "Expired": "Expiré",
+      "PasswordExpired": "Mot de passe expiré",
+      "PasswordNeverExpires": "Mot de passe n'expire jamais",
+      "Inactive90Days": "Inactif 90+ jours",
+      "Inactive30Days": "Inactif 30+ jours",
+      "NeverLoggedOn": "Jamais connecté",
+      "PasswordNeverChanged": "Mot de passe jamais changé"
+    },
+    "flagDesc": {
+      "Disabled": "Le compte est désactivé",
+      "Locked": "Le compte est verrouillé",
+      "Expired": "Le compte a expiré",
+      "PasswordExpired": "Le mot de passe a expiré",
+      "PasswordNeverExpires": "Le mot de passe est configuré pour ne jamais expirer",
+      "Inactive90Days": "Aucune connexion depuis plus de 90 jours",
+      "Inactive30Days": "Aucune connexion depuis plus de 30 jours",
+      "NeverLoggedOn": "Le compte n'a jamais été utilisé",
+      "PasswordNeverChanged": "Le mot de passe n'a jamais été changé depuis la création du compte"
+    }
+  },
+  "alertBadge": {
+    "ok": "OK",
+    "alert_one": "{{count}} alerte",
+    "alert_other": "{{count}} alertes",
+    "noAlerts": "Aucune alerte détectée",
+    "summary": "{{count}} alerte(s), plus haute : {{level}}"
+  }
+}

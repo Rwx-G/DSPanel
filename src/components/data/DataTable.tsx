@@ -7,6 +7,7 @@ import {
   type ContextMenuItem,
 } from "@/components/common/ContextMenu";
 import { exportTableToCsv } from "@/utils/csvExport";
+import { useTranslation } from "react-i18next";
 
 export interface Column<T> {
   key: keyof T & string;
@@ -48,10 +49,12 @@ export function DataTable<T>({
   onRowClick,
   onRowContextMenu,
   loading = false,
-  emptyMessage = "No data available",
+  emptyMessage,
   rowKey,
   csvFilename,
 }: DataTableProps<T>) {
+  const { t } = useTranslation(["components", "common"]);
+  const resolvedEmptyMessage = emptyMessage ?? t("components:dataTable.noData");
   const [csvMenuPos, setCsvMenuPos] = useState<{
     x: number;
     y: number;
@@ -152,7 +155,7 @@ export function DataTable<T>({
   const csvMenuItems: ContextMenuItem[] = csvFilename
     ? [
         {
-          label: "Export to CSV",
+          label: t("components:dataTable.exportCsv"),
           icon: <Download size={14} />,
           onClick: async () => {
             await exportTableToCsv(columns, sortedData, csvFilename);
@@ -167,7 +170,7 @@ export function DataTable<T>({
         className="flex justify-center py-8"
         data-testid="data-table-loading"
       >
-        <LoadingSpinner message="Loading..." />
+        <LoadingSpinner message={t("common:loading")} />
       </div>
     );
   }
@@ -175,7 +178,7 @@ export function DataTable<T>({
   if (sortedData.length === 0) {
     return (
       <div data-testid="data-table-empty">
-        <EmptyState title={emptyMessage} />
+        <EmptyState title={resolvedEmptyMessage} />
       </div>
     );
   }

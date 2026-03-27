@@ -156,13 +156,13 @@ pub fn cross_reference_aces(
 #[allow(clippy::transmute_ptr_to_ref, clippy::missing_transmute_annotations)]
 pub fn read_acl(path: &str) -> Result<Vec<AceEntry>, String> {
     use std::ptr;
-    use windows::core::PCWSTR;
     use windows::Win32::Foundation::LocalFree;
     use windows::Win32::Security::Authorization::{GetNamedSecurityInfoW, SE_FILE_OBJECT};
     use windows::Win32::Security::{
         ACCESS_ALLOWED_ACE, ACCESS_DENIED_ACE, ACE_HEADER, ACL as WinAcl,
         DACL_SECURITY_INFORMATION, PSECURITY_DESCRIPTOR,
     };
+    use windows::core::PCWSTR;
 
     validate_unc_path(path)?;
 

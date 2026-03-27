@@ -578,7 +578,7 @@ describe("NtfsAnalyzer", () => {
     fireEvent.click(screen.getByTestId("analyze-button"));
 
     await waitFor(() => {
-      expect(screen.getByText("error(s)")).toBeInTheDocument();
+      expect(screen.getByText(/errors/)).toBeInTheDocument();
     });
   });
 
@@ -593,7 +593,7 @@ describe("NtfsAnalyzer", () => {
     fireEvent.click(screen.getByTestId("analyze-button"));
 
     await waitFor(() => {
-      expect(screen.getByText("conflict(s)")).toBeInTheDocument();
+      expect(screen.getByText(/conflict/)).toBeInTheDocument();
     });
   });
 

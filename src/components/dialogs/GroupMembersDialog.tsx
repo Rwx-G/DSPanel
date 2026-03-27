@@ -6,6 +6,7 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { type DirectoryEntry } from "@/types/directory";
 import { parseCnFromDn } from "@/utils/dn";
 import { X, Users } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 interface GroupMembersDialogProps {
   groupDn: string;
@@ -18,6 +19,7 @@ export function GroupMembersDialog({
   groupName,
   onClose,
 }: GroupMembersDialogProps) {
+  const { t } = useTranslation(["dialogs", "common"]);
   const [members, setMembers] = useState<DirectoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -71,14 +73,14 @@ export function GroupMembersDialog({
             </h2>
             {!loading && !error && (
               <span className="text-caption text-[var(--color-text-secondary)]">
-                ({members.length} member{members.length !== 1 ? "s" : ""})
+                ({t("dialogs:groupMembers.memberCount", { count: members.length })})
               </span>
             )}
           </div>
           <button
             className="btn btn-sm btn-secondary"
             onClick={onClose}
-            aria-label="Close"
+            aria-label={t("dialogs:groupMembers.close")}
             data-testid="group-members-close"
           >
             <X size={14} />
@@ -90,21 +92,21 @@ export function GroupMembersDialog({
             className="flex justify-center py-8"
             data-testid="group-members-loading"
           >
-            <LoadingSpinner message="Loading members..." />
+            <LoadingSpinner message={t("dialogs:groupMembers.loadingMembers")} />
           </div>
         )}
 
         {error && (
           <div data-testid="group-members-error">
-            <EmptyState title="Failed to load members" description={error} />
+            <EmptyState title={t("dialogs:groupMembers.failedToLoad")} description={error} />
           </div>
         )}
 
         {!loading && !error && members.length === 0 && (
           <div data-testid="group-members-empty">
             <EmptyState
-              title="No members"
-              description="This group has no members."
+              title={t("dialogs:groupMembers.noMembers")}
+              description={t("dialogs:groupMembers.noMembersDescription")}
             />
           </div>
         )}
@@ -118,10 +120,10 @@ export function GroupMembersDialog({
               <thead>
                 <tr className="bg-[var(--color-surface-card)] text-left">
                   <th className="border-b border-[var(--color-border-default)] px-3 py-2 font-medium text-[var(--color-text-secondary)]">
-                    Display Name
+                    {t("common:displayName")}
                   </th>
                   <th className="border-b border-[var(--color-border-default)] px-3 py-2 font-medium text-[var(--color-text-secondary)]">
-                    Account Name
+                    {t("dialogs:groupMembers.accountName")}
                   </th>
                 </tr>
               </thead>

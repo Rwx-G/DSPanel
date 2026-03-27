@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo } from "react";
 import { TreeView, type TreeNode } from "@/components/data/TreeView";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { EmptyState } from "@/components/common/EmptyState";
+import { useTranslation } from "react-i18next";
 
 export interface OUNode {
   distinguishedName: string;
@@ -38,6 +39,7 @@ export function OUPicker({
   error = false,
   disabled = false,
 }: OUPickerProps) {
+  const { t } = useTranslation(["components"]);
   const [_expandedIds] = useState<Set<string>>(new Set());
 
   const treeNodes = useMemo(() => ouNodesToTreeNodes(nodes), [nodes]);
@@ -59,7 +61,7 @@ export function OUPicker({
   if (loading) {
     return (
       <div className="flex justify-center py-4" data-testid="ou-picker-loading">
-        <LoadingSpinner message="Loading OUs..." />
+        <LoadingSpinner message={t("components:ouPicker.loading")} />
       </div>
     );
   }
@@ -68,8 +70,8 @@ export function OUPicker({
     return (
       <div data-testid="ou-picker-error">
         <EmptyState
-          title="Failed to load OUs"
-          description="Check your AD connection and try again."
+          title={t("components:ouPicker.loadFailed")}
+          description={t("components:ouPicker.loadFailedHint")}
         />
       </div>
     );
@@ -78,7 +80,7 @@ export function OUPicker({
   if (nodes.length === 0) {
     return (
       <div data-testid="ou-picker-empty">
-        <EmptyState title="No OUs available" />
+        <EmptyState title={t("components:ouPicker.noOus")} />
       </div>
     );
   }
@@ -94,7 +96,7 @@ export function OUPicker({
           data-testid="ou-picker-selected"
           title={selectedOU}
         >
-          Selected: {selectedOU}
+          {t("components:ouPicker.selected", { ou: selectedOU })}
         </div>
       )}
       <div className="max-h-64 overflow-auto">

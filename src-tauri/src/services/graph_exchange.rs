@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use serde::Deserialize;
 use std::sync::RwLock;
 
-use crate::models::exchange_online::{compute_usage_percentage, ExchangeOnlineInfo};
+use crate::models::exchange_online::{ExchangeOnlineInfo, compute_usage_percentage};
 
 /// Configuration for Microsoft Graph API integration.
 #[derive(Debug, Clone, Default)]
@@ -169,10 +169,10 @@ impl GraphExchangeService {
         // Check cache first
         {
             let cache = self.token_cache.read().expect("lock poisoned");
-            if let Some(ref cached) = *cache {
-                if cached.expires_at > std::time::Instant::now() {
-                    return Ok(cached.access_token.clone());
-                }
+            if let Some(ref cached) = *cache
+                && cached.expires_at > std::time::Instant::now()
+            {
+                return Ok(cached.access_token.clone());
             }
         }
 

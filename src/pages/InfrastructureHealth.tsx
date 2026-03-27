@@ -16,6 +16,7 @@ import {
   CheckCircle,
   AlertTriangle,
   HelpCircle,
+  MapPin,
 } from "lucide-react";
 import { ExportToolbar } from "@/components/common/ExportToolbar";
 import {
@@ -24,13 +25,7 @@ import {
   type DcHealthLevel,
 } from "@/types/dc-health";
 import { extractErrorMessage } from "@/utils/errorMapping";
-
-const REFRESH_INTERVALS = [
-  { label: "1 min", value: 60 },
-  { label: "5 min", value: 300 },
-  { label: "15 min", value: 900 },
-  { label: "Off", value: 0 },
-];
+import { useTranslation } from "react-i18next";
 
 function statusColor(level: DcHealthLevel): string {
   switch (level) {
@@ -96,6 +91,7 @@ function DcHealthCard({
   isExpanded: boolean;
   onToggle: () => void;
 }) {
+  const { t } = useTranslation(["infrastructureHealth", "common"]);
   const borderColor = statusColor(result.overallStatus);
 
   return (
@@ -131,7 +127,7 @@ function DcHealthCard({
             ))}
           </div>
           <span className="text-caption text-[var(--color-text-secondary)]">
-            Site: {result.dc.siteName}
+            {t("site")}: {result.dc.siteName}
             {result.dc.functionalLevel && (
               <> - {result.dc.functionalLevel}</>
             )}
@@ -145,7 +141,7 @@ function DcHealthCard({
               key={check.name}
               className="flex h-5 w-5 items-center justify-center rounded-full"
               style={{ color: statusColor(check.status) }}
-              title={`${check.name}: ${check.message}`}
+              title={`${t(`checkNames.${check.name}`, { defaultValue: check.name })}: ${check.message}`}
             >
               {checkIcon(check.name, 12)}
             </span>
@@ -174,10 +170,10 @@ function DcHealthCard({
             </colgroup>
             <thead>
               <tr className="text-left text-[var(--color-text-secondary)]">
-                <th className="pb-2 font-medium">Check</th>
-                <th className="pb-2 font-medium">Status</th>
-                <th className="pb-2 font-medium">Details</th>
-                <th className="pb-2 font-medium">Value</th>
+                <th className="pb-2 font-medium">{t("check")}</th>
+                <th className="pb-2 font-medium">{t("common:status")}</th>
+                <th className="pb-2 font-medium">{t("common:details")}</th>
+                <th className="pb-2 font-medium">{t("common:value")}</th>
               </tr>
             </thead>
             <tbody>
@@ -187,7 +183,7 @@ function DcHealthCard({
             </tbody>
           </table>
           <div className="mt-2 text-[10px] text-[var(--color-text-secondary)]">
-            Last checked: {new Date(result.checkedAt).toLocaleTimeString()}
+            {t("lastChecked")}: {new Date(result.checkedAt).toLocaleTimeString()}
           </div>
         </div>
       )}
@@ -195,13 +191,54 @@ function DcHealthCard({
   );
 }
 
+/** Translate a DC health check message using pattern matching on the English text. */
+function useTranslateCheckMessage() {
+  const { t } = useTranslation("infrastructureHealth");
+  return (msg: string): string => {
+    const patterns: [RegExp, string, (m: RegExpMatchArray) => Record<string, string>][] = [
+      [/^Resolved via AD DNS to (.+)$/, "checkMsg.dnsResolved", (m) => ({ ip: m[1] })],
+      [/^No SRV records/, "checkMsg.dnsNoRecords", () => ({})],
+      [/^DNS resolution failed/, "checkMsg.dnsFailed", () => ({})],
+      [/^LDAP response: (\d+)ms$/, "checkMsg.ldapResponse", (m) => ({ ms: m[1] })],
+      [/^LDAP response slow: (\d+)ms$/, "checkMsg.ldapSlow", (m) => ({ ms: m[1] })],
+      [/^LDAP response very slow: (\d+)ms$/, "checkMsg.ldapVerySlow", (m) => ({ ms: m[1] })],
+      [/^LDAP connection failed/, "checkMsg.ldapFailed", () => ({})],
+      [/^All services registered: (.+)$/, "checkMsg.servicesAll", (m) => ({ list: m[1] })],
+      [/^Missing services: (.+)$/, "checkMsg.servicesMissing", (m) => ({ list: m[1] })],
+      [/^Service check failed/, "checkMsg.servicesFailed", () => ({})],
+      [/^(\d+) inbound replication link/, "checkMsg.replLinks", (m) => ({ count: m[1] })],
+      [/^No inbound replication/, "checkMsg.replNone", () => ({})],
+      [/^Replication check failed/, "checkMsg.replFailed", () => ({})],
+      [/^DFSR enabled, SMB reachable \((.+)\)$/, "checkMsg.sysvolOk", (m) => ({ state: m[1] })],
+      [/^DFSR enabled but SMB port 445 unreachable \((.+)\)$/, "checkMsg.sysvolSmbFail", (m) => ({ state: m[1] })],
+      [/^SYSVOL check failed/, "checkMsg.sysvolFailed", () => ({})],
+      [/^(\d+)s skew - exceeds/, "checkMsg.clockCritical", (m) => ({ seconds: m[1] })],
+      [/^(\d+)s skew \(Kerberos/, "checkMsg.clockWarn", (m) => ({ seconds: m[1] })],
+      [/^(\d+)s skew$/, "checkMsg.clockOk", (m) => ({ seconds: m[1] })],
+      [/^Clock skew check failed/, "checkMsg.clockFailed", () => ({})],
+      [/^Machine account OK \((.+)\)$/, "checkMsg.accountOk", (m) => ({ info: m[1] })],
+      [/^Machine account: (.+)$/, "checkMsg.accountWarn", (m) => ({ issues: m[1] })],
+      [/^Machine account check failed/, "checkMsg.accountFailed", () => ({})],
+    ];
+    for (const [re, key, extract] of patterns) {
+      const m = msg.match(re);
+      if (m) return t(key, extract(m));
+    }
+    return msg; // fallback: return original
+  };
+}
+
 function CheckRow({ check }: { check: DcHealthCheck }) {
+  const { t } = useTranslation("infrastructureHealth");
+  const translateMsg = useTranslateCheckMessage();
+  const translatedName = t(`checkNames.${check.name}`, { defaultValue: check.name });
+  const translatedMsg = translateMsg(check.message);
   return (
     <tr className="border-t border-[var(--color-border-subtle)]">
       <td className="py-2 pr-4">
         <div className="flex items-center gap-2 text-[var(--color-text-primary)]">
           {checkIcon(check.name)}
-          {check.name}
+          {translatedName}
         </div>
       </td>
       <td className="py-2 pr-4 text-center">
@@ -209,8 +246,8 @@ function CheckRow({ check }: { check: DcHealthCheck }) {
           <StatusIcon level={check.status} size={14} />
         </span>
       </td>
-      <td className="truncate py-2 pr-4 text-[var(--color-text-secondary)]" title={check.message}>
-        {check.message}
+      <td className="truncate py-2 pr-4 text-[var(--color-text-secondary)]" title={translatedMsg}>
+        {translatedMsg}
       </td>
       <td className="truncate py-2 font-mono text-[var(--color-text-secondary)]" title={check.value ?? "-"}>
         {check.value ?? "-"}
@@ -220,6 +257,15 @@ function CheckRow({ check }: { check: DcHealthCheck }) {
 }
 
 export function InfrastructureHealth() {
+  const { t } = useTranslation(["infrastructureHealth", "common"]);
+
+  const REFRESH_INTERVALS = [
+    { label: t("autoRefresh1m"), value: 60 },
+    { label: t("autoRefresh5m"), value: 300 },
+    { label: t("autoRefresh15m"), value: 900 },
+    { label: t("autoRefreshOff"), value: 0 },
+  ];
+
   const [results, setResults] = useState<DcHealthResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -287,7 +333,7 @@ export function InfrastructureHealth() {
       {/* Toolbar */}
       <div className="flex items-center justify-between border-b border-[var(--color-border-default)] px-4 py-2">
         <h2 className="text-body font-semibold text-[var(--color-text-primary)]">
-          Infrastructure Health
+          {t("pageTitle")}
         </h2>
         <div className="flex items-center gap-3">
           {/* Summary badges */}
@@ -325,12 +371,12 @@ export function InfrastructureHealth() {
 
           <ExportToolbar<{ dc: string; site: string; status: string; check: string; checkStatus: string; message: string }>
             columns={[
-              { key: "dc", header: "DC" },
-              { key: "site", header: "Site" },
-              { key: "status", header: "Overall" },
-              { key: "check", header: "Check" },
-              { key: "checkStatus", header: "Check Status" },
-              { key: "message", header: "Message" },
+              { key: "dc", header: t("exportDc") },
+              { key: "site", header: t("site") },
+              { key: "status", header: t("exportOverall") },
+              { key: "check", header: t("check") },
+              { key: "checkStatus", header: t("exportCheckStatus") },
+              { key: "message", header: t("exportMessage") },
             ]}
             data={(() => {
               let lastDc = "";
@@ -350,7 +396,7 @@ export function InfrastructureHealth() {
               );
             })()}
             rowMapper={(r) => [r.dc, r.site, r.status, r.check, r.checkStatus, r.message]}
-            title="Infrastructure Health Report"
+            title={t("exportTitle")}
             filenameBase="dc-health"
           />
 
@@ -365,7 +411,7 @@ export function InfrastructureHealth() {
             data-testid="refresh-button"
           >
             <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-            Refresh
+            {t("common:refresh")}
           </button>
         </div>
       </div>
@@ -373,28 +419,49 @@ export function InfrastructureHealth() {
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4">
         {loading && results.length === 0 ? (
-          <LoadingSpinner message="Checking domain controllers..." />
+          <LoadingSpinner message={t("checkingDcs")} />
         ) : error ? (
           <EmptyState
             icon={<AlertCircle size={40} />}
-            title="Health Check Failed"
+            title={t("healthCheckFailed")}
             description={error}
           />
         ) : results.length === 0 ? (
           <EmptyState
             icon={<Server size={40} />}
-            title="No Domain Controllers Found"
-            description="No domain controllers were discovered in the AD configuration."
+            title={t("noDcsFound")}
+            description={t("noDcsDescription")}
           />
         ) : (
-          <div className="flex flex-col gap-4">
-            {results.map((result) => (
-              <DcHealthCard
-                key={result.dc.hostname}
-                result={result}
-                isExpanded={!collapsedDcs.has(result.dc.hostname)}
-                onToggle={() => handleToggleDc(result.dc.hostname)}
-              />
+          <div className="flex flex-col gap-6">
+            {Object.entries(
+              results.reduce<Record<string, DcHealthResult[]>>((groups, result) => {
+                const site = result.dc.siteName || "Unknown Site";
+                (groups[site] ??= []).push(result);
+                return groups;
+              }, {}),
+            ).map(([site, dcs]) => (
+              <div key={site}>
+                <div className="mb-2 flex items-center gap-2">
+                  <MapPin size={14} className="text-[var(--color-primary)]" />
+                  <h3 className="text-body font-semibold text-[var(--color-text-primary)]">
+                    {site}
+                  </h3>
+                  <span className="text-caption text-[var(--color-text-secondary)]">
+                    ({dcs.length} DC{dcs.length > 1 ? "s" : ""})
+                  </span>
+                </div>
+                <div className="flex flex-col gap-4">
+                  {dcs.map((result) => (
+                    <DcHealthCard
+                      key={result.dc.hostname}
+                      result={result}
+                      isExpanded={!collapsedDcs.has(result.dc.hostname)}
+                      onToggle={() => handleToggleDc(result.dc.hostname)}
+                    />
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
         )}

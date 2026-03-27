@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+
 export interface StatusBarProps {
   domainName: string | null;
   domainController: string | null;
@@ -13,6 +15,8 @@ export function StatusBar({
   isConnected,
   appVersion,
 }: StatusBarProps) {
+  const { t } = useTranslation(["layout", "common"]);
+
   return (
     <footer
       className="flex h-7 items-center justify-between border-t border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 text-caption text-[var(--color-text-secondary)]"
@@ -30,7 +34,7 @@ export function StatusBar({
             />
           </span>
           <span data-testid="status-connection">
-            {isConnected ? "Connected" : "Disconnected"}
+            {isConnected ? t("common:connected") : t("common:disconnected")}
           </span>
         </span>
 

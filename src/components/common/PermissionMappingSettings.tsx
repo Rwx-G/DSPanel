@@ -5,6 +5,7 @@ import { type PermissionLevel, PERMISSION_LEVELS } from "@/types/permissions";
 import { usePermissions } from "@/hooks/usePermissions";
 import type { DirectoryEntry } from "@/types/directory";
 import { LoadingSpinner } from "./LoadingSpinner";
+import { useTranslation } from "react-i18next";
 
 /** Maps each PermissionLevel to a list of AD group DNs. */
 interface PermissionMappings {
@@ -36,6 +37,7 @@ function extractCn(dn: string): string {
 }
 
 export function PermissionMappingSettings() {
+  const { t } = useTranslation(["components", "common"]);
   const { hasPermission } = usePermissions();
   const [mappings, setMappings] = useState<PermissionMappings>({ mappings: {} });
   const [loading, setLoading] = useState(true);
@@ -155,7 +157,7 @@ export function PermissionMappingSettings() {
         data-testid="permission-mapping-access-denied"
       >
         <AlertTriangle size={24} />
-        <p className="text-body">DomainAdmin access required to manage permission mappings.</p>
+        <p className="text-body">{t("components:permissionMapping.domainAdminRequired")}</p>
       </div>
     );
   }
@@ -167,9 +169,7 @@ export function PermissionMappingSettings() {
   return (
     <div className="space-y-4" data-testid="permission-mapping-settings">
       <p className="text-caption text-[var(--color-text-secondary)]">
-        Map AD security groups to DSPanel permission levels. When a user belongs to multiple mapped
-        groups, the highest level wins. Default detection (RID-based + DSPanel-* groups) remains
-        active alongside custom mappings.
+        {t("components:permissionMapping.description")}
       </p>
 
       {error && (
@@ -186,7 +186,7 @@ export function PermissionMappingSettings() {
           className="rounded-md border border-[var(--color-success)] bg-[var(--color-success-bg)] px-3 py-2 text-caption text-[var(--color-success)]"
           data-testid="permission-mapping-success"
         >
-          Permission mappings saved successfully.
+          {t("components:permissionMapping.savedSuccessfully")}
         </div>
       )}
 
@@ -217,7 +217,7 @@ export function PermissionMappingSettings() {
                   className="btn btn-sm rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2 py-1 text-caption text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors"
                   data-testid={`add-group-${level}`}
                 >
-                  <Plus size={14} className="inline" /> Add Group
+                  <Plus size={14} className="inline" /> {t("components:permissionMapping.addGroup")}
                 </button>
               </div>
 
@@ -235,7 +235,7 @@ export function PermissionMappingSettings() {
                       onKeyDown={(e) => {
                         if (e.key === "Enter") handleSearch();
                       }}
-                      placeholder="Search AD groups by name..."
+                      placeholder={t("components:permissionMapping.searchGroupsPlaceholder")}
                       className="flex-1 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2 py-1 text-caption text-[var(--color-text-primary)] placeholder-[var(--color-text-secondary)] focus:border-[var(--color-primary)] focus:outline-none"
                       data-testid={`group-search-input-${level}`}
                       autoFocus
@@ -272,7 +272,7 @@ export function PermissionMappingSettings() {
                             </span>
                             {alreadyMapped && (
                               <span className="ml-1 text-[var(--color-text-secondary)]">
-                                (already mapped)
+                                {t("components:permissionMapping.alreadyMapped")}
                               </span>
                             )}
                           </button>
@@ -286,7 +286,7 @@ export function PermissionMappingSettings() {
               {/* Mapped groups list */}
               {groups.length === 0 ? (
                 <p className="text-caption text-[var(--color-text-secondary)] italic">
-                  No custom groups mapped. Default detection applies.
+                  {t("components:permissionMapping.noCustomGroups")}
                 </p>
               ) : (
                 <div className="space-y-1">
@@ -297,7 +297,7 @@ export function PermissionMappingSettings() {
                     >
                       <div className="flex items-center gap-2 min-w-0">
                         {validationWarnings[groupDn] === false && (
-                          <span title="Group not found in AD">
+                          <span title={t("components:permissionMapping.groupNotFoundInAd")}>
                             <AlertTriangle
                               size={14}
                               className="shrink-0 text-[var(--color-warning)]"
@@ -316,7 +316,7 @@ export function PermissionMappingSettings() {
                           <button
                             onClick={() => validateGroup(groupDn)}
                             className="text-caption text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
-                            title="Validate group exists in AD"
+                            title={t("components:permissionMapping.validateGroupExists")}
                             data-testid={`validate-group-btn`}
                           >
                             <Search size={12} />
@@ -325,7 +325,7 @@ export function PermissionMappingSettings() {
                         <button
                           onClick={() => removeGroup(level, groupDn)}
                           className="text-[var(--color-text-secondary)] hover:text-[var(--color-error)] transition-colors"
-                          title="Remove group"
+                          title={t("components:permissionMapping.removeGroup")}
                           data-testid={`remove-group-btn`}
                         >
                           <X size={14} />
@@ -347,10 +347,10 @@ export function PermissionMappingSettings() {
           className="btn btn-sm btn-primary"
           data-testid="permission-mapping-save"
         >
-          {saving ? "Saving..." : "Save Mappings"}
+          {saving ? t("common:saving") : t("components:permissionMapping.saveMappings")}
         </button>
         {dirty && (
-          <span className="text-caption text-[var(--color-warning)]">Unsaved changes</span>
+          <span className="text-caption text-[var(--color-warning)]">{t("common:unsavedChanges")}</span>
         )}
       </div>
     </div>

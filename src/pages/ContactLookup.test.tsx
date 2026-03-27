@@ -25,25 +25,32 @@ vi.mock("@tanstack/react-virtual", () => ({
   }),
 }));
 
+const mockHandleError = vi.fn();
 vi.mock("@/hooks/useErrorHandler", () => ({
   useErrorHandler: () => ({
-    handleError: vi.fn(),
+    handleError: mockHandleError,
   }),
 }));
 
+const mockShowConfirmation = vi.fn().mockResolvedValue(false);
 vi.mock("@/contexts/DialogContext", () => ({
   useDialog: () => ({
-    showConfirmation: vi.fn(),
+    showConfirmation: mockShowConfirmation,
   }),
 }));
 
+const mockPendingChanges: { attributeName: string; oldValue: string; newValue: string }[] = [];
+const mockStageChange = vi.fn();
+const mockClearChanges = vi.fn();
+const mockSubmitChanges = vi.fn().mockResolvedValue(true);
+const mockSaving = { value: false };
 vi.mock("@/hooks/useModifyAttribute", () => ({
   useModifyAttribute: () => ({
-    pendingChanges: [],
-    saving: false,
-    stageChange: vi.fn(),
-    clearChanges: vi.fn(),
-    submitChanges: vi.fn(),
+    pendingChanges: mockPendingChanges,
+    saving: mockSaving.value,
+    stageChange: mockStageChange,
+    clearChanges: mockClearChanges,
+    submitChanges: mockSubmitChanges,
   }),
 }));
 
@@ -98,6 +105,9 @@ describe("ContactLookup", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockHasPermission.mockReturnValue(false);
+    mockShowConfirmation.mockResolvedValue(false);
+    mockPendingChanges.length = 0;
+    mockSaving.value = false;
   });
 
   it("renders with search bar in initial state", async () => {
@@ -113,8 +123,8 @@ describe("ContactLookup", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText("No contacts available."),
-      ).toBeInTheDocument();
+        screen.getByTestId("empty-state-title"),
+      ).toHaveTextContent("No contacts found");
     });
   });
 
@@ -319,5 +329,390 @@ describe("ContactLookup", () => {
       const status = screen.getByTestId("contact-lookup-status");
       expect(status).toHaveTextContent("2 contacts found");
     });
+  });
+
+  it("shows 1 contact (singular) in status", async () => {
+    const entries = [makeContactEntry("John Doe")];
+
+    mockInvoke.mockImplementation((cmd: string) => {
+      if (cmd === "browse_contacts")
+        return Promise.resolve(makeBrowseResult(entries));
+      return Promise.resolve(null);
+    });
+
+    render(<ContactLookup />, { wrapper: Wrapper });
+
+    await waitFor(() => {
+      const status = screen.getByTestId("contact-lookup-status");
+      expect(status).toHaveTextContent("1 contact found");
+    });
+  });
+
+  it("deletes a contact after confirmation", async () => {
+    mockHasPermission.mockReturnValue(true);
+    mockShowConfirmation.mockResolvedValue(true);
+    const entries = [makeContactEntry("John Doe")];
+
+    mockInvoke.mockImplementation((cmd: string) => {
+      if (cmd === "browse_contacts")
+        return Promise.resolve(makeBrowseResult(entries));
+      if (cmd === "delete_contact") return Promise.resolve(undefined);
+      return Promise.resolve(null);
+    });
+
+    render(<ContactLookup />, { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("contact-results-list")).toBeInTheDocument();
+    });
+
+    fireEvent.click(
+      screen.getByTestId("contact-result-CN=John Doe,OU=Contacts,DC=example,DC=com"),
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("contact-delete-btn")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId("contact-delete-btn"));
+
+    await waitFor(() => {
+      expect(mockShowConfirmation).toHaveBeenCalledWith(
+        "Delete Contact",
+        expect.stringContaining("John Doe"),
+        "This action cannot be undone.",
+      );
+    });
+
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith("delete_contact", {
+        dn: "CN=John Doe,OU=Contacts,DC=example,DC=com",
+      });
+    });
+  });
+
+  it("does not delete contact when confirmation is cancelled", async () => {
+    mockHasPermission.mockReturnValue(true);
+    mockShowConfirmation.mockResolvedValue(false);
+    const entries = [makeContactEntry("John Doe")];
+
+    mockInvoke.mockImplementation((cmd: string) => {
+      if (cmd === "browse_contacts")
+        return Promise.resolve(makeBrowseResult(entries));
+      return Promise.resolve(null);
+    });
+
+    render(<ContactLookup />, { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("contact-results-list")).toBeInTheDocument();
+    });
+
+    fireEvent.click(
+      screen.getByTestId("contact-result-CN=John Doe,OU=Contacts,DC=example,DC=com"),
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("contact-delete-btn")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId("contact-delete-btn"));
+
+    await waitFor(() => {
+      expect(mockShowConfirmation).toHaveBeenCalled();
+    });
+
+    expect(mockInvoke).not.toHaveBeenCalledWith(
+      "delete_contact",
+      expect.anything(),
+    );
+  });
+
+  it("handles delete error gracefully", async () => {
+    mockHasPermission.mockReturnValue(true);
+    mockShowConfirmation.mockResolvedValue(true);
+    const entries = [makeContactEntry("John Doe")];
+
+    mockInvoke.mockImplementation((cmd: string) => {
+      if (cmd === "browse_contacts")
+        return Promise.resolve(makeBrowseResult(entries));
+      if (cmd === "delete_contact")
+        return Promise.reject(new Error("Access denied"));
+      return Promise.resolve(null);
+    });
+
+    render(<ContactLookup />, { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("contact-results-list")).toBeInTheDocument();
+    });
+
+    fireEvent.click(
+      screen.getByTestId("contact-result-CN=John Doe,OU=Contacts,DC=example,DC=com"),
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("contact-delete-btn")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId("contact-delete-btn"));
+
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith("delete_contact", expect.anything());
+    });
+
+    // Error was handled, not thrown
+    await waitFor(() => {
+      expect(mockHandleError).toHaveBeenCalled();
+    });
+  });
+
+  it("shows pending changes bar when changes exist", async () => {
+    mockHasPermission.mockReturnValue(true);
+    mockPendingChanges.push({
+      attributeName: "mail",
+      oldValue: "old@test.com",
+      newValue: "new@test.com",
+    });
+    const entries = [makeContactEntry("John Doe")];
+
+    mockInvoke.mockImplementation((cmd: string) => {
+      if (cmd === "browse_contacts")
+        return Promise.resolve(makeBrowseResult(entries));
+      return Promise.resolve(null);
+    });
+
+    render(<ContactLookup />, { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("contact-results-list")).toBeInTheDocument();
+    });
+
+    fireEvent.click(
+      screen.getByTestId("contact-result-CN=John Doe,OU=Contacts,DC=example,DC=com"),
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("pending-changes-bar")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText(/1 change/)).toBeInTheDocument();
+    expect(screen.getByText("mail")).toBeInTheDocument();
+  });
+
+  it("discard button clears pending changes", async () => {
+    mockHasPermission.mockReturnValue(true);
+    mockPendingChanges.push({
+      attributeName: "mail",
+      oldValue: "old@test.com",
+      newValue: "new@test.com",
+    });
+    const entries = [makeContactEntry("John Doe")];
+
+    mockInvoke.mockImplementation((cmd: string) => {
+      if (cmd === "browse_contacts")
+        return Promise.resolve(makeBrowseResult(entries));
+      return Promise.resolve(null);
+    });
+
+    render(<ContactLookup />, { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("contact-results-list")).toBeInTheDocument();
+    });
+
+    fireEvent.click(
+      screen.getByTestId("contact-result-CN=John Doe,OU=Contacts,DC=example,DC=com"),
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("discard-changes-btn")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId("discard-changes-btn"));
+    expect(mockClearChanges).toHaveBeenCalled();
+  });
+
+  it("save button submits changes after confirmation", async () => {
+    mockHasPermission.mockReturnValue(true);
+    mockShowConfirmation.mockResolvedValue(true);
+    mockPendingChanges.push({
+      attributeName: "mail",
+      oldValue: "old@test.com",
+      newValue: "new@test.com",
+    });
+    const entries = [makeContactEntry("John Doe")];
+
+    mockInvoke.mockImplementation((cmd: string) => {
+      if (cmd === "browse_contacts")
+        return Promise.resolve(makeBrowseResult(entries));
+      return Promise.resolve(null);
+    });
+
+    render(<ContactLookup />, { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("contact-results-list")).toBeInTheDocument();
+    });
+
+    fireEvent.click(
+      screen.getByTestId("contact-result-CN=John Doe,OU=Contacts,DC=example,DC=com"),
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("save-changes-btn")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId("save-changes-btn"));
+
+    await waitFor(() => {
+      expect(mockShowConfirmation).toHaveBeenCalledWith(
+        "Save",
+        "Pending changes",
+        expect.stringContaining("mail"),
+      );
+    });
+
+    await waitFor(() => {
+      expect(mockSubmitChanges).toHaveBeenCalledWith(
+        "CN=John Doe,OU=Contacts,DC=example,DC=com",
+      );
+    });
+  });
+
+  it("does not save when confirmation is cancelled", async () => {
+    mockHasPermission.mockReturnValue(true);
+    mockShowConfirmation.mockResolvedValue(false);
+    mockPendingChanges.push({
+      attributeName: "mail",
+      oldValue: "old@test.com",
+      newValue: "new@test.com",
+    });
+    const entries = [makeContactEntry("John Doe")];
+
+    mockInvoke.mockImplementation((cmd: string) => {
+      if (cmd === "browse_contacts")
+        return Promise.resolve(makeBrowseResult(entries));
+      return Promise.resolve(null);
+    });
+
+    render(<ContactLookup />, { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("contact-results-list")).toBeInTheDocument();
+    });
+
+    fireEvent.click(
+      screen.getByTestId("contact-result-CN=John Doe,OU=Contacts,DC=example,DC=com"),
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("save-changes-btn")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId("save-changes-btn"));
+
+    await waitFor(() => {
+      expect(mockShowConfirmation).toHaveBeenCalled();
+    });
+
+    expect(mockSubmitChanges).not.toHaveBeenCalled();
+  });
+
+  it("opens context menu with Move option for AccountOperator", async () => {
+    mockHasPermission.mockReturnValue(true);
+    const entries = [makeContactEntry("John Doe")];
+
+    mockInvoke.mockImplementation((cmd: string) => {
+      if (cmd === "browse_contacts")
+        return Promise.resolve(makeBrowseResult(entries));
+      return Promise.resolve(null);
+    });
+
+    render(<ContactLookup />, { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("contact-results-list")).toBeInTheDocument();
+    });
+
+    const contactItem = screen.getByTestId(
+      "contact-result-CN=John Doe,OU=Contacts,DC=example,DC=com",
+    );
+    fireEvent.contextMenu(contactItem);
+
+    await waitFor(() => {
+      expect(screen.getByText("Move to OU")).toBeInTheDocument();
+    });
+  });
+
+  it("does not show context menu for ReadOnly users", async () => {
+    mockHasPermission.mockReturnValue(false);
+    const entries = [makeContactEntry("John Doe")];
+
+    mockInvoke.mockImplementation((cmd: string) => {
+      if (cmd === "browse_contacts")
+        return Promise.resolve(makeBrowseResult(entries));
+      return Promise.resolve(null);
+    });
+
+    render(<ContactLookup />, { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("contact-results-list")).toBeInTheDocument();
+    });
+
+    const contactItem = screen.getByTestId(
+      "contact-result-CN=John Doe,OU=Contacts,DC=example,DC=com",
+    );
+    fireEvent.contextMenu(contactItem);
+
+    expect(screen.queryByText("Move to OU")).not.toBeInTheDocument();
+  });
+
+  it("shows contact email in list item subtitle", async () => {
+    const entries = [makeContactEntry("John Doe")];
+
+    mockInvoke.mockImplementation((cmd: string) => {
+      if (cmd === "browse_contacts")
+        return Promise.resolve(makeBrowseResult(entries));
+      return Promise.resolve(null);
+    });
+
+    render(<ContactLookup />, { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("contact-results-list")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("john.doe@example.com")).toBeInTheDocument();
+  });
+
+  it("shows property groups with correct categories when contact selected", async () => {
+    mockHasPermission.mockReturnValue(false);
+    const entries = [makeContactEntry("John Doe")];
+
+    mockInvoke.mockImplementation((cmd: string) => {
+      if (cmd === "browse_contacts")
+        return Promise.resolve(makeBrowseResult(entries));
+      return Promise.resolve(null);
+    });
+
+    render(<ContactLookup />, { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("contact-results-list")).toBeInTheDocument();
+    });
+
+    fireEvent.click(
+      screen.getByTestId("contact-result-CN=John Doe,OU=Contacts,DC=example,DC=com"),
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("contact-detail")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("Identity")).toBeInTheDocument();
+    expect(screen.getByText("Contact Info")).toBeInTheDocument();
+    expect(screen.getByText("Organization")).toBeInTheDocument();
   });
 });

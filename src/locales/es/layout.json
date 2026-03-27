@@ -1,0 +1,18 @@
+{
+  "skipToMain": "Ir al contenido principal",
+  "mainContent": "Contenido principal",
+  "breadcrumb": "Ruta de navegación",
+  "scrollTabsLeft": "Desplazar pestañas a la izquierda",
+  "scrollTabsRight": "Desplazar pestañas a la derecha",
+  "closeTab": "Cerrar {{title}}",
+  "closeOthers": "Cerrar otras",
+  "closeAll": "Cerrar todas",
+  "tabOptions": "Opciones de pestaña",
+  "loginServer": "Servidor",
+  "loginAccount": "Cuenta",
+  "loginSubtitle": "Ingrese sus credenciales AD para conectarse",
+  "loginPassword": "Contraseña",
+  "loginPasswordPlaceholder": "Ingrese la contraseña...",
+  "loginConnect": "Conectar",
+  "loginConnecting": "Conectando..."
+}

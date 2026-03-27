@@ -31,7 +31,7 @@ export function useMfaGate() {
 
         return result === true;
       } catch {
-        return true;
+        return false;
       }
     },
     [showCustomDialog],

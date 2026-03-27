@@ -20,6 +20,7 @@ import {
   type ReplicationPartnership,
   type ReplicationPartnershipStatus,
 } from "@/types/replication-status";
+import { useTranslation } from "react-i18next";
 
 const REFRESH_INTERVALS = [
   { label: "60s", value: 60 },
@@ -105,6 +106,7 @@ function latencyColor(lastSyncTime: string | null): string {
 }
 
 export function ReplicationStatus() {
+  const { t } = useTranslation(["replicationStatus", "common"]);
   const [partnerships, setPartnerships] = useState<ReplicationPartnership[]>(
     [],
   );
@@ -157,8 +159,8 @@ export function ReplicationStatus() {
 
   const handleForceReplication = async (p: ReplicationPartnership) => {
     const confirmed = await showConfirmation(
-      "Force Replication",
-      `Force replication from ${p.sourceDc} to ${p.targetDc} for ${p.namingContext}?`,
+      t("forceReplication"),
+      t("forceReplicationDesc", { source: p.sourceDc, target: p.targetDc, context: p.namingContext }),
     );
     if (!confirmed) return;
 
@@ -195,7 +197,7 @@ export function ReplicationStatus() {
       {/* Toolbar */}
       <div className="flex items-center justify-between border-b border-[var(--color-border-default)] px-4 py-2">
         <h2 className="text-body font-semibold text-[var(--color-text-primary)]">
-          AD Replication Status
+          {t("pageTitle")}
         </h2>
         <div className="flex items-center gap-3">
           {partnerships.length > 0 && (
@@ -240,12 +242,14 @@ export function ReplicationStatus() {
 
           <ExportToolbar<ReplicationPartnership>
             columns={[
-              { key: "sourceDc", header: "Source DC" },
-              { key: "targetDc", header: "Target DC" },
-              { key: "namingContext", header: "Naming Context" },
-              { key: "status", header: "Status" },
-              { key: "lastSyncTime", header: "Last Sync" },
-              { key: "consecutiveFailures", header: "Failures" },
+              { key: "sourceDc", header: t("sourceDc") },
+              { key: "targetDc", header: t("targetDc") },
+              { key: "namingContext", header: t("namingContext") },
+              { key: "status", header: t("common:status") },
+              { key: "lastSyncTime", header: t("lastSync") },
+              { key: "usn", header: t("usn") },
+              { key: "transport", header: t("transport") },
+              { key: "consecutiveFailures", header: t("failures") },
             ]}
             data={partnerships}
             rowMapper={(p) => [
@@ -254,9 +258,11 @@ export function ReplicationStatus() {
               p.namingContext,
               p.status,
               p.lastSyncTime ?? "Never",
+              p.usnLastObjChangeSynced != null ? String(p.usnLastObjChangeSynced) : "",
+              p.transport ?? "",
               String(p.consecutiveFailures),
             ]}
-            title="AD Replication Status"
+            title={t("pageTitle")}
             filenameBase="replication-status"
           />
 
@@ -270,7 +276,7 @@ export function ReplicationStatus() {
             data-testid="refresh-button"
           >
             <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-            Refresh
+            {t("common:refresh")}
           </button>
         </div>
       </div>
@@ -278,18 +284,18 @@ export function ReplicationStatus() {
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4">
         {loading && partnerships.length === 0 ? (
-          <LoadingSpinner message="Loading replication partnerships..." />
+          <LoadingSpinner message={t("loadingPartnerships")} />
         ) : error ? (
           <EmptyState
             icon={<AlertCircle size={40} />}
-            title="Replication Check Failed"
+            title={t("checkFailed")}
             description={error}
           />
         ) : partnerships.length === 0 ? (
           <EmptyState
             icon={<Server size={40} />}
-            title="No Replication Partnerships Found"
-            description="No NTDS Connection objects were found in the AD configuration."
+            title={t("noPartnerships")}
+            description={t("noPartnershipsDescription")}
           />
         ) : (
           <>
@@ -300,9 +306,7 @@ export function ReplicationStatus() {
             >
               <Info size={14} className="mt-0.5 shrink-0 text-[var(--color-info)]" />
               <p className="text-caption text-[var(--color-text-primary)]">
-                Force replication is not available in simple bind mode.
-                This feature requires a domain-joined machine with GSSAPI authentication
-                to execute replication commands on domain controllers.
+{t("simpleBindWarning")}
               </p>
             </div>
           )}
@@ -310,14 +314,16 @@ export function ReplicationStatus() {
             <table className="w-full text-body" data-testid="replication-table">
               <thead>
                 <tr className="border-b border-[var(--color-border-default)] text-left text-caption text-[var(--color-text-secondary)]">
-                  <th className="px-3 py-2 font-medium">Status</th>
-                  <th className="px-3 py-2 font-medium">Source DC</th>
-                  <th className="px-3 py-2 font-medium">Target DC</th>
-                  <th className="px-3 py-2 font-medium">Naming Context</th>
-                  <th className="px-3 py-2 font-medium">Last Sync</th>
-                  <th className="px-3 py-2 font-medium">Errors</th>
+                  <th className="px-3 py-2 font-medium">{t("common:status")}</th>
+                  <th className="px-3 py-2 font-medium">{t("sourceDc")}</th>
+                  <th className="px-3 py-2 font-medium">{t("targetDc")}</th>
+                  <th className="px-3 py-2 font-medium">{t("namingContext")}</th>
+                  <th className="px-3 py-2 font-medium">{t("lastSync")}</th>
+                  <th className="px-3 py-2 font-medium">{t("usn")}</th>
+                  <th className="px-3 py-2 font-medium">{t("transport")}</th>
+                  <th className="px-3 py-2 font-medium">{t("failures")}</th>
                   {platform === "windows" && (
-                    <th className="px-3 py-2 font-medium">Actions</th>
+                    <th className="px-3 py-2 font-medium">{t("common:actions")}</th>
                   )}
                 </tr>
               </thead>
@@ -359,6 +365,12 @@ export function ReplicationStatus() {
                           {formatLatency(p.lastSyncTime)}
                         </span>
                       </td>
+                      <td className="px-3 py-2 font-mono text-caption text-[var(--color-text-secondary)]">
+                        {p.usnLastObjChangeSynced != null ? p.usnLastObjChangeSynced.toLocaleString() : "-"}
+                      </td>
+                      <td className="px-3 py-2 text-caption text-[var(--color-text-secondary)]">
+                        {p.transport ?? "-"}
+                      </td>
                       <td className="px-3 py-2">
                         {p.consecutiveFailures > 0 ? (
                           <span
@@ -385,12 +397,12 @@ export function ReplicationStatus() {
                           >
                             <Play size={12} />
                             {forcingReplication === forceKey
-                              ? "Syncing..."
-                              : "Sync"}
+                              ? t("syncing")
+                              : t("sync")}
                           </button>
                           {simpleBind && (
                             <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-md bg-[var(--color-surface-elevated)] px-2.5 py-1.5 text-caption font-medium text-[var(--color-text-primary)] opacity-0 shadow-md transition-opacity duration-150 group-hover:opacity-100">
-                              Not available in simple bind mode
+{t("notAvailableSimpleBind")}
                             </span>
                           )}
                         </div>

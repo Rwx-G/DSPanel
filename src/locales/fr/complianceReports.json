@@ -1,0 +1,40 @@
+{
+  "pageTitle": "Rapports de conformité",
+  "runScan": "Lancer l'analyse de conformité",
+  "reScan": "Relancer",
+  "scanningLabel": "Analyse en cours...",
+  "emptyTitle": "Rapports de conformité",
+  "emptyDescription": "Lancez une analyse de conformité pour évaluer votre Active Directory selon 9 référentiels : RGPD, HIPAA, SOX, PCI-DSS v4.0, ISO 27001, NIST 800-53, CIS v8, NIS2 et ANSSI.",
+  "globalScore": "Score de conformité global",
+  "accountsScanned": "comptes analysés",
+  "findingsLabel": "constats",
+  "checks": "Vérifications",
+  "checkClear": "OK",
+  "check": "Vérification",
+  "severity": "Sévérité",
+  "findings": "Constats",
+  "description": "Description",
+  "remediation": "Remédiation",
+  "report": "Rapport",
+  "exportTitle": "Analyse de conformité - Toutes les vérifications",
+  "scanFailed": "Analyse échouée",
+  "checkTitles": {
+    "privileged_accounts": "Comptes privilégiés",
+    "inactive_accounts": "Comptes inactifs (>90 jours)",
+    "password_not_required": "Mot de passe non requis (PASSWD_NOTREQD)",
+    "reversible_encryption": "Chiffrement réversible du mot de passe",
+    "password_expired": "Mots de passe obsolètes (>90 jours)",
+    "password_never_expires": "Mot de passe n'expire jamais",
+    "disabled_accounts": "Cycle de vie des comptes désactivés"
+  },
+  "severityLabels": {
+    "Critical": "Critique",
+    "High": "Élevé",
+    "Medium": "Moyen",
+    "Low": "Faible"
+  },
+  "andMore": "... et {{count}} de plus (voir le rapport exporté)",
+  "disclaimer.checks": "7 vérifications sur 9 référentiels (RGPD, HIPAA, SOX, PCI-DSS v4.0, ISO 27001, NIST 800-53, CIS v8, NIS2, ANSSI). Vérifications : comptes privilégiés (adminCount), comptes inactifs (>90j), indicateur PASSWD_NOTREQD, chiffrement réversible, mots de passe obsolètes (>90j), mot de passe n'expire jamais, comptes désactivés. Score de conformité 0-100 avec détail par référentiel. Export de rapport HTML par référentiel avec références de contrôles et remédiation PowerShell.",
+  "disclaimer.limitations": "Instantané ponctuel uniquement - pas d'historique des modifications ni de surveillance continue. N'évalue pas les paramètres GPO, les permissions de serveur de fichiers, la configuration des journaux d'audit, ni la segmentation réseau. Pas de détection de comptes partagés/génériques, d'analyse de séparation des fonctions, ni de workflows de recertification d'accès. Ne peut pas lire la politique de mot de passe du domaine (complexité, seuils de verrouillage).",
+  "disclaimer.tools": "Netwrix Auditor (audit des modifications, 30+ contrôles/référentiel), ManageEngine ADAudit Plus (200+ rapports, alertes temps réel), Microsoft Compliance Manager (contrôles partagés, actions d'amélioration), Qualys Policy Compliance (benchmarks CIS), ou SolarWinds ARM (visualisation des droits d'accès) pour une gestion complète de la conformité."
+}

@@ -64,7 +64,7 @@ async fn capture_snapshot(state: &AppState, object_dn: &str, operation: &str) {
     state.snapshot_service.capture(object_dn, operation);
 
     // Resolve the authenticated LDAP user (or fall back to OS username)
-    let provider = state.directory_provider.clone();
+    let provider = state.provider();
     let operator = provider
         .authenticated_user()
         .unwrap_or_else(|| std::env::var("USERNAME").unwrap_or_else(|_| "Unknown".to_string()));
@@ -221,12 +221,106 @@ pub fn is_simple_bind() -> bool {
     std::env::var("DSPANEL_LDAP_BIND_DN").is_ok()
 }
 
+/// Returns true if the app is waiting for the user to provide credentials.
+/// This happens when DSPANEL_LDAP_SERVER and DSPANEL_LDAP_BIND_DN are set
+/// but DSPANEL_LDAP_BIND_PASSWORD is not.
+#[tauri::command]
+pub fn needs_credentials(state: State<'_, AppState>) -> bool {
+    *state.needs_credentials.lock().expect("lock poisoned")
+}
+
+/// Returns the configured LDAP server and bind DN for display on the login dialog.
+#[tauri::command]
+pub fn get_bind_info() -> (String, String) {
+    let server = std::env::var("DSPANEL_LDAP_SERVER").unwrap_or_default();
+    let bind_dn = std::env::var("DSPANEL_LDAP_BIND_DN").unwrap_or_default();
+    (server, bind_dn)
+}
+
+/// Connects to LDAP using the provided password (completing the simple bind
+/// flow when credentials were not fully provided at startup).
+///
+/// Reads server and bind_dn from environment variables, combines with the
+/// user-provided password, creates a new LdapDirectoryProvider, and replaces
+/// the current (disconnected) provider.
+#[tauri::command]
+pub async fn connect_simple_bind(
+    password: String,
+    state: State<'_, AppState>,
+) -> Result<bool, AppError> {
+    use crate::services::ldap_directory::{LdapDirectoryProvider, LdapTlsConfig};
+    use std::sync::Arc;
+
+    let server = std::env::var("DSPANEL_LDAP_SERVER")
+        .map_err(|_| AppError::Configuration("DSPANEL_LDAP_SERVER not set".to_string()))?;
+    let bind_dn = std::env::var("DSPANEL_LDAP_BIND_DN")
+        .map_err(|_| AppError::Configuration("DSPANEL_LDAP_BIND_DN not set".to_string()))?;
+
+    let use_tls = std::env::var("DSPANEL_LDAP_USE_TLS")
+        .map(|v| v == "true" || v == "1")
+        .unwrap_or(false);
+    let starttls = std::env::var("DSPANEL_LDAP_STARTTLS")
+        .map(|v| v == "true" || v == "1")
+        .unwrap_or(false);
+    let skip_verify = std::env::var("DSPANEL_LDAP_TLS_SKIP_VERIFY")
+        .map(|v| v == "true" || v == "1")
+        .unwrap_or(false);
+    let ca_cert_file = std::env::var("DSPANEL_LDAP_CA_CERT").ok();
+
+    let tls_config = LdapTlsConfig {
+        enabled: use_tls,
+        starttls,
+        skip_verify,
+        ca_cert_file,
+    };
+
+    let provider: Arc<dyn crate::services::DirectoryProvider> = Arc::new(
+        LdapDirectoryProvider::new_with_credentials(server, bind_dn, password, tls_config),
+    );
+
+    // Test the connection
+    match provider.test_connection().await {
+        Ok(true) => {
+            // Detect permissions
+            if let Err(e) = state
+                .permission_service
+                .detect_permissions(&*provider)
+                .await
+            {
+                tracing::warn!("Permission detection failed after login: {}", e);
+            }
+            if let Some(ref name) = provider.authenticated_user() {
+                state
+                    .permission_service
+                    .set_authenticated_user(name.clone());
+                state.audit_service.set_operator(name.clone());
+                tracing::info!(operator = %name, "Authenticated after login prompt");
+            }
+
+            // Swap the provider
+            state.set_provider(provider);
+            *state.needs_credentials.lock().expect("lock poisoned") = false;
+
+            tracing::info!("Simple bind connection established via login prompt");
+            Ok(true)
+        }
+        Ok(false) => {
+            tracing::warn!("Simple bind connection test returned false");
+            Err(AppError::Network("Connection test failed".to_string()))
+        }
+        Err(e) => {
+            tracing::warn!("Simple bind connection failed: {}", e);
+            Err(AppError::Network(format!("Connection failed: {}", e)))
+        }
+    }
+}
+
 #[allow(clippy::unwrap_used)]
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::services::directory::tests::MockDirectoryProvider;
     use crate::services::PermissionConfig;
+    use crate::services::directory::tests::MockDirectoryProvider;
     use std::sync::Arc;
 
     fn make_state() -> AppState {

@@ -11,62 +11,104 @@ import {
   Globe,
   GitBranch,
   CheckCircle,
+  ChevronDown,
 } from "lucide-react";
 import { type TopologyData, type TopologyDcNode } from "@/types/topology";
 import { extractErrorMessage } from "@/utils/errorMapping";
+import { useTranslation } from "react-i18next";
 
-/** Renders a single DC entry within a site card. */
+/** Renders a single DC entry within a site card, expandable on click. */
 function DcEntry({ dc }: { dc: TopologyDcNode }) {
+  const { t } = useTranslation(["topology", "common"]);
+  const [expanded, setExpanded] = useState(false);
+
   return (
-    <div className="flex items-start gap-4 px-4 py-3">
-      <div className="relative mt-0.5 shrink-0">
-        <Server size={20} className="text-[var(--color-text-secondary)]" />
-        <span
-          className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[var(--color-surface-card)]"
-          style={{
-            backgroundColor: dc.isOnline ? "var(--color-success)" : "var(--color-error)",
-          }}
-          title={dc.isOnline ? "Online" : "Offline"}
-        />
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="font-mono text-body font-medium text-[var(--color-text-primary)]">
-          {dc.hostname}
+    <div>
+      <button
+        className="flex w-full items-start gap-4 px-4 py-3 text-left hover:bg-[var(--color-surface-hover)] transition-colors"
+        onClick={() => setExpanded(!expanded)}
+        data-testid={`dc-entry-${dc.hostname}`}
+      >
+        <div className="relative mt-0.5 shrink-0">
+          <Server size={20} className="text-[var(--color-text-secondary)]" />
+          <span
+            className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[var(--color-surface-card)]"
+            style={{
+              backgroundColor: dc.isOnline ? "var(--color-success)" : "var(--color-error)",
+            }}
+            title={dc.isOnline ? t("online") : t("offline")}
+          />
         </div>
-        <div className="mt-1 flex flex-wrap gap-1.5">
-          {dc.isPdc && (
-            <span className="flex items-center gap-1 rounded bg-[#8b5cf6] px-1.5 py-0.5 text-[10px] font-medium text-white">
-              <Crown size={10} /> PDC
-            </span>
-          )}
-          {dc.isGc && (
-            <span className="flex items-center gap-1 rounded bg-[var(--color-primary)] px-1.5 py-0.5 text-[10px] font-medium text-white">
-              <Globe size={10} /> GC
-            </span>
-          )}
-          {dc.fsmoRoles.filter((r) => r !== "PDC").map((role) => (
-            <span
-              key={role}
-              className="rounded bg-[var(--color-text-secondary)] px-1.5 py-0.5 text-[10px] font-medium text-white"
-            >
-              {role}
-            </span>
-          ))}
-        </div>
-        <div className="mt-1 space-y-0.5 text-caption text-[var(--color-text-secondary)]">
-          {dc.osVersion && <div>{dc.osVersion}</div>}
-          {dc.ipAddress && <div>IP: {dc.ipAddress}</div>}
-          <div className="flex items-center gap-1.5">
-            <span
-              className="inline-block h-2 w-2 rounded-full"
-              style={{ backgroundColor: dc.isOnline ? "var(--color-success)" : "var(--color-error)" }}
-            />
-            <span style={{ color: dc.isOnline ? "var(--color-success)" : "var(--color-error)" }}>
-              {dc.isOnline ? "Online" : "Offline"}
-            </span>
+        <div className="min-w-0 flex-1">
+          <div className="font-mono text-body font-medium text-[var(--color-text-primary)]">
+            {dc.hostname}
+          </div>
+          <div className="mt-1 flex flex-wrap gap-1.5">
+            {dc.isPdc && (
+              <span className="flex items-center gap-1 rounded bg-[#8b5cf6] px-1.5 py-0.5 text-[10px] font-medium text-white">
+                <Crown size={10} /> PDC
+              </span>
+            )}
+            {dc.isGc && (
+              <span className="flex items-center gap-1 rounded bg-[var(--color-primary)] px-1.5 py-0.5 text-[10px] font-medium text-white">
+                <Globe size={10} /> GC
+              </span>
+            )}
+            {dc.fsmoRoles.filter((r) => r !== "PDC").map((role) => (
+              <span
+                key={role}
+                className="rounded bg-[var(--color-text-secondary)] px-1.5 py-0.5 text-[10px] font-medium text-white"
+              >
+                {role}
+              </span>
+            ))}
           </div>
         </div>
-      </div>
+        <ChevronDown
+          size={14}
+          className={`mt-1 shrink-0 text-[var(--color-text-secondary)] transition-transform ${expanded ? "rotate-180" : ""}`}
+        />
+      </button>
+      {expanded && (
+        <div className="border-t border-[var(--color-border-subtle)] bg-[var(--color-surface-hover)] px-4 py-2">
+          <table className="w-full text-caption">
+            <tbody>
+              <tr>
+                <td className="py-0.5 pr-3 font-medium text-[var(--color-text-secondary)]">{t("common:status")}</td>
+                <td className="py-0.5" style={{ color: dc.isOnline ? "var(--color-success)" : "var(--color-error)" }}>
+                  {dc.isOnline ? t("online") : t("offline")}
+                </td>
+              </tr>
+              {dc.ipAddress && (
+                <tr>
+                  <td className="py-0.5 pr-3 font-medium text-[var(--color-text-secondary)]">{t("ipAddress")}</td>
+                  <td className="py-0.5 font-mono text-[var(--color-text-primary)]">{dc.ipAddress}</td>
+                </tr>
+              )}
+              {dc.osVersion && (
+                <tr>
+                  <td className="py-0.5 pr-3 font-medium text-[var(--color-text-secondary)]">{t("os")}</td>
+                  <td className="py-0.5 text-[var(--color-text-primary)]">{dc.osVersion}</td>
+                </tr>
+              )}
+              <tr>
+                <td className="py-0.5 pr-3 font-medium text-[var(--color-text-secondary)]">{t("site")}</td>
+                <td className="py-0.5 text-[var(--color-text-primary)]">{dc.siteName}</td>
+              </tr>
+              <tr>
+                <td className="py-0.5 pr-3 font-medium text-[var(--color-text-secondary)]">{t("globalCatalog")}</td>
+                <td className="py-0.5 text-[var(--color-text-primary)]">{dc.isGc ? t("common:yes") : t("common:no")}</td>
+              </tr>
+              {dc.fsmoRoles.length > 0 && (
+                <tr>
+                  <td className="py-0.5 pr-3 font-medium text-[var(--color-text-secondary)]">{t("fsmoRoles")}</td>
+                  <td className="py-0.5 text-[var(--color-text-primary)]">{dc.fsmoRoles.join(", ")}</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
@@ -82,6 +124,7 @@ function replLinkStatusColor(status: string): string {
 
 /** Structured card view for AD topology. */
 function SimpleTopologyView({ data }: { data: TopologyData }) {
+  const { t } = useTranslation(["topology", "common"]);
   const totalDcs = data.sites.reduce((n, s) => n + s.dcs.length, 0);
 
   return (
@@ -119,7 +162,7 @@ function SimpleTopologyView({ data }: { data: TopologyData }) {
             {site.subnets.length > 0 && (
               <div className="border-t border-[var(--color-border-default)] px-4 py-3">
                 <div className="text-caption font-medium text-[var(--color-text-secondary)]">
-                  Subnets
+                  {t("subnets")}
                 </div>
                 <div className="mt-1 flex flex-wrap gap-2">
                   {site.subnets.map((subnet) => (
@@ -142,7 +185,7 @@ function SimpleTopologyView({ data }: { data: TopologyData }) {
             <div className="flex items-center gap-3 border-b border-[var(--color-border-default)] px-4 py-3">
               <RefreshCw size={18} className="text-[var(--color-text-secondary)]" />
               <h3 className="text-body font-semibold text-[var(--color-text-primary)]">
-                Replication Links
+                {t("replicationLinks")}
               </h3>
             </div>
             <div className="divide-y divide-[var(--color-border-subtle)]">
@@ -182,7 +225,7 @@ function SimpleTopologyView({ data }: { data: TopologyData }) {
             <div className="flex items-center gap-3 border-b border-[var(--color-border-default)] px-4 py-3">
               <GitBranch size={18} className="text-[var(--color-text-secondary)]" />
               <h3 className="text-body font-semibold text-[var(--color-text-primary)]">
-                Site Links
+                {t("siteLinks")}
               </h3>
             </div>
             <div className="divide-y divide-[var(--color-border-subtle)]">
@@ -197,8 +240,8 @@ function SimpleTopologyView({ data }: { data: TopologyData }) {
                     </span>
                   </div>
                   <div className="flex items-center gap-4 text-caption text-[var(--color-text-secondary)]">
-                    <span>Cost: {sl.cost}</span>
-                    <span>Interval: {sl.replInterval} min</span>
+                    <span>{t("cost")} {sl.cost}</span>
+                    <span>{t("interval")} {sl.replInterval} {t("min")}</span>
                   </div>
                 </div>
               ))}
@@ -222,6 +265,7 @@ function SimpleTopologyView({ data }: { data: TopologyData }) {
 }
 
 export function TopologyView() {
+  const { t } = useTranslation(["topology", "common"]);
   const [data, setData] = useState<TopologyData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -248,7 +292,7 @@ export function TopologyView() {
       {/* Toolbar */}
       <div className="flex items-center justify-between border-b border-[var(--color-border-default)] px-4 py-2">
         <h2 className="text-body font-semibold text-[var(--color-text-primary)]">
-          AD Topology
+          {t("pageTitle")}
         </h2>
         <div className="flex items-center gap-2">
           {data && (
@@ -266,7 +310,7 @@ export function TopologyView() {
             data-testid="refresh-button"
           >
             <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-            Refresh
+            {t("common:refresh")}
           </button>
         </div>
       </div>
@@ -275,13 +319,13 @@ export function TopologyView() {
       <div className="flex-1 overflow-y-auto">
         {loading ? (
           <div className="flex h-full items-center justify-center">
-            <LoadingSpinner message="Loading AD topology..." />
+            <LoadingSpinner message={t("loadingTopology")} />
           </div>
         ) : error ? (
           <div className="flex h-full items-center justify-center">
             <EmptyState
               icon={<AlertCircle size={40} />}
-              title="Topology Load Failed"
+              title={t("loadFailed")}
               description={error}
             />
           </div>
@@ -289,8 +333,8 @@ export function TopologyView() {
           <div className="flex h-full items-center justify-center">
             <EmptyState
               icon={<Server size={40} />}
-              title="No Topology Data"
-              description="No AD sites were found in the configuration."
+              title={t("noData")}
+              description={t("noDataDescription")}
             />
           </div>
         ) : (

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { X, Filter } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 export interface FilterChip {
   id: string;
@@ -19,9 +20,11 @@ export function FilterBar({
   filters,
   onFilterChange,
   onTextFilter,
-  placeholder = "Filter...",
+  placeholder,
   debounceMs = 300,
 }: FilterBarProps) {
+  const { t } = useTranslation(["components"]);
+  const resolvedPlaceholder = placeholder ?? t("components:filterBar.placeholder");
   const [textValue, setTextValue] = useState("");
 
   useEffect(() => {
@@ -62,7 +65,7 @@ export function FilterBar({
           <button
             onClick={() => removeFilter(chip.id)}
             className="rounded-sm p-0.5 hover:bg-[var(--color-surface-hover)] transition-colors"
-            aria-label={`Remove ${chip.label} filter`}
+            aria-label={t("components:filterBar.removeFilter", { label: chip.label })}
             data-testid={`filter-remove-${chip.id}`}
           >
             <X size={10} />
@@ -74,8 +77,8 @@ export function FilterBar({
         type="text"
         value={textValue}
         onChange={(e) => setTextValue(e.target.value)}
-        placeholder={placeholder}
-        aria-label={placeholder}
+        placeholder={resolvedPlaceholder}
+        aria-label={resolvedPlaceholder}
         className="flex-1 min-w-[120px] bg-transparent text-body text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-secondary)]"
         data-testid="filter-text-input"
       />
@@ -84,7 +87,7 @@ export function FilterBar({
         <button
           onClick={clearAll}
           className="rounded-sm p-0.5 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
-          aria-label="Clear all filters"
+          aria-label={t("components:filterBar.clearAll")}
           data-testid="filter-clear-all"
         >
           <X size={14} />

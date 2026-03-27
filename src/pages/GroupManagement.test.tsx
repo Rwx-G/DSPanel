@@ -458,6 +458,243 @@ describe("GroupManagement", () => {
     });
   });
 
+  describe("Category filter and counts", () => {
+    it("shows category filter buttons with counts", async () => {
+      const entries = [
+        makeGroupEntry("SecGroup1", "Global", "Security"),
+        makeGroupEntry("SecGroup2", "DomainLocal", "Security"),
+        makeGroupEntry("DistGroup1", "Universal", "Distribution"),
+      ];
+      mockBrowseWith(entries);
+
+      render(<GroupManagement />, { wrapper: TestProviders });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("group-results-list")).toBeInTheDocument();
+      });
+
+      // All three filter buttons should exist
+      expect(screen.getByText("All")).toBeInTheDocument();
+      expect(screen.getByText("Security")).toBeInTheDocument();
+      expect(screen.getByText("Distribution")).toBeInTheDocument();
+
+      // Security count should be 2, Distribution should be 1
+      expect(screen.getByText("(2)")).toBeInTheDocument();
+      expect(screen.getByText("(1)")).toBeInTheDocument();
+    });
+
+    it("filters groups by Security category", async () => {
+      const entries = [
+        makeGroupEntry("SecGroup", "Global", "Security"),
+        makeGroupEntry("DistGroup", "Universal", "Distribution"),
+      ];
+      mockBrowseWith(entries);
+
+      render(<GroupManagement />, { wrapper: TestProviders });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("group-result-SecGroup")).toBeInTheDocument();
+        expect(screen.getByTestId("group-result-DistGroup")).toBeInTheDocument();
+      });
+
+      // Click Security filter
+      fireEvent.click(screen.getByText("Security"));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("group-result-SecGroup")).toBeInTheDocument();
+        expect(screen.queryByTestId("group-result-DistGroup")).not.toBeInTheDocument();
+      });
+    });
+
+    it("filters groups by Distribution category", async () => {
+      const entries = [
+        makeGroupEntry("SecGroup", "Global", "Security"),
+        makeGroupEntry("DistGroup", "Universal", "Distribution"),
+      ];
+      mockBrowseWith(entries);
+
+      render(<GroupManagement />, { wrapper: TestProviders });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("group-results-list")).toBeInTheDocument();
+      });
+
+      // Click Distribution filter
+      fireEvent.click(screen.getByText("Distribution"));
+
+      await waitFor(() => {
+        expect(screen.queryByTestId("group-result-SecGroup")).not.toBeInTheDocument();
+        expect(screen.getByTestId("group-result-DistGroup")).toBeInTheDocument();
+      });
+    });
+
+    it("shows empty state with category-specific message when filter matches nothing", async () => {
+      const entries = [
+        makeGroupEntry("SecGroup", "Global", "Security"),
+      ];
+      mockBrowseWith(entries);
+
+      render(<GroupManagement />, { wrapper: TestProviders });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("group-results-list")).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText("Distribution"));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("group-management-empty")).toBeInTheDocument();
+        expect(screen.getByText(/No Distribution groups found/)).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("GroupBadge tooltip", () => {
+    it("shows tooltip on mouse enter with scope and category info", async () => {
+      const entries = [makeGroupEntry("TestGroup", "Universal", "Distribution", 5)];
+      mockBrowseWith(entries);
+
+      render(<GroupManagement />, { wrapper: TestProviders });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("group-result-TestGroup")).toBeInTheDocument();
+      });
+
+      // The badge inside the result item - find the badge container with scope abbreviation "U"
+      const groupItem = screen.getByTestId("group-result-TestGroup");
+      // Find the badge container with aria-describedby logic
+      const badgeContainer = groupItem.querySelector('[class*="inline-flex shrink-0"]');
+      expect(badgeContainer).not.toBeNull();
+
+      fireEvent.mouseEnter(badgeContainer!);
+
+      await waitFor(() => {
+        // Tooltip should show scope and category information
+        const tooltip = document.querySelector('[role="tooltip"]');
+        expect(tooltip).toBeInTheDocument();
+        expect(tooltip).toHaveTextContent("Distribution");
+        expect(tooltip).toHaveTextContent("Universal");
+        expect(tooltip).toHaveTextContent("5 members");
+      });
+
+      fireEvent.mouseLeave(badgeContainer!);
+
+      await waitFor(() => {
+        expect(document.querySelector('[role="tooltip"]')).not.toBeInTheDocument();
+      });
+    });
+
+    it("shows DL abbreviation for DomainLocal scope", async () => {
+      const entries = [makeGroupEntry("DLGroup", "DomainLocal", "Security", 1)];
+      mockBrowseWith(entries);
+
+      render(<GroupManagement />, { wrapper: TestProviders });
+
+      await waitFor(() => {
+        const groupItem = screen.getByTestId("group-result-DLGroup");
+        expect(groupItem.textContent).toContain("DL");
+      });
+    });
+
+    it("shows singular 'member' for count of 1", async () => {
+      const entries = [makeGroupEntry("SingleMember", "Global", "Security", 1)];
+      mockBrowseWith(entries);
+
+      render(<GroupManagement />, { wrapper: TestProviders });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("group-result-SingleMember")).toBeInTheDocument();
+      });
+
+      const groupItem = screen.getByTestId("group-result-SingleMember");
+      const badgeContainer = groupItem.querySelector('[class*="inline-flex shrink-0"]');
+      fireEvent.mouseEnter(badgeContainer!);
+
+      await waitFor(() => {
+        const tooltip = document.querySelector('[role="tooltip"]');
+        expect(tooltip).toHaveTextContent("1 member");
+        // Should NOT say "1 members"
+        expect(tooltip?.textContent).not.toContain("1 members");
+      });
+    });
+  });
+
+  describe("Move to OU dialog", () => {
+    it("shows Move to OU option in context menu for AccountOperator users", async () => {
+      const entries = [makeGroupEntry("Developers")];
+      mockBrowseWith(entries, { permissionLevel: "AccountOperator" });
+
+      render(<GroupManagement />, { wrapper: TestProviders });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("group-result-Developers")).toBeInTheDocument();
+      });
+
+      fireEvent.contextMenu(screen.getByTestId("group-result-Developers"));
+
+      await waitFor(() => {
+        expect(screen.getByText("Move to OU")).toBeInTheDocument();
+      });
+    });
+
+    it("does not show context menu for ReadOnly users (no items)", async () => {
+      const entries = [makeGroupEntry("Developers")];
+      mockBrowseWith(entries, { permissionLevel: "ReadOnly" });
+
+      render(<GroupManagement />, { wrapper: TestProviders });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("group-result-Developers")).toBeInTheDocument();
+      });
+
+      fireEvent.contextMenu(screen.getByTestId("group-result-Developers"));
+
+      // Should not show any context menu items
+      await waitFor(() => {
+        expect(screen.queryByText("Move to OU")).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("Member loading edge cases", () => {
+    it("handles member loading failure gracefully", async () => {
+      const entries = [makeGroupEntry("Developers")];
+      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      mockInvoke.mockImplementation(((cmd: string) => {
+        if (cmd === "browse_groups")
+          return Promise.resolve(makeBrowseResult(entries));
+        if (cmd === "get_group_members")
+          return Promise.reject(new Error("Member load failed"));
+        if (cmd === "get_permission_level") return Promise.resolve("ReadOnly");
+        if (cmd === "get_user_groups") return Promise.resolve([]);
+        return Promise.resolve(null);
+      }) as typeof invoke);
+
+      render(<GroupManagement />, { wrapper: TestProviders });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("group-result-Developers")).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByTestId("group-result-Developers"));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("group-detail")).toBeInTheDocument();
+      });
+
+      // Members should be empty (graceful failure)
+      await waitFor(() => {
+        expect(consoleSpy).toHaveBeenCalledWith(
+          expect.stringContaining("Failed to load group members"),
+          expect.anything(),
+        );
+      });
+
+      consoleSpy.mockRestore();
+    });
+  });
+
   describe("Member Management (Story 4.2)", () => {
     const memberEntries: DirectoryEntry[] = [
       {

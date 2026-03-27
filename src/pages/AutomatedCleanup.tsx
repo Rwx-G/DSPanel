@@ -15,6 +15,7 @@ import {
   Search,
   ShieldAlert,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 // ---------------------------------------------------------------------------
 // Types (mirror Rust models)
@@ -62,16 +63,16 @@ interface CleanupExecutionResult {
 // Constants
 // ---------------------------------------------------------------------------
 
-const CONDITION_LABELS: Record<CleanupCondition, string> = {
-  inactiveDays: "Inactive for X days",
-  neverLoggedOnCreatedDays: "Never logged on + created > X days",
-  disabledDays: "Disabled for X days",
+const CONDITION_KEYS: Record<CleanupCondition, string> = {
+  inactiveDays: "conditionInactive",
+  neverLoggedOnCreatedDays: "conditionNeverLogged",
+  disabledDays: "conditionDisabled",
 };
 
-const ACTION_LABELS: Record<CleanupAction, string> = {
-  disable: "Disable",
-  move: "Move to OU",
-  delete: "Delete",
+const ACTION_KEYS: Record<CleanupAction, string> = {
+  disable: "actionDisable",
+  move: "actionMove",
+  delete: "actionDelete",
 };
 
 const DEFAULT_RULE: CleanupRule = {
@@ -99,6 +100,7 @@ function RuleEditor({
   onSave: () => void;
   onCancel: () => void;
 }) {
+  const { t } = useTranslation(["automatedCleanup", "common"]);
   return (
     <div
       className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-4 space-y-3"
@@ -107,19 +109,19 @@ function RuleEditor({
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="block text-caption font-medium text-[var(--color-text-secondary)] mb-1">
-            Rule Name
+            {t("ruleName")}
           </label>
           <input
             className="w-full rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2 py-1.5 text-caption text-[var(--color-text-primary)]"
             value={rule.name}
             onChange={(e) => onChange({ ...rule, name: e.target.value })}
-            placeholder="e.g., Disable inactive 180 days"
+            placeholder={t("ruleNamePlaceholder")}
             data-testid="rule-name-input"
           />
         </div>
         <div>
           <label className="block text-caption font-medium text-[var(--color-text-secondary)] mb-1">
-            Condition
+            {t("condition")}
           </label>
           <select
             className="w-full rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2 py-1.5 text-caption text-[var(--color-text-primary)]"
@@ -129,16 +131,16 @@ function RuleEditor({
             }
             data-testid="rule-condition-select"
           >
-            {Object.entries(CONDITION_LABELS).map(([value, label]) => (
+            {Object.entries(CONDITION_KEYS).map(([value, key]) => (
               <option key={value} value={value}>
-                {label}
+                {t(key)}
               </option>
             ))}
           </select>
         </div>
         <div>
           <label className="block text-caption font-medium text-[var(--color-text-secondary)] mb-1">
-            Threshold (days)
+            {t("threshold")}
           </label>
           <input
             type="number"
@@ -153,7 +155,7 @@ function RuleEditor({
         </div>
         <div>
           <label className="block text-caption font-medium text-[var(--color-text-secondary)] mb-1">
-            Action
+            {t("action")}
           </label>
           <select
             className="w-full rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2 py-1.5 text-caption text-[var(--color-text-primary)]"
@@ -163,9 +165,9 @@ function RuleEditor({
             }
             data-testid="rule-action-select"
           >
-            {Object.entries(ACTION_LABELS).map(([value, label]) => (
+            {Object.entries(ACTION_KEYS).map(([value, key]) => (
               <option key={value} value={value}>
-                {label}
+                {t(key)}
               </option>
             ))}
           </select>
@@ -174,7 +176,7 @@ function RuleEditor({
       {rule.action === "move" && (
         <div>
           <label className="block text-caption font-medium text-[var(--color-text-secondary)] mb-1">
-            Target OU (Distinguished Name)
+            {t("targetOu")}
           </label>
           <input
             className="w-full rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2 py-1.5 text-caption text-[var(--color-text-primary)]"
@@ -182,7 +184,7 @@ function RuleEditor({
             onChange={(e) =>
               onChange({ ...rule, targetOu: e.target.value || null })
             }
-            placeholder="OU=Disabled,DC=example,DC=com"
+            placeholder={t("targetOuPlaceholder")}
             data-testid="rule-target-ou-input"
           />
         </div>
@@ -190,7 +192,7 @@ function RuleEditor({
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="block text-caption font-medium text-[var(--color-text-secondary)] mb-1">
-            Exclude SAM patterns (comma-separated, e.g., svc_*, admin*)
+            {t("excludePatterns")}
           </label>
           <input
             className="w-full rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2 py-1.5 text-caption text-[var(--color-text-primary)]"
@@ -204,13 +206,13 @@ function RuleEditor({
                   : null,
               });
             }}
-            placeholder="svc_*, test*, shared*"
+            placeholder={t("excludePatternsPlaceholder")}
             data-testid="rule-exclude-patterns"
           />
         </div>
         <div>
           <label className="block text-caption font-medium text-[var(--color-text-secondary)] mb-1">
-            Exclude OUs (comma-separated)
+            {t("excludeOus")}
           </label>
           <input
             className="w-full rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2 py-1.5 text-caption text-[var(--color-text-primary)]"
@@ -224,7 +226,7 @@ function RuleEditor({
                   : null,
               });
             }}
-            placeholder="OU=ServiceAccounts, OU=Admin"
+            placeholder={t("excludeOusPlaceholder")}
             data-testid="rule-exclude-ous"
           />
         </div>
@@ -235,7 +237,7 @@ function RuleEditor({
           onClick={onCancel}
           data-testid="rule-cancel-btn"
         >
-          Cancel
+          {t("common:cancel")}
         </button>
         <button
           className="btn btn-sm btn-primary flex items-center gap-1"
@@ -243,7 +245,7 @@ function RuleEditor({
           disabled={!rule.name.trim()}
           data-testid="rule-save-btn"
         >
-          Save Rule
+          {t("saveRule")}
         </button>
       </div>
     </div>
@@ -255,6 +257,7 @@ function RuleEditor({
 // ---------------------------------------------------------------------------
 
 export function AutomatedCleanup() {
+  const { t } = useTranslation(["automatedCleanup", "common"]);
   const [rules, setRules] = useState<CleanupRule[]>([]);
   const [rulesLoaded, setRulesLoaded] = useState(false);
   const [editingRule, setEditingRule] = useState<CleanupRule | null>(null);
@@ -373,12 +376,12 @@ export function AutomatedCleanup() {
       <div className="flex items-center justify-between border-b border-[var(--color-border-default)] px-4 py-2">
         <h2 className="flex items-center gap-1.5 text-body font-semibold text-[var(--color-text-primary)]">
           <ShieldAlert size={16} />
-          Automated Cleanup
+          {t("pageTitle")}
           <SecurityDisclaimer
             coverage="~40%"
-            checks="3 condition types (inactive >X days, never logged on + created >Y days, disabled >Z days), 3 actions (disable, move to OU, delete). Mandatory dry-run with selectable matches, double confirmation for deletes. Protected account exclusion (Administrator, krbtgt, Guest). Service account exclusion by SAM pattern (glob) and OU. All actions audit-logged."
-            limitations="On-demand execution only - no scheduled runs. Does not detect shared/generic accounts, orphaned SIDs, or stale computer accounts. No approval workflow (single admin decision). Cannot evaluate service account dependencies before disabling."
-            tools="ManageEngine ADManager Plus (automated lifecycle policies, scheduled cleanup, approval workflows), Quest Active Roles (policy-based deprovisioning with HR integration), or BeyondTrust Privileged Access Management for enterprise account lifecycle management."
+            checks={t("disclaimer.checks")}
+            limitations={t("disclaimer.limitations")}
+            tools={t("disclaimer.tools")}
           />
         </h2>
         <button
@@ -390,7 +393,7 @@ export function AutomatedCleanup() {
           data-testid="add-rule-btn"
         >
           <Plus size={14} />
-          Add Rule
+          {t("addRule")}
         </button>
       </div>
 
@@ -412,8 +415,8 @@ export function AutomatedCleanup() {
         {rules.length === 0 && !editingRule && (
           <EmptyState
             icon={<ShieldAlert size={40} />}
-            title="No Cleanup Rules"
-            description="Add cleanup rules to identify and act on stale AD accounts."
+            title={t("emptyTitle")}
+            description={t("emptyDescription")}
           />
         )}
 
@@ -430,16 +433,16 @@ export function AutomatedCleanup() {
                     {rule.name}
                   </div>
                   <div className="text-[11px] text-[var(--color-text-secondary)]">
-                    {CONDITION_LABELS[rule.condition]} ({rule.thresholdDays}d) - {ACTION_LABELS[rule.action]}
+                    {t(CONDITION_KEYS[rule.condition])} ({rule.thresholdDays}d) - {t(ACTION_KEYS[rule.action])}
                     {rule.action === "move" && rule.targetOu && ` to ${rule.targetOu}`}
                     {rule.excludePatterns && rule.excludePatterns.length > 0 && (
                       <span className="ml-2 text-[var(--color-text-disabled)]">
-                        Excl: {rule.excludePatterns.join(", ")}
+                        {t("excl")}: {rule.excludePatterns.join(", ")}
                       </span>
                     )}
                     {rule.excludeOus && rule.excludeOus.length > 0 && (
                       <span className="ml-2 text-[var(--color-text-disabled)]">
-                        Excl OUs: {rule.excludeOus.join(", ")}
+                        {t("exclOus")}: {rule.excludeOus.join(", ")}
                       </span>
                     )}
                   </div>
@@ -452,7 +455,7 @@ export function AutomatedCleanup() {
                     data-testid={`run-rule-${index}`}
                   >
                     <Search size={12} />
-                    Dry Run
+                    {t("dryRun")}
                   </button>
                   <button
                     className="btn btn-sm p-1 text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
@@ -462,7 +465,7 @@ export function AutomatedCleanup() {
                     }}
                     data-testid={`edit-rule-${index}`}
                   >
-                    Edit
+                    {t("common:edit")}
                   </button>
                   <button
                     className="btn btn-sm p-1 text-[var(--color-error)] hover:text-[var(--color-error)]"
@@ -488,7 +491,7 @@ export function AutomatedCleanup() {
         {dryRunError && (
           <EmptyState
             icon={<AlertTriangle size={40} />}
-            title="Dry Run Failed"
+            title={t("dryRunFailed")}
             description={dryRunError}
           />
         )}
@@ -501,16 +504,16 @@ export function AutomatedCleanup() {
           >
             <div className="flex items-center justify-between">
               <h3 className="text-body font-semibold text-[var(--color-text-primary)]">
-                Dry Run: {dryRunResult.ruleName} ({dryRunResult.totalCount} matches)
+                {t("dryRunTitle")}: {dryRunResult.ruleName} ({dryRunResult.totalCount} {t("matches")})
               </h3>
               <div className="flex items-center gap-2">
                 <ExportToolbar<CleanupMatch>
                   columns={[
-                    { key: "displayName", header: "Display Name" },
-                    { key: "samAccountName", header: "SAM Account" },
-                    { key: "currentState", header: "Current State" },
-                    { key: "proposedAction", header: "Proposed Action" },
-                    { key: "dn", header: "DN" },
+                    { key: "displayName", header: t("common:displayName") },
+                    { key: "samAccountName", header: t("samAccount") },
+                    { key: "currentState", header: t("currentState") },
+                    { key: "proposedAction", header: t("proposedAction") },
+                    { key: "dn", header: t("common:distinguishedName") },
                   ]}
                   data={dryRunResult.matches}
                   rowMapper={(m) => [
@@ -531,10 +534,10 @@ export function AutomatedCleanup() {
                 >
                   <Play size={14} />
                   {confirmDelete
-                    ? `Confirm DELETE (${selectedCount})`
+                    ? `${t("confirmDelete")} (${selectedCount})`
                     : executing
-                      ? "Executing..."
-                      : `Execute (${selectedCount})`}
+                      ? t("executing")
+                      : `${t("common:execute")} (${selectedCount})`}
                 </button>
               </div>
             </div>
@@ -546,7 +549,7 @@ export function AutomatedCleanup() {
               >
                 <AlertTriangle size={14} />
                 <span>
-                  This will permanently <strong>DELETE</strong> selected accounts. Click Execute again to confirm.
+                  {t("deleteWarning")}
                 </span>
               </div>
             )}
@@ -571,10 +574,10 @@ export function AutomatedCleanup() {
                         }}
                       />
                     </th>
-                    <th className="px-3 py-2 font-medium">Display Name</th>
-                    <th className="px-3 py-2 font-medium">SAM Account</th>
-                    <th className="px-3 py-2 font-medium">Current State</th>
-                    <th className="px-3 py-2 font-medium">Proposed Action</th>
+                    <th className="px-3 py-2 font-medium">{t("common:displayName")}</th>
+                    <th className="px-3 py-2 font-medium">{t("samAccount")}</th>
+                    <th className="px-3 py-2 font-medium">{t("currentState")}</th>
+                    <th className="px-3 py-2 font-medium">{t("proposedAction")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -624,15 +627,15 @@ export function AutomatedCleanup() {
         {executionResults && (
           <div className="space-y-3" data-testid="execution-results">
             <h3 className="text-body font-semibold text-[var(--color-text-primary)]">
-              Execution Results
+              {t("executionResults")}
             </h3>
             <div className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)]">
               <table className="w-full text-caption">
                 <thead>
                   <tr className="border-b border-[var(--color-border-default)] text-left text-[var(--color-text-secondary)]">
-                    <th className="px-3 py-2 font-medium">Account</th>
-                    <th className="px-3 py-2 font-medium">Action</th>
-                    <th className="px-3 py-2 text-center font-medium">Result</th>
+                    <th className="px-3 py-2 font-medium">{t("account")}</th>
+                    <th className="px-3 py-2 font-medium">{t("action")}</th>
+                    <th className="px-3 py-2 text-center font-medium">{t("result")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -642,19 +645,19 @@ export function AutomatedCleanup() {
                         {r.displayName}
                       </td>
                       <td className="px-3 py-2 text-[var(--color-text-secondary)]">
-                        {ACTION_LABELS[r.action]}
+                        {t(ACTION_KEYS[r.action])}
                       </td>
                       <td className="px-3 py-2 text-center">
                         {r.success ? (
                           <span className="inline-flex items-center gap-1 text-[var(--color-success)]">
-                            <CheckCircle size={12} /> OK
+                            <CheckCircle size={12} /> {t("common:ok")}
                           </span>
                         ) : (
                           <span
                             className="inline-flex items-center gap-1 text-[var(--color-error)]"
                             title={r.error ?? ""}
                           >
-                            <XCircle size={12} /> Failed
+                            <XCircle size={12} /> {t("common:fail")}
                           </span>
                         )}
                       </td>

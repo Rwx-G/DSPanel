@@ -1,0 +1,23 @@
+{
+  "dashboard": "Dashboard",
+  "activeDirectory": "Active Directory",
+  "currentSession": "Current Session",
+  "authenticatedAs": "Authenticated as",
+  "level": "Level",
+  "domainJoined": "Domain joined",
+  "environment": "Environment",
+  "mfaSecurity": "MFA Security",
+  "configured": "Configured",
+  "notConfigured": "Not configured",
+  "setupMfa": "Setup MFA",
+  "revokeMfa": "Revoke MFA",
+  "adGroupMemberships": "AD Group Memberships",
+  "notConnectedWarning": "Not connected to Active Directory. Directory lookups will not be available. Check that this machine is domain-joined and has network access to a domain controller.",
+  "generating": "Generating...",
+  "permissions": "Permissions",
+  "readOnly": "Read Only",
+  "helpDesk": "Help Desk",
+  "accountOperator": "Account Operator",
+  "admin": "Admin",
+  "domainAdmin": "Domain Admin"
+}
