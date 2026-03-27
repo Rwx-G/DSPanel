@@ -9,6 +9,62 @@ use ldap3::{LdapConnAsync, LdapConnSettings, Mod, Scope, SearchEntry};
 use crate::models::{ContactInfo, DirectoryEntry, OUNode, PrinterInfo};
 use crate::services::directory::DirectoryProvider;
 
+/// Resolves the DC FQDN from a domain name using DNS SRV lookup.
+///
+/// `sasl_gssapi_bind` needs the server FQDN for the Kerberos SPN
+/// (e.g., `ldap/dc01.corp.local`). When only the domain name is known
+/// (e.g., `corp.local` from `USERDNSDOMAIN`), this function queries
+/// `_ldap._tcp.<domain>` to find the actual DC hostname.
+///
+/// Falls back to the original host if:
+/// - The host is already a FQDN (more than 2 dot-separated parts)
+/// - DNS SRV resolution fails
+#[cfg(feature = "gssapi")]
+async fn resolve_dc_fqdn_for_gssapi(host: &str) -> String {
+    // If host already looks like a FQDN (e.g., dc01.corp.local), use it as-is
+    if host.split('.').count() > 2 {
+        return host.to_string();
+    }
+
+    // Try DNS SRV lookup: _ldap._tcp.<domain>
+    let srv_name = format!("_ldap._tcp.{}.", host);
+    tracing::debug!(srv_name = %srv_name, "Resolving DC FQDN via DNS SRV for GSSAPI");
+
+    let resolver = hickory_resolver::TokioResolver::builder_tokio()
+        .map(|b| b.build())
+        .unwrap_or_else(|_| {
+            hickory_resolver::TokioResolver::builder_with_config(
+                hickory_resolver::config::ResolverConfig::default(),
+                Default::default(),
+            )
+            .build()
+        });
+
+    match resolver.srv_lookup(&srv_name).await {
+        Ok(lookup) => {
+            if let Some(srv) = lookup.iter().next() {
+                let fqdn = srv.target().to_string();
+                let fqdn = fqdn.trim_end_matches('.').to_string();
+                tracing::info!(domain = %host, fqdn = %fqdn, "DC FQDN resolved via DNS SRV");
+                return fqdn;
+            }
+            tracing::warn!(domain = %host, "DNS SRV lookup returned no records");
+            host.to_string()
+        }
+        Err(e) => {
+            // Fallback: try LOGONSERVER env var (Windows only)
+            if let Ok(logon_server) = std::env::var("LOGONSERVER") {
+                let netbios = logon_server.trim_start_matches('\\');
+                let fqdn = format!("{}.{}", netbios, host);
+                tracing::info!(fqdn = %fqdn, "DC FQDN derived from LOGONSERVER");
+                return fqdn;
+            }
+            tracing::warn!(domain = %host, error = %e, "DNS SRV lookup failed, using domain as fallback");
+            host.to_string()
+        }
+    }
+}
+
 /// LDAP attributes to retrieve for user searches.
 const USER_ATTRS: &[&str] = &[
     "distinguishedName",
@@ -579,9 +635,15 @@ impl LdapDirectoryProvider {
             }
             LdapAuthMode::Gssapi => {
                 #[cfg(feature = "gssapi")]
-                ldap.sasl_gssapi_bind(&host)
-                    .await
-                    .context("GSSAPI (Kerberos) authentication failed")?;
+                {
+                    // sasl_gssapi_bind needs the server FQDN for the SPN (ldap/<fqdn>),
+                    // not the domain name. Resolve DC FQDN via DNS SRV lookup.
+                    let gssapi_host = resolve_dc_fqdn_for_gssapi(&host).await;
+                    tracing::debug!(gssapi_host = %gssapi_host, original_host = %host, "GSSAPI bind with resolved FQDN");
+                    ldap.sasl_gssapi_bind(&gssapi_host)
+                        .await
+                        .context("GSSAPI (Kerberos) authentication failed")?;
+                }
 
                 #[cfg(not(feature = "gssapi"))]
                 ldap.simple_bind("", "")
@@ -881,9 +943,12 @@ async fn create_fresh_connection(
         }
         LdapAuthMode::Gssapi => {
             #[cfg(feature = "gssapi")]
-            ldap.sasl_gssapi_bind(&host)
-                .await
-                .context("GSSAPI authentication failed")?;
+            {
+                let gssapi_host = resolve_dc_fqdn_for_gssapi(&host).await;
+                ldap.sasl_gssapi_bind(&gssapi_host)
+                    .await
+                    .context("GSSAPI authentication failed")?;
+            }
 
             #[cfg(not(feature = "gssapi"))]
             ldap.simple_bind("", "")

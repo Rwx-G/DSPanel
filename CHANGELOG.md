@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Fix GSSAPI/Kerberos authentication failing when only domain name is known: `sasl_gssapi_bind` was receiving the domain name (e.g., `DSPANEL.LOCAL`) instead of the DC FQDN (e.g., `dc01.dspanel.local`), causing SPN mismatch. Now resolves DC FQDN via DNS SRV lookup (`_ldap._tcp.<domain>`) with LOGONSERVER fallback.
+
 ## [1.0.0] - 2026-03-27
 
 ### Security
