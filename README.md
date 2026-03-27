@@ -1,4 +1,5 @@
 <p align="center">
+  <img src="docs/logo.png" alt="DSPanel" width="120">
   <h1 align="center">DSPanel</h1>
   <p align="center">Active Directory support and administration tool for Windows, macOS, and Linux.</p>
 </p>
