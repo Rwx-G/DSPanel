@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix vulnerable npm transitive dependencies (flatted, picomatch, brace-expansion)
 - Replace `std::env::temp_dir()` with `tempfile::tempdir()` in tests to prevent symlink race conditions
 - Add weekly dependency health check for critical single-maintainer crates (ldap3, qrcode)
+- Enforce `pnpm install --frozen-lockfile` in all CI workflows to prevent dependency drift
 
 ## [1.0.1] - 2026-03-27
 
