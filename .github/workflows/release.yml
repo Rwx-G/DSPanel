@@ -67,7 +67,7 @@ jobs:
           echo "PKG_CONFIG_PATH=$(brew --prefix krb5)/lib/pkgconfig" >> $GITHUB_ENV
 
       - name: Install frontend dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install
 
       - name: Run Rust tests
         working-directory: src-tauri

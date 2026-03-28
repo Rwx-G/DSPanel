@@ -48,9 +48,6 @@ pub struct AppSettings {
     /// Attack detection thresholds and exclusion lists.
     #[serde(default)]
     pub attack_detection_config: Option<crate::models::security::AttackDetectionConfig>,
-    /// Remote syslog forwarding for audit entries.
-    #[serde(default)]
-    pub syslog: Option<super::audit::SyslogSettings>,
 }
 
 /// Update check settings.

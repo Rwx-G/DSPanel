@@ -28,7 +28,6 @@ import {
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigation } from "@/contexts/NavigationContext";
-import { usePermissions } from "@/hooks/usePermissions";
 import { type SidebarModule } from "@/types/navigation";
 import { About } from "@/pages/About";
 
@@ -121,7 +120,7 @@ const MODULES: SidebarModule[] = [
     label: "Recycle Bin",
     icon: "recycle-bin",
     group: "Directory",
-    requiredLevel: "Admin",
+    requiredLevel: "DomainAdmin",
   },
   {
     id: "automated-cleanup",
@@ -135,49 +134,49 @@ const MODULES: SidebarModule[] = [
     label: "Infrastructure Health",
     icon: "activity",
     group: "Infrastructure",
-    requiredLevel: "Admin",
+    requiredLevel: "DomainAdmin",
   },
   {
     id: "replication-status",
     label: "Replication Status",
     icon: "git-branch",
     group: "Infrastructure",
-    requiredLevel: "Admin",
+    requiredLevel: "DomainAdmin",
   },
   {
     id: "dns-kerberos",
     label: "DNS & Kerberos",
     icon: "globe",
     group: "Infrastructure",
-    requiredLevel: "Admin",
+    requiredLevel: "DomainAdmin",
   },
   {
     id: "topology",
     label: "AD Topology",
     icon: "network",
     group: "Infrastructure",
-    requiredLevel: "Admin",
+    requiredLevel: "DomainAdmin",
   },
   {
     id: "gpo-viewer",
     label: "GPO Viewer",
     icon: "shield",
     group: "Infrastructure",
-    requiredLevel: "Admin",
+    requiredLevel: "DomainAdmin",
   },
   {
     id: "security-dashboard",
     label: "Privileged Accounts",
     icon: "shield",
     group: "Security",
-    requiredLevel: "Admin",
+    requiredLevel: "DomainAdmin",
   },
   {
     id: "risk-score",
     label: "Risk Score",
     icon: "gauge",
     group: "Security",
-    requiredLevel: "Admin",
+    requiredLevel: "DomainAdmin",
   },
   {
     id: "attack-detection",
@@ -191,7 +190,7 @@ const MODULES: SidebarModule[] = [
     label: "Escalation Paths",
     icon: "route",
     group: "Security",
-    requiredLevel: "Admin",
+    requiredLevel: "DomainAdmin",
   },
   {
     id: "compliance-reports",
@@ -266,7 +265,6 @@ interface SidebarProps {
 export function Sidebar({ expanded, onToggle }: SidebarProps) {
   const { t } = useTranslation(["sidebar", "common"]);
   const { openTab, activeTabId, openTabs, goHome } = useNavigation();
-  const { hasPermission } = usePermissions();
   const [showAbout, setShowAbout] = useState(false);
   const activeModuleId = openTabs.find((t) => t.id === activeTabId)?.moduleId;
 
@@ -310,7 +308,7 @@ export function Sidebar({ expanded, onToggle }: SidebarProps) {
     about: "about",
   };
 
-  const groups = MODULES.filter((mod) => hasPermission(mod.requiredLevel)).reduce(
+  const groups = MODULES.reduce(
     (acc, mod) => {
       if (!acc[mod.group]) acc[mod.group] = [];
       acc[mod.group].push(mod);

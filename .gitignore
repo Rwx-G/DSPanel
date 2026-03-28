@@ -25,7 +25,6 @@ Desktop.ini
 *.snk
 *.env
 *.env.*
-security-audit-*.md
 
 # SQLite databases (local audit log, snapshots)
 *.db

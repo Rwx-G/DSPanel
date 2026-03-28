@@ -2,7 +2,7 @@ use tauri::State;
 
 use crate::error::AppError;
 use crate::models::DirectoryEntry;
-use crate::services::audit::{AuditEntry, AuditFilter, AuditQueryResult, ChainVerification};
+use crate::services::audit::{AuditEntry, AuditFilter, AuditQueryResult};
 use crate::services::comparison::GroupComparisonResult;
 use crate::services::mfa::{MfaConfig, MfaSetupResult};
 use crate::services::password::{HibpResult, PasswordOptions};
@@ -551,25 +551,6 @@ pub(crate) fn purge_audit_entries_inner(
         );
     }
     Ok(deleted)
-}
-
-/// Verifies the hash chain integrity of the audit log.
-/// Requires DomainAdmin permission.
-#[tauri::command]
-pub fn verify_audit_chain(state: State<'_, AppState>) -> Result<ChainVerification, AppError> {
-    verify_audit_chain_inner(&state)
-}
-
-pub(crate) fn verify_audit_chain_inner(state: &AppState) -> Result<ChainVerification, AppError> {
-    if !state
-        .permission_service
-        .has_permission(PermissionLevel::DomainAdmin)
-    {
-        return Err(AppError::PermissionDenied(
-            "Audit chain verification requires DomainAdmin permission".to_string(),
-        ));
-    }
-    Ok(state.audit_service.verify_chain())
 }
 
 /// Adds a user to a group.

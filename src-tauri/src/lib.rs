@@ -193,11 +193,6 @@ pub fn run() {
                 }
             }
 
-            // Configure syslog forwarding from persisted settings
-            if let Some(ref syslog_cfg) = state.app_settings.get().syslog {
-                state.audit_service.configure_syslog(syslog_cfg);
-            }
-
             // Run audit log retention cleanup at startup
             {
                 let retention_days = state
@@ -216,6 +211,18 @@ pub fn run() {
                         "AuditPurge",
                         "audit_log",
                         &format!("Purged {} entries older than {} days", purged, retention_days),
+                    );
+                }
+            }
+
+            // Warn if MFA is configured on a non-Windows platform (no DPAPI encryption)
+            #[cfg(not(target_os = "windows"))]
+            {
+                if state.mfa_service.is_configured() {
+                    tracing::warn!(
+                        "MFA is configured but DPAPI is not available on this platform. \
+                         The TOTP secret in mfa.dat is NOT encrypted at rest. \
+                         See SECURITY.md for details."
                     );
                 }
             }
@@ -259,7 +266,6 @@ pub fn run() {
             commands::query_audit_log,
             commands::get_audit_action_types,
             commands::purge_audit_entries,
-            commands::verify_audit_chain,
             commands::generate_password,
             commands::check_password_hibp,
             commands::mfa_setup,

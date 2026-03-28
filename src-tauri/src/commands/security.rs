@@ -13,16 +13,16 @@ use crate::state::AppState;
 // ---------------------------------------------------------------------------
 
 /// Scans all privileged groups and returns accounts with security alerts.
-/// Requires Admin permission.
+/// Requires DomainAdmin permission.
 pub(crate) async fn get_privileged_accounts_inner(
     state: &AppState,
 ) -> Result<PrivilegedAccountsReport, AppError> {
     if !state
         .permission_service
-        .has_permission(PermissionLevel::Admin)
+        .has_permission(PermissionLevel::DomainAdmin)
     {
         return Err(AppError::PermissionDenied(
-            "Privileged accounts scan requires Admin permission".to_string(),
+            "Privileged accounts scan requires DomainAdmin permission".to_string(),
         ));
     }
 
@@ -53,14 +53,14 @@ pub async fn get_privileged_accounts(
 // Domain Risk Score - Inner functions (Story 9.2)
 // ---------------------------------------------------------------------------
 
-/// Computes the domain risk score. Requires Admin.
+/// Computes the domain risk score. Requires DomainAdmin.
 pub(crate) async fn get_risk_score_inner(state: &AppState) -> Result<RiskScoreResult, AppError> {
     if !state
         .permission_service
-        .has_permission(PermissionLevel::Admin)
+        .has_permission(PermissionLevel::DomainAdmin)
     {
         return Err(AppError::PermissionDenied(
-            "Risk score computation requires Admin permission".to_string(),
+            "Risk score computation requires DomainAdmin permission".to_string(),
         ));
     }
 
@@ -78,17 +78,17 @@ pub(crate) async fn get_risk_score_inner(state: &AppState) -> Result<RiskScoreRe
     Ok(result)
 }
 
-/// Returns the risk score history for the last N days. Requires Admin.
+/// Returns the risk score history for the last N days. Requires DomainAdmin.
 pub(crate) fn get_risk_score_history_inner(
     state: &AppState,
     days: u32,
 ) -> Result<Vec<RiskScoreHistory>, AppError> {
     if !state
         .permission_service
-        .has_permission(PermissionLevel::Admin)
+        .has_permission(PermissionLevel::DomainAdmin)
     {
         return Err(AppError::PermissionDenied(
-            "Risk score history requires Admin permission".to_string(),
+            "Risk score history requires DomainAdmin permission".to_string(),
         ));
     }
 
@@ -153,16 +153,16 @@ pub async fn detect_ad_attacks(
 // Escalation Paths - Inner functions (Story 9.4)
 // ---------------------------------------------------------------------------
 
-/// Builds the privilege escalation graph. Requires Admin.
+/// Builds the privilege escalation graph. Requires DomainAdmin.
 pub(crate) async fn get_escalation_paths_inner(
     state: &AppState,
 ) -> Result<EscalationGraphResult, AppError> {
     if !state
         .permission_service
-        .has_permission(PermissionLevel::Admin)
+        .has_permission(PermissionLevel::DomainAdmin)
     {
         return Err(AppError::PermissionDenied(
-            "Escalation path visualization requires Admin permission".to_string(),
+            "Escalation path visualization requires DomainAdmin permission".to_string(),
         ));
     }
 

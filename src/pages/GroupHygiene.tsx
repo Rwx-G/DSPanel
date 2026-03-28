@@ -205,7 +205,7 @@ export function GroupHygiene() {
 
   const [showInfo, setShowInfo] = useState(false);
   const { hasPermission } = usePermissions();
-  const canDelete = hasPermission("AccountOperator");
+  const canDelete = hasPermission("Admin");
   const { openTab } = useNavigation();
 
   const handleScan = useCallback(async () => {

@@ -1,8 +1,6 @@
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use std::fs;
-use std::net::UdpSocket;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
@@ -18,116 +16,20 @@ pub struct AuditEntry {
     pub success: bool,
 }
 
-/// Result of hash chain verification.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ChainVerification {
-    pub valid: bool,
-    pub total_entries: usize,
-    pub verified_entries: usize,
-    /// ID of the first tampered entry, if any.
-    pub first_invalid_id: Option<i64>,
-}
-
-/// Remote syslog forwarding configuration.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SyslogSettings {
-    /// Enable remote syslog forwarding.
-    #[serde(default)]
-    pub enabled: bool,
-    /// Syslog server hostname or IP address.
-    #[serde(default)]
-    pub host: String,
-    /// Syslog server port (default: 514).
-    #[serde(default = "default_syslog_port")]
-    pub port: u16,
-}
-
-fn default_syslog_port() -> u16 {
-    514
-}
-
-impl Default for SyslogSettings {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            host: String::new(),
-            port: 514,
-        }
-    }
-}
-
 /// Service for recording audit trail of sensitive operations.
 ///
 /// Every write operation (password reset, account enable/disable, flag changes)
 /// must be logged through this service. Password values are never recorded.
-/// Entries are stored in a SQLite database with hash-chain integrity.
-/// Optionally forwards entries to a remote syslog server (RFC 5424 UDP).
+/// Entries are stored in a SQLite database for durability and query performance.
 pub struct AuditService {
     conn: Mutex<Connection>,
     operator: Mutex<String>,
-    syslog: Mutex<Option<SyslogForwarder>>,
-}
-
-/// Lightweight UDP syslog forwarder (RFC 5424).
-struct SyslogForwarder {
-    socket: UdpSocket,
-    addr: String,
 }
 
 impl Default for AuditService {
     fn default() -> Self {
         Self::new()
     }
-}
-
-impl SyslogForwarder {
-    fn new(settings: &SyslogSettings) -> Option<Self> {
-        if !settings.enabled || settings.host.is_empty() {
-            return None;
-        }
-        let addr = format!("{}:{}", settings.host, settings.port);
-        match UdpSocket::bind("0.0.0.0:0") {
-            Ok(socket) => {
-                tracing::info!(addr = %addr, "Syslog forwarder initialized");
-                Some(Self { socket, addr })
-            }
-            Err(e) => {
-                tracing::warn!("Failed to create syslog UDP socket: {}", e);
-                None
-            }
-        }
-    }
-
-    /// Sends one audit entry as an RFC 5424 syslog message (facility=local0, severity=info/warning).
-    fn send(&self, entry: &AuditEntry) {
-        // RFC 5424: <PRI>VERSION SP TIMESTAMP SP HOSTNAME SP APP-NAME SP PROCID SP MSGID SP MSG
-        // facility=16 (local0), severity=6 (info) or 4 (warning)
-        let severity: u8 = if entry.success { 6 } else { 4 };
-        let priority = 16 * 8 + severity;
-        let hostname = gethostname();
-        let msg = format!(
-            "<{}>1 {} {} DSPanel - - [operator=\"{}\" action=\"{}\" target=\"{}\" success={}] {}",
-            priority,
-            entry.timestamp,
-            hostname,
-            entry.operator,
-            entry.action,
-            entry.target_dn,
-            entry.success,
-            entry.details,
-        );
-        if let Err(e) = self.socket.send_to(msg.as_bytes(), &self.addr) {
-            tracing::debug!("Syslog send failed: {}", e);
-        }
-    }
-}
-
-fn gethostname() -> String {
-    std::env::var("COMPUTERNAME")
-        .or_else(|_| std::env::var("HOSTNAME"))
-        .unwrap_or_else(|_| "unknown".to_string())
 }
 
 impl AuditService {
@@ -150,15 +52,9 @@ impl AuditService {
         let svc = Self {
             conn: Mutex::new(conn),
             operator: Mutex::new(operator),
-            syslog: Mutex::new(None),
         };
         svc.init_schema();
         svc
-    }
-
-    /// Configures remote syslog forwarding. Call after settings are loaded.
-    pub fn configure_syslog(&self, settings: &SyslogSettings) {
-        *self.syslog.lock().expect("lock poisoned") = SyslogForwarder::new(settings);
     }
 
     /// Updates the operator identity (called after WhoAmI resolves the
@@ -175,7 +71,6 @@ impl AuditService {
         let svc = Self {
             conn: Mutex::new(conn),
             operator: Mutex::new(std::env::var("USERNAME").unwrap_or_else(|_| "Test".to_string())),
-            syslog: Mutex::new(None),
         };
         svc.init_schema();
         svc
@@ -202,52 +97,20 @@ impl AuditService {
                 action TEXT NOT NULL,
                 target_dn TEXT NOT NULL,
                 details TEXT NOT NULL,
-                success INTEGER NOT NULL,
-                hash TEXT NOT NULL DEFAULT '',
-                prev_hash TEXT NOT NULL DEFAULT ''
+                success INTEGER NOT NULL
             );
             CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit_entries(timestamp);
             CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_entries(action);",
         ) {
             tracing::error!("Failed to initialize audit schema: {}", e);
         }
-        // Migrate existing databases that lack the hash columns
-        let _ = conn.execute_batch(
-            "ALTER TABLE audit_entries ADD COLUMN hash TEXT NOT NULL DEFAULT '';
-             ALTER TABLE audit_entries ADD COLUMN prev_hash TEXT NOT NULL DEFAULT '';",
-        );
-    }
-
-    /// Computes the SHA-256 hash for an audit entry given the previous hash.
-    fn compute_hash(prev_hash: &str, entry: &AuditEntry) -> String {
-        let mut hasher = Sha256::new();
-        hasher.update(prev_hash.as_bytes());
-        hasher.update(entry.timestamp.as_bytes());
-        hasher.update(entry.operator.as_bytes());
-        hasher.update(entry.action.as_bytes());
-        hasher.update(entry.target_dn.as_bytes());
-        hasher.update(entry.details.as_bytes());
-        hasher.update(if entry.success { b"1" } else { b"0" });
-        format!("{:x}", hasher.finalize())
     }
 
     fn insert_entry(&self, entry: &AuditEntry) {
         let conn = self.conn.lock().expect("lock poisoned");
-
-        // Fetch the hash of the last entry to chain
-        let prev_hash: String = conn
-            .query_row(
-                "SELECT hash FROM audit_entries ORDER BY id DESC LIMIT 1",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap_or_default();
-
-        let hash = Self::compute_hash(&prev_hash, entry);
-
         if let Err(e) = conn.execute(
-            "INSERT INTO audit_entries (timestamp, operator, action, target_dn, details, success, hash, prev_hash)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            "INSERT INTO audit_entries (timestamp, operator, action, target_dn, details, success)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
             rusqlite::params![
                 entry.timestamp,
                 entry.operator,
@@ -255,16 +118,9 @@ impl AuditService {
                 entry.target_dn,
                 entry.details,
                 entry.success as i32,
-                hash,
-                prev_hash,
             ],
         ) {
             tracing::error!("Failed to insert audit entry: {}", e);
-        }
-
-        // Forward to syslog if configured
-        if let Some(ref fwd) = *self.syslog.lock().expect("lock poisoned") {
-            fwd.send(entry);
         }
     }
 
@@ -487,106 +343,6 @@ impl AuditService {
         )
         .unwrap_or(0)
     }
-
-    /// Verifies the hash chain integrity of the audit log.
-    ///
-    /// Walks all entries from oldest to newest and recomputes each hash.
-    /// Returns a report indicating whether the chain is intact and, if not,
-    /// the ID of the first tampered entry.
-    pub fn verify_chain(&self) -> ChainVerification {
-        let conn = self.conn.lock().expect("lock poisoned");
-        let mut stmt = match conn.prepare(
-            "SELECT id, timestamp, operator, action, target_dn, details, success, hash, prev_hash
-             FROM audit_entries ORDER BY id ASC",
-        ) {
-            Ok(s) => s,
-            Err(e) => {
-                tracing::error!("Failed to prepare chain verification query: {}", e);
-                return ChainVerification {
-                    valid: false,
-                    total_entries: 0,
-                    verified_entries: 0,
-                    first_invalid_id: None,
-                };
-            }
-        };
-
-        struct Row {
-            id: i64,
-            entry: AuditEntry,
-            hash: String,
-            prev_hash: String,
-        }
-
-        let rows: Vec<Row> = match stmt.query_map([], |row| {
-            Ok(Row {
-                id: row.get(0)?,
-                entry: AuditEntry {
-                    timestamp: row.get(1)?,
-                    operator: row.get(2)?,
-                    action: row.get(3)?,
-                    target_dn: row.get(4)?,
-                    details: row.get(5)?,
-                    success: row.get::<_, i32>(6)? != 0,
-                },
-                hash: row.get(7)?,
-                prev_hash: row.get(8)?,
-            })
-        }) {
-            Ok(iter) => iter.filter_map(|r| r.ok()).collect(),
-            Err(e) => {
-                tracing::error!("Failed to query for chain verification: {}", e);
-                return ChainVerification {
-                    valid: false,
-                    total_entries: 0,
-                    verified_entries: 0,
-                    first_invalid_id: None,
-                };
-            }
-        };
-
-        let total = rows.len();
-        let mut expected_prev = String::new();
-        let mut verified = 0usize;
-
-        for row in &rows {
-            // Skip legacy entries that predate the hash chain (empty hash)
-            if row.hash.is_empty() {
-                expected_prev = String::new();
-                verified += 1;
-                continue;
-            }
-
-            if row.prev_hash != expected_prev {
-                return ChainVerification {
-                    valid: false,
-                    total_entries: total,
-                    verified_entries: verified,
-                    first_invalid_id: Some(row.id),
-                };
-            }
-
-            let recomputed = Self::compute_hash(&row.prev_hash, &row.entry);
-            if recomputed != row.hash {
-                return ChainVerification {
-                    valid: false,
-                    total_entries: total,
-                    verified_entries: verified,
-                    first_invalid_id: Some(row.id),
-                };
-            }
-
-            expected_prev = row.hash.clone();
-            verified += 1;
-        }
-
-        ChainVerification {
-            valid: true,
-            total_entries: total,
-            verified_entries: verified,
-            first_invalid_id: None,
-        }
-    }
 }
 
 /// Filter parameters for querying audit entries.
@@ -730,8 +486,10 @@ mod tests {
 
     #[test]
     fn test_persist_and_reload() {
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("audit-test.db");
+        let dir = std::env::temp_dir().join("dspanel_test_audit_sqlite");
+        let _ = fs::create_dir_all(&dir);
+        let path = dir.join("audit-test.db");
+        let _ = fs::remove_file(&path);
 
         // Write
         {
@@ -739,7 +497,6 @@ mod tests {
             let svc = AuditService {
                 conn: Mutex::new(conn),
                 operator: Mutex::new("test".to_string()),
-                syslog: Mutex::new(None),
             };
             svc.init_schema();
             svc.log_success("TestAction", "CN=Test", "test details");
@@ -752,13 +509,16 @@ mod tests {
             let svc = AuditService {
                 conn: Mutex::new(conn),
                 operator: Mutex::new("test".to_string()),
-                syslog: Mutex::new(None),
             };
             svc.init_schema();
             assert_eq!(svc.count(), 1);
             let entries = svc.get_entries();
             assert_eq!(entries[0].action, "TestAction");
         }
+
+        // Cleanup
+        let _ = fs::remove_file(&path);
+        let _ = fs::remove_dir(&dir);
     }
 
     #[test]
@@ -819,7 +579,6 @@ mod tests {
         let svc = AuditService {
             conn: Mutex::new(conn),
             operator: Mutex::new("test".to_string()),
-            syslog: Mutex::new(None),
         };
         svc.init_schema();
         svc.init_schema(); // second call - should be a no-op
@@ -1099,206 +858,5 @@ mod tests {
         let deleted = svc.purge_older_than(365);
         assert_eq!(deleted, 0);
         assert_eq!(svc.count(), 1);
-    }
-
-    // -----------------------------------------------------------------------
-    // Hash chain tests
-    // -----------------------------------------------------------------------
-
-    #[test]
-    fn test_verify_chain_empty_log() {
-        let svc = AuditService::new_in_memory();
-        let result = svc.verify_chain();
-        assert!(result.valid);
-        assert_eq!(result.total_entries, 0);
-        assert_eq!(result.verified_entries, 0);
-        assert!(result.first_invalid_id.is_none());
-    }
-
-    #[test]
-    fn test_verify_chain_single_entry() {
-        let svc = AuditService::new_in_memory();
-        svc.log_success("A", "dn", "d");
-        let result = svc.verify_chain();
-        assert!(result.valid);
-        assert_eq!(result.total_entries, 1);
-        assert_eq!(result.verified_entries, 1);
-    }
-
-    #[test]
-    fn test_verify_chain_multiple_entries() {
-        let svc = AuditService::new_in_memory();
-        svc.log_success("A", "dn1", "d1");
-        svc.log_failure("B", "dn2", "d2");
-        svc.log_success("C", "dn3", "d3");
-        let result = svc.verify_chain();
-        assert!(result.valid);
-        assert_eq!(result.total_entries, 3);
-        assert_eq!(result.verified_entries, 3);
-    }
-
-    #[test]
-    fn test_verify_chain_detects_tampered_hash() {
-        let svc = AuditService::new_in_memory();
-        svc.log_success("A", "dn1", "d1");
-        svc.log_success("B", "dn2", "d2");
-        svc.log_success("C", "dn3", "d3");
-
-        // Tamper with the hash of the second entry
-        {
-            let conn = svc.conn.lock().unwrap();
-            conn.execute(
-                "UPDATE audit_entries SET hash = 'tampered' WHERE id = 2",
-                [],
-            )
-            .unwrap();
-        }
-
-        let result = svc.verify_chain();
-        assert!(!result.valid);
-        assert_eq!(result.first_invalid_id, Some(2));
-    }
-
-    #[test]
-    fn test_verify_chain_detects_tampered_content() {
-        let svc = AuditService::new_in_memory();
-        svc.log_success("A", "dn1", "original");
-        svc.log_success("B", "dn2", "d2");
-
-        // Tamper with content but leave hash intact
-        {
-            let conn = svc.conn.lock().unwrap();
-            conn.execute(
-                "UPDATE audit_entries SET details = 'forged' WHERE id = 1",
-                [],
-            )
-            .unwrap();
-        }
-
-        let result = svc.verify_chain();
-        assert!(!result.valid);
-        assert_eq!(result.first_invalid_id, Some(1));
-    }
-
-    #[test]
-    fn test_verify_chain_detects_broken_prev_hash() {
-        let svc = AuditService::new_in_memory();
-        svc.log_success("A", "dn1", "d1");
-        svc.log_success("B", "dn2", "d2");
-
-        // Break the chain by changing prev_hash of second entry
-        {
-            let conn = svc.conn.lock().unwrap();
-            conn.execute(
-                "UPDATE audit_entries SET prev_hash = 'wrong' WHERE id = 2",
-                [],
-            )
-            .unwrap();
-        }
-
-        let result = svc.verify_chain();
-        assert!(!result.valid);
-        assert_eq!(result.first_invalid_id, Some(2));
-    }
-
-    #[test]
-    fn test_hash_chain_entries_have_non_empty_hash() {
-        let svc = AuditService::new_in_memory();
-        svc.log_success("A", "dn", "d");
-
-        let conn = svc.conn.lock().unwrap();
-        let hash: String = conn
-            .query_row("SELECT hash FROM audit_entries WHERE id = 1", [], |row| {
-                row.get(0)
-            })
-            .unwrap();
-        assert!(!hash.is_empty());
-        // SHA-256 hex = 64 chars
-        assert_eq!(hash.len(), 64);
-    }
-
-    #[test]
-    fn test_hash_chain_first_entry_has_empty_prev_hash() {
-        let svc = AuditService::new_in_memory();
-        svc.log_success("A", "dn", "d");
-
-        let conn = svc.conn.lock().unwrap();
-        let prev: String = conn
-            .query_row(
-                "SELECT prev_hash FROM audit_entries WHERE id = 1",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap();
-        assert!(prev.is_empty());
-    }
-
-    #[test]
-    fn test_hash_chain_second_entry_chains_to_first() {
-        let svc = AuditService::new_in_memory();
-        svc.log_success("A", "dn1", "d1");
-        svc.log_success("B", "dn2", "d2");
-
-        let conn = svc.conn.lock().unwrap();
-        let first_hash: String = conn
-            .query_row("SELECT hash FROM audit_entries WHERE id = 1", [], |row| {
-                row.get(0)
-            })
-            .unwrap();
-        let second_prev: String = conn
-            .query_row(
-                "SELECT prev_hash FROM audit_entries WHERE id = 2",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap();
-        assert_eq!(first_hash, second_prev);
-    }
-
-    #[test]
-    fn test_chain_verification_serialization() {
-        let v = ChainVerification {
-            valid: true,
-            total_entries: 5,
-            verified_entries: 5,
-            first_invalid_id: None,
-        };
-        let json = serde_json::to_string(&v).unwrap();
-        assert!(json.contains("totalEntries"));
-        assert!(json.contains("verifiedEntries"));
-    }
-
-    // -----------------------------------------------------------------------
-    // Syslog settings tests
-    // -----------------------------------------------------------------------
-
-    #[test]
-    fn test_syslog_settings_default() {
-        let s = SyslogSettings::default();
-        assert!(!s.enabled);
-        assert!(s.host.is_empty());
-        assert_eq!(s.port, 514);
-    }
-
-    #[test]
-    fn test_syslog_settings_serialization() {
-        let s = SyslogSettings {
-            enabled: true,
-            host: "192.168.1.10".to_string(),
-            port: 1514,
-        };
-        let json = serde_json::to_string(&s).unwrap();
-        assert!(json.contains("192.168.1.10"));
-        let loaded: SyslogSettings = serde_json::from_str(&json).unwrap();
-        assert!(loaded.enabled);
-        assert_eq!(loaded.port, 1514);
-    }
-
-    #[test]
-    fn test_syslog_settings_backwards_compat() {
-        let json = "{}";
-        let s: SyslogSettings = serde_json::from_str(json).unwrap();
-        assert!(!s.enabled);
-        assert_eq!(s.port, 514);
     }
 }
