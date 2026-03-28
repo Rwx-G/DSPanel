@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-03-28
+
 ### Security
 
 - Use OS keychain (macOS Keychain / Linux Secret Service) for MFA secret storage on non-Windows platforms instead of unencrypted base64 file
