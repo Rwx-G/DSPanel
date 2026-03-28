@@ -5,9 +5,9 @@ use serde::{Deserialize, Serialize};
 use sha1::Sha1;
 use std::collections::HashMap;
 use std::sync::Mutex;
+use std::time::Instant;
 #[cfg(target_os = "windows")]
 use std::{fs, path::PathBuf};
-use std::time::Instant;
 use zeroize::Zeroize;
 
 type HmacSha1 = Hmac<Sha1>;

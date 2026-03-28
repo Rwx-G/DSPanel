@@ -1208,11 +1208,9 @@ mod tests {
 
         let conn = svc.conn.lock().unwrap();
         let hash: String = conn
-            .query_row(
-                "SELECT hash FROM audit_entries WHERE id = 1",
-                [],
-                |row| row.get(0),
-            )
+            .query_row("SELECT hash FROM audit_entries WHERE id = 1", [], |row| {
+                row.get(0)
+            })
             .unwrap();
         assert!(!hash.is_empty());
         // SHA-256 hex = 64 chars
@@ -1243,11 +1241,9 @@ mod tests {
 
         let conn = svc.conn.lock().unwrap();
         let first_hash: String = conn
-            .query_row(
-                "SELECT hash FROM audit_entries WHERE id = 1",
-                [],
-                |row| row.get(0),
-            )
+            .query_row("SELECT hash FROM audit_entries WHERE id = 1", [], |row| {
+                row.get(0)
+            })
             .unwrap();
         let second_prev: String = conn
             .query_row(

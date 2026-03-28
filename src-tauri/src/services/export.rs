@@ -201,18 +201,22 @@ pub fn export_to_pdf(
     let header_row_height: f32 = 6.0;
 
     /// Helper: emit ops to write text at (x, y) with given font and size.
-    fn text_ops(
-        text: &str,
-        size: f32,
-        x: f32,
-        y: f32,
-        font: &PdfFontHandle,
-    ) -> Vec<Op> {
+    fn text_ops(text: &str, size: f32, x: f32, y: f32, font: &PdfFontHandle) -> Vec<Op> {
         vec![
             Op::StartTextSection,
-            Op::SetTextCursor { pos: Point { x: Mm(x).into(), y: Mm(y).into() } },
-            Op::SetFont { font: font.clone(), size: Pt(size) },
-            Op::ShowText { items: vec![TextItem::Text(text.to_string())] },
+            Op::SetTextCursor {
+                pos: Point {
+                    x: Mm(x).into(),
+                    y: Mm(y).into(),
+                },
+            },
+            Op::SetFont {
+                font: font.clone(),
+                size: Pt(size),
+            },
+            Op::ShowText {
+                items: vec![TextItem::Text(text.to_string())],
+            },
             Op::EndTextSection,
         ]
     }
@@ -242,7 +246,11 @@ pub fn export_to_pdf(
             // Footer on current page
             let footer = format!("Page {page_num}");
             ops.extend(text_ops(
-                &footer, 7.0, page_width_mm / 2.0 - 5.0, 5.0, &font_regular,
+                &footer,
+                7.0,
+                page_width_mm / 2.0 - 5.0,
+                5.0,
+                &font_regular,
             ));
 
             // Finalize current page
@@ -264,7 +272,11 @@ pub fn export_to_pdf(
     // Footer on last page
     let footer = format!("Page {page_num}");
     ops.extend(text_ops(
-        &footer, 7.0, page_width_mm / 2.0 - 5.0, 5.0, &font_regular,
+        &footer,
+        7.0,
+        page_width_mm / 2.0 - 5.0,
+        5.0,
+        &font_regular,
     ));
     pages.push(PdfPage::new(Mm(page_width_mm), Mm(page_height_mm), ops));
 
