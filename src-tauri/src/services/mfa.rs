@@ -67,6 +67,8 @@ pub struct MfaService {
     /// Path to the DPAPI-encrypted file (Windows only).
     #[cfg(target_os = "windows")]
     persist_path: Option<PathBuf>,
+    /// When true, skip all persistence (keyring/DPAPI). Used in tests.
+    in_memory: bool,
     failed_attempts: Mutex<u32>,
     last_verified: Mutex<Option<Instant>>,
     /// Cache of recently used TOTP codes to prevent replay attacks.
@@ -97,6 +99,7 @@ impl MfaService {
             config: Mutex::new(MfaConfig::default()),
             #[cfg(target_os = "windows")]
             persist_path: Self::resolve_persist_path(),
+            in_memory: false,
             failed_attempts: Mutex::new(0),
             last_verified: Mutex::new(None),
             used_codes: Mutex::new(HashMap::new()),
@@ -113,6 +116,7 @@ impl MfaService {
             config: Mutex::new(MfaConfig::default()),
             #[cfg(target_os = "windows")]
             persist_path: None,
+            in_memory: true,
             failed_attempts: Mutex::new(0),
             last_verified: Mutex::new(None),
             used_codes: Mutex::new(HashMap::new()),
@@ -149,6 +153,9 @@ impl MfaService {
 
     #[cfg(target_os = "windows")]
     fn persist(&self) {
+        if self.in_memory {
+            return;
+        }
         if let Some(ref path) = self.persist_path {
             let secret = self.secret.lock().expect("lock poisoned");
             if let Some(ref s) = *secret {
@@ -199,6 +206,9 @@ impl MfaService {
 
     #[cfg(not(target_os = "windows"))]
     fn persist(&self) {
+        if self.in_memory {
+            return;
+        }
         let secret = self.secret.lock().expect("lock poisoned");
         if let Some(ref s) = *secret {
             use base64::Engine;
@@ -409,6 +419,9 @@ impl MfaService {
 
     #[cfg(not(target_os = "windows"))]
     fn delete_persisted(&self) {
+        if self.in_memory {
+            return;
+        }
         if let Ok(entry) = keyring::Entry::new(KEYRING_SERVICE, KEYRING_KEY) {
             let _ = entry.delete_credential();
         }
