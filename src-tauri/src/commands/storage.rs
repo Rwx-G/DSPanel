@@ -14,14 +14,14 @@ use super::capture_snapshot;
 // Recycle Bin commands
 // ---------------------------------------------------------------------------
 
-/// Checks whether the AD Recycle Bin feature is enabled. Requires DomainAdmin.
+/// Checks whether the AD Recycle Bin feature is enabled. Requires Admin.
 pub(crate) async fn is_recycle_bin_enabled_inner(state: &AppState) -> Result<bool, AppError> {
     if !state
         .permission_service
-        .has_permission(PermissionLevel::DomainAdmin)
+        .has_permission(PermissionLevel::Admin)
     {
         return Err(AppError::PermissionDenied(
-            "Recycle Bin access requires DomainAdmin permission".to_string(),
+            "Recycle Bin access requires Admin permission".to_string(),
         ));
     }
 
@@ -32,16 +32,16 @@ pub(crate) async fn is_recycle_bin_enabled_inner(state: &AppState) -> Result<boo
         .map_err(|e| AppError::Directory(e.to_string()))
 }
 
-/// Lists deleted objects from the AD Recycle Bin. Requires DomainAdmin.
+/// Lists deleted objects from the AD Recycle Bin. Requires Admin.
 pub(crate) async fn get_deleted_objects_inner(
     state: &AppState,
 ) -> Result<Vec<DeletedObject>, AppError> {
     if !state
         .permission_service
-        .has_permission(PermissionLevel::DomainAdmin)
+        .has_permission(PermissionLevel::Admin)
     {
         return Err(AppError::PermissionDenied(
-            "Recycle Bin access requires DomainAdmin permission".to_string(),
+            "Recycle Bin access requires Admin permission".to_string(),
         ));
     }
 
