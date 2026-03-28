@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 
 - Use OS keychain (macOS Keychain / Linux Secret Service) for MFA secret storage on non-Windows platforms instead of unencrypted base64 file
+- Add SHA-256 hash chain to audit log entries for tamper detection
+- Add remote syslog forwarding (RFC 5424 UDP) for audit entries with configurable host/port
+- Add `verify_audit_chain` IPC command (DomainAdmin) to verify audit log integrity
 
 ## [1.0.1] - 2026-03-27
 

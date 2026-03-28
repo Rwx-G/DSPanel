@@ -33,7 +33,8 @@ DSPanel interacts directly with Active Directory and can perform privileged oper
 
 - All AD communication uses secure protocols (LDAPS / Kerberos)
 - No credentials are stored locally (Windows Integrated Authentication)
-- All write operations are logged in the internal audit trail
+- All write operations are logged in the internal audit trail with SHA-256 hash chain integrity
+- Optional remote syslog forwarding (RFC 5424 UDP) for tamper-resistant external logging
 - Permission levels are enforced at the service layer, not just the UI
 - Object snapshots are taken before any modification for rollback capability
 - Sensitive data in memory (LDAP passwords, TOTP secrets) is zeroized on drop
