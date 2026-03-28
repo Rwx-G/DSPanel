@@ -592,6 +592,11 @@ describe("PresetManagement", () => {
     await waitForEditorReady();
     fireEvent.click(screen.getByTestId("preset-new-btn"));
 
+    // Wait for editor to render after new preset creation
+    await waitFor(() => {
+      expect(screen.getByTestId("preset-name-input")).toBeDefined();
+    });
+
     // Fill name and target OU (but no groups or attributes)
     fireEvent.change(screen.getByTestId("preset-name-input"), {
       target: { value: "Empty Preset" },
