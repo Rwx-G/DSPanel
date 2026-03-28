@@ -381,10 +381,8 @@ mod tests {
 
     #[test]
     fn test_persist_and_reload() {
-        let dir = std::env::temp_dir().join("dspanel_test_obj_snapshot_sqlite");
-        let _ = fs::create_dir_all(&dir);
-        let path = dir.join("snapshot-test.db");
-        let _ = fs::remove_file(&path);
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("snapshot-test.db");
 
         // Write
         {
@@ -408,9 +406,5 @@ mod tests {
             let history = svc.get_history("CN=Test");
             assert_eq!(history[0].operation_type, "TestOp");
         }
-
-        // Cleanup
-        let _ = fs::remove_file(&path);
-        let _ = fs::remove_dir(&dir);
     }
 }

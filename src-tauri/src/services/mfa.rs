@@ -4,10 +4,10 @@ use rand::RngExt;
 use serde::{Deserialize, Serialize};
 use sha1::Sha1;
 use std::collections::HashMap;
-use std::fs;
-use std::path::PathBuf;
 use std::sync::Mutex;
 use std::time::Instant;
+#[cfg(target_os = "windows")]
+use std::{fs, path::PathBuf};
 use zeroize::Zeroize;
 
 type HmacSha1 = Hmac<Sha1>;
@@ -57,13 +57,18 @@ struct MfaPersistedData {
 
 /// TOTP-based MFA service implementing RFC 6238.
 ///
-/// The shared secret and backup codes are persisted to a local file
-/// in the user's app data directory for durability across restarts.
+/// The shared secret and backup codes are persisted for durability across
+/// restarts. On Windows, uses DPAPI-encrypted file (`mfa.dat`). On
+/// macOS/Linux, uses the OS keychain via the `keyring` crate.
 pub struct MfaService {
     secret: Mutex<Option<Vec<u8>>>,
     backup_codes: Mutex<Vec<String>>,
     config: Mutex<MfaConfig>,
+    /// Path to the DPAPI-encrypted file (Windows only).
+    #[cfg(target_os = "windows")]
     persist_path: Option<PathBuf>,
+    /// When true, skip all persistence (keyring/DPAPI). Used in tests.
+    in_memory: bool,
     failed_attempts: Mutex<u32>,
     last_verified: Mutex<Option<Instant>>,
     /// Cache of recently used TOTP codes to prevent replay attacks.
@@ -77,26 +82,31 @@ impl Default for MfaService {
     }
 }
 
+/// Keyring service name used on non-Windows platforms.
+#[cfg(not(target_os = "windows"))]
+const KEYRING_SERVICE: &str = "DSPanel-MFA";
+/// Keyring key for the MFA secret + backup codes JSON blob.
+#[cfg(not(target_os = "windows"))]
+const KEYRING_KEY: &str = "mfa_data";
+
 impl MfaService {
     pub fn new() -> Self {
-        let persist_path = Self::resolve_persist_path();
-        let (secret, backup_codes) = persist_path
-            .as_ref()
-            .and_then(Self::load_from_file)
-            .unwrap_or((None, Vec::new()));
+        let (secret, backup_codes) = Self::load_persisted().unwrap_or((None, Vec::new()));
 
         Self {
             secret: Mutex::new(secret),
             backup_codes: Mutex::new(backup_codes),
             config: Mutex::new(MfaConfig::default()),
-            persist_path,
+            #[cfg(target_os = "windows")]
+            persist_path: Self::resolve_persist_path(),
+            in_memory: false,
             failed_attempts: Mutex::new(0),
             last_verified: Mutex::new(None),
             used_codes: Mutex::new(HashMap::new()),
         }
     }
 
-    /// Creates an MfaService without file persistence (for testing).
+    /// Creates an MfaService without persistence (for testing).
     #[allow(clippy::unwrap_used)]
     #[cfg(test)]
     pub fn new_in_memory() -> Self {
@@ -104,17 +114,22 @@ impl MfaService {
             secret: Mutex::new(None),
             backup_codes: Mutex::new(Vec::new()),
             config: Mutex::new(MfaConfig::default()),
+            #[cfg(target_os = "windows")]
             persist_path: None,
+            in_memory: true,
             failed_attempts: Mutex::new(0),
             last_verified: Mutex::new(None),
             used_codes: Mutex::new(HashMap::new()),
         }
     }
 
+    // -----------------------------------------------------------------------
+    // Windows: DPAPI-encrypted file (mfa.dat)
+    // -----------------------------------------------------------------------
+
+    #[cfg(target_os = "windows")]
     fn resolve_persist_path() -> Option<PathBuf> {
-        let base = std::env::var("LOCALAPPDATA")
-            .or_else(|_| std::env::var("HOME"))
-            .ok()?;
+        let base = std::env::var("LOCALAPPDATA").ok()?;
         let dir = PathBuf::from(base).join("DSPanel");
         if !dir.exists() {
             fs::create_dir_all(&dir).ok()?;
@@ -122,8 +137,10 @@ impl MfaService {
         Some(dir.join("mfa.dat"))
     }
 
-    fn load_from_file(path: &PathBuf) -> Option<(Option<Vec<u8>>, Vec<String>)> {
-        let encrypted = fs::read(path).ok()?;
+    #[cfg(target_os = "windows")]
+    fn load_persisted() -> Option<(Option<Vec<u8>>, Vec<String>)> {
+        let path = Self::resolve_persist_path()?;
+        let encrypted = fs::read(&path).ok()?;
         let decrypted = crate::services::dpapi::unprotect(&encrypted).ok()?;
         let persisted: MfaPersistedData = serde_json::from_slice(&decrypted).ok()?;
         use base64::Engine;
@@ -134,7 +151,11 @@ impl MfaService {
         Some((Some(secret), persisted.backup_codes))
     }
 
+    #[cfg(target_os = "windows")]
     fn persist(&self) {
+        if self.in_memory {
+            return;
+        }
         if let Some(ref path) = self.persist_path {
             let secret = self.secret.lock().expect("lock poisoned");
             if let Some(ref s) = *secret {
@@ -153,6 +174,57 @@ impl MfaService {
                         Err(e) => {
                             tracing::warn!("DPAPI encryption failed: {}", e);
                         }
+                    }
+                }
+            }
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Non-Windows: OS keychain via keyring crate
+    // -----------------------------------------------------------------------
+
+    #[cfg(not(target_os = "windows"))]
+    fn load_persisted() -> Option<(Option<Vec<u8>>, Vec<String>)> {
+        let entry = keyring::Entry::new(KEYRING_SERVICE, KEYRING_KEY).ok()?;
+        let json = match entry.get_password() {
+            Ok(pw) => pw,
+            Err(keyring::Error::NoEntry) => return None,
+            Err(e) => {
+                tracing::warn!("Failed to read MFA data from OS keychain: {}", e);
+                return None;
+            }
+        };
+        let persisted: MfaPersistedData = serde_json::from_str(&json).ok()?;
+        use base64::Engine;
+        let secret = base64::engine::general_purpose::STANDARD
+            .decode(&persisted.secret_b64)
+            .ok()?;
+        tracing::info!("MFA secret loaded from OS keychain");
+        Some((Some(secret), persisted.backup_codes))
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    fn persist(&self) {
+        if self.in_memory {
+            return;
+        }
+        let secret = self.secret.lock().expect("lock poisoned");
+        if let Some(ref s) = *secret {
+            use base64::Engine;
+            let data = MfaPersistedData {
+                secret_b64: base64::engine::general_purpose::STANDARD.encode(s),
+                backup_codes: self.backup_codes.lock().expect("lock poisoned").clone(),
+            };
+            if let Ok(json) = serde_json::to_string(&data) {
+                match keyring::Entry::new(KEYRING_SERVICE, KEYRING_KEY) {
+                    Ok(entry) => {
+                        if let Err(e) = entry.set_password(&json) {
+                            tracing::warn!("Failed to persist MFA data to OS keychain: {}", e);
+                        }
+                    }
+                    Err(e) => {
+                        tracing::warn!("Failed to create keyring entry: {}", e);
                     }
                 }
             }
@@ -217,7 +289,7 @@ impl MfaService {
     pub fn setup(&self, username: &str) -> Result<MfaSetupResult> {
         let mut rng = rand::rng();
         let secret: Vec<u8> = (0..20).map(|_| rng.random()).collect();
-        let secret_b32 = base32::encode(base32::Alphabet::Rfc4648 { padding: false }, &secret);
+        let secret_b32 = data_encoding::BASE32_NOPAD.encode(&secret);
 
         let qr_uri = format!(
             "otpauth://totp/DSPanel:{}?secret={}&issuer=DSPanel&algorithm=SHA1&digits=6&period=30",
@@ -327,7 +399,7 @@ impl MfaService {
         *self.failed_attempts.lock().expect("lock poisoned") = 0;
     }
 
-    /// Revokes MFA setup by removing the stored secret and persisted file.
+    /// Revokes MFA setup by removing the stored secret and persisted data.
     pub fn revoke(&self) {
         if let Some(ref mut secret) = *self.secret.lock().expect("lock poisoned") {
             secret.zeroize();
@@ -335,8 +407,23 @@ impl MfaService {
         *self.secret.lock().expect("lock poisoned") = None;
         self.backup_codes.lock().expect("lock poisoned").clear();
         *self.failed_attempts.lock().expect("lock poisoned") = 0;
+        self.delete_persisted();
+    }
+
+    #[cfg(target_os = "windows")]
+    fn delete_persisted(&self) {
         if let Some(ref path) = self.persist_path {
             let _ = fs::remove_file(path);
+        }
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    fn delete_persisted(&self) {
+        if self.in_memory {
+            return;
+        }
+        if let Ok(entry) = keyring::Entry::new(KEYRING_SERVICE, KEYRING_KEY) {
+            let _ = entry.delete_credential();
         }
     }
 }
@@ -742,11 +829,9 @@ mod tests {
         let result = svc.setup("testuser").unwrap();
 
         // Decode the secret from the setup result
-        let secret = base32::decode(
-            base32::Alphabet::Rfc4648 { padding: false },
-            &result.secret_base32,
-        )
-        .unwrap();
+        let secret = data_encoding::BASE32_NOPAD
+            .decode(result.secret_base32.as_bytes())
+            .unwrap();
 
         // Generate the current valid TOTP code
         let now = std::time::SystemTime::now()
@@ -769,11 +854,9 @@ mod tests {
         assert!(svc.check_mfa_for_action("PasswordReset").is_err());
 
         // Verify with a real TOTP code
-        let secret = base32::decode(
-            base32::Alphabet::Rfc4648 { padding: false },
-            &result.secret_base32,
-        )
-        .unwrap();
+        let secret = data_encoding::BASE32_NOPAD
+            .decode(result.secret_base32.as_bytes())
+            .unwrap();
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()

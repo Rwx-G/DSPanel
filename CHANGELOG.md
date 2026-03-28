@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- Use OS keychain (macOS Keychain / Linux Secret Service) for MFA secret storage on non-Windows platforms instead of unencrypted base64 file
+- Add SHA-256 hash chain to audit log entries for tamper detection
+- Add remote syslog forwarding (RFC 5424 UDP) for audit entries with configurable host/port
+- Add `verify_audit_chain` IPC command (DomainAdmin) to verify audit log integrity
+- Replace `base32` crate with `data-encoding` (higher maintainer bus factor, actively maintained)
+- Add `cargo audit` + `pnpm audit` CI workflow (weekly schedule + on every PR)
+- Fix vulnerable npm transitive dependencies (flatted, picomatch, brace-expansion)
+- Replace `std::env::temp_dir()` with `tempfile::tempdir()` in tests to prevent symlink race conditions
+- Add weekly dependency health check for critical single-maintainer crates (ldap3, qrcode)
+- Enforce `pnpm install --frozen-lockfile` in all CI workflows to prevent dependency drift
+- Upgrade `printpdf` 0.3 to 0.9 to resolve 4 unmaintained transitive dependency warnings (adler, lzw, rusttype, stb_truetype)
+- Migrate LDAP TLS from `native-tls` (platform-specific) to `rustls` (pure Rust, audited, memory-safe)
+- Lower infrastructure, security monitoring, and recycle bin pages from DomainAdmin to Admin permission level
+- Fix frontend/backend permission mismatch in GroupHygiene and BulkOperations (used "Admin" instead of "AccountOperator")
+- Filter sidebar navigation based on user permission level (hide inaccessible pages)
+
 ## [1.0.1] - 2026-03-27
 
 ### Fixed
