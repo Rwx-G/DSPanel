@@ -177,112 +177,106 @@ pub fn export_to_pdf(
 ) -> Result<Vec<u8>, AppError> {
     use printpdf::*;
 
-    let page_width_mm = 297.0; // A4 landscape width
-    let page_height_mm = 210.0; // A4 landscape height
-    let margin = 15.0;
+    let page_width_mm: f32 = 297.0; // A4 landscape width
+    let page_height_mm: f32 = 210.0; // A4 landscape height
+    let margin: f32 = 15.0;
     let usable_width = page_width_mm - 2.0 * margin;
 
-    let (doc, page1, layer1) =
-        PdfDocument::new(title, Mm(page_width_mm), Mm(page_height_mm), "Layer 1");
-
-    let font_regular = doc
-        .add_builtin_font(BuiltinFont::Helvetica)
-        .map_err(|e| AppError::Internal(format!("PDF font error: {e}")))?;
-    let font_bold = doc
-        .add_builtin_font(BuiltinFont::HelveticaBold)
-        .map_err(|e| AppError::Internal(format!("PDF bold font error: {e}")))?;
+    let font_regular = PdfFontHandle::Builtin(BuiltinFont::Helvetica);
+    let font_bold = PdfFontHandle::Builtin(BuiltinFont::HelveticaBold);
 
     let timestamp = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let col_count = columns.len();
     let col_width = if col_count > 0 {
-        usable_width / col_count as f64
+        usable_width / col_count as f32
     } else {
         usable_width
     };
 
-    let title_size = 14.0;
-    let meta_size = 8.0;
-    let header_size = 7.0;
-    let cell_size = 6.5;
-    let row_height = 5.0;
-    let header_row_height = 6.0;
+    let title_size: f32 = 14.0;
+    let meta_size: f32 = 8.0;
+    let header_size: f32 = 7.0;
+    let cell_size: f32 = 6.5;
+    let row_height: f32 = 5.0;
+    let header_row_height: f32 = 6.0;
 
-    let mut current_page = doc.get_page(page1);
-    let mut current_layer = current_page.get_layer(layer1);
+    /// Helper: emit ops to write text at (x, y) with given font and size.
+    fn text_ops(
+        text: &str,
+        size: f32,
+        x: f32,
+        y: f32,
+        font: &PdfFontHandle,
+    ) -> Vec<Op> {
+        vec![
+            Op::StartTextSection,
+            Op::SetTextCursor { pos: Point { x: Mm(x).into(), y: Mm(y).into() } },
+            Op::SetFont { font: font.clone(), size: Pt(size) },
+            Op::ShowText { items: vec![TextItem::Text(text.to_string())] },
+            Op::EndTextSection,
+        ]
+    }
+
+    let mut pages: Vec<PdfPage> = Vec::new();
+    let mut ops: Vec<Op> = Vec::new();
     let mut y = page_height_mm - margin;
-
-    // Title
-    current_layer.use_text(title, title_size, Mm(margin), Mm(y), &font_bold);
+    let mut page_num = 1;
+    // Title + meta + header on first page
+    ops.extend(text_ops(title, title_size, margin, y, &font_bold));
     y -= title_size * 0.5 + 2.0;
 
-    // Timestamp + row count
     let meta_text = format!("Generated: {} - {} rows", timestamp, rows.len());
-    current_layer.use_text(&meta_text, meta_size, Mm(margin), Mm(y), &font_regular);
+    ops.extend(text_ops(&meta_text, meta_size, margin, y, &font_regular));
     y -= meta_size * 0.5 + 4.0;
 
-    // Table header
     for (i, col) in columns.iter().enumerate() {
-        let x = margin + i as f64 * col_width;
-        // Truncate header to fit column
+        let x = margin + i as f32 * col_width;
         let header_text = truncate_for_col(&col.header, col_width, header_size);
-        current_layer.use_text(&header_text, header_size, Mm(x + 1.0), Mm(y), &font_bold);
+        ops.extend(text_ops(&header_text, header_size, x + 1.0, y, &font_bold));
     }
     y -= header_row_height + 1.0;
 
     // Data rows
-    let mut page_num = 1;
     for row in rows {
         if y < margin + 10.0 {
-            // Footer on current page before creating new one
+            // Footer on current page
             let footer = format!("Page {page_num}");
-            current_layer.use_text(
-                &footer,
-                7.0,
-                Mm(page_width_mm / 2.0 - 5.0),
-                Mm(5.0),
-                &font_regular,
-            );
+            ops.extend(text_ops(
+                &footer, 7.0, page_width_mm / 2.0 - 5.0, 5.0, &font_regular,
+            ));
 
-            // New page
+            // Finalize current page
+            pages.push(PdfPage::new(Mm(page_width_mm), Mm(page_height_mm), ops));
+            ops = Vec::new();
             page_num += 1;
-            let (new_page, new_layer) = doc.add_page(
-                Mm(page_width_mm),
-                Mm(page_height_mm),
-                format!("Page {page_num}"),
-            );
-            current_page = doc.get_page(new_page);
-            current_layer = current_page.get_layer(new_layer);
             y = page_height_mm - margin;
         }
 
         for (i, _col) in columns.iter().enumerate() {
-            let x = margin + i as f64 * col_width;
+            let x = margin + i as f32 * col_width;
             let value = row.get(i).map(|s| s.as_str()).unwrap_or("");
             let display = truncate_for_col(value, col_width, cell_size);
-            current_layer.use_text(&display, cell_size, Mm(x + 1.0), Mm(y), &font_regular);
+            ops.extend(text_ops(&display, cell_size, x + 1.0, y, &font_regular));
         }
         y -= row_height;
     }
 
     // Footer on last page
     let footer = format!("Page {page_num}");
-    current_layer.use_text(
-        &footer,
-        7.0,
-        Mm(page_width_mm / 2.0 - 5.0),
-        Mm(5.0),
-        &font_regular,
-    );
+    ops.extend(text_ops(
+        &footer, 7.0, page_width_mm / 2.0 - 5.0, 5.0, &font_regular,
+    ));
+    pages.push(PdfPage::new(Mm(page_width_mm), Mm(page_height_mm), ops));
 
-    let mut output = Vec::new();
-    doc.save(&mut std::io::BufWriter::new(&mut output))
-        .map_err(|e| AppError::Internal(format!("PDF save error: {e}")))?;
+    let mut doc = PdfDocument::new(title);
+    let doc = doc.with_pages(pages);
+    let bytes = doc.save(&PdfSaveOptions::default(), &mut Vec::new());
 
-    Ok(output)
+    Ok(bytes)
 }
 
 /// Truncates text to approximately fit a column width in mm at a given font size.
-fn truncate_for_col(text: &str, col_width_mm: f64, font_size: f64) -> String {
+fn truncate_for_col(text: &str, col_width_mm: f32, font_size: f32) -> String {
     // Approximate: 1 char ~ font_size * 0.35 mm for Helvetica
     let max_chars = (col_width_mm / (font_size * 0.35)) as usize;
     if max_chars == 0 {
