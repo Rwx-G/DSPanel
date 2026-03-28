@@ -46,3 +46,28 @@ jobs:
 
       - name: Run pnpm audit (production)
         run: pnpm audit --prod
+
+  dependency-health:
+    name: Critical Dependency Health Check
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    steps:
+      - name: Check ldap3 maintainer activity
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "## Critical Dependency Health Check" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          for repo in "inejge/ldap3" "kennytm/qrcode-rust"; do
+            echo "### $repo" >> $GITHUB_STEP_SUMMARY
+            LAST_PUSH=$(gh api "repos/$repo" --jq '.pushed_at')
+            DAYS_AGO=$(( ($(date +%s) - $(date -d "$LAST_PUSH" +%s)) / 86400 ))
+            OPEN_ISSUES=$(gh api "repos/$repo" --jq '.open_issues_count')
+            echo "- Last push: $LAST_PUSH ($DAYS_AGO days ago)" >> $GITHUB_STEP_SUMMARY
+            echo "- Open issues: $OPEN_ISSUES" >> $GITHUB_STEP_SUMMARY
+
+            if [ "$DAYS_AGO" -gt 365 ]; then
+              echo "::warning::$repo has not been updated in $DAYS_AGO days - consider finding an alternative"
+            fi
+          done

@@ -3345,7 +3345,8 @@ mod tests {
     #[test]
     fn test_build_tls_connector_with_ca_invalid_content() {
         // Write a temporary file with invalid certificate data
-        let tmp = std::env::temp_dir().join("dspanel_test_invalid_cert.pem");
+        let dir = tempfile::tempdir().unwrap();
+        let tmp = dir.path().join("invalid_cert.pem");
         std::fs::write(&tmp, b"not a certificate").unwrap();
         let result = build_tls_connector_with_ca(tmp.to_str().unwrap(), false);
         assert!(result.is_err());
@@ -3355,7 +3356,6 @@ mod tests {
                 .to_string()
                 .contains("Failed to parse CA certificate")
         );
-        let _ = std::fs::remove_file(&tmp);
     }
 
     #[tokio::test]

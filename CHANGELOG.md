@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Replace `base32` crate with `data-encoding` (higher maintainer bus factor, actively maintained)
 - Add `cargo audit` + `pnpm audit` CI workflow (weekly schedule + on every PR)
 - Fix vulnerable npm transitive dependencies (flatted, picomatch, brace-expansion)
+- Replace `std::env::temp_dir()` with `tempfile::tempdir()` in tests to prevent symlink race conditions
+- Add weekly dependency health check for critical single-maintainer crates (ldap3, qrcode)
 
 ## [1.0.1] - 2026-03-27
 
