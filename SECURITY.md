@@ -40,10 +40,10 @@ DSPanel interacts directly with Active Directory and can perform privileged oper
 
 ### MFA secret storage by platform
 
-| Platform | Protection | Notes |
-| -------- | ---------- | ----- |
-| Windows  | DPAPI (CryptProtectData) | Secret tied to current user profile |
-| macOS    | Base64 only | **Not encrypted at rest** |
-| Linux    | Base64 only | **Not encrypted at rest** |
+| Platform | Protection | Backend |
+| -------- | ---------- | ------- |
+| Windows  | DPAPI (CryptProtectData) | Encrypted file (`mfa.dat`) tied to current user profile |
+| macOS    | OS Keychain | Stored via `keyring` crate (macOS Keychain Services) |
+| Linux    | Secret Service | Stored via `keyring` crate (GNOME Keyring / KWallet) |
 
-On non-Windows platforms, the TOTP shared secret stored in `mfa.dat` is **not encrypted at rest**. A warning is logged at application startup when MFA is configured on a non-Windows host. Native keychain integration (macOS Keychain, Linux Secret Service) is planned for a future release.
+On all platforms the TOTP shared secret is protected by the OS-native credential store. No plaintext secrets are written to disk.
