@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add weekly dependency health check for critical single-maintainer crates (ldap3, qrcode)
 - Enforce `pnpm install --frozen-lockfile` in all CI workflows to prevent dependency drift
 - Upgrade `printpdf` 0.3 to 0.9 to resolve 4 unmaintained transitive dependency warnings (adler, lzw, rusttype, stb_truetype)
+- Migrate LDAP TLS from `native-tls` (platform-specific) to `rustls` (pure Rust, audited, memory-safe)
 
 ## [1.0.1] - 2026-03-27
 
