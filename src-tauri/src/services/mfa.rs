@@ -279,7 +279,7 @@ impl MfaService {
     pub fn setup(&self, username: &str) -> Result<MfaSetupResult> {
         let mut rng = rand::rng();
         let secret: Vec<u8> = (0..20).map(|_| rng.random()).collect();
-        let secret_b32 = base32::encode(base32::Alphabet::Rfc4648 { padding: false }, &secret);
+        let secret_b32 = data_encoding::BASE32_NOPAD.encode(&secret);
 
         let qr_uri = format!(
             "otpauth://totp/DSPanel:{}?secret={}&issuer=DSPanel&algorithm=SHA1&digits=6&period=30",
@@ -816,11 +816,9 @@ mod tests {
         let result = svc.setup("testuser").unwrap();
 
         // Decode the secret from the setup result
-        let secret = base32::decode(
-            base32::Alphabet::Rfc4648 { padding: false },
-            &result.secret_base32,
-        )
-        .unwrap();
+        let secret = data_encoding::BASE32_NOPAD
+            .decode(result.secret_base32.as_bytes())
+            .unwrap();
 
         // Generate the current valid TOTP code
         let now = std::time::SystemTime::now()
@@ -843,11 +841,9 @@ mod tests {
         assert!(svc.check_mfa_for_action("PasswordReset").is_err());
 
         // Verify with a real TOTP code
-        let secret = base32::decode(
-            base32::Alphabet::Rfc4648 { padding: false },
-            &result.secret_base32,
-        )
-        .unwrap();
+        let secret = data_encoding::BASE32_NOPAD
+            .decode(result.secret_base32.as_bytes())
+            .unwrap();
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()

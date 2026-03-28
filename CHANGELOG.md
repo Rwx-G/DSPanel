@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add SHA-256 hash chain to audit log entries for tamper detection
 - Add remote syslog forwarding (RFC 5424 UDP) for audit entries with configurable host/port
 - Add `verify_audit_chain` IPC command (DomainAdmin) to verify audit log integrity
+- Replace `base32` crate with `data-encoding` (higher maintainer bus factor, actively maintained)
+- Add `cargo audit` + `pnpm audit` CI workflow (weekly schedule + on every PR)
+- Fix vulnerable npm transitive dependencies (flatted, picomatch, brace-expansion)
 
 ## [1.0.1] - 2026-03-27
 
