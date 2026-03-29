@@ -251,29 +251,87 @@ pub struct LdapTlsConfig {
     pub ca_cert_file: Option<String>,
 }
 
-/// Builds a custom `native_tls::TlsConnector` with the given CA certificate file.
+/// Builds a custom `rustls::ClientConfig` with the given CA certificate file.
 ///
-/// Reads the file, tries PEM first then DER, and returns a connector with the
+/// Reads the file, tries PEM first then DER, and returns a config with the
 /// certificate added as a trusted root.
-fn build_tls_connector_with_ca(
+fn build_tls_config_with_ca(
     ca_cert_path: &str,
     skip_verify: bool,
-) -> Result<native_tls::TlsConnector> {
+) -> Result<std::sync::Arc<rustls::ClientConfig>> {
     let cert_data = std::fs::read(ca_cert_path).context("Failed to read CA certificate file")?;
 
-    // Try PEM first, fall back to DER
-    let certificate = native_tls::Certificate::from_pem(&cert_data)
-        .or_else(|_| native_tls::Certificate::from_der(&cert_data))
-        .context("Failed to parse CA certificate (tried PEM and DER formats)")?;
+    let mut root_store = rustls::RootCertStore::empty();
 
-    let mut builder = native_tls::TlsConnector::builder();
-    builder.add_root_certificate(certificate);
-    if skip_verify {
-        builder.danger_accept_invalid_certs(true);
+    // Try PEM first
+    let mut reader = std::io::BufReader::new(cert_data.as_slice());
+    let pem_certs: Vec<_> = rustls_pemfile::certs(&mut reader).collect();
+    let added = pem_certs
+        .into_iter()
+        .filter_map(|c| c.ok())
+        .map(|c| root_store.add(c))
+        .filter(|r| r.is_ok())
+        .count();
+
+    // Fall back to DER if no PEM certs found
+    if added == 0 {
+        let der_cert = rustls::pki_types::CertificateDer::from(cert_data);
+        root_store
+            .add(der_cert)
+            .context("Failed to parse CA certificate (tried PEM and DER formats)")?;
     }
-    builder
-        .build()
-        .context("Failed to build TLS connector with custom CA")
+
+    let builder = rustls::ClientConfig::builder().with_root_certificates(root_store);
+    let mut config = builder.with_no_client_auth();
+
+    if skip_verify {
+        config
+            .dangerous()
+            .set_certificate_verifier(std::sync::Arc::new(NoCertVerification));
+    }
+
+    Ok(std::sync::Arc::new(config))
+}
+
+/// Certificate verifier that accepts any certificate (for skip_verify mode).
+#[derive(Debug)]
+struct NoCertVerification;
+
+impl rustls::client::danger::ServerCertVerifier for NoCertVerification {
+    fn verify_server_cert(
+        &self,
+        _end_entity: &rustls::pki_types::CertificateDer<'_>,
+        _intermediates: &[rustls::pki_types::CertificateDer<'_>],
+        _server_name: &rustls::pki_types::ServerName<'_>,
+        _ocsp_response: &[u8],
+        _now: rustls::pki_types::UnixTime,
+    ) -> std::result::Result<rustls::client::danger::ServerCertVerified, rustls::Error> {
+        Ok(rustls::client::danger::ServerCertVerified::assertion())
+    }
+
+    fn verify_tls12_signature(
+        &self,
+        _message: &[u8],
+        _cert: &rustls::pki_types::CertificateDer<'_>,
+        _dss: &rustls::DigitallySignedStruct,
+    ) -> std::result::Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
+        Ok(rustls::client::danger::HandshakeSignatureValid::assertion())
+    }
+
+    fn verify_tls13_signature(
+        &self,
+        _message: &[u8],
+        _cert: &rustls::pki_types::CertificateDer<'_>,
+        _dss: &rustls::DigitallySignedStruct,
+    ) -> std::result::Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
+        Ok(rustls::client::danger::HandshakeSignatureValid::assertion())
+    }
+
+    fn supported_verify_schemes(&self) -> Vec<rustls::SignatureScheme> {
+        rustls::crypto::ring::default_provider()
+            .signature_verification_algorithms
+            .supported_schemes()
+    }
 }
 
 /// Maximum age of a connection before forced invalidation (14 minutes).
@@ -597,8 +655,8 @@ impl LdapDirectoryProvider {
         let mut settings =
             LdapConnSettings::new().set_conn_timeout(std::time::Duration::from_secs(10));
         if let Some(ref ca_path) = self.tls_config.ca_cert_file {
-            let connector = build_tls_connector_with_ca(ca_path, self.tls_config.skip_verify)?;
-            settings = settings.set_connector(connector);
+            let config = build_tls_config_with_ca(ca_path, self.tls_config.skip_verify)?;
+            settings = settings.set_config(config);
             tracing::info!(ca_cert = %ca_path, "Custom CA certificate loaded");
         } else if self.tls_config.skip_verify {
             settings = settings.set_no_tls_verify(true);
@@ -916,8 +974,8 @@ async fn create_fresh_connection(
     };
     let mut settings = LdapConnSettings::new().set_conn_timeout(std::time::Duration::from_secs(10));
     if let Some(ref ca_path) = tls_config.ca_cert_file {
-        let connector = build_tls_connector_with_ca(ca_path, tls_config.skip_verify)?;
-        settings = settings.set_connector(connector);
+        let config = build_tls_config_with_ca(ca_path, tls_config.skip_verify)?;
+        settings = settings.set_config(config);
     } else if tls_config.skip_verify {
         settings = settings.set_no_tls_verify(true);
     }
@@ -3331,8 +3389,8 @@ mod tests {
     }
 
     #[test]
-    fn test_build_tls_connector_with_ca_invalid_path() {
-        let result = build_tls_connector_with_ca("/nonexistent/ca.pem", false);
+    fn test_build_tls_config_with_ca_invalid_path() {
+        let result = build_tls_config_with_ca("/nonexistent/ca.pem", false);
         assert!(result.is_err());
         assert!(
             result
@@ -3343,11 +3401,12 @@ mod tests {
     }
 
     #[test]
-    fn test_build_tls_connector_with_ca_invalid_content() {
+    fn test_build_tls_config_with_ca_invalid_content() {
         // Write a temporary file with invalid certificate data
-        let tmp = std::env::temp_dir().join("dspanel_test_invalid_cert.pem");
+        let dir = tempfile::tempdir().unwrap();
+        let tmp = dir.path().join("invalid_cert.pem");
         std::fs::write(&tmp, b"not a certificate").unwrap();
-        let result = build_tls_connector_with_ca(tmp.to_str().unwrap(), false);
+        let result = build_tls_config_with_ca(tmp.to_str().unwrap(), false);
         assert!(result.is_err());
         assert!(
             result
@@ -3355,7 +3414,6 @@ mod tests {
                 .to_string()
                 .contains("Failed to parse CA certificate")
         );
-        let _ = std::fs::remove_file(&tmp);
     }
 
     #[tokio::test]

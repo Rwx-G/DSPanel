@@ -14,14 +14,14 @@ use crate::state::AppState;
 // ---------------------------------------------------------------------------
 
 /// Returns the health status of all domain controllers.
-/// Requires DomainAdmin permission.
+/// Requires Admin permission.
 pub(crate) async fn get_dc_health_inner(state: &AppState) -> Result<Vec<DcHealthResult>, AppError> {
     if !state
         .permission_service
-        .has_permission(PermissionLevel::DomainAdmin)
+        .has_permission(PermissionLevel::Admin)
     {
         return Err(AppError::PermissionDenied(
-            "DC health checks require DomainAdmin permission".to_string(),
+            "DC health checks require Admin permission".to_string(),
         ));
     }
 
@@ -35,16 +35,16 @@ pub(crate) async fn get_dc_health_inner(state: &AppState) -> Result<Vec<DcHealth
 // Replication Status - Inner functions
 // ---------------------------------------------------------------------------
 
-/// Returns all replication partnerships. Requires DomainAdmin.
+/// Returns all replication partnerships. Requires Admin.
 pub(crate) async fn get_replication_status_inner(
     state: &AppState,
 ) -> Result<Vec<ReplicationPartnership>, AppError> {
     if !state
         .permission_service
-        .has_permission(PermissionLevel::DomainAdmin)
+        .has_permission(PermissionLevel::Admin)
     {
         return Err(AppError::PermissionDenied(
-            "Replication status requires DomainAdmin permission".to_string(),
+            "Replication status requires Admin permission".to_string(),
         ));
     }
 
@@ -84,17 +84,17 @@ pub(crate) async fn force_replication_inner(
 // ---------------------------------------------------------------------------
 
 /// Returns a full DNS and Kerberos validation report.
-/// Requires DomainAdmin permission.
+/// Requires Admin permission.
 pub(crate) async fn get_dns_kerberos_validation_inner(
     state: &AppState,
     threshold_seconds: u32,
 ) -> Result<DnsKerberosReport, AppError> {
     if !state
         .permission_service
-        .has_permission(PermissionLevel::DomainAdmin)
+        .has_permission(PermissionLevel::Admin)
     {
         return Err(AppError::PermissionDenied(
-            "DNS/Kerberos validation requires DomainAdmin permission".to_string(),
+            "DNS/Kerberos validation requires Admin permission".to_string(),
         ));
     }
 
@@ -133,14 +133,14 @@ pub(crate) async fn get_workstation_metrics_inner(
 // ---------------------------------------------------------------------------
 
 /// Returns the AD topology (sites, DCs, replication links, site links).
-/// Requires DomainAdmin permission.
+/// Requires Admin permission.
 pub(crate) async fn get_topology_inner(state: &AppState) -> Result<TopologyData, AppError> {
     if !state
         .permission_service
-        .has_permission(PermissionLevel::DomainAdmin)
+        .has_permission(PermissionLevel::Admin)
     {
         return Err(AppError::PermissionDenied(
-            "Topology visualization requires DomainAdmin permission".to_string(),
+            "Topology visualization requires Admin permission".to_string(),
         ));
     }
 
@@ -210,17 +210,17 @@ pub async fn get_topology(state: State<'_, AppState>) -> Result<TopologyData, Ap
 use crate::services::gpo::{self, GpoInfo, GpoLink, GpoLinksResult};
 
 /// Returns GPO links for a given object DN by walking the OU hierarchy.
-/// Requires DomainAdmin permission.
+/// Requires Admin permission.
 pub(crate) async fn get_gpo_links_inner(
     state: &AppState,
     object_dn: &str,
 ) -> Result<GpoLinksResult, AppError> {
     if !state
         .permission_service
-        .has_permission(PermissionLevel::DomainAdmin)
+        .has_permission(PermissionLevel::Admin)
     {
         return Err(AppError::PermissionDenied(
-            "GPO viewer requires DomainAdmin permission".to_string(),
+            "GPO viewer requires Admin permission".to_string(),
         ));
     }
 
@@ -251,10 +251,10 @@ pub(crate) async fn get_gpo_scope_inner(
 ) -> Result<Vec<GpoLink>, AppError> {
     if !state
         .permission_service
-        .has_permission(PermissionLevel::DomainAdmin)
+        .has_permission(PermissionLevel::Admin)
     {
         return Err(AppError::PermissionDenied(
-            "GPO viewer requires DomainAdmin permission".to_string(),
+            "GPO viewer requires Admin permission".to_string(),
         ));
     }
 
@@ -511,10 +511,10 @@ pub async fn get_gpo_list(state: State<'_, AppState>) -> Result<Vec<GpoInfo>, Ap
 pub(crate) async fn get_gpo_list_inner(state: &AppState) -> Result<Vec<GpoInfo>, AppError> {
     if !state
         .permission_service
-        .has_permission(PermissionLevel::DomainAdmin)
+        .has_permission(PermissionLevel::Admin)
     {
         return Err(AppError::PermissionDenied(
-            "GPO viewer requires DomainAdmin permission".to_string(),
+            "GPO viewer requires Admin permission".to_string(),
         ));
     }
 
@@ -616,13 +616,13 @@ mod tests {
     // -----------------------------------------------------------------------
 
     #[tokio::test]
-    async fn test_get_dc_health_requires_domain_admin() {
+    async fn test_get_dc_health_requires_admin() {
         let state = make_state(); // ReadOnly by default
         let result = get_dc_health_inner(&state).await;
         assert!(result.is_err());
         match result.unwrap_err() {
             AppError::PermissionDenied(msg) => {
-                assert!(msg.contains("DomainAdmin"));
+                assert!(msg.contains("Admin"));
             }
             other => panic!("Expected PermissionDenied, got: {:?}", other),
         }
@@ -644,13 +644,13 @@ mod tests {
     // -----------------------------------------------------------------------
 
     #[tokio::test]
-    async fn test_get_replication_status_requires_domain_admin() {
+    async fn test_get_replication_status_requires_admin() {
         let state = make_state();
         let result = get_replication_status_inner(&state).await;
         assert!(result.is_err());
         match result.unwrap_err() {
             AppError::PermissionDenied(msg) => {
-                assert!(msg.contains("DomainAdmin"));
+                assert!(msg.contains("Admin"));
             }
             other => panic!("Expected PermissionDenied, got: {:?}", other),
         }
@@ -694,13 +694,13 @@ mod tests {
     // -----------------------------------------------------------------------
 
     #[tokio::test]
-    async fn test_get_dns_kerberos_validation_requires_domain_admin() {
+    async fn test_get_dns_kerberos_validation_requires_admin() {
         let state = make_state();
         let result = get_dns_kerberos_validation_inner(&state, 300).await;
         assert!(result.is_err());
         match result.unwrap_err() {
             AppError::PermissionDenied(msg) => {
-                assert!(msg.contains("DomainAdmin"));
+                assert!(msg.contains("Admin"));
             }
             other => panic!("Expected PermissionDenied, got: {:?}", other),
         }
@@ -728,13 +728,13 @@ mod tests {
     // -----------------------------------------------------------------------
 
     #[tokio::test]
-    async fn test_get_topology_requires_domain_admin() {
+    async fn test_get_topology_requires_admin() {
         let state = make_state();
         let result = get_topology_inner(&state).await;
         assert!(result.is_err());
         match result.unwrap_err() {
             AppError::PermissionDenied(msg) => {
-                assert!(msg.contains("DomainAdmin"));
+                assert!(msg.contains("Admin"));
             }
             other => panic!("Expected PermissionDenied, got: {:?}", other),
         }
@@ -745,13 +745,13 @@ mod tests {
     // -----------------------------------------------------------------------
 
     #[tokio::test]
-    async fn test_get_gpo_links_requires_domain_admin() {
+    async fn test_get_gpo_links_requires_admin() {
         let state = make_state();
         let result = get_gpo_links_inner(&state, "CN=User,OU=Users,DC=example,DC=com").await;
         assert!(result.is_err());
         match result.unwrap_err() {
             AppError::PermissionDenied(msg) => {
-                assert!(msg.contains("DomainAdmin"));
+                assert!(msg.contains("Admin"));
             }
             other => panic!("Expected PermissionDenied, got: {:?}", other),
         }
