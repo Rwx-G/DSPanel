@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.3] - 2026-04-23
+
 ### Added
 
 - Surface the cause of failed directory connections on the dashboard: when `Active Directory` shows `Disconnected`, the card now renders a localized hint explaining why (clock skew, missing Kerberos ticket, DNS SRV failure, LDAP signing requirement, TLS handshake error, authentication refused, network unreachable, etc.). Full technical error chain is written to the log at ERROR level; the UI intentionally shows only the category so support copy-paste stays manageable.
@@ -16,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - GSSAPI bind logs are promoted from DEBUG to INFO: `original_host`, `gssapi_host`, computed `spn` (`ldap/<fqdn>`) and `LOGONSERVER` are now visible in the default application log, making Kerberos diagnostics possible without toggling `RUST_LOG=debug`. On failure, the full `anyhow::Error` chain is logged at ERROR level.
 - `classify_bind_error` now recognizes the Microsoft-localized SSPI error strings for French, German, Italian and Spanish in addition to English, so the UI hint stays precise on non-English Windows hosts (where `FormatMessageW(LANG_NEUTRAL)` returns text in the OS UI language). Accent folding is applied before matching so ASCII patterns hit accented text.
+
+### Fixed
+
+- Satisfy clippy lints promoted to errors in Rust 1.95 (`unnecessary_sort_by`, `collapsible_match`) in pre-existing code touched by the CI pipeline. Semantically equivalent refactors in `ldap_directory.rs`, `preset.rs`, `replication.rs`, `replication_status.rs`.
+- `evaluate_health_cmd` tests now generate input dates relative to `Utc::now()` so the healthy-user case no longer drifts into `Inactive30Days` warning territory as real time advances past the hard-coded 2026-03 timestamps.
 
 
 
