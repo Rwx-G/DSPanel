@@ -93,18 +93,16 @@ pub fn parse_replication_metadata(raw_xml: &str) -> Vec<AttributeMetadata> {
                     current_tag = tag;
                 }
             }
-            Ok(Event::Text(e)) => {
-                if in_entry && !current_tag.is_empty() {
-                    let text = String::from_utf8_lossy(&e).trim().to_string();
-                    match current_tag.as_str() {
-                        "pszAttributeName" => attr_name = text,
-                        "dwVersion" => version = text.parse().unwrap_or(0),
-                        "ftimeLastOriginatingChange" => change_time = text,
-                        "pszLastOriginatingDsaDN" => dsa_dn = text,
-                        "usnLocalChange" => local_usn = text.parse().unwrap_or(0),
-                        "usnOriginatingChange" => originating_usn = text.parse().unwrap_or(0),
-                        _ => {}
-                    }
+            Ok(Event::Text(e)) if in_entry && !current_tag.is_empty() => {
+                let text = String::from_utf8_lossy(&e).trim().to_string();
+                match current_tag.as_str() {
+                    "pszAttributeName" => attr_name = text,
+                    "dwVersion" => version = text.parse().unwrap_or(0),
+                    "ftimeLastOriginatingChange" => change_time = text,
+                    "pszLastOriginatingDsaDN" => dsa_dn = text,
+                    "usnLocalChange" => local_usn = text.parse().unwrap_or(0),
+                    "usnOriginatingChange" => originating_usn = text.parse().unwrap_or(0),
+                    _ => {}
                 }
             }
             Ok(Event::End(e)) => {
@@ -182,22 +180,20 @@ pub fn parse_replication_value_metadata(raw_xml: &str) -> Vec<ValueMetadata> {
                     current_tag = tag;
                 }
             }
-            Ok(Event::Text(e)) => {
-                if in_entry && !current_tag.is_empty() {
-                    let text = String::from_utf8_lossy(&e).trim().to_string();
-                    match current_tag.as_str() {
-                        "pszAttributeName" => attr_name = text,
-                        "pszObjectDn" => object_dn = text,
-                        "dwVersion" => version = text.parse().unwrap_or(0),
-                        "ftimeLastOriginatingChange" => change_time = text,
-                        "pszLastOriginatingDsaDN" => dsa_dn = text,
-                        "usnLocalChange" => local_usn = text.parse().unwrap_or(0),
-                        "usnOriginatingChange" => originating_usn = text.parse().unwrap_or(0),
-                        "ftimeDeleted" => {
-                            is_deleted = !text.is_empty() && text != "1601-01-01T00:00:00Z"
-                        }
-                        _ => {}
+            Ok(Event::Text(e)) if in_entry && !current_tag.is_empty() => {
+                let text = String::from_utf8_lossy(&e).trim().to_string();
+                match current_tag.as_str() {
+                    "pszAttributeName" => attr_name = text,
+                    "pszObjectDn" => object_dn = text,
+                    "dwVersion" => version = text.parse().unwrap_or(0),
+                    "ftimeLastOriginatingChange" => change_time = text,
+                    "pszLastOriginatingDsaDN" => dsa_dn = text,
+                    "usnLocalChange" => local_usn = text.parse().unwrap_or(0),
+                    "usnOriginatingChange" => originating_usn = text.parse().unwrap_or(0),
+                    "ftimeDeleted" => {
+                        is_deleted = !text.is_empty() && text != "1601-01-01T00:00:00Z"
                     }
+                    _ => {}
                 }
             }
             Ok(Event::End(e)) => {

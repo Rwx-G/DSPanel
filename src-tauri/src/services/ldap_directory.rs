@@ -1977,7 +1977,7 @@ impl DirectoryProvider for LdapDirectoryProvider {
                     })
                     .collect();
 
-                flat_ous.sort_by(|a, b| a.1.to_lowercase().cmp(&b.1.to_lowercase()));
+                flat_ous.sort_by_key(|a| a.1.to_lowercase());
                 Ok(build_ou_tree(&flat_ous, &base))
             }
         })
@@ -3262,7 +3262,7 @@ fn build_ou_tree(flat_ous: &[(String, String)], base_dn: &str) -> Vec<OUNode> {
             })
             .collect();
 
-        nodes.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+        nodes.sort_by_key(|a| a.name.to_lowercase());
         nodes
     }
 
