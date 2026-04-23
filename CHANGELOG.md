@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - GSSAPI bind logs are promoted from DEBUG to INFO: `original_host`, `gssapi_host`, computed `spn` (`ldap/<fqdn>`) and `LOGONSERVER` are now visible in the default application log, making Kerberos diagnostics possible without toggling `RUST_LOG=debug`. On failure, the full `anyhow::Error` chain is logged at ERROR level.
+- `classify_bind_error` now recognizes the Microsoft-localized SSPI error strings for French, German, Italian and Spanish in addition to English, so the UI hint stays precise on non-English Windows hosts (where `FormatMessageW(LANG_NEUTRAL)` returns text in the OS UI language). Accent folding is applied before matching so ASCII patterns hit accented text.
 
 
 

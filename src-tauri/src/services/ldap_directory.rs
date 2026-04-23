@@ -358,6 +358,26 @@ pub struct LdapDirectoryProvider {
     last_error_kind: Mutex<Option<String>>,
 }
 
+/// Strips common Latin-1/Latin-2 accents so multilingual keyword matching
+/// works against error texts produced by Windows `FormatMessageW` in French,
+/// German, Italian, Spanish, etc. Cheap pass - does not normalize ligatures
+/// or combining characters, which none of our target strings use.
+fn fold_ascii(s: &str) -> String {
+    s.chars()
+        .map(|c| match c {
+            'á' | 'à' | 'â' | 'ä' | 'ã' | 'å' => 'a',
+            'ç' => 'c',
+            'é' | 'è' | 'ê' | 'ë' => 'e',
+            'í' | 'ì' | 'î' | 'ï' => 'i',
+            'ñ' => 'n',
+            'ó' | 'ò' | 'ô' | 'ö' | 'õ' => 'o',
+            'ú' | 'ù' | 'û' | 'ü' => 'u',
+            'ý' | 'ÿ' => 'y',
+            _ => c,
+        })
+        .collect()
+}
+
 /// Maps a bind/connect error chain to a stable classification key for the UI.
 ///
 /// The raw message is not exposed to the frontend - it is written to logs at
@@ -365,47 +385,110 @@ pub struct LdapDirectoryProvider {
 /// and returns one of: `clock_skew`, `no_credentials`, `unknown_principal`,
 /// `ldap_signing`, `dns`, `network`, `auth_denied`, `tls`, `kerberos_unknown`,
 /// `not_domain_joined`, `unknown`.
+///
+/// On Windows, `cross-krb5` formats SSPI errors with `FormatMessageW` using
+/// `LANG_NEUTRAL`, so the text is localized in the OS UI language. The matches
+/// below cover English plus the Microsoft-localized strings for French,
+/// German, Italian and Spanish - confirmed via Microsoft Learn, public
+/// bug trackers (dotnet/runtime #27493, #45680) and the `finderr.net`
+/// translation index. Keywords are chosen to be the stable terminology
+/// fragments rather than the full sentence, so minor wording revisions
+/// in a Windows service pack do not break classification.
 fn classify_bind_error(err: &anyhow::Error) -> &'static str {
     let mut chain = String::new();
     for cause in err.chain() {
         chain.push_str(&cause.to_string());
         chain.push(' ');
     }
-    let msg = chain.to_lowercase();
+    // Lowercase then accent-fold so keyword patterns written in ASCII match
+    // localized Windows SSPI messages (see `fold_ascii`).
+    let msg = fold_ascii(&chain.to_lowercase());
 
     if msg.contains("not domain-joined") || msg.contains("no domain available") {
         return "not_domain_joined";
     }
+    // SEC_E_TIME_SKEW / KRB_AP_ERR_SKEW
+    //   EN: "The clocks on the client and server machines are skewed"
+    //   FR: "les horloges ... sont decalees"
+    //   DE: "Uhren ... weichen ab" / "Zeitabweichung"
+    //   IT: "orologi ... disallineati" / "scostamento"
+    //   ES: "relojes ... desfasados" / "desfase"
     if msg.contains("clock skew")
         || msg.contains("time skew")
         || msg.contains("skew too great")
         || msg.contains("preauth")
         || msg.contains("krb_ap_err_skew")
+        || msg.contains("horloge")
+        || msg.contains("uhren")
+        || msg.contains("uhr ")
+        || msg.contains("zeitabweich")
+        || msg.contains("orologi")
+        || msg.contains("disallin")
+        || msg.contains("scostament")
+        || msg.contains("reloj")
+        || msg.contains("desfas")
+        || msg.contains("desincron")
     {
         return "clock_skew";
     }
+    // SEC_E_NO_CREDENTIALS (0x8009030E): "No credentials are available in the
+    // security package"
+    //   FR: "Aucune information d'identification n'est disponible dans le
+    //        package de securite"
+    //   DE: "Im Sicherheitspaket sind keine Anmeldeinformationen verfuegbar"
+    //   IT: "Nessuna credenziale disponibile nel pacchetto di sicurezza"
+    //   ES: "No hay credenciales disponibles en el paquete de seguridad"
     if msg.contains("no credentials")
         || msg.contains("no cached credentials")
         || msg.contains("no kerberos")
         || msg.contains("no tgt")
         || msg.contains("credentials cache")
         || msg.contains("ccache")
-        || msg.contains("0x8009030e")
+        || msg.contains("information d'identification")
+        || msg.contains("anmeldeinformationen")
+        || msg.contains("sicherheitspaket")
+        || msg.contains("nessuna credenziale")
+        || msg.contains("pacchetto di sicurezza")
+        || msg.contains("no hay credenciales")
+        || msg.contains("paquete de seguridad")
     {
         return "no_credentials";
     }
+    // SEC_E_WRONG_PRINCIPAL / SEC_E_TARGET_UNKNOWN:
+    //   EN: "target principal name is incorrect" / "target is unknown"
+    //   FR: "nom principal de la cible ... incorrect" / "cible ... inconnue"
+    //   DE: "Zielprinzipalname ... falsch" / "Ziel ... unbekannt"
+    //   IT: "nome principale di destinazione non e corretto" /
+    //        "destinazione ... sconosciuta"
+    //   ES: "nombre de principal de destino ... incorrecto" /
+    //        "destino ... desconocido"
     if msg.contains("server not found in kerberos database")
         || msg.contains("s_principal_unknown")
         || msg.contains("unknown server")
         || msg.contains("unknown principal")
+        || msg.contains("target principal")
+        || msg.contains("target is unknown")
+        || msg.contains("principal de la cible")
+        || msg.contains("cible specifiee")
+        || msg.contains("zielprinzipal")
+        || msg.contains("ziel ist unbekannt")
+        || msg.contains("principale di destinazione")
+        || msg.contains("destinazione specificata")
+        || msg.contains("principal de destino")
+        || msg.contains("destino especificado")
     {
         return "unknown_principal";
     }
+    // LDAP signing / sealing required by the DC
     if msg.contains("strong(er) auth")
         || msg.contains("strong authentication")
         || msg.contains("confidentiality required")
         || msg.contains("ldap signing")
         || msg.contains("sign and seal")
+        || msg.contains("authentification plus forte")
+        || msg.contains("starkere authentifizierung")
+        || msg.contains("autenticazione piu forte")
+        || msg.contains("autenticacion mas segura")
     {
         return "ldap_signing";
     }
@@ -431,14 +514,37 @@ fn classify_bind_error(err: &anyhow::Error) -> &'static str {
         || msg.contains("certificate")
         || msg.contains("handshake")
         || msg.contains("starttls")
+        || msg.contains("certificat")
+        || msg.contains("zertifikat")
+        || msg.contains("certificato")
+        || msg.contains("certificado")
     {
         return "tls";
     }
+    // SEC_E_LOGON_DENIED (0x8009030C) / LDAP invalidCredentials (rc=49)
+    //   EN: "logon attempt failed" / "invalid credentials" / "access denied"
+    //   FR: "ouverture de session ... echoue" / "identifiants ... invalides" /
+    //        "acces refuse"
+    //   DE: "Anmeld... fehlgeschlagen" / "Zugriff verweigert"
+    //   IT: "accesso ... non riuscito" / "accesso negato" /
+    //        "credenziali non valide"
+    //   ES: "inicio de sesion ... fallido" / "acceso denegado" /
+    //        "credenciales no validas"
     if msg.contains("insufficient access")
         || msg.contains("invalid credentials")
         || msg.contains("access denied")
         || msg.contains("49)")
         || msg.contains("rc=49")
+        || msg.contains("ouverture de session")
+        || msg.contains("identifiants invalides")
+        || msg.contains("acces refuse")
+        || msg.contains("anmeld")
+        || msg.contains("zugriff verweigert")
+        || msg.contains("accesso negato")
+        || msg.contains("credenziali non valide")
+        || msg.contains("inicio de sesion")
+        || msg.contains("acceso denegado")
+        || msg.contains("credenciales no validas")
     {
         return "auth_denied";
     }
@@ -3693,5 +3799,90 @@ mod tests {
         let root = anyhow::anyhow!("getaddrinfo EAI_NONAME");
         let wrapped: anyhow::Error = root.context("resolving _ldap._tcp.corp.local");
         assert_eq!(classify_bind_error(&wrapped), "dns");
+    }
+
+    // Windows SSPI error text is localized in the OS UI language via
+    // FormatMessageW(LANG_NEUTRAL). The tests below exercise the known
+    // Microsoft translations we match against (FR/DE/IT/ES).
+
+    #[test]
+    fn test_classify_bind_error_no_credentials_fr() {
+        let e = anyhow::anyhow!(
+            "GSSAPI operation error: ClientCtx::step failed Aucune information d'identification n'est disponible dans le package de sécurité"
+        );
+        assert_eq!(classify_bind_error(&e), "no_credentials");
+    }
+
+    #[test]
+    fn test_classify_bind_error_no_credentials_de() {
+        let e = anyhow::anyhow!("Im Sicherheitspaket sind keine Anmeldeinformationen verfügbar");
+        assert_eq!(classify_bind_error(&e), "no_credentials");
+    }
+
+    #[test]
+    fn test_classify_bind_error_no_credentials_it() {
+        let e = anyhow::anyhow!("Nessuna credenziale disponibile nel pacchetto di sicurezza");
+        assert_eq!(classify_bind_error(&e), "no_credentials");
+    }
+
+    #[test]
+    fn test_classify_bind_error_no_credentials_es() {
+        let e = anyhow::anyhow!("No hay credenciales disponibles en el paquete de seguridad");
+        assert_eq!(classify_bind_error(&e), "no_credentials");
+    }
+
+    #[test]
+    fn test_classify_bind_error_unknown_principal_fr() {
+        let e = anyhow::anyhow!("Le nom principal de la cible n'est pas correct");
+        assert_eq!(classify_bind_error(&e), "unknown_principal");
+    }
+
+    #[test]
+    fn test_classify_bind_error_unknown_principal_de() {
+        let e = anyhow::anyhow!("Der Zielprinzipalname ist falsch");
+        assert_eq!(classify_bind_error(&e), "unknown_principal");
+    }
+
+    #[test]
+    fn test_classify_bind_error_clock_skew_fr() {
+        let e = anyhow::anyhow!("Les horloges des ordinateurs client et serveur sont décalées");
+        assert_eq!(classify_bind_error(&e), "clock_skew");
+    }
+
+    #[test]
+    fn test_classify_bind_error_clock_skew_de() {
+        let e = anyhow::anyhow!("Zeitabweichung zwischen Client und Server");
+        assert_eq!(classify_bind_error(&e), "clock_skew");
+    }
+
+    #[test]
+    fn test_classify_bind_error_auth_denied_fr() {
+        let e = anyhow::anyhow!("La tentative d'ouverture de session a échoué");
+        assert_eq!(classify_bind_error(&e), "auth_denied");
+    }
+
+    #[test]
+    fn test_classify_bind_error_auth_denied_de() {
+        let e = anyhow::anyhow!("Anmeldeversuch fehlgeschlagen - Zugriff verweigert");
+        assert_eq!(classify_bind_error(&e), "auth_denied");
+    }
+
+    #[test]
+    fn test_classify_bind_error_auth_denied_es() {
+        let e = anyhow::anyhow!("Credenciales no válidas - acceso denegado");
+        assert_eq!(classify_bind_error(&e), "auth_denied");
+    }
+
+    #[test]
+    fn test_fold_ascii_strips_accents() {
+        assert_eq!(fold_ascii("décalées"), "decalees");
+        assert_eq!(fold_ascii("sécurité"), "securite");
+        assert_eq!(fold_ascii("échoué"), "echoue");
+        assert_eq!(fold_ascii("verfügbar"), "verfugbar");
+        assert_eq!(fold_ascii("stärkere"), "starkere");
+        assert_eq!(fold_ascii("più"), "piu");
+        assert_eq!(fold_ascii("sesión"), "sesion");
+        assert_eq!(fold_ascii("válidas"), "validas");
+        assert_eq!(fold_ascii("año"), "ano");
     }
 }
