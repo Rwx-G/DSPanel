@@ -19,5 +19,19 @@
   "helpDesk": "Mesa de ayuda",
   "accountOperator": "Operador de cuentas",
   "admin": "Admin",
-  "domainAdmin": "Administrador de dominio"
+  "domainAdmin": "Administrador de dominio",
+  "kerberosHint": {
+    "logRef": "Consulte el registro de la aplicación para ver el error técnico completo.",
+    "not_domain_joined": "Esta estación de trabajo no está unida a un dominio de Active Directory.",
+    "clock_skew": "El reloj de la estación está desincronizado con el Domain Controller (más de 5 minutos).",
+    "no_credentials": "No hay ticket Kerberos disponible. Cierre y vuelva a abrir la sesión, o ejecute `klist purge` y luego `kinit`.",
+    "unknown_principal": "El SPN LDAP es desconocido para Kerberos. El nombre de host del DC puede resolverse incorrectamente.",
+    "ldap_signing": "El Domain Controller requiere firma o sellado LDAP que el bind actual no puede proporcionar.",
+    "dns": "Falló la resolución DNS. No se pudo resolver el registro SRV `_ldap._tcp.<dominio>`.",
+    "network": "La conexión de red con el Domain Controller falló (rechazada, inalcanzable o caducada).",
+    "tls": "Falló la negociación TLS con el Domain Controller. Verifique la confianza del certificado y el puerto 636.",
+    "auth_denied": "Autenticación rechazada por el directorio (credenciales no válidas o acceso insuficiente).",
+    "kerberos_unknown": "La autenticación Kerberos falló por un motivo no reconocido.",
+    "unknown": "La conexión falló por un motivo desconocido."
+  }
 }

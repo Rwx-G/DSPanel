@@ -54,11 +54,13 @@ function installGlobalErrorHandlers() {
 interface DomainInfo {
   domain_name: string | null;
   is_connected: boolean;
+  connection_error?: string | null;
 }
 
 export interface AppStatus {
   isConnected: boolean;
   domainName: string | null;
+  connectionError: string | null;
   permissionLevel: string;
   authenticatedUser: string;
   username: string;
@@ -75,6 +77,7 @@ export function App() {
   const [status, setStatus] = useState<AppStatus>({
     isConnected: false,
     domainName: null,
+    connectionError: null,
     permissionLevel: "ReadOnly",
     authenticatedUser: "",
     username: "",
@@ -93,6 +96,7 @@ export function App() {
           ...s,
           domainName: info.domain_name,
           isConnected: info.is_connected,
+          connectionError: info.connection_error ?? null,
         }));
       })
       .catch((e) => console.warn("Failed to get domain info:", e));
@@ -100,6 +104,16 @@ export function App() {
     invoke<boolean>("check_connection")
       .then((connected) => {
         setStatus((s) => ({ ...s, isConnected: connected }));
+        // Refresh the error kind after check_connection, which may have just
+        // updated the provider's last_error_kind.
+        invoke<DomainInfo>("get_domain_info")
+          .then((info) =>
+            setStatus((s) => ({
+              ...s,
+              connectionError: info.connection_error ?? null,
+            })),
+          )
+          .catch(() => {});
       })
       .catch((e) => console.warn("Failed to check connection:", e));
 

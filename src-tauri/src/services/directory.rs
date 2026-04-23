@@ -31,6 +31,17 @@ pub trait DirectoryProvider: Send + Sync {
     /// Tests the connection by performing a lightweight rootDSE query.
     async fn test_connection(&self) -> Result<bool>;
 
+    /// Returns a classification key for the last connection failure, if any.
+    ///
+    /// The value is a stable identifier (e.g. `clock_skew`, `no_credentials`,
+    /// `dns`, `ldap_signing`, `network`, `auth_denied`, `kerberos_unknown`,
+    /// `unknown`, `not_domain_joined`) that the UI maps to a localized hint.
+    /// The raw error message is not exposed here - full detail is written to
+    /// the application log at ERROR level.
+    fn last_connection_error(&self) -> Option<String> {
+        None
+    }
+
     /// Searches for user accounts matching the filter.
     async fn search_users(&self, filter: &str, max_results: usize) -> Result<Vec<DirectoryEntry>>;
 
@@ -362,6 +373,7 @@ pub mod tests {
         pub set_photo_calls: Mutex<Vec<(String, String)>>,
         pub remove_photo_calls: Mutex<Vec<String>>,
         configuration_entries: Mutex<Vec<DirectoryEntry>>,
+        connection_error: Mutex<Option<String>>,
     }
 
     impl Default for MockDirectoryProvider {
@@ -412,6 +424,7 @@ pub mod tests {
                 set_photo_calls: Mutex::new(Vec::new()),
                 remove_photo_calls: Mutex::new(Vec::new()),
                 configuration_entries: Mutex::new(Vec::new()),
+                connection_error: Mutex::new(None),
             }
         }
 
@@ -456,6 +469,7 @@ pub mod tests {
                 set_photo_calls: Mutex::new(Vec::new()),
                 remove_photo_calls: Mutex::new(Vec::new()),
                 configuration_entries: Mutex::new(Vec::new()),
+                connection_error: Mutex::new(Some("not_domain_joined".to_string())),
             }
         }
 
@@ -532,6 +546,11 @@ pub mod tests {
             self
         }
 
+        pub fn with_connection_error(self, kind: &str) -> Self {
+            *self.connection_error.lock().unwrap() = Some(kind.to_string());
+            self
+        }
+
         fn check_failure(&self) -> Result<()> {
             if *self.should_fail.lock().unwrap() {
                 anyhow::bail!("Mock directory provider failure");
@@ -561,6 +580,10 @@ pub mod tests {
         async fn test_connection(&self) -> Result<bool> {
             self.check_failure()?;
             Ok(self.is_connected())
+        }
+
+        fn last_connection_error(&self) -> Option<String> {
+            self.connection_error.lock().unwrap().clone()
         }
 
         async fn search_users(

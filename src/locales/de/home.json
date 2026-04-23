@@ -19,5 +19,19 @@
   "helpDesk": "HelpDesk",
   "accountOperator": "Kontobediener",
   "admin": "Admin",
-  "domainAdmin": "Domänen-Admin"
+  "domainAdmin": "Domänen-Admin",
+  "kerberosHint": {
+    "logRef": "Vollständige technische Fehlermeldung siehe Anwendungsprotokoll.",
+    "not_domain_joined": "Dieser Arbeitsplatz ist keiner Active-Directory-Domäne beigetreten.",
+    "clock_skew": "Die Uhr des Arbeitsplatzes ist nicht mit dem Domain Controller synchron (mehr als 5 Minuten Abweichung).",
+    "no_credentials": "Kein Kerberos-Ticket verfügbar. Melden Sie sich ab und wieder an oder führen Sie `klist purge` und anschließend `kinit` aus.",
+    "unknown_principal": "Der LDAP-SPN ist Kerberos unbekannt. Der DC-Hostname wird möglicherweise falsch aufgelöst.",
+    "ldap_signing": "Der Domain Controller verlangt LDAP-Signierung oder -Versiegelung, die der aktuelle Bind nicht liefern kann.",
+    "dns": "DNS-Auflösung fehlgeschlagen. Der SRV-Eintrag `_ldap._tcp.<Domäne>` konnte nicht aufgelöst werden.",
+    "network": "Netzwerkverbindung zum Domain Controller fehlgeschlagen (abgelehnt, nicht erreichbar oder Zeitüberschreitung).",
+    "tls": "TLS-Handshake mit dem Domain Controller fehlgeschlagen. Prüfen Sie Zertifikatsvertrauen und Port 636.",
+    "auth_denied": "Authentifizierung vom Verzeichnis abgelehnt (ungültige Anmeldeinformationen oder unzureichende Rechte).",
+    "kerberos_unknown": "Kerberos-Authentifizierung aus einem nicht erkannten Grund fehlgeschlagen.",
+    "unknown": "Verbindung aus unbekanntem Grund fehlgeschlagen."
+  }
 }

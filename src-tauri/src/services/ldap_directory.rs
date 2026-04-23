@@ -353,6 +353,205 @@ pub struct LdapDirectoryProvider {
     dc_fqdn: Mutex<Option<String>>,
     /// Timestamp of the last successful LDAP operation.
     last_successful_op: Mutex<Option<std::time::Instant>>,
+    /// Stable classification key for the last connection failure (no raw text).
+    /// See `classify_bind_error` for the set of possible values.
+    last_error_kind: Mutex<Option<String>>,
+}
+
+/// Strips common Latin-1/Latin-2 accents so multilingual keyword matching
+/// works against error texts produced by Windows `FormatMessageW` in French,
+/// German, Italian, Spanish, etc. Cheap pass - does not normalize ligatures
+/// or combining characters, which none of our target strings use.
+fn fold_ascii(s: &str) -> String {
+    s.chars()
+        .map(|c| match c {
+            'á' | 'à' | 'â' | 'ä' | 'ã' | 'å' => 'a',
+            'ç' => 'c',
+            'é' | 'è' | 'ê' | 'ë' => 'e',
+            'í' | 'ì' | 'î' | 'ï' => 'i',
+            'ñ' => 'n',
+            'ó' | 'ò' | 'ô' | 'ö' | 'õ' => 'o',
+            'ú' | 'ù' | 'û' | 'ü' => 'u',
+            'ý' | 'ÿ' => 'y',
+            _ => c,
+        })
+        .collect()
+}
+
+/// Maps a bind/connect error chain to a stable classification key for the UI.
+///
+/// The raw message is not exposed to the frontend - it is written to logs at
+/// ERROR level. This function only inspects `err.to_string()` (plus the chain)
+/// and returns one of: `clock_skew`, `no_credentials`, `unknown_principal`,
+/// `ldap_signing`, `dns`, `network`, `auth_denied`, `tls`, `kerberos_unknown`,
+/// `not_domain_joined`, `unknown`.
+///
+/// On Windows, `cross-krb5` formats SSPI errors with `FormatMessageW` using
+/// `LANG_NEUTRAL`, so the text is localized in the OS UI language. The matches
+/// below cover English plus the Microsoft-localized strings for French,
+/// German, Italian and Spanish - confirmed via Microsoft Learn, public
+/// bug trackers (dotnet/runtime #27493, #45680) and the `finderr.net`
+/// translation index. Keywords are chosen to be the stable terminology
+/// fragments rather than the full sentence, so minor wording revisions
+/// in a Windows service pack do not break classification.
+fn classify_bind_error(err: &anyhow::Error) -> &'static str {
+    let mut chain = String::new();
+    for cause in err.chain() {
+        chain.push_str(&cause.to_string());
+        chain.push(' ');
+    }
+    // Lowercase then accent-fold so keyword patterns written in ASCII match
+    // localized Windows SSPI messages (see `fold_ascii`).
+    let msg = fold_ascii(&chain.to_lowercase());
+
+    if msg.contains("not domain-joined") || msg.contains("no domain available") {
+        return "not_domain_joined";
+    }
+    // SEC_E_TIME_SKEW / KRB_AP_ERR_SKEW
+    //   EN: "The clocks on the client and server machines are skewed"
+    //   FR: "les horloges ... sont decalees"
+    //   DE: "Uhren ... weichen ab" / "Zeitabweichung"
+    //   IT: "orologi ... disallineati" / "scostamento"
+    //   ES: "relojes ... desfasados" / "desfase"
+    if msg.contains("clock skew")
+        || msg.contains("time skew")
+        || msg.contains("skew too great")
+        || msg.contains("preauth")
+        || msg.contains("krb_ap_err_skew")
+        || msg.contains("horloge")
+        || msg.contains("uhren")
+        || msg.contains("uhr ")
+        || msg.contains("zeitabweich")
+        || msg.contains("orologi")
+        || msg.contains("disallin")
+        || msg.contains("scostament")
+        || msg.contains("reloj")
+        || msg.contains("desfas")
+        || msg.contains("desincron")
+    {
+        return "clock_skew";
+    }
+    // SEC_E_NO_CREDENTIALS (0x8009030E): "No credentials are available in the
+    // security package"
+    //   FR: "Aucune information d'identification n'est disponible dans le
+    //        package de securite"
+    //   DE: "Im Sicherheitspaket sind keine Anmeldeinformationen verfuegbar"
+    //   IT: "Nessuna credenziale disponibile nel pacchetto di sicurezza"
+    //   ES: "No hay credenciales disponibles en el paquete de seguridad"
+    if msg.contains("no credentials")
+        || msg.contains("no cached credentials")
+        || msg.contains("no kerberos")
+        || msg.contains("no tgt")
+        || msg.contains("credentials cache")
+        || msg.contains("ccache")
+        || msg.contains("information d'identification")
+        || msg.contains("anmeldeinformationen")
+        || msg.contains("sicherheitspaket")
+        || msg.contains("nessuna credenziale")
+        || msg.contains("pacchetto di sicurezza")
+        || msg.contains("no hay credenciales")
+        || msg.contains("paquete de seguridad")
+    {
+        return "no_credentials";
+    }
+    // SEC_E_WRONG_PRINCIPAL / SEC_E_TARGET_UNKNOWN:
+    //   EN: "target principal name is incorrect" / "target is unknown"
+    //   FR: "nom principal de la cible ... incorrect" / "cible ... inconnue"
+    //   DE: "Zielprinzipalname ... falsch" / "Ziel ... unbekannt"
+    //   IT: "nome principale di destinazione non e corretto" /
+    //        "destinazione ... sconosciuta"
+    //   ES: "nombre de principal de destino ... incorrecto" /
+    //        "destino ... desconocido"
+    if msg.contains("server not found in kerberos database")
+        || msg.contains("s_principal_unknown")
+        || msg.contains("unknown server")
+        || msg.contains("unknown principal")
+        || msg.contains("target principal")
+        || msg.contains("target is unknown")
+        || msg.contains("principal de la cible")
+        || msg.contains("cible specifiee")
+        || msg.contains("zielprinzipal")
+        || msg.contains("ziel ist unbekannt")
+        || msg.contains("principale di destinazione")
+        || msg.contains("destinazione specificata")
+        || msg.contains("principal de destino")
+        || msg.contains("destino especificado")
+    {
+        return "unknown_principal";
+    }
+    // LDAP signing / sealing required by the DC
+    if msg.contains("strong(er) auth")
+        || msg.contains("strong authentication")
+        || msg.contains("confidentiality required")
+        || msg.contains("ldap signing")
+        || msg.contains("sign and seal")
+        || msg.contains("authentification plus forte")
+        || msg.contains("starkere authentifizierung")
+        || msg.contains("autenticazione piu forte")
+        || msg.contains("autenticacion mas segura")
+    {
+        return "ldap_signing";
+    }
+    if msg.contains("name or service not known")
+        || msg.contains("nodename nor servname")
+        || msg.contains("no such host")
+        || msg.contains("_ldap._tcp")
+        || msg.contains("dns")
+        || msg.contains("getaddrinfo")
+    {
+        return "dns";
+    }
+    if msg.contains("connection refused")
+        || msg.contains("no route to host")
+        || msg.contains("network unreachable")
+        || msg.contains("timed out")
+        || msg.contains("timeout")
+        || msg.contains("connection reset")
+    {
+        return "network";
+    }
+    if msg.contains("tls")
+        || msg.contains("certificate")
+        || msg.contains("handshake")
+        || msg.contains("starttls")
+        || msg.contains("certificat")
+        || msg.contains("zertifikat")
+        || msg.contains("certificato")
+        || msg.contains("certificado")
+    {
+        return "tls";
+    }
+    // SEC_E_LOGON_DENIED (0x8009030C) / LDAP invalidCredentials (rc=49)
+    //   EN: "logon attempt failed" / "invalid credentials" / "access denied"
+    //   FR: "ouverture de session ... echoue" / "identifiants ... invalides" /
+    //        "acces refuse"
+    //   DE: "Anmeld... fehlgeschlagen" / "Zugriff verweigert"
+    //   IT: "accesso ... non riuscito" / "accesso negato" /
+    //        "credenziali non valide"
+    //   ES: "inicio de sesion ... fallido" / "acceso denegado" /
+    //        "credenciales no validas"
+    if msg.contains("insufficient access")
+        || msg.contains("invalid credentials")
+        || msg.contains("access denied")
+        || msg.contains("49)")
+        || msg.contains("rc=49")
+        || msg.contains("ouverture de session")
+        || msg.contains("identifiants invalides")
+        || msg.contains("acces refuse")
+        || msg.contains("anmeld")
+        || msg.contains("zugriff verweigert")
+        || msg.contains("accesso negato")
+        || msg.contains("credenziali non valide")
+        || msg.contains("inicio de sesion")
+        || msg.contains("acceso denegado")
+        || msg.contains("credenciales no validas")
+    {
+        return "auth_denied";
+    }
+    if msg.contains("gssapi") || msg.contains("kerberos") || msg.contains("sasl") {
+        return "kerberos_unknown";
+    }
+    "unknown"
 }
 
 /// Parses the server string and returns (host, use_tls).
@@ -391,6 +590,12 @@ impl LdapDirectoryProvider {
             Some(d) => tracing::info!("Domain detected: {}", d),
         }
 
+        let initial_error = if domain.is_none() {
+            Some("not_domain_joined".to_string())
+        } else {
+            None
+        };
+
         Self {
             domain,
             server_override: None,
@@ -402,6 +607,7 @@ impl LdapDirectoryProvider {
             authenticated_user: Mutex::new(None),
             dc_fqdn: Mutex::new(None),
             last_successful_op: Mutex::new(None),
+            last_error_kind: Mutex::new(initial_error),
         }
     }
 
@@ -442,6 +648,7 @@ impl LdapDirectoryProvider {
             authenticated_user: Mutex::new(None),
             dc_fqdn: Mutex::new(None),
             last_successful_op: Mutex::new(None),
+            last_error_kind: Mutex::new(None),
         }
     }
 
@@ -697,10 +904,18 @@ impl LdapDirectoryProvider {
                     // sasl_gssapi_bind needs the server FQDN for the SPN (ldap/<fqdn>),
                     // not the domain name. Resolve DC FQDN via DNS SRV lookup.
                     let gssapi_host = resolve_dc_fqdn_for_gssapi(&host).await;
-                    tracing::debug!(gssapi_host = %gssapi_host, original_host = %host, "GSSAPI bind with resolved FQDN");
+                    let logon_server = std::env::var("LOGONSERVER").unwrap_or_default();
+                    tracing::info!(
+                        original_host = %host,
+                        gssapi_host = %gssapi_host,
+                        spn = %format!("ldap/{}", gssapi_host),
+                        logonserver = %logon_server,
+                        "GSSAPI bind attempt"
+                    );
                     ldap.sasl_gssapi_bind(&gssapi_host)
                         .await
                         .context("GSSAPI (Kerberos) authentication failed")?;
+                    tracing::info!("GSSAPI bind succeeded");
                 }
 
                 #[cfg(not(feature = "gssapi"))]
@@ -740,6 +955,7 @@ impl LdapDirectoryProvider {
         }
 
         *self.connected.lock().expect("lock poisoned") = true;
+        *self.last_error_kind.lock().expect("lock poisoned") = None;
         Ok(ldap)
     }
 
@@ -1131,16 +1347,33 @@ impl DirectoryProvider for LdapDirectoryProvider {
 
     async fn test_connection(&self) -> Result<bool> {
         if self.domain.is_none() {
+            *self.last_error_kind.lock().expect("lock poisoned") =
+                Some("not_domain_joined".to_string());
             return Ok(false);
         }
         match self.get_connection().await {
-            Ok(_) => Ok(true),
+            Ok(_) => {
+                *self.last_error_kind.lock().expect("lock poisoned") = None;
+                Ok(true)
+            }
             Err(e) => {
-                tracing::warn!("Connection test failed: {}", e);
+                let kind = classify_bind_error(&e);
+                let chain: Vec<String> = e.chain().map(|c| c.to_string()).collect();
+                tracing::error!(
+                    kind = kind,
+                    chain = ?chain,
+                    "LDAP connection test failed: {:#}",
+                    e
+                );
+                *self.last_error_kind.lock().expect("lock poisoned") = Some(kind.to_string());
                 self.invalidate_connection().await;
                 Ok(false)
             }
         }
+    }
+
+    fn last_connection_error(&self) -> Option<String> {
+        self.last_error_kind.lock().expect("lock poisoned").clone()
     }
 
     async fn search_users(&self, filter: &str, max_results: usize) -> Result<Vec<DirectoryEntry>> {
@@ -1744,7 +1977,7 @@ impl DirectoryProvider for LdapDirectoryProvider {
                     })
                     .collect();
 
-                flat_ous.sort_by(|a, b| a.1.to_lowercase().cmp(&b.1.to_lowercase()));
+                flat_ous.sort_by_key(|a| a.1.to_lowercase());
                 Ok(build_ou_tree(&flat_ous, &base))
             }
         })
@@ -3029,7 +3262,7 @@ fn build_ou_tree(flat_ous: &[(String, String)], base_dn: &str) -> Vec<OUNode> {
             })
             .collect();
 
-        nodes.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+        nodes.sort_by_key(|a| a.name.to_lowercase());
         nodes
     }
 
@@ -3483,11 +3716,173 @@ mod tests {
 
         let provider = LdapDirectoryProvider::new();
         assert!(!provider.test_connection().await.unwrap());
+        assert_eq!(
+            provider.last_connection_error().as_deref(),
+            Some("not_domain_joined")
+        );
 
         if let Some(val) = original {
             unsafe {
                 std::env::set_var("USERDNSDOMAIN", val);
             }
         }
+    }
+
+    #[test]
+    fn test_classify_bind_error_clock_skew() {
+        let e = anyhow::anyhow!("GSSAPI: clock skew too great");
+        assert_eq!(classify_bind_error(&e), "clock_skew");
+    }
+
+    #[test]
+    fn test_classify_bind_error_no_credentials() {
+        let e = anyhow::anyhow!("No credentials cache found (filename: FILE:/tmp/krb5cc)");
+        assert_eq!(classify_bind_error(&e), "no_credentials");
+    }
+
+    #[test]
+    fn test_classify_bind_error_unknown_principal() {
+        let e = anyhow::anyhow!("Server not found in Kerberos database");
+        assert_eq!(classify_bind_error(&e), "unknown_principal");
+    }
+
+    #[test]
+    fn test_classify_bind_error_ldap_signing() {
+        let e = anyhow::anyhow!("Server requires confidentiality required");
+        assert_eq!(classify_bind_error(&e), "ldap_signing");
+    }
+
+    #[test]
+    fn test_classify_bind_error_dns() {
+        let e = anyhow::anyhow!("getaddrinfo: Name or service not known");
+        assert_eq!(classify_bind_error(&e), "dns");
+    }
+
+    #[test]
+    fn test_classify_bind_error_network() {
+        let e = anyhow::anyhow!("Connection refused (os error 111)");
+        assert_eq!(classify_bind_error(&e), "network");
+    }
+
+    #[test]
+    fn test_classify_bind_error_tls() {
+        let e = anyhow::anyhow!("TLS handshake failure: bad certificate");
+        assert_eq!(classify_bind_error(&e), "tls");
+    }
+
+    #[test]
+    fn test_classify_bind_error_auth_denied() {
+        let e = anyhow::anyhow!("Simple bind failed (rc=49): invalid credentials");
+        assert_eq!(classify_bind_error(&e), "auth_denied");
+    }
+
+    #[test]
+    fn test_classify_bind_error_kerberos_fallback() {
+        let e = anyhow::anyhow!("GSSAPI returned an unrecognized minor code");
+        assert_eq!(classify_bind_error(&e), "kerberos_unknown");
+    }
+
+    #[test]
+    fn test_classify_bind_error_unknown() {
+        let e = anyhow::anyhow!("Something completely unexpected happened");
+        assert_eq!(classify_bind_error(&e), "unknown");
+    }
+
+    #[test]
+    fn test_classify_bind_error_not_domain_joined() {
+        let e = anyhow::anyhow!("No domain available - machine is not domain-joined");
+        assert_eq!(classify_bind_error(&e), "not_domain_joined");
+    }
+
+    #[test]
+    fn test_classify_bind_error_follows_cause_chain() {
+        let root = anyhow::anyhow!("getaddrinfo EAI_NONAME");
+        let wrapped: anyhow::Error = root.context("resolving _ldap._tcp.corp.local");
+        assert_eq!(classify_bind_error(&wrapped), "dns");
+    }
+
+    // Windows SSPI error text is localized in the OS UI language via
+    // FormatMessageW(LANG_NEUTRAL). The tests below exercise the known
+    // Microsoft translations we match against (FR/DE/IT/ES).
+
+    #[test]
+    fn test_classify_bind_error_no_credentials_fr() {
+        let e = anyhow::anyhow!(
+            "GSSAPI operation error: ClientCtx::step failed Aucune information d'identification n'est disponible dans le package de sécurité"
+        );
+        assert_eq!(classify_bind_error(&e), "no_credentials");
+    }
+
+    #[test]
+    fn test_classify_bind_error_no_credentials_de() {
+        let e = anyhow::anyhow!("Im Sicherheitspaket sind keine Anmeldeinformationen verfügbar");
+        assert_eq!(classify_bind_error(&e), "no_credentials");
+    }
+
+    #[test]
+    fn test_classify_bind_error_no_credentials_it() {
+        let e = anyhow::anyhow!("Nessuna credenziale disponibile nel pacchetto di sicurezza");
+        assert_eq!(classify_bind_error(&e), "no_credentials");
+    }
+
+    #[test]
+    fn test_classify_bind_error_no_credentials_es() {
+        let e = anyhow::anyhow!("No hay credenciales disponibles en el paquete de seguridad");
+        assert_eq!(classify_bind_error(&e), "no_credentials");
+    }
+
+    #[test]
+    fn test_classify_bind_error_unknown_principal_fr() {
+        let e = anyhow::anyhow!("Le nom principal de la cible n'est pas correct");
+        assert_eq!(classify_bind_error(&e), "unknown_principal");
+    }
+
+    #[test]
+    fn test_classify_bind_error_unknown_principal_de() {
+        let e = anyhow::anyhow!("Der Zielprinzipalname ist falsch");
+        assert_eq!(classify_bind_error(&e), "unknown_principal");
+    }
+
+    #[test]
+    fn test_classify_bind_error_clock_skew_fr() {
+        let e = anyhow::anyhow!("Les horloges des ordinateurs client et serveur sont décalées");
+        assert_eq!(classify_bind_error(&e), "clock_skew");
+    }
+
+    #[test]
+    fn test_classify_bind_error_clock_skew_de() {
+        let e = anyhow::anyhow!("Zeitabweichung zwischen Client und Server");
+        assert_eq!(classify_bind_error(&e), "clock_skew");
+    }
+
+    #[test]
+    fn test_classify_bind_error_auth_denied_fr() {
+        let e = anyhow::anyhow!("La tentative d'ouverture de session a échoué");
+        assert_eq!(classify_bind_error(&e), "auth_denied");
+    }
+
+    #[test]
+    fn test_classify_bind_error_auth_denied_de() {
+        let e = anyhow::anyhow!("Anmeldeversuch fehlgeschlagen - Zugriff verweigert");
+        assert_eq!(classify_bind_error(&e), "auth_denied");
+    }
+
+    #[test]
+    fn test_classify_bind_error_auth_denied_es() {
+        let e = anyhow::anyhow!("Credenciales no válidas - acceso denegado");
+        assert_eq!(classify_bind_error(&e), "auth_denied");
+    }
+
+    #[test]
+    fn test_fold_ascii_strips_accents() {
+        assert_eq!(fold_ascii("décalées"), "decalees");
+        assert_eq!(fold_ascii("sécurité"), "securite");
+        assert_eq!(fold_ascii("échoué"), "echoue");
+        assert_eq!(fold_ascii("verfügbar"), "verfugbar");
+        assert_eq!(fold_ascii("stärkere"), "starkere");
+        assert_eq!(fold_ascii("più"), "piu");
+        assert_eq!(fold_ascii("sesión"), "sesion");
+        assert_eq!(fold_ascii("válidas"), "validas");
+        assert_eq!(fold_ascii("año"), "ano");
     }
 }

@@ -397,15 +397,11 @@ fn parse_single_repl_neighbor_xml(xml: &str) -> Option<ReplNeighborXml> {
                     "dwReplicaFlags" => {
                         neighbor.replica_flags = text.parse().unwrap_or(0);
                     }
-                    "ftimeLastSyncSuccess" => {
-                        if !text.is_empty() && text != "0" {
-                            neighbor.last_sync_success = Some(text);
-                        }
+                    "ftimeLastSyncSuccess" if !text.is_empty() && text != "0" => {
+                        neighbor.last_sync_success = Some(text);
                     }
-                    "ftimeLastSyncAttempt" => {
-                        if !text.is_empty() && text != "0" {
-                            neighbor.last_sync_attempt = Some(text);
-                        }
+                    "ftimeLastSyncAttempt" if !text.is_empty() && text != "0" => {
+                        neighbor.last_sync_attempt = Some(text);
                     }
                     "dwLastSyncResult" => {
                         neighbor.last_sync_result = text.parse().unwrap_or(0);

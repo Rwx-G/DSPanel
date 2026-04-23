@@ -9,7 +9,7 @@
   <img src="https://img.shields.io/badge/Rust-2024-orange.svg" alt="Rust">
   <img src="https://img.shields.io/badge/Tauri-v2-blue.svg" alt="Tauri">
   <img src="https://img.shields.io/badge/Platform-Windows%20|%20macOS%20|%20Linux-0078D6.svg" alt="Platform">
-  <img src="https://img.shields.io/badge/Status-v1.0.2-brightgreen.svg" alt="Status">
+  <img src="https://img.shields.io/badge/Status-v1.0.3-brightgreen.svg" alt="Status">
   <img src="https://img.shields.io/badge/Coverage-82%25_Rust_|_87%25_TS-brightgreen.svg" alt="Coverage">
   <img src="https://img.shields.io/badge/i18n-EN%20|%20FR%20|%20DE%20|%20ES%20|%20IT-blueviolet.svg" alt="i18n">
 </p>
