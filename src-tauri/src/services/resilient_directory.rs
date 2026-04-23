@@ -162,6 +162,10 @@ where
         resilient_call!(self, |inner| inner.test_connection().await)
     }
 
+    fn last_connection_error(&self) -> Option<String> {
+        self.inner.last_connection_error()
+    }
+
     async fn search_users(&self, filter: &str, max_results: usize) -> Result<Vec<DirectoryEntry>> {
         let filter = filter.to_string();
         resilient_call!(self, filter, |inner, f| inner

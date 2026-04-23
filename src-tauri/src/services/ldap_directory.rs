@@ -353,6 +353,99 @@ pub struct LdapDirectoryProvider {
     dc_fqdn: Mutex<Option<String>>,
     /// Timestamp of the last successful LDAP operation.
     last_successful_op: Mutex<Option<std::time::Instant>>,
+    /// Stable classification key for the last connection failure (no raw text).
+    /// See `classify_bind_error` for the set of possible values.
+    last_error_kind: Mutex<Option<String>>,
+}
+
+/// Maps a bind/connect error chain to a stable classification key for the UI.
+///
+/// The raw message is not exposed to the frontend - it is written to logs at
+/// ERROR level. This function only inspects `err.to_string()` (plus the chain)
+/// and returns one of: `clock_skew`, `no_credentials`, `unknown_principal`,
+/// `ldap_signing`, `dns`, `network`, `auth_denied`, `tls`, `kerberos_unknown`,
+/// `not_domain_joined`, `unknown`.
+fn classify_bind_error(err: &anyhow::Error) -> &'static str {
+    let mut chain = String::new();
+    for cause in err.chain() {
+        chain.push_str(&cause.to_string());
+        chain.push(' ');
+    }
+    let msg = chain.to_lowercase();
+
+    if msg.contains("not domain-joined") || msg.contains("no domain available") {
+        return "not_domain_joined";
+    }
+    if msg.contains("clock skew")
+        || msg.contains("time skew")
+        || msg.contains("skew too great")
+        || msg.contains("preauth")
+        || msg.contains("krb_ap_err_skew")
+    {
+        return "clock_skew";
+    }
+    if msg.contains("no credentials")
+        || msg.contains("no cached credentials")
+        || msg.contains("no kerberos")
+        || msg.contains("no tgt")
+        || msg.contains("credentials cache")
+        || msg.contains("ccache")
+        || msg.contains("0x8009030e")
+    {
+        return "no_credentials";
+    }
+    if msg.contains("server not found in kerberos database")
+        || msg.contains("s_principal_unknown")
+        || msg.contains("unknown server")
+        || msg.contains("unknown principal")
+    {
+        return "unknown_principal";
+    }
+    if msg.contains("strong(er) auth")
+        || msg.contains("strong authentication")
+        || msg.contains("confidentiality required")
+        || msg.contains("ldap signing")
+        || msg.contains("sign and seal")
+    {
+        return "ldap_signing";
+    }
+    if msg.contains("name or service not known")
+        || msg.contains("nodename nor servname")
+        || msg.contains("no such host")
+        || msg.contains("_ldap._tcp")
+        || msg.contains("dns")
+        || msg.contains("getaddrinfo")
+    {
+        return "dns";
+    }
+    if msg.contains("connection refused")
+        || msg.contains("no route to host")
+        || msg.contains("network unreachable")
+        || msg.contains("timed out")
+        || msg.contains("timeout")
+        || msg.contains("connection reset")
+    {
+        return "network";
+    }
+    if msg.contains("tls")
+        || msg.contains("certificate")
+        || msg.contains("handshake")
+        || msg.contains("starttls")
+    {
+        return "tls";
+    }
+    if msg.contains("insufficient access")
+        || msg.contains("invalid credentials")
+        || msg.contains("access denied")
+        || msg.contains("49)")
+        || msg.contains("rc=49")
+    {
+        return "auth_denied";
+    }
+    if msg.contains("gssapi") || msg.contains("kerberos") || msg.contains("sasl") {
+        return "kerberos_unknown";
+    }
+    "unknown"
 }
 
 /// Parses the server string and returns (host, use_tls).
@@ -391,6 +484,12 @@ impl LdapDirectoryProvider {
             Some(d) => tracing::info!("Domain detected: {}", d),
         }
 
+        let initial_error = if domain.is_none() {
+            Some("not_domain_joined".to_string())
+        } else {
+            None
+        };
+
         Self {
             domain,
             server_override: None,
@@ -402,6 +501,7 @@ impl LdapDirectoryProvider {
             authenticated_user: Mutex::new(None),
             dc_fqdn: Mutex::new(None),
             last_successful_op: Mutex::new(None),
+            last_error_kind: Mutex::new(initial_error),
         }
     }
 
@@ -442,6 +542,7 @@ impl LdapDirectoryProvider {
             authenticated_user: Mutex::new(None),
             dc_fqdn: Mutex::new(None),
             last_successful_op: Mutex::new(None),
+            last_error_kind: Mutex::new(None),
         }
     }
 
@@ -697,10 +798,18 @@ impl LdapDirectoryProvider {
                     // sasl_gssapi_bind needs the server FQDN for the SPN (ldap/<fqdn>),
                     // not the domain name. Resolve DC FQDN via DNS SRV lookup.
                     let gssapi_host = resolve_dc_fqdn_for_gssapi(&host).await;
-                    tracing::debug!(gssapi_host = %gssapi_host, original_host = %host, "GSSAPI bind with resolved FQDN");
+                    let logon_server = std::env::var("LOGONSERVER").unwrap_or_default();
+                    tracing::info!(
+                        original_host = %host,
+                        gssapi_host = %gssapi_host,
+                        spn = %format!("ldap/{}", gssapi_host),
+                        logonserver = %logon_server,
+                        "GSSAPI bind attempt"
+                    );
                     ldap.sasl_gssapi_bind(&gssapi_host)
                         .await
                         .context("GSSAPI (Kerberos) authentication failed")?;
+                    tracing::info!("GSSAPI bind succeeded");
                 }
 
                 #[cfg(not(feature = "gssapi"))]
@@ -740,6 +849,7 @@ impl LdapDirectoryProvider {
         }
 
         *self.connected.lock().expect("lock poisoned") = true;
+        *self.last_error_kind.lock().expect("lock poisoned") = None;
         Ok(ldap)
     }
 
@@ -1131,16 +1241,33 @@ impl DirectoryProvider for LdapDirectoryProvider {
 
     async fn test_connection(&self) -> Result<bool> {
         if self.domain.is_none() {
+            *self.last_error_kind.lock().expect("lock poisoned") =
+                Some("not_domain_joined".to_string());
             return Ok(false);
         }
         match self.get_connection().await {
-            Ok(_) => Ok(true),
+            Ok(_) => {
+                *self.last_error_kind.lock().expect("lock poisoned") = None;
+                Ok(true)
+            }
             Err(e) => {
-                tracing::warn!("Connection test failed: {}", e);
+                let kind = classify_bind_error(&e);
+                let chain: Vec<String> = e.chain().map(|c| c.to_string()).collect();
+                tracing::error!(
+                    kind = kind,
+                    chain = ?chain,
+                    "LDAP connection test failed: {:#}",
+                    e
+                );
+                *self.last_error_kind.lock().expect("lock poisoned") = Some(kind.to_string());
                 self.invalidate_connection().await;
                 Ok(false)
             }
         }
+    }
+
+    fn last_connection_error(&self) -> Option<String> {
+        self.last_error_kind.lock().expect("lock poisoned").clone()
     }
 
     async fn search_users(&self, filter: &str, max_results: usize) -> Result<Vec<DirectoryEntry>> {
@@ -3483,11 +3610,88 @@ mod tests {
 
         let provider = LdapDirectoryProvider::new();
         assert!(!provider.test_connection().await.unwrap());
+        assert_eq!(
+            provider.last_connection_error().as_deref(),
+            Some("not_domain_joined")
+        );
 
         if let Some(val) = original {
             unsafe {
                 std::env::set_var("USERDNSDOMAIN", val);
             }
         }
+    }
+
+    #[test]
+    fn test_classify_bind_error_clock_skew() {
+        let e = anyhow::anyhow!("GSSAPI: clock skew too great");
+        assert_eq!(classify_bind_error(&e), "clock_skew");
+    }
+
+    #[test]
+    fn test_classify_bind_error_no_credentials() {
+        let e = anyhow::anyhow!("No credentials cache found (filename: FILE:/tmp/krb5cc)");
+        assert_eq!(classify_bind_error(&e), "no_credentials");
+    }
+
+    #[test]
+    fn test_classify_bind_error_unknown_principal() {
+        let e = anyhow::anyhow!("Server not found in Kerberos database");
+        assert_eq!(classify_bind_error(&e), "unknown_principal");
+    }
+
+    #[test]
+    fn test_classify_bind_error_ldap_signing() {
+        let e = anyhow::anyhow!("Server requires confidentiality required");
+        assert_eq!(classify_bind_error(&e), "ldap_signing");
+    }
+
+    #[test]
+    fn test_classify_bind_error_dns() {
+        let e = anyhow::anyhow!("getaddrinfo: Name or service not known");
+        assert_eq!(classify_bind_error(&e), "dns");
+    }
+
+    #[test]
+    fn test_classify_bind_error_network() {
+        let e = anyhow::anyhow!("Connection refused (os error 111)");
+        assert_eq!(classify_bind_error(&e), "network");
+    }
+
+    #[test]
+    fn test_classify_bind_error_tls() {
+        let e = anyhow::anyhow!("TLS handshake failure: bad certificate");
+        assert_eq!(classify_bind_error(&e), "tls");
+    }
+
+    #[test]
+    fn test_classify_bind_error_auth_denied() {
+        let e = anyhow::anyhow!("Simple bind failed (rc=49): invalid credentials");
+        assert_eq!(classify_bind_error(&e), "auth_denied");
+    }
+
+    #[test]
+    fn test_classify_bind_error_kerberos_fallback() {
+        let e = anyhow::anyhow!("GSSAPI returned an unrecognized minor code");
+        assert_eq!(classify_bind_error(&e), "kerberos_unknown");
+    }
+
+    #[test]
+    fn test_classify_bind_error_unknown() {
+        let e = anyhow::anyhow!("Something completely unexpected happened");
+        assert_eq!(classify_bind_error(&e), "unknown");
+    }
+
+    #[test]
+    fn test_classify_bind_error_not_domain_joined() {
+        let e = anyhow::anyhow!("No domain available - machine is not domain-joined");
+        assert_eq!(classify_bind_error(&e), "not_domain_joined");
+    }
+
+    #[test]
+    fn test_classify_bind_error_follows_cause_chain() {
+        let root = anyhow::anyhow!("getaddrinfo EAI_NONAME");
+        let wrapped: anyhow::Error = root.context("resolving _ldap._tcp.corp.local");
+        assert_eq!(classify_bind_error(&wrapped), "dns");
     }
 }
