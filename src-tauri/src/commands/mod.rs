@@ -91,6 +91,10 @@ async fn capture_snapshot(state: &AppState, object_dn: &str, operation: &str) {
 pub struct DomainInfo {
     pub domain_name: Option<String>,
     pub is_connected: bool,
+    /// Stable classification key for the last connection failure, if any.
+    /// Maps to an i18n hint on the UI. Raw error text stays in the log.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub connection_error: Option<String>,
 }
 
 /// Paginated browse result for user listing.

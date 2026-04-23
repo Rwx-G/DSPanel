@@ -244,6 +244,7 @@ pub(crate) fn get_domain_info_inner(state: &AppState) -> DomainInfo {
     DomainInfo {
         domain_name: provider.domain_name().map(|s| s.to_string()),
         is_connected: provider.is_connected(),
+        connection_error: provider.last_connection_error(),
     }
 }
 
@@ -810,6 +811,15 @@ mod tests {
         let info = get_domain_info_inner(&state);
         assert!(info.domain_name.is_none());
         assert!(!info.is_connected);
+        assert_eq!(info.connection_error.as_deref(), Some("not_domain_joined"));
+    }
+
+    #[test]
+    fn test_get_domain_info_surfaces_connection_error_kind() {
+        let provider = Arc::new(MockDirectoryProvider::new().with_connection_error("clock_skew"));
+        let state = AppState::new_for_test(provider, PermissionConfig::default());
+        let info = get_domain_info_inner(&state);
+        assert_eq!(info.connection_error.as_deref(), Some("clock_skew"));
     }
 
     #[test]
@@ -817,6 +827,7 @@ mod tests {
         let info = DomainInfo {
             domain_name: Some("CORP.LOCAL".to_string()),
             is_connected: true,
+            connection_error: None,
         };
         let json = serde_json::to_string(&info).unwrap();
         assert!(json.contains("domain_name"));
@@ -1173,10 +1184,12 @@ mod tests {
         let info = DomainInfo {
             domain_name: None,
             is_connected: false,
+            connection_error: Some("clock_skew".to_string()),
         };
         let json = serde_json::to_string(&info).unwrap();
         assert!(json.contains("null"));
         assert!(json.contains("false"));
+        assert!(json.contains("clock_skew"));
     }
 
     #[test]
