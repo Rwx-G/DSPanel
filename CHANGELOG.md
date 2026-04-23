@@ -7,7 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.0.2] - 2026-03-28
+### Added
+
+- Surface the cause of failed directory connections on the dashboard: when `Active Directory` shows `Disconnected`, the card now renders a localized hint explaining why (clock skew, missing Kerberos ticket, DNS SRV failure, LDAP signing requirement, TLS handshake error, authentication refused, network unreachable, etc.). Full technical error chain is written to the log at ERROR level; the UI intentionally shows only the category so support copy-paste stays manageable.
+- `DomainInfo` now carries a `connection_error` field (stable classification key, omitted when connected). A new `last_connection_error()` method on `DirectoryProvider` backs it.
+
+### Changed
+
+- GSSAPI bind logs are promoted from DEBUG to INFO: `original_host`, `gssapi_host`, computed `spn` (`ldap/<fqdn>`) and `LOGONSERVER` are now visible in the default application log, making Kerberos diagnostics possible without toggling `RUST_LOG=debug`. On failure, the full `anyhow::Error` chain is logged at ERROR level.
+
+
 
 ### Security
 
