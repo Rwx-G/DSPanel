@@ -1010,17 +1010,30 @@ mod tests {
     // evaluate_health_cmd tests
     // -----------------------------------------------------------------------
 
+    /// Returns an ISO 8601 UTC timestamp `days` days before `now`.
+    ///
+    /// Used by health tests that hit the real `Utc::now()` through
+    /// `evaluate_health_cmd`, so assertions stay stable regardless of when
+    /// the suite runs.
+    fn days_ago_iso(days: i64) -> String {
+        let ts = chrono::Utc::now() - chrono::Duration::days(days);
+        ts.format("%Y-%m-%dT%H:%M:%SZ").to_string()
+    }
+
     #[test]
     fn test_evaluate_health_cmd_healthy_user() {
         let input = HealthInput {
             enabled: true,
             locked_out: false,
             account_expires: None,
-            password_last_set: Some("2026-03-01T10:00:00Z".to_string()),
+            // Password set 30 days ago - distinct from when_created, not stale
+            password_last_set: Some(days_ago_iso(30)),
             password_expired: false,
             password_never_expires: false,
-            last_logon: Some("2026-03-12T08:00:00Z".to_string()),
-            when_created: Some("2024-01-01T00:00:00Z".to_string()),
+            // Logon 5 days ago - well under the 30-day Inactive30Days threshold
+            last_logon: Some(days_ago_iso(5)),
+            // Account created 1 year ago - not recent, not co-created with password
+            when_created: Some(days_ago_iso(365)),
         };
         let result = evaluate_health_cmd(input);
         assert_eq!(result.level, crate::services::HealthLevel::Healthy);
@@ -1033,11 +1046,11 @@ mod tests {
             enabled: false,
             locked_out: false,
             account_expires: None,
-            password_last_set: Some("2026-03-01T10:00:00Z".to_string()),
+            password_last_set: Some(days_ago_iso(30)),
             password_expired: false,
             password_never_expires: false,
-            last_logon: Some("2026-03-12T08:00:00Z".to_string()),
-            when_created: Some("2024-01-01T00:00:00Z".to_string()),
+            last_logon: Some(days_ago_iso(5)),
+            when_created: Some(days_ago_iso(365)),
         };
         let result = evaluate_health_cmd(input);
         assert_eq!(result.level, crate::services::HealthLevel::Critical);
