@@ -19,5 +19,19 @@
   "helpDesk": "Help Desk",
   "accountOperator": "Opérateur de comptes",
   "admin": "Admin",
-  "domainAdmin": "Administrateur du domaine"
+  "domainAdmin": "Administrateur du domaine",
+  "kerberosHint": {
+    "logRef": "Consultez le journal de l'application pour l'erreur technique complète.",
+    "not_domain_joined": "Ce poste n'est pas joint à un domaine Active Directory.",
+    "clock_skew": "L'horloge du poste est désynchronisée avec le Domain Controller (plus de 5 minutes).",
+    "no_credentials": "Aucun ticket Kerberos disponible. Déconnectez-vous puis reconnectez la session, ou exécutez `klist purge` puis `kinit`.",
+    "unknown_principal": "Le SPN LDAP est inconnu de Kerberos. Le nom d'hôte du DC est peut-être mal résolu.",
+    "ldap_signing": "Le Domain Controller exige une signature ou un scellement LDAP que le bind actuel ne peut pas fournir.",
+    "dns": "Échec de la résolution DNS. L'enregistrement SRV `_ldap._tcp.<domaine>` n'a pas pu être résolu.",
+    "network": "La connexion réseau vers le Domain Controller a échoué (refusée, injoignable ou expirée).",
+    "tls": "Échec de la négociation TLS avec le Domain Controller. Vérifiez la confiance du certificat et le port 636.",
+    "auth_denied": "Authentification rejetée par l'annuaire (identifiants invalides ou accès insuffisant).",
+    "kerberos_unknown": "L'authentification Kerberos a échoué pour une raison non reconnue.",
+    "unknown": "La connexion a échoué pour une raison inconnue."
+  }
 }

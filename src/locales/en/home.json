@@ -19,5 +19,19 @@
   "helpDesk": "Help Desk",
   "accountOperator": "Account Operator",
   "admin": "Admin",
-  "domainAdmin": "Domain Admin"
+  "domainAdmin": "Domain Admin",
+  "kerberosHint": {
+    "logRef": "See the application log for the full technical error.",
+    "not_domain_joined": "This workstation is not joined to an Active Directory domain.",
+    "clock_skew": "Workstation clock is out of sync with the domain controller (more than 5 minutes).",
+    "no_credentials": "No Kerberos ticket available. Sign out and back in, or run `klist purge` then `kinit`.",
+    "unknown_principal": "The LDAP service principal name (SPN) is unknown to Kerberos. DC hostname may be misresolved.",
+    "ldap_signing": "The domain controller requires LDAP signing or sealing that the current bind cannot provide.",
+    "dns": "DNS resolution failed. The `_ldap._tcp.<domain>` SRV record could not be resolved.",
+    "network": "Network connection to the domain controller failed (refused, unreachable, or timed out).",
+    "tls": "TLS handshake with the domain controller failed. Check certificate trust and port 636.",
+    "auth_denied": "Authentication was rejected by the directory (invalid credentials or insufficient access).",
+    "kerberos_unknown": "Kerberos authentication failed for an unrecognized reason.",
+    "unknown": "Connection failed for an unknown reason."
+  }
 }

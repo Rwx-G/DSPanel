@@ -229,6 +229,18 @@ export function HomePage({ status }: HomePageProps) {
             <p className="text-caption text-[var(--color-warning)]">
               {t("notConnectedWarning")}
             </p>
+            {status.connectionError && (
+              <>
+                <p className="mt-2 text-caption font-medium text-[var(--color-warning)]">
+                  {t(`kerberosHint.${status.connectionError}`, {
+                    defaultValue: t("kerberosHint.unknown"),
+                  })}
+                </p>
+                <p className="mt-1 text-caption text-[var(--color-text-secondary)]">
+                  {t("kerberosHint.logRef")}
+                </p>
+              </>
+            )}
           </div>
         )}
       </div>

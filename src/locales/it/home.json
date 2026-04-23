@@ -19,5 +19,19 @@
   "helpDesk": "Help Desk",
   "accountOperator": "Operatore account",
   "admin": "Amministratore",
-  "domainAdmin": "Amministratore di dominio"
+  "domainAdmin": "Amministratore di dominio",
+  "kerberosHint": {
+    "logRef": "Consulta il registro dell'applicazione per l'errore tecnico completo.",
+    "not_domain_joined": "Questa postazione non è aggiunta a un dominio Active Directory.",
+    "clock_skew": "L'orologio della postazione non è sincronizzato con il Domain Controller (più di 5 minuti).",
+    "no_credentials": "Nessun ticket Kerberos disponibile. Disconnetti e riaccedi, oppure esegui `klist purge` e poi `kinit`.",
+    "unknown_principal": "L'SPN LDAP è sconosciuto a Kerberos. Il nome host del DC potrebbe essere risolto in modo errato.",
+    "ldap_signing": "Il Domain Controller richiede la firma o il sigillo LDAP che il bind attuale non può fornire.",
+    "dns": "Risoluzione DNS non riuscita. Il record SRV `_ldap._tcp.<dominio>` non è stato risolto.",
+    "network": "La connessione di rete al Domain Controller non è riuscita (rifiutata, irraggiungibile o scaduta).",
+    "tls": "Handshake TLS con il Domain Controller non riuscito. Verifica la fiducia del certificato e la porta 636.",
+    "auth_denied": "Autenticazione rifiutata dalla directory (credenziali non valide o accesso insufficiente).",
+    "kerberos_unknown": "L'autenticazione Kerberos non è riuscita per un motivo non riconosciuto.",
+    "unknown": "La connessione non è riuscita per un motivo sconosciuto."
+  }
 }
