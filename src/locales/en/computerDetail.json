@@ -20,5 +20,17 @@
   "filterGroups": "Filter groups...",
   "groupName": "Group Name",
   "viewGroupMembers": "View group members",
-  "openMonitoring": "Open Workstation Monitoring"
+  "openMonitoring": "Open Workstation Monitoring",
+  "quickFix": {
+    "disableUnconstrainedDelegation": {
+      "fixButton": "Fix",
+      "fixButtonAriaLabel": "Disable unconstrained Kerberos delegation",
+      "title": "Disable unconstrained Kerberos delegation",
+      "body": "This computer is trusted for unconstrained delegation: when a user authenticates against it, the computer receives a forwardable Ticket-Granting Ticket (TGT) for that user and can impersonate them to any other service in the domain.\n\nAttack vector: an attacker who compromises this host harvests TGTs of every user that authenticated against it (cached for 10 hours by default) - including any Domain Admin who logged in - and replays them anywhere in the domain. This is the textbook 'golden ticket via TGT capture' primitive.\n\nRecommended migration: replace with constrained delegation (set msDS-AllowedToDelegateTo to the specific target SPNs the host actually needs to call). Constrained delegation limits the blast radius to the explicit target services.\n\nRisk if disabled blindly: legitimate Kerberos double-hop services WILL break. Examples include SQL Server linked servers running queries against another SQL instance under the calling user's identity, IIS web apps that impersonate the user to a back-end SQL or file share, and SharePoint with Kerberos delegation. Verify no production service on this host requires the current configuration before proceeding.",
+      "checkboxLabel": "I have verified no production service on this host requires unconstrained delegation",
+      "confirmButton": "Disable delegation",
+      "successNotification": "Unconstrained delegation disabled on {{name}}",
+      "failureNotification": "Failed to disable unconstrained delegation: {{error}}"
+    }
+  }
 }

@@ -20,5 +20,17 @@
   "filterGroups": "Gruppen filtern...",
   "groupName": "Gruppenname",
   "viewGroupMembers": "Gruppenmitglieder anzeigen",
-  "openMonitoring": "Arbeitsstationsüberwachung öffnen"
+  "openMonitoring": "Arbeitsstationsüberwachung öffnen",
+  "quickFix": {
+    "disableUnconstrainedDelegation": {
+      "fixButton": "Beheben",
+      "fixButtonAriaLabel": "Unbeschränkte Kerberos-Delegierung deaktivieren",
+      "title": "Unbeschränkte Kerberos-Delegierung deaktivieren",
+      "body": "Dieser Computer ist für unbeschränkte Delegierung vertrauenswürdig: Wenn sich ein Benutzer dagegen authentifiziert, erhält der Computer ein weiterleitbares Ticket-Granting Ticket (TGT) für diesen Benutzer und kann ihn gegenüber jedem anderen Dienst in der Domäne imitieren.\n\nAngriffsvektor: Ein Angreifer, der diesen Host kompromittiert, sammelt TGTs aller Benutzer, die sich gegen ihn authentifiziert haben (standardmäßig 10 Stunden im Cache), einschließlich aller angemeldeten Domain Admins, und spielt sie überall in der Domäne erneut ab. Dies ist die klassische 'Golden Ticket via TGT-Capture'-Primitive.\n\nEmpfohlene Migration: durch beschränkte Delegierung ersetzen (msDS-AllowedToDelegateTo auf die spezifischen Ziel-SPNs setzen, die der Host tatsächlich aufrufen muss). Beschränkte Delegierung begrenzt den Schadenradius auf die expliziten Zieldienste.\n\nRisiko bei blinder Deaktivierung: legitime Kerberos-Double-Hop-Dienste WERDEN ausfallen. Beispiele: SQL Server Linked Servers, die Abfragen gegen eine andere SQL-Instanz unter der Identität des aufrufenden Benutzers ausführen, IIS-Web-Apps, die den Benutzer gegenüber einem Backend-SQL oder einer Dateifreigabe imitieren, SharePoint mit Kerberos-Delegierung. Stellen Sie sicher, dass kein Produktionsdienst auf diesem Host die aktuelle Konfiguration benötigt, bevor Sie fortfahren.",
+      "checkboxLabel": "Ich habe verifiziert, dass kein Produktionsdienst auf diesem Host unbeschränkte Delegierung benötigt",
+      "confirmButton": "Delegierung deaktivieren",
+      "successNotification": "Unbeschränkte Delegierung auf {{name}} deaktiviert",
+      "failureNotification": "Deaktivieren der unbeschränkten Delegierung fehlgeschlagen: {{error}}"
+    }
+  }
 }

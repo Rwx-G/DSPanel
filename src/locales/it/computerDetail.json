@@ -20,5 +20,17 @@
   "filterGroups": "Filtra gruppi...",
   "groupName": "Nome gruppo",
   "viewGroupMembers": "Visualizza membri del gruppo",
-  "openMonitoring": "Apri monitoraggio workstation"
+  "openMonitoring": "Apri monitoraggio workstation",
+  "quickFix": {
+    "disableUnconstrainedDelegation": {
+      "fixButton": "Correggi",
+      "fixButtonAriaLabel": "Disabilita la delega Kerberos non vincolata",
+      "title": "Disabilita la delega Kerberos non vincolata",
+      "body": "Questo computer è autorizzato per la delega non vincolata: quando un utente si autentica contro di esso, il computer riceve un Ticket-Granting Ticket (TGT) inoltrabile per quell'utente e può impersonarlo verso qualsiasi altro servizio nel dominio.\n\nVettore di attacco: un attaccante che compromette questo host raccoglie i TGT di ogni utente che vi si è autenticato (memorizzati in cache per 10 ore di default), incluso qualsiasi Domain Admin che si è connesso, e li riproduce ovunque nel dominio. È la classica primitiva 'golden ticket via TGT capture'.\n\nMigrazione consigliata: sostituire con la delega vincolata (impostare msDS-AllowedToDelegateTo sugli SPN target specifici che l'host deve effettivamente chiamare). La delega vincolata limita il raggio di impatto ai servizi target espliciti.\n\nRischio in caso di disabilitazione cieca: i servizi Kerberos legittimi a doppio salto SI INTERROMPERANNO. Esempi: SQL Server linked servers che eseguono query verso un'altra istanza SQL sotto l'identità dell'utente chiamante, applicazioni web IIS che impersonano l'utente verso un SQL o file share di backend, SharePoint con delega Kerberos. Verifica che nessun servizio di produzione su questo host richieda la configurazione attuale prima di procedere.",
+      "checkboxLabel": "Ho verificato che nessun servizio di produzione su questo host richiede la delega non vincolata",
+      "confirmButton": "Disabilita la delega",
+      "successNotification": "Delega non vincolata disabilitata su {{name}}",
+      "failureNotification": "Disabilitazione della delega non vincolata non riuscita: {{error}}"
+    }
+  }
 }
