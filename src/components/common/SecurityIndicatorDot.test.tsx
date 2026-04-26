@@ -200,4 +200,166 @@ describe("SecurityIndicatorDot", () => {
     fireEvent.click(dot);
     expect(dot).toBeInTheDocument();
   });
+
+  // ---------------------------------------------------------------------------
+  // Popover metadata enrichment (QA-14.3-003)
+  // ---------------------------------------------------------------------------
+
+  it("shows ConstrainedDelegation target SPNs inline in the popover", async () => {
+    render(
+      <SecurityIndicatorDot
+        indicators={set({
+          indicators: [
+            indicator({
+              kind: "ConstrainedDelegation",
+              severity: "Warning",
+              metadata: {
+                target_spns: [
+                  "MSSQLSvc/db.corp.local:1433",
+                  "HTTP/web1.corp.local",
+                ],
+              },
+            }),
+          ],
+          highestSeverity: "Warning",
+        })}
+      />,
+    );
+    fireEvent.mouseEnter(screen.getByTestId("security-indicator-dot"));
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId("security-indicator-meta-ConstrainedDelegation"),
+      ).toBeInTheDocument();
+    });
+    const meta = screen.getByTestId(
+      "security-indicator-meta-ConstrainedDelegation",
+    );
+    expect(meta.textContent).toContain("MSSQLSvc/db.corp.local:1433");
+    expect(meta.textContent).toContain("HTTP/web1.corp.local");
+    // No truncation suffix when the list fits under the preview limit
+    expect(meta.textContent).not.toMatch(/more/);
+  });
+
+  it("shows Rbcd allowed-principal SIDs inline in the popover", async () => {
+    render(
+      <SecurityIndicatorDot
+        indicators={set({
+          indicators: [
+            indicator({
+              kind: "Rbcd",
+              severity: "Critical",
+              metadata: {
+                allowed_principals: [
+                  "S-1-5-21-1-2-3-1100",
+                  "S-1-5-21-1-2-3-1101",
+                ],
+              },
+            }),
+          ],
+          highestSeverity: "Critical",
+        })}
+      />,
+    );
+    fireEvent.mouseEnter(screen.getByTestId("security-indicator-dot"));
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId("security-indicator-meta-Rbcd"),
+      ).toBeInTheDocument();
+    });
+    const meta = screen.getByTestId("security-indicator-meta-Rbcd");
+    expect(meta.textContent).toContain("S-1-5-21-1-2-3-1100");
+    expect(meta.textContent).toContain("S-1-5-21-1-2-3-1101");
+  });
+
+  it("truncates the metadata preview at 3 entries with a +N more suffix", async () => {
+    render(
+      <SecurityIndicatorDot
+        indicators={set({
+          indicators: [
+            indicator({
+              kind: "ConstrainedDelegation",
+              severity: "Warning",
+              metadata: {
+                target_spns: [
+                  "spn1/host",
+                  "spn2/host",
+                  "spn3/host",
+                  "spn4/host",
+                  "spn5/host",
+                ],
+              },
+            }),
+          ],
+          highestSeverity: "Warning",
+        })}
+      />,
+    );
+    fireEvent.mouseEnter(screen.getByTestId("security-indicator-dot"));
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId("security-indicator-meta-ConstrainedDelegation"),
+      ).toBeInTheDocument();
+    });
+    const meta = screen.getByTestId(
+      "security-indicator-meta-ConstrainedDelegation",
+    );
+    expect(meta.textContent).toContain("spn1/host");
+    expect(meta.textContent).toContain("spn2/host");
+    expect(meta.textContent).toContain("spn3/host");
+    expect(meta.textContent).not.toContain("spn4/host");
+    expect(meta.textContent).toMatch(/\+2 more/);
+  });
+
+  it("does not render a metadata line for indicator kinds without metadata", async () => {
+    render(
+      <SecurityIndicatorDot
+        indicators={set({
+          indicators: [
+            indicator({ kind: "Kerberoastable", severity: "Warning" }),
+          ],
+          highestSeverity: "Warning",
+        })}
+      />,
+    );
+    fireEvent.mouseEnter(screen.getByTestId("security-indicator-dot"));
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId("security-indicator-row-Kerberoastable"),
+      ).toBeInTheDocument();
+    });
+    expect(
+      screen.queryByTestId("security-indicator-meta-Kerberoastable"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("hides the metadata line when the metadata array is empty", async () => {
+    render(
+      <SecurityIndicatorDot
+        indicators={set({
+          indicators: [
+            indicator({
+              kind: "Rbcd",
+              severity: "Warning",
+              metadata: { allowed_principals: [] },
+            }),
+          ],
+          highestSeverity: "Warning",
+        })}
+      />,
+    );
+    fireEvent.mouseEnter(screen.getByTestId("security-indicator-dot"));
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId("security-indicator-row-Rbcd"),
+      ).toBeInTheDocument();
+    });
+    expect(
+      screen.queryByTestId("security-indicator-meta-Rbcd"),
+    ).not.toBeInTheDocument();
+  });
 });

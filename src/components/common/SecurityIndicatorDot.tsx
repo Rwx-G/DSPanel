@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { Shield, ShieldAlert } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type {
+  SecurityIndicator,
   SecurityIndicatorSet,
   IndicatorSeverity,
 } from "@/types/securityIndicators";
@@ -17,6 +18,31 @@ const SEVERITY_COLOR: Record<IndicatorSeverity, string> = {
   Warning: "var(--color-warning)",
   Critical: "var(--color-error)",
 };
+
+/**
+ * Maximum number of metadata items rendered inline before truncation. Past
+ * this count the popover shows "+N more" so the row stays compact and the
+ * operator gets a stable visual rhythm regardless of how many SPNs / SIDs
+ * are configured.
+ */
+const METADATA_PREVIEW_LIMIT = 3;
+
+/**
+ * Returns the metadata array (target SPNs for `ConstrainedDelegation`,
+ * allowed-principal SIDs for `Rbcd`) when present, else null. Other
+ * indicator kinds have no metadata payload.
+ */
+function metadataItemsFor(indicator: SecurityIndicator): string[] | null {
+  if (indicator.kind === "ConstrainedDelegation") {
+    const spns = indicator.metadata?.target_spns;
+    return Array.isArray(spns) ? (spns as string[]) : null;
+  }
+  if (indicator.kind === "Rbcd") {
+    const principals = indicator.metadata?.allowed_principals;
+    return Array.isArray(principals) ? (principals as string[]) : null;
+  }
+  return null;
+}
 
 /**
  * Compact aggregate indicator for the user / computer lookup list. Shows a
@@ -108,23 +134,39 @@ export function SecurityIndicatorDot({
             <p className="mb-1 text-caption font-medium text-[var(--color-text-primary)]">
               {t("dot.popoverHeader")}
             </p>
-            <ul className="space-y-1">
+            <ul className="space-y-1.5">
               {indicators.indicators.map((indicator) => {
                 const indicatorColor = SEVERITY_COLOR[indicator.severity];
+                const metadata = metadataItemsFor(indicator);
+                const preview = metadata?.slice(0, METADATA_PREVIEW_LIMIT) ?? [];
+                const overflow = (metadata?.length ?? 0) - preview.length;
                 return (
                   <li
                     key={indicator.kind}
-                    className="flex items-center gap-1.5"
+                    className="flex items-start gap-1.5"
                     data-testid={`security-indicator-row-${indicator.kind}`}
                   >
                     <span
-                      className="inline-block h-2 w-2 shrink-0 rounded-full"
+                      className="mt-1 inline-block h-2 w-2 shrink-0 rounded-full"
                       style={{ backgroundColor: indicatorColor }}
                       aria-hidden="true"
                     />
-                    <span className="text-caption text-[var(--color-text-primary)]">
-                      {t(`${indicator.kind}.badge`)}
-                    </span>
+                    <div className="flex flex-col gap-0.5 min-w-0">
+                      <span className="text-caption text-[var(--color-text-primary)]">
+                        {t(`${indicator.kind}.badge`)}
+                      </span>
+                      {preview.length > 0 && (
+                        <span
+                          className="font-mono text-[11px] text-[var(--color-text-secondary)] break-all"
+                          data-testid={`security-indicator-meta-${indicator.kind}`}
+                        >
+                          {preview.join(", ")}
+                          {overflow > 0 &&
+                            " " +
+                              t("dot.metadataMore", { count: overflow })}
+                        </span>
+                      )}
+                    </div>
                   </li>
                 );
               })}

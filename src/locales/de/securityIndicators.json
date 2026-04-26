@@ -34,6 +34,8 @@
   "dot": {
     "ariaLabel": "Sicherheitsindikatoren: {{count}}",
     "popoverHeader": "Sicherheitsindikatoren",
-    "noIndicators": "Keine Sicherheitsindikatoren erkannt"
+    "noIndicators": "Keine Sicherheitsindikatoren erkannt",
+    "metadataMore_one": "+{{count}} weitere",
+    "metadataMore_other": "+{{count}} weitere"
   }
 }

@@ -17,7 +17,7 @@ import { GroupMembersDialog } from "@/components/dialogs/GroupMembersDialog";
 import { type DirectoryComputer } from "@/types/directory";
 import {
   severityToBadgeVariant,
-  type SecurityIndicator,
+  tooltipParamsFor,
   type SecurityIndicatorSet,
 } from "@/types/securityIndicators";
 import { DisableUnconstrainedDelegationDialog } from "@/components/dialogs/DisableUnconstrainedDelegationDialog";
@@ -57,32 +57,6 @@ export function ComputerDetail({
     "securityIndicators",
   ]);
 
-  /**
-   * Builds the i18next interpolation context for one indicator's tooltip.
-   * `ConstrainedDelegation` injects `{{targets}}` from
-   * `metadata.target_spns`; `Rbcd` injects `{{principals}}` from
-   * `metadata.allowed_principals`. Other kinds receive an empty params
-   * object - their tooltips have no placeholders, so i18next ignores it.
-   */
-  const tooltipParamsFor = (
-    indicator: SecurityIndicator,
-  ): Record<string, string> => {
-    if (indicator.kind === "ConstrainedDelegation") {
-      const spns = indicator.metadata?.target_spns;
-      return {
-        targets: Array.isArray(spns) ? (spns as string[]).join(", ") : "",
-      };
-    }
-    if (indicator.kind === "Rbcd") {
-      const principals = indicator.metadata?.allowed_principals;
-      return {
-        principals: Array.isArray(principals)
-          ? (principals as string[]).join(", ")
-          : "",
-      };
-    }
-    return {};
-  };
   const [groupFilterText, setGroupFilterText] = useState("");
   const [showMonitoring, setShowMonitoring] = useState(false);
   const [platform, setPlatform] = useState("unknown");

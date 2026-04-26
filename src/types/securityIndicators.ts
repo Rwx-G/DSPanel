@@ -66,3 +66,35 @@ export function severityToBadgeVariant(
 ): "warning" | "error" {
   return severity === "Critical" ? "error" : "warning";
 }
+
+/**
+ * Builds the i18next interpolation context for one indicator's tooltip /
+ * description string. `ConstrainedDelegation` injects `{{targets}}` from
+ * `metadata.target_spns`; `Rbcd` injects `{{principals}}` from
+ * `metadata.allowed_principals`. Other kinds receive an empty params
+ * object - their description strings have no placeholders, so i18next
+ * ignores it.
+ *
+ * Shared by `ComputerDetail` and `SecurityIndicatorDot` so the metadata-to-
+ * placeholder mapping stays in one place. Adding a new metadata-bearing
+ * indicator only requires extending this function.
+ */
+export function tooltipParamsFor(
+  indicator: SecurityIndicator,
+): Record<string, string> {
+  if (indicator.kind === "ConstrainedDelegation") {
+    const spns = indicator.metadata?.target_spns;
+    return {
+      targets: Array.isArray(spns) ? (spns as string[]).join(", ") : "",
+    };
+  }
+  if (indicator.kind === "Rbcd") {
+    const principals = indicator.metadata?.allowed_principals;
+    return {
+      principals: Array.isArray(principals)
+        ? (principals as string[]).join(", ")
+        : "",
+    };
+  }
+  return {};
+}
