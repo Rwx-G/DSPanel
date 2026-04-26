@@ -321,10 +321,52 @@ impl PermissionService {
 ///
 /// Example: "CN=Domain Admins,CN=Users,DC=example,DC=com" -> "Domain Admins"
 fn extract_cn(dn: &str) -> Option<String> {
-    dn.split(',')
-        .next()
-        .and_then(|part| part.strip_prefix("CN="))
-        .map(|cn| cn.to_string())
+    parse_first_rdn_value(dn, "CN")
+}
+
+/// Parses the value of the first RDN of a Distinguished Name per RFC 4514.
+///
+/// Returns the unescaped value when the first RDN's attribute type matches
+/// `expected_type` case-insensitively, otherwise `None`. Handles backslash
+/// escapes (`\,`, `\\`, `\=`, `\+`, `\"`, `\<`, `\>`, `\;`, `\#`, `\ `) so
+/// that values containing literal commas (e.g. `CN=Doe\, John,OU=Users`)
+/// are not split on the wrong character.
+///
+/// Hex pair escapes (`\2C`) are not currently expanded; in practice AD
+/// emits the single-char escape form for these characters.
+fn parse_first_rdn_value(dn: &str, expected_type: &str) -> Option<String> {
+    let mut chars = dn.chars();
+
+    // Read attribute type up to the first unescaped '=', rejecting the DN if
+    // we hit a comma or end of string before seeing one.
+    let mut attr_type = String::new();
+    loop {
+        match chars.next()? {
+            '\\' => return None, // Backslash inside attribute type is malformed
+            '=' => break,
+            ',' => return None,
+            c => attr_type.push(c),
+        }
+    }
+    if !attr_type.trim().eq_ignore_ascii_case(expected_type) {
+        return None;
+    }
+
+    // Read value, unescaping `\<char>` and stopping at the first unescaped
+    // comma (end of the RDN).
+    let mut value = String::new();
+    while let Some(c) = chars.next() {
+        match c {
+            ',' => break,
+            '\\' => {
+                if let Some(escaped) = chars.next() {
+                    value.push(escaped);
+                }
+            }
+            other => value.push(other),
+        }
+    }
+    Some(value)
 }
 
 #[allow(clippy::unwrap_used)]
@@ -652,6 +694,88 @@ mod tests {
     #[test]
     fn test_extract_cn_returns_none_for_empty() {
         assert_eq!(extract_cn(""), None);
+    }
+
+    // --- parse_first_rdn_value tests (RFC 4514 escapes) ---
+
+    #[test]
+    fn test_parse_rdn_handles_escaped_comma() {
+        // The original bug: a CN containing a comma was split on it,
+        // returning "Doe\\" instead of "Doe, John".
+        assert_eq!(
+            parse_first_rdn_value("CN=Doe\\, John,OU=Users,DC=example,DC=com", "CN",),
+            Some("Doe, John".to_string())
+        );
+    }
+
+    #[test]
+    fn test_parse_rdn_handles_escaped_backslash() {
+        assert_eq!(
+            parse_first_rdn_value("CN=path\\\\with\\\\slashes,OU=X", "CN"),
+            Some("path\\with\\slashes".to_string())
+        );
+    }
+
+    #[test]
+    fn test_parse_rdn_handles_escaped_equals() {
+        assert_eq!(
+            parse_first_rdn_value("CN=key\\=value,OU=X", "CN"),
+            Some("key=value".to_string())
+        );
+    }
+
+    #[test]
+    fn test_parse_rdn_handles_escaped_plus() {
+        // RFC 4514 multi-valued RDN separator
+        assert_eq!(
+            parse_first_rdn_value("CN=a\\+b,OU=X", "CN"),
+            Some("a+b".to_string())
+        );
+    }
+
+    #[test]
+    fn test_parse_rdn_attribute_type_case_insensitive() {
+        assert_eq!(
+            parse_first_rdn_value("cn=John,OU=X", "CN"),
+            Some("John".to_string())
+        );
+        assert_eq!(
+            parse_first_rdn_value("Cn=John,OU=X", "cn"),
+            Some("John".to_string())
+        );
+    }
+
+    #[test]
+    fn test_parse_rdn_returns_none_when_type_mismatch() {
+        assert_eq!(parse_first_rdn_value("OU=Users,DC=corp", "CN"), None);
+        assert_eq!(parse_first_rdn_value("DC=corp,DC=local", "CN"), None);
+    }
+
+    #[test]
+    fn test_parse_rdn_empty_value_is_some() {
+        assert_eq!(parse_first_rdn_value("CN=,OU=X", "CN"), Some(String::new()));
+    }
+
+    #[test]
+    fn test_parse_rdn_no_equals_returns_none() {
+        assert_eq!(parse_first_rdn_value("malformed", "CN"), None);
+    }
+
+    #[test]
+    fn test_parse_rdn_unicode_value_preserved() {
+        assert_eq!(
+            parse_first_rdn_value("CN=Café,OU=X", "CN"),
+            Some("Café".to_string())
+        );
+    }
+
+    #[test]
+    fn test_parse_rdn_trailing_backslash_does_not_panic() {
+        // Defensive: a stray backslash at end of string must not panic
+        assert_eq!(
+            parse_first_rdn_value("CN=value\\", "CN"),
+            Some("value".to_string())
+        );
     }
 
     // --- PermissionMappings tests ---
