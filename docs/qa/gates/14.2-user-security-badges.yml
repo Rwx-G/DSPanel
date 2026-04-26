@@ -1,0 +1,168 @@
+schema: 1
+story: "14.2"
+story_title: "User Security Indicator Badges"
+gate: PASS
+status_reason: "Pure UI consumer of the Story 14.1 backend. All 7 ACs met (2 documented strong-deviations on AC #1 and AC #5). All 4 PO-flagged residual risks verified OK. 25/25 new tests pass; full frontend suite 2126/2126 and full backend suite 1624/1624 green; lint and tsc clean."
+reviewer: "Quinn (Test Architect)"
+updated: "2026-04-26T00:00:00Z"
+
+top_issues:
+  - id: "QA-14.2-001"
+    severity: low
+    finding: "Stale code comment in src/pages/UserLookup.tsx:167 reads \"Only reset health map when...\" but the block now resets both healthMap and indicatorMap."
+    suggested_action: "Update the comment to say \"Reset both maps when the filter actually changes the user list\" or drop the comment entirely. Non-blocking documentation cleanup."
+    blocking: false
+    suggested_owner: dev
+  - id: "QA-14.2-002"
+    severity: low
+    finding: "SecurityIndicatorDot does not have viewport-clamp tests. HealthBadge.test.tsx:315-389 has equivalent tests for its identical position-clamping logic."
+    suggested_action: "Optional - add 2 viewport-clamp tests (right-edge overflow, bottom-edge overflow) to mirror HealthBadge coverage. Not strictly necessary; add if a regression appears or for parity. Track for future hardening."
+    blocking: false
+    suggested_owner: dev
+  - id: "QA-14.2-003"
+    severity: low
+    finding: "evaluateUserSecurityIndicators (single, non-batch) is a 2-line wrapper exercised only transitively through refreshSelectedUser. The batch variant has direct test coverage."
+    suggested_action: "Optional - add a dedicated unit test for the single-call wrapper, especially once Stories 14.4-14.6 quick-fix flows add direct callers. Track for future hardening."
+    blocking: false
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 95
+
+expires: "2026-05-26T00:00:00Z"
+
+evidence:
+  tests_reviewed: 25
+  risks_identified: 4
+  trace:
+    ac_covered:
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+      - 6
+      - 7
+    ac_uncovered: []
+    ac_to_test_map:
+      "AC1":
+        code:
+          - "src/pages/UserDetail.tsx:455-468 securityIndicators?.indicators.map() in badge row"
+        notes: "Implementation deviates from literal AC text - UserDetail receives securityIndicators as a prop from UserLookup rather than calling invoke() itself, matching the existing healthStatus data flow. Documented in completion notes."
+        tests:
+          - "transitive via the 6 indicator-specific badge tests"
+      "AC2":
+        code:
+          - "src/types/securityIndicators.ts:64-68 severityToBadgeVariant"
+          - "src/pages/UserDetail.tsx:466 variant={severityToBadgeVariant(indicator.severity)}"
+        notes: "Critical correctness path - reads indicator.severity (NOT indicator.kind) so AdminSDHolder escalation from Story 14.1 surfaces correctly without UI re-implementation. No kind-keyed map exists in the codebase."
+        tests:
+          - "renders Kerberoastable indicator badge with warning variant"
+          - "renders PasswordNotRequired indicator badge with error variant"
+          - "renders PasswordNeverExpires indicator badge with warning variant"
+          - "renders ReversibleEncryption indicator badge with error variant"
+          - "renders AsRepRoastable indicator badge with error variant"
+          - "uses the indicator severity for the badge variant (escalated Kerberoastable becomes error)"
+      "AC3":
+        code:
+          - "src/pages/UserDetail.tsx:466 imports existing StatusBadge"
+        notes: "No new badge primitive created. SecurityIndicatorDot is a different concern (lookup-list aggregator), not a badge primitive."
+        tests:
+          - "all badge tests assert via querySelector('[data-testid=\"status-badge\"]') confirming the existing component is used"
+      "AC4":
+        code:
+          - "src/pages/UserDetail.tsx:457-460 <span title={t(...tooltip)}>"
+          - "src/locales/en/securityIndicators.json AsRepRoastable.tooltip references DONT_REQUIRE_PREAUTH 0x400000"
+          - "src/locales/{fr,de,it,es}/securityIndicators.json all reference the same AD attribute fragments"
+        tests:
+          - "attaches the localized tooltip text via title attribute (asserts contains DONT_REQUIRE_PREAUTH)"
+      "AC5":
+        code:
+          - "src/locales/en/securityIndicators.json (5 indicators + dot helpers)"
+          - "src/locales/fr/securityIndicators.json"
+          - "src/locales/de/securityIndicators.json"
+          - "src/locales/it/securityIndicators.json"
+          - "src/locales/es/securityIndicators.json"
+          - "src/locales/{lang}/index.ts each exports the new namespace"
+        notes: "Implementation deviates from literal AC text - dedicated securityIndicators.json namespace instead of extending userDetail.json, justified by cross-story reuse (Stories 14.3, 14.4-14.6). Documented in completion notes."
+        tests:
+          - "src/locales/translations.test.ts (176 tests across en/fr/de/it/es: namespace presence, key parity, no empty values, no orphans, interpolation variable preservation)"
+      "AC6":
+        code:
+          - "src/components/common/SecurityIndicatorDot.tsx:43 Icon = highestSeverity === Critical ? ShieldAlert : Shield"
+          - "src/components/common/SecurityIndicatorDot.tsx:65 if (count === 0) return null"
+          - "src/components/common/SecurityIndicatorDot.tsx:98-134 portal popover lists every indicator"
+          - "src/pages/UserLookup.tsx:333-339 renders dot only after batch resolves"
+        tests:
+          - "renders nothing when the set is empty"
+          - "renders the dot for a Warning-only set"
+          - "renders the dot for a Critical set with the alert shield icon"
+          - "opens the popover on hover and lists every indicator"
+          - "renders no dot for users with no detected indicators (UserLookup integration)"
+          - "renders the dot for users that have indicators (UserLookup integration)"
+          - "dot color reflects highestSeverity (Critical wins over Warning)"
+          - "propagates indicator set to UserDetail when a user is selected"
+      "AC7":
+        code:
+          - "src/components/common/SecurityIndicatorDot.test.tsx (11 tests)"
+          - "src/pages/UserDetail.test.tsx Story 14.2 - security indicator badges block (10 tests)"
+          - "src/pages/UserLookup.test.tsx security indicator dot block (4 tests)"
+        tests:
+          - "all 25 new tests + 176 translation completeness tests"
+
+residual_risks:
+  - id: "R1"
+    label: "Wire-format consistency (camelCase)"
+    status: VERIFIED_OK
+    notes: "Backend touch-up commit f017f16 added #[serde(rename_all = camelCase)] on SecurityIndicator. All 21 backend unit tests in security_indicators.rs still pass; full lib suite 1624/1624 green. TS types use descriptionKey + highestSeverity consistent with the actual JSON shape. metadata: Record<string, unknown> typed correctly because inner keys are produced via serde_json::json!() literals (snake_case)."
+  - id: "R2"
+    label: "severityToBadgeVariant correctness (AC #2 escalation correctness path)"
+    status: VERIFIED_OK
+    notes: "src/types/securityIndicators.ts:64-68 reads ONLY the severity parameter. No kind-keyed map exists in the codebase (grep verified). Test 'uses the indicator severity for the badge variant (escalated Kerberoastable becomes error)' explicitly verifies that severity=Critical on a Kerberoastable produces variant=error - i.e. backend escalation flows through."
+  - id: "R3"
+    label: "Indicator map cancellation in UserLookup useEffect"
+    status: VERIFIED_OK
+    notes: "Cancellation flag set in cleanup function (UserLookup.tsx:160-162). Both computeHealth and computeIndicators check if (!cancelled) before setState. handleFilterChange clears both maps on >=3-char filter change. No stale-state path."
+  - id: "R4"
+    label: "SecurityIndicatorDot accessibility"
+    status: VERIFIED_OK
+    notes: "tabIndex=0, count-aware aria-label via i18n interpolation, aria-describedby links to tooltip when shown, Enter/Space toggle, Escape close, focus/blur trigger, role=status on dot, role=tooltip on popover. Empty dot returns null (no empty role=status). Native title for badge tooltips is acceptable per Dev Notes line 60 and consistent with existing AdminSDHolder badge pattern."
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Pure UI consumer of read-only data. Tooltip text comes from i18n bundles (not raw LDAP), so no XSS path through attacker-controlled attribute values. Indicator kind/descriptionKey are stable enum strings. metadata field exists in TS types but is not rendered in this story (Story 14.3 will render it - flagged for that review to escape RBCD/ConstrainedDelegation principal lists)."
+  performance:
+    status: PASS
+    notes: "Batch IPC over visible page (50-200 users typical) in single-digit ms. O(1) Map lookup at row render. Portal tooltip avoids re-layout on hover. refreshSelectedUser uses Promise.all for parallel health + indicators evaluation. No measurable UX regression expected."
+  reliability:
+    status: PASS
+    notes: "useEffect cancellation flag honored. try/catch around batch IPC degrades to console.warn (no crash). Filter change resets stale maps."
+  maintainability:
+    status: PASS
+    notes: "Mirrors HealthBadge / evaluateHealth patterns - team familiarity. No new abstractions. Adding a 6th indicator only requires backend detection (Story 14.1) plus an i18n key, no UI code change."
+  accessibility:
+    status: PASS
+    notes: "Full keyboard support on the dot (tabIndex, Enter/Space toggle, Escape close, focus/blur). Native title for badge tooltips is acceptable and consistent with existing AdminSDHolder pattern. Empty dot renders null (no empty role=status)."
+
+recommendations:
+  immediate: []
+  future:
+    - "Update or drop the stale 'Only reset health map' comment in src/pages/UserLookup.tsx:167 (now resets both maps). Tiny documentation cleanup."
+    - "Optional: add 2 viewport-clamp tests on SecurityIndicatorDot to mirror HealthBadge coverage. Same code pattern; not strictly necessary for current parity. Track for future hardening."
+    - "Optional: add a dedicated unit test for the evaluateUserSecurityIndicators single-call wrapper, especially once Stories 14.4-14.6 quick-fix flows add direct callers."
+    - "Story 14.3 must escape the metadata field (RBCD allowed_principals SID list, ConstrainedDelegation target_spns) when rendered - those values come from binary security descriptors / multi-valued LDAP attributes and could in theory contain attacker-influenced content. Flag for QA-14.3."
+
+test_summary:
+  new_tests_in_story: 25
+  test_files_touched:
+    - "src/components/common/SecurityIndicatorDot.test.tsx (new, 11 tests)"
+    - "src/pages/UserDetail.test.tsx (+10 tests, total 63)"
+    - "src/pages/UserLookup.test.tsx (+4 tests, total 44)"
+  full_frontend_suite: "2126 passed (139 files), 0 failures, 0 new ignored"
+  full_backend_suite: "1624 passed (no regression from the SecurityIndicator rename_all touch-up)"
+  translation_completeness_suite: "176 tests across en/fr/de/it/es - green (no missing keys, no orphans, no empty values, interpolation preserved)"
+  lint: "clean (eslint exit 0)"
+  tsc: "clean (no diagnostics)"
