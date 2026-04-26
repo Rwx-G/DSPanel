@@ -7,7 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.0.4] - 2026-04-24
+## [1.0.5] - 2026-04-26
+
+### Added
+
+- New common React component `<TruncatedBanner>` rendered at the top of the User, Computer, Group, Contact and Printer lookup pages whenever the underlying directory browse returned partial results. Translations added for en/fr/de/it/es.
+- `BrowseResult.truncated` field on the IPC contract (omitted as `false` by default) and `DirectoryProvider::last_search_was_truncated()` trait method backing it.
+
+### Fixed
+
+- Read `nTSecurityDescriptor` with the `SD_FLAGS` LDAP control (OID 1.2.840.113556.1.4.801, value=`OWNER|GROUP|DACL=7`). Without this control, AD strips the descriptor or refuses the read entirely for callers that lack `SeSecurityPrivilege`, so the "User Cannot Change Password" check could return a false negative for HelpDesk and AccountOperator operators.
+- Fall back to a client-side breadth-first walk of `memberOf` when the server rejects `LDAP_MATCHING_RULE_IN_CHAIN` (OID 1.2.840.113556.1.4.1941) with `criticalExtensionUnavailable` (rc=12) or `unwillingToPerform` (rc=53). Affects non-Microsoft directories such as Samba 4 (older builds) and OpenLDAP appliances emulating AD; on real AD the matching rule is still used in a single round-trip.
+- Surface `sizeLimitExceeded` (LDAP rc=4) and the internal `MAX_BROWSE` cap as a `truncated` flag on `BrowseResult`. Previously the partial list was returned silently, so an operator browsing a domain larger than 5000 entries could conclude that a missing user "did not exist". The flag is cached alongside the entries so subsequent calls within the cache TTL stay consistent.
+
+## [1.0.4] - 2026-04-26
 
 ### Fixed
 
