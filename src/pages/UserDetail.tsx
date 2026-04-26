@@ -19,6 +19,10 @@ import { FilterBar, type FilterChip } from "@/components/data/FilterBar";
 import { AdvancedAttributes } from "@/components/data/AdvancedAttributes";
 import { PasswordResetDialog } from "@/components/dialogs/PasswordResetDialog";
 import { ClearPasswordNotRequiredDialog } from "@/components/dialogs/ClearPasswordNotRequiredDialog";
+import {
+  ManageSpnsDialog,
+  type RemoveSpnsResult,
+} from "@/components/dialogs/ManageSpnsDialog";
 import { GroupMembersDialog } from "@/components/dialogs/GroupMembersDialog";
 import { type DirectoryUser } from "@/types/directory";
 import type { AccountHealthStatus, HealthLevel } from "@/types/health";
@@ -106,8 +110,9 @@ export function UserDetail({
    * being fixed so the conditional render below picks the right dialog
    * component. `null` hides all quick-fix dialogs.
    */
-  const [activeQuickFix, setActiveQuickFix] =
-    useState<"PasswordNotRequired" | null>(null);
+  const [activeQuickFix, setActiveQuickFix] = useState<
+    "PasswordNotRequired" | "RemoveUserSpns" | null
+  >(null);
   const [contextMenuPos, setContextMenuPos] = useState<{
     x: number;
     y: number;
@@ -473,6 +478,22 @@ export function UserDetail({
                     text={t(`securityIndicators:${indicator.kind}.badge`)}
                     variant={severityToBadgeVariant(indicator.severity)}
                   />
+                  {indicator.kind === "Kerberoastable" && canEdit && (
+                    <button
+                      type="button"
+                      className="rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveQuickFix("RemoveUserSpns");
+                      }}
+                      aria-label={t(
+                        "userDetail:quickFix.removeUserSpns.manageButtonAriaLabel",
+                      )}
+                      data-testid="quick-fix-RemoveUserSpns-btn"
+                    >
+                      {t("userDetail:quickFix.removeUserSpns.manageButton")}
+                    </button>
+                  )}
                   {indicator.kind === "PasswordNotRequired" && canEdit && (
                     <button
                       type="button"
@@ -677,6 +698,31 @@ export function UserDetail({
               "success",
             );
             handleRefresh();
+          }}
+        />
+      )}
+
+      {activeQuickFix === "RemoveUserSpns" && (
+        <ManageSpnsDialog
+          userDn={user.distinguishedName}
+          displayName={user.displayName || user.samAccountName}
+          currentSpns={user.rawAttributes?.servicePrincipalName ?? []}
+          onClose={() => setActiveQuickFix(null)}
+          onSuccess={(result: RemoveSpnsResult) => {
+            setActiveQuickFix(null);
+            if (result.removed.length > 0) {
+              notify(
+                t(
+                  "userDetail:quickFix.removeUserSpns.successNotification",
+                  {
+                    count: result.removed.length,
+                    name: user.displayName || user.samAccountName,
+                  },
+                ),
+                "success",
+              );
+              handleRefresh();
+            }
           }}
         />
       )}

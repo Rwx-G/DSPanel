@@ -1225,4 +1225,105 @@ describe("UserDetail", () => {
       ).toBeInTheDocument();
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // Story 14.5 - Quick-fix Manage SPNs button
+  // ---------------------------------------------------------------------------
+
+  it("renders the Manage SPNs button next to the Kerberoastable badge for AccountOperator+", () => {
+    render(
+      <UserDetail
+        {...makeProps({
+          user: makeUser({
+            rawAttributes: {
+              servicePrincipalName: ["MSSQLSvc/db.corp.local:1433"],
+            },
+          }),
+          securityIndicators: {
+            indicators: [
+              {
+                kind: "Kerberoastable",
+                severity: "Warning",
+                descriptionKey: "securityIndicators.Kerberoastable",
+              },
+            ],
+            highestSeverity: "Warning",
+          },
+        })}
+      />,
+      { wrapper: TestProviders },
+    );
+    expect(
+      screen.getByTestId("quick-fix-RemoveUserSpns-btn"),
+    ).toBeInTheDocument();
+  });
+
+  it("does not render the Manage SPNs button next to other indicator kinds", () => {
+    render(
+      <UserDetail
+        {...makeProps({
+          securityIndicators: {
+            indicators: [
+              {
+                kind: "PasswordNeverExpires",
+                severity: "Warning",
+                descriptionKey: "securityIndicators.PasswordNeverExpires",
+              },
+            ],
+            highestSeverity: "Warning",
+          },
+        })}
+      />,
+      { wrapper: TestProviders },
+    );
+    expect(
+      screen.queryByTestId("quick-fix-RemoveUserSpns-btn"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("opens the ManageSpnsDialog with the user's current SPNs when the button is clicked", async () => {
+    render(
+      <UserDetail
+        {...makeProps({
+          user: makeUser({
+            rawAttributes: {
+              servicePrincipalName: [
+                "MSSQLSvc/db.corp.local:1433",
+                "HTTP/web1.corp.local",
+              ],
+            },
+          }),
+          securityIndicators: {
+            indicators: [
+              {
+                kind: "Kerberoastable",
+                severity: "Warning",
+                descriptionKey: "securityIndicators.Kerberoastable",
+              },
+            ],
+            highestSeverity: "Warning",
+          },
+        })}
+      />,
+      { wrapper: TestProviders },
+    );
+
+    expect(
+      screen.queryByTestId("manage-spns-dialog"),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("quick-fix-RemoveUserSpns-btn"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("manage-spns-dialog")).toBeInTheDocument();
+    });
+    // Both removable SPN rows are rendered (system-SPN guard would hide
+    // them but neither MSSQLSvc nor HTTP is system)
+    expect(
+      screen.getByTestId("spn-row-MSSQLSvc/db.corp.local:1433"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId("spn-row-HTTP/web1.corp.local"),
+    ).toBeInTheDocument();
+  });
 });
