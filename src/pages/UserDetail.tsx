@@ -21,6 +21,10 @@ import { PasswordResetDialog } from "@/components/dialogs/PasswordResetDialog";
 import { GroupMembersDialog } from "@/components/dialogs/GroupMembersDialog";
 import { type DirectoryUser } from "@/types/directory";
 import type { AccountHealthStatus, HealthLevel } from "@/types/health";
+import {
+  severityToBadgeVariant,
+  type SecurityIndicatorSet,
+} from "@/types/securityIndicators";
 import { parseCnFromDn } from "@/utils/dn";
 import { Users, FolderOpen, Save, ArrowUp, AlertTriangle, Trash2 } from "lucide-react";
 import { useNavigation } from "@/contexts/NavigationContext";
@@ -61,6 +65,12 @@ function toPropertySeverity(level: HealthLevel): PropertySeverity | undefined {
 export interface UserDetailProps {
   user: DirectoryUser;
   healthStatus?: AccountHealthStatus;
+  /**
+   * Set of security indicators detected for this user (Story 14.2). When
+   * undefined the security badge row is hidden, so the prop is optional
+   * for callers that have not yet wired the evaluator.
+   */
+  securityIndicators?: SecurityIndicatorSet;
   groupColumns: Column<{ name: string; dn: string }>[];
   groupRows: { name: string; dn: string }[];
   groupFilterText: string;
@@ -73,6 +83,7 @@ export interface UserDetailProps {
 export function UserDetail({
   user,
   healthStatus,
+  securityIndicators,
   groupColumns,
   groupRows,
   groupFilterText: _groupFilterText,
@@ -81,7 +92,12 @@ export function UserDetail({
   onDeleted,
   schemaAttributes,
 }: UserDetailProps) {
-  const { t } = useTranslation(["userDetail", "common", "sidebar"]);
+  const { t } = useTranslation([
+    "userDetail",
+    "common",
+    "sidebar",
+    "securityIndicators",
+  ]);
   const [groupFilters, setGroupFilters] = useState<FilterChip[]>([]);
   const [showPasswordReset, setShowPasswordReset] = useState(false);
   const [contextMenuPos, setContextMenuPos] = useState<{
@@ -436,6 +452,20 @@ export function UserDetail({
                   />
                 </span>
               )}
+              {securityIndicators?.indicators.map((indicator) => (
+                <span
+                  key={indicator.kind}
+                  title={t(
+                    `securityIndicators:${indicator.kind}.tooltip`,
+                  )}
+                  data-testid={`security-indicator-badge-${indicator.kind}`}
+                >
+                  <StatusBadge
+                    text={t(`securityIndicators:${indicator.kind}.badge`)}
+                    variant={severityToBadgeVariant(indicator.severity)}
+                  />
+                </span>
+              ))}
             </div>
           </div>
 

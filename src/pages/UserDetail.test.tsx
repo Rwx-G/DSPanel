@@ -997,4 +997,140 @@ describe("UserDetail", () => {
     // At least 2 N/A: whenCreated + whenChanged (and possibly lastLogonWorkstation)
     expect(naTexts.length).toBeGreaterThanOrEqual(2);
   });
+
+  // ---------------------------------------------------------------------------
+  // Story 14.2 - security indicator badges
+  // ---------------------------------------------------------------------------
+
+  it("renders no security indicator badges when the prop is undefined", () => {
+    render(<UserDetail {...makeProps()} />, { wrapper: TestProviders });
+    expect(
+      screen.queryByTestId(/^security-indicator-badge-/),
+    ).not.toBeInTheDocument();
+  });
+
+  it("renders no security indicator badges when the indicator list is empty", () => {
+    render(
+      <UserDetail
+        {...makeProps({
+          securityIndicators: { indicators: [], highestSeverity: "Healthy" },
+        })}
+      />,
+      { wrapper: TestProviders },
+    );
+    expect(
+      screen.queryByTestId(/^security-indicator-badge-/),
+    ).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["Kerberoastable", "warning"] as const,
+    ["PasswordNotRequired", "error"] as const,
+    ["PasswordNeverExpires", "warning"] as const,
+    ["ReversibleEncryption", "error"] as const,
+    ["AsRepRoastable", "error"] as const,
+  ])("renders %s indicator badge with %s variant", (kind, expectedVariant) => {
+    render(
+      <UserDetail
+        {...makeProps({
+          securityIndicators: {
+            indicators: [
+              {
+                kind,
+                severity: expectedVariant === "error" ? "Critical" : "Warning",
+                descriptionKey: `securityIndicators.${kind}`,
+              },
+            ],
+            highestSeverity: expectedVariant === "error" ? "Critical" : "Warning",
+          },
+        })}
+      />,
+      { wrapper: TestProviders },
+    );
+    const badge = screen.getByTestId(`security-indicator-badge-${kind}`);
+    expect(badge).toBeInTheDocument();
+    expect(badge.querySelector('[data-testid="status-badge"]')).toHaveAttribute(
+      "data-variant",
+      expectedVariant,
+    );
+  });
+
+  it("renders multiple indicator badges in declaration order", () => {
+    render(
+      <UserDetail
+        {...makeProps({
+          securityIndicators: {
+            indicators: [
+              {
+                kind: "PasswordNotRequired",
+                severity: "Critical",
+                descriptionKey: "securityIndicators.PasswordNotRequired",
+              },
+              {
+                kind: "Kerberoastable",
+                severity: "Warning",
+                descriptionKey: "securityIndicators.Kerberoastable",
+              },
+            ],
+            highestSeverity: "Critical",
+          },
+        })}
+      />,
+      { wrapper: TestProviders },
+    );
+    expect(
+      screen.getByTestId("security-indicator-badge-PasswordNotRequired"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId("security-indicator-badge-Kerberoastable"),
+    ).toBeInTheDocument();
+  });
+
+  it("uses the indicator severity for the badge variant (escalated Kerberoastable becomes error)", () => {
+    render(
+      <UserDetail
+        {...makeProps({
+          securityIndicators: {
+            indicators: [
+              {
+                kind: "Kerberoastable",
+                severity: "Critical",
+                descriptionKey: "securityIndicators.Kerberoastable",
+              },
+            ],
+            highestSeverity: "Critical",
+          },
+        })}
+      />,
+      { wrapper: TestProviders },
+    );
+    const badge = screen.getByTestId("security-indicator-badge-Kerberoastable");
+    expect(badge.querySelector('[data-testid="status-badge"]')).toHaveAttribute(
+      "data-variant",
+      "error",
+    );
+  });
+
+  it("attaches the localized tooltip text via title attribute", () => {
+    render(
+      <UserDetail
+        {...makeProps({
+          securityIndicators: {
+            indicators: [
+              {
+                kind: "AsRepRoastable",
+                severity: "Critical",
+                descriptionKey: "securityIndicators.AsRepRoastable",
+              },
+            ],
+            highestSeverity: "Critical",
+          },
+        })}
+      />,
+      { wrapper: TestProviders },
+    );
+    const badge = screen.getByTestId("security-indicator-badge-AsRepRoastable");
+    const title = badge.getAttribute("title") ?? "";
+    expect(title).toContain("DONT_REQUIRE_PREAUTH");
+  });
 });
