@@ -470,6 +470,74 @@ pub(crate) async fn clear_password_not_required_inner(
     }
 }
 
+/// Disables Kerberos unconstrained delegation on a computer object by
+/// clearing the TRUSTED_FOR_DELEGATION bit (`userAccountControl & 0x80000`)
+/// (Story 14.6 quick-fix from Epic 14).
+///
+/// Reuses the generic `clear_user_account_control_bits` trait method
+/// introduced by Story 14.4 - the command needs zero new backend trait
+/// surface and inherits the same idempotent-no-op + read-modify-write
+/// semantics.
+///
+/// Requires `Admin` permission (HIGHER bar than the AccountOperator gate
+/// used by Stories 14.4 and 14.5: computer delegation changes can break
+/// production Kerberos services like SQL Server linked servers, IIS with
+/// constrained delegation, etc.). May require MFA.
+///
+/// The audit action `DisabledUnconstrainedDelegation` is intentionally
+/// unique and identifiable - SOC consumers tail or grep for it as a
+/// stand-in for a structural Critical-severity field on AuditEntry (the
+/// severity field amendment is deferred to a future Epic 11 story).
+pub(crate) async fn disable_unconstrained_delegation_inner(
+    state: &AppState,
+    computer_dn: &str,
+) -> Result<(), AppError> {
+    require_fresh_permission(
+        state,
+        PermissionLevel::Admin,
+        "Disable unconstrained delegation",
+    )
+    .await?;
+
+    state
+        .mfa_service
+        .check_mfa_for_action("DisableUnconstrainedDelegation")
+        .map_err(|e| AppError::PermissionDenied(e.to_string()))?;
+
+    capture_snapshot(state, computer_dn, "DisableUnconstrainedDelegation").await;
+
+    let provider = state.provider();
+    match provider
+        .clear_user_account_control_bits(computer_dn, 0x80000)
+        .await
+    {
+        Ok((previous, new)) if previous == new => {
+            // Idempotent no-op - the bit was already clear, nothing to audit.
+            // The snapshot capture above was wasted; same accepted trade-off
+            // as Story 14.4. Story 14.5 has the no-op-before-snapshot
+            // optimization but only because its read happens explicitly in
+            // the command layer.
+            Ok(())
+        }
+        Ok((previous, new)) => {
+            state.audit_service.log_success(
+                "DisabledUnconstrainedDelegation",
+                computer_dn,
+                &format!("uac: 0x{:X} -> 0x{:X}", previous, new),
+            );
+            Ok(())
+        }
+        Err(e) => {
+            state.audit_service.log_failure(
+                "DisableUnconstrainedDelegationFailed",
+                computer_dn,
+                &e.to_string(),
+            );
+            Err(AppError::Directory(e.to_string()))
+        }
+    }
+}
+
 /// Result of a `remove_user_spns` invocation. Lists every SPN that was
 /// actually removed, every SPN kept on the user object after the call, and
 /// every SPN the operator requested but the system-SPN guard refused to
@@ -910,6 +978,18 @@ pub async fn remove_user_spns(
     state: State<'_, AppState>,
 ) -> Result<RemoveSpnsResult, AppError> {
     remove_user_spns_inner(&state, &user_dn, &spns_to_remove).await
+}
+
+/// Disables Kerberos unconstrained delegation on a computer object by
+/// clearing the TRUSTED_FOR_DELEGATION bit (`userAccountControl & 0x80000`)
+/// (Story 14.6 quick-fix). Requires Admin+, may require MFA, captures
+/// snapshot, audits.
+#[tauri::command]
+pub async fn disable_unconstrained_delegation(
+    computer_dn: String,
+    state: State<'_, AppState>,
+) -> Result<(), AppError> {
+    disable_unconstrained_delegation_inner(&state, &computer_dn).await
 }
 
 #[allow(clippy::unwrap_used)]
@@ -2169,5 +2249,156 @@ mod tests {
                 .details
                 .contains("removed: [AlphaSvc/a.corp.local, ZetaSvc/z.corp.local]")
         );
+    }
+
+    // -----------------------------------------------------------------------
+    // disable_unconstrained_delegation_inner (Story 14.6)
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_disable_unconstrained_delegation_requires_admin() {
+        // ReadOnly default - denied
+        let state = make_state();
+        let result =
+            disable_unconstrained_delegation_inner(&state, "CN=Computer,DC=example,DC=com").await;
+        assert!(matches!(result.unwrap_err(), AppError::PermissionDenied(_)));
+
+        // HelpDesk also denied
+        let state = make_state_with_level(PermissionLevel::HelpDesk);
+        let result =
+            disable_unconstrained_delegation_inner(&state, "CN=Computer,DC=example,DC=com").await;
+        assert!(matches!(result.unwrap_err(), AppError::PermissionDenied(_)));
+
+        // AccountOperator ALSO denied (HIGHER bar than 14.4 / 14.5)
+        let state = make_state_with_level(PermissionLevel::AccountOperator);
+        let result =
+            disable_unconstrained_delegation_inner(&state, "CN=Computer,DC=example,DC=com").await;
+        assert!(matches!(result.unwrap_err(), AppError::PermissionDenied(_)));
+    }
+
+    #[tokio::test]
+    async fn test_disable_unconstrained_delegation_succeeds_for_admin() {
+        let (state, provider) = make_state_with_level_and_provider(PermissionLevel::Admin);
+        let dn = "CN=DC01,OU=Domain Controllers,DC=example,DC=com";
+        // 0x80020 = TRUSTED_FOR_DELEGATION | ACCOUNTDISABLE
+        provider.set_user_account_control(dn, 0x80020);
+
+        let result = disable_unconstrained_delegation_inner(&state, dn).await;
+        assert!(result.is_ok());
+
+        // Verify the trait method recorded the correct mask + before/after
+        let calls = provider.clear_uac_bits_calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0], (dn.to_string(), 0x80000, 0x80020, 0x00020));
+
+        // Verify the audit entry shape (action name, target_dn, details
+        // contain uac before/after)
+        let entries = state.audit_service.get_entries();
+        let entry = entries
+            .iter()
+            .find(|e| e.action == "DisabledUnconstrainedDelegation")
+            .expect("audit entry recorded");
+        assert_eq!(entry.target_dn, dn);
+        assert!(entry.details.contains("0x80020"));
+        assert!(entry.details.contains("0x20"));
+        assert!(entry.success);
+    }
+
+    #[tokio::test]
+    async fn test_disable_unconstrained_delegation_succeeds_for_domain_admin() {
+        let (state, provider) = make_state_with_level_and_provider(PermissionLevel::DomainAdmin);
+        let dn = "CN=Server01,OU=Servers,DC=example,DC=com";
+        provider.set_user_account_control(dn, 0x80000);
+
+        let result = disable_unconstrained_delegation_inner(&state, dn).await;
+        assert!(result.is_ok());
+
+        let entries = state.audit_service.get_entries();
+        assert!(
+            entries
+                .iter()
+                .any(|e| e.action == "DisabledUnconstrainedDelegation")
+        );
+    }
+
+    #[tokio::test]
+    async fn test_disable_unconstrained_delegation_idempotent_no_op() {
+        let (state, provider) = make_state_with_level_and_provider(PermissionLevel::Admin);
+        let dn = "CN=Server01,OU=Servers,DC=example,DC=com";
+        // 0x00020 = ACCOUNTDISABLE only - TRUSTED_FOR_DELEGATION already clear
+        provider.set_user_account_control(dn, 0x00020);
+
+        let result = disable_unconstrained_delegation_inner(&state, dn).await;
+        assert!(result.is_ok(), "idempotent no-op returns Ok");
+
+        let calls = provider.clear_uac_bits_calls.lock().unwrap();
+        assert!(calls.is_empty(), "no recorded state-change call on no-op");
+
+        let writes = provider.modify_attribute_calls.lock().unwrap();
+        assert!(writes.is_empty(), "no LDAP write on no-op");
+
+        let entries = state.audit_service.get_entries();
+        assert!(
+            !entries
+                .iter()
+                .any(|e| e.action == "DisabledUnconstrainedDelegation"),
+            "no audit entry on no-op"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_disable_unconstrained_delegation_preserves_unrelated_uac_bits() {
+        let (state, provider) = make_state_with_level_and_provider(PermissionLevel::Admin);
+        let dn = "CN=DC01,DC=example,DC=com";
+        // 0x82020 = TRUSTED_FOR_DELEGATION | DONT_EXPIRE_PASSWORD | ACCOUNTDISABLE | a flag at 0x2000
+        // We pick a value with several unrelated bits set to verify mask isolation
+        provider.set_user_account_control(dn, 0x82020);
+
+        disable_unconstrained_delegation_inner(&state, dn)
+            .await
+            .unwrap();
+
+        let calls = provider.clear_uac_bits_calls.lock().unwrap();
+        // previous=0x82020, mask=0x80000, new=0x82020 & !0x80000 = 0x02020
+        assert_eq!(calls[0].2, 0x82020);
+        assert_eq!(calls[0].3, 0x02020, "unrelated bits preserved");
+    }
+
+    #[tokio::test]
+    async fn test_disable_unconstrained_delegation_captures_snapshot() {
+        let (state, provider) = make_state_with_level_and_provider(PermissionLevel::Admin);
+        let dn = "CN=DC01,DC=example,DC=com";
+        provider.set_user_account_control(dn, 0x80020);
+
+        disable_unconstrained_delegation_inner(&state, dn)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            state.snapshot_service.count(),
+            1,
+            "snapshot captured before write"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_disable_unconstrained_delegation_audit_on_directory_failure() {
+        let provider = Arc::new(MockDirectoryProvider::new().with_failure());
+        let provider_ref = Arc::clone(&provider);
+        let state = AppState::new_for_test(provider, PermissionConfig::default());
+        state.permission_service.set_level(PermissionLevel::Admin);
+
+        let dn = "CN=DC01,DC=example,DC=com";
+        provider_ref.set_user_account_control(dn, 0x80000);
+
+        let result = disable_unconstrained_delegation_inner(&state, dn).await;
+        assert!(matches!(result.unwrap_err(), AppError::Directory(_)));
+
+        let entries = state.audit_service.get_entries();
+        let failed = entries
+            .iter()
+            .find(|e| e.action == "DisableUnconstrainedDelegationFailed")
+            .expect("failure audit entry recorded");
+        assert!(!failed.success);
     }
 }

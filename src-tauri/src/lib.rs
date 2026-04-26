@@ -259,6 +259,7 @@ pub fn run() {
             commands::disable_account,
             commands::clear_password_not_required,
             commands::remove_user_spns,
+            commands::disable_unconstrained_delegation,
             commands::get_cannot_change_password,
             commands::set_password_flags,
             commands::get_audit_entries,
