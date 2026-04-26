@@ -343,6 +343,7 @@ export function ComputerLookup() {
                     setSelectedComputer(null);
                     refresh();
                   }}
+                  onRefresh={refresh}
                 />
               ) : (
                 <div className="flex h-full items-center justify-center">

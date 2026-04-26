@@ -617,4 +617,135 @@ describe("ComputerDetail", () => {
       expect(badge.getAttribute("title")).toContain("msDS-AllowedToDelegateTo");
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // Story 14.6 - Quick-fix Disable Unconstrained Delegation button
+  // ---------------------------------------------------------------------------
+
+  describe("Disable Unconstrained Delegation Fix button (Story 14.6)", () => {
+    const unconstrainedSet = {
+      indicators: [
+        {
+          kind: "UnconstrainedDelegation" as const,
+          severity: "Critical" as const,
+          descriptionKey: "securityIndicators.UnconstrainedDelegation",
+        },
+      ],
+      highestSeverity: "Critical" as const,
+    };
+
+    it("does not render the Fix button at the default ReadOnly permission level", () => {
+      // Default mock at top of file returns hasPermission: () => false
+      render(
+        <ComputerDetail
+          computer={makeComputer()}
+          securityIndicators={unconstrainedSet}
+        />,
+      );
+      expect(
+        screen.queryByTestId("quick-fix-DisableUnconstrainedDelegation-btn"),
+      ).not.toBeInTheDocument();
+    });
+
+    it("does not render the Fix button at AccountOperator level (Admin gate is HIGHER)", async () => {
+      const permMod = await import("@/hooks/usePermissions");
+      vi.spyOn(permMod, "usePermissions").mockReturnValue({
+        hasPermission: (level: string) => level === "AccountOperator",
+        level: "AccountOperator" as import("@/types/permissions").PermissionLevel,
+        groups: [],
+        loading: false,
+      });
+
+      render(
+        <ComputerDetail
+          computer={makeComputer()}
+          securityIndicators={unconstrainedSet}
+        />,
+      );
+      expect(
+        screen.queryByTestId("quick-fix-DisableUnconstrainedDelegation-btn"),
+      ).not.toBeInTheDocument();
+    });
+
+    it("renders the Fix button at Admin level", async () => {
+      const permMod = await import("@/hooks/usePermissions");
+      vi.spyOn(permMod, "usePermissions").mockReturnValue({
+        hasPermission: () => true,
+        level: "Admin" as import("@/types/permissions").PermissionLevel,
+        groups: [],
+        loading: false,
+      });
+
+      render(
+        <ComputerDetail
+          computer={makeComputer()}
+          securityIndicators={unconstrainedSet}
+        />,
+      );
+      expect(
+        screen.getByTestId("quick-fix-DisableUnconstrainedDelegation-btn"),
+      ).toBeInTheDocument();
+    });
+
+    it("does not render the Fix button next to other indicator kinds", async () => {
+      const permMod = await import("@/hooks/usePermissions");
+      vi.spyOn(permMod, "usePermissions").mockReturnValue({
+        hasPermission: () => true,
+        level: "Admin" as import("@/types/permissions").PermissionLevel,
+        groups: [],
+        loading: false,
+      });
+
+      render(
+        <ComputerDetail
+          computer={makeComputer()}
+          securityIndicators={{
+            indicators: [
+              {
+                kind: "ConstrainedDelegation",
+                severity: "Warning",
+                descriptionKey: "securityIndicators.ConstrainedDelegation",
+                metadata: { target_spns: ["http/web1"] },
+              },
+            ],
+            highestSeverity: "Warning",
+          }}
+        />,
+      );
+      expect(
+        screen.queryByTestId("quick-fix-DisableUnconstrainedDelegation-btn"),
+      ).not.toBeInTheDocument();
+    });
+
+    it("opens the DisableUnconstrainedDelegationDialog when the Fix button is clicked", async () => {
+      const permMod = await import("@/hooks/usePermissions");
+      vi.spyOn(permMod, "usePermissions").mockReturnValue({
+        hasPermission: () => true,
+        level: "Admin" as import("@/types/permissions").PermissionLevel,
+        groups: [],
+        loading: false,
+      });
+
+      render(
+        <ComputerDetail
+          computer={makeComputer()}
+          securityIndicators={unconstrainedSet}
+        />,
+      );
+
+      expect(
+        screen.queryByTestId("disable-unconstrained-delegation-dialog"),
+      ).not.toBeInTheDocument();
+
+      fireEvent.click(
+        screen.getByTestId("quick-fix-DisableUnconstrainedDelegation-btn"),
+      );
+
+      await waitFor(() => {
+        expect(
+          screen.getByTestId("disable-unconstrained-delegation-dialog"),
+        ).toBeInTheDocument();
+      });
+    });
+  });
 });
