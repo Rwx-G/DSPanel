@@ -1,9 +1,16 @@
-/// DPAPI-based encryption for protecting sensitive data at rest.
-///
-/// On Windows, uses CryptProtectData/CryptUnprotectData (DPAPI) which ties
-/// the encrypted blob to the current Windows user profile. On non-Windows
-/// platforms, falls back to base64 encoding (no real encryption).
-#[cfg(target_os = "windows")]
+//! DPAPI-based encryption for protecting sensitive data at rest.
+//!
+//! Uses `CryptProtectData` / `CryptUnprotectData` so the encrypted blob is
+//! tied to the current Windows user profile (i.e. another OS account on the
+//! same machine cannot decrypt it).
+//!
+//! This module is **Windows only**. Non-Windows platforms must use the OS
+//! keyring backend exposed by the `mfa` service - there is no portable DPAPI
+//! equivalent and this module deliberately does not ship a fake one. The
+//! parent `services/mod.rs` gates the module declaration with
+//! `#[cfg(target_os = "windows")]` so attempting to call it from non-Windows
+//! code is a compile error rather than silently producing unencrypted bytes.
+
 mod platform {
     use anyhow::{Context, Result};
     use windows::Win32::Foundation::HLOCAL;
@@ -67,25 +74,6 @@ mod platform {
     }
 }
 
-#[cfg(not(target_os = "windows"))]
-mod platform {
-    use anyhow::Result;
-    use base64::Engine;
-
-    /// Fallback: base64 encoding (no real encryption on non-Windows).
-    pub fn protect(plaintext: &[u8]) -> Result<Vec<u8>> {
-        Ok(base64::engine::general_purpose::STANDARD
-            .encode(plaintext)
-            .into_bytes())
-    }
-
-    /// Fallback: base64 decoding.
-    pub fn unprotect(ciphertext: &[u8]) -> Result<Vec<u8>> {
-        let encoded = std::str::from_utf8(ciphertext)?;
-        Ok(base64::engine::general_purpose::STANDARD.decode(encoded)?)
-    }
-}
-
 pub use platform::{protect, unprotect};
 
 #[allow(clippy::unwrap_used)]
@@ -105,8 +93,6 @@ mod tests {
     fn test_protect_produces_different_output() {
         let plaintext = b"test data";
         let encrypted = protect(plaintext).unwrap();
-        // On Windows DPAPI, encrypted != plaintext
-        // On non-Windows, it's base64 which is also different from raw bytes
         assert_ne!(encrypted, plaintext);
     }
 
