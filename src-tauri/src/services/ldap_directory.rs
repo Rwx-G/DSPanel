@@ -383,6 +383,10 @@ pub struct LdapDirectoryProvider {
     /// Stable classification key for the last connection failure (no raw text).
     /// See `classify_bind_error` for the set of possible values.
     last_error_kind: Mutex<Option<String>>,
+    /// True when the last `search()` call returned partial results because
+    /// the server (or our own `max_results` cap) cut the response short.
+    /// Reset to `false` at the start of every `search()`.
+    last_search_truncated: Mutex<bool>,
 }
 
 /// Strips common Latin-1/Latin-2 accents so multilingual keyword matching
@@ -635,6 +639,7 @@ impl LdapDirectoryProvider {
             dc_fqdn: Mutex::new(None),
             last_successful_op: Mutex::new(None),
             last_error_kind: Mutex::new(initial_error),
+            last_search_truncated: Mutex::new(false),
         }
     }
 
@@ -676,6 +681,7 @@ impl LdapDirectoryProvider {
             dc_fqdn: Mutex::new(None),
             last_successful_op: Mutex::new(None),
             last_error_kind: Mutex::new(None),
+            last_search_truncated: Mutex::new(false),
         }
     }
 
@@ -1047,39 +1053,72 @@ impl LdapDirectoryProvider {
         let filter = filter.to_string();
         let attrs: Vec<String> = attrs.iter().map(|a| a.to_string()).collect();
 
+        // Reset the truncation flag at the start of every search; callers
+        // read it via `last_search_was_truncated()` after the call.
+        *self.last_search_truncated.lock().expect("lock poisoned") = false;
+
         if max_results <= 1000 {
             // Simple search without pagination (within AD's default MaxPageSize).
             tracing::info!(filter = %filter, max_results, base = %base, "Search: simple path");
-            self.with_connection(|mut ldap| {
-                let base = base.clone();
-                let filter = filter.clone();
-                let attrs = attrs.clone();
-                async move {
-                    let search_result = ldap
-                        .search(&base, Scope::Subtree, &filter, attrs)
-                        .await
-                        .context("LDAP search failed")?;
+            let truncated_flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+            let result = self
+                .with_connection(|mut ldap| {
+                    let base = base.clone();
+                    let filter = filter.clone();
+                    let attrs = attrs.clone();
+                    let truncated_flag = truncated_flag.clone();
+                    async move {
+                        let search_result = ldap
+                            .search(&base, Scope::Subtree, &filter, attrs)
+                            .await
+                            .context("LDAP search failed")?;
 
-                    let rc = search_result.1.rc;
+                        let rc = search_result.1.rc;
 
-                    // rc=0: success, rc=4: sizeLimitExceeded (partial results OK)
-                    if rc != 0 && rc != 4 {
-                        anyhow::bail!("LDAP search error (rc={}): {}", rc, search_result.1.text);
+                        // rc=0: success, rc=4: sizeLimitExceeded (partial results OK)
+                        if rc != 0 && rc != 4 {
+                            anyhow::bail!(
+                                "LDAP search error (rc={}): {}",
+                                rc,
+                                search_result.1.text
+                            );
+                        }
+
+                        let rs = search_result.0;
+                        let raw_count = rs.len();
+
+                        let entries: Vec<DirectoryEntry> = rs
+                            .into_iter()
+                            .take(max_results)
+                            .map(|entry| {
+                                search_entry_to_directory_entry(SearchEntry::construct(entry))
+                            })
+                            .collect();
+
+                        let truncated = rc == 4 || raw_count > max_results;
+                        if truncated {
+                            tracing::warn!(
+                                rc,
+                                raw_count,
+                                max_results,
+                                "Search truncated: server hit sizeLimit or max_results cap reached"
+                            );
+                        }
+                        truncated_flag.store(truncated, std::sync::atomic::Ordering::Relaxed);
+
+                        tracing::debug!(
+                            count = entries.len(),
+                            rc,
+                            truncated,
+                            "Search: simple path complete"
+                        );
+                        Ok(entries)
                     }
-
-                    let rs = search_result.0;
-
-                    let entries: Vec<DirectoryEntry> = rs
-                        .into_iter()
-                        .take(max_results)
-                        .map(|entry| search_entry_to_directory_entry(SearchEntry::construct(entry)))
-                        .collect();
-
-                    tracing::debug!(count = entries.len(), rc, "Search: simple path complete");
-                    Ok(entries)
-                }
-            })
-            .await
+                })
+                .await;
+            *self.last_search_truncated.lock().expect("lock poisoned") =
+                truncated_flag.load(std::sync::atomic::Ordering::Relaxed);
+            result
         } else {
             // Paged search: create a dedicated connection inside the retry
             // loop so stale connections are handled automatically.
@@ -1088,72 +1127,99 @@ impl LdapDirectoryProvider {
             let auth_mode = self.auth_mode.clone();
             let tls_config = self.tls_config.clone();
 
-            self.with_connection(|_pooled_ldap| {
-                let base = base.clone();
-                let filter = filter.clone();
-                let attrs = attrs.clone();
-                let domain = domain.clone();
-                let server_override = server_override.clone();
-                let auth_mode = auth_mode.clone();
-                let tls_config = tls_config.clone();
-                async move {
-                    // Use a fresh dedicated connection for paged search
-                    // to avoid leaking controls into the shared pool.
-                    let mut ldap =
-                        create_fresh_connection(&domain, &server_override, &auth_mode, &tls_config)
-                            .await?;
+            let truncated_flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+            let result = self
+                .with_connection(|_pooled_ldap| {
+                    let base = base.clone();
+                    let filter = filter.clone();
+                    let attrs = attrs.clone();
+                    let domain = domain.clone();
+                    let server_override = server_override.clone();
+                    let auth_mode = auth_mode.clone();
+                    let tls_config = tls_config.clone();
+                    let truncated_flag = truncated_flag.clone();
+                    async move {
+                        // Use a fresh dedicated connection for paged search
+                        // to avoid leaking controls into the shared pool.
+                        let mut ldap = create_fresh_connection(
+                            &domain,
+                            &server_override,
+                            &auth_mode,
+                            &tls_config,
+                        )
+                        .await?;
 
-                    let page_size = 500_i32;
-                    let mut all_entries = Vec::new();
-                    let mut cookie: Vec<u8> = Vec::new();
+                        let page_size = 500_i32;
+                        let mut all_entries = Vec::new();
+                        let mut cookie: Vec<u8> = Vec::new();
+                        let mut hit_cap = false;
 
-                    loop {
-                        let pr_control: RawControl = controls::PagedResults {
-                            size: page_size,
-                            cookie: cookie.clone(),
-                        }
-                        .into();
-                        ldap.with_controls(vec![pr_control]);
+                        loop {
+                            let pr_control: RawControl = controls::PagedResults {
+                                size: page_size,
+                                cookie: cookie.clone(),
+                            }
+                            .into();
+                            ldap.with_controls(vec![pr_control]);
 
-                        let (rs, result) = ldap
-                            .search(&base, Scope::Subtree, &filter, attrs.clone())
-                            .await
-                            .context("LDAP paged search failed")?
-                            .success()
-                            .context("LDAP paged search returned error")?;
+                            let (rs, result) = ldap
+                                .search(&base, Scope::Subtree, &filter, attrs.clone())
+                                .await
+                                .context("LDAP paged search failed")?
+                                .success()
+                                .context("LDAP paged search returned error")?;
 
-                        for entry in rs {
-                            all_entries.push(search_entry_to_directory_entry(
-                                SearchEntry::construct(entry),
-                            ));
-                        }
+                            for entry in rs {
+                                all_entries.push(search_entry_to_directory_entry(
+                                    SearchEntry::construct(entry),
+                                ));
+                            }
 
-                        if all_entries.len() >= max_results {
-                            all_entries.truncate(max_results);
-                            break;
-                        }
+                            // Read the next-page cookie before deciding whether
+                            // to break, so we can tell "we hit max_results AND
+                            // there were more pages" (truncated) from "we hit
+                            // exactly the last page" (not truncated).
+                            cookie = Vec::new();
+                            for ctrl in &result.ctrls {
+                                if let controls::Control(
+                                    Some(controls::ControlType::PagedResults),
+                                    ref raw,
+                                ) = *ctrl
+                                {
+                                    let pr: controls::PagedResults = raw.parse();
+                                    cookie = pr.cookie;
+                                }
+                            }
 
-                        cookie = Vec::new();
-                        for ctrl in &result.ctrls {
-                            if let controls::Control(
-                                Some(controls::ControlType::PagedResults),
-                                ref raw,
-                            ) = *ctrl
-                            {
-                                let pr: controls::PagedResults = raw.parse();
-                                cookie = pr.cookie;
+                            if all_entries.len() >= max_results {
+                                all_entries.truncate(max_results);
+                                hit_cap = true;
+                                break;
+                            }
+
+                            if cookie.is_empty() {
+                                break;
                             }
                         }
 
-                        if cookie.is_empty() {
-                            break;
+                        let truncated = hit_cap && !cookie.is_empty();
+                        if truncated {
+                            tracing::warn!(
+                                count = all_entries.len(),
+                                max_results,
+                                "Paged search truncated: max_results cap reached with more pages available"
+                            );
                         }
-                    }
+                        truncated_flag
+                            .store(truncated, std::sync::atomic::Ordering::Relaxed);
 
-                    Ok(all_entries)
-                }
-            })
-            .await
+                        Ok(all_entries)
+                    }
+                })
+                .await;
+            *self.last_search_truncated.lock().expect("lock poisoned") =
+                truncated_flag.load(std::sync::atomic::Ordering::Relaxed);
+            result
         }
     }
 }
@@ -1261,12 +1327,104 @@ async fn create_fresh_connection(
     Ok(ldap)
 }
 
+/// True when an LDAP result code indicates the server rejected
+/// `LDAP_MATCHING_RULE_IN_CHAIN` because the extension is not implemented.
+///
+/// AD always returns `0` (success) when 1941 works. Non-AD directories that
+/// don't know the OID typically reply with `criticalExtensionUnavailable`
+/// (rc=12) per RFC 4511, but some appliances opt for the looser
+/// `unwillingToPerform` (rc=53). We treat both as a signal to fall back.
+fn matching_rule_unsupported(rc: u32) -> bool {
+    rc == 12 || rc == 53
+}
+
+/// Reconstructs a user's full nested group membership client-side by walking
+/// the `memberOf` attribute breadth-first.
+///
+/// Used as a fallback when `LDAP_MATCHING_RULE_IN_CHAIN` is rejected by the
+/// server. Includes cycle detection (a group reached via two paths is only
+/// processed once) and a hard depth cap so a pathologically deep nesting
+/// cannot stall the request indefinitely.
+async fn nested_groups_via_memberof_bfs(
+    ldap: &mut ldap3::Ldap,
+    start_dn: &str,
+) -> Result<Vec<String>> {
+    use std::collections::VecDeque;
+    const MAX_DEPTH: usize = 100;
+
+    let mut groups: HashSet<String> = HashSet::new();
+    let mut visited: HashSet<String> = HashSet::new();
+    let mut queue: VecDeque<(String, usize)> = VecDeque::new();
+    queue.push_back((start_dn.to_string(), 0));
+
+    while let Some((dn, depth)) = queue.pop_front() {
+        if depth >= MAX_DEPTH {
+            tracing::warn!(
+                start_dn = %start_dn,
+                "memberOf BFS hit MAX_DEPTH={}, returning partial result",
+                MAX_DEPTH
+            );
+            break;
+        }
+        if !visited.insert(dn.clone()) {
+            continue;
+        }
+        let result = ldap
+            .search(&dn, Scope::Base, "(objectClass=*)", vec!["memberOf"])
+            .await
+            .context("memberOf BFS lookup failed")?
+            .success()
+            .context("memberOf BFS lookup returned error")?;
+        for entry in result.0 {
+            let se = SearchEntry::construct(entry);
+            if let Some(parents) = se.attrs.get("memberOf") {
+                for p in parents {
+                    if groups.insert(p.clone()) {
+                        queue.push_back((p.clone(), depth + 1));
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(groups.into_iter().collect())
+}
+
+/// Builds the LDAP `SD_FLAGS` control (OID 1.2.840.113556.1.4.801) requesting
+/// only the parts of `nTSecurityDescriptor` that an unprivileged caller is
+/// allowed to read. Without this control, AD will return the full descriptor
+/// only if the caller holds `SeSecurityPrivilege` (typically Domain Admins);
+/// non-admin operators will either see a stripped descriptor or get an
+/// "insufficient access" error.
+///
+/// `flags` is a bitmask:
+/// - 0x01 OWNER_SECURITY_INFORMATION
+/// - 0x02 GROUP_SECURITY_INFORMATION
+/// - 0x04 DACL_SECURITY_INFORMATION
+/// - 0x08 SACL_SECURITY_INFORMATION (requires SeSecurityPrivilege)
+///
+/// We pass `7` (`OWNER|GROUP|DACL`) by default so the read works for
+/// HelpDesk and Account Operator accounts.
+///
+/// Wire format per Microsoft `LDAP_SERVER_SD_FLAGS_OID` documentation:
+/// `SDFlagsRequestValue ::= SEQUENCE { Flags INTEGER }` BER-encoded.
+fn sd_flags_control(flags: u8) -> RawControl {
+    // SEQUENCE (0x30) length=3, INTEGER (0x02) length=1, value=flags
+    let val = vec![0x30, 0x03, 0x02, 0x01, flags];
+    RawControl {
+        ctype: "1.2.840.113556.1.4.801".to_string(),
+        crit: true,
+        val: Some(val),
+    }
+}
+
 /// Modifies the DACL to set or clear the "User Cannot Change Password" deny ACEs.
 async fn set_cannot_change_password_with_ldap(
     user_dn: &str,
     deny: bool,
     ldap: &mut ldap3::Ldap,
 ) -> Result<()> {
+    ldap.with_controls(vec![sd_flags_control(0x07)]);
     let (rs, _) = ldap
         .search(
             user_dn,
@@ -1401,6 +1559,10 @@ impl DirectoryProvider for LdapDirectoryProvider {
 
     fn last_connection_error(&self) -> Option<String> {
         self.last_error_kind.lock().expect("lock poisoned").clone()
+    }
+
+    fn last_search_was_truncated(&self) -> bool {
+        *self.last_search_truncated.lock().expect("lock poisoned")
     }
 
     async fn search_users(&self, filter: &str, max_results: usize) -> Result<Vec<DirectoryEntry>> {
@@ -1655,6 +1817,7 @@ impl DirectoryProvider for LdapDirectoryProvider {
         self.with_connection(|mut ldap| {
             let dn = dn.clone();
             async move {
+                ldap.with_controls(vec![sd_flags_control(0x07)]);
                 let (rs, _) = ldap
                     .search(
                         &dn,
@@ -1942,24 +2105,41 @@ impl DirectoryProvider for LdapDirectoryProvider {
             let base = base.clone();
             let dn = dn.clone();
             async move {
-                // LDAP_MATCHING_RULE_IN_CHAIN resolves transitive membership
+                // LDAP_MATCHING_RULE_IN_CHAIN resolves transitive membership in
+                // a single query. AD supports it; non-Microsoft directories
+                // (Samba 4 < 4.5, OpenLDAP, some appliances) often do not, in
+                // which case the server returns rc=12 (criticalExtensionUnavailable)
+                // or rc=53 (unwillingToPerform). On such servers we fall back
+                // to a client-side BFS over the `memberOf` attribute.
                 let filter = format!(
                     "(&(objectClass=group)(member:1.2.840.113556.1.4.1941:={}))",
                     dn
                 );
-                let (rs, _) = ldap
+                let result = ldap
                     .search(&base, Scope::Subtree, &filter, vec!["distinguishedName"])
                     .await
-                    .context("Failed to query nested groups")?
-                    .success()
-                    .context("Nested groups LDAP query returned error")?;
+                    .context("Failed to query nested groups")?;
 
-                let groups: Vec<String> = rs
-                    .into_iter()
-                    .map(|entry| SearchEntry::construct(entry).dn)
-                    .collect();
+                let rc = result.1.rc;
+                if rc == 0 {
+                    let groups: Vec<String> = result
+                        .0
+                        .into_iter()
+                        .map(|entry| SearchEntry::construct(entry).dn)
+                        .collect();
+                    return Ok(groups);
+                }
 
-                Ok(groups)
+                if matching_rule_unsupported(rc) {
+                    tracing::warn!(
+                        rc,
+                        user_dn = %dn,
+                        "LDAP_MATCHING_RULE_IN_CHAIN unsupported by server, falling back to client-side memberOf BFS"
+                    );
+                    return nested_groups_via_memberof_bfs(&mut ldap, &dn).await;
+                }
+
+                anyhow::bail!("Nested groups LDAP query returned error rc={}", rc);
             }
         })
         .await
@@ -3953,5 +4133,62 @@ mod tests {
         assert_eq!(fqdn_from_logonserver("", "\\\\DC01"), None);
         assert_eq!(fqdn_from_logonserver("corp.local", ""), None);
         assert_eq!(fqdn_from_logonserver("corp.local", "\\\\"), None);
+    }
+
+    // -----------------------------------------------------------------------
+    // sd_flags_control - LDAP_SERVER_SD_FLAGS_OID encoding
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_sd_flags_control_oid_and_criticality() {
+        let c = sd_flags_control(0x07);
+        assert_eq!(c.ctype, "1.2.840.113556.1.4.801");
+        assert!(c.crit);
+    }
+
+    #[test]
+    fn test_sd_flags_control_value_owner_group_dacl() {
+        // SDFlagsRequestValue ::= SEQUENCE { Flags INTEGER }
+        // For flags=0x07: SEQUENCE(0x30) len=3 INTEGER(0x02) len=1 value=0x07
+        let c = sd_flags_control(0x07);
+        assert_eq!(c.val.as_deref(), Some(&[0x30, 0x03, 0x02, 0x01, 0x07][..]));
+    }
+
+    #[test]
+    fn test_sd_flags_control_value_owner_only() {
+        let c = sd_flags_control(0x01);
+        assert_eq!(c.val.as_deref(), Some(&[0x30, 0x03, 0x02, 0x01, 0x01][..]));
+    }
+
+    #[test]
+    fn test_sd_flags_control_value_full_with_sacl() {
+        let c = sd_flags_control(0x0F);
+        assert_eq!(c.val.as_deref(), Some(&[0x30, 0x03, 0x02, 0x01, 0x0F][..]));
+    }
+
+    // -----------------------------------------------------------------------
+    // matching_rule_unsupported - LDAP_MATCHING_RULE_IN_CHAIN fallback trigger
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_matching_rule_unsupported_recognizes_critical_extension() {
+        // RFC 4511: criticalExtensionUnavailable
+        assert!(matching_rule_unsupported(12));
+    }
+
+    #[test]
+    fn test_matching_rule_unsupported_recognizes_unwilling_to_perform() {
+        // RFC 4511: unwillingToPerform - some appliances use this loosely
+        assert!(matching_rule_unsupported(53));
+    }
+
+    #[test]
+    fn test_matching_rule_unsupported_rejects_other_codes() {
+        // Do NOT fall back on auth failures, missing object, or success
+        assert!(!matching_rule_unsupported(0)); // success
+        assert!(!matching_rule_unsupported(32)); // noSuchObject
+        assert!(!matching_rule_unsupported(49)); // invalidCredentials
+        assert!(!matching_rule_unsupported(50)); // insufficientAccessRights
+        assert!(!matching_rule_unsupported(2)); // protocolError
     }
 }
