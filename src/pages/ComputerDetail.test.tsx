@@ -616,6 +616,36 @@ describe("ComputerDetail", () => {
       // Tooltip still renders, just with empty interpolation
       expect(badge.getAttribute("title")).toContain("msDS-AllowedToDelegateTo");
     });
+
+    it("handles Rbcd with missing metadata gracefully", () => {
+      // Parity test for QA-14.3-001 - Rbcd uses the same Array.isArray
+      // narrowing in tooltipParamsFor as ConstrainedDelegation; this test
+      // catches any future asymmetric refactor that breaks one path but
+      // leaves the other working.
+      render(
+        <ComputerDetail
+          computer={makeComputer()}
+          securityIndicators={{
+            indicators: [
+              {
+                kind: "Rbcd",
+                severity: "Warning",
+                descriptionKey: "securityIndicators.Rbcd",
+              },
+            ],
+            highestSeverity: "Warning",
+          }}
+        />,
+      );
+      const badge = screen.getByTestId(
+        "computer-security-indicator-badge-Rbcd",
+      );
+      expect(badge).toBeInTheDocument();
+      // Tooltip still renders, just with empty {{principals}} interpolation
+      expect(badge.getAttribute("title")).toContain(
+        "msDS-AllowedToActOnBehalfOfOtherIdentity",
+      );
+    });
   });
 
   // ---------------------------------------------------------------------------
