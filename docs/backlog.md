@@ -2,16 +2,14 @@
 
 Items deferred from QA reviews. None are blocking - all stories are PASS.
 
-## Priority: Low
-
-| Source | Item | Refs |
-| ------ | ---- | ---- |
-| Epic 14 QA | `tooltipParamsFor` factor when needed. Currently local to ComputerDetail. If a future story needs the same metadata extraction logic, factor to `src/types/securityIndicators.ts` or `src/lib/`. | Story 14.3, QA-14.3-002 |
-| Epic 14 QA | SecurityIndicatorDot popover metadata enrichment. Currently shows kind labels only. Could show first-N principal SIDs / target SPNs in the popover so the operator does not need to open ComputerDetail to see what the configuration permits. | Story 14.3, QA-14.3-003 |
-| Epic 14 QA | Manual browser smoke test for all UI changes across the 4 themes (light/dark + 2 accent variants) before tagging the v1.1.0 release. Component-level tests cover correctness but visual rendering should be human-verified. | Epic 14 finalization |
+The Epic 14 backlog is now empty. Visual rendering verification before each
+release is documented in [`docs/release-smoke-test.md`](release-smoke-test.md)
+as a recurring checklist rather than a one-shot backlog item.
 
 ### Recently resolved
 
+- **`tooltipParamsFor` factor + SecurityIndicatorDot popover metadata enrichment** (QA-14.3-002 + QA-14.3-003) - resolved 2026-04-26 in commit `6b13e0e`. Moved `tooltipParamsFor` from `ComputerDetail` to `src/types/securityIndicators.ts` so `SecurityIndicatorDot` can share it. Enriched the dot popover with per-indicator metadata previews: ConstrainedDelegation lists the first 3 target SPNs, Rbcd lists the first 3 allowed-principal SIDs, with a `+N more` truncation suffix backed by the new `dot.metadataMore` i18n key (translated to en/fr/de/it/es). 5 new tests cover preview rendering, truncation, no-metadata fallback, and empty-array fallback.
+- **Manual cross-theme smoke test** (Epic 14 finalization) - resolved 2026-04-26 in commit `6b13e0e`. Replaced the ad-hoc one-shot backlog item with `docs/release-smoke-test.md`, a reusable visual checklist for every release. Notes that DSPanel ships only `light` / `dark` themes (no accent variants) and walks through every Epic 14 surface (UserLookup / ComputerLookup dot + popover, UserDetail / ComputerDetail badges + Fix buttons, the 3 quick-fix dialogs, AuditLog, notification toasts).
 - **AuditSeverity::Critical structural field on AuditEntry** (QA-14.6-001) - resolved 2026-04-26 in commit `d416b22`. Added `AuditSeverity` enum + `severity` field on `AuditEntry`, SQLite migration with `severity` TEXT column + index, new `log_success_with_severity` / `log_failure_with_severity` methods, syslog forwarder severity mapping (Critical→2, Warning→4, Info→6/4), Story 14.6 now records both success and failure entries as Critical. Severity is excluded from the SHA-256 chain hash to preserve backward compatibility on existing chains. Frontend `AuditEntry` interface gains optional `severity` field.
 - **Snapshot-on-no-op optimization for Stories 14.4 and 14.6** (QA-14.5-003) - resolved 2026-04-26 in commit `07d4eed`. Promoted the previously-private `get_user_account_control` LDAP helper to a `DirectoryProvider` trait method so the command layer peeks before snapshotting. Both `clear_password_not_required_inner` and `disable_unconstrained_delegation_inner` short-circuit on the no-op path before calling `capture_snapshot`. Read-phase failures log a `<command>Failed` audit entry with a `get_user_account_control:` prefix in the details. Allowlist updated for `ClearPasswordNotRequiredFailed` and `DisableUnconstrainedDelegationFailed` (same shape as `RemoveUserSpnsFailed` for QA-14.5-001).
 - **i18n schema deduplication for the 3 quick-fix dialogs** (QA-14.4-003) - resolved 2026-04-26 in commit `02e36a8`. Extracted `AcknowledgeQuickFixDialog` shared React component plus `AcknowledgeQuickFixI18nKeys` TypeScript interface documenting the 8-key contract. `ClearPasswordNotRequiredDialog` and `DisableUnconstrainedDelegationDialog` collapsed to thin wrappers that supply their i18n base key, Tauri command, and MFA action name. Story 14.5 (`ManageSpns`) keeps its own dialog because the per-SPN selection list shape does not fit the acknowledge pattern.
