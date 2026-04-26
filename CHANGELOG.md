@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-04-26
+
+### Added
+
+- **Epic 14 - Security-Aware Admin**. DSPanel now signals Active Directory security risk inline at the moment the operator manipulates an object, plus three 1-click remediation actions for the most common misconfigurations. Differentiates DSPanel from read-only audit tools (PingCastle, BloodHound CE) by combining detection with safe in-place remediation.
+- **Per-object security indicator badges (Stories 14.1, 14.2, 14.3)**. New `services/security_indicators.rs` Rust evaluator detects 8 indicators from already-fetched LDAP attributes - 5 user-side (`Kerberoastable`, `PasswordNotRequired`, `PasswordNeverExpires`, `ReversibleEncryption`, `AsRepRoastable`) and 3 computer-side (`UnconstrainedDelegation`, `ConstrainedDelegation`, `Rbcd`). Severity escalates from Warning to Critical for `Kerberoastable` and `PasswordNeverExpires` when the user is also AdminSDHolder-protected (`adminCount=1`). Pure-function design with zero LDAP dependency, exposed via 4 batch-aware Tauri commands.
+- **Security indicator rendering in UserDetail and ComputerDetail (Stories 14.2, 14.3)**. `StatusBadge` row next to existing health/enabled/locked badges, severity-driven variant via `severityToBadgeVariant(indicator.severity)` so AdminSDHolder escalation surfaces correctly. ConstrainedDelegation tooltip lists the actual `msDS-AllowedToDelegateTo` SPN list; RBCD tooltip lists the parsed `msDS-AllowedToActOnBehalfOfOtherIdentity` principal SIDs (server-side parsing via the new `extract_dacl_principals` helper in `services/dacl.rs`).
+- **Security indicator dot in UserLookup and ComputerLookup (Stories 14.2, 14.3)**. New `<SecurityIndicatorDot>` common component renders a compact aggregate dot (Shield / ShieldAlert icon colored by `highestSeverity`) per row with a portal-tooltip popover listing every indicator. Hidden for clean rows. Mirrors the HealthBadge keyboard-accessible interaction pattern (Enter/Space toggle, Escape close, focus/blur).
+- **Quick-Fix: Clear PasswordNotRequired (Story 14.4)**. New AccountOperator-gated Tauri command `clear_password_not_required(user_dn)` clears the `userAccountControl` PASSWORD_NOT_REQUIRED bit (0x0020). New `clear_user_account_control_bits(dn, mask)` generic trait method on `DirectoryProvider` - introduced for 14.4 and reused by 14.6. Inline "Fix" button on the badge row in UserDetail with confirmation dialog (acknowledgement checkbox + multi-paragraph body explaining the policy implication). Defense in depth at 4 gates (frontend canEdit + `require_fresh_permission` backend + `useMfaGate` hook + `mfa_service.check_mfa_for_action` backend).
+- **Quick-Fix: Remove Unused SPN (Story 14.5)**. New AccountOperator-gated Tauri command `remove_user_spns(user_dn, spns_to_remove)` rewrites the multi-valued `servicePrincipalName` attribute via `Mod::Replace` with the new set. New `services/spn.rs` module with `is_system_spn` guard (12 prefixes: `host`, `RestrictedKrbHost`, `cifs`, `ldap`, `GC`, `kadmin`, `krbtgt`, `wsman`, `TERMSRV`, `MSServerClusterMgmtAPI`, `MSServerCluster`, `DNS`) - system SPNs cannot be removed even by an Admin to prevent service outage. Cross-language guard mirrored at `src/utils/spn.ts` with verbatim-port tests (19 Rust + 21 TS) ensuring drift detection. New `<ManageSpnsDialog>` lists removable + system-protected SPNs in two visual sections; result reports `removed`, `kept`, `blockedSystem` lists sorted alphabetically for deterministic SHA-256 audit chain hash. Defense in depth at 5 gates (4 standard + system-SPN policy filter on both client + server).
+- **Quick-Fix: Disable Unconstrained Delegation (Story 14.6)**. New Admin-gated Tauri command `disable_unconstrained_delegation(computer_dn)` clears the `userAccountControl` TRUSTED_FOR_DELEGATION bit (0x80000) via reuse of Story 14.4's generic trait method. Higher permission bar than user-side fixes because computer delegation changes can break production Kerberos services (SQL Server linked servers, IIS impersonation, SharePoint with Kerberos delegation). Inline "Fix" button on the badge row in ComputerDetail with confirmation dialog (acknowledgement checkbox: "I have verified no production service requires this", multi-paragraph body explaining the golden-ticket-via-TGT-capture attack vector and recommending migration to constrained delegation).
+- All new strings translated for EN/FR/DE/IT/ES (translation completeness suite enforces parity).
+- 199 new tests across the epic (70 Rust unit + 108 frontend component + 21 cross-language verbatim port). Full backend suite 1673/1673; full frontend suite 2200/2200; clippy/fmt/lint/tsc all clean.
+
+### Changed
+
+- `DirectoryComputer` TypeScript type now includes `rawAttributes: Record<string, string[]>` to mirror `DirectoryUser`. Required for the indicator service to read raw UAC + delegation attributes. `mapEntryToComputer` populates the field from `entry.attributes`.
+- `SecurityIndicator` Rust struct serializes with `#[serde(rename_all = "camelCase")]` for consistent camelCase wire shape (was a mixed snake/camel inconsistency before).
+- `ComputerDetail` accepts a new optional `onRefresh?: () => void` prop for quick-fix success callbacks (mirrors `UserDetail`).
+- `COMPUTER_ATTRS` in `services/ldap_directory.rs` extended with `msDS-AllowedToDelegateTo` and `msDS-AllowedToActOnBehalfOfOtherIdentity`. New `BINARY_ATTRS_TO_SURFACE` mechanism base64-encodes the binary RBCD security descriptor blob into the standard `attributes` map so the frontend can forward it without a separate LDAP read.
+
+### Fixed
+
+- Anonymized a doc-comment example in `services/ldap_directory.rs` (`fqdn_from_logonserver`) and the matching test that referenced a real-world deployment domain. Replaced with generic placeholders (`subsite.corp.example` + `AD2-SUBSITE`) preserving the three-label-domain property the test exercises. No behavior change.
+
 ## [1.0.5] - 2026-04-26
 
 ### Added

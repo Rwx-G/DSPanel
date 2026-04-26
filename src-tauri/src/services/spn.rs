@@ -110,9 +110,7 @@ mod tests {
 
     #[test]
     fn cluster_mgmt_is_system() {
-        assert!(is_system_spn(
-            "MSServerClusterMgmtAPI/cluster01.corp.local"
-        ));
+        assert!(is_system_spn("MSServerClusterMgmtAPI/cluster01.corp.local"));
         assert!(is_system_spn("MSServerCluster/cluster01.corp.local"));
     }
 
