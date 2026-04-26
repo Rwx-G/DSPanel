@@ -6,6 +6,7 @@ import { mockPermissionLevel } from "@/test-utils/permissions";
 import { NavigationProvider } from "@/contexts/NavigationContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import { DialogProvider } from "@/contexts/DialogContext";
+import { NotificationHost } from "@/components/common/NotificationHost";
 import type { DirectoryUser } from "@/types/directory";
 import type { AccountHealthStatus } from "@/types/health";
 
@@ -13,7 +14,10 @@ function TestProviders({ children }: { children: ReactNode }) {
   return (
     <NotificationProvider>
       <DialogProvider>
-        <NavigationProvider>{children}</NavigationProvider>
+        <NavigationProvider>
+          {children}
+          <NotificationHost />
+        </NavigationProvider>
       </DialogProvider>
     </NotificationProvider>
   );
@@ -1290,5 +1294,172 @@ describe("UserDetail", () => {
     expect(
       screen.getByTestId("spn-row-HTTP/web1.corp.local"),
     ).toBeInTheDocument();
+  });
+
+  // ---------------------------------------------------------------------------
+  // E2E success-path tests for quick-fix flows (QA-14.4-002)
+  // Click Fix -> dialog -> ack checkbox -> Confirm -> invoke -> notification -> onRefresh
+  // ---------------------------------------------------------------------------
+
+  it("E2E: clear PasswordNotRequired runs invoke, fires success notification, and calls onRefresh", async () => {
+    const { invoke } = await import("@tauri-apps/api/core");
+    const mockedInvoke = vi.mocked(invoke);
+    mockedInvoke.mockImplementation((cmd: string) => {
+      if (cmd === "mfa_is_configured") {
+        return Promise.resolve(false) as ReturnType<typeof invoke>;
+      }
+      if (cmd === "clear_password_not_required") {
+        return Promise.resolve(null) as ReturnType<typeof invoke>;
+      }
+      return Promise.resolve(null) as ReturnType<typeof invoke>;
+    });
+
+    const onRefresh = vi.fn();
+
+    render(
+      <UserDetail
+        {...makeProps({
+          onRefresh,
+          securityIndicators: {
+            indicators: [
+              {
+                kind: "PasswordNotRequired",
+                severity: "Critical",
+                descriptionKey: "securityIndicators.PasswordNotRequired",
+              },
+            ],
+            highestSeverity: "Critical",
+          },
+        })}
+      />,
+      { wrapper: TestProviders },
+    );
+
+    fireEvent.click(screen.getByTestId("quick-fix-PasswordNotRequired-btn"));
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId("clear-password-not-required-dialog"),
+      ).toBeInTheDocument();
+    });
+
+    const ackCheckbox = screen.getByTestId("acknowledge-checkbox");
+    expect(screen.getByTestId("confirm-btn")).toBeDisabled();
+    fireEvent.click(ackCheckbox);
+    expect(screen.getByTestId("confirm-btn")).not.toBeDisabled();
+
+    fireEvent.click(screen.getByTestId("confirm-btn"));
+
+    await waitFor(() => {
+      const calls = mockedInvoke.mock.calls.filter(
+        (c) => c[0] === "clear_password_not_required",
+      );
+      expect(calls.length).toBe(1);
+      expect(calls[0][1]).toEqual({
+        userDn: "CN=John Doe,OU=Users,DC=example,DC=com",
+      });
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.queryByTestId("clear-password-not-required-dialog"),
+      ).not.toBeInTheDocument();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("notification-host")).toBeInTheDocument();
+    });
+    expect(
+      screen.getByText(/PasswordNotRequired cleared on John Doe/),
+    ).toBeInTheDocument();
+
+    expect(onRefresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("E2E: remove SPNs runs invoke, fires success notification (pluralised), and calls onRefresh", async () => {
+    const { invoke } = await import("@tauri-apps/api/core");
+    const mockedInvoke = vi.mocked(invoke);
+    mockedInvoke.mockImplementation((cmd: string) => {
+      if (cmd === "mfa_is_configured") {
+        return Promise.resolve(false) as ReturnType<typeof invoke>;
+      }
+      if (cmd === "remove_user_spns") {
+        return Promise.resolve({
+          removed: ["MSSQLSvc/db.corp.local:1433"],
+          kept: ["HTTP/web1.corp.local"],
+          blockedSystem: [],
+        }) as ReturnType<typeof invoke>;
+      }
+      return Promise.resolve(null) as ReturnType<typeof invoke>;
+    });
+
+    const onRefresh = vi.fn();
+
+    render(
+      <UserDetail
+        {...makeProps({
+          onRefresh,
+          user: makeUser({
+            rawAttributes: {
+              servicePrincipalName: [
+                "MSSQLSvc/db.corp.local:1433",
+                "HTTP/web1.corp.local",
+              ],
+            },
+          }),
+          securityIndicators: {
+            indicators: [
+              {
+                kind: "Kerberoastable",
+                severity: "Warning",
+                descriptionKey: "securityIndicators.Kerberoastable",
+              },
+            ],
+            highestSeverity: "Warning",
+          },
+        })}
+      />,
+      { wrapper: TestProviders },
+    );
+
+    fireEvent.click(screen.getByTestId("quick-fix-RemoveUserSpns-btn"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("manage-spns-dialog")).toBeInTheDocument();
+    });
+
+    expect(screen.getByTestId("confirm-btn")).toBeDisabled();
+    fireEvent.click(
+      screen.getByTestId("spn-checkbox-MSSQLSvc/db.corp.local:1433"),
+    );
+    expect(screen.getByTestId("confirm-btn")).not.toBeDisabled();
+
+    fireEvent.click(screen.getByTestId("confirm-btn"));
+
+    await waitFor(() => {
+      const calls = mockedInvoke.mock.calls.filter(
+        (c) => c[0] === "remove_user_spns",
+      );
+      expect(calls.length).toBe(1);
+      expect(calls[0][1]).toEqual({
+        userDn: "CN=John Doe,OU=Users,DC=example,DC=com",
+        spnsToRemove: ["MSSQLSvc/db.corp.local:1433"],
+      });
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.queryByTestId("manage-spns-dialog"),
+      ).not.toBeInTheDocument();
+    });
+
+    // i18n returns the singular form for count = 1
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Removed 1 SPN from John Doe/),
+      ).toBeInTheDocument();
+    });
+
+    expect(onRefresh).toHaveBeenCalledTimes(1);
   });
 });

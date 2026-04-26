@@ -39,15 +39,23 @@ vi.mock("@/hooks/usePermissions", () => ({
   }),
 }));
 
+// Hoisted spies so individual E2E tests can assert against them after a
+// confirm-button click triggers the dialog's onSuccess callback.
+const { notifySpy, showCustomDialogSpy } = vi.hoisted(() => ({
+  notifySpy: vi.fn(),
+  showCustomDialogSpy: vi.fn(),
+}));
+
 vi.mock("@/contexts/DialogContext", () => ({
   useDialog: () => ({
     showConfirmation: vi.fn(),
+    showCustomDialog: showCustomDialogSpy,
   }),
 }));
 
 vi.mock("@/contexts/NotificationContext", () => ({
   useNotifications: () => ({
-    notify: vi.fn(),
+    notify: notifySpy,
   }),
 }));
 
@@ -753,6 +761,73 @@ describe("ComputerDetail", () => {
           screen.getByTestId("disable-unconstrained-delegation-dialog"),
         ).toBeInTheDocument();
       });
+    });
+
+    // -------------------------------------------------------------------------
+    // E2E success-path test for the 14.6 quick-fix flow (QA-14.4-002)
+    // Click Fix -> dialog -> ack checkbox -> Confirm -> invoke -> notify -> onRefresh
+    // -------------------------------------------------------------------------
+
+    it("E2E: disable unconstrained delegation runs invoke, fires notify, and calls onRefresh", async () => {
+      await mockPermissionLevel("Admin");
+
+      mockInvoke.mockImplementation(((cmd: string) => {
+        if (cmd === "resolve_dns") return Promise.resolve(["10.0.0.1"]);
+        if (cmd === "ping_host") return Promise.resolve("Reachable (1ms)");
+        if (cmd === "mfa_is_configured") return Promise.resolve(false);
+        if (cmd === "disable_unconstrained_delegation")
+          return Promise.resolve(null);
+        return Promise.resolve(null);
+      }) as typeof invoke);
+
+      const onRefresh = vi.fn();
+
+      render(
+        <ComputerDetail
+          computer={makeComputer({ name: "SRV01" })}
+          securityIndicators={unconstrainedSet}
+          onRefresh={onRefresh}
+        />,
+      );
+
+      fireEvent.click(
+        screen.getByTestId("quick-fix-DisableUnconstrainedDelegation-btn"),
+      );
+
+      await waitFor(() => {
+        expect(
+          screen.getByTestId("disable-unconstrained-delegation-dialog"),
+        ).toBeInTheDocument();
+      });
+
+      const ackCheckbox = screen.getByTestId("acknowledge-checkbox");
+      expect(screen.getByTestId("confirm-btn")).toBeDisabled();
+      fireEvent.click(ackCheckbox);
+      expect(screen.getByTestId("confirm-btn")).not.toBeDisabled();
+
+      fireEvent.click(screen.getByTestId("confirm-btn"));
+
+      await waitFor(() => {
+        const calls = mockInvoke.mock.calls.filter(
+          (c) => c[0] === "disable_unconstrained_delegation",
+        );
+        expect(calls.length).toBe(1);
+        expect(calls[0][1]).toEqual({
+          computerDn: "CN=WS001,OU=Computers,DC=example,DC=com",
+        });
+      });
+
+      await waitFor(() => {
+        expect(
+          screen.queryByTestId("disable-unconstrained-delegation-dialog"),
+        ).not.toBeInTheDocument();
+      });
+
+      expect(notifySpy).toHaveBeenCalledWith(
+        expect.stringContaining("Unconstrained delegation disabled on SRV01"),
+        "success",
+      );
+      expect(onRefresh).toHaveBeenCalledTimes(1);
     });
   });
 });
