@@ -24,5 +24,17 @@
   "unsavedChanges": "{{count}} modification(s) non enregistrée(s)",
   "scrollToActionBar": "Défiler vers la barre d'actions",
   "viewGroupMembers": "Voir les membres du groupe",
-  "openInGroupManagement": "Ouvrir dans Gestion des groupes"
+  "openInGroupManagement": "Ouvrir dans Gestion des groupes",
+  "quickFix": {
+    "clearPasswordNotRequired": {
+      "fixButton": "Corriger",
+      "fixButtonAriaLabel": "Effacer le drapeau PasswordNotRequired",
+      "title": "Effacer le drapeau PasswordNotRequired",
+      "body": "Ce compte autorise actuellement un mot de passe vide (PASSWORD_NOT_REQUIRED est activé sur userAccountControl). Un attaquant qui apprend le nom d'utilisateur peut s'authentifier sans aucun identifiant.\n\nEffacer ce drapeau désactive le bit 0x0020 de userAccountControl. Le compte sera ensuite soumis à la politique de mot de passe du domaine au prochain changement de mot de passe.",
+      "checkboxLabel": "Je comprends que cet utilisateur devra respecter la politique de mot de passe du domaine à la prochaine connexion",
+      "confirmButton": "Effacer le drapeau",
+      "successNotification": "PasswordNotRequired effacé sur {{name}}",
+      "failureNotification": "Échec de l'effacement de PasswordNotRequired : {{error}}"
+    }
+  }
 }

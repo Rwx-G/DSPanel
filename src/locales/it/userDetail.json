@@ -24,5 +24,17 @@
   "unsavedChanges": "{{count}} modifica/e non salvata/e",
   "scrollToActionBar": "Scorri alla barra azioni",
   "viewGroupMembers": "Visualizza membri del gruppo",
-  "openInGroupManagement": "Apri in Gestione gruppi"
+  "openInGroupManagement": "Apri in Gestione gruppi",
+  "quickFix": {
+    "clearPasswordNotRequired": {
+      "fixButton": "Correggi",
+      "fixButtonAriaLabel": "Rimuovi flag PasswordNotRequired",
+      "title": "Rimuovi flag PasswordNotRequired",
+      "body": "Questo account consente attualmente una password vuota (PASSWORD_NOT_REQUIRED è impostato su userAccountControl). Un attaccante che conosce il nome utente può autenticarsi senza credenziali.\n\nRimuovere questo flag disattiva il bit 0x0020 di userAccountControl. L'account sarà quindi soggetto alla policy delle password del dominio al prossimo cambio password.",
+      "checkboxLabel": "Comprendo che questo utente dovrà rispettare la policy delle password del dominio al prossimo accesso",
+      "confirmButton": "Rimuovi flag",
+      "successNotification": "PasswordNotRequired rimosso da {{name}}",
+      "failureNotification": "Rimozione di PasswordNotRequired non riuscita: {{error}}"
+    }
+  }
 }

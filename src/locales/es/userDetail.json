@@ -24,5 +24,17 @@
   "unsavedChanges": "{{count}} cambio(s) sin guardar",
   "scrollToActionBar": "Desplazar a la barra de acciones",
   "viewGroupMembers": "Ver miembros del grupo",
-  "openInGroupManagement": "Abrir en Administración de grupos"
+  "openInGroupManagement": "Abrir en Administración de grupos",
+  "quickFix": {
+    "clearPasswordNotRequired": {
+      "fixButton": "Corregir",
+      "fixButtonAriaLabel": "Quitar el indicador PasswordNotRequired",
+      "title": "Quitar el indicador PasswordNotRequired",
+      "body": "Esta cuenta permite actualmente una contraseña vacía (PASSWORD_NOT_REQUIRED está activado en userAccountControl). Un atacante que conozca el nombre de usuario puede autenticarse sin ninguna credencial.\n\nQuitar este indicador desactiva el bit 0x0020 de userAccountControl. La cuenta entonces quedará sujeta a la política de contraseñas del dominio en el próximo cambio de contraseña.",
+      "checkboxLabel": "Entiendo que este usuario deberá cumplir con la política de contraseñas del dominio en el próximo inicio de sesión",
+      "confirmButton": "Quitar indicador",
+      "successNotification": "PasswordNotRequired quitado de {{name}}",
+      "failureNotification": "Error al quitar PasswordNotRequired: {{error}}"
+    }
+  }
 }
