@@ -25,20 +25,18 @@ Items deferred from QA reviews. None are blocking - all stories are PASS.
 | Epic 14 QA | Per-test mock helper `withPermission(level)` to factor the per-test `vi.spyOn(permMod, 'usePermissions')` boilerplate in `ComputerDetail.test.tsx`. Trivial cleanup, no functional impact. | Story 14.6, QA-14.6-003 |
 | Epic 14 QA | Manual browser smoke test for all UI changes across the 4 themes (light/dark + 2 accent variants) before tagging the v1.1.0 release. Component-level tests cover correctness but visual rendering should be human-verified. | Epic 14 finalization |
 
-## Dependencies (checked 2026-03-23)
+## Dependencies (checked 2026-04-26)
 
-All direct dependencies up to date within compatibility constraints.
+All direct dependencies up to date.
 
 ### Rust (Cargo.toml)
 
 | Crate | Current | Latest | Breaking | Notes |
 | ----- | ------- | ------ | -------- | ----- |
-| *(none)* | - | - | - | All Rust dependencies up to date (2026-03-23) |
+| *(none)* | - | - | - | All Rust dependencies up to date. `rustls-webpki` pinned to >=0.103.13 via Cargo.lock to patch RUSTSEC-2026-0098/0099/0104 (2026-04-26). |
 
 ### NPM (package.json)
 
 | Package | Current | Latest | Breaking | Notes |
 | ------- | ------- | ------ | -------- | ----- |
-| `vite` | 7.3.1 | 8.0.2 | Yes | Blocked by `@tailwindcss/vite` and `@storybook/react-vite` peer deps (no vite 8 support yet). 7.3.1 is latest 7.x. |
-| `@vitejs/plugin-react` | 5.2.0 | 6.0.1 | Yes | Blocked - v6 requires vite 8 as peer. 5.2.0 is latest compatible with vite 7. |
-| `typescript` | 5.9.3 | 6.0.2 | Yes | Blocked by `typescript-eslint` peer dep (requires < 6.0.0). 5.9.3 is latest 5.x. |
+| *(none)* | - | - | - | All direct dependencies on latest. Major bumps applied 2026-04-26: vite 7.3.1 -> 8.0.10, @vitejs/plugin-react 5.2.0 -> 6.0.1, typescript 5.9.3 -> 6.0.3 (with typescript-eslint -> 8.59.0 + tsconfig baseUrl removal for TS 7 forward-compat). pnpm overrides on `postcss@<8.5.12` and `@joshwooding/vite-plugin-react-docgen-typescript@<0.7.0` to patch transitive Storybook deps. |
