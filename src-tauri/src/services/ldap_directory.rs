@@ -9,24 +9,25 @@ use ldap3::{LdapConnAsync, LdapConnSettings, Mod, Scope, SearchEntry};
 use crate::models::{ContactInfo, DirectoryEntry, OUNode, PrinterInfo};
 use crate::services::directory::DirectoryProvider;
 
-/// Resolves the DC FQDN from a domain name using DNS SRV lookup.
+/// Resolves the DC FQDN from a domain name for the Kerberos SPN.
 ///
-/// `sasl_gssapi_bind` needs the server FQDN for the Kerberos SPN
-/// (e.g., `ldap/dc01.corp.local`). When only the domain name is known
-/// (e.g., `corp.local` from `USERDNSDOMAIN`), this function queries
-/// `_ldap._tcp.<domain>` to find the actual DC hostname.
+/// `sasl_gssapi_bind` needs the server FQDN (e.g., `ldap/dc01.corp.local`),
+/// not the domain name (`corp.local`). The DC's machine SPN is registered
+/// against its hostname, so sending the bare domain produces
+/// `SEC_E_TARGET_UNKNOWN`.
 ///
-/// Falls back to the original host if:
-/// - The host is already a FQDN (more than 2 dot-separated parts)
-/// - DNS SRV resolution fails
+/// Resolution order:
+/// 1. DNS SRV lookup of `_ldap._tcp.<host>` - the authoritative source
+///    in any AD environment. Always tried first regardless of dot count
+///    in `host`, because a multi-level domain like `corp.example.local`
+///    is structurally indistinguishable from a hostname FQDN.
+/// 2. `LOGONSERVER` env var on Windows - the NetBIOS name of the DC the
+///    workstation logged on against. Combined with `host` (treated as the
+///    DNS suffix) to build a plausible FQDN.
+/// 3. `host` returned as-is - last resort. Bind will likely fail with
+///    `unknown_principal` but at least the user sees a clear log line.
 #[cfg(feature = "gssapi")]
 async fn resolve_dc_fqdn_for_gssapi(host: &str) -> String {
-    // If host already looks like a FQDN (e.g., dc01.corp.local), use it as-is
-    if host.split('.').count() > 2 {
-        return host.to_string();
-    }
-
-    // Try DNS SRV lookup: _ldap._tcp.<domain>
     let srv_name = format!("_ldap._tcp.{}.", host);
     tracing::debug!(srv_name = %srv_name, "Resolving DC FQDN via DNS SRV for GSSAPI");
 
@@ -49,20 +50,46 @@ async fn resolve_dc_fqdn_for_gssapi(host: &str) -> String {
                 return fqdn;
             }
             tracing::warn!(domain = %host, "DNS SRV lookup returned no records");
-            host.to_string()
         }
         Err(e) => {
-            // Fallback: try LOGONSERVER env var (Windows only)
-            if let Ok(logon_server) = std::env::var("LOGONSERVER") {
-                let netbios = logon_server.trim_start_matches('\\');
-                let fqdn = format!("{}.{}", netbios, host);
-                tracing::info!(fqdn = %fqdn, "DC FQDN derived from LOGONSERVER");
-                return fqdn;
-            }
-            tracing::warn!(domain = %host, error = %e, "DNS SRV lookup failed, using domain as fallback");
-            host.to_string()
+            tracing::warn!(domain = %host, error = %e, "DNS SRV lookup failed");
         }
     }
+
+    // Fallback: try LOGONSERVER env var (Windows only). Combine its NetBIOS
+    // name with `host` as the DNS suffix.
+    if let Ok(logon_server) = std::env::var("LOGONSERVER")
+        && let Some(fqdn) = fqdn_from_logonserver(host, &logon_server)
+    {
+        tracing::info!(fqdn = %fqdn, "DC FQDN derived from LOGONSERVER");
+        return fqdn;
+    }
+
+    tracing::warn!(host = %host, "no FQDN candidate available, using host as-is");
+    host.to_string()
+}
+
+/// Builds a DC FQDN by combining the NetBIOS name from `LOGONSERVER`
+/// (e.g. `\\AD2-INFORMADIS`) with `host` as the DNS suffix
+/// (e.g. `INFORMADIS.LECLERC.DMI`), yielding `AD2-INFORMADIS.INFORMADIS.LECLERC.DMI`.
+///
+/// Returns None if either input is empty after trimming, or if `host` is
+/// already FQDN-shaped *and* starts with the LOGONSERVER NetBIOS name (in
+/// that case the caller should use `host` directly rather than re-prefixing
+/// it).
+fn fqdn_from_logonserver(host: &str, logon_server: &str) -> Option<String> {
+    let netbios = logon_server.trim_start_matches('\\').trim();
+    if netbios.is_empty() || host.is_empty() {
+        return None;
+    }
+    // Avoid building "DC.dc.example.com" if host is already "dc.example.com"
+    // and starts with the NetBIOS prefix.
+    let host_lower = host.to_ascii_lowercase();
+    let netbios_lower = netbios.to_ascii_lowercase();
+    if host_lower.starts_with(&format!("{}.", netbios_lower)) {
+        return Some(host.to_string());
+    }
+    Some(format!("{}.{}", netbios, host))
 }
 
 /// LDAP attributes to retrieve for user searches.
@@ -3884,5 +3911,47 @@ mod tests {
         assert_eq!(fold_ascii("sesión"), "sesion");
         assert_eq!(fold_ascii("válidas"), "validas");
         assert_eq!(fold_ascii("año"), "ano");
+    }
+
+    // -----------------------------------------------------------------------
+    // fqdn_from_logonserver - DC FQDN derivation
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_fqdn_from_logonserver_three_level_domain() {
+        // The bug that motivated this: INFORMADIS.LECLERC.DMI is the AD
+        // domain, AD2-INFORMADIS is the DC NetBIOS name. The SPN must point
+        // at the DC's own FQDN, not the bare domain.
+        let fqdn = fqdn_from_logonserver("INFORMADIS.LECLERC.DMI", "\\\\AD2-INFORMADIS");
+        assert_eq!(
+            fqdn.as_deref(),
+            Some("AD2-INFORMADIS.INFORMADIS.LECLERC.DMI")
+        );
+    }
+
+    #[test]
+    fn test_fqdn_from_logonserver_two_level_domain() {
+        let fqdn = fqdn_from_logonserver("corp.local", "\\\\DC01");
+        assert_eq!(fqdn.as_deref(), Some("DC01.corp.local"));
+    }
+
+    #[test]
+    fn test_fqdn_from_logonserver_already_prefixed() {
+        // If host is already the DC's full FQDN, do not re-prefix it.
+        let fqdn = fqdn_from_logonserver("dc01.corp.local", "\\\\DC01");
+        assert_eq!(fqdn.as_deref(), Some("dc01.corp.local"));
+    }
+
+    #[test]
+    fn test_fqdn_from_logonserver_case_insensitive_already_prefixed() {
+        let fqdn = fqdn_from_logonserver("DC01.corp.local", "\\\\dc01");
+        assert_eq!(fqdn.as_deref(), Some("DC01.corp.local"));
+    }
+
+    #[test]
+    fn test_fqdn_from_logonserver_empty_inputs() {
+        assert_eq!(fqdn_from_logonserver("", "\\\\DC01"), None);
+        assert_eq!(fqdn_from_logonserver("corp.local", ""), None);
+        assert_eq!(fqdn_from_logonserver("corp.local", "\\\\"), None);
     }
 }
