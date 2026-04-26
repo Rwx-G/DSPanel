@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { ComputerDetail } from "./ComputerDetail";
 import type { DirectoryComputer } from "@/types/directory";
+import { mockPermissionLevel } from "@/test-utils/permissions";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
@@ -678,13 +679,7 @@ describe("ComputerDetail", () => {
     });
 
     it("does not render the Fix button at AccountOperator level (Admin gate is HIGHER)", async () => {
-      const permMod = await import("@/hooks/usePermissions");
-      vi.spyOn(permMod, "usePermissions").mockReturnValue({
-        hasPermission: (level: string) => level === "AccountOperator",
-        level: "AccountOperator" as import("@/types/permissions").PermissionLevel,
-        groups: [],
-        loading: false,
-      });
+      await mockPermissionLevel("AccountOperator");
 
       render(
         <ComputerDetail
@@ -698,13 +693,7 @@ describe("ComputerDetail", () => {
     });
 
     it("renders the Fix button at Admin level", async () => {
-      const permMod = await import("@/hooks/usePermissions");
-      vi.spyOn(permMod, "usePermissions").mockReturnValue({
-        hasPermission: () => true,
-        level: "Admin" as import("@/types/permissions").PermissionLevel,
-        groups: [],
-        loading: false,
-      });
+      await mockPermissionLevel("Admin");
 
       render(
         <ComputerDetail
@@ -718,13 +707,7 @@ describe("ComputerDetail", () => {
     });
 
     it("does not render the Fix button next to other indicator kinds", async () => {
-      const permMod = await import("@/hooks/usePermissions");
-      vi.spyOn(permMod, "usePermissions").mockReturnValue({
-        hasPermission: () => true,
-        level: "Admin" as import("@/types/permissions").PermissionLevel,
-        groups: [],
-        loading: false,
-      });
+      await mockPermissionLevel("Admin");
 
       render(
         <ComputerDetail
@@ -748,13 +731,7 @@ describe("ComputerDetail", () => {
     });
 
     it("opens the DisableUnconstrainedDelegationDialog when the Fix button is clicked", async () => {
-      const permMod = await import("@/hooks/usePermissions");
-      vi.spyOn(permMod, "usePermissions").mockReturnValue({
-        hasPermission: () => true,
-        level: "Admin" as import("@/types/permissions").PermissionLevel,
-        groups: [],
-        loading: false,
-      });
+      await mockPermissionLevel("Admin");
 
       render(
         <ComputerDetail

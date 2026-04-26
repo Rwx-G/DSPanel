@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { type ReactNode } from "react";
 import { UserDetail, type UserDetailProps } from "./UserDetail";
+import { mockPermissionLevel } from "@/test-utils/permissions";
 import { NavigationProvider } from "@/contexts/NavigationContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import { DialogProvider } from "@/contexts/DialogContext";
@@ -664,13 +665,7 @@ describe("UserDetail", () => {
 
   it("shows pending changes bar after staging a change via PropertyGrid", async () => {
     // Mock usePermissions so canEdit is true
-    const permMod = await import("@/hooks/usePermissions");
-    vi.spyOn(permMod, "usePermissions").mockReturnValue({
-      hasPermission: () => true,
-      level: "AccountOperator" as import("@/types/permissions").PermissionLevel,
-      groups: [],
-      loading: false,
-    });
+    await mockPermissionLevel("AccountOperator");
 
     render(<UserDetail {...makeProps()} />, { wrapper: TestProviders });
 
@@ -692,13 +687,7 @@ describe("UserDetail", () => {
   });
 
   it("clears pending changes when Discard button is clicked", async () => {
-    const permMod = await import("@/hooks/usePermissions");
-    vi.spyOn(permMod, "usePermissions").mockReturnValue({
-      hasPermission: () => true,
-      level: "AccountOperator" as import("@/types/permissions").PermissionLevel,
-      groups: [],
-      loading: false,
-    });
+    await mockPermissionLevel("AccountOperator");
 
     render(<UserDetail {...makeProps()} />, { wrapper: TestProviders });
 
@@ -785,13 +774,7 @@ describe("UserDetail", () => {
   // ---------------------------------------------------------------------------
 
   it("shows delete button when user has AccountOperator permission", async () => {
-    const permMod = await import("@/hooks/usePermissions");
-    vi.spyOn(permMod, "usePermissions").mockReturnValue({
-      hasPermission: () => true,
-      level: "AccountOperator" as import("@/types/permissions").PermissionLevel,
-      groups: [],
-      loading: false,
-    });
+    await mockPermissionLevel("AccountOperator");
 
     render(<UserDetail {...makeProps()} />, { wrapper: TestProviders });
     expect(screen.getByTestId("user-delete-btn")).toBeInTheDocument();
@@ -799,13 +782,7 @@ describe("UserDetail", () => {
 
   it("hides delete button for ReadOnly users", async () => {
     // Explicitly set ReadOnly permissions (previous tests may have spied)
-    const permMod = await import("@/hooks/usePermissions");
-    vi.spyOn(permMod, "usePermissions").mockReturnValue({
-      hasPermission: () => false,
-      level: "ReadOnly" as import("@/types/permissions").PermissionLevel,
-      groups: [],
-      loading: false,
-    });
+    await mockPermissionLevel("ReadOnly");
 
     render(<UserDetail {...makeProps()} />, { wrapper: TestProviders });
     expect(screen.queryByTestId("user-delete-btn")).not.toBeInTheDocument();
@@ -844,13 +821,7 @@ describe("UserDetail", () => {
     globalThis.IntersectionObserver =
       NotVisibleObserver as unknown as typeof IntersectionObserver;
 
-    const permMod = await import("@/hooks/usePermissions");
-    vi.spyOn(permMod, "usePermissions").mockReturnValue({
-      hasPermission: () => true,
-      level: "AccountOperator" as import("@/types/permissions").PermissionLevel,
-      groups: [],
-      loading: false,
-    });
+    await mockPermissionLevel("AccountOperator");
 
     render(<UserDetail {...makeProps()} />, { wrapper: TestProviders });
 
@@ -951,13 +922,7 @@ describe("UserDetail", () => {
   // ---------------------------------------------------------------------------
 
   it("shows multiple attribute names in pending changes bar", async () => {
-    const permMod = await import("@/hooks/usePermissions");
-    vi.spyOn(permMod, "usePermissions").mockReturnValue({
-      hasPermission: () => true,
-      level: "AccountOperator" as import("@/types/permissions").PermissionLevel,
-      groups: [],
-      loading: false,
-    });
+    await mockPermissionLevel("AccountOperator");
 
     render(<UserDetail {...makeProps()} />, { wrapper: TestProviders });
 
