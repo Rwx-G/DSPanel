@@ -1077,42 +1077,6 @@ impl LdapDirectoryProvider {
         Ok(ldap)
     }
 
-    /// Reads the current `userAccountControl` value for a user.
-    async fn get_user_account_control(&self, user_dn: &str) -> Result<u32> {
-        let dn = user_dn.to_string();
-        self.with_connection(|mut ldap| {
-            let dn = dn.clone();
-            async move {
-                let (rs, _) = ldap
-                    .search(
-                        &dn,
-                        Scope::Base,
-                        "(objectClass=*)",
-                        vec!["userAccountControl"],
-                    )
-                    .await
-                    .context("Failed to read userAccountControl")?
-                    .success()
-                    .context("userAccountControl read returned error")?;
-
-                let entry = rs
-                    .into_iter()
-                    .next()
-                    .context("User not found when reading userAccountControl")?;
-                let se = SearchEntry::construct(entry);
-                let uac_str = se
-                    .attrs
-                    .get("userAccountControl")
-                    .and_then(|v| v.first())
-                    .context("userAccountControl attribute not present")?;
-                uac_str
-                    .parse::<u32>()
-                    .context("Failed to parse userAccountControl value")
-            }
-        })
-        .await
-    }
-
     /// Performs an LDAP search and maps results to `DirectoryEntry` objects.
     ///
     /// Uses LDAP paged results control to retrieve results in pages of 500,
@@ -2037,6 +2001,41 @@ impl DirectoryProvider for LdapDirectoryProvider {
                     .get("servicePrincipalName")
                     .cloned()
                     .unwrap_or_default())
+            }
+        })
+        .await
+    }
+
+    async fn get_user_account_control(&self, user_dn: &str) -> Result<u32> {
+        let dn = user_dn.to_string();
+        self.with_connection(|mut ldap| {
+            let dn = dn.clone();
+            async move {
+                let (rs, _) = ldap
+                    .search(
+                        &dn,
+                        Scope::Base,
+                        "(objectClass=*)",
+                        vec!["userAccountControl"],
+                    )
+                    .await
+                    .context("Failed to read userAccountControl")?
+                    .success()
+                    .context("userAccountControl read returned error")?;
+
+                let entry = rs
+                    .into_iter()
+                    .next()
+                    .context("User not found when reading userAccountControl")?;
+                let se = SearchEntry::construct(entry);
+                let uac_str = se
+                    .attrs
+                    .get("userAccountControl")
+                    .and_then(|v| v.first())
+                    .context("userAccountControl attribute not present")?;
+                uac_str
+                    .parse::<u32>()
+                    .context("Failed to parse userAccountControl value")
             }
         })
         .await

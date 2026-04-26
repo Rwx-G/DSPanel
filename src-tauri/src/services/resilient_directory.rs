@@ -310,6 +310,13 @@ where
         .map_err(|e| anyhow::anyhow!(e))
     }
 
+    async fn get_user_account_control(&self, user_dn: &str) -> Result<u32> {
+        let dn = user_dn.to_string();
+        resilient_call!(self, dn, |inner, d| inner
+            .get_user_account_control(&d)
+            .await)
+    }
+
     async fn get_cannot_change_password(&self, user_dn: &str) -> Result<bool> {
         let dn = user_dn.to_string();
         resilient_call!(self, dn, |inner, d| inner

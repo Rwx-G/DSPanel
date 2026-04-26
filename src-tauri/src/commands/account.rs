@@ -438,17 +438,39 @@ pub(crate) async fn clear_password_not_required_inner(
         .check_mfa_for_action("ClearPasswordNotRequired")
         .map_err(|e| AppError::PermissionDenied(e.to_string()))?;
 
+    let provider = state.provider();
+
+    // Peek the current UAC first so an idempotent invocation skips the
+    // snapshot capture entirely (no-op-before-snapshot pattern, mirrors
+    // Story 14.5's explicit get_user_spns read phase).
+    let current_uac = match provider.get_user_account_control(user_dn).await {
+        Ok(uac) => uac,
+        Err(e) => {
+            state.audit_service.log_failure(
+                "ClearPasswordNotRequiredFailed",
+                user_dn,
+                &format!("get_user_account_control: {}", e),
+            );
+            return Err(AppError::Directory(e.to_string()));
+        }
+    };
+    if current_uac & 0x0020 == 0 {
+        // Bit already clear - no LDAP write, no snapshot, no audit entry.
+        return Ok(());
+    }
+
     capture_snapshot(state, user_dn, "ClearPasswordNotRequired").await;
 
-    let provider = state.provider();
     match provider
         .clear_user_account_control_bits(user_dn, 0x0020)
         .await
     {
         Ok((previous, new)) if previous == new => {
-            // Idempotent no-op - the bit was already clear, nothing to audit.
-            // The snapshot capture above was wasted; accepted trade-off for
-            // simpler code (no extra trait peek round-trip).
+            // Should not happen because the peek above already filtered the
+            // no-op path. Treat as success without auditing in case a
+            // concurrent operator already cleared the bit between peek and
+            // write (rare race, accepted: snapshot is already recorded for
+            // forensic traceability, no audit needed because no LDAP write).
             Ok(())
         }
         Ok((previous, new)) => {
@@ -504,19 +526,37 @@ pub(crate) async fn disable_unconstrained_delegation_inner(
         .check_mfa_for_action("DisableUnconstrainedDelegation")
         .map_err(|e| AppError::PermissionDenied(e.to_string()))?;
 
+    let provider = state.provider();
+
+    // Peek the current UAC first so an idempotent invocation skips the
+    // snapshot capture entirely (no-op-before-snapshot pattern, matches
+    // Story 14.4 and Story 14.5).
+    let current_uac = match provider.get_user_account_control(computer_dn).await {
+        Ok(uac) => uac,
+        Err(e) => {
+            state.audit_service.log_failure(
+                "DisableUnconstrainedDelegationFailed",
+                computer_dn,
+                &format!("get_user_account_control: {}", e),
+            );
+            return Err(AppError::Directory(e.to_string()));
+        }
+    };
+    if current_uac & 0x80000 == 0 {
+        // Bit already clear - no LDAP write, no snapshot, no audit entry.
+        return Ok(());
+    }
+
     capture_snapshot(state, computer_dn, "DisableUnconstrainedDelegation").await;
 
-    let provider = state.provider();
     match provider
         .clear_user_account_control_bits(computer_dn, 0x80000)
         .await
     {
         Ok((previous, new)) if previous == new => {
-            // Idempotent no-op - the bit was already clear, nothing to audit.
-            // The snapshot capture above was wasted; same accepted trade-off
-            // as Story 14.4. Story 14.5 has the no-op-before-snapshot
-            // optimization but only because its read happens explicitly in
-            // the command layer.
+            // Should not happen because the peek above already filtered the
+            // no-op path. See clear_password_not_required_inner for the race
+            // explanation.
             Ok(())
         }
         Ok((previous, new)) => {
@@ -1930,6 +1970,15 @@ mod tests {
                 .any(|e| e.action == "ClearedPasswordNotRequired"),
             "no audit entry on no-op"
         );
+
+        // No-op-before-snapshot optimization (QA-14.5-003 retro-applied):
+        // the peek detects the bit is already clear and returns early
+        // before capture_snapshot, so no snapshot is written.
+        assert_eq!(
+            state.snapshot_service.count(),
+            0,
+            "no snapshot captured on idempotent no-op"
+        );
     }
 
     #[tokio::test]
@@ -2369,6 +2418,15 @@ mod tests {
                 .iter()
                 .any(|e| e.action == "DisabledUnconstrainedDelegation"),
             "no audit entry on no-op"
+        );
+
+        // No-op-before-snapshot optimization (QA-14.5-003 retro-applied):
+        // the peek detects the bit is already clear and returns early
+        // before capture_snapshot, so no snapshot is written.
+        assert_eq!(
+            state.snapshot_service.count(),
+            0,
+            "no snapshot captured on idempotent no-op"
         );
     }
 

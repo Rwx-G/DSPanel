@@ -133,6 +133,16 @@ pub trait DirectoryProvider: Send + Sync {
         bits_to_clear: u32,
     ) -> Result<(u32, u32)>;
 
+    /// Reads the current `userAccountControl` value for a user or computer
+    /// object without writing anything back.
+    ///
+    /// Used by Stories 14.4 / 14.6 quick-fix command layers as a no-op peek
+    /// before calling `capture_snapshot` + `clear_user_account_control_bits`,
+    /// so an idempotent invocation (target bit already clear) skips the
+    /// snapshot write entirely - matching the no-op-before-snapshot pattern
+    /// Story 14.5 already has via its explicit `get_user_spns` read phase.
+    async fn get_user_account_control(&self, user_dn: &str) -> Result<u32>;
+
     /// Returns the multi-valued `servicePrincipalName` attribute on a user
     /// object as a `Vec<String>`. Returns `Ok(vec![])` when the attribute is
     /// absent.
@@ -815,6 +825,17 @@ pub mod tests {
                 new,
             ));
             Ok((previous, new))
+        }
+
+        async fn get_user_account_control(&self, user_dn: &str) -> Result<u32> {
+            self.check_failure()?;
+            Ok(self
+                .user_uac
+                .lock()
+                .unwrap()
+                .get(user_dn)
+                .copied()
+                .unwrap_or(0))
         }
 
         async fn get_user_spns(&self, user_dn: &str) -> Result<Vec<String>> {

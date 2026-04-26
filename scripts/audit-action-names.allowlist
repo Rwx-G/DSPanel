@@ -23,3 +23,13 @@ MoveObjectFailed
 # of which LDAP call broke. Read-phase log adds 'get_user_spns:' prefix
 # in the details string for forensic granularity.
 RemoveUserSpnsFailed
+
+# Story 14.4 + 14.6 (QA-14.5-003 retro-applied) - same pattern as 14.5:
+# the no-op-before-snapshot optimization splits the read (peek
+# get_user_account_control) from the write (clear_user_account_control_bits)
+# in the command layer. A failure on either side emits the same audit
+# action so SOC counts them together. Read-phase log adds
+# 'get_user_account_control:' prefix in the details for forensic
+# granularity.
+ClearPasswordNotRequiredFailed
+DisableUnconstrainedDelegationFailed
