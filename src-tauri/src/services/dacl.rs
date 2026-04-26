@@ -665,4 +665,240 @@ mod tests {
         let new_owner_off = u32::from_le_bytes([result[4], result[5], result[6], result[7]]);
         assert!(new_owner_off > owner_off);
     }
+
+    // ----------------------------------------------------------------------
+    // extract_dacl_principals - dedicated tests (QA-14.1-001)
+    //
+    // The parser is exercised end-to-end via Story 14.1's RBCD test in
+    // services/security_indicators.rs::tests, but those tests build a
+    // minimal SD with a single ACCESS_ALLOWED_ACE. The cases below cover
+    // the harder code paths in isolation: deny-ACE skip, mixed Allow + Deny,
+    // ACCESS_ALLOWED_OBJECT_ACE with the object_flags GUID-presence bits,
+    // and malformed truncation.
+    // ----------------------------------------------------------------------
+
+    /// Builds an ACCESS_ALLOWED_ACE (type 0x00) for a 4-subauth SID
+    /// `S-1-5-21-1-2-3-N` where N is the value passed in.
+    fn build_allowed_ace_for_sid(subauth_n: u32) -> Vec<u8> {
+        let sid: [u8; 24] = [
+            0x01,
+            0x04, // rev, count=4
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x05, // authority = 5 (BE)
+            0x15,
+            0x00,
+            0x00,
+            0x00, // 21
+            0x01,
+            0x00,
+            0x00,
+            0x00, // 1
+            0x02,
+            0x00,
+            0x00,
+            0x00, // 2
+            (subauth_n & 0xff) as u8,
+            ((subauth_n >> 8) & 0xff) as u8,
+            ((subauth_n >> 16) & 0xff) as u8,
+            ((subauth_n >> 24) & 0xff) as u8,
+        ];
+        let ace_size: u16 = 4 + 4 + sid.len() as u16; // header + mask + sid = 32
+        let mut ace = Vec::new();
+        ace.push(ACCESS_ALLOWED_ACE_TYPE); // 0x00
+        ace.push(0x00); // flags
+        ace.extend_from_slice(&ace_size.to_le_bytes());
+        ace.extend_from_slice(&0x00000100u32.to_le_bytes()); // mask
+        ace.extend_from_slice(&sid);
+        ace
+    }
+
+    /// Builds a deny-ACE skeleton (type 0x01 ACCESS_DENIED_ACE) for the same
+    /// SID shape. extract_dacl_principals must SKIP this ACE.
+    fn build_denied_ace_for_sid(subauth_n: u32) -> Vec<u8> {
+        let mut ace = build_allowed_ace_for_sid(subauth_n);
+        ace[0] = 0x01; // ACCESS_DENIED_ACE_TYPE - the function must skip this
+        ace
+    }
+
+    /// Wraps the supplied ACEs into a self-relative SD with a DACL.
+    fn make_sd_with_aces(aces: Vec<Vec<u8>>) -> Vec<u8> {
+        let aces_total: usize = aces.iter().map(|a| a.len()).sum();
+        let acl_size: u16 = (8 + aces_total) as u16;
+        let ace_count: u16 = aces.len() as u16;
+
+        let mut sd = Vec::new();
+        // SD header (20 bytes): rev, sbz1, control, OffsetOwner=0, OffsetGroup=0,
+        // OffsetSacl=0, OffsetDacl=20
+        sd.push(0x01);
+        sd.push(0x00);
+        sd.extend_from_slice(&0x8000u16.to_le_bytes()); // SELF_RELATIVE
+        sd.extend_from_slice(&0u32.to_le_bytes()); // OffsetOwner
+        sd.extend_from_slice(&0u32.to_le_bytes()); // OffsetGroup
+        sd.extend_from_slice(&0u32.to_le_bytes()); // OffsetSacl
+        sd.extend_from_slice(&20u32.to_le_bytes()); // OffsetDacl
+
+        // DACL header (8 bytes)
+        sd.push(0x02); // AclRevision
+        sd.push(0x00); // Sbz1
+        sd.extend_from_slice(&acl_size.to_le_bytes());
+        sd.extend_from_slice(&ace_count.to_le_bytes());
+        sd.extend_from_slice(&0u16.to_le_bytes()); // Sbz2
+
+        // ACEs back-to-back
+        for ace in aces {
+            sd.extend_from_slice(&ace);
+        }
+
+        sd
+    }
+
+    #[test]
+    fn test_extract_dacl_principals_skips_deny_aces() {
+        // DACL with one Allow ACE (sid ...1000) and one Deny ACE (sid ...1001).
+        // Only the Allow trustee must appear in the result.
+        let sd = make_sd_with_aces(vec![
+            build_allowed_ace_for_sid(1000),
+            build_denied_ace_for_sid(1001),
+        ]);
+
+        let principals = extract_dacl_principals(&sd).unwrap();
+
+        assert_eq!(principals.len(), 1, "deny ACE was not skipped");
+        assert!(principals[0].ends_with("-1000"));
+    }
+
+    #[test]
+    fn test_extract_dacl_principals_mixed_allow_and_deny_preserves_order() {
+        // Allow ...1000, Deny ...1001, Allow ...1002, Deny ...1003.
+        // Result must be [...1000, ...1002] in DACL order.
+        let sd = make_sd_with_aces(vec![
+            build_allowed_ace_for_sid(1000),
+            build_denied_ace_for_sid(1001),
+            build_allowed_ace_for_sid(1002),
+            build_denied_ace_for_sid(1003),
+        ]);
+
+        let principals = extract_dacl_principals(&sd).unwrap();
+
+        assert_eq!(principals.len(), 2);
+        assert!(principals[0].ends_with("-1000"));
+        assert!(principals[1].ends_with("-1002"));
+    }
+
+    #[test]
+    fn test_extract_dacl_principals_handles_object_ace_with_object_type_present() {
+        // ACCESS_ALLOWED_OBJECT_ACE (type 0x05) with ObjectFlags=0x01
+        // (ACE_OBJECT_TYPE_PRESENT) -> the GUID is present, so the SID
+        // sits 16 bytes further into the ACE body than the bare-allowed
+        // case. extract_dacl_principals must compute the correct offset.
+        let sid: [u8; 24] = [
+            0x01, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x05, 0x15, 0x00, 0x00, 0x00, 0x01, 0x00,
+            0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, // ...4096
+        ];
+        // ACE body: header(4) + Mask(4) + ObjectFlags(4) + ObjectType GUID(16) + SID(24) = 52
+        let ace_size: u16 = 4 + 4 + 4 + 16 + sid.len() as u16;
+        let mut ace = Vec::new();
+        ace.push(ACCESS_ALLOWED_OBJECT_ACE_TYPE); // 0x05
+        ace.push(0x00); // flags
+        ace.extend_from_slice(&ace_size.to_le_bytes());
+        ace.extend_from_slice(&0x00000100u32.to_le_bytes()); // Mask
+        ace.extend_from_slice(&0x01u32.to_le_bytes()); // ObjectFlags = ACE_OBJECT_TYPE_PRESENT
+        ace.extend_from_slice(&[0u8; 16]); // ObjectType GUID (any value)
+        ace.extend_from_slice(&sid);
+
+        let sd = make_sd_with_aces(vec![ace]);
+        let principals = extract_dacl_principals(&sd).unwrap();
+
+        assert_eq!(principals.len(), 1);
+        assert!(
+            principals[0].ends_with("-4096"),
+            "expected SID ending in -4096, got {:?}",
+            principals[0]
+        );
+    }
+
+    #[test]
+    fn test_extract_dacl_principals_handles_object_ace_with_both_guid_flags() {
+        // ObjectFlags = 0x01 | 0x02 = both GUIDs present (ObjectType +
+        // InheritedObjectType). The SID sits 32 bytes further into the
+        // ACE body than the bare-allowed case.
+        let sid: [u8; 24] = [
+            0x01, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x05, 0x15, 0x00, 0x00, 0x00, 0x01, 0x00,
+            0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x39, 0x05, 0x00, 0x00, // ...1337
+        ];
+        let ace_size: u16 = 4 + 4 + 4 + 16 + 16 + sid.len() as u16;
+        let mut ace = Vec::new();
+        ace.push(ACCESS_ALLOWED_OBJECT_ACE_TYPE);
+        ace.push(0x00);
+        ace.extend_from_slice(&ace_size.to_le_bytes());
+        ace.extend_from_slice(&0x00000100u32.to_le_bytes()); // Mask
+        ace.extend_from_slice(&0x03u32.to_le_bytes()); // ObjectFlags = both
+        ace.extend_from_slice(&[0u8; 16]); // ObjectType GUID
+        ace.extend_from_slice(&[0u8; 16]); // InheritedObjectType GUID
+        ace.extend_from_slice(&sid);
+
+        let sd = make_sd_with_aces(vec![ace]);
+        let principals = extract_dacl_principals(&sd).unwrap();
+
+        assert_eq!(principals.len(), 1);
+        assert!(principals[0].ends_with("-1337"));
+    }
+
+    #[test]
+    fn test_extract_dacl_principals_truncated_sd_returns_err() {
+        // Build a valid SD then truncate it mid-ACE. The ACL header still
+        // claims the full size, so the bounds check `acl_data_end >
+        // sd_bytes.len()` triggers and the parser returns Err. This is
+        // the correct defensive behavior: a corrupted SD should error
+        // out, not silently return partial data that an audit consumer
+        // might trust.
+        let sd_full = make_sd_with_aces(vec![
+            build_allowed_ace_for_sid(1000),
+            build_allowed_ace_for_sid(2000),
+        ]);
+        let truncated = &sd_full[..sd_full.len() - 8];
+
+        let result = extract_dacl_principals(truncated);
+        assert!(result.is_err(), "truncated SD should return Err");
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("beyond security descriptor bounds"),
+            "expected bounds error, got: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn test_extract_dacl_principals_dedupes_identical_sids() {
+        // Two ACCESS_ALLOWED_ACEs targeting the same SID should appear
+        // only once in the result (the function dedupes on SID string).
+        let sd = make_sd_with_aces(vec![
+            build_allowed_ace_for_sid(1000),
+            build_allowed_ace_for_sid(1000),
+        ]);
+
+        let principals = extract_dacl_principals(&sd).unwrap();
+
+        assert_eq!(principals.len(), 1, "duplicate SID was not deduplicated");
+    }
+
+    #[test]
+    fn test_extract_dacl_principals_skips_audit_ace() {
+        // SYSTEM_AUDIT_ACE (type 0x02) is neither Allow nor Deny - the
+        // parser hits the `_` arm and skips it without crashing. Combined
+        // with one Allow ACE to confirm only the Allow trustee is
+        // returned.
+        let mut audit_ace = build_allowed_ace_for_sid(9999);
+        audit_ace[0] = 0x02; // SYSTEM_AUDIT_ACE_TYPE
+
+        let sd = make_sd_with_aces(vec![build_allowed_ace_for_sid(1000), audit_ace]);
+        let principals = extract_dacl_principals(&sd).unwrap();
+
+        assert_eq!(principals.len(), 1);
+        assert!(principals[0].ends_with("-1000"));
+    }
 }
