@@ -564,11 +564,7 @@ mod tests {
 
     #[test]
     fn computer_unconstrained_dominates_constrained_severity() {
-        let r = evaluate_computer_indicators(&computer(
-            0x80000,
-            &["http/web1.corp.local"],
-            None,
-        ));
+        let r = evaluate_computer_indicators(&computer(0x80000, &["http/web1.corp.local"], None));
         assert_eq!(r.indicators.len(), 2);
         assert_eq!(r.highest_severity, HealthLevel::Critical);
     }
