@@ -33,7 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- GSSAPI bind would fail with `SEC_E_TARGET_UNKNOWN` (`unknown_principal`) on AD domains with three or more DNS labels (e.g. `INFORMADIS.LECLERC.DMI`). `resolve_dc_fqdn_for_gssapi` previously short-circuited the DNS SRV lookup whenever `host` had more than two dots, treating multi-level domain names as if they were already DC FQDNs. The check is removed; `_ldap._tcp.<host>` is now always queried first, with the existing `LOGONSERVER`-based fallback retained for environments where SRV is blocked. The fallback path is extracted into a pure helper so it can be unit-tested.
+- GSSAPI bind would fail with `SEC_E_TARGET_UNKNOWN` (`unknown_principal`) on AD domains with three or more DNS labels (e.g. `subsite.corp.example`). `resolve_dc_fqdn_for_gssapi` previously short-circuited the DNS SRV lookup whenever `host` had more than two dots, treating multi-level domain names as if they were already DC FQDNs. The check is removed; `_ldap._tcp.<host>` is now always queried first, with the existing `LOGONSERVER`-based fallback retained for environments where SRV is blocked. The fallback path is extracted into a pure helper so it can be unit-tested.
 - Application logs were being written to whatever directory the app happened to be launched from (commonly `Downloads/` after install, since Windows shortcuts inherit the launcher's working directory). `init_logging` now resolves an OS-standard absolute path via `default_log_dir()` - `%LOCALAPPDATA%\DSPanel\logs` on Windows, `~/Library/Logs/DSPanel` on macOS, `$XDG_STATE_HOME/DSPanel/logs` (or `~/.local/state/DSPanel/logs`) on Linux - and prints the resolved path to stderr at startup.
 
 ## [1.0.3] - 2026-04-23

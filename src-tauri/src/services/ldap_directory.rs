@@ -70,8 +70,8 @@ async fn resolve_dc_fqdn_for_gssapi(host: &str) -> String {
 }
 
 /// Builds a DC FQDN by combining the NetBIOS name from `LOGONSERVER`
-/// (e.g. `\\AD2-INFORMADIS`) with `host` as the DNS suffix
-/// (e.g. `INFORMADIS.LECLERC.DMI`), yielding `AD2-INFORMADIS.INFORMADIS.LECLERC.DMI`.
+/// (e.g. `\\AD2-SUBSITE`) with `host` as the DNS suffix
+/// (e.g. `subsite.corp.example`), yielding `AD2-SUBSITE.subsite.corp.example`.
 ///
 /// Returns None if either input is empty after trimming, or if `host` is
 /// already FQDN-shaped *and* starts with the LOGONSERVER NetBIOS name (in
@@ -4430,14 +4430,14 @@ mod tests {
 
     #[test]
     fn test_fqdn_from_logonserver_three_level_domain() {
-        // The bug that motivated this: INFORMADIS.LECLERC.DMI is the AD
-        // domain, AD2-INFORMADIS is the DC NetBIOS name. The SPN must point
-        // at the DC's own FQDN, not the bare domain.
-        let fqdn = fqdn_from_logonserver("INFORMADIS.LECLERC.DMI", "\\\\AD2-INFORMADIS");
-        assert_eq!(
-            fqdn.as_deref(),
-            Some("AD2-INFORMADIS.INFORMADIS.LECLERC.DMI")
-        );
+        // The bug that motivated this: a three-label AD domain
+        // (e.g. `subsite.corp.example`) combined with a DC NetBIOS name
+        // (e.g. `AD2-SUBSITE`). The SPN must point at the DC's own FQDN,
+        // not the bare domain - older code short-circuited the SRV lookup
+        // when `host` had more than two dots, treating multi-level domain
+        // names as if they were already DC FQDNs.
+        let fqdn = fqdn_from_logonserver("subsite.corp.example", "\\\\AD2-SUBSITE");
+        assert_eq!(fqdn.as_deref(), Some("AD2-SUBSITE.subsite.corp.example"));
     }
 
     #[test]
