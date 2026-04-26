@@ -1,0 +1,220 @@
+schema: 1
+story: "14.5"
+story_title: "Quick-Fix - Remove Unused SPN"
+gate: PASS
+status_reason: "Second WRITE operation in Epic 14. All 10 ACs met. Defense in depth realized at 5 gates (canEdit + require_fresh_permission + useMfaGate + mfa_service.check_mfa_for_action + system-SPN policy filter on BOTH client + server). Cross-language Rust↔TS guard parity verified by 19+21 verbatim-port tests. Multi-valued attribute write goes through Mod::Replace(attr, HashSet) - no Mod::Delete case-folding pitfall. Audit chain integrity preserved via sorted-alphabetical details. All 10 PO-flagged residual risks verified OK. 67/67 new tests pass; full backend 1666/1666, full frontend 2185/2185; clippy/fmt/lint/tsc all clean."
+reviewer: "Quinn (Test Architect)"
+updated: "2026-04-26T00:00:00Z"
+
+top_issues:
+  - id: "QA-14.5-001"
+    severity: low
+    finding: "Audit failure path only logs log_failure when modify_attribute returns Err. If get_user_spns (the read) fails earlier, the function returns AppError::Directory but does NOT call log_failure first. Story 14.4 has the same gap on its own read path."
+    suggested_action: "Optional - extend the audit-failure path to log_failure on get_user_spns error too, so transient AD outages are visible in the audit trail. Track as a future audit-completeness pass spanning all quick-fix commands."
+    blocking: false
+    suggested_owner: dev
+  - id: "QA-14.5-002"
+    severity: low
+    finding: "SYSTEM_SPN_PREFIXES is duplicated across src-tauri/src/services/spn.rs and src/utils/spn.ts with explicit 'Keep in sync' warning comments. Currently relies on verbatim-port test suites as a tripwire (19 Rust + 21 TS tests would fail loudly if the lists drift). No build-time enforcement."
+    suggested_action: "Optional - add a CI check that diffs the two lists. Low priority: the verbatim-port tests are an effective tripwire and the 12-prefix list is small."
+    blocking: false
+    suggested_owner: dev
+  - id: "QA-14.5-003"
+    severity: low
+    finding: "Story 14.5 introduces a no-op-before-snapshot optimization (skips capture_snapshot when no state change is going to happen). Story 14.4 always captures the snapshot on no-op paths."
+    suggested_action: "Optional - retro-apply the same pattern to Story 14.4's clear_password_not_required_inner. Saves one get_all_attributes LDAP call per operator double-click. Worth doing once Story 14.6 lands and shares the same trade-off."
+    blocking: false
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 95
+
+expires: "2026-05-26T00:00:00Z"
+
+evidence:
+  tests_reviewed: 67
+  risks_identified: 10
+  trace:
+    ac_covered:
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+      - 6
+      - 7
+      - 8
+      - 9
+      - 10
+    ac_uncovered: []
+    ac_to_test_map:
+      "AC1":
+        code:
+          - "src/pages/UserDetail.tsx Manage SPNs button gated by `indicator.kind === 'Kerberoastable' && canEdit`"
+          - "src/pages/UserDetail.tsx:125 canEdit = hasPermission('AccountOperator')"
+        tests:
+          - "renders the Manage SPNs button next to the Kerberoastable badge for AccountOperator+"
+          - "does not render the Manage SPNs button next to other indicator kinds"
+      "AC2":
+        code:
+          - "src/components/dialogs/ManageSpnsDialog.tsx renders both removable + system sections via useMemo"
+          - "src/locales/en/userDetail.json removeUserSpns body explains Kerberoasting + servicePrincipalName"
+        tests:
+          - "renders the dialog with title and display name"
+          - "body explains Kerberoasting and references servicePrincipalName"
+          - "groups SPNs into removable and system sections"
+          - "system SPN row has the system-spn tooltip"
+      "AC3":
+        code:
+          - "src/components/dialogs/ManageSpnsDialog.tsx:36 const { checkMfa } = useMfaGate()"
+          - "src/components/dialogs/ManageSpnsDialog.tsx:70 await checkMfa('RemoveUserSpns'); if (!mfaAllowed) return"
+        tests:
+          - "does not call remove_user_spns when MFA is denied"
+      "AC4":
+        code:
+          - "src-tauri/src/commands/account.rs #[tauri::command] pub async fn remove_user_spns"
+          - "src-tauri/src/lib.rs commands::remove_user_spns registered in invoke_handler"
+        tests:
+          - "all 9 command-level tests transitively exercise the wrapper via the inner function"
+      "AC5":
+        code:
+          - "src-tauri/src/commands/account.rs:511-514 reads via provider.get_user_spns(user_dn)"
+          - "src-tauri/src/commands/account.rs:560-562 writes via provider.modify_attribute(user_dn, 'servicePrincipalName', &new_set)"
+          - "src-tauri/src/services/ldap_directory.rs:2738-2763 modify_attribute uses Mod::Replace(attr_name, HashSet<String>)"
+        notes: "Empty Vec → empty HashSet → AD attribute deletion (correct multi-valued semantics, avoids Mod::Delete case-folding pitfall)"
+        tests:
+          - "test_remove_user_spns_succeeds_for_account_operator_single_removal (writes filtered set)"
+          - "test_remove_user_spns_all_removed_writes_empty_set (empty Vec correctly forwarded)"
+      "AC6":
+        code:
+          - "src-tauri/src/commands/account.rs:540-545 explicit removed_sorted.sort(), kept_sorted.sort(), blocked_sorted.sort() BEFORE formatting"
+          - "src-tauri/src/commands/account.rs:565-573 log_success with sorted lists in details string"
+        tests:
+          - "test_remove_user_spns_audit_details_sorted (passes input in non-alphabetic order, asserts sorted output)"
+      "AC7":
+        code:
+          - "src/pages/UserDetail.tsx onSuccess fires notify + handleRefresh when result.removed.length > 0"
+          - "handleRefresh = onRefresh ?? noop; UserLookup.refreshSelectedUser re-fetches user attributes + re-evaluates indicators"
+        tests:
+          - "opens the ManageSpnsDialog with the user's current SPNs when the button is clicked (verifies the click → dialog → SPN-list rendering flow)"
+      "AC8":
+        code:
+          - "src-tauri/src/commands/account.rs:503 require_fresh_permission(state, AccountOperator, 'Remove user SPNs')"
+          - "src-tauri/src/commands/account.rs:14-50 require_fresh_permission helper - same as Story 14.4"
+        tests:
+          - "test_remove_user_spns_requires_account_operator (ReadOnly + HelpDesk both denied)"
+      "AC9":
+        code:
+          - "src-tauri/src/commands/account.rs:522-530 system-SPN filter splits into approved / blocked_system"
+          - "src-tauri/src/services/spn.rs is_system_spn (Rust authoritative guard)"
+          - "src/utils/spn.ts isSystemSpn (TS UI guard - mirrors Rust verbatim)"
+        notes: "Defense in depth: UI hides system SPNs from selectable list, backend filters them server-side. Forged IPC bypass attack rejected by the policy filter regardless of UI state."
+        tests:
+          - "test_remove_user_spns_blocks_system_spns (mix of user + system in same call)"
+          - "test_remove_user_spns_all_system_no_op (all-system blocked → no LDAP write)"
+          - "19 spn.rs tests + 21 spn.ts verbatim-port tests (cross-language parity)"
+      "AC10":
+        code:
+          - "src-tauri/src/services/spn.rs::tests (19 unit tests)"
+          - "src-tauri/src/services/directory.rs::tests get_user_spns (3 trait-level tests)"
+          - "src-tauri/src/commands/account.rs::tests remove_user_spns (9 command-level tests)"
+        tests:
+          - "host_is_system + 11 other prefix-classification tests"
+          - "host_substring_in_user_prefix_is_not_system (substring false-positive guard)"
+          - "no_slash_with_system_prefix_is_system (conservative-bias)"
+          - "test_get_user_spns_returns_empty_for_unknown_dn"
+          - "test_get_user_spns_returns_set_values"
+          - "test_get_user_spns_propagates_failure_flag"
+          - "test_remove_user_spns_requires_account_operator"
+          - "test_remove_user_spns_succeeds_for_account_operator_single_removal"
+          - "test_remove_user_spns_blocks_system_spns"
+          - "test_remove_user_spns_idempotent_when_spn_not_present"
+          - "test_remove_user_spns_all_system_no_op"
+          - "test_remove_user_spns_all_removed_writes_empty_set"
+          - "test_remove_user_spns_captures_snapshot_before_write"
+          - "test_remove_user_spns_audit_on_directory_failure"
+          - "test_remove_user_spns_audit_details_sorted"
+
+residual_risks:
+  - id: "R1"
+    label: "System-SPN guard parity Rust↔TS"
+    status: VERIFIED_OK
+    notes: "Both files: SAME 12 prefixes in SAME order with SAME case. Both implementations: case-insensitive prefix-equality (NOT substring), same conservative-bias on no-slash inputs. 19 Rust + 21 TS verbatim-port tests cover identical inputs producing identical results. 'Keep in sync' warning comments in both files."
+  - id: "R2"
+    label: "Multi-valued attribute write semantics (Mod::Replace not Mod::Delete)"
+    status: VERIFIED_OK
+    notes: "ldap_directory.rs:2738-2763 modify_attribute uses Mod::Replace(attr_name, HashSet<String>) - exactly the prescribed pattern. Mod::Delete is not used (avoids the case-folding gotcha the story Dev Notes warned about)."
+  - id: "R3"
+    label: "Empty-after-removal (Mod::Replace with empty HashSet → AD attribute deletion)"
+    status: VERIFIED_OK
+    notes: "account.rs passes the new Vec<String> (which can be empty) to modify_attribute. ldap_directory.rs:2746 collects into a HashSet (empty Vec → empty HashSet). Test test_remove_user_spns_all_removed_writes_empty_set verifies the empty Vec is forwarded correctly to modify_attribute_calls."
+  - id: "R4"
+    label: "System-SPN bypass attack via forged IPC"
+    status: VERIFIED_OK
+    notes: "The system-SPN filter at account.rs:522-530 runs UNCONDITIONALLY - it does NOT depend on what the frontend filtered. A forged IPC call passing system SPNs lands in blocked_system, NOT in the LDAP write. Test test_remove_user_spns_blocks_system_spns verifies with mixed user + system input."
+  - id: "R5"
+    label: "Idempotent no-op when SPN not in current set"
+    status: VERIFIED_OK
+    notes: "account.rs:525-527 only adds to approved if current_set.contains(spn). account.rs:547-556 returns early when new_set.len() == current.len() WITHOUT capture_snapshot or audit. Test test_remove_user_spns_idempotent_when_spn_not_present verifies no LDAP write, no audit entry."
+  - id: "R6"
+    label: "All-system-blocked no-op"
+    status: VERIFIED_OK
+    notes: "When all requested SPNs are system-flagged, approved is empty → new_set == current → idempotent no-op path returns early. Test test_remove_user_spns_all_system_no_op verifies no LDAP write, no audit entry, no snapshot."
+  - id: "R7"
+    label: "Audit chain hash determinism (sorted-alphabetical lists)"
+    status: VERIFIED_OK
+    notes: "account.rs:540-545 explicit removed_sorted.sort(), kept_sorted.sort(), blocked_sorted.sort() before formatting. Test test_remove_user_spns_audit_details_sorted passes inputs in non-alphabetic order and asserts sorted output. SHA-256 chain hash is deterministic regardless of input order."
+  - id: "R8"
+    label: "Permission re-detection (stale cache demotion attack)"
+    status: VERIFIED_OK
+    notes: "Same require_fresh_permission helper as Story 14.4. Re-detects permissions before each invocation; preserves cached level only on transient AD failures. Denial path runs against actual current level - demotion correctly blocks the call."
+  - id: "R9"
+    label: "i18next plural variants in 5 languages"
+    status: VERIFIED_OK
+    notes: "userDetail.json (5 languages) all contain successNotification_one and successNotification_other. Translation completeness suite (176 tests) enforces parity. {{count}} and {{name}} interpolation preserved across all languages."
+  - id: "R10"
+    label: "No unwrap() outside tests"
+    status: VERIFIED_OK
+    notes: "Grep on src-tauri/src/services/spn.rs returned zero unwrap() calls. Grep on production parts of src-tauri/src/commands/account.rs returned zero unwrap() calls (only test code at lines 1023+ uses unwrap). Dialog component uses optional chaining + ?? defaults instead of unwrap. No innerHTML or dangerouslySetInnerHTML in dialog (XSS surface = zero)."
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Defense in depth at 5 gates (canEdit + require_fresh_permission + useMfaGate + mfa_service.check_mfa_for_action + system-SPN policy filter on BOTH sides). Forged IPC bypass attack rejected. Audit chain captured every state change with SHA-256 hash chain integrity. Cross-language parity ensures UX guard cannot drift from security guard. Sorted-alphabetical audit details produce deterministic chain hash. No unwrap() outside tests, no innerHTML."
+  performance:
+    status: PASS
+    notes: "Per-fix cost: 4 LDAP round trips (permission re-detection + snapshot + SPN read + SPN write). BETTER than Story 14.4: no-op path skips both snapshot AND write (3 calls saved on no-op vs 14.4). get_user_spns is a Base-scope search asking for one attribute (<10ms). modify_attribute is a single Mod::Replace."
+  reliability:
+    status: PASS
+    notes: "ResilientDirectoryProvider wrapping inherits retry/timeout/circuit-breaker for both new read and existing write. Idempotent no-op handles double-clicks + race conditions. All-system-blocked no-op also handled. Empty-after-removal correctly maps to attribute deletion. Snapshot before write enables rollback. log_failure on directory error."
+  maintainability:
+    status: PASS
+    notes: "Generic trait method get_user_spns reusable. Mirrors Story 14.4 patterns - team familiarity. Cross-language sync warning comments. Discriminated union state machine extensible for Story 14.6. All public types documented. 67 new tests provide regression safety."
+  accessibility:
+    status: PASS
+    notes: "Manage SPNs button has explicit aria-label via i18n. Dialog uses ariaLabel via DialogShell. Each removable checkbox has aria-label set to the SPN string. System-SPN rows have title tooltip. Confirm button disabled state prevents accidental empty-selection submit. Cancel button respects loading state."
+
+recommendations:
+  immediate: []
+  future:
+    - "Optional: extend the audit-failure path in remove_user_spns_inner to log_failure on get_user_spns error too. Story 14.4 has the same gap. Track as a future audit-completeness pass spanning all quick-fix commands."
+    - "Optional: add a CI check that diffs the Rust SYSTEM_SPN_PREFIXES list against the TS SYSTEM_SPN_PREFIXES list. Currently relies on the verbatim-port tests as a tripwire."
+    - "Optional: retro-apply Story 14.5's no-op-before-snapshot pattern to Story 14.4's clear_password_not_required_inner. Saves one get_all_attributes LDAP call per operator double-click. Worth doing once Story 14.6 lands."
+
+test_summary:
+  new_tests_in_story: 67
+  test_files_touched:
+    - "src-tauri/src/services/spn.rs (new, 19 tests)"
+    - "src-tauri/src/services/directory.rs (+3 trait-level tests for get_user_spns)"
+    - "src-tauri/src/commands/account.rs (+9 command-level tests for remove_user_spns)"
+    - "src/utils/spn.ts (new) + src/utils/spn.test.ts (new, 21 verbatim-port tests)"
+    - "src/components/dialogs/ManageSpnsDialog.test.tsx (new, 12 tests)"
+    - "src/pages/UserDetail.test.tsx (+3 tests, total 69)"
+  full_backend_suite: "1666 passed, 0 failures, 2 ignored (pre-existing). +31 new vs pre-story baseline."
+  full_frontend_suite: "2185 passed (142 files), 0 failures, 0 new ignored. +36 new vs pre-story baseline."
+  translation_completeness_suite: "176 tests across en/fr/de/it/es - green (i18next plural variants successNotification_one and successNotification_other present in all languages, all interpolation vars preserved)"
+  lint: "clean (eslint exit 0, cargo clippy --features gssapi --all-targets -- -D warnings exit 0)"
+  fmt: "clean (cargo fmt --check exit 0)"
+  tsc: "clean (no diagnostics)"
