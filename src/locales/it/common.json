@@ -114,5 +114,8 @@
   "noData": "Nessun dato disponibile",
   "result_one": "{{count}} risultato",
   "result_other": "{{count}} risultati",
-  "present": "Presente"
+  "present": "Presente",
+  "truncatedTitle": "Risultati parziali",
+  "truncatedDetail": "La directory ha restituito più voci di quante possano essere recuperate in una singola richiesta. Affina il filtro per visualizzare le voci mancanti.",
+  "truncatedDetailWithCount": "Visualizzazione delle prime {{shown}} voci restituite dalla directory. Affina il filtro per visualizzare le voci mancanti."
 }

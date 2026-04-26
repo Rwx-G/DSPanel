@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { SearchBar } from "@/components/common/SearchBar";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { EmptyState } from "@/components/common/EmptyState";
+import { TruncatedBanner } from "@/components/common/TruncatedBanner";
 import { VirtualizedList } from "@/components/data/VirtualizedList";
 import {
   PropertyGrid,
@@ -56,6 +57,7 @@ export function ContactLookup() {
     loadingMore,
     error,
     hasMore,
+    truncated,
     filterText,
     setFilterText,
     loadMore,
@@ -240,6 +242,12 @@ export function ContactLookup() {
         {!loading && contacts.length === 0 && !error && t("noContactsFound")}
         {error && `${t("common:error")}: ${error}`}
       </div>
+
+      {truncated && (
+        <div className="px-3 pt-2">
+          <TruncatedBanner truncated={truncated} />
+        </div>
+      )}
 
       <div className="flex flex-1 overflow-hidden">
         {loading && (

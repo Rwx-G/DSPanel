@@ -114,5 +114,8 @@
   "noData": "Keine Daten verfügbar",
   "result_one": "{{count}} Ergebnis",
   "result_other": "{{count}} Ergebnisse",
-  "present": "Vorhanden"
+  "present": "Vorhanden",
+  "truncatedTitle": "Teilergebnisse",
+  "truncatedDetail": "Das Verzeichnis hat mehr Einträge zurückgegeben, als in einer Anfrage abgerufen werden können. Verfeinern Sie Ihren Filter, um die fehlenden Elemente zu sehen.",
+  "truncatedDetailWithCount": "Es werden die ersten {{shown}} vom Verzeichnis zurückgegebenen Einträge angezeigt. Verfeinern Sie Ihren Filter, um die fehlenden Elemente zu sehen."
 }

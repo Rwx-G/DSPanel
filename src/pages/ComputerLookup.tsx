@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo } from "react";
 import { SearchBar } from "@/components/common/SearchBar";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { EmptyState } from "@/components/common/EmptyState";
+import { TruncatedBanner } from "@/components/common/TruncatedBanner";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { VirtualizedList } from "@/components/data/VirtualizedList";
 import {
@@ -43,6 +44,7 @@ export function ComputerLookup() {
     loadingMore,
     error,
     hasMore,
+    truncated,
     filterText,
     setFilterText,
     loadMore,
@@ -230,6 +232,12 @@ export function ComputerLookup() {
         {!loading && filteredComputers.length === 0 && !error && t("noComputersFound")}
         {error && `${t("common:error")}: ${error}`}
       </div>
+
+      {truncated && (
+        <div className="px-3 pt-2">
+          <TruncatedBanner truncated={truncated} />
+        </div>
+      )}
 
       <div className="flex flex-1 overflow-hidden">
         {loading && (

@@ -114,5 +114,8 @@
   "noData": "No data available",
   "result_one": "{{count}} result",
   "result_other": "{{count}} results",
-  "present": "Present"
+  "present": "Present",
+  "truncatedTitle": "Partial results",
+  "truncatedDetail": "The directory returned more entries than could be retrieved in one request. Refine your filter to see the missing items.",
+  "truncatedDetailWithCount": "Showing the first {{shown}} entries returned by the directory. Refine your filter to see the missing items."
 }
