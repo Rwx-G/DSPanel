@@ -35,3 +35,4 @@ export { default as bulkOperations } from "./bulkOperations.json";
 export { default as presetManagement } from "./presetManagement.json";
 export { default as dialogs } from "./dialogs.json";
 export { default as components } from "./components.json";
+export { default as securityIndicators } from "./securityIndicators.json";

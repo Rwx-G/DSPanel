@@ -1,0 +1,27 @@
+{
+  "Kerberoastable": {
+    "badge": "Kerberoastable",
+    "tooltip": "Ce compte expose un Service Principal Name. N'importe quel utilisateur authentifie peut demander un ticket de service pour ce compte et casser son mot de passe hors ligne. (attribut servicePrincipalName)"
+  },
+  "PasswordNotRequired": {
+    "badge": "Mot de passe non requis",
+    "tooltip": "Ce compte peut avoir un mot de passe vide. Un attaquant qui connait le nom d'utilisateur peut s'authentifier sans aucun identifiant. (bit userAccountControl PASSWD_NOTREQD 0x0020)"
+  },
+  "PasswordNeverExpires": {
+    "badge": "Mot de passe permanent",
+    "tooltip": "Le mot de passe de ce compte n'expire jamais. Les identifiants a longue duree de vie ont plus de valeur pour un attaquant et contournent la politique de rotation. (bit userAccountControl DONT_EXPIRE_PASSWORD 0x10000)"
+  },
+  "ReversibleEncryption": {
+    "badge": "Chiffrement reversible",
+    "tooltip": "Le mot de passe de ce compte est stocke sous une forme equivalente au clair. Toute personne pouvant lire la base AD recupere le mot de passe. (bit userAccountControl ENCRYPTED_TEXT_PWD_ALLOWED 0x0080)"
+  },
+  "AsRepRoastable": {
+    "badge": "AS-REP roastable",
+    "tooltip": "La pre-authentification Kerberos est desactivee pour ce compte. Un attaquant non authentifie peut demander un AS-REP et casser le mot de passe hors ligne. (bit userAccountControl DONT_REQUIRE_PREAUTH 0x400000)"
+  },
+  "dot": {
+    "ariaLabel": "Indicateurs de securite : {{count}}",
+    "popoverHeader": "Indicateurs de securite",
+    "noIndicators": "Aucun indicateur de securite detecte"
+  }
+}

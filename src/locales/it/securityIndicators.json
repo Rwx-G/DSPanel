@@ -1,0 +1,27 @@
+{
+  "Kerberoastable": {
+    "badge": "Kerberoastable",
+    "tooltip": "Questo account espone un Service Principal Name. Qualunque utente autenticato puo richiedere un ticket di servizio e violare la password offline. (attributo servicePrincipalName)"
+  },
+  "PasswordNotRequired": {
+    "badge": "Password non richiesta",
+    "tooltip": "L'account puo avere una password vuota. Un attaccante che conosce il nome utente puo autenticarsi senza credenziali. (bit userAccountControl PASSWD_NOTREQD 0x0020)"
+  },
+  "PasswordNeverExpires": {
+    "badge": "Password senza scadenza",
+    "tooltip": "La password di questo account non scade mai. Le credenziali di lunga durata sono piu preziose per gli attaccanti e aggirano la policy di rotazione. (bit userAccountControl DONT_EXPIRE_PASSWORD 0x10000)"
+  },
+  "ReversibleEncryption": {
+    "badge": "Cifratura reversibile",
+    "tooltip": "La password di questo account e memorizzata in una forma equivalente al testo in chiaro. Chiunque possa leggere il database della directory recupera la password. (bit userAccountControl ENCRYPTED_TEXT_PWD_ALLOWED 0x0080)"
+  },
+  "AsRepRoastable": {
+    "badge": "AS-REP roastable",
+    "tooltip": "La pre-autenticazione Kerberos e disabilitata per questo account. Un attaccante non autenticato puo richiedere un AS-REP e violare la password offline. (bit userAccountControl DONT_REQUIRE_PREAUTH 0x400000)"
+  },
+  "dot": {
+    "ariaLabel": "Indicatori di sicurezza: {{count}}",
+    "popoverHeader": "Indicatori di sicurezza",
+    "noIndicators": "Nessun indicatore di sicurezza rilevato"
+  }
+}

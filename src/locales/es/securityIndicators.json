@@ -1,0 +1,27 @@
+{
+  "Kerberoastable": {
+    "badge": "Kerberoastable",
+    "tooltip": "Esta cuenta expone un Service Principal Name. Cualquier usuario autenticado puede solicitar un ticket de servicio y descifrar la contrasena de la cuenta sin conexion. (atributo servicePrincipalName)"
+  },
+  "PasswordNotRequired": {
+    "badge": "Contrasena no requerida",
+    "tooltip": "La cuenta puede tener una contrasena vacia. Un atacante que conozca el nombre de usuario puede autenticarse sin ninguna credencial. (bit userAccountControl PASSWD_NOTREQD 0x0020)"
+  },
+  "PasswordNeverExpires": {
+    "badge": "Contrasena sin caducidad",
+    "tooltip": "La contrasena de esta cuenta nunca caduca. Las credenciales de larga duracion son mas valiosas para los atacantes y eluden su politica de rotacion. (bit userAccountControl DONT_EXPIRE_PASSWORD 0x10000)"
+  },
+  "ReversibleEncryption": {
+    "badge": "Cifrado reversible",
+    "tooltip": "La contrasena de esta cuenta se almacena en una forma equivalente al texto plano. Cualquiera que pueda leer la base de datos del directorio recupera la contrasena. (bit userAccountControl ENCRYPTED_TEXT_PWD_ALLOWED 0x0080)"
+  },
+  "AsRepRoastable": {
+    "badge": "AS-REP roastable",
+    "tooltip": "La preautenticacion Kerberos esta deshabilitada para esta cuenta. Un atacante no autenticado puede solicitar un AS-REP y descifrar la contrasena sin conexion. (bit userAccountControl DONT_REQUIRE_PREAUTH 0x400000)"
+  },
+  "dot": {
+    "ariaLabel": "Indicadores de seguridad: {{count}}",
+    "popoverHeader": "Indicadores de seguridad",
+    "noIndicators": "No se detectaron indicadores de seguridad"
+  }
+}

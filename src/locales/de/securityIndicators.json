@@ -1,0 +1,27 @@
+{
+  "Kerberoastable": {
+    "badge": "Kerberoastable",
+    "tooltip": "Dieses Konto besitzt einen Service Principal Name. Jeder authentifizierte Benutzer kann ein Diensteticket dafur anfordern und das Kennwort offline knacken. (Attribut servicePrincipalName)"
+  },
+  "PasswordNotRequired": {
+    "badge": "Kennwort nicht erforderlich",
+    "tooltip": "Das Konto darf ein leeres Kennwort haben. Ein Angreifer, der den Benutzernamen kennt, kann sich ohne Anmeldedaten anmelden. (userAccountControl-Bit PASSWD_NOTREQD 0x0020)"
+  },
+  "PasswordNeverExpires": {
+    "badge": "Kennwort lauft nie ab",
+    "tooltip": "Das Kennwort dieses Kontos lauft nie ab. Langlebige Anmeldedaten sind wertvoller fur Angreifer und umgehen Ihre Kennwortrotationsrichtlinie. (userAccountControl-Bit DONT_EXPIRE_PASSWORD 0x10000)"
+  },
+  "ReversibleEncryption": {
+    "badge": "Reversible Verschlusselung",
+    "tooltip": "Das Kennwort dieses Kontos wird in einer Form gespeichert, die dem Klartext entspricht. Wer die Verzeichnisdatenbank lesen kann, kann das Kennwort wiederherstellen. (userAccountControl-Bit ENCRYPTED_TEXT_PWD_ALLOWED 0x0080)"
+  },
+  "AsRepRoastable": {
+    "badge": "AS-REP-roastable",
+    "tooltip": "Die Kerberos-Vorauthentifizierung ist fur dieses Konto deaktiviert. Ein nicht authentifizierter Angreifer kann eine AS-REP anfordern und das Kennwort offline knacken. (userAccountControl-Bit DONT_REQUIRE_PREAUTH 0x400000)"
+  },
+  "dot": {
+    "ariaLabel": "Sicherheitsindikatoren: {{count}}",
+    "popoverHeader": "Sicherheitsindikatoren",
+    "noIndicators": "Keine Sicherheitsindikatoren erkannt"
+  }
+}
