@@ -427,4 +427,194 @@ describe("ComputerDetail", () => {
       expect(screen.queryByTestId("computer-delete-btn")).not.toBeInTheDocument();
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // Story 14.3 - Security indicator badges
+  // ---------------------------------------------------------------------------
+
+  describe("Security indicator badges (Story 14.3)", () => {
+    it("renders no badges when securityIndicators prop is undefined", () => {
+      render(<ComputerDetail computer={makeComputer()} />);
+      expect(
+        screen.queryByTestId(/^computer-security-indicator-badge-/),
+      ).not.toBeInTheDocument();
+    });
+
+    it("renders no badges when the indicator list is empty", () => {
+      render(
+        <ComputerDetail
+          computer={makeComputer()}
+          securityIndicators={{ indicators: [], highestSeverity: "Healthy" }}
+        />,
+      );
+      expect(
+        screen.queryByTestId(/^computer-security-indicator-badge-/),
+      ).not.toBeInTheDocument();
+    });
+
+    it("renders UnconstrainedDelegation badge as Critical (error variant)", () => {
+      render(
+        <ComputerDetail
+          computer={makeComputer()}
+          securityIndicators={{
+            indicators: [
+              {
+                kind: "UnconstrainedDelegation",
+                severity: "Critical",
+                descriptionKey: "securityIndicators.UnconstrainedDelegation",
+              },
+            ],
+            highestSeverity: "Critical",
+          }}
+        />,
+      );
+      const badge = screen.getByTestId(
+        "computer-security-indicator-badge-UnconstrainedDelegation",
+      );
+      expect(badge).toBeInTheDocument();
+      expect(badge.querySelector('[data-testid="status-badge"]')).toHaveAttribute(
+        "data-variant",
+        "error",
+      );
+      const title = badge.getAttribute("title") ?? "";
+      expect(title).toContain("TRUSTED_FOR_DELEGATION");
+    });
+
+    it("renders ConstrainedDelegation badge as Warning with target SPNs in tooltip", () => {
+      render(
+        <ComputerDetail
+          computer={makeComputer()}
+          securityIndicators={{
+            indicators: [
+              {
+                kind: "ConstrainedDelegation",
+                severity: "Warning",
+                descriptionKey: "securityIndicators.ConstrainedDelegation",
+                metadata: {
+                  target_spns: [
+                    "http/web1.corp.local",
+                    "http/web2.corp.local",
+                  ],
+                },
+              },
+            ],
+            highestSeverity: "Warning",
+          }}
+        />,
+      );
+      const badge = screen.getByTestId(
+        "computer-security-indicator-badge-ConstrainedDelegation",
+      );
+      expect(badge.querySelector('[data-testid="status-badge"]')).toHaveAttribute(
+        "data-variant",
+        "warning",
+      );
+      const title = badge.getAttribute("title") ?? "";
+      expect(title).toContain("http/web1.corp.local");
+      expect(title).toContain("http/web2.corp.local");
+      expect(title).toContain("msDS-AllowedToDelegateTo");
+    });
+
+    it("renders Rbcd badge as Warning with allowed principals in tooltip", () => {
+      render(
+        <ComputerDetail
+          computer={makeComputer()}
+          securityIndicators={{
+            indicators: [
+              {
+                kind: "Rbcd",
+                severity: "Warning",
+                descriptionKey: "securityIndicators.Rbcd",
+                metadata: {
+                  allowed_principals: [
+                    "S-1-5-21-1-2-3-1000",
+                    "S-1-5-21-1-2-3-1001",
+                  ],
+                },
+              },
+            ],
+            highestSeverity: "Warning",
+          }}
+        />,
+      );
+      const badge = screen.getByTestId(
+        "computer-security-indicator-badge-Rbcd",
+      );
+      expect(badge.querySelector('[data-testid="status-badge"]')).toHaveAttribute(
+        "data-variant",
+        "warning",
+      );
+      const title = badge.getAttribute("title") ?? "";
+      expect(title).toContain("S-1-5-21-1-2-3-1000");
+      expect(title).toContain("S-1-5-21-1-2-3-1001");
+      expect(title).toContain("msDS-AllowedToActOnBehalfOfOtherIdentity");
+    });
+
+    it("renders all 3 indicators side by side in declaration order", () => {
+      render(
+        <ComputerDetail
+          computer={makeComputer()}
+          securityIndicators={{
+            indicators: [
+              {
+                kind: "UnconstrainedDelegation",
+                severity: "Critical",
+                descriptionKey: "securityIndicators.UnconstrainedDelegation",
+              },
+              {
+                kind: "ConstrainedDelegation",
+                severity: "Warning",
+                descriptionKey: "securityIndicators.ConstrainedDelegation",
+                metadata: { target_spns: ["http/web1"] },
+              },
+              {
+                kind: "Rbcd",
+                severity: "Warning",
+                descriptionKey: "securityIndicators.Rbcd",
+                metadata: { allowed_principals: ["S-1-5-21-1-2-3-1000"] },
+              },
+            ],
+            highestSeverity: "Critical",
+          }}
+        />,
+      );
+      expect(
+        screen.getByTestId(
+          "computer-security-indicator-badge-UnconstrainedDelegation",
+        ),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByTestId(
+          "computer-security-indicator-badge-ConstrainedDelegation",
+        ),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByTestId("computer-security-indicator-badge-Rbcd"),
+      ).toBeInTheDocument();
+    });
+
+    it("handles ConstrainedDelegation with missing metadata gracefully", () => {
+      render(
+        <ComputerDetail
+          computer={makeComputer()}
+          securityIndicators={{
+            indicators: [
+              {
+                kind: "ConstrainedDelegation",
+                severity: "Warning",
+                descriptionKey: "securityIndicators.ConstrainedDelegation",
+              },
+            ],
+            highestSeverity: "Warning",
+          }}
+        />,
+      );
+      const badge = screen.getByTestId(
+        "computer-security-indicator-badge-ConstrainedDelegation",
+      );
+      expect(badge).toBeInTheDocument();
+      // Tooltip still renders, just with empty interpolation
+      expect(badge.getAttribute("title")).toContain("msDS-AllowedToDelegateTo");
+    });
+  });
 });

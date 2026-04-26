@@ -15,6 +15,11 @@ import { ExportToolbar, type ExportColumn } from "@/components/common/ExportTool
 import { FilterBar, type FilterChip } from "@/components/data/FilterBar";
 import { GroupMembersDialog } from "@/components/dialogs/GroupMembersDialog";
 import { type DirectoryComputer } from "@/types/directory";
+import {
+  severityToBadgeVariant,
+  type SecurityIndicator,
+  type SecurityIndicatorSet,
+} from "@/types/securityIndicators";
 import { parseCnFromDn } from "@/utils/dn";
 import { Users, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -27,12 +32,49 @@ import { useErrorHandler } from "@/hooks/useErrorHandler";
 
 export function ComputerDetail({
   computer,
+  securityIndicators,
   onDeleted,
 }: {
   computer: DirectoryComputer;
+  /**
+   * Set of security indicators detected for this computer (Story 14.3).
+   * Optional so callers that have not yet wired the evaluator still compile.
+   */
+  securityIndicators?: SecurityIndicatorSet;
   onDeleted?: () => void;
 }) {
-  const { t } = useTranslation(["computerDetail", "common"]);
+  const { t } = useTranslation([
+    "computerDetail",
+    "common",
+    "securityIndicators",
+  ]);
+
+  /**
+   * Builds the i18next interpolation context for one indicator's tooltip.
+   * `ConstrainedDelegation` injects `{{targets}}` from
+   * `metadata.target_spns`; `Rbcd` injects `{{principals}}` from
+   * `metadata.allowed_principals`. Other kinds receive an empty params
+   * object - their tooltips have no placeholders, so i18next ignores it.
+   */
+  const tooltipParamsFor = (
+    indicator: SecurityIndicator,
+  ): Record<string, string> => {
+    if (indicator.kind === "ConstrainedDelegation") {
+      const spns = indicator.metadata?.target_spns;
+      return {
+        targets: Array.isArray(spns) ? (spns as string[]).join(", ") : "",
+      };
+    }
+    if (indicator.kind === "Rbcd") {
+      const principals = indicator.metadata?.allowed_principals;
+      return {
+        principals: Array.isArray(principals)
+          ? (principals as string[]).join(", ")
+          : "",
+      };
+    }
+    return {};
+  };
   const [groupFilterText, setGroupFilterText] = useState("");
   const [showMonitoring, setShowMonitoring] = useState(false);
   const [platform, setPlatform] = useState("unknown");
@@ -258,6 +300,21 @@ export function ComputerDetail({
             text={computer.enabled ? t("common:enabled") : t("common:disabled")}
             variant={computer.enabled ? "success" : "error"}
           />
+          {securityIndicators?.indicators.map((indicator) => (
+            <span
+              key={indicator.kind}
+              title={t(
+                `securityIndicators:${indicator.kind}.tooltip`,
+                tooltipParamsFor(indicator),
+              )}
+              data-testid={`computer-security-indicator-badge-${indicator.kind}`}
+            >
+              <StatusBadge
+                text={t(`securityIndicators:${indicator.kind}.badge`)}
+                variant={severityToBadgeVariant(indicator.severity)}
+              />
+            </span>
+          ))}
         </div>
       </div>
 
