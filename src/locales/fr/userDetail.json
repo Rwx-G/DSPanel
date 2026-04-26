@@ -35,6 +35,22 @@
       "confirmButton": "Effacer le drapeau",
       "successNotification": "PasswordNotRequired effacé sur {{name}}",
       "failureNotification": "Échec de l'effacement de PasswordNotRequired : {{error}}"
+    },
+    "removeUserSpns": {
+      "manageButton": "Gérer les SPN",
+      "manageButtonAriaLabel": "Gérer les Service Principal Names",
+      "title": "Gérer les Service Principal Names",
+      "body": "Les Service Principal Names (SPN) enregistrés sur un compte utilisateur exposent ce compte au Kerberoasting : tout utilisateur authentifié du domaine peut demander un ticket de service Kerberos pour le SPN et casser le mot de passe du compte hors ligne.\n\nExaminez la liste ci-dessous et supprimez tout SPN qui ne correspond plus à un service en cours d'exécution. Les SPN système (HOST, ldap, krbtgt, etc.) ne peuvent pas être supprimés depuis ce dialogue car leur suppression provoquerait une panne de service.",
+      "removableSectionHeader": "SPN supprimables",
+      "systemSectionHeader": "SPN système (lecture seule)",
+      "systemSpnTooltip": "SPN système, ne peut pas être supprimé en toute sécurité depuis ce dialogue",
+      "noRemovableSpns": "Aucun SPN supprimable sur ce compte",
+      "noSpnsAtAll": "Aucun SPN enregistré sur ce compte",
+      "confirmButton": "Supprimer la sélection",
+      "summary": "{{removed}} SPN supprimé(s), {{kept}} conservé(s), {{blocked}} SPN système bloqué(s)",
+      "successNotification_one": "{{count}} SPN supprimé de {{name}}",
+      "successNotification_other": "{{count}} SPN supprimés de {{name}}",
+      "failureNotification": "Échec de la suppression des SPN : {{error}}"
     }
   }
 }

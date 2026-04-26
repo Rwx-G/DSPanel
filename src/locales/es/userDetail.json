@@ -35,6 +35,22 @@
       "confirmButton": "Quitar indicador",
       "successNotification": "PasswordNotRequired quitado de {{name}}",
       "failureNotification": "Error al quitar PasswordNotRequired: {{error}}"
+    },
+    "removeUserSpns": {
+      "manageButton": "Administrar SPN",
+      "manageButtonAriaLabel": "Administrar los Service Principal Names",
+      "title": "Administrar los Service Principal Names",
+      "body": "Los Service Principal Names (SPN) registrados en una cuenta de usuario exponen esa cuenta al Kerberoasting: cualquier usuario autenticado del dominio puede solicitar un ticket de servicio Kerberos para el SPN y descifrar la contraseña de la cuenta sin conexión.\n\nRevise la lista siguiente y elimine cualquier SPN que ya no corresponda a un servicio en ejecución. Los SPN del sistema (HOST, ldap, krbtgt, etc.) no se pueden eliminar desde este diálogo porque su eliminación causaría una interrupción del servicio.",
+      "removableSectionHeader": "SPN eliminables",
+      "systemSectionHeader": "SPN del sistema (solo lectura)",
+      "systemSpnTooltip": "SPN del sistema, no se puede eliminar de forma segura desde este diálogo",
+      "noRemovableSpns": "Ningún SPN eliminable en esta cuenta",
+      "noSpnsAtAll": "Ningún SPN registrado en esta cuenta",
+      "confirmButton": "Eliminar selección",
+      "summary": "{{removed}} SPN eliminados, {{kept}} conservados, {{blocked}} SPN del sistema bloqueados",
+      "successNotification_one": "{{count}} SPN eliminado de {{name}}",
+      "successNotification_other": "{{count}} SPN eliminados de {{name}}",
+      "failureNotification": "Error al eliminar los SPN: {{error}}"
     }
   }
 }

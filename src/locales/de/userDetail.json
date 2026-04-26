@@ -35,6 +35,22 @@
       "confirmButton": "Flag entfernen",
       "successNotification": "PasswordNotRequired bei {{name}} entfernt",
       "failureNotification": "Entfernen von PasswordNotRequired fehlgeschlagen: {{error}}"
+    },
+    "removeUserSpns": {
+      "manageButton": "SPNs verwalten",
+      "manageButtonAriaLabel": "Service Principal Names verwalten",
+      "title": "Service Principal Names verwalten",
+      "body": "Auf einem Benutzerkonto registrierte Service Principal Names (SPNs) setzen das Konto Kerberoasting aus: Jeder authentifizierte Domänenbenutzer kann ein Kerberos-Diensteticket für den SPN anfordern und das Kontopasswort offline knacken.\n\nÜberprüfen Sie die folgende Liste und entfernen Sie alle SPNs, die keinem laufenden Dienst mehr entsprechen. System-SPNs (HOST, ldap, krbtgt, usw.) können in diesem Dialog nicht entfernt werden, da ihre Entfernung einen Dienstausfall verursachen würde.",
+      "removableSectionHeader": "Entfernbare SPNs",
+      "systemSectionHeader": "System-SPNs (schreibgeschützt)",
+      "systemSpnTooltip": "System-SPN, kann aus diesem Dialog nicht sicher entfernt werden",
+      "noRemovableSpns": "Keine entfernbaren SPNs auf diesem Konto",
+      "noSpnsAtAll": "Keine SPNs auf diesem Konto registriert",
+      "confirmButton": "Auswahl entfernen",
+      "summary": "{{removed}} SPN(s) entfernt, {{kept}} beibehalten, {{blocked}} System-SPN(s) blockiert",
+      "successNotification_one": "{{count}} SPN von {{name}} entfernt",
+      "successNotification_other": "{{count}} SPNs von {{name}} entfernt",
+      "failureNotification": "Entfernen der SPNs fehlgeschlagen: {{error}}"
     }
   }
 }
