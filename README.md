@@ -34,8 +34,8 @@ DSPanel is an open source cross-platform desktop application (Rust/Tauri v2) tha
 
 ### Directory
 
-- **User Lookup** - Search accounts, view detailed info, healthcheck badges, group memberships, advanced attributes editor
-- **Computer Lookup** - Search and browse computer accounts with OS info, last logon, health badges
+- **User Lookup** - Search accounts, view detailed info, healthcheck badges, security indicator badges (Kerberoastable, PasswordNotRequired, ReversibleEncryption, AS-REP roastable, etc.), group memberships, advanced attributes editor
+- **Computer Lookup** - Search and browse computer accounts with OS info, last logon, health badges, Kerberos delegation indicators (Unconstrained / Constrained / RBCD)
 - **User Comparison** - Side-by-side comparison with visual group delta (shared / only A / only B)
 - **Group Management** - Tree/flat views, drag-and-drop membership, scope/category badges
 - **Group Hygiene** - Detect empty, single-member, stale, undescribed, circular, deeply nested, and duplicate groups
@@ -62,6 +62,7 @@ DSPanel is an open source cross-platform desktop application (Rust/Tauri v2) tha
 - **User Photos** - View, upload (auto-resize to 96x96), and remove AD thumbnail photos
 - **Password Generator** - Configurable length, character sets, pronounceable mode, HIBP check
 - **Object Snapshots** - SQLite-backed attribute snapshots before every write, with diff viewer and restore
+- **Quick-Fix Actions** - 1-click remediation for common AD security misconfigurations (clear PASSWD_NOTREQD, remove unused SPNs, disable unconstrained delegation) gated by permission level + MFA, with operator acknowledgement dialogs
 
 ### Infrastructure
 
@@ -76,13 +77,14 @@ DSPanel is an open source cross-platform desktop application (Rust/Tauri v2) tha
 
 ### Security
 
+- **Per-Object Security Indicators** - Inline badges on user/computer detail pages flag the 8 most actionable AD misconfigurations (Kerberoastable, PasswordNotRequired, PasswordNeverExpires, ReversibleEncryption, AS-REP Roastable, Unconstrained / Constrained / RBCD delegation), with severity escalated to Critical on AdminSDHolder-protected accounts. Lookup pages render an aggregate dot with a hover popover listing all detected indicators plus their metadata (target SPNs, allowed-principal SIDs)
 - **Privileged Accounts Audit** - Admin group members with 12 security checks per account (Kerberoastable, AS-REP Roastable, Protected Users, SIDHistory, delegation, etc.), domain findings (KRBTGT age, LAPS coverage, PSO), CSV/HTML export
 - **Domain Risk Score** - Security posture scoring (0-100) with 9 weighted factors and ~70 checks, SVG gauge + radar chart, per-finding CIS/MITRE references, remediation with complexity scoring, 30-day trend, HTML report export
 - **Attack Detection** - On-demand Windows Security Event Log analysis for 14 attack types (Golden Ticket, DCSync, Kerberoasting, Pass-the-Hash, etc.) with structured XML parsing and MITRE ATT&CK mapping
 - **Escalation Paths** - Privilege escalation path analysis with 5 node types, 8 edge types (membership, delegation, RBCD, SIDHistory, ADCS, GPO), and weighted Dijkstra path-finding
 - **Compliance Reports** - 7 checks across 9 frameworks (GDPR, HIPAA, SOX, PCI-DSS v4.0, ISO 27001, NIST 800-53, CIS v8, NIS2, ANSSI) with per-framework scoring, control references, and remediation PowerShell commands
 - **MFA Gate** - TOTP verification for sensitive operations (password reset, account disable, etc.)
-- **Audit Trail** - Full internal action logging for compliance with export support
+- **Audit Trail** - Full internal action logging for compliance with export support, SHA-256 hash chain integrity verification, optional severity classification (Info / Warning / Critical) for SIEM filtering, RFC 5424 syslog forwarding (UDP + TCP)
 
 ![Risk Score](docs/screenshots/risk-score.png)
 
@@ -96,7 +98,7 @@ DSPanel is an open source cross-platform desktop application (Rust/Tauri v2) tha
 - **Application Settings** - Centralized settings (Connection, Presets, Permissions, Security, Reports, Appearance)
 - **Custom Permission Mapping** - Map AD security groups to DSPanel permission levels via UI
 - **Auto-Update Notifications** - GitHub Releases API check with Download, Skip, Remind Me Later
-- **i18n** - Full localization in 5 languages: English, French, German, Italian, Spanish (1709 keys)
+- **i18n** - Full localization in 5 languages: English, French, German, Italian, Spanish (1780 keys)
 - **Theme** - Light, Dark, and System theme with live preview
 - **Login Prompt** - Password prompt at startup when credentials are partially configured
 
@@ -229,10 +231,10 @@ The client secret is stored in the OS credential store (Windows Credential Manag
 ### Unit tests
 
 ```bash
-# Frontend (2089 tests, 87% coverage)
+# Frontend (2209 tests, 87% coverage)
 pnpm test
 
-# Rust (1520 tests, 82% coverage)
+# Rust (1688 lib tests, 82% coverage)
 cargo test --manifest-path src-tauri/Cargo.toml --lib
 ```
 
@@ -303,6 +305,8 @@ DSPanel/
 - [Product Requirements (PRD)](docs/prd.md) - Functional/non-functional requirements, epics, stories
 - [Architecture](docs/architecture.md) - Tech stack, data models, components, workflows
 - [Localization](docs/architecture/localization.md) - i18n guide for adding languages and translation keys
+- [Release smoke test](docs/release-smoke-test.md) - Cross-theme visual checklist before tagging a release
+- [Changelog](CHANGELOG.md) - Notable changes per release
 
 ## Contributing
 
