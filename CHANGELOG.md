@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `AuditSeverity` enum (Info / Warning / Critical) and matching `severity` field on `AuditEntry`. New `log_success_with_severity` and `log_failure_with_severity` methods on `AuditService` let critical write operations opt in to the highest severity bucket; existing `log_success` / `log_failure` keep working and produce `Info` entries. SQLite migration adds a nullable-by-default `severity` column with index. Syslog forwarder maps `Critical` to RFC 5424 priority 2 and emits the value in the structured-data field. Story 14.6 (`disable_unconstrained_delegation`) is the first consumer and now records both success and failure entries as `Critical`. Severity is intentionally excluded from the SHA-256 chain hash so the upgrade does not invalidate existing chains. Frontend `AuditEntry` interface gains an optional `severity` field. Closes QA-14.6-001.
+- `AcknowledgeQuickFixDialog` shared React component encapsulating the Story 14.4 + 14.6 dialog shape (title + multi-paragraph body + acknowledgement checkbox + MFA-gated Tauri invoke). `ClearPasswordNotRequiredDialog` and `DisableUnconstrainedDelegationDialog` collapse to thin wrappers that supply their i18n base key and Tauri command. The exported `AcknowledgeQuickFixI18nKeys` interface documents the 8-key contract translators must honour for any future quick-fix that consumes the component. Story 14.5 (`ManageSpns`) keeps its own dialog because the per-SPN selection list shape does not fit the acknowledge pattern. Closes QA-14.4-003.
+- E2E success-path tests for the three Epic 14 quick-fix flows: click Fix button -> dialog opens -> tick acknowledgement / select SPN -> Confirm -> Tauri invoke -> success notification -> `onRefresh` callback. `UserDetail.test.tsx` wraps the test providers with `NotificationHost` so toast messages appear in the DOM and can be asserted via `getByText`; `ComputerDetail.test.tsx` promotes its previously local notify mock to a hoisted spy. Closes QA-14.4-002.
+
+### Changed
+
+- Skip snapshot capture on idempotent quick-fix no-ops in Stories 14.4 (`clear_password_not_required`) and 14.6 (`disable_unconstrained_delegation`). Both commands now peek `userAccountControl` via the new `DirectoryProvider::get_user_account_control(dn)` trait method before calling `capture_snapshot`, returning early when the target bit is already clear. Matches the no-op-before-snapshot pattern Story 14.5 already had via its explicit `get_user_spns` read phase. Read-phase failures continue to log a `<command>Failed` audit entry with a `get_user_account_control:` prefix in the details for forensic granularity. Closes QA-14.5-003.
+
+### Security
+
+- Pin `rustls-webpki` to `>=0.103.13` via `Cargo.lock` to patch RUSTSEC-2026-0098 / 0099 / 0104 (transitive dependency through `tonic` / `tauri`).
+- Bump `vite` 7.3.1 -> 8.0.10, `@vitejs/plugin-react` 5.2.0 -> 6.0.1, `typescript` 5.9.3 -> 6.0.3 (with `typescript-eslint` -> 8.59.0 and `tsconfig` `baseUrl` removal for TS 7 forward-compatibility) to clear 4 NPM advisories.
+- Add `pnpm` overrides for `postcss@<8.5.12` and `@joshwooding/vite-plugin-react-docgen-typescript@<0.7.0` to patch transitive Storybook dependencies.
+
 ## [1.1.0] - 2026-04-26
 
 ### Added

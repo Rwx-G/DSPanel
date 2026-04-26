@@ -2,25 +2,20 @@
 
 Items deferred from QA reviews. None are blocking - all stories are PASS.
 
-## Priority: Medium
-
-| Source | Item | Refs |
-| ------ | ---- | ---- |
-| Epic 14 QA | AuditSeverity::Critical structural field on AuditEntry. Critical-severity dimension is currently encoded in the unique action name `DisabledUnconstrainedDelegation` for Story 14.6. Adding a typed `Option<AuditSeverity>` field would let SIEM dashboards / severity-filtered queries treat 14.6 events as Critical without action-name regex. Requires SQLite schema migration + log_success/log_failure signature change + syslog forwarder severity mapping + all existing call sites or default-to-Info. Land as a future Epic 11 amendment. | Story 14.6, QA-14.6-001 |
-
 ## Priority: Low
 
 | Source | Item | Refs |
 | ------ | ---- | ---- |
-| Epic 14 QA | Snapshot-on-no-op optimization for Stories 14.4 and 14.6. Both currently capture the snapshot before the trait call even on idempotent no-op paths. Story 14.5 has the no-op-before-snapshot optimization. Retro-apply the pattern - requires either splitting the trait method (read + write phases) or adding a peek helper. | Stories 14.4 + 14.6, QA-14.5-003 |
-| Epic 14 QA | i18n schema deduplication for the 3 quick-fix dialogs. The structure (title/body/checkboxLabel/confirmButton/fixButton/fixButtonAriaLabel/successNotification/failureNotification) is identical across Stories 14.4 / 14.5 / 14.6 - factor into a shared schema or helper. | Stories 14.4 / 14.5 / 14.6, QA-14.4-003 |
-| Epic 14 QA | End-to-end success-path frontend integration tests. Currently the click-Fix → check-checkbox → confirm → invoke → notification → handleRefresh flow is split across UserDetail/ComputerDetail tests (button + dialog open) and Dialog tests (confirm calls invoke + onSuccess). End-to-end is implicit. | Stories 14.4 / 14.5 / 14.6, QA-14.4-002 |
 | Epic 14 QA | `tooltipParamsFor` factor when needed. Currently local to ComputerDetail. If a future story needs the same metadata extraction logic, factor to `src/types/securityIndicators.ts` or `src/lib/`. | Story 14.3, QA-14.3-002 |
 | Epic 14 QA | SecurityIndicatorDot popover metadata enrichment. Currently shows kind labels only. Could show first-N principal SIDs / target SPNs in the popover so the operator does not need to open ComputerDetail to see what the configuration permits. | Story 14.3, QA-14.3-003 |
 | Epic 14 QA | Manual browser smoke test for all UI changes across the 4 themes (light/dark + 2 accent variants) before tagging the v1.1.0 release. Component-level tests cover correctness but visual rendering should be human-verified. | Epic 14 finalization |
 
 ### Recently resolved
 
+- **AuditSeverity::Critical structural field on AuditEntry** (QA-14.6-001) - resolved 2026-04-26 in commit `d416b22`. Added `AuditSeverity` enum + `severity` field on `AuditEntry`, SQLite migration with `severity` TEXT column + index, new `log_success_with_severity` / `log_failure_with_severity` methods, syslog forwarder severity mapping (Critical→2, Warning→4, Info→6/4), Story 14.6 now records both success and failure entries as Critical. Severity is excluded from the SHA-256 chain hash to preserve backward compatibility on existing chains. Frontend `AuditEntry` interface gains optional `severity` field.
+- **Snapshot-on-no-op optimization for Stories 14.4 and 14.6** (QA-14.5-003) - resolved 2026-04-26 in commit `07d4eed`. Promoted the previously-private `get_user_account_control` LDAP helper to a `DirectoryProvider` trait method so the command layer peeks before snapshotting. Both `clear_password_not_required_inner` and `disable_unconstrained_delegation_inner` short-circuit on the no-op path before calling `capture_snapshot`. Read-phase failures log a `<command>Failed` audit entry with a `get_user_account_control:` prefix in the details. Allowlist updated for `ClearPasswordNotRequiredFailed` and `DisableUnconstrainedDelegationFailed` (same shape as `RemoveUserSpnsFailed` for QA-14.5-001).
+- **i18n schema deduplication for the 3 quick-fix dialogs** (QA-14.4-003) - resolved 2026-04-26 in commit `02e36a8`. Extracted `AcknowledgeQuickFixDialog` shared React component plus `AcknowledgeQuickFixI18nKeys` TypeScript interface documenting the 8-key contract. `ClearPasswordNotRequiredDialog` and `DisableUnconstrainedDelegationDialog` collapsed to thin wrappers that supply their i18n base key, Tauri command, and MFA action name. Story 14.5 (`ManageSpns`) keeps its own dialog because the per-SPN selection list shape does not fit the acknowledge pattern.
+- **End-to-end success-path frontend integration tests** (QA-14.4-002) - resolved 2026-04-26 in commit `638c58e`. Three new E2E tests cover the full quick-fix flow for Stories 14.4, 14.5, and 14.6: click Fix button → dialog opens → tick acknowledgement / select SPN → Confirm → Tauri invoke → success notification → `onRefresh` callback. `UserDetail.test.tsx` wraps providers with `NotificationHost` so toasts appear in the DOM; `ComputerDetail.test.tsx` promotes its notify mock to a hoisted spy.
 - **Audit-failure logging on backend READ errors** (QA-14.5-001) - resolved 2026-04-26 in commit `bcf0202`. `remove_user_spns_inner` now calls `log_failure("RemoveUserSpnsFailed", dn, "get_user_spns: <error>")` on read-phase failures before returning Err. Stories 14.4 / 14.6 already had read-failure coverage via the `clear_user_account_control_bits` trait method's Err arm.
 - **Dedicated unit tests for `extract_dacl_principals`** (QA-14.1-001) - resolved 2026-04-26 in commit `ac9ee55`. Added 7 dedicated tests: deny-ACE skip, mixed Allow+Deny order, ACCESS_ALLOWED_OBJECT_ACE with ObjectType GUID flag, ACCESS_ALLOWED_OBJECT_ACE with both GUID flags, truncated SD returns Err, identical SIDs deduped, audit ACE skipped.
 - **Symmetric Rbcd missing-metadata fallback test** (QA-14.3-001) - resolved 2026-04-26 in commit `ab4e2e3`.
