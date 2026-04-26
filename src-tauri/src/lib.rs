@@ -48,7 +48,7 @@ pub fn install_panic_hook() {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    logging::init_logging("logs");
+    logging::init_logging(logging::default_log_dir());
     install_panic_hook();
 
     tracing::info!("DSPanel starting up");
