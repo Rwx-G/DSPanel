@@ -28,6 +28,7 @@ pub mod replication;
 pub mod replication_status;
 pub mod resilience;
 pub mod resilient_directory;
+pub mod security_indicators;
 pub mod security;
 pub mod snapshot;
 pub mod topology;
