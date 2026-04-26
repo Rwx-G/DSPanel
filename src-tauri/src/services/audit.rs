@@ -2,7 +2,8 @@ use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::fs;
-use std::net::UdpSocket;
+use std::io::Write;
+use std::net::{TcpStream, ToSocketAddrs, UdpSocket};
 use std::path::PathBuf;
 use std::sync::Mutex;
 
@@ -29,6 +30,22 @@ pub struct ChainVerification {
     pub first_invalid_id: Option<i64>,
 }
 
+/// Transport used by the remote syslog forwarder.
+///
+/// UDP (RFC 5426) is the historical default - low overhead but silently
+/// drops messages on packet loss. TCP (RFC 6587, octet-counting framing) is
+/// reliable but requires a long-lived connection and a syslog daemon that
+/// accepts TCP (rsyslog, syslog-ng, Splunk, Datadog Agent, etc.). Operators
+/// who route audit entries to a SIEM should pick TCP so a missed message
+/// becomes a logged write error rather than a silent gap.
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SyslogTransport {
+    #[default]
+    Udp,
+    Tcp,
+}
+
 /// Remote syslog forwarding configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -42,6 +59,9 @@ pub struct SyslogSettings {
     /// Syslog server port (default: 514).
     #[serde(default = "default_syslog_port")]
     pub port: u16,
+    /// Transport (default: udp - kept for backward compatibility).
+    #[serde(default)]
+    pub transport: SyslogTransport,
 }
 
 fn default_syslog_port() -> u16 {
@@ -54,6 +74,7 @@ impl Default for SyslogSettings {
             enabled: false,
             host: String::new(),
             port: 514,
+            transport: SyslogTransport::Udp,
         }
     }
 }
@@ -70,10 +91,19 @@ pub struct AuditService {
     syslog: Mutex<Option<SyslogForwarder>>,
 }
 
-/// Lightweight UDP syslog forwarder (RFC 5424).
+/// Lightweight syslog forwarder for RFC 5424 messages over UDP or TCP.
 struct SyslogForwarder {
-    socket: UdpSocket,
+    transport: SyslogChannel,
     addr: String,
+}
+
+enum SyslogChannel {
+    Udp(UdpSocket),
+    /// TCP connection wrapped in a Mutex because `TcpStream::write_all`
+    /// needs `&mut self` while `SyslogForwarder::send` is `&self`. The outer
+    /// `Mutex<Option<SyslogForwarder>>` already serializes access; this
+    /// inner Mutex is only there to satisfy the type system.
+    Tcp(std::sync::Mutex<TcpStream>),
 }
 
 impl Default for AuditService {
@@ -88,22 +118,59 @@ impl SyslogForwarder {
             return None;
         }
         let addr = format!("{}:{}", settings.host, settings.port);
-        match UdpSocket::bind("0.0.0.0:0") {
-            Ok(socket) => {
-                tracing::info!(addr = %addr, "Syslog forwarder initialized");
-                Some(Self { socket, addr })
-            }
-            Err(e) => {
-                tracing::warn!("Failed to create syslog UDP socket: {}", e);
-                None
+        match settings.transport {
+            SyslogTransport::Udp => match UdpSocket::bind("0.0.0.0:0") {
+                Ok(socket) => {
+                    tracing::info!(addr = %addr, transport = "udp", "Syslog forwarder initialized");
+                    Some(Self {
+                        transport: SyslogChannel::Udp(socket),
+                        addr,
+                    })
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to create syslog UDP socket: {}", e);
+                    None
+                }
+            },
+            SyslogTransport::Tcp => {
+                let resolved: Option<std::net::SocketAddr> =
+                    addr.to_socket_addrs().ok().and_then(|mut it| it.next());
+                let socket_addr = match resolved {
+                    Some(a) => a,
+                    None => {
+                        tracing::warn!(addr = %addr, "Syslog TCP: address resolution failed");
+                        return None;
+                    }
+                };
+                match TcpStream::connect_timeout(&socket_addr, std::time::Duration::from_secs(5)) {
+                    Ok(stream) => {
+                        // Disable Nagle so audit entries reach the SIEM without
+                        // being held in the TCP coalesce buffer.
+                        let _ = stream.set_nodelay(true);
+                        tracing::info!(addr = %addr, transport = "tcp", "Syslog forwarder initialized");
+                        Some(Self {
+                            transport: SyslogChannel::Tcp(std::sync::Mutex::new(stream)),
+                            addr,
+                        })
+                    }
+                    Err(e) => {
+                        tracing::warn!(addr = %addr, error = %e, "Syslog TCP connect failed");
+                        None
+                    }
+                }
             }
         }
     }
 
-    /// Sends one audit entry as an RFC 5424 syslog message (facility=local0, severity=info/warning).
+    /// Sends one audit entry as an RFC 5424 syslog message
+    /// (facility=local0, severity=info/warning).
+    ///
+    /// UDP path emits a single datagram. TCP path uses RFC 6587 octet-counting
+    /// framing (`<length> <SP> <message>`) which is the modern reliable framing
+    /// supported by rsyslog/syslog-ng/Splunk/Datadog. No retry/reconnect is
+    /// attempted on TCP write error - the next entry will surface the failure
+    /// and the operator will see the WARN log.
     fn send(&self, entry: &AuditEntry) {
-        // RFC 5424: <PRI>VERSION SP TIMESTAMP SP HOSTNAME SP APP-NAME SP PROCID SP MSGID SP MSG
-        // facility=16 (local0), severity=6 (info) or 4 (warning)
         let severity: u8 = if entry.success { 6 } else { 4 };
         let priority = 16 * 8 + severity;
         let hostname = gethostname();
@@ -118,8 +185,26 @@ impl SyslogForwarder {
             entry.success,
             entry.details,
         );
-        if let Err(e) = self.socket.send_to(msg.as_bytes(), &self.addr) {
-            tracing::debug!("Syslog send failed: {}", e);
+        match &self.transport {
+            SyslogChannel::Udp(socket) => {
+                if let Err(e) = socket.send_to(msg.as_bytes(), &self.addr) {
+                    tracing::debug!("Syslog UDP send failed: {}", e);
+                }
+            }
+            SyslogChannel::Tcp(stream) => {
+                let framed = format!("{} {}", msg.len(), msg);
+                let mut guard = match stream.lock() {
+                    Ok(g) => g,
+                    Err(poisoned) => poisoned.into_inner(),
+                };
+                if let Err(e) = guard.write_all(framed.as_bytes()) {
+                    tracing::warn!(
+                        addr = %self.addr,
+                        error = %e,
+                        "Syslog TCP send failed - SIEM may be missing audit entries"
+                    );
+                }
+            }
         }
     }
 }
@@ -1278,6 +1363,7 @@ mod tests {
         assert!(!s.enabled);
         assert!(s.host.is_empty());
         assert_eq!(s.port, 514);
+        assert_eq!(s.transport, SyslogTransport::Udp);
     }
 
     #[test]
@@ -1286,19 +1372,78 @@ mod tests {
             enabled: true,
             host: "192.168.1.10".to_string(),
             port: 1514,
+            transport: SyslogTransport::Tcp,
         };
         let json = serde_json::to_string(&s).unwrap();
         assert!(json.contains("192.168.1.10"));
+        assert!(json.contains("\"tcp\""));
         let loaded: SyslogSettings = serde_json::from_str(&json).unwrap();
         assert!(loaded.enabled);
         assert_eq!(loaded.port, 1514);
+        assert_eq!(loaded.transport, SyslogTransport::Tcp);
     }
 
     #[test]
     fn test_syslog_settings_backwards_compat() {
+        // Old config files (pre-1.0.5) had no `transport` field; missing
+        // value must default to UDP so existing deployments keep their
+        // current behavior on upgrade.
         let json = "{}";
         let s: SyslogSettings = serde_json::from_str(json).unwrap();
         assert!(!s.enabled);
         assert_eq!(s.port, 514);
+        assert_eq!(s.transport, SyslogTransport::Udp);
+    }
+
+    #[test]
+    fn test_syslog_tcp_emits_octet_counted_frame() {
+        // Boot a one-shot TCP listener on a random port, send one entry,
+        // verify the framing matches RFC 6587 octet-counting form
+        // (`<length> <SP> <message>`).
+        use std::io::Read;
+        use std::net::TcpListener;
+
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+        let port = listener.local_addr().expect("addr").port();
+
+        let received = std::sync::Arc::new(std::sync::Mutex::new(Vec::<u8>::new()));
+        let received_clone = received.clone();
+        let handle = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().expect("accept");
+            let mut buf = Vec::new();
+            stream.read_to_end(&mut buf).ok();
+            *received_clone.lock().unwrap() = buf;
+        });
+
+        let settings = SyslogSettings {
+            enabled: true,
+            host: "127.0.0.1".to_string(),
+            port,
+            transport: SyslogTransport::Tcp,
+        };
+        let fwd = SyslogForwarder::new(&settings).expect("forwarder ready");
+        let entry = AuditEntry {
+            timestamp: "2026-04-26T10:00:00Z".to_string(),
+            operator: "test".to_string(),
+            action: "test_action".to_string(),
+            target_dn: "CN=Test,DC=corp".to_string(),
+            details: "ok".to_string(),
+            success: true,
+        };
+        fwd.send(&entry);
+        drop(fwd);
+
+        handle.join().expect("listener joined");
+        let buf = received.lock().unwrap();
+        let s = String::from_utf8_lossy(&buf);
+        // Should look like "  <prefix-length>  <SP>  <PRI>1 ...",
+        // i.e. start with ASCII digits then a space.
+        let space_idx = s.find(' ').expect("octet counting framing has a space");
+        let len_str = &s[..space_idx];
+        let len: usize = len_str.parse().expect("framing length is numeric");
+        let payload = &s[space_idx + 1..];
+        assert_eq!(payload.len(), len, "framing length must match payload");
+        assert!(payload.starts_with("<134>1 "), "RFC 5424 PRI=local0+info");
+        assert!(payload.contains("test_action"));
     }
 }
