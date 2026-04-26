@@ -18,6 +18,7 @@ import { ExportToolbar, type ExportColumn } from "@/components/common/ExportTool
 import { FilterBar, type FilterChip } from "@/components/data/FilterBar";
 import { AdvancedAttributes } from "@/components/data/AdvancedAttributes";
 import { PasswordResetDialog } from "@/components/dialogs/PasswordResetDialog";
+import { ClearPasswordNotRequiredDialog } from "@/components/dialogs/ClearPasswordNotRequiredDialog";
 import { GroupMembersDialog } from "@/components/dialogs/GroupMembersDialog";
 import { type DirectoryUser } from "@/types/directory";
 import type { AccountHealthStatus, HealthLevel } from "@/types/health";
@@ -100,6 +101,13 @@ export function UserDetail({
   ]);
   const [groupFilters, setGroupFilters] = useState<FilterChip[]>([]);
   const [showPasswordReset, setShowPasswordReset] = useState(false);
+  /**
+   * Active quick-fix dialog (Story 14.4-14.6). Stores the indicator kind
+   * being fixed so the conditional render below picks the right dialog
+   * component. `null` hides all quick-fix dialogs.
+   */
+  const [activeQuickFix, setActiveQuickFix] =
+    useState<"PasswordNotRequired" | null>(null);
   const [contextMenuPos, setContextMenuPos] = useState<{
     x: number;
     y: number;
@@ -455,6 +463,7 @@ export function UserDetail({
               {securityIndicators?.indicators.map((indicator) => (
                 <span
                   key={indicator.kind}
+                  className="inline-flex items-center gap-1"
                   title={t(
                     `securityIndicators:${indicator.kind}.tooltip`,
                   )}
@@ -464,6 +473,24 @@ export function UserDetail({
                     text={t(`securityIndicators:${indicator.kind}.badge`)}
                     variant={severityToBadgeVariant(indicator.severity)}
                   />
+                  {indicator.kind === "PasswordNotRequired" && canEdit && (
+                    <button
+                      type="button"
+                      className="rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveQuickFix("PasswordNotRequired");
+                      }}
+                      aria-label={t(
+                        "userDetail:quickFix.clearPasswordNotRequired.fixButtonAriaLabel",
+                      )}
+                      data-testid="quick-fix-PasswordNotRequired-btn"
+                    >
+                      {t(
+                        "userDetail:quickFix.clearPasswordNotRequired.fixButton",
+                      )}
+                    </button>
+                  )}
                 </span>
               ))}
             </div>
@@ -632,6 +659,25 @@ export function UserDetail({
           displayName={user.displayName || user.samAccountName}
           onClose={() => setShowPasswordReset(false)}
           onSuccess={handleRefresh}
+        />
+      )}
+
+      {activeQuickFix === "PasswordNotRequired" && (
+        <ClearPasswordNotRequiredDialog
+          userDn={user.distinguishedName}
+          displayName={user.displayName || user.samAccountName}
+          onClose={() => setActiveQuickFix(null)}
+          onSuccess={() => {
+            setActiveQuickFix(null);
+            notify(
+              t(
+                "userDetail:quickFix.clearPasswordNotRequired.successNotification",
+                { name: user.displayName || user.samAccountName },
+              ),
+              "success",
+            );
+            handleRefresh();
+          }}
         />
       )}
 

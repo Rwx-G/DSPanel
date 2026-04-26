@@ -1133,4 +1133,96 @@ describe("UserDetail", () => {
     const title = badge.getAttribute("title") ?? "";
     expect(title).toContain("DONT_REQUIRE_PREAUTH");
   });
+
+  // ---------------------------------------------------------------------------
+  // Story 14.4 - Quick-fix Clear PasswordNotRequired button
+  // ---------------------------------------------------------------------------
+
+  it("renders the Fix button next to the PasswordNotRequired badge for AccountOperator+", () => {
+    // The default usePermissions mock in this test file returns
+    // hasPermission(level) checking against AccountOperator. The
+    // canEdit boolean in UserDetail is hasPermission("AccountOperator")
+    // which is true by default in the test wrapper - confirm with the
+    // existing canEdit-dependent assertions below.
+    render(
+      <UserDetail
+        {...makeProps({
+          securityIndicators: {
+            indicators: [
+              {
+                kind: "PasswordNotRequired",
+                severity: "Critical",
+                descriptionKey: "securityIndicators.PasswordNotRequired",
+              },
+            ],
+            highestSeverity: "Critical",
+          },
+        })}
+      />,
+      { wrapper: TestProviders },
+    );
+    expect(
+      screen.getByTestId("quick-fix-PasswordNotRequired-btn"),
+    ).toBeInTheDocument();
+  });
+
+  it("does not render the Fix button next to other indicator kinds", () => {
+    render(
+      <UserDetail
+        {...makeProps({
+          securityIndicators: {
+            indicators: [
+              {
+                kind: "Kerberoastable",
+                severity: "Warning",
+                descriptionKey: "securityIndicators.Kerberoastable",
+              },
+              {
+                kind: "ReversibleEncryption",
+                severity: "Critical",
+                descriptionKey: "securityIndicators.ReversibleEncryption",
+              },
+            ],
+            highestSeverity: "Critical",
+          },
+        })}
+      />,
+      { wrapper: TestProviders },
+    );
+    expect(
+      screen.queryByTestId("quick-fix-PasswordNotRequired-btn"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("opens the ClearPasswordNotRequiredDialog when the Fix button is clicked", async () => {
+    render(
+      <UserDetail
+        {...makeProps({
+          securityIndicators: {
+            indicators: [
+              {
+                kind: "PasswordNotRequired",
+                severity: "Critical",
+                descriptionKey: "securityIndicators.PasswordNotRequired",
+              },
+            ],
+            highestSeverity: "Critical",
+          },
+        })}
+      />,
+      { wrapper: TestProviders },
+    );
+
+    expect(
+      screen.queryByTestId("clear-password-not-required-dialog"),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("quick-fix-PasswordNotRequired-btn"));
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId("clear-password-not-required-dialog"),
+      ).toBeInTheDocument();
+    });
+  });
 });
