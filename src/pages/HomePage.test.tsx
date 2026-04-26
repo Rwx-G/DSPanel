@@ -38,6 +38,7 @@ function makeStatus(overrides: Partial<AppStatus> = {}): AppStatus {
     isConnected: true,
     domainName: "example.com",
     connectionError: null,
+    dcIsRodc: false,
     permissionLevel: "HelpDesk",
     authenticatedUser: "jdoe@example.com",
     username: "jdoe",

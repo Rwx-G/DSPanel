@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { parseOuBreadcrumb, parseCnFromDn, formatOuPath } from "./dn";
+import {
+  parseOuBreadcrumb,
+  parseCnFromDn,
+  formatOuPath,
+  extractForeignSidFromDn,
+} from "./dn";
 
 describe("parseOuBreadcrumb", () => {
   it("extracts OU components in hierarchical order", () => {
@@ -74,5 +79,65 @@ describe("formatOuPath", () => {
 
   it("returns single OU without separator", () => {
     expect(formatOuPath("CN=User,OU=Users,DC=corp,DC=local")).toBe("Users");
+  });
+});
+
+describe("extractForeignSidFromDn", () => {
+  it("extracts SID from a standard FSP DN", () => {
+    expect(
+      extractForeignSidFromDn(
+        "CN=S-1-5-21-1234567890-987654321-1111111111-1234,CN=ForeignSecurityPrincipals,DC=corp,DC=local",
+      ),
+    ).toBe("S-1-5-21-1234567890-987654321-1111111111-1234");
+  });
+
+  it("matches case-insensitively on cn= and the container name", () => {
+    expect(
+      extractForeignSidFromDn(
+        "cn=S-1-5-21-1-2-3-1000,cn=foreignsecurityprincipals,dc=corp,dc=local",
+      ),
+    ).toBe("S-1-5-21-1-2-3-1000");
+  });
+
+  it("matches well-known short SIDs (e.g. AuthenticatedUsers)", () => {
+    expect(
+      extractForeignSidFromDn(
+        "CN=S-1-5-11,CN=ForeignSecurityPrincipals,DC=corp,DC=local",
+      ),
+    ).toBe("S-1-5-11");
+  });
+
+  it("returns null for a regular user DN", () => {
+    expect(
+      extractForeignSidFromDn("CN=John Doe,OU=Users,DC=corp,DC=local"),
+    ).toBeNull();
+  });
+
+  it("does not match the FSP container DN itself", () => {
+    expect(
+      extractForeignSidFromDn(
+        "CN=ForeignSecurityPrincipals,DC=corp,DC=local",
+      ),
+    ).toBeNull();
+  });
+
+  it("rejects non-SID values inside the FSP container", () => {
+    expect(
+      extractForeignSidFromDn(
+        "CN=Alice,CN=ForeignSecurityPrincipals,DC=corp,DC=local",
+      ),
+    ).toBeNull();
+  });
+
+  it("returns null for empty input", () => {
+    expect(extractForeignSidFromDn("")).toBeNull();
+  });
+
+  it("handles multilevel domain DN suffixes", () => {
+    expect(
+      extractForeignSidFromDn(
+        "CN=S-1-5-21-9-9-9-500,CN=ForeignSecurityPrincipals,DC=ad,DC=corp,DC=local",
+      ),
+    ).toBe("S-1-5-21-9-9-9-500");
   });
 });

@@ -55,12 +55,14 @@ interface DomainInfo {
   domain_name: string | null;
   is_connected: boolean;
   connection_error?: string | null;
+  dc_is_rodc?: boolean;
 }
 
 export interface AppStatus {
   isConnected: boolean;
   domainName: string | null;
   connectionError: string | null;
+  dcIsRodc: boolean;
   permissionLevel: string;
   authenticatedUser: string;
   username: string;
@@ -78,6 +80,7 @@ export function App() {
     isConnected: false,
     domainName: null,
     connectionError: null,
+    dcIsRodc: false,
     permissionLevel: "ReadOnly",
     authenticatedUser: "",
     username: "",
@@ -97,6 +100,7 @@ export function App() {
           domainName: info.domain_name,
           isConnected: info.is_connected,
           connectionError: info.connection_error ?? null,
+          dcIsRodc: info.dc_is_rodc ?? false,
         }));
       })
       .catch((e) => console.warn("Failed to get domain info:", e));
@@ -111,6 +115,7 @@ export function App() {
             setStatus((s) => ({
               ...s,
               connectionError: info.connection_error ?? null,
+              dcIsRodc: info.dc_is_rodc ?? false,
             })),
           )
           .catch(() => {});

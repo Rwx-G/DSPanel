@@ -117,5 +117,9 @@
   "present": "Vorhanden",
   "truncatedTitle": "Teilergebnisse",
   "truncatedDetail": "Das Verzeichnis hat mehr Einträge zurückgegeben, als in einer Anfrage abgerufen werden können. Verfeinern Sie Ihren Filter, um die fehlenden Elemente zu sehen.",
-  "truncatedDetailWithCount": "Es werden die ersten {{shown}} vom Verzeichnis zurückgegebenen Einträge angezeigt. Verfeinern Sie Ihren Filter, um die fehlenden Elemente zu sehen."
+  "truncatedDetailWithCount": "Es werden die ersten {{shown}} vom Verzeichnis zurückgegebenen Einträge angezeigt. Verfeinern Sie Ihren Filter, um die fehlenden Elemente zu sehen.",
+  "foreignPrincipalBadge": "Extern",
+  "foreignPrincipalTooltip": "Foreign Security Principal aus einer vertrauten Domäne (SID: {{sid}}). DSPanel löst keine Namen über Gesamtstrukturgrenzen hinweg auf.",
+  "rodcBannerTitle": "Mit einem schreibgeschützten Domain Controller (RODC) verbunden",
+  "rodcBannerDetail": "Dieser DC akzeptiert keine Schreibvorgänge. Passwortzurücksetzungen, Änderungen der Gruppenmitgliedschaft und Kontoänderungen werden, falls verfügbar, an einen beschreibbaren DC weitergeleitet, andernfalls abgelehnt."
 }
