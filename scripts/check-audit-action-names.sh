@@ -64,7 +64,7 @@ while IFS= read -r -d '' rs_file; do
     /^[[:space:]]*mod tests / { in_test = 1 }
     in_test { next }
 
-    /\.log_(success|failure)\(/ {
+    /\.log_(success|failure)(_with_severity)?\(/ {
       # Collect tokens forward until we find the first quoted string
       buffer = $0
       while (buffer !~ /"[^"]+"/ && (getline next_line) > 0) {
@@ -81,7 +81,7 @@ if [[ ${#duplicates[@]} -gt 0 ]]; then
   echo "FAIL: unwhitelisted duplicate audit action names found:" >&2
   for dup in "${duplicates[@]}"; do
     echo "  - $dup" >&2
-    grep -rn --include='*.rs' "\.log_\(success\|failure\)(\s*\"$dup\"" src-tauri/src/commands/ | sed 's/^/      /' >&2
+    grep -rn --include='*.rs' "\.log_\(success\|failure\)\(_with_severity\)\?(\s*\"$dup\"" src-tauri/src/commands/ | sed 's/^/      /' >&2
   done
   echo "" >&2
   echo "If these duplicates are intentional (e.g. single + bulk variants" >&2

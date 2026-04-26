@@ -20,6 +20,8 @@ import { useTranslation } from "react-i18next";
 // Types
 // ---------------------------------------------------------------------------
 
+type AuditSeverity = "info" | "warning" | "critical";
+
 interface AuditEntry {
   timestamp: string;
   operator: string;
@@ -27,6 +29,12 @@ interface AuditEntry {
   targetDn: string;
   details: string;
   success: boolean;
+  /**
+   * Severity classification. Optional on the wire so pre-1.1.0 audit
+   * exports without the field still deserialize. Defaults to "info"
+   * at render time.
+   */
+  severity?: AuditSeverity;
 }
 
 interface AuditFilter {

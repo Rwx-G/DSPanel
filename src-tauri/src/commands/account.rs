@@ -2,7 +2,9 @@ use tauri::State;
 
 use crate::error::AppError;
 use crate::models::DirectoryEntry;
-use crate::services::audit::{AuditEntry, AuditFilter, AuditQueryResult, ChainVerification};
+use crate::services::audit::{
+    AuditEntry, AuditFilter, AuditQueryResult, AuditSeverity, ChainVerification,
+};
 use crate::services::comparison::GroupComparisonResult;
 use crate::services::mfa::{MfaConfig, MfaSetupResult};
 use crate::services::password::{HibpResult, PasswordOptions};
@@ -534,10 +536,11 @@ pub(crate) async fn disable_unconstrained_delegation_inner(
     let current_uac = match provider.get_user_account_control(computer_dn).await {
         Ok(uac) => uac,
         Err(e) => {
-            state.audit_service.log_failure(
+            state.audit_service.log_failure_with_severity(
                 "DisableUnconstrainedDelegationFailed",
                 computer_dn,
                 &format!("get_user_account_control: {}", e),
+                AuditSeverity::Critical,
             );
             return Err(AppError::Directory(e.to_string()));
         }
@@ -560,18 +563,20 @@ pub(crate) async fn disable_unconstrained_delegation_inner(
             Ok(())
         }
         Ok((previous, new)) => {
-            state.audit_service.log_success(
+            state.audit_service.log_success_with_severity(
                 "DisabledUnconstrainedDelegation",
                 computer_dn,
                 &format!("uac: 0x{:X} -> 0x{:X}", previous, new),
+                AuditSeverity::Critical,
             );
             Ok(())
         }
         Err(e) => {
-            state.audit_service.log_failure(
+            state.audit_service.log_failure_with_severity(
                 "DisableUnconstrainedDelegationFailed",
                 computer_dn,
                 &e.to_string(),
+                AuditSeverity::Critical,
             );
             Err(AppError::Directory(e.to_string()))
         }
@@ -2484,5 +2489,51 @@ mod tests {
             .find(|e| e.action == "DisableUnconstrainedDelegationFailed")
             .expect("failure audit entry recorded");
         assert!(!failed.success);
+    }
+
+    #[tokio::test]
+    async fn test_disable_unconstrained_delegation_records_critical_severity_on_success() {
+        let (state, provider) = make_state_with_level_and_provider(PermissionLevel::Admin);
+        let dn = "CN=SRV01,OU=Computers,DC=example,DC=com";
+        provider.set_user_account_control(dn, 0x80020);
+
+        disable_unconstrained_delegation_inner(&state, dn)
+            .await
+            .unwrap();
+
+        let entries = state.audit_service.get_entries();
+        let success = entries
+            .iter()
+            .find(|e| e.action == "DisabledUnconstrainedDelegation")
+            .expect("success audit entry recorded");
+        assert_eq!(
+            success.severity,
+            AuditSeverity::Critical,
+            "Story 14.6 success entries must be Critical severity (QA-14.6-001)"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_disable_unconstrained_delegation_records_critical_severity_on_failure() {
+        let provider = Arc::new(MockDirectoryProvider::new().with_failure());
+        let provider_ref = Arc::clone(&provider);
+        let state = AppState::new_for_test(provider, PermissionConfig::default());
+        state.permission_service.set_level(PermissionLevel::Admin);
+
+        let dn = "CN=SRV01,OU=Computers,DC=example,DC=com";
+        provider_ref.set_user_account_control(dn, 0x80000);
+
+        let _ = disable_unconstrained_delegation_inner(&state, dn).await;
+
+        let entries = state.audit_service.get_entries();
+        let failed = entries
+            .iter()
+            .find(|e| e.action == "DisableUnconstrainedDelegationFailed")
+            .expect("failure audit entry recorded");
+        assert_eq!(
+            failed.severity,
+            AuditSeverity::Critical,
+            "Story 14.6 failure entries must also be Critical severity (QA-14.6-001)"
+        );
     }
 }
