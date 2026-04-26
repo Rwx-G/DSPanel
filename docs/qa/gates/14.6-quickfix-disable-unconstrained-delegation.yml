@@ -1,0 +1,207 @@
+schema: 1
+story: "14.6"
+story_title: "Quick-Fix - Disable Unconstrained Delegation"
+gate: PASS
+status_reason: "Last quick-fix in Epic 14, highest permission bar (Admin). All 9 ACs met. Defense in depth at 4 gates with permission alignment frontend ↔ backend (no drift). Reused Story 14.4's clear_user_account_control_bits trait method - zero new backend trait surface, generic architecture from 14.4 paid off. AuditSeverity::Critical structural field amendment deferred to a future Epic 11 story with documented rationale; Critical-severity dimension encoded in the unique action name 'DisabledUnconstrainedDelegation' (grep verified - only in new code). All 10 PO-flagged residual risks verified OK. 22/22 new tests pass; full backend 1673/1673, full frontend 2200/2200; clippy/fmt/lint/tsc all clean. No identifying client/customer names anywhere."
+reviewer: "Quinn (Test Architect)"
+updated: "2026-04-26T00:00:00Z"
+
+top_issues:
+  - id: "QA-14.6-001"
+    severity: low
+    finding: "AuditSeverity::Critical structural field on AuditEntry is deferred to a future Epic 11 amendment. Critical-severity dimension is encoded in the unique action name 'DisabledUnconstrainedDelegation' for v1. The action-name encoding works but is fragile to typos in syslog rules and does not help generic severity-aware audit consumers (SIEM dashboards, severity-filtered queries)."
+    suggested_action: "Optional - land the structural AuditSeverity field as a future Epic 11 amendment when AuditEntry needs other structural changes (consolidates the SQLite migration cost). Current encoding is acceptable for v1; the SOC tail/grep workflow on the unique action name is unambiguous."
+    blocking: false
+    suggested_owner: dev
+  - id: "QA-14.6-002"
+    severity: low
+    finding: "No automated check that audit action names are globally unique. A future story accidentally introducing a collision with 'DisabledUnconstrainedDelegation' would silently break the SOC's ability to identify Critical-severity entries by string match."
+    suggested_action: "Optional - add a build-time uniqueness check (simple script grepping for duplicate string literals in log_success / log_failure call sites in commands/*.rs)."
+    blocking: false
+    suggested_owner: dev
+  - id: "QA-14.6-003"
+    severity: low
+    finding: "Per-test `vi.spyOn(permMod, 'usePermissions').mockReturnValue(...)` boilerplate is repeated across 4 of the 5 new ComputerDetail tests. Could be factored into a `withPermission(level)` test helper."
+    suggested_action: "Optional - factor the per-test mock setup into a shared helper. Trivial test cleanup, no functional impact."
+    blocking: false
+    suggested_owner: dev
+
+waiver:
+  active: false
+
+quality_score: 95
+
+expires: "2026-05-26T00:00:00Z"
+
+evidence:
+  tests_reviewed: 22
+  risks_identified: 10
+  trace:
+    ac_covered:
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+      - 6
+      - 7
+      - 8
+      - 9
+    ac_uncovered: []
+    ac_to_test_map:
+      "AC1":
+        code:
+          - "src-tauri/src/commands/account.rs:495 require_fresh_permission(state, PermissionLevel::Admin, ...)"
+          - "src/pages/ComputerDetail.tsx canEditCritical = hasPermission('Admin')"
+          - "src/pages/ComputerDetail.tsx Fix button gated by `indicator.kind === 'UnconstrainedDelegation' && canEditCritical`"
+        notes: "Permission gate is HIGHER than Stories 14.4/14.5 (Admin instead of AccountOperator). Frontend canEditCritical is separate from existing canDelete (AccountOperator) so the Fix button does not appear at lower levels."
+        tests:
+          - "test_disable_unconstrained_delegation_requires_admin (ReadOnly + HelpDesk + AccountOperator denied at backend)"
+          - "does not render the Fix button at the default ReadOnly permission level"
+          - "does not render the Fix button at AccountOperator level (Admin gate is HIGHER)"
+          - "renders the Fix button at Admin level"
+      "AC2":
+        code:
+          - "src/components/dialogs/DisableUnconstrainedDelegationDialog.tsx:90-103 acknowledgement checkbox"
+          - "src/components/dialogs/DisableUnconstrainedDelegationDialog.tsx:127 confirm-disabled-until-acknowledged"
+          - "src/components/dialogs/DisableUnconstrainedDelegationDialog.tsx:86-88 multi-paragraph body via whitespace-pre-line"
+          - "src/locales/{en,fr,de,it,es}/computerDetail.json body string covers all 4 mandatory points"
+        notes: "EN body verified by grep: 'TGT' + 'golden ticket via TGT capture' + 'constrained delegation (set msDS-AllowedToDelegateTo...' + 'SQL Server linked servers / IIS web apps / SharePoint'. Translation completeness suite enforces parity in fr/de/it/es."
+        tests:
+          - "renders the dialog with title and computer name"
+          - "body explains the attack vector (TGT capture / golden ticket)"
+          - "body recommends migration to constrained delegation via msDS-AllowedToDelegateTo"
+          - "body warns about risks to double-hop services"
+          - "disables the Confirm button until the acknowledgement checkbox is checked"
+      "AC3":
+        code:
+          - "src/components/dialogs/DisableUnconstrainedDelegationDialog.tsx:41 const { checkMfa } = useMfaGate()"
+          - "src/components/dialogs/DisableUnconstrainedDelegationDialog.tsx:46 await checkMfa('DisableUnconstrainedDelegation'); if (!mfaAllowed) return"
+        tests:
+          - "invokes the MFA gate before the Tauri command"
+          - "does not call disable_unconstrained_delegation when MFA is denied"
+      "AC4":
+        code:
+          - "src-tauri/src/commands/account.rs #[tauri::command] pub async fn disable_unconstrained_delegation"
+          - "src-tauri/src/lib.rs commands::disable_unconstrained_delegation registered in invoke_handler"
+        tests:
+          - "all 7 command-level tests transitively exercise the wrapper via the inner function"
+      "AC5":
+        code:
+          - "src-tauri/src/commands/account.rs:510-512 calls clear_user_account_control_bits(computer_dn, 0x80000)"
+          - "Story 14.4 trait method handles read + Mod::Replace(attr, HashSet) + idempotent detection internally"
+        notes: "Zero new backend trait surface. Generic trait architecture from Story 14.4 paid off exactly as intended - one trait method serving both PASSWORD_NOT_REQUIRED (14.4) and TRUSTED_FOR_DELEGATION (14.6) clearing."
+        tests:
+          - "test_disable_unconstrained_delegation_succeeds_for_admin (asserts clear_uac_bits_calls record == (dn, 0x80000, 0x80020, 0x00020))"
+          - "Story 14.4's test_clear_uac_bits_works_with_any_mask already verified mask 0x80000 against the trait method"
+      "AC6":
+        code:
+          - "src/pages/ComputerDetail.tsx onSuccess fires notify + onRefresh()"
+          - "src/pages/ComputerDetail.tsx new optional onRefresh prop"
+          - "src/pages/ComputerLookup.tsx wires onRefresh={refresh} to useBrowse refresh"
+          - "ComputerLookup.tsx existing useEffect on `computers` re-runs evaluateComputerSecurityIndicatorsBatch when the list refreshes"
+        tests:
+          - "opens the DisableUnconstrainedDelegationDialog when the Fix button is clicked (verifies the click → dialog flow)"
+      "AC7":
+        code:
+          - "src-tauri/src/commands/account.rs:495 require_fresh_permission(state, PermissionLevel::Admin, 'Disable unconstrained delegation')"
+        tests:
+          - "test_disable_unconstrained_delegation_requires_admin (ReadOnly + HelpDesk + AccountOperator ALL denied; HIGHER bar than 14.4/14.5)"
+      "AC8":
+        code:
+          - "src-tauri/src/commands/account.rs:524 audit_service.log_success('DisabledUnconstrainedDelegation', ...)"
+          - "src-tauri/src/commands/account.rs:532 audit_service.log_failure('DisableUnconstrainedDelegationFailed', ...)"
+        notes: "Both action names verified UNIQUE in the codebase (grep returned only the new command + tests). SOC tail/grep on either string finds only the Critical-severity entries. Structural AuditSeverity field amendment deferred to future Epic 11 - documented in story Completion Notes."
+        tests:
+          - "test_disable_unconstrained_delegation_succeeds_for_admin (asserts audit entry with correct action name)"
+          - "test_disable_unconstrained_delegation_audit_on_directory_failure (asserts failure entry with correct action name)"
+      "AC9":
+        code:
+          - "src-tauri/src/commands/account.rs::tests test_disable_unconstrained_delegation_* (7 tests)"
+        tests:
+          - "test_disable_unconstrained_delegation_requires_admin"
+          - "test_disable_unconstrained_delegation_succeeds_for_admin"
+          - "test_disable_unconstrained_delegation_succeeds_for_domain_admin"
+          - "test_disable_unconstrained_delegation_idempotent_no_op"
+          - "test_disable_unconstrained_delegation_preserves_unrelated_uac_bits"
+          - "test_disable_unconstrained_delegation_captures_snapshot"
+          - "test_disable_unconstrained_delegation_audit_on_directory_failure"
+
+residual_risks:
+  - id: "R1"
+    label: "Permission gate alignment (frontend canEditCritical ↔ backend require_fresh_permission)"
+    status: VERIFIED_OK
+    notes: "Both use PermissionLevel::Admin - same enum value, no drift possible. Tests assert ReadOnly + HelpDesk + AccountOperator denied at both layers. Even if a stale UI cache shows the button at AccountOperator, backend re-detection rejects (defense in depth)."
+  - id: "R2"
+    label: "Generic trait method reuse with mask 0x80000"
+    status: VERIFIED_OK
+    notes: "Story 14.4's test_clear_uac_bits_works_with_any_mask explicitly verifies mask 0x80000 (TRUSTED_FOR_DELEGATION). Story 14.6's test_disable_unconstrained_delegation_succeeds_for_admin verifies the end-to-end chain: previous=0x80020, mask=0x80000, new=0x00020 (correct bit math)."
+  - id: "R3"
+    label: "AuditSeverity deferral + action-name uniqueness"
+    status: VERIFIED_OK
+    notes: "DisabledUnconstrainedDelegation and DisableUnconstrainedDelegationFailed are UNIQUE in the codebase (grep returned only the new command + tests). SOC tail/grep is unambiguous. Deferral documented in Completion Notes with cost analysis. Audit chain SHA-256 integrity preserved - the deferral only affects structural typing of severity."
+  - id: "R4"
+    label: "Snapshot trade-off (carried from 14.4)"
+    status: VERIFIED_OK
+    notes: "Snapshot captured at account.rs:507 BEFORE the trait call at line 510. Rollback semantics preserved. Same wasted-on-no-op trade-off as Story 14.4. Documented inline with cross-reference to Story 14.5's optimization (tracked in QA-14.5-003)."
+  - id: "R5"
+    label: "Idempotent no-op"
+    status: VERIFIED_OK
+    notes: "Test test_disable_unconstrained_delegation_idempotent_no_op: UAC=0x00020 (already clear) → no clear_uac_bits_calls record → no LDAP write → no audit entry → returns Ok. Command logic at lines 514-521 returns early on previous == new without calling log_success."
+  - id: "R6"
+    label: "Unrelated UAC bit preservation"
+    status: VERIFIED_OK
+    notes: "Test test_disable_unconstrained_delegation_preserves_unrelated_uac_bits: UAC=0x82020 → only 0x80000 cleared → new=0x02020. Bits at 0x2000 and 0x0020 (ACCOUNTDISABLE) survive. Story 14.4's test_clear_uac_bits_preserves_unrelated_bits already covered the general case."
+  - id: "R7"
+    label: "ComputerDetail refresh wiring"
+    status: VERIFIED_OK
+    notes: "ComputerDetail.tsx onSuccess calls onRefresh?.(). ComputerLookup.tsx wires onRefresh={refresh} to useBrowse refresh. Existing computerLookup useEffect on `computers` re-runs evaluateComputerSecurityIndicatorsBatch when the list refreshes - the badge naturally disappears once the indicator evaluates against the cleared UAC."
+  - id: "R8"
+    label: "Body content completeness (AC #2 - 4 mandatory points)"
+    status: VERIFIED_OK
+    notes: "Grep on EN computerDetail.json body confirmed all 4 mandatory points: 'TGT' (Ticket-Granting Ticket explanation), 'golden ticket via TGT capture' (attack vector), 'constrained delegation (set msDS-AllowedToDelegateTo...' (migration), 'SQL Server linked servers / IIS web apps / SharePoint with Kerberos delegation' (double-hop service examples). Translation completeness suite enforces parity in fr/de/it/es."
+  - id: "R9"
+    label: "No `unwrap()` in production code"
+    status: VERIFIED_OK
+    notes: "Grep on src/components/dialogs/DisableUnconstrainedDelegationDialog.tsx returned zero unwrap() calls. Production lines of disable_unconstrained_delegation_inner in account.rs have zero .unwrap() calls (test code uses unwrap which is allowed)."
+  - id: "R10"
+    label: "No identifying client/customer/deployment names"
+    status: VERIFIED_OK
+    notes: "Grep for INFORMADIS|LECLERC across the entire repo returned zero matches. New i18n strings, test data, audit details all use generic placeholders (corp.example, srv01, dc01.corp.local, CN=DC01,DC=example,DC=com)."
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "4 gates at the highest bar in the epic (canEditCritical + Admin re-detection + useMfaGate + backend MFA check). Action name uniquely identifiable as Critical-severity proxy. Audit chain SHA-256 integrity preserved. Snapshot before write. UAC bit isolation tested. No unwrap() outside tests, no innerHTML. Defense-in-depth bypass attempt (lower-permission forged IPC) rejected at require_fresh_permission. AuditSeverity deferral does not compromise chain integrity."
+  performance:
+    status: PASS
+    notes: "Per-fix cost: 4 LDAP round trips. Same as Story 14.4. Acceptable for an interactive Admin-level operator action."
+  reliability:
+    status: PASS
+    notes: "ResilientDirectoryProvider wrapping inherited from the Story 14.4 trait method. Idempotent no-op handles double-clicks. Snapshot before write enables rollback. log_failure on directory error. Frontend has loading state + error message + Cancel respects loading."
+  maintainability:
+    status: PASS
+    notes: "Reused trait method - zero new abstractions. Mirrors Stories 14.4/14.5 patterns exactly. Discriminated union state extensible. AuditSeverity deferral rationale documented in Completion Notes. No identifying client/customer names."
+  accessibility:
+    status: PASS
+    notes: "Fix button explicit aria-label via i18n. Dialog ariaLabel via DialogShell. Acknowledgement checkbox has wrapping label association. Confirm-disabled state prevents accidental empty-acknowledgement submit. Cancel respects loading. Body uses whitespace-pre-line for proper paragraph rendering with screen readers."
+
+recommendations:
+  immediate: []
+  future:
+    - "Optional: structural AuditSeverity::Critical field on AuditEntry. Currently deferred per the documented rationale. Future Epic 11 amendment when AuditEntry needs other structural changes (consolidates SQLite migration cost)."
+    - "Optional: build-time uniqueness check on audit action names. Simple script grepping for duplicate string literals in log_success / log_failure call sites in commands/*.rs."
+    - "Optional: factor the per-test vi.spyOn(permMod, 'usePermissions') boilerplate in ComputerDetail.test.tsx into a withPermission(level) helper. Trivial test cleanup."
+
+test_summary:
+  new_tests_in_story: 22
+  test_files_touched:
+    - "src-tauri/src/commands/account.rs (+7 command-level tests)"
+    - "src/components/dialogs/DisableUnconstrainedDelegationDialog.test.tsx (new, 10 tests)"
+    - "src/pages/ComputerDetail.test.tsx (+5 tests, total 43)"
+  full_backend_suite: "1673 passed, 0 failures, 2 ignored (pre-existing). +7 new vs pre-story baseline."
+  full_frontend_suite: "2200 passed (143 files), 0 failures, 0 new ignored. +15 new vs pre-story baseline."
+  translation_completeness_suite: "176 tests across en/fr/de/it/es - green ({{name}} and {{error}} interpolation preserved)"
+  lint: "clean (eslint exit 0, cargo clippy --features gssapi --all-targets -- -D warnings exit 0)"
+  fmt: "clean (cargo fmt --check exit 0)"
+  tsc: "clean (no diagnostics)"

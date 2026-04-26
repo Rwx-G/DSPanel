@@ -20,5 +20,17 @@
   "filterGroups": "Filtrar grupos...",
   "groupName": "Nombre del grupo",
   "viewGroupMembers": "Ver miembros del grupo",
-  "openMonitoring": "Abrir monitoreo de estación de trabajo"
+  "openMonitoring": "Abrir monitoreo de estación de trabajo",
+  "quickFix": {
+    "disableUnconstrainedDelegation": {
+      "fixButton": "Corregir",
+      "fixButtonAriaLabel": "Deshabilitar la delegación Kerberos sin restricciones",
+      "title": "Deshabilitar la delegación Kerberos sin restricciones",
+      "body": "Este equipo está autorizado para la delegación sin restricciones: cuando un usuario se autentica contra él, el equipo recibe un Ticket-Granting Ticket (TGT) reenviable para ese usuario y puede suplantarlo ante cualquier otro servicio del dominio.\n\nVector de ataque: un atacante que comprometa este host recolecta los TGT de cada usuario que se haya autenticado contra él (almacenados en caché durante 10 horas por defecto), incluido cualquier Domain Admin que haya iniciado sesión, y los reproduce en cualquier parte del dominio. Esta es la primitiva clásica de 'golden ticket via TGT capture'.\n\nMigración recomendada: reemplazar con delegación restringida (establecer msDS-AllowedToDelegateTo a los SPN destino específicos que el host realmente necesita llamar). La delegación restringida limita el radio de impacto a los servicios destino explícitos.\n\nRiesgo si se deshabilita a ciegas: los servicios Kerberos legítimos de doble salto SE INTERRUMPIRÁN. Ejemplos: SQL Server linked servers ejecutando consultas contra otra instancia SQL bajo la identidad del usuario llamador, aplicaciones web IIS que suplantan al usuario hacia un SQL o recurso compartido de backend, SharePoint con delegación Kerberos. Verifique que ningún servicio de producción en este host requiera la configuración actual antes de continuar.",
+      "checkboxLabel": "He verificado que ningún servicio de producción en este host requiere delegación sin restricciones",
+      "confirmButton": "Deshabilitar la delegación",
+      "successNotification": "Delegación sin restricciones deshabilitada en {{name}}",
+      "failureNotification": "Error al deshabilitar la delegación sin restricciones: {{error}}"
+    }
+  }
 }

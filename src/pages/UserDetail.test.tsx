@@ -2,9 +2,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { type ReactNode } from "react";
 import { UserDetail, type UserDetailProps } from "./UserDetail";
+import { mockPermissionLevel } from "@/test-utils/permissions";
 import { NavigationProvider } from "@/contexts/NavigationContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import { DialogProvider } from "@/contexts/DialogContext";
+import { NotificationHost } from "@/components/common/NotificationHost";
 import type { DirectoryUser } from "@/types/directory";
 import type { AccountHealthStatus } from "@/types/health";
 
@@ -12,7 +14,10 @@ function TestProviders({ children }: { children: ReactNode }) {
   return (
     <NotificationProvider>
       <DialogProvider>
-        <NavigationProvider>{children}</NavigationProvider>
+        <NavigationProvider>
+          {children}
+          <NotificationHost />
+        </NavigationProvider>
       </DialogProvider>
     </NotificationProvider>
   );
@@ -664,13 +669,7 @@ describe("UserDetail", () => {
 
   it("shows pending changes bar after staging a change via PropertyGrid", async () => {
     // Mock usePermissions so canEdit is true
-    const permMod = await import("@/hooks/usePermissions");
-    vi.spyOn(permMod, "usePermissions").mockReturnValue({
-      hasPermission: () => true,
-      level: "AccountOperator" as import("@/types/permissions").PermissionLevel,
-      groups: [],
-      loading: false,
-    });
+    await mockPermissionLevel("AccountOperator");
 
     render(<UserDetail {...makeProps()} />, { wrapper: TestProviders });
 
@@ -692,13 +691,7 @@ describe("UserDetail", () => {
   });
 
   it("clears pending changes when Discard button is clicked", async () => {
-    const permMod = await import("@/hooks/usePermissions");
-    vi.spyOn(permMod, "usePermissions").mockReturnValue({
-      hasPermission: () => true,
-      level: "AccountOperator" as import("@/types/permissions").PermissionLevel,
-      groups: [],
-      loading: false,
-    });
+    await mockPermissionLevel("AccountOperator");
 
     render(<UserDetail {...makeProps()} />, { wrapper: TestProviders });
 
@@ -785,13 +778,7 @@ describe("UserDetail", () => {
   // ---------------------------------------------------------------------------
 
   it("shows delete button when user has AccountOperator permission", async () => {
-    const permMod = await import("@/hooks/usePermissions");
-    vi.spyOn(permMod, "usePermissions").mockReturnValue({
-      hasPermission: () => true,
-      level: "AccountOperator" as import("@/types/permissions").PermissionLevel,
-      groups: [],
-      loading: false,
-    });
+    await mockPermissionLevel("AccountOperator");
 
     render(<UserDetail {...makeProps()} />, { wrapper: TestProviders });
     expect(screen.getByTestId("user-delete-btn")).toBeInTheDocument();
@@ -799,13 +786,7 @@ describe("UserDetail", () => {
 
   it("hides delete button for ReadOnly users", async () => {
     // Explicitly set ReadOnly permissions (previous tests may have spied)
-    const permMod = await import("@/hooks/usePermissions");
-    vi.spyOn(permMod, "usePermissions").mockReturnValue({
-      hasPermission: () => false,
-      level: "ReadOnly" as import("@/types/permissions").PermissionLevel,
-      groups: [],
-      loading: false,
-    });
+    await mockPermissionLevel("ReadOnly");
 
     render(<UserDetail {...makeProps()} />, { wrapper: TestProviders });
     expect(screen.queryByTestId("user-delete-btn")).not.toBeInTheDocument();
@@ -844,13 +825,7 @@ describe("UserDetail", () => {
     globalThis.IntersectionObserver =
       NotVisibleObserver as unknown as typeof IntersectionObserver;
 
-    const permMod = await import("@/hooks/usePermissions");
-    vi.spyOn(permMod, "usePermissions").mockReturnValue({
-      hasPermission: () => true,
-      level: "AccountOperator" as import("@/types/permissions").PermissionLevel,
-      groups: [],
-      loading: false,
-    });
+    await mockPermissionLevel("AccountOperator");
 
     render(<UserDetail {...makeProps()} />, { wrapper: TestProviders });
 
@@ -951,13 +926,7 @@ describe("UserDetail", () => {
   // ---------------------------------------------------------------------------
 
   it("shows multiple attribute names in pending changes bar", async () => {
-    const permMod = await import("@/hooks/usePermissions");
-    vi.spyOn(permMod, "usePermissions").mockReturnValue({
-      hasPermission: () => true,
-      level: "AccountOperator" as import("@/types/permissions").PermissionLevel,
-      groups: [],
-      loading: false,
-    });
+    await mockPermissionLevel("AccountOperator");
 
     render(<UserDetail {...makeProps()} />, { wrapper: TestProviders });
 
@@ -996,5 +965,501 @@ describe("UserDetail", () => {
     const naTexts = screen.getAllByText("N/A");
     // At least 2 N/A: whenCreated + whenChanged (and possibly lastLogonWorkstation)
     expect(naTexts.length).toBeGreaterThanOrEqual(2);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Story 14.2 - security indicator badges
+  // ---------------------------------------------------------------------------
+
+  it("renders no security indicator badges when the prop is undefined", () => {
+    render(<UserDetail {...makeProps()} />, { wrapper: TestProviders });
+    expect(
+      screen.queryByTestId(/^security-indicator-badge-/),
+    ).not.toBeInTheDocument();
+  });
+
+  it("renders no security indicator badges when the indicator list is empty", () => {
+    render(
+      <UserDetail
+        {...makeProps({
+          securityIndicators: { indicators: [], highestSeverity: "Healthy" },
+        })}
+      />,
+      { wrapper: TestProviders },
+    );
+    expect(
+      screen.queryByTestId(/^security-indicator-badge-/),
+    ).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["Kerberoastable", "warning"] as const,
+    ["PasswordNotRequired", "error"] as const,
+    ["PasswordNeverExpires", "warning"] as const,
+    ["ReversibleEncryption", "error"] as const,
+    ["AsRepRoastable", "error"] as const,
+  ])("renders %s indicator badge with %s variant", (kind, expectedVariant) => {
+    render(
+      <UserDetail
+        {...makeProps({
+          securityIndicators: {
+            indicators: [
+              {
+                kind,
+                severity: expectedVariant === "error" ? "Critical" : "Warning",
+                descriptionKey: `securityIndicators.${kind}`,
+              },
+            ],
+            highestSeverity: expectedVariant === "error" ? "Critical" : "Warning",
+          },
+        })}
+      />,
+      { wrapper: TestProviders },
+    );
+    const badge = screen.getByTestId(`security-indicator-badge-${kind}`);
+    expect(badge).toBeInTheDocument();
+    expect(badge.querySelector('[data-testid="status-badge"]')).toHaveAttribute(
+      "data-variant",
+      expectedVariant,
+    );
+  });
+
+  it("renders multiple indicator badges in declaration order", () => {
+    render(
+      <UserDetail
+        {...makeProps({
+          securityIndicators: {
+            indicators: [
+              {
+                kind: "PasswordNotRequired",
+                severity: "Critical",
+                descriptionKey: "securityIndicators.PasswordNotRequired",
+              },
+              {
+                kind: "Kerberoastable",
+                severity: "Warning",
+                descriptionKey: "securityIndicators.Kerberoastable",
+              },
+            ],
+            highestSeverity: "Critical",
+          },
+        })}
+      />,
+      { wrapper: TestProviders },
+    );
+    expect(
+      screen.getByTestId("security-indicator-badge-PasswordNotRequired"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId("security-indicator-badge-Kerberoastable"),
+    ).toBeInTheDocument();
+  });
+
+  it("uses the indicator severity for the badge variant (escalated Kerberoastable becomes error)", () => {
+    render(
+      <UserDetail
+        {...makeProps({
+          securityIndicators: {
+            indicators: [
+              {
+                kind: "Kerberoastable",
+                severity: "Critical",
+                descriptionKey: "securityIndicators.Kerberoastable",
+              },
+            ],
+            highestSeverity: "Critical",
+          },
+        })}
+      />,
+      { wrapper: TestProviders },
+    );
+    const badge = screen.getByTestId("security-indicator-badge-Kerberoastable");
+    expect(badge.querySelector('[data-testid="status-badge"]')).toHaveAttribute(
+      "data-variant",
+      "error",
+    );
+  });
+
+  it("attaches the localized tooltip text via title attribute", () => {
+    render(
+      <UserDetail
+        {...makeProps({
+          securityIndicators: {
+            indicators: [
+              {
+                kind: "AsRepRoastable",
+                severity: "Critical",
+                descriptionKey: "securityIndicators.AsRepRoastable",
+              },
+            ],
+            highestSeverity: "Critical",
+          },
+        })}
+      />,
+      { wrapper: TestProviders },
+    );
+    const badge = screen.getByTestId("security-indicator-badge-AsRepRoastable");
+    const title = badge.getAttribute("title") ?? "";
+    expect(title).toContain("DONT_REQUIRE_PREAUTH");
+  });
+
+  // ---------------------------------------------------------------------------
+  // Story 14.4 - Quick-fix Clear PasswordNotRequired button
+  // ---------------------------------------------------------------------------
+
+  it("renders the Fix button next to the PasswordNotRequired badge for AccountOperator+", () => {
+    // The default usePermissions mock in this test file returns
+    // hasPermission(level) checking against AccountOperator. The
+    // canEdit boolean in UserDetail is hasPermission("AccountOperator")
+    // which is true by default in the test wrapper - confirm with the
+    // existing canEdit-dependent assertions below.
+    render(
+      <UserDetail
+        {...makeProps({
+          securityIndicators: {
+            indicators: [
+              {
+                kind: "PasswordNotRequired",
+                severity: "Critical",
+                descriptionKey: "securityIndicators.PasswordNotRequired",
+              },
+            ],
+            highestSeverity: "Critical",
+          },
+        })}
+      />,
+      { wrapper: TestProviders },
+    );
+    expect(
+      screen.getByTestId("quick-fix-PasswordNotRequired-btn"),
+    ).toBeInTheDocument();
+  });
+
+  it("does not render the Fix button next to other indicator kinds", () => {
+    render(
+      <UserDetail
+        {...makeProps({
+          securityIndicators: {
+            indicators: [
+              {
+                kind: "Kerberoastable",
+                severity: "Warning",
+                descriptionKey: "securityIndicators.Kerberoastable",
+              },
+              {
+                kind: "ReversibleEncryption",
+                severity: "Critical",
+                descriptionKey: "securityIndicators.ReversibleEncryption",
+              },
+            ],
+            highestSeverity: "Critical",
+          },
+        })}
+      />,
+      { wrapper: TestProviders },
+    );
+    expect(
+      screen.queryByTestId("quick-fix-PasswordNotRequired-btn"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("opens the ClearPasswordNotRequiredDialog when the Fix button is clicked", async () => {
+    render(
+      <UserDetail
+        {...makeProps({
+          securityIndicators: {
+            indicators: [
+              {
+                kind: "PasswordNotRequired",
+                severity: "Critical",
+                descriptionKey: "securityIndicators.PasswordNotRequired",
+              },
+            ],
+            highestSeverity: "Critical",
+          },
+        })}
+      />,
+      { wrapper: TestProviders },
+    );
+
+    expect(
+      screen.queryByTestId("clear-password-not-required-dialog"),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("quick-fix-PasswordNotRequired-btn"));
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId("clear-password-not-required-dialog"),
+      ).toBeInTheDocument();
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Story 14.5 - Quick-fix Manage SPNs button
+  // ---------------------------------------------------------------------------
+
+  it("renders the Manage SPNs button next to the Kerberoastable badge for AccountOperator+", () => {
+    render(
+      <UserDetail
+        {...makeProps({
+          user: makeUser({
+            rawAttributes: {
+              servicePrincipalName: ["MSSQLSvc/db.corp.local:1433"],
+            },
+          }),
+          securityIndicators: {
+            indicators: [
+              {
+                kind: "Kerberoastable",
+                severity: "Warning",
+                descriptionKey: "securityIndicators.Kerberoastable",
+              },
+            ],
+            highestSeverity: "Warning",
+          },
+        })}
+      />,
+      { wrapper: TestProviders },
+    );
+    expect(
+      screen.getByTestId("quick-fix-RemoveUserSpns-btn"),
+    ).toBeInTheDocument();
+  });
+
+  it("does not render the Manage SPNs button next to other indicator kinds", () => {
+    render(
+      <UserDetail
+        {...makeProps({
+          securityIndicators: {
+            indicators: [
+              {
+                kind: "PasswordNeverExpires",
+                severity: "Warning",
+                descriptionKey: "securityIndicators.PasswordNeverExpires",
+              },
+            ],
+            highestSeverity: "Warning",
+          },
+        })}
+      />,
+      { wrapper: TestProviders },
+    );
+    expect(
+      screen.queryByTestId("quick-fix-RemoveUserSpns-btn"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("opens the ManageSpnsDialog with the user's current SPNs when the button is clicked", async () => {
+    render(
+      <UserDetail
+        {...makeProps({
+          user: makeUser({
+            rawAttributes: {
+              servicePrincipalName: [
+                "MSSQLSvc/db.corp.local:1433",
+                "HTTP/web1.corp.local",
+              ],
+            },
+          }),
+          securityIndicators: {
+            indicators: [
+              {
+                kind: "Kerberoastable",
+                severity: "Warning",
+                descriptionKey: "securityIndicators.Kerberoastable",
+              },
+            ],
+            highestSeverity: "Warning",
+          },
+        })}
+      />,
+      { wrapper: TestProviders },
+    );
+
+    expect(
+      screen.queryByTestId("manage-spns-dialog"),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("quick-fix-RemoveUserSpns-btn"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("manage-spns-dialog")).toBeInTheDocument();
+    });
+    // Both removable SPN rows are rendered (system-SPN guard would hide
+    // them but neither MSSQLSvc nor HTTP is system)
+    expect(
+      screen.getByTestId("spn-row-MSSQLSvc/db.corp.local:1433"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId("spn-row-HTTP/web1.corp.local"),
+    ).toBeInTheDocument();
+  });
+
+  // ---------------------------------------------------------------------------
+  // E2E success-path tests for quick-fix flows (QA-14.4-002)
+  // Click Fix -> dialog -> ack checkbox -> Confirm -> invoke -> notification -> onRefresh
+  // ---------------------------------------------------------------------------
+
+  it("E2E: clear PasswordNotRequired runs invoke, fires success notification, and calls onRefresh", async () => {
+    const { invoke } = await import("@tauri-apps/api/core");
+    const mockedInvoke = vi.mocked(invoke);
+    mockedInvoke.mockImplementation((cmd: string) => {
+      if (cmd === "mfa_is_configured") {
+        return Promise.resolve(false) as ReturnType<typeof invoke>;
+      }
+      if (cmd === "clear_password_not_required") {
+        return Promise.resolve(null) as ReturnType<typeof invoke>;
+      }
+      return Promise.resolve(null) as ReturnType<typeof invoke>;
+    });
+
+    const onRefresh = vi.fn();
+
+    render(
+      <UserDetail
+        {...makeProps({
+          onRefresh,
+          securityIndicators: {
+            indicators: [
+              {
+                kind: "PasswordNotRequired",
+                severity: "Critical",
+                descriptionKey: "securityIndicators.PasswordNotRequired",
+              },
+            ],
+            highestSeverity: "Critical",
+          },
+        })}
+      />,
+      { wrapper: TestProviders },
+    );
+
+    fireEvent.click(screen.getByTestId("quick-fix-PasswordNotRequired-btn"));
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId("clear-password-not-required-dialog"),
+      ).toBeInTheDocument();
+    });
+
+    const ackCheckbox = screen.getByTestId("acknowledge-checkbox");
+    expect(screen.getByTestId("confirm-btn")).toBeDisabled();
+    fireEvent.click(ackCheckbox);
+    expect(screen.getByTestId("confirm-btn")).not.toBeDisabled();
+
+    fireEvent.click(screen.getByTestId("confirm-btn"));
+
+    await waitFor(() => {
+      const calls = mockedInvoke.mock.calls.filter(
+        (c) => c[0] === "clear_password_not_required",
+      );
+      expect(calls.length).toBe(1);
+      expect(calls[0][1]).toEqual({
+        userDn: "CN=John Doe,OU=Users,DC=example,DC=com",
+      });
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.queryByTestId("clear-password-not-required-dialog"),
+      ).not.toBeInTheDocument();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("notification-host")).toBeInTheDocument();
+    });
+    expect(
+      screen.getByText(/PasswordNotRequired cleared on John Doe/),
+    ).toBeInTheDocument();
+
+    expect(onRefresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("E2E: remove SPNs runs invoke, fires success notification (pluralised), and calls onRefresh", async () => {
+    const { invoke } = await import("@tauri-apps/api/core");
+    const mockedInvoke = vi.mocked(invoke);
+    mockedInvoke.mockImplementation((cmd: string) => {
+      if (cmd === "mfa_is_configured") {
+        return Promise.resolve(false) as ReturnType<typeof invoke>;
+      }
+      if (cmd === "remove_user_spns") {
+        return Promise.resolve({
+          removed: ["MSSQLSvc/db.corp.local:1433"],
+          kept: ["HTTP/web1.corp.local"],
+          blockedSystem: [],
+        }) as ReturnType<typeof invoke>;
+      }
+      return Promise.resolve(null) as ReturnType<typeof invoke>;
+    });
+
+    const onRefresh = vi.fn();
+
+    render(
+      <UserDetail
+        {...makeProps({
+          onRefresh,
+          user: makeUser({
+            rawAttributes: {
+              servicePrincipalName: [
+                "MSSQLSvc/db.corp.local:1433",
+                "HTTP/web1.corp.local",
+              ],
+            },
+          }),
+          securityIndicators: {
+            indicators: [
+              {
+                kind: "Kerberoastable",
+                severity: "Warning",
+                descriptionKey: "securityIndicators.Kerberoastable",
+              },
+            ],
+            highestSeverity: "Warning",
+          },
+        })}
+      />,
+      { wrapper: TestProviders },
+    );
+
+    fireEvent.click(screen.getByTestId("quick-fix-RemoveUserSpns-btn"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("manage-spns-dialog")).toBeInTheDocument();
+    });
+
+    expect(screen.getByTestId("confirm-btn")).toBeDisabled();
+    fireEvent.click(
+      screen.getByTestId("spn-checkbox-MSSQLSvc/db.corp.local:1433"),
+    );
+    expect(screen.getByTestId("confirm-btn")).not.toBeDisabled();
+
+    fireEvent.click(screen.getByTestId("confirm-btn"));
+
+    await waitFor(() => {
+      const calls = mockedInvoke.mock.calls.filter(
+        (c) => c[0] === "remove_user_spns",
+      );
+      expect(calls.length).toBe(1);
+      expect(calls[0][1]).toEqual({
+        userDn: "CN=John Doe,OU=Users,DC=example,DC=com",
+        spnsToRemove: ["MSSQLSvc/db.corp.local:1433"],
+      });
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.queryByTestId("manage-spns-dialog"),
+      ).not.toBeInTheDocument();
+    });
+
+    // i18n returns the singular form for count = 1
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Removed 1 SPN from John Doe/),
+      ).toBeInTheDocument();
+    });
+
+    expect(onRefresh).toHaveBeenCalledTimes(1);
   });
 });

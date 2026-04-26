@@ -1,15 +1,18 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { SearchBar } from "@/components/common/SearchBar";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { EmptyState } from "@/components/common/EmptyState";
 import { TruncatedBanner } from "@/components/common/TruncatedBanner";
 import { StatusBadge } from "@/components/common/StatusBadge";
+import { SecurityIndicatorDot } from "@/components/common/SecurityIndicatorDot";
 import { VirtualizedList } from "@/components/data/VirtualizedList";
 import {
   ContextMenu,
   type ContextMenuItem,
 } from "@/components/common/ContextMenu";
 import { type DirectoryComputer, mapEntryToComputer } from "@/types/directory";
+import type { SecurityIndicatorSet } from "@/types/securityIndicators";
+import { evaluateComputerSecurityIndicatorsBatch } from "@/services/securityIndicators";
 import { useBrowse } from "@/hooks/useBrowse";
 import { usePermissions } from "@/hooks/usePermissions";
 import { ComputerDetail } from "@/pages/ComputerDetail";
@@ -58,6 +61,25 @@ export function ComputerLookup() {
   const { hasPermission } = usePermissions();
   const canMove = hasPermission("AccountOperator");
   const [moveTargets, setMoveTargets] = useState<MoveTarget[] | null>(null);
+  const [indicatorMap, setIndicatorMap] = useState<
+    Map<string, SecurityIndicatorSet>
+  >(new Map());
+
+  useEffect(() => {
+    if (computers.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const map = await evaluateComputerSecurityIndicatorsBatch(computers);
+        if (!cancelled) setIndicatorMap(map);
+      } catch (e) {
+        console.warn("Computer security indicators batch failed:", e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [computers]);
   const [contextMenuPos, setContextMenuPos] = useState<{
     x: number;
     y: number;
@@ -160,9 +182,20 @@ export function ComputerLookup() {
           text={computer.enabled ? t("common:active") : t("common:disabled")}
           variant={computer.enabled ? "success" : "error"}
         />
+        {indicatorMap.get(computer.distinguishedName) && (
+          <SecurityIndicatorDot
+            indicators={indicatorMap.get(computer.distinguishedName)!}
+          />
+        )}
       </button>
     ),
-    [selectedComputer, setSelectedComputer, handleComputerContextMenu],
+    [
+      selectedComputer,
+      setSelectedComputer,
+      handleComputerContextMenu,
+      indicatorMap,
+      t,
+    ],
   );
 
   return (
@@ -303,10 +336,14 @@ export function ComputerLookup() {
               {selectedComputer ? (
                 <ComputerDetail
                   computer={selectedComputer}
+                  securityIndicators={indicatorMap.get(
+                    selectedComputer.distinguishedName,
+                  )}
                   onDeleted={() => {
                     setSelectedComputer(null);
                     refresh();
                   }}
+                  onRefresh={refresh}
                 />
               ) : (
                 <div className="flex h-full items-center justify-center">

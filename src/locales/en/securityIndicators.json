@@ -1,0 +1,41 @@
+{
+  "Kerberoastable": {
+    "badge": "Kerberoastable",
+    "tooltip": "This account exposes a Service Principal Name. Any authenticated user can request a service ticket for it and crack the account password offline. (servicePrincipalName attribute)"
+  },
+  "PasswordNotRequired": {
+    "badge": "Password not required",
+    "tooltip": "The account is allowed to have an empty password. An attacker who learns the username can authenticate with no credential at all. (userAccountControl bit PASSWD_NOTREQD 0x0020)"
+  },
+  "PasswordNeverExpires": {
+    "badge": "Password never expires",
+    "tooltip": "The password of this account never expires. Long-lived credentials are higher value to attackers and bypass your password rotation policy. (userAccountControl bit DONT_EXPIRE_PASSWORD 0x10000)"
+  },
+  "ReversibleEncryption": {
+    "badge": "Reversible encryption",
+    "tooltip": "The password of this account is stored in a form equivalent to plaintext. Anyone who can read the directory database recovers the password. (userAccountControl bit ENCRYPTED_TEXT_PWD_ALLOWED 0x0080)"
+  },
+  "AsRepRoastable": {
+    "badge": "AS-REP roastable",
+    "tooltip": "Kerberos pre-authentication is disabled for this account. An unauthenticated attacker can request an AS-REP and crack the account password offline. (userAccountControl bit DONT_REQUIRE_PREAUTH 0x400000)"
+  },
+  "UnconstrainedDelegation": {
+    "badge": "Unconstrained delegation",
+    "tooltip": "This computer can impersonate any user that authenticates against it. A compromise of this host compromises every account that ever logged on. (userAccountControl bit TRUSTED_FOR_DELEGATION 0x80000)"
+  },
+  "ConstrainedDelegation": {
+    "badge": "Constrained delegation",
+    "tooltip": "This computer can impersonate users when authenticating to: {{targets}}. Verify each target SPN is still required and minimal. (msDS-AllowedToDelegateTo)"
+  },
+  "Rbcd": {
+    "badge": "RBCD",
+    "tooltip": "These principals can impersonate users to this computer: {{principals}}. Often legitimate (e.g. SQL Server delegation), but if a low-privilege account has write access to this attribute it enables a relay attack. (msDS-AllowedToActOnBehalfOfOtherIdentity)"
+  },
+  "dot": {
+    "ariaLabel": "Security indicators: {{count}}",
+    "popoverHeader": "Security indicators",
+    "noIndicators": "No security indicators detected",
+    "metadataMore_one": "+{{count}} more",
+    "metadataMore_other": "+{{count}} more"
+  }
+}

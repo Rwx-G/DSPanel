@@ -1,0 +1,35 @@
+# Audit action names allowed to appear at multiple log_success / log_failure
+# call sites. One name per line. Comments start with #.
+#
+# A name belongs here when several call sites legitimately emit the SAME
+# audit category - e.g. a single-object operation AND its bulk variant
+# both emit `ObjectMoved` so that SOC consumers tail/grep on one string
+# and get every move event regardless of single vs bulk origin.
+#
+# Adding to this list should be deliberate. The default invariant is:
+# every audit action name is unique across src-tauri/src/commands/. The
+# QA-14.6-002 motivation is to catch a future story accidentally
+# reusing a unique critical-severity action name (e.g.
+# DisabledUnconstrainedDelegation) and silently breaking SOC alerts.
+
+# Story 7.x - move_object_inner (single) + bulk_move_objects_inner (bulk)
+# share the same audit category for the underlying AD operation.
+ObjectMoved
+MoveObjectFailed
+
+# Story 14.5 (QA-14.5-001) - read-phase failure (get_user_spns) and
+# write-phase failure (modify_attribute) both emit the same audit
+# action so SOC counts them together as "remove SPNs failed" regardless
+# of which LDAP call broke. Read-phase log adds 'get_user_spns:' prefix
+# in the details string for forensic granularity.
+RemoveUserSpnsFailed
+
+# Story 14.4 + 14.6 (QA-14.5-003 retro-applied) - same pattern as 14.5:
+# the no-op-before-snapshot optimization splits the read (peek
+# get_user_account_control) from the write (clear_user_account_control_bits)
+# in the command layer. A failure on either side emits the same audit
+# action so SOC counts them together. Read-phase log adds
+# 'get_user_account_control:' prefix in the details for forensic
+# granularity.
+ClearPasswordNotRequiredFailed
+DisableUnconstrainedDelegationFailed

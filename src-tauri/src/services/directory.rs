@@ -115,6 +115,44 @@ pub trait DirectoryProvider: Send + Sync {
     /// Disables a user account by setting the ACCOUNTDISABLE flag in `userAccountControl`.
     async fn disable_account(&self, user_dn: &str) -> Result<()>;
 
+    /// Generic UAC bit-clear helper - reads the current `userAccountControl`,
+    /// masks out the supplied bits, and writes back when the value changed.
+    ///
+    /// Used by Epic 14 quick-fix actions to safely flip individual UAC flags
+    /// (e.g. `0x0020` PASSWD_NOTREQD for Story 14.4, `0x80000`
+    /// TRUSTED_FOR_DELEGATION for Story 14.6) without needing a per-action
+    /// trait method.
+    ///
+    /// Returns `(previous_uac, new_uac)`. When the bits were already clear
+    /// the two values are equal and no LDAP write was performed - the
+    /// caller treats this as an idempotent no-op (skip snapshot, skip
+    /// audit entry).
+    async fn clear_user_account_control_bits(
+        &self,
+        user_dn: &str,
+        bits_to_clear: u32,
+    ) -> Result<(u32, u32)>;
+
+    /// Reads the current `userAccountControl` value for a user or computer
+    /// object without writing anything back.
+    ///
+    /// Used by Stories 14.4 / 14.6 quick-fix command layers as a no-op peek
+    /// before calling `capture_snapshot` + `clear_user_account_control_bits`,
+    /// so an idempotent invocation (target bit already clear) skips the
+    /// snapshot write entirely - matching the no-op-before-snapshot pattern
+    /// Story 14.5 already has via its explicit `get_user_spns` read phase.
+    async fn get_user_account_control(&self, user_dn: &str) -> Result<u32>;
+
+    /// Returns the multi-valued `servicePrincipalName` attribute on a user
+    /// object as a `Vec<String>`. Returns `Ok(vec![])` when the attribute is
+    /// absent.
+    ///
+    /// Used by Story 14.5 quick-fix `remove_user_spns` to read the current
+    /// SPN set before computing the new one. The write goes through the
+    /// existing `modify_attribute(dn, "servicePrincipalName", &new_set)`
+    /// path - no separate write trait method needed.
+    async fn get_user_spns(&self, user_dn: &str) -> Result<Vec<String>>;
+
     /// Reads the "User Cannot Change Password" flag from the DACL.
     async fn get_cannot_change_password(&self, user_dn: &str) -> Result<bool>;
 
@@ -373,6 +411,19 @@ pub mod tests {
         pub update_managed_by_calls: Mutex<Vec<(String, String)>>,
         pub create_user_calls: Mutex<Vec<(String, String, String)>>,
         pub modify_attribute_calls: Mutex<Vec<(String, String, Vec<String>)>>,
+        /// Per-user-DN userAccountControl values. Used by
+        /// `clear_user_account_control_bits` to simulate read-modify-write.
+        /// Pre-populate with `set_user_account_control(dn, uac)`; defaults
+        /// to 0 when absent.
+        pub user_uac: Mutex<HashMap<String, u32>>,
+        /// Records every successful clear_user_account_control_bits call
+        /// (idempotent no-ops are NOT recorded). Tuple is
+        /// `(dn, bits_to_clear, previous_uac, new_uac)`.
+        pub clear_uac_bits_calls: Mutex<Vec<(String, u32, u32, u32)>>,
+        /// Per-user-DN `servicePrincipalName` value lists. Used by
+        /// `get_user_spns` to simulate the multi-valued attribute. Defaults
+        /// to empty `Vec` when absent.
+        pub user_spns: Mutex<HashMap<String, Vec<String>>>,
         cannot_change_password: Mutex<bool>,
         replication_metadata: Mutex<Option<String>>,
         ou_tree: Mutex<Vec<OUNode>>,
@@ -426,6 +477,9 @@ pub mod tests {
                 update_managed_by_calls: Mutex::new(Vec::new()),
                 create_user_calls: Mutex::new(Vec::new()),
                 modify_attribute_calls: Mutex::new(Vec::new()),
+                user_uac: Mutex::new(HashMap::new()),
+                clear_uac_bits_calls: Mutex::new(Vec::new()),
+                user_spns: Mutex::new(HashMap::new()),
                 cannot_change_password: Mutex::new(false),
                 replication_metadata: Mutex::new(None),
                 ou_tree: Mutex::new(Vec::new()),
@@ -473,6 +527,9 @@ pub mod tests {
                 update_managed_by_calls: Mutex::new(Vec::new()),
                 create_user_calls: Mutex::new(Vec::new()),
                 modify_attribute_calls: Mutex::new(Vec::new()),
+                user_uac: Mutex::new(HashMap::new()),
+                clear_uac_bits_calls: Mutex::new(Vec::new()),
+                user_spns: Mutex::new(HashMap::new()),
                 cannot_change_password: Mutex::new(false),
                 replication_metadata: Mutex::new(None),
                 ou_tree: Mutex::new(Vec::new()),
@@ -568,6 +625,18 @@ pub mod tests {
         pub fn with_failure(self) -> Self {
             *self.should_fail.lock().unwrap() = true;
             self
+        }
+
+        /// Sets the userAccountControl value for a specific user DN. Used by
+        /// tests of the `clear_user_account_control_bits` flow.
+        pub fn set_user_account_control(&self, dn: &str, uac: u32) {
+            self.user_uac.lock().unwrap().insert(dn.to_string(), uac);
+        }
+
+        /// Sets the `servicePrincipalName` values for a specific user DN.
+        /// Used by tests of the `get_user_spns` and `remove_user_spns` flows.
+        pub fn set_user_spns(&self, dn: &str, spns: Vec<String>) {
+            self.user_spns.lock().unwrap().insert(dn.to_string(), spns);
         }
 
         pub fn with_connection_error(self, kind: &str) -> Self {
@@ -728,6 +797,56 @@ pub mod tests {
             self.check_failure()?;
             self.disable_calls.lock().unwrap().push(user_dn.to_string());
             Ok(())
+        }
+
+        async fn clear_user_account_control_bits(
+            &self,
+            user_dn: &str,
+            bits_to_clear: u32,
+        ) -> Result<(u32, u32)> {
+            self.check_failure()?;
+            let mut uac_map = self.user_uac.lock().unwrap();
+            let previous = uac_map.get(user_dn).copied().unwrap_or(0);
+            let new = previous & !bits_to_clear;
+            if new == previous {
+                // Idempotent no-op - no state change, no recorded call
+                return Ok((previous, previous));
+            }
+            uac_map.insert(user_dn.to_string(), new);
+            self.modify_attribute_calls.lock().unwrap().push((
+                user_dn.to_string(),
+                "userAccountControl".to_string(),
+                vec![new.to_string()],
+            ));
+            self.clear_uac_bits_calls.lock().unwrap().push((
+                user_dn.to_string(),
+                bits_to_clear,
+                previous,
+                new,
+            ));
+            Ok((previous, new))
+        }
+
+        async fn get_user_account_control(&self, user_dn: &str) -> Result<u32> {
+            self.check_failure()?;
+            Ok(self
+                .user_uac
+                .lock()
+                .unwrap()
+                .get(user_dn)
+                .copied()
+                .unwrap_or(0))
+        }
+
+        async fn get_user_spns(&self, user_dn: &str) -> Result<Vec<String>> {
+            self.check_failure()?;
+            Ok(self
+                .user_spns
+                .lock()
+                .unwrap()
+                .get(user_dn)
+                .cloned()
+                .unwrap_or_default())
         }
 
         async fn get_cannot_change_password(&self, _user_dn: &str) -> Result<bool> {
@@ -1328,5 +1447,146 @@ pub mod tests {
         let calls = provider.delete_calls.lock().unwrap();
         assert_eq!(calls.len(), 1);
         assert_eq!(calls[0], "CN=OldGroup,OU=Groups,DC=example,DC=com");
+    }
+
+    // ------------------------------------------------------------------
+    // clear_user_account_control_bits (Epic 14 Story 14.4 / 14.6)
+    // ------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_clear_uac_bits_clears_only_target_bit() {
+        let provider = MockDirectoryProvider::new();
+        let dn = "CN=Alice,DC=example,DC=com";
+        // 0x0220 = PASSWORD_NOT_REQUIRED (0x0020) | ACCOUNTDISABLE (0x0200)
+        provider.set_user_account_control(dn, 0x0220);
+
+        let (previous, new) = provider
+            .clear_user_account_control_bits(dn, 0x0020)
+            .await
+            .unwrap();
+
+        assert_eq!(previous, 0x0220);
+        assert_eq!(new, 0x0200, "only PASSWORD_NOT_REQUIRED should be cleared");
+
+        let calls = provider.clear_uac_bits_calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0], (dn.to_string(), 0x0020, 0x0220, 0x0200));
+
+        let writes = provider.modify_attribute_calls.lock().unwrap();
+        assert_eq!(writes.len(), 1);
+        assert_eq!(writes[0].1, "userAccountControl");
+        assert_eq!(writes[0].2, vec!["512".to_string()]); // 0x0200 = 512
+    }
+
+    #[tokio::test]
+    async fn test_clear_uac_bits_idempotent_no_op_when_already_clear() {
+        let provider = MockDirectoryProvider::new();
+        let dn = "CN=Bob,DC=example,DC=com";
+        // 0x0200 = ACCOUNTDISABLE only, PASSWORD_NOT_REQUIRED already clear
+        provider.set_user_account_control(dn, 0x0200);
+
+        let (previous, new) = provider
+            .clear_user_account_control_bits(dn, 0x0020)
+            .await
+            .unwrap();
+
+        assert_eq!(previous, 0x0200);
+        assert_eq!(new, 0x0200, "no-op should return previous == new");
+
+        let calls = provider.clear_uac_bits_calls.lock().unwrap();
+        assert!(
+            calls.is_empty(),
+            "no clear_uac_bits_calls entry on no-op (only successful state changes are recorded)"
+        );
+
+        let writes = provider.modify_attribute_calls.lock().unwrap();
+        assert!(writes.is_empty(), "no LDAP write on no-op");
+    }
+
+    #[tokio::test]
+    async fn test_clear_uac_bits_preserves_unrelated_bits() {
+        let provider = MockDirectoryProvider::new();
+        let dn = "CN=Carol,DC=example,DC=com";
+        // 0x80220 = TRUSTED_FOR_DELEGATION | ACCOUNTDISABLE | PASSWORD_NOT_REQUIRED
+        provider.set_user_account_control(dn, 0x80220);
+
+        // Clear only PASSWORD_NOT_REQUIRED - delegation and disable bits must
+        // survive
+        let (_previous, new) = provider
+            .clear_user_account_control_bits(dn, 0x0020)
+            .await
+            .unwrap();
+
+        assert_eq!(new, 0x80200);
+        assert_eq!(new & 0x80000, 0x80000, "TRUSTED_FOR_DELEGATION preserved");
+        assert_eq!(new & 0x0200, 0x0200, "ACCOUNTDISABLE preserved");
+        assert_eq!(new & 0x0020, 0, "PASSWORD_NOT_REQUIRED cleared");
+    }
+
+    #[tokio::test]
+    async fn test_clear_uac_bits_works_with_any_mask() {
+        let provider = MockDirectoryProvider::new();
+        let dn = "CN=Dave,DC=example,DC=com";
+        // Story 14.6 will clear TRUSTED_FOR_DELEGATION (0x80000)
+        provider.set_user_account_control(dn, 0x80200);
+
+        let (previous, new) = provider
+            .clear_user_account_control_bits(dn, 0x80000)
+            .await
+            .unwrap();
+
+        assert_eq!(previous, 0x80200);
+        assert_eq!(new, 0x0200, "only TRUSTED_FOR_DELEGATION cleared");
+
+        let calls = provider.clear_uac_bits_calls.lock().unwrap();
+        assert_eq!(calls[0].1, 0x80000, "mask recorded as-is");
+    }
+
+    #[tokio::test]
+    async fn test_clear_uac_bits_propagates_failure_flag() {
+        let provider = MockDirectoryProvider::new().with_failure();
+        let result = provider
+            .clear_user_account_control_bits("CN=Alice,DC=example,DC=com", 0x0020)
+            .await;
+        assert!(result.is_err());
+    }
+
+    // ------------------------------------------------------------------
+    // get_user_spns (Epic 14 Story 14.5)
+    // ------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_get_user_spns_returns_empty_for_unknown_dn() {
+        let provider = MockDirectoryProvider::new();
+        let spns = provider
+            .get_user_spns("CN=Unknown,DC=example,DC=com")
+            .await
+            .unwrap();
+        assert!(spns.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_get_user_spns_returns_set_values() {
+        let provider = MockDirectoryProvider::new();
+        let dn = "CN=SvcAccount,DC=example,DC=com";
+        provider.set_user_spns(
+            dn,
+            vec![
+                "MSSQLSvc/db.corp.local:1433".to_string(),
+                "HTTP/web1.corp.local".to_string(),
+            ],
+        );
+
+        let spns = provider.get_user_spns(dn).await.unwrap();
+        assert_eq!(spns.len(), 2);
+        assert!(spns.contains(&"MSSQLSvc/db.corp.local:1433".to_string()));
+        assert!(spns.contains(&"HTTP/web1.corp.local".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_get_user_spns_propagates_failure_flag() {
+        let provider = MockDirectoryProvider::new().with_failure();
+        let result = provider.get_user_spns("CN=Alice,DC=example,DC=com").await;
+        assert!(result.is_err());
     }
 }

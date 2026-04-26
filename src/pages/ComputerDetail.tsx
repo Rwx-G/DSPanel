@@ -15,6 +15,12 @@ import { ExportToolbar, type ExportColumn } from "@/components/common/ExportTool
 import { FilterBar, type FilterChip } from "@/components/data/FilterBar";
 import { GroupMembersDialog } from "@/components/dialogs/GroupMembersDialog";
 import { type DirectoryComputer } from "@/types/directory";
+import {
+  severityToBadgeVariant,
+  tooltipParamsFor,
+  type SecurityIndicatorSet,
+} from "@/types/securityIndicators";
+import { DisableUnconstrainedDelegationDialog } from "@/components/dialogs/DisableUnconstrainedDelegationDialog";
 import { parseCnFromDn } from "@/utils/dn";
 import { Users, Trash2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -27,18 +33,51 @@ import { useErrorHandler } from "@/hooks/useErrorHandler";
 
 export function ComputerDetail({
   computer,
+  securityIndicators,
   onDeleted,
+  onRefresh,
 }: {
   computer: DirectoryComputer;
+  /**
+   * Set of security indicators detected for this computer (Story 14.3).
+   * Optional so callers that have not yet wired the evaluator still compile.
+   */
+  securityIndicators?: SecurityIndicatorSet;
   onDeleted?: () => void;
+  /**
+   * Triggered after a Story 14.6 quick-fix succeeds so the parent can
+   * re-fetch the computer attributes + re-evaluate indicators (the badge
+   * disappears once the next render reads the cleared UAC).
+   */
+  onRefresh?: () => void;
 }) {
-  const { t } = useTranslation(["computerDetail", "common"]);
+  const { t } = useTranslation([
+    "computerDetail",
+    "common",
+    "securityIndicators",
+  ]);
+
   const [groupFilterText, setGroupFilterText] = useState("");
   const [showMonitoring, setShowMonitoring] = useState(false);
   const [platform, setPlatform] = useState("unknown");
   const { hasPermission } = usePermissions();
   const canDelete = hasPermission("AccountOperator");
   const canMonitor = hasPermission("HelpDesk");
+  /**
+   * Story 14.6: clearing TRUSTED_FOR_DELEGATION on a computer object
+   * requires Admin, NOT AccountOperator. Computer delegation changes can
+   * break production Kerberos services so the bar is intentionally higher
+   * than user-side quick-fixes.
+   */
+  const canEditCritical = hasPermission("Admin");
+  /**
+   * Active quick-fix dialog (Story 14.6). `null` hides all dialogs.
+   * Discriminated union extensible if more computer-side quick-fixes
+   * land in a future story.
+   */
+  const [activeQuickFix, setActiveQuickFix] = useState<
+    "DisableUnconstrainedDelegation" | null
+  >(null);
 
   useEffect(() => {
     invoke<string>("get_platform").then(setPlatform).catch(() => {});
@@ -258,6 +297,40 @@ export function ComputerDetail({
             text={computer.enabled ? t("common:enabled") : t("common:disabled")}
             variant={computer.enabled ? "success" : "error"}
           />
+          {securityIndicators?.indicators.map((indicator) => (
+            <span
+              key={indicator.kind}
+              className="inline-flex items-center gap-1"
+              title={t(
+                `securityIndicators:${indicator.kind}.tooltip`,
+                tooltipParamsFor(indicator),
+              )}
+              data-testid={`computer-security-indicator-badge-${indicator.kind}`}
+            >
+              <StatusBadge
+                text={t(`securityIndicators:${indicator.kind}.badge`)}
+                variant={severityToBadgeVariant(indicator.severity)}
+              />
+              {indicator.kind === "UnconstrainedDelegation" && canEditCritical && (
+                <button
+                  type="button"
+                  className="rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setActiveQuickFix("DisableUnconstrainedDelegation");
+                  }}
+                  aria-label={t(
+                    "computerDetail:quickFix.disableUnconstrainedDelegation.fixButtonAriaLabel",
+                  )}
+                  data-testid="quick-fix-DisableUnconstrainedDelegation-btn"
+                >
+                  {t(
+                    "computerDetail:quickFix.disableUnconstrainedDelegation.fixButton",
+                  )}
+                </button>
+              )}
+            </span>
+          ))}
         </div>
       </div>
 
@@ -339,6 +412,25 @@ export function ComputerDetail({
           groupDn={groupMembersDialog.dn}
           groupName={groupMembersDialog.name}
           onClose={() => setGroupMembersDialog(null)}
+        />
+      )}
+
+      {activeQuickFix === "DisableUnconstrainedDelegation" && (
+        <DisableUnconstrainedDelegationDialog
+          computerDn={computer.distinguishedName}
+          computerName={computer.name}
+          onClose={() => setActiveQuickFix(null)}
+          onSuccess={() => {
+            setActiveQuickFix(null);
+            notify(
+              t(
+                "computerDetail:quickFix.disableUnconstrainedDelegation.successNotification",
+                { name: computer.name },
+              ),
+              "success",
+            );
+            onRefresh?.();
+          }}
         />
       )}
 

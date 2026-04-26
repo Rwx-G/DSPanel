@@ -7,6 +7,45 @@ use std::net::{TcpStream, ToSocketAddrs, UdpSocket};
 use std::path::PathBuf;
 use std::sync::Mutex;
 
+/// Severity dimension on an audit entry. Independent of the success flag:
+/// a Critical event can be either a successful Critical action (e.g. an
+/// admin disabled unconstrained delegation) or a failed one. SOC consumers
+/// filter on this field to surface the small set of Critical actions
+/// without needing to maintain a regex over action-name strings.
+///
+/// Defaults to Info so existing call sites and pre-migration database rows
+/// land on the safe lowest-severity bucket.
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum AuditSeverity {
+    #[default]
+    Info,
+    Warning,
+    Critical,
+}
+
+impl AuditSeverity {
+    /// Stable lowercase string used for SQLite persistence and the syslog
+    /// structured-data field. Round-trips with `from_db_str`.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            AuditSeverity::Info => "info",
+            AuditSeverity::Warning => "warning",
+            AuditSeverity::Critical => "critical",
+        }
+    }
+
+    /// Parses the SQLite TEXT column. Unknown / NULL values fall back to
+    /// `Info` so a corrupted row does not poison the read path.
+    pub fn from_db_str(s: &str) -> Self {
+        match s {
+            "warning" => AuditSeverity::Warning,
+            "critical" => AuditSeverity::Critical,
+            _ => AuditSeverity::Info,
+        }
+    }
+}
+
 /// Represents a single audit log entry.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -17,6 +56,13 @@ pub struct AuditEntry {
     pub target_dn: String,
     pub details: String,
     pub success: bool,
+    /// Severity classification. Defaults to `Info` so existing call sites
+    /// that use `log_success` / `log_failure` (without `_with_severity`)
+    /// continue to compile and produce non-Critical entries. Pre-migration
+    /// database rows also resolve to `Info` via `serde(default)` and the
+    /// `from_db_str` fallback.
+    #[serde(default)]
+    pub severity: AuditSeverity,
 }
 
 /// Result of hash chain verification.
@@ -163,19 +209,35 @@ impl SyslogForwarder {
     }
 
     /// Sends one audit entry as an RFC 5424 syslog message
-    /// (facility=local0, severity=info/warning).
+    /// (facility=local0, severity=critical/warning/info per AuditSeverity).
     ///
     /// UDP path emits a single datagram. TCP path uses RFC 6587 octet-counting
     /// framing (`<length> <SP> <message>`) which is the modern reliable framing
     /// supported by rsyslog/syslog-ng/Splunk/Datadog. No retry/reconnect is
     /// attempted on TCP write error - the next entry will surface the failure
     /// and the operator will see the WARN log.
+    ///
+    /// Severity mapping (RFC 5424 numeric):
+    /// - `Critical` → 2 (overrides success/failure - SOC alerting tier)
+    /// - `Warning`  → 4
+    /// - `Info`     → 6 on success, 4 on failure (matches the pre-severity
+    ///   default so existing collectors keep parsing the same priority)
     fn send(&self, entry: &AuditEntry) {
-        let severity: u8 = if entry.success { 6 } else { 4 };
+        let severity: u8 = match entry.severity {
+            AuditSeverity::Critical => 2,
+            AuditSeverity::Warning => 4,
+            AuditSeverity::Info => {
+                if entry.success {
+                    6
+                } else {
+                    4
+                }
+            }
+        };
         let priority = 16 * 8 + severity;
         let hostname = gethostname();
         let msg = format!(
-            "<{}>1 {} {} DSPanel - - [operator=\"{}\" action=\"{}\" target=\"{}\" success={}] {}",
+            "<{}>1 {} {} DSPanel - - [operator=\"{}\" action=\"{}\" target=\"{}\" success={} severity=\"{}\"] {}",
             priority,
             entry.timestamp,
             hostname,
@@ -183,6 +245,7 @@ impl SyslogForwarder {
             entry.action,
             entry.target_dn,
             entry.success,
+            entry.severity.as_str(),
             entry.details,
         );
         match &self.transport {
@@ -289,10 +352,12 @@ impl AuditService {
                 details TEXT NOT NULL,
                 success INTEGER NOT NULL,
                 hash TEXT NOT NULL DEFAULT '',
-                prev_hash TEXT NOT NULL DEFAULT ''
+                prev_hash TEXT NOT NULL DEFAULT '',
+                severity TEXT NOT NULL DEFAULT 'info'
             );
             CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit_entries(timestamp);
-            CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_entries(action);",
+            CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_entries(action);
+            CREATE INDEX IF NOT EXISTS idx_audit_severity ON audit_entries(severity);",
         ) {
             tracing::error!("Failed to initialize audit schema: {}", e);
         }
@@ -301,9 +366,22 @@ impl AuditService {
             "ALTER TABLE audit_entries ADD COLUMN hash TEXT NOT NULL DEFAULT '';
              ALTER TABLE audit_entries ADD COLUMN prev_hash TEXT NOT NULL DEFAULT '';",
         );
+        // Migrate existing databases that lack the severity column. Pre-existing
+        // rows default to 'info' which is the same value the new code writes
+        // for every call site that does not opt in to AuditSeverity::Critical.
+        let _ = conn.execute_batch(
+            "ALTER TABLE audit_entries ADD COLUMN severity TEXT NOT NULL DEFAULT 'info';",
+        );
     }
 
     /// Computes the SHA-256 hash for an audit entry given the previous hash.
+    ///
+    /// Severity is intentionally NOT included in the hash so adding the
+    /// severity column does not invalidate any existing chain on upgrade.
+    /// The audit-truth fields the chain protects (operator, action,
+    /// target, success) cover what the operator did and whether it
+    /// succeeded; severity is a SOC categorisation hint that callers can
+    /// adjust without rewriting history.
     fn compute_hash(prev_hash: &str, entry: &AuditEntry) -> String {
         let mut hasher = Sha256::new();
         hasher.update(prev_hash.as_bytes());
@@ -331,8 +409,8 @@ impl AuditService {
         let hash = Self::compute_hash(&prev_hash, entry);
 
         if let Err(e) = conn.execute(
-            "INSERT INTO audit_entries (timestamp, operator, action, target_dn, details, success, hash, prev_hash)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            "INSERT INTO audit_entries (timestamp, operator, action, target_dn, details, success, hash, prev_hash, severity)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
             rusqlite::params![
                 entry.timestamp,
                 entry.operator,
@@ -342,6 +420,7 @@ impl AuditService {
                 entry.success as i32,
                 hash,
                 prev_hash,
+                entry.severity.as_str(),
             ],
         ) {
             tracing::error!("Failed to insert audit entry: {}", e);
@@ -353,8 +432,23 @@ impl AuditService {
         }
     }
 
-    /// Logs a successful operation.
+    /// Logs a successful operation at the default `Info` severity.
     pub fn log_success(&self, action: &str, target_dn: &str, details: &str) {
+        self.log_success_with_severity(action, target_dn, details, AuditSeverity::Info);
+    }
+
+    /// Logs a successful operation with an explicit severity. Use
+    /// `AuditSeverity::Critical` for high-blast-radius write operations
+    /// (e.g. disable unconstrained delegation, demote a Domain Admin)
+    /// so SOC dashboards can filter by severity instead of grepping
+    /// action-name strings.
+    pub fn log_success_with_severity(
+        &self,
+        action: &str,
+        target_dn: &str,
+        details: &str,
+        severity: AuditSeverity,
+    ) {
         let entry = AuditEntry {
             timestamp: chrono::Utc::now().to_rfc3339(),
             operator: self.operator.lock().expect("lock poisoned").clone(),
@@ -362,19 +456,35 @@ impl AuditService {
             target_dn: target_dn.to_string(),
             details: details.to_string(),
             success: true,
+            severity,
         };
         tracing::info!(
             action = %entry.action,
             target = %entry.target_dn,
             operator = %entry.operator,
+            severity = entry.severity.as_str(),
             "Audit: {}",
             details
         );
         self.insert_entry(&entry);
     }
 
-    /// Logs a failed operation.
+    /// Logs a failed operation at the default `Info` severity.
     pub fn log_failure(&self, action: &str, target_dn: &str, error: &str) {
+        self.log_failure_with_severity(action, target_dn, error, AuditSeverity::Info);
+    }
+
+    /// Logs a failed operation with an explicit severity. The Critical
+    /// flavour is the right choice when the failure itself is a security
+    /// concern (e.g. an Admin-gated quick-fix rejected because the
+    /// caller lacked the permission level).
+    pub fn log_failure_with_severity(
+        &self,
+        action: &str,
+        target_dn: &str,
+        error: &str,
+        severity: AuditSeverity,
+    ) {
         let entry = AuditEntry {
             timestamp: chrono::Utc::now().to_rfc3339(),
             operator: self.operator.lock().expect("lock poisoned").clone(),
@@ -382,11 +492,13 @@ impl AuditService {
             target_dn: target_dn.to_string(),
             details: error.to_string(),
             success: false,
+            severity,
         };
         tracing::warn!(
             action = %entry.action,
             target = %entry.target_dn,
             operator = %entry.operator,
+            severity = entry.severity.as_str(),
             "Audit FAILED: {}",
             error
         );
@@ -397,7 +509,7 @@ impl AuditService {
     pub fn get_entries(&self) -> Vec<AuditEntry> {
         let conn = self.conn.lock().expect("lock poisoned");
         let mut stmt = match conn.prepare(
-            "SELECT timestamp, operator, action, target_dn, details, success
+            "SELECT timestamp, operator, action, target_dn, details, success, severity
              FROM audit_entries ORDER BY id DESC",
         ) {
             Ok(s) => s,
@@ -408,6 +520,7 @@ impl AuditService {
         };
 
         let result: Vec<AuditEntry> = match stmt.query_map([], |row| {
+            let severity_str: String = row.get(6)?;
             Ok(AuditEntry {
                 timestamp: row.get(0)?,
                 operator: row.get(1)?,
@@ -415,6 +528,7 @@ impl AuditService {
                 target_dn: row.get(3)?,
                 details: row.get(4)?,
                 success: row.get::<_, i32>(5)? != 0,
+                severity: AuditSeverity::from_db_str(&severity_str),
             })
         }) {
             Ok(rows) => rows.filter_map(|r| r.ok()).collect(),
@@ -493,7 +607,7 @@ impl AuditService {
         let offset = filter.page * filter.page_size;
         let order = if filter.sort_ascending { "ASC" } else { "DESC" };
         let query_sql = format!(
-            "SELECT timestamp, operator, action, target_dn, details, success
+            "SELECT timestamp, operator, action, target_dn, details, success, severity
              FROM audit_entries {} ORDER BY id {} LIMIT ?{} OFFSET ?{}",
             where_sql,
             order,
@@ -516,6 +630,7 @@ impl AuditService {
         };
 
         let entries = match stmt.query_map(param_refs.as_slice(), |row| {
+            let severity_str: String = row.get(6)?;
             Ok(AuditEntry {
                 timestamp: row.get(0)?,
                 operator: row.get(1)?,
@@ -523,6 +638,7 @@ impl AuditService {
                 target_dn: row.get(3)?,
                 details: row.get(4)?,
                 success: row.get::<_, i32>(5)? != 0,
+                severity: AuditSeverity::from_db_str(&severity_str),
             })
         }) {
             Ok(rows) => rows.filter_map(|r| r.ok()).collect(),
@@ -581,7 +697,7 @@ impl AuditService {
     pub fn verify_chain(&self) -> ChainVerification {
         let conn = self.conn.lock().expect("lock poisoned");
         let mut stmt = match conn.prepare(
-            "SELECT id, timestamp, operator, action, target_dn, details, success, hash, prev_hash
+            "SELECT id, timestamp, operator, action, target_dn, details, success, hash, prev_hash, severity
              FROM audit_entries ORDER BY id ASC",
         ) {
             Ok(s) => s,
@@ -604,6 +720,7 @@ impl AuditService {
         }
 
         let rows: Vec<Row> = match stmt.query_map([], |row| {
+            let severity_str: String = row.get(9)?;
             Ok(Row {
                 id: row.get(0)?,
                 entry: AuditEntry {
@@ -613,6 +730,7 @@ impl AuditService {
                     target_dn: row.get(4)?,
                     details: row.get(5)?,
                     success: row.get::<_, i32>(6)? != 0,
+                    severity: AuditSeverity::from_db_str(&severity_str),
                 },
                 hash: row.get(7)?,
                 prev_hash: row.get(8)?,
@@ -807,10 +925,104 @@ mod tests {
             target_dn: "CN=Test,DC=example,DC=com".to_string(),
             details: "Reset by admin".to_string(),
             success: true,
+            severity: AuditSeverity::Info,
         };
         let json = serde_json::to_string(&entry).unwrap();
         assert!(json.contains("targetDn")); // camelCase
         assert!(json.contains("PasswordReset"));
+        assert!(json.contains("\"severity\":\"info\""));
+    }
+
+    #[test]
+    fn test_entry_deserialization_from_pre_severity_json() {
+        // Pre-AuditSeverity callers and any persisted JSON without the
+        // severity field must deserialize without error and default to Info.
+        let json = r#"{"timestamp":"2026-03-14T10:00:00Z","operator":"admin","action":"PasswordReset","targetDn":"CN=Test,DC=example,DC=com","details":"Reset by admin","success":true}"#;
+        let entry: AuditEntry = serde_json::from_str(json).unwrap();
+        assert!(matches!(entry.severity, AuditSeverity::Info));
+    }
+
+    #[test]
+    fn test_severity_db_roundtrip() {
+        for &s in &[
+            AuditSeverity::Info,
+            AuditSeverity::Warning,
+            AuditSeverity::Critical,
+        ] {
+            assert_eq!(AuditSeverity::from_db_str(s.as_str()), s);
+        }
+        assert_eq!(
+            AuditSeverity::from_db_str("unknown-on-disk"),
+            AuditSeverity::Info,
+            "unknown values must default to Info, not panic"
+        );
+    }
+
+    #[test]
+    fn test_log_success_with_severity_critical_persists_field() {
+        let svc = AuditService::new_in_memory();
+        svc.log_success_with_severity(
+            "DisabledUnconstrainedDelegation",
+            "CN=SRV01,OU=Computers,DC=example,DC=com",
+            "uac: 0x82020 -> 0x02020",
+            AuditSeverity::Critical,
+        );
+        let entries = svc.get_entries();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].severity, AuditSeverity::Critical);
+        assert!(entries[0].success);
+    }
+
+    #[test]
+    fn test_log_failure_with_severity_critical_persists_field() {
+        let svc = AuditService::new_in_memory();
+        svc.log_failure_with_severity(
+            "DisableUnconstrainedDelegationFailed",
+            "CN=SRV01,OU=Computers,DC=example,DC=com",
+            "Permission denied",
+            AuditSeverity::Critical,
+        );
+        let entries = svc.get_entries();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].severity, AuditSeverity::Critical);
+        assert!(!entries[0].success);
+    }
+
+    #[test]
+    fn test_log_success_default_severity_is_info() {
+        let svc = AuditService::new_in_memory();
+        svc.log_success("PasswordReset", "CN=Alice,DC=example,DC=com", "Reset");
+        let entries = svc.get_entries();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(
+            entries[0].severity,
+            AuditSeverity::Info,
+            "log_success without _with_severity defaults to Info"
+        );
+    }
+
+    #[test]
+    fn test_severity_excluded_from_hash_chain() {
+        // The chain protects audit truth (operator/action/target/result/etc.),
+        // not the SOC categorisation hint. Two otherwise-identical entries
+        // with different severities must produce the same hash so adding
+        // the severity column does not invalidate any existing chain on
+        // upgrade.
+        let entry_info = AuditEntry {
+            timestamp: "2026-03-14T10:00:00Z".to_string(),
+            operator: "admin".to_string(),
+            action: "TestAction".to_string(),
+            target_dn: "CN=X,DC=ex,DC=com".to_string(),
+            details: "x".to_string(),
+            success: true,
+            severity: AuditSeverity::Info,
+        };
+        let mut entry_critical = entry_info.clone();
+        entry_critical.severity = AuditSeverity::Critical;
+
+        let h_info = AuditService::compute_hash("", &entry_info);
+        let h_critical = AuditService::compute_hash("", &entry_critical);
+        assert_eq!(h_info, h_critical);
     }
 
     #[test]
@@ -1429,6 +1641,7 @@ mod tests {
             target_dn: "CN=Test,DC=corp".to_string(),
             details: "ok".to_string(),
             success: true,
+            severity: AuditSeverity::Info,
         };
         fwd.send(&entry);
         drop(fwd);

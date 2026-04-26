@@ -2,7 +2,9 @@ use tauri::State;
 
 use crate::error::AppError;
 use crate::models::DirectoryEntry;
-use crate::services::audit::{AuditEntry, AuditFilter, AuditQueryResult, ChainVerification};
+use crate::services::audit::{
+    AuditEntry, AuditFilter, AuditQueryResult, AuditSeverity, ChainVerification,
+};
 use crate::services::comparison::GroupComparisonResult;
 use crate::services::mfa::{MfaConfig, MfaSetupResult};
 use crate::services::password::{HibpResult, PasswordOptions};
@@ -411,6 +413,303 @@ pub(crate) async fn modify_attribute_inner(
     }
 }
 
+/// Clears the PASSWORD_NOT_REQUIRED flag (`userAccountControl & 0x0020`) on a
+/// user account (Story 14.4 quick-fix from Epic 14).
+///
+/// Reads the current `userAccountControl`, clears bit 0x0020, and writes the
+/// result back when the value changed. When the bit is already clear, the
+/// command returns `Ok(())` early without writing or auditing - operators
+/// double-clicking "Fix" within seconds will not produce duplicate audit
+/// entries or duplicate LDAP writes.
+///
+/// Requires `AccountOperator` permission, may require MFA, and captures an
+/// object snapshot before the write for rollback.
+pub(crate) async fn clear_password_not_required_inner(
+    state: &AppState,
+    user_dn: &str,
+) -> Result<(), AppError> {
+    require_fresh_permission(
+        state,
+        PermissionLevel::AccountOperator,
+        "Clear PasswordNotRequired",
+    )
+    .await?;
+
+    state
+        .mfa_service
+        .check_mfa_for_action("ClearPasswordNotRequired")
+        .map_err(|e| AppError::PermissionDenied(e.to_string()))?;
+
+    let provider = state.provider();
+
+    // Peek the current UAC first so an idempotent invocation skips the
+    // snapshot capture entirely (no-op-before-snapshot pattern, mirrors
+    // Story 14.5's explicit get_user_spns read phase).
+    let current_uac = match provider.get_user_account_control(user_dn).await {
+        Ok(uac) => uac,
+        Err(e) => {
+            state.audit_service.log_failure(
+                "ClearPasswordNotRequiredFailed",
+                user_dn,
+                &format!("get_user_account_control: {}", e),
+            );
+            return Err(AppError::Directory(e.to_string()));
+        }
+    };
+    if current_uac & 0x0020 == 0 {
+        // Bit already clear - no LDAP write, no snapshot, no audit entry.
+        return Ok(());
+    }
+
+    capture_snapshot(state, user_dn, "ClearPasswordNotRequired").await;
+
+    match provider
+        .clear_user_account_control_bits(user_dn, 0x0020)
+        .await
+    {
+        Ok((previous, new)) if previous == new => {
+            // Should not happen because the peek above already filtered the
+            // no-op path. Treat as success without auditing in case a
+            // concurrent operator already cleared the bit between peek and
+            // write (rare race, accepted: snapshot is already recorded for
+            // forensic traceability, no audit needed because no LDAP write).
+            Ok(())
+        }
+        Ok((previous, new)) => {
+            state.audit_service.log_success(
+                "ClearedPasswordNotRequired",
+                user_dn,
+                &format!("uac: 0x{:X} -> 0x{:X}", previous, new),
+            );
+            Ok(())
+        }
+        Err(e) => {
+            state.audit_service.log_failure(
+                "ClearPasswordNotRequiredFailed",
+                user_dn,
+                &e.to_string(),
+            );
+            Err(AppError::Directory(e.to_string()))
+        }
+    }
+}
+
+/// Disables Kerberos unconstrained delegation on a computer object by
+/// clearing the TRUSTED_FOR_DELEGATION bit (`userAccountControl & 0x80000`)
+/// (Story 14.6 quick-fix from Epic 14).
+///
+/// Reuses the generic `clear_user_account_control_bits` trait method
+/// introduced by Story 14.4 - the command needs zero new backend trait
+/// surface and inherits the same idempotent-no-op + read-modify-write
+/// semantics.
+///
+/// Requires `Admin` permission (HIGHER bar than the AccountOperator gate
+/// used by Stories 14.4 and 14.5: computer delegation changes can break
+/// production Kerberos services like SQL Server linked servers, IIS with
+/// constrained delegation, etc.). May require MFA.
+///
+/// The audit action `DisabledUnconstrainedDelegation` is intentionally
+/// unique and identifiable - SOC consumers tail or grep for it as a
+/// stand-in for a structural Critical-severity field on AuditEntry (the
+/// severity field amendment is deferred to a future Epic 11 story).
+pub(crate) async fn disable_unconstrained_delegation_inner(
+    state: &AppState,
+    computer_dn: &str,
+) -> Result<(), AppError> {
+    require_fresh_permission(
+        state,
+        PermissionLevel::Admin,
+        "Disable unconstrained delegation",
+    )
+    .await?;
+
+    state
+        .mfa_service
+        .check_mfa_for_action("DisableUnconstrainedDelegation")
+        .map_err(|e| AppError::PermissionDenied(e.to_string()))?;
+
+    let provider = state.provider();
+
+    // Peek the current UAC first so an idempotent invocation skips the
+    // snapshot capture entirely (no-op-before-snapshot pattern, matches
+    // Story 14.4 and Story 14.5).
+    let current_uac = match provider.get_user_account_control(computer_dn).await {
+        Ok(uac) => uac,
+        Err(e) => {
+            state.audit_service.log_failure_with_severity(
+                "DisableUnconstrainedDelegationFailed",
+                computer_dn,
+                &format!("get_user_account_control: {}", e),
+                AuditSeverity::Critical,
+            );
+            return Err(AppError::Directory(e.to_string()));
+        }
+    };
+    if current_uac & 0x80000 == 0 {
+        // Bit already clear - no LDAP write, no snapshot, no audit entry.
+        return Ok(());
+    }
+
+    capture_snapshot(state, computer_dn, "DisableUnconstrainedDelegation").await;
+
+    match provider
+        .clear_user_account_control_bits(computer_dn, 0x80000)
+        .await
+    {
+        Ok((previous, new)) if previous == new => {
+            // Should not happen because the peek above already filtered the
+            // no-op path. See clear_password_not_required_inner for the race
+            // explanation.
+            Ok(())
+        }
+        Ok((previous, new)) => {
+            state.audit_service.log_success_with_severity(
+                "DisabledUnconstrainedDelegation",
+                computer_dn,
+                &format!("uac: 0x{:X} -> 0x{:X}", previous, new),
+                AuditSeverity::Critical,
+            );
+            Ok(())
+        }
+        Err(e) => {
+            state.audit_service.log_failure_with_severity(
+                "DisableUnconstrainedDelegationFailed",
+                computer_dn,
+                &e.to_string(),
+                AuditSeverity::Critical,
+            );
+            Err(AppError::Directory(e.to_string()))
+        }
+    }
+}
+
+/// Result of a `remove_user_spns` invocation. Lists every SPN that was
+/// actually removed, every SPN kept on the user object after the call, and
+/// every SPN the operator requested but the system-SPN guard refused to
+/// remove. The three lists are sorted alphabetically so the audit chain
+/// hash and any UI rendering are deterministic regardless of input order.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoveSpnsResult {
+    pub removed: Vec<String>,
+    pub kept: Vec<String>,
+    pub blocked_system: Vec<String>,
+}
+
+/// Removes one or more values from a user's `servicePrincipalName` attribute
+/// (Story 14.5 quick-fix). System SPNs (HOST/, ldap/, krbtgt/, etc.) are
+/// blocked even if requested by the operator - those values would cause a
+/// service outage if removed and the policy is enforced server-side as a
+/// defense in depth (the dialog also hides them).
+///
+/// Idempotent no-op: when the requested removals do not change the SPN set
+/// (all already absent or all system-blocked), returns Ok without writing
+/// or auditing.
+///
+/// Requires `AccountOperator` permission, may require MFA, and captures an
+/// object snapshot before the write for rollback.
+pub(crate) async fn remove_user_spns_inner(
+    state: &AppState,
+    user_dn: &str,
+    spns_to_remove: &[String],
+) -> Result<RemoveSpnsResult, AppError> {
+    require_fresh_permission(state, PermissionLevel::AccountOperator, "Remove user SPNs").await?;
+
+    state
+        .mfa_service
+        .check_mfa_for_action("RemoveUserSpns")
+        .map_err(|e| AppError::PermissionDenied(e.to_string()))?;
+
+    let provider = state.provider();
+    let current = match provider.get_user_spns(user_dn).await {
+        Ok(spns) => spns,
+        Err(e) => {
+            // Audit-completeness: a transient AD outage on the read must
+            // be visible in the audit trail, not silently propagated as
+            // an Err only the IPC caller sees. Tracked as QA-14.5-001.
+            state.audit_service.log_failure(
+                "RemoveUserSpnsFailed",
+                user_dn,
+                &format!("get_user_spns: {}", e),
+            );
+            return Err(AppError::Directory(e.to_string()));
+        }
+    };
+
+    // Split requested removals: anything in the system list goes into
+    // blocked_system; the rest is approved (only if also present in current).
+    use std::collections::HashSet;
+    let current_set: HashSet<&String> = current.iter().collect();
+    let mut approved: Vec<String> = Vec::new();
+    let mut blocked_system: Vec<String> = Vec::new();
+    for spn in spns_to_remove {
+        if crate::services::spn::is_system_spn(spn) {
+            blocked_system.push(spn.clone());
+        } else if current_set.contains(spn) {
+            approved.push(spn.clone());
+        }
+        // SPN not in current set and not system: silently dropped (already
+        // removed - idempotent no-op for that value).
+    }
+
+    let approved_set: HashSet<&String> = approved.iter().collect();
+    let new_set: Vec<String> = current
+        .iter()
+        .filter(|s| !approved_set.contains(s))
+        .cloned()
+        .collect();
+
+    // Sort all result lists alphabetically for deterministic audit chain hash.
+    let mut removed_sorted = approved.clone();
+    removed_sorted.sort();
+    let mut kept_sorted = new_set.clone();
+    kept_sorted.sort();
+    let mut blocked_sorted = blocked_system.clone();
+    blocked_sorted.sort();
+
+    if new_set.len() == current.len() {
+        // Idempotent no-op - either nothing requested existed in current,
+        // or every requested removal was system-blocked. No state change,
+        // no snapshot, no audit entry.
+        return Ok(RemoveSpnsResult {
+            removed: Vec::new(),
+            kept: kept_sorted,
+            blocked_system: blocked_sorted,
+        });
+    }
+
+    capture_snapshot(state, user_dn, "RemoveUserSpns").await;
+
+    match provider
+        .modify_attribute(user_dn, "servicePrincipalName", &new_set)
+        .await
+    {
+        Ok(()) => {
+            state.audit_service.log_success(
+                "RemovedUserSpns",
+                user_dn,
+                &format!(
+                    "removed: [{}]; kept: [{}]; blocked_system: [{}]",
+                    removed_sorted.join(", "),
+                    kept_sorted.join(", "),
+                    blocked_sorted.join(", "),
+                ),
+            );
+            Ok(RemoveSpnsResult {
+                removed: removed_sorted,
+                kept: kept_sorted,
+                blocked_system: blocked_sorted,
+            })
+        }
+        Err(e) => {
+            state
+                .audit_service
+                .log_failure("RemoveUserSpnsFailed", user_dn, &e.to_string());
+            Err(AppError::Directory(e.to_string()))
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Tauri commands - thin wrappers
 // ---------------------------------------------------------------------------
@@ -711,6 +1010,41 @@ pub async fn modify_attribute(
     state: State<'_, AppState>,
 ) -> Result<(), AppError> {
     modify_attribute_inner(&state, &dn, &attribute_name, &values).await
+}
+
+/// Clears the PASSWORD_NOT_REQUIRED flag (`userAccountControl & 0x0020`) on a
+/// user account (Story 14.4 quick-fix). Requires AccountOperator+, may
+/// require MFA, captures snapshot, audits.
+#[tauri::command]
+pub async fn clear_password_not_required(
+    user_dn: String,
+    state: State<'_, AppState>,
+) -> Result<(), AppError> {
+    clear_password_not_required_inner(&state, &user_dn).await
+}
+
+/// Removes one or more values from a user's `servicePrincipalName` attribute
+/// (Story 14.5 quick-fix). System SPNs are blocked even if requested.
+/// Requires AccountOperator+, may require MFA, captures snapshot, audits.
+#[tauri::command]
+pub async fn remove_user_spns(
+    user_dn: String,
+    spns_to_remove: Vec<String>,
+    state: State<'_, AppState>,
+) -> Result<RemoveSpnsResult, AppError> {
+    remove_user_spns_inner(&state, &user_dn, &spns_to_remove).await
+}
+
+/// Disables Kerberos unconstrained delegation on a computer object by
+/// clearing the TRUSTED_FOR_DELEGATION bit (`userAccountControl & 0x80000`)
+/// (Story 14.6 quick-fix). Requires Admin+, may require MFA, captures
+/// snapshot, audits.
+#[tauri::command]
+pub async fn disable_unconstrained_delegation(
+    computer_dn: String,
+    state: State<'_, AppState>,
+) -> Result<(), AppError> {
+    disable_unconstrained_delegation_inner(&state, &computer_dn).await
 }
 
 #[allow(clippy::unwrap_used)]
@@ -1554,5 +1888,652 @@ mod tests {
         .unwrap();
 
         assert_eq!(state.snapshot_service.count(), 1);
+    }
+
+    // -----------------------------------------------------------------------
+    // clear_password_not_required_inner (Story 14.4)
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_clear_password_not_required_requires_account_operator() {
+        // ReadOnly default
+        let state = make_state();
+        let result = clear_password_not_required_inner(&state, "CN=User,DC=example,DC=com").await;
+        assert!(matches!(result.unwrap_err(), AppError::PermissionDenied(_)));
+
+        // HelpDesk also denied (gate is AccountOperator+)
+        let state = make_state_with_level(PermissionLevel::HelpDesk);
+        let result = clear_password_not_required_inner(&state, "CN=User,DC=example,DC=com").await;
+        assert!(matches!(result.unwrap_err(), AppError::PermissionDenied(_)));
+    }
+
+    #[tokio::test]
+    async fn test_clear_password_not_required_succeeds_for_account_operator() {
+        let (state, provider) =
+            make_state_with_level_and_provider(PermissionLevel::AccountOperator);
+        let dn = "CN=Alice,DC=example,DC=com";
+        // 0x0220 = PASSWORD_NOT_REQUIRED | ACCOUNTDISABLE
+        provider.set_user_account_control(dn, 0x0220);
+
+        let result = clear_password_not_required_inner(&state, dn).await;
+        assert!(result.is_ok());
+
+        let calls = provider.clear_uac_bits_calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+        // (dn, mask, previous, new)
+        assert_eq!(calls[0], (dn.to_string(), 0x0020, 0x0220, 0x0200));
+
+        let entries = state.audit_service.get_entries();
+        let cleared = entries
+            .iter()
+            .find(|e| e.action == "ClearedPasswordNotRequired")
+            .expect("audit entry recorded");
+        assert_eq!(cleared.target_dn, dn);
+        assert!(cleared.details.contains("0x220"));
+        assert!(cleared.details.contains("0x200"));
+        assert!(cleared.success);
+    }
+
+    #[tokio::test]
+    async fn test_clear_password_not_required_succeeds_for_admin() {
+        let (state, provider) = make_state_with_level_and_provider(PermissionLevel::Admin);
+        let dn = "CN=Alice,DC=example,DC=com";
+        provider.set_user_account_control(dn, 0x0020);
+
+        let result = clear_password_not_required_inner(&state, dn).await;
+        assert!(result.is_ok());
+
+        let entries = state.audit_service.get_entries();
+        assert!(
+            entries
+                .iter()
+                .any(|e| e.action == "ClearedPasswordNotRequired")
+        );
+    }
+
+    #[tokio::test]
+    async fn test_clear_password_not_required_idempotent_no_op() {
+        let (state, provider) =
+            make_state_with_level_and_provider(PermissionLevel::AccountOperator);
+        let dn = "CN=Bob,DC=example,DC=com";
+        // ACCOUNTDISABLE only - PASSWORD_NOT_REQUIRED already clear
+        provider.set_user_account_control(dn, 0x0200);
+
+        let result = clear_password_not_required_inner(&state, dn).await;
+        assert!(result.is_ok(), "idempotent no-op returns Ok");
+
+        let calls = provider.clear_uac_bits_calls.lock().unwrap();
+        assert!(calls.is_empty(), "no recorded state-change call on no-op");
+
+        let writes = provider.modify_attribute_calls.lock().unwrap();
+        assert!(writes.is_empty(), "no LDAP write on no-op");
+
+        let entries = state.audit_service.get_entries();
+        assert!(
+            !entries
+                .iter()
+                .any(|e| e.action == "ClearedPasswordNotRequired"),
+            "no audit entry on no-op"
+        );
+
+        // No-op-before-snapshot optimization (QA-14.5-003 retro-applied):
+        // the peek detects the bit is already clear and returns early
+        // before capture_snapshot, so no snapshot is written.
+        assert_eq!(
+            state.snapshot_service.count(),
+            0,
+            "no snapshot captured on idempotent no-op"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_clear_password_not_required_captures_snapshot() {
+        let (state, provider) =
+            make_state_with_level_and_provider(PermissionLevel::AccountOperator);
+        let dn = "CN=Alice,DC=example,DC=com";
+        provider.set_user_account_control(dn, 0x0220);
+
+        clear_password_not_required_inner(&state, dn).await.unwrap();
+
+        assert_eq!(
+            state.snapshot_service.count(),
+            1,
+            "snapshot captured before write"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_clear_password_not_required_audit_on_directory_failure() {
+        let provider = Arc::new(MockDirectoryProvider::new().with_failure());
+        let provider_ref = Arc::clone(&provider);
+        let state = AppState::new_for_test(provider, PermissionConfig::default());
+        state
+            .permission_service
+            .set_level(PermissionLevel::AccountOperator);
+
+        let dn = "CN=Alice,DC=example,DC=com";
+        provider_ref.set_user_account_control(dn, 0x0020);
+
+        let result = clear_password_not_required_inner(&state, dn).await;
+        assert!(matches!(result.unwrap_err(), AppError::Directory(_)));
+
+        let entries = state.audit_service.get_entries();
+        let failed = entries
+            .iter()
+            .find(|e| e.action == "ClearPasswordNotRequiredFailed")
+            .expect("failure audit entry recorded");
+        assert!(!failed.success);
+    }
+
+    // -----------------------------------------------------------------------
+    // remove_user_spns_inner (Story 14.5)
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_remove_user_spns_requires_account_operator() {
+        // ReadOnly default
+        let state = make_state();
+        let result = remove_user_spns_inner(
+            &state,
+            "CN=User,DC=example,DC=com",
+            &["MSSQLSvc/db.corp.local:1433".to_string()],
+        )
+        .await;
+        assert!(matches!(result.unwrap_err(), AppError::PermissionDenied(_)));
+
+        // HelpDesk also denied
+        let state = make_state_with_level(PermissionLevel::HelpDesk);
+        let result = remove_user_spns_inner(
+            &state,
+            "CN=User,DC=example,DC=com",
+            &["MSSQLSvc/db.corp.local:1433".to_string()],
+        )
+        .await;
+        assert!(matches!(result.unwrap_err(), AppError::PermissionDenied(_)));
+    }
+
+    #[tokio::test]
+    async fn test_remove_user_spns_succeeds_for_account_operator_single_removal() {
+        let (state, provider) =
+            make_state_with_level_and_provider(PermissionLevel::AccountOperator);
+        let dn = "CN=SvcSql,DC=example,DC=com";
+        provider.set_user_spns(
+            dn,
+            vec![
+                "MSSQLSvc/db.corp.local:1433".to_string(),
+                "HTTP/web1.corp.local".to_string(),
+                "FtpSvc/files.corp.local".to_string(),
+            ],
+        );
+
+        let result = remove_user_spns_inner(&state, dn, &["HTTP/web1.corp.local".to_string()])
+            .await
+            .unwrap();
+
+        assert_eq!(result.removed, vec!["HTTP/web1.corp.local"]);
+        assert_eq!(
+            result.kept,
+            vec![
+                "FtpSvc/files.corp.local".to_string(),
+                "MSSQLSvc/db.corp.local:1433".to_string(),
+            ]
+        );
+        assert!(result.blocked_system.is_empty());
+
+        // Verify the LDAP write happened with the correct new set
+        let writes = provider.modify_attribute_calls.lock().unwrap();
+        assert_eq!(writes.len(), 1);
+        assert_eq!(writes[0].1, "servicePrincipalName");
+        assert_eq!(writes[0].2.len(), 2);
+        assert!(writes[0].2.contains(&"FtpSvc/files.corp.local".to_string()));
+        assert!(
+            writes[0]
+                .2
+                .contains(&"MSSQLSvc/db.corp.local:1433".to_string())
+        );
+
+        // Verify the audit entry shape
+        let entries = state.audit_service.get_entries();
+        let entry = entries
+            .iter()
+            .find(|e| e.action == "RemovedUserSpns")
+            .expect("audit entry recorded");
+        assert_eq!(entry.target_dn, dn);
+        assert!(entry.details.contains("HTTP/web1.corp.local"));
+        assert!(entry.details.contains("FtpSvc/files.corp.local"));
+        assert!(entry.details.contains("MSSQLSvc/db.corp.local:1433"));
+        assert!(entry.success);
+    }
+
+    #[tokio::test]
+    async fn test_remove_user_spns_blocks_system_spns() {
+        let (state, provider) =
+            make_state_with_level_and_provider(PermissionLevel::AccountOperator);
+        let dn = "CN=DC01,DC=example,DC=com";
+        provider.set_user_spns(
+            dn,
+            vec![
+                "HOST/dc01.corp.local".to_string(),
+                "MSSQLSvc/db.corp.local:1433".to_string(),
+            ],
+        );
+
+        // Operator requests removal of both - HOST is blocked, MSSQLSvc removed
+        let result = remove_user_spns_inner(
+            &state,
+            dn,
+            &[
+                "HOST/dc01.corp.local".to_string(),
+                "MSSQLSvc/db.corp.local:1433".to_string(),
+            ],
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(result.removed, vec!["MSSQLSvc/db.corp.local:1433"]);
+        assert_eq!(result.kept, vec!["HOST/dc01.corp.local"]);
+        assert_eq!(result.blocked_system, vec!["HOST/dc01.corp.local"]);
+
+        // Audit details mention both removed and blocked
+        let entries = state.audit_service.get_entries();
+        let entry = entries
+            .iter()
+            .find(|e| e.action == "RemovedUserSpns")
+            .expect("audit entry recorded");
+        assert!(
+            entry
+                .details
+                .contains("removed: [MSSQLSvc/db.corp.local:1433]")
+        );
+        assert!(
+            entry
+                .details
+                .contains("blocked_system: [HOST/dc01.corp.local]")
+        );
+    }
+
+    #[tokio::test]
+    async fn test_remove_user_spns_idempotent_when_spn_not_present() {
+        let (state, provider) =
+            make_state_with_level_and_provider(PermissionLevel::AccountOperator);
+        let dn = "CN=Svc,DC=example,DC=com";
+        provider.set_user_spns(dn, vec!["MSSQLSvc/db.corp.local:1433".to_string()]);
+
+        // Request removal of an SPN that the user does not have
+        let result = remove_user_spns_inner(&state, dn, &["HTTP/web1.corp.local".to_string()])
+            .await
+            .unwrap();
+
+        assert!(result.removed.is_empty());
+        assert_eq!(result.kept, vec!["MSSQLSvc/db.corp.local:1433"]);
+        assert!(result.blocked_system.is_empty());
+
+        // No LDAP write, no audit entry
+        let writes = provider.modify_attribute_calls.lock().unwrap();
+        assert!(writes.is_empty(), "no LDAP write on idempotent no-op");
+
+        let entries = state.audit_service.get_entries();
+        assert!(
+            !entries.iter().any(|e| e.action == "RemovedUserSpns"),
+            "no audit entry on no-op"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_remove_user_spns_all_system_no_op() {
+        let (state, provider) =
+            make_state_with_level_and_provider(PermissionLevel::AccountOperator);
+        let dn = "CN=DC01,DC=example,DC=com";
+        provider.set_user_spns(
+            dn,
+            vec![
+                "HOST/dc01.corp.local".to_string(),
+                "ldap/dc01.corp.local".to_string(),
+            ],
+        );
+
+        // Request removal of only system SPNs - all blocked
+        let result = remove_user_spns_inner(
+            &state,
+            dn,
+            &[
+                "HOST/dc01.corp.local".to_string(),
+                "ldap/dc01.corp.local".to_string(),
+            ],
+        )
+        .await
+        .unwrap();
+
+        assert!(result.removed.is_empty());
+        assert_eq!(result.blocked_system.len(), 2);
+
+        // No LDAP write, no audit entry
+        let writes = provider.modify_attribute_calls.lock().unwrap();
+        assert!(writes.is_empty());
+
+        let entries = state.audit_service.get_entries();
+        assert!(!entries.iter().any(|e| e.action == "RemovedUserSpns"));
+    }
+
+    #[tokio::test]
+    async fn test_remove_user_spns_all_removed_writes_empty_set() {
+        let (state, provider) =
+            make_state_with_level_and_provider(PermissionLevel::AccountOperator);
+        let dn = "CN=Svc,DC=example,DC=com";
+        provider.set_user_spns(dn, vec!["MSSQLSvc/db.corp.local:1433".to_string()]);
+
+        let result =
+            remove_user_spns_inner(&state, dn, &["MSSQLSvc/db.corp.local:1433".to_string()])
+                .await
+                .unwrap();
+
+        assert_eq!(result.removed, vec!["MSSQLSvc/db.corp.local:1433"]);
+        assert!(result.kept.is_empty());
+
+        // modify_attribute called with an empty Vec - LDAP layer turns this
+        // into Mod::Replace with empty HashSet, deleting the attribute
+        let writes = provider.modify_attribute_calls.lock().unwrap();
+        assert_eq!(writes.len(), 1);
+        assert!(writes[0].2.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_remove_user_spns_captures_snapshot_before_write() {
+        let (state, provider) =
+            make_state_with_level_and_provider(PermissionLevel::AccountOperator);
+        let dn = "CN=Svc,DC=example,DC=com";
+        provider.set_user_spns(dn, vec!["MSSQLSvc/db.corp.local:1433".to_string()]);
+
+        remove_user_spns_inner(&state, dn, &["MSSQLSvc/db.corp.local:1433".to_string()])
+            .await
+            .unwrap();
+
+        assert_eq!(state.snapshot_service.count(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_remove_user_spns_audit_on_directory_failure() {
+        let provider = Arc::new(MockDirectoryProvider::new().with_failure());
+        let provider_ref = Arc::clone(&provider);
+        let state = AppState::new_for_test(provider, PermissionConfig::default());
+        state
+            .permission_service
+            .set_level(PermissionLevel::AccountOperator);
+
+        let dn = "CN=Svc,DC=example,DC=com";
+        provider_ref.set_user_spns(dn, vec!["MSSQLSvc/db.corp.local:1433".to_string()]);
+
+        let result =
+            remove_user_spns_inner(&state, dn, &["MSSQLSvc/db.corp.local:1433".to_string()]).await;
+        // get_user_spns will fail first since with_failure() short-circuits
+        // every method - the resulting error is still AppError::Directory
+        assert!(matches!(result.unwrap_err(), AppError::Directory(_)));
+
+        // Audit-completeness (QA-14.5-001): the read failure must be
+        // recorded as an audit entry so SOC consumers see transient AD
+        // outages, not just IPC callers.
+        let entries = state.audit_service.get_entries();
+        let failed = entries
+            .iter()
+            .find(|e| e.action == "RemoveUserSpnsFailed")
+            .expect("read-failure audit entry recorded");
+        assert!(!failed.success);
+        assert_eq!(failed.target_dn, dn);
+        assert!(
+            failed.details.contains("get_user_spns:"),
+            "audit details should identify the failed read phase, got: {}",
+            failed.details
+        );
+    }
+
+    #[tokio::test]
+    async fn test_remove_user_spns_audit_details_sorted() {
+        let (state, provider) =
+            make_state_with_level_and_provider(PermissionLevel::AccountOperator);
+        let dn = "CN=Svc,DC=example,DC=com";
+        provider.set_user_spns(
+            dn,
+            vec![
+                "ZetaSvc/z.corp.local".to_string(),
+                "AlphaSvc/a.corp.local".to_string(),
+                "MidSvc/m.corp.local".to_string(),
+            ],
+        );
+
+        let result = remove_user_spns_inner(
+            &state,
+            dn,
+            // Pass in non-alphabetic order to verify sorting
+            &[
+                "ZetaSvc/z.corp.local".to_string(),
+                "AlphaSvc/a.corp.local".to_string(),
+            ],
+        )
+        .await
+        .unwrap();
+
+        // Removed list sorted alphabetically
+        assert_eq!(
+            result.removed,
+            vec!["AlphaSvc/a.corp.local", "ZetaSvc/z.corp.local"]
+        );
+
+        // Audit details have the sorted lists
+        let entries = state.audit_service.get_entries();
+        let entry = entries
+            .iter()
+            .find(|e| e.action == "RemovedUserSpns")
+            .expect("audit entry recorded");
+        assert!(
+            entry
+                .details
+                .contains("removed: [AlphaSvc/a.corp.local, ZetaSvc/z.corp.local]")
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // disable_unconstrained_delegation_inner (Story 14.6)
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_disable_unconstrained_delegation_requires_admin() {
+        // ReadOnly default - denied
+        let state = make_state();
+        let result =
+            disable_unconstrained_delegation_inner(&state, "CN=Computer,DC=example,DC=com").await;
+        assert!(matches!(result.unwrap_err(), AppError::PermissionDenied(_)));
+
+        // HelpDesk also denied
+        let state = make_state_with_level(PermissionLevel::HelpDesk);
+        let result =
+            disable_unconstrained_delegation_inner(&state, "CN=Computer,DC=example,DC=com").await;
+        assert!(matches!(result.unwrap_err(), AppError::PermissionDenied(_)));
+
+        // AccountOperator ALSO denied (HIGHER bar than 14.4 / 14.5)
+        let state = make_state_with_level(PermissionLevel::AccountOperator);
+        let result =
+            disable_unconstrained_delegation_inner(&state, "CN=Computer,DC=example,DC=com").await;
+        assert!(matches!(result.unwrap_err(), AppError::PermissionDenied(_)));
+    }
+
+    #[tokio::test]
+    async fn test_disable_unconstrained_delegation_succeeds_for_admin() {
+        let (state, provider) = make_state_with_level_and_provider(PermissionLevel::Admin);
+        let dn = "CN=DC01,OU=Domain Controllers,DC=example,DC=com";
+        // 0x80020 = TRUSTED_FOR_DELEGATION | ACCOUNTDISABLE
+        provider.set_user_account_control(dn, 0x80020);
+
+        let result = disable_unconstrained_delegation_inner(&state, dn).await;
+        assert!(result.is_ok());
+
+        // Verify the trait method recorded the correct mask + before/after
+        let calls = provider.clear_uac_bits_calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0], (dn.to_string(), 0x80000, 0x80020, 0x00020));
+
+        // Verify the audit entry shape (action name, target_dn, details
+        // contain uac before/after)
+        let entries = state.audit_service.get_entries();
+        let entry = entries
+            .iter()
+            .find(|e| e.action == "DisabledUnconstrainedDelegation")
+            .expect("audit entry recorded");
+        assert_eq!(entry.target_dn, dn);
+        assert!(entry.details.contains("0x80020"));
+        assert!(entry.details.contains("0x20"));
+        assert!(entry.success);
+    }
+
+    #[tokio::test]
+    async fn test_disable_unconstrained_delegation_succeeds_for_domain_admin() {
+        let (state, provider) = make_state_with_level_and_provider(PermissionLevel::DomainAdmin);
+        let dn = "CN=Server01,OU=Servers,DC=example,DC=com";
+        provider.set_user_account_control(dn, 0x80000);
+
+        let result = disable_unconstrained_delegation_inner(&state, dn).await;
+        assert!(result.is_ok());
+
+        let entries = state.audit_service.get_entries();
+        assert!(
+            entries
+                .iter()
+                .any(|e| e.action == "DisabledUnconstrainedDelegation")
+        );
+    }
+
+    #[tokio::test]
+    async fn test_disable_unconstrained_delegation_idempotent_no_op() {
+        let (state, provider) = make_state_with_level_and_provider(PermissionLevel::Admin);
+        let dn = "CN=Server01,OU=Servers,DC=example,DC=com";
+        // 0x00020 = ACCOUNTDISABLE only - TRUSTED_FOR_DELEGATION already clear
+        provider.set_user_account_control(dn, 0x00020);
+
+        let result = disable_unconstrained_delegation_inner(&state, dn).await;
+        assert!(result.is_ok(), "idempotent no-op returns Ok");
+
+        let calls = provider.clear_uac_bits_calls.lock().unwrap();
+        assert!(calls.is_empty(), "no recorded state-change call on no-op");
+
+        let writes = provider.modify_attribute_calls.lock().unwrap();
+        assert!(writes.is_empty(), "no LDAP write on no-op");
+
+        let entries = state.audit_service.get_entries();
+        assert!(
+            !entries
+                .iter()
+                .any(|e| e.action == "DisabledUnconstrainedDelegation"),
+            "no audit entry on no-op"
+        );
+
+        // No-op-before-snapshot optimization (QA-14.5-003 retro-applied):
+        // the peek detects the bit is already clear and returns early
+        // before capture_snapshot, so no snapshot is written.
+        assert_eq!(
+            state.snapshot_service.count(),
+            0,
+            "no snapshot captured on idempotent no-op"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_disable_unconstrained_delegation_preserves_unrelated_uac_bits() {
+        let (state, provider) = make_state_with_level_and_provider(PermissionLevel::Admin);
+        let dn = "CN=DC01,DC=example,DC=com";
+        // 0x82020 = TRUSTED_FOR_DELEGATION | DONT_EXPIRE_PASSWORD | ACCOUNTDISABLE | a flag at 0x2000
+        // We pick a value with several unrelated bits set to verify mask isolation
+        provider.set_user_account_control(dn, 0x82020);
+
+        disable_unconstrained_delegation_inner(&state, dn)
+            .await
+            .unwrap();
+
+        let calls = provider.clear_uac_bits_calls.lock().unwrap();
+        // previous=0x82020, mask=0x80000, new=0x82020 & !0x80000 = 0x02020
+        assert_eq!(calls[0].2, 0x82020);
+        assert_eq!(calls[0].3, 0x02020, "unrelated bits preserved");
+    }
+
+    #[tokio::test]
+    async fn test_disable_unconstrained_delegation_captures_snapshot() {
+        let (state, provider) = make_state_with_level_and_provider(PermissionLevel::Admin);
+        let dn = "CN=DC01,DC=example,DC=com";
+        provider.set_user_account_control(dn, 0x80020);
+
+        disable_unconstrained_delegation_inner(&state, dn)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            state.snapshot_service.count(),
+            1,
+            "snapshot captured before write"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_disable_unconstrained_delegation_audit_on_directory_failure() {
+        let provider = Arc::new(MockDirectoryProvider::new().with_failure());
+        let provider_ref = Arc::clone(&provider);
+        let state = AppState::new_for_test(provider, PermissionConfig::default());
+        state.permission_service.set_level(PermissionLevel::Admin);
+
+        let dn = "CN=DC01,DC=example,DC=com";
+        provider_ref.set_user_account_control(dn, 0x80000);
+
+        let result = disable_unconstrained_delegation_inner(&state, dn).await;
+        assert!(matches!(result.unwrap_err(), AppError::Directory(_)));
+
+        let entries = state.audit_service.get_entries();
+        let failed = entries
+            .iter()
+            .find(|e| e.action == "DisableUnconstrainedDelegationFailed")
+            .expect("failure audit entry recorded");
+        assert!(!failed.success);
+    }
+
+    #[tokio::test]
+    async fn test_disable_unconstrained_delegation_records_critical_severity_on_success() {
+        let (state, provider) = make_state_with_level_and_provider(PermissionLevel::Admin);
+        let dn = "CN=SRV01,OU=Computers,DC=example,DC=com";
+        provider.set_user_account_control(dn, 0x80020);
+
+        disable_unconstrained_delegation_inner(&state, dn)
+            .await
+            .unwrap();
+
+        let entries = state.audit_service.get_entries();
+        let success = entries
+            .iter()
+            .find(|e| e.action == "DisabledUnconstrainedDelegation")
+            .expect("success audit entry recorded");
+        assert_eq!(
+            success.severity,
+            AuditSeverity::Critical,
+            "Story 14.6 success entries must be Critical severity (QA-14.6-001)"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_disable_unconstrained_delegation_records_critical_severity_on_failure() {
+        let provider = Arc::new(MockDirectoryProvider::new().with_failure());
+        let provider_ref = Arc::clone(&provider);
+        let state = AppState::new_for_test(provider, PermissionConfig::default());
+        state.permission_service.set_level(PermissionLevel::Admin);
+
+        let dn = "CN=SRV01,OU=Computers,DC=example,DC=com";
+        provider_ref.set_user_account_control(dn, 0x80000);
+
+        let _ = disable_unconstrained_delegation_inner(&state, dn).await;
+
+        let entries = state.audit_service.get_entries();
+        let failed = entries
+            .iter()
+            .find(|e| e.action == "DisableUnconstrainedDelegationFailed")
+            .expect("failure audit entry recorded");
+        assert_eq!(
+            failed.severity,
+            AuditSeverity::Critical,
+            "Story 14.6 failure entries must also be Critical severity (QA-14.6-001)"
+        );
     }
 }

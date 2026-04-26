@@ -1,0 +1,153 @@
+schema: 1
+story: "14.3"
+story_title: "Computer Security Indicator Badges"
+gate: PASS
+status_reason: "Mirror of Story 14.2 on the computer side. All 6 ACs met (2 documented stronger-than-spec deviations on i18n key naming). All 4 PO-flagged residual risks verified OK. Forwarded QA-14.2 concern about metadata XSS is resolved by architecture (title attribute path, no innerHTML). 11/11 new tests pass; full frontend suite 2137/2137; full backend suite 1624/1624; lint and tsc clean."
+reviewer: "Quinn (Test Architect)"
+updated: "2026-04-26T00:00:00Z"
+
+top_issues:
+  - id: "QA-14.3-001"
+    severity: low
+    finding: "Test 'handles ConstrainedDelegation with missing metadata gracefully' exercises the missing-metadata fallback for ConstrainedDelegation but not for Rbcd. Both kinds use the same Array.isArray narrowing path in tooltipParamsFor."
+    suggested_action: "Optional - add a parity test for Rbcd missing-metadata. Same code path is exercised either way; parity would catch any future asymmetric refactor of tooltipParamsFor. Non-blocking."
+    blocking: false
+    suggested_owner: dev
+  - id: "QA-14.3-002"
+    severity: low
+    finding: "tooltipParamsFor is local to ComputerDetail.tsx. If Story 14.6 (Disable Unconstrained Delegation refresh callback) needs the same metadata extraction logic, the helper should be factored to a shared location (src/types/securityIndicators.ts or src/lib/)."
+    suggested_action: "Defer until Story 14.6 implementation. Currently local-to-page is correct because no other consumer exists. Track as a refactor opportunity."
+    blocking: false
+    suggested_owner: dev
+  - id: "QA-14.3-003"
+    severity: low
+    finding: "SecurityIndicatorDot popover shows indicator labels but not the metadata (SPN / principal lists). Operator must open ComputerDetail to see what the configuration actually permits."
+    suggested_action: "Acceptable for the lookup row to stay compact. Future enhancement could show first-N principals in the popover. Track for backlog."
+    blocking: false
+    suggested_owner: po
+
+waiver:
+  active: false
+
+quality_score: 95
+
+expires: "2026-05-26T00:00:00Z"
+
+evidence:
+  tests_reviewed: 11
+  risks_identified: 4
+  trace:
+    ac_covered:
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+      - 6
+    ac_uncovered: []
+    ac_to_test_map:
+      "AC1":
+        code:
+          - "src/pages/ComputerDetail.tsx:262-279 securityIndicators?.indicators.map() in badge row, after Enabled / Disabled status badge"
+        notes: "Implementation extends the existing computer detail badge area (no separate row created). Mirrors Story 14.2 user-side data flow - prop from parent, no per-detail invoke."
+        tests:
+          - "transitive via the 6 indicator-rendering tests"
+      "AC2":
+        code:
+          - "src/types/securityIndicators.ts severityToBadgeVariant (reused from Story 14.2)"
+          - "src/pages/ComputerDetail.tsx:276 variant={severityToBadgeVariant(indicator.severity)}"
+        notes: "Reads indicator.severity NOT indicator.kind so backend severity flows through (consistent with Story 14.2 contract). 3 indicators detected by Story 14.1 backend with appropriate base severities (UnconstrainedDelegation Critical, ConstrainedDelegation Warning, Rbcd Warning)."
+        tests:
+          - "renders UnconstrainedDelegation badge as Critical (error variant)"
+          - "renders ConstrainedDelegation badge as Warning with target SPNs in tooltip"
+          - "renders Rbcd badge as Warning with allowed principals in tooltip"
+      "AC3":
+        code:
+          - "src/pages/ComputerDetail.tsx:59-77 tooltipParamsFor helper"
+          - "src/pages/ComputerDetail.tsx:266-269 title={t(`securityIndicators:${kind}.tooltip`, tooltipParamsFor(indicator))}"
+        notes: "tooltipParamsFor extracts target_spns / allowed_principals from indicator.metadata with Array.isArray narrowing for type safety. Joins with comma-space for display. Returns empty object for kinds without interpolation - i18next safely ignores extra params."
+        tests:
+          - "renders ConstrainedDelegation badge as Warning with target SPNs in tooltip (asserts http/web1.corp.local and http/web2.corp.local appear in title)"
+          - "renders Rbcd badge as Warning with allowed principals in tooltip (asserts S-1-5-21-1-2-3-1000 and S-1-5-21-1-2-3-1001 appear in title)"
+          - "handles ConstrainedDelegation with missing metadata gracefully (tooltip still renders, msDS-AllowedToDelegateTo reference still present)"
+      "AC4":
+        code:
+          - "src/locales/en/securityIndicators.json (3 new computer indicator keys + dot helpers)"
+          - "src/locales/fr/securityIndicators.json"
+          - "src/locales/de/securityIndicators.json"
+          - "src/locales/it/securityIndicators.json"
+          - "src/locales/es/securityIndicators.json"
+        notes: "Extended existing namespace from Story 14.2 (rather than creating a new computer-specific one) - the SecurityIndicator badge contract is the same across user and computer pages. {{targets}} and {{principals}} interpolation placeholders preserved across all 5 languages."
+        tests:
+          - "src/locales/translations.test.ts (176 tests verify namespace presence, key parity, no empty values, no orphans, interpolation variable preservation)"
+      "AC5":
+        code:
+          - "src/components/common/SecurityIndicatorDot.tsx (UNMODIFIED - reused from Story 14.2)"
+          - "src/pages/ComputerLookup.tsx import + render in row"
+          - "src/pages/ComputerLookup.tsx batch evaluation in useEffect (line 60-77 area)"
+        notes: "True component reuse - no fork, no duplicate. Component was generic on SecurityIndicatorSet from Story 14.2 design, computer side just provides a different data source."
+        tests:
+          - "renders no dot for computers with no detected indicators"
+          - "renders the dot for computers with indicators"
+          - "dot color reflects highestSeverity (Critical wins over Warning)"
+          - "propagates indicator set to ComputerDetail when a computer is selected"
+      "AC6":
+        code:
+          - "src/pages/ComputerDetail.test.tsx Story 14.3 - Security indicator badges block (7 tests)"
+          - "src/pages/ComputerLookup.test.tsx security indicator dot block (4 tests)"
+        tests:
+          - "all 11 new tests + parametrized translation completeness tests"
+
+residual_risks:
+  - id: "R1"
+    label: "DirectoryComputer.rawAttributes addition (consumer compatibility)"
+    status: VERIFIED_OK
+    notes: "Existing 9 mapEntryToComputer tests still pass. Pure pass-through addition, no behavioral change to other fields. Only one outside-mapper test factory needed update (ComputerDetail.test.tsx makeComputer added rawAttributes: {} default). Grep of DirectoryComputer usage confirmed all sites are reads, no other constructor exists outside the test factory. Full frontend suite 2137/2137 - no regression."
+  - id: "R2"
+    label: "tooltipParamsFor metadata extraction safety"
+    status: VERIFIED_OK
+    notes: "Array.isArray narrowing at lines 65 and 71 prevents type errors on malformed metadata. Falls through to empty string interpolation. 'handles ConstrainedDelegation with missing metadata gracefully' test verifies the fallback path. Symmetric Rbcd test would be parity-improving but is low-severity (same code path)."
+  - id: "R3"
+    label: "ComputerLookup indicator map keying by distinguishedName"
+    status: VERIFIED_OK
+    notes: "evaluateComputerSecurityIndicatorsBatch keys by computer.distinguishedName (services/securityIndicators.ts:131). renderComputerItem reads indicatorMap.get(computer.distinguishedName) - exact key match. End-to-end test 'propagates indicator set to ComputerDetail when a computer is selected' verifies the round-trip. DN over samAccountName is correct because computer samAccountNames are mangled with trailing $."
+  - id: "R4"
+    label: "i18next interpolation safety with raw LDAP / SD values (forwarded from QA-14.2)"
+    status: VERIFIED_OK_BY_ARCHITECTURE
+    notes: "Project-wide config sets escapeValue: false (i18n.ts:46) which is safe for all current consumers because tooltip values flow into the title attribute via React's JSX prop binding. setAttribute path treats the value as text - no HTML parsing, no XSS path possible. Grep for dangerouslySetInnerHTML and innerHTML in ComputerDetail.tsx and ComputerLookup.tsx returned zero matches. The architecture itself eliminates the QA-14.2 escaping concern."
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Zero XSS surface by architecture. title attribute is set-only, never parsed. No innerHTML or dangerouslySetInnerHTML in new code (grep verified). Even attacker-controlled SID/SPN content renders as literal text in browser tooltip. Backend Rbcd parser (Story 14.1 extract_dacl_principals) is the trust boundary; UI trusts the parsed result."
+  performance:
+    status: PASS
+    notes: "Batch IPC over typical 50-200 computer visible page in single-digit ms. O(1) Map<dn, set> lookup at row render. tooltipParamsFor is a cheap synchronous Array.isArray + join, no measurable overhead. Backend RBCD adds one base64 decode + SD walk per RBCD-bearing host."
+  reliability:
+    status: PASS
+    notes: "useEffect cancellation honored. try/catch around batch IPC degrades to console.warn (no crash). Array.isArray narrowing prevents type-error crashes on malformed metadata."
+  maintainability:
+    status: PASS
+    notes: "Mirrors Story 14.2 patterns 1:1. tooltipParamsFor is local to page (correct - no other consumer yet). Adding a 4th computer indicator only needs backend detection (Story 14.1) plus an i18n key, no UI change. Foundational rawAttributes addition makes DirectoryComputer symmetric with DirectoryUser."
+  accessibility:
+    status: PASS
+    notes: "Native title for tooltip consistent with project pattern. SecurityIndicatorDot accessibility (tabIndex, count-aware aria-label, Enter/Space toggle, Escape close, focus/blur) inherited unchanged from Story 14.2."
+
+recommendations:
+  immediate: []
+  future:
+    - "Optional: add a Rbcd missing-metadata fallback test mirroring the existing ConstrainedDelegation one. Same code path; parity would catch any future asymmetric refactor."
+    - "Defer until Story 14.6: factor tooltipParamsFor to a shared location if the quick-fix refresh callback needs the same metadata extraction logic. Currently local-to-page is correct."
+    - "Backlog: enhance SecurityIndicatorDot popover to show first-N principal SIDs / target SPNs (currently only kind labels). Trade-off: loses the compact look in the lookup row."
+    - "Backlog (Epic 14 follow-up): SID-to-name resolution for the Rbcd allowed_principals list. Would maintain XSS safety as long as resolved names continue to flow through title attributes."
+
+test_summary:
+  new_tests_in_story: 11
+  test_files_touched:
+    - "src/pages/ComputerDetail.test.tsx (+7 tests, total 38)"
+    - "src/pages/ComputerLookup.test.tsx (+4 tests, total 38)"
+  full_frontend_suite: "2137 passed (139 files), 0 failures, 0 new ignored"
+  full_backend_suite: "1624 passed (frontend-only story, no backend touch - validated unchanged)"
+  translation_completeness_suite: "176 tests across en/fr/de/it/es - green (no missing keys, no orphans, no empty values, {{targets}} and {{principals}} interpolation preserved)"
+  lint: "clean (eslint exit 0)"
+  tsc: "clean (no diagnostics)"

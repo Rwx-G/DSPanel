@@ -1,0 +1,179 @@
+schema: 1
+story: "14.1"
+story_title: "Security Indicators Backend Foundation"
+gate: PASS
+status_reason: "Pure-function evaluator implemented per the canonical HealthInput pattern. All 8 ACs met (2 documented strong-deviations on AC #1 and AC #5). All 3 PO-flagged residual risks verified OK. 21/21 tests pass, clippy clean, fmt clean."
+reviewer: "Quinn (Test Architect)"
+updated: "2026-04-26T00:00:00Z"
+
+top_issues:
+  - id: "QA-14.1-001"
+    severity: low
+    finding: "No dedicated unit tests for `extract_dacl_principals` in dacl.rs::tests. End-to-end coverage exists via security_indicators.rs `computer_rbcd_parses_principals_from_sd_blob` but dedicated tests would harden the helper against future regressions in DACL parsing."
+    suggested_action: "Add 3-4 tests in dacl.rs::tests covering: deny-ACE skip, mixed Allow/Deny DACL, ACCESS_ALLOWED_OBJECT_ACE with ACE_OBJECT_TYPE_PRESENT and InheritedObjectType flag combinations, malformed ACE truncation. Non-blocking. Recommend folding into Story 14.3 (computer badges) work."
+    blocking: false
+  - id: "QA-14.1-002"
+    severity: low
+    finding: "Story AC #1 text specifies `&DirectoryUser` / `&DirectoryComputer` inputs but those Rust types do not exist (only the generic DirectoryEntry plus the TS-side DirectoryUser). Implementation correctly uses typed projection structs (UserIndicatorInput / ComputerIndicatorInput) per the canonical HealthInput pattern from services/health.rs."
+    suggested_action: "Documentation-only update: refresh AC #1 text in a follow-up to formalize the typed projection input convention. Already documented in the Dev Agent Record completion notes."
+    blocking: false
+  - id: "QA-14.1-003"
+    severity: low
+    finding: "Story AC #5 says \"A new Tauri command\" (singular) but the implementation exposes four commands (single + batch for user and computer), mirroring the evaluate_health_cmd / evaluate_health_batch pattern. Stronger than the AC."
+    suggested_action: "Documentation-only update: refresh AC #5 text to acknowledge the batch variants. Already documented in the Dev Agent Record completion notes."
+    blocking: false
+
+waiver:
+  active: false
+
+quality_score: 95
+
+expires: "2026-05-26T00:00:00Z"
+
+evidence:
+  tests_reviewed: 21
+  risks_identified: 3
+  trace:
+    ac_covered:
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+      - 6
+      - 7
+      - 8
+    ac_uncovered: []
+    ac_to_test_map:
+      "AC1":
+        code:
+          - "src-tauri/src/services/security_indicators.rs:153 evaluate_user_indicators"
+          - "src-tauri/src/services/security_indicators.rs:219 evaluate_computer_indicators"
+        notes: "Inputs are typed projection structs (UserIndicatorInput / ComputerIndicatorInput) per HealthInput pattern, not &DirectoryUser / &DirectoryComputer. Documented deviation."
+        tests:
+          - "all 21 tests transitively"
+      "AC2":
+        code:
+          - "src-tauri/src/services/security_indicators.rs:62-75 SecurityIndicator"
+          - "src-tauri/src/services/security_indicators.rs:80-85 SecurityIndicatorSet"
+        tests:
+          - "computer_constrained_delegation_is_warning_with_metadata"
+          - "computer_rbcd_parses_principals_from_sd_blob"
+      "AC3":
+        code:
+          - "src-tauri/src/services/security_indicators.rs:44 pub type IndicatorSeverity = HealthLevel"
+        tests:
+          - "implicit in every severity assertion"
+      "AC4":
+        code:
+          - "src-tauri/src/services/security_indicators.rs:20-36 UAC bit constants"
+          - "src-tauri/src/services/security_indicators.rs:158-209 user indicator branches"
+          - "src-tauri/src/services/security_indicators.rs:223-261 computer indicator branches"
+        tests:
+          - "user_password_not_required_is_critical"
+          - "user_reversible_encryption_is_critical"
+          - "user_password_never_expires_is_warning_when_not_protected"
+          - "user_as_rep_roastable_is_critical"
+          - "user_kerberoastable_is_warning_when_not_protected"
+          - "computer_unconstrained_delegation_is_critical"
+          - "computer_constrained_delegation_is_warning_with_metadata"
+          - "computer_rbcd_parses_principals_from_sd_blob"
+      "AC5":
+        code:
+          - "src-tauri/src/commands/directory.rs:567 evaluate_user_security_indicators"
+          - "src-tauri/src/commands/directory.rs:575 evaluate_user_security_indicators_batch"
+          - "src-tauri/src/commands/directory.rs:583 evaluate_computer_security_indicators"
+          - "src-tauri/src/commands/directory.rs:591 evaluate_computer_security_indicators_batch"
+          - "src-tauri/src/lib.rs:244-247 invoke_handler registration"
+        notes: "Four commands, not one. Deviation is stronger than AC."
+        tests:
+          - "transitively via 21 unit tests on the underlying functions"
+      "AC6":
+        code:
+          - "src-tauri/src/services/ldap_directory.rs:96+ USER_ATTRS already had userAccountControl, servicePrincipalName, adminCount"
+          - "src-tauri/src/services/ldap_directory.rs:141-142 COMPUTER_ATTRS extended with msDS-AllowedToDelegateTo and msDS-AllowedToActOnBehalfOfOtherIdentity"
+          - "src-tauri/src/services/ldap_directory.rs:1646-1689 BINARY_ATTRS_TO_SURFACE + base64 encoding in search_entry_to_directory_entry"
+        notes: "Additive change; no new LDAP requests. Existing search now returns extra attributes in the same call."
+        tests:
+          - "validated by integration; no new attr fetched on a separate query"
+      "AC7":
+        code:
+          - "src-tauri/src/services/security_indicators.rs:274-585 21 unit tests"
+        tests:
+          - "user_password_not_required_is_critical"
+          - "user_reversible_encryption_is_critical"
+          - "user_password_never_expires_is_warning_when_not_protected"
+          - "user_as_rep_roastable_is_critical"
+          - "user_kerberoastable_is_warning_when_not_protected"
+          - "user_kerberoastable_escalates_to_critical_when_admin_count_one"
+          - "user_password_never_expires_escalates_when_admin_count_one"
+          - "user_both_escalating_indicators_when_admin_count_one"
+          - "user_admin_count_zero_does_not_escalate"
+          - "user_admin_count_two_does_not_escalate"
+          - "user_admin_count_absent_does_not_escalate"
+          - "user_multiple_indicators_combined"
+          - "user_clean_yields_empty_set"
+          - "user_empty_spn_array_treated_as_no_spn"
+          - "computer_unconstrained_delegation_is_critical"
+          - "computer_constrained_delegation_is_warning_with_metadata"
+          - "computer_rbcd_parses_principals_from_sd_blob"
+          - "computer_clean_yields_empty_set"
+          - "computer_unconstrained_dominates_constrained_severity"
+          - "computer_empty_rbcd_string_does_not_emit_indicator"
+          - "computer_invalid_base64_does_not_emit_indicator"
+      "AC8":
+        code:
+          - "src-tauri/src/services/security_indicators.rs:134-136 is_admin_sdholder_protected helper"
+          - "src-tauri/src/services/security_indicators.rs:179-183 PasswordNeverExpires escalation branch"
+          - "src-tauri/src/services/security_indicators.rs:201-205 Kerberoastable escalation branch"
+        notes: "Strict equality `admin_count == Some(1)`. Escalates Warning -> Critical for the two specified indicators only. Other Critical-baseline indicators correctly not escalated."
+        tests:
+          - "user_kerberoastable_escalates_to_critical_when_admin_count_one"
+          - "user_password_never_expires_escalates_when_admin_count_one"
+          - "user_both_escalating_indicators_when_admin_count_one"
+          - "user_admin_count_zero_does_not_escalate"
+          - "user_admin_count_two_does_not_escalate"
+          - "user_admin_count_absent_does_not_escalate"
+
+residual_risks:
+  - id: "R1"
+    label: "Severity escalation correctness"
+    status: VERIFIED_OK
+    notes: "Symmetric pattern in both branches (lines 179-183 and 201-205). 6 dedicated tests cover all combinations including the edge case of adminCount=2 (rare migration leftover that must NOT escalate per AD semantics)."
+  - id: "R2"
+    label: "is_admin_sdholder_protected helper logic"
+    status: VERIFIED_OK
+    notes: "Strict equality `admin_count == Some(1)` (line 134-136). Triple-negative coverage: Some(0), Some(2), None. Helper is private (fn, not pub fn) per coding standards."
+  - id: "R3"
+    label: "RBCD principal extraction via extract_dacl_principals"
+    status: VERIFIED_OK_WITH_MINOR_CONCERN
+    notes: "Deny / Audit ACEs correctly skipped via the `_` arm (dacl.rs:242-247). Allow types ACCESS_ALLOWED_ACE (0x00) and ACCESS_ALLOWED_OBJECT_ACE (0x05) handled with proper SID-offset arithmetic for variable GUID presence. Bounds-checked. End-to-end coverage via constructed SD blob in security_indicators.rs `computer_rbcd_parses_principals_from_sd_blob`. Minor concern (QA-14.1-001): no dedicated dacl.rs tests for the helper itself - tracked for Story 14.3 or backlog."
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "Pure function, no I/O. Read-only on already-fetched data. No secrets. description_key is i18n key (not translated string) - removes locale-injection vector. Bounds-checked binary SD parsing prevents panic on malformed input."
+  performance:
+    status: PASS
+    notes: "O(1) per object for UAC checks; O(n) over small SPN/delegation lists; base64 decode + SD walk done once per Rbcd-bearing computer. Batch IPC variants amortize the roundtrip cost over visible list page (50-200 rows in single-digit ms)."
+  reliability:
+    status: PASS
+    notes: "No panics. `.unwrap_or_default()` on base64 / SD parsing failure (commands/security_indicators.rs:248). Defensive empty / invalid b64 covered by tests. No `unwrap()` outside tests."
+  maintainability:
+    status: PASS
+    notes: "Constants documented with ADS_UF names. Mirrors services/health.rs (team familiarity). 21 tests aligned with existing pattern. Public API fully `///` documented."
+
+recommendations:
+  immediate: []
+  future:
+    - "Add dedicated tests for `dacl::extract_dacl_principals`: deny-ACE skip, mixed Allow+Deny DACL, ACCESS_ALLOWED_OBJECT_ACE with object_flags (ACE_OBJECT_TYPE_PRESENT 0x01 + InheritedObjectType 0x02) variants, malformed truncation. Fold into Story 14.3 work or Epic 14 backlog."
+    - "Update Story 14.1 AC #1 and AC #5 text in a documentation pass to formalize the typed projection input convention and the batch IPC variant pattern. Optional cleanup; current Dev Agent Record completion notes already document the deviations."
+
+test_summary:
+  total_tests_in_module: 21
+  pass: 21
+  fail: 0
+  ignored: 0
+  full_lib_suite: "1624 passed (was 1603 pre-story, +21 new), 0 failures, 0 new ignored"
+  clippy: "clean (cargo clippy --all-targets -- -D warnings)"
+  fmt: "clean (cargo fmt --check)"

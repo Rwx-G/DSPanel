@@ -4,6 +4,7 @@ import { SearchBar } from "@/components/common/SearchBar";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { EmptyState } from "@/components/common/EmptyState";
 import { HealthBadge } from "@/components/common/HealthBadge";
+import { SecurityIndicatorDot } from "@/components/common/SecurityIndicatorDot";
 import { TruncatedBanner } from "@/components/common/TruncatedBanner";
 import { VirtualizedList } from "@/components/data/VirtualizedList";
 import { type Column } from "@/components/data/DataTable";
@@ -13,7 +14,12 @@ import {
   mapEntryToUser,
 } from "@/types/directory";
 import type { AccountHealthStatus } from "@/types/health";
+import type { SecurityIndicatorSet } from "@/types/securityIndicators";
 import { evaluateHealth, evaluateHealthBatch } from "@/services/healthcheck";
+import {
+  evaluateUserSecurityIndicators,
+  evaluateUserSecurityIndicatorsBatch,
+} from "@/services/securityIndicators";
 import { parseCnFromDn } from "@/utils/dn";
 import { useUserBrowse } from "@/hooks/useUserBrowse";
 import { useNavigation } from "@/contexts/NavigationContext";
@@ -119,6 +125,9 @@ export function UserLookup() {
   const [healthMap, setHealthMap] = useState<Map<string, AccountHealthStatus>>(
     new Map(),
   );
+  const [indicatorMap, setIndicatorMap] = useState<
+    Map<string, SecurityIndicatorSet>
+  >(new Map());
 
   useEffect(() => {
     if (users.length === 0) return;
@@ -135,7 +144,19 @@ export function UserLookup() {
       }
     };
 
+    const computeIndicators = async () => {
+      try {
+        const map = await evaluateUserSecurityIndicatorsBatch(users);
+        if (!cancelled) {
+          setIndicatorMap(map);
+        }
+      } catch (e) {
+        console.warn("Security indicators batch evaluation failed:", e);
+      }
+    };
+
     computeHealth();
+    computeIndicators();
     return () => {
       cancelled = true;
     };
@@ -146,6 +167,7 @@ export function UserLookup() {
       // Only reset health map when the filter actually changes the user list
       if (query.length >= 3) {
         setHealthMap(new Map());
+        setIndicatorMap(new Map());
       }
       setFilterText(query);
     },
@@ -162,10 +184,18 @@ export function UserLookup() {
         const updated = mapEntryToUser(entry);
         setSelectedUser(updated);
         updateItem(updated.samAccountName, updated);
-        const health = await evaluateHealth(updated);
+        const [health, indicators] = await Promise.all([
+          evaluateHealth(updated),
+          evaluateUserSecurityIndicators(updated),
+        ]);
         setHealthMap((prev) => {
           const next = new Map(prev);
           next.set(updated.samAccountName, health);
+          return next;
+        });
+        setIndicatorMap((prev) => {
+          const next = new Map(prev);
+          next.set(updated.samAccountName, indicators);
           return next;
         });
       }
@@ -336,9 +366,20 @@ export function UserLookup() {
             compact={healthMap.get(user.samAccountName)!.level === "Healthy"}
           />
         )}
+        {indicatorMap.get(user.samAccountName) && (
+          <SecurityIndicatorDot
+            indicators={indicatorMap.get(user.samAccountName)!}
+          />
+        )}
       </button>
     ),
-    [selectedUser, setSelectedUser, healthMap, handleUserContextMenu],
+    [
+      selectedUser,
+      setSelectedUser,
+      healthMap,
+      indicatorMap,
+      handleUserContextMenu,
+    ],
   );
 
   return (
@@ -462,6 +503,9 @@ export function UserLookup() {
                 <UserDetail
                   user={selectedUser}
                   healthStatus={healthMap.get(selectedUser.samAccountName)}
+                  securityIndicators={indicatorMap.get(
+                    selectedUser.samAccountName,
+                  )}
                   groupColumns={groupColumns}
                   groupRows={groupRows}
                   groupFilterText={groupFilterText}

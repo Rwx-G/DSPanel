@@ -20,5 +20,17 @@
   "filterGroups": "Filtrer les groupes...",
   "groupName": "Nom du groupe",
   "viewGroupMembers": "Voir les membres du groupe",
-  "openMonitoring": "Ouvrir la surveillance du poste"
+  "openMonitoring": "Ouvrir la surveillance du poste",
+  "quickFix": {
+    "disableUnconstrainedDelegation": {
+      "fixButton": "Corriger",
+      "fixButtonAriaLabel": "Désactiver la délégation Kerberos non contrainte",
+      "title": "Désactiver la délégation Kerberos non contrainte",
+      "body": "Cet ordinateur est approuvé pour la délégation non contrainte : lorsqu'un utilisateur s'authentifie contre lui, l'ordinateur reçoit un Ticket-Granting Ticket (TGT) transmissible pour cet utilisateur et peut usurper son identité auprès de tout autre service du domaine.\n\nVecteur d'attaque : un attaquant qui compromet cet hôte récupère les TGT de tous les utilisateurs qui s'y sont authentifiés (mis en cache pendant 10 heures par défaut), y compris tout Domain Admin qui s'est connecté, et les rejoue n'importe où dans le domaine. C'est la primitive 'golden ticket via TGT capture' classique.\n\nMigration recommandée : remplacer par une délégation contrainte (définir msDS-AllowedToDelegateTo aux SPN cibles spécifiques que l'hôte doit réellement appeler). La délégation contrainte limite le rayon d'impact aux services cibles explicites.\n\nRisque si désactivée à l'aveugle : les services Kerberos legitimes en double-hop VONT s'interrompre. Exemples : SQL Server linked servers exécutant des requêtes vers une autre instance SQL sous l'identité de l'utilisateur appelant, applications web IIS qui usurpent l'utilisateur vers un SQL ou partage de fichiers en backend, SharePoint avec délégation Kerberos. Vérifiez qu'aucun service de production sur cet hôte ne dépend de la configuration actuelle avant de continuer.",
+      "checkboxLabel": "J'ai vérifié qu'aucun service de production sur cet hôte ne nécessite la délégation non contrainte",
+      "confirmButton": "Désactiver la délégation",
+      "successNotification": "Délégation non contrainte désactivée sur {{name}}",
+      "failureNotification": "Échec de la désactivation de la délégation non contrainte : {{error}}"
+    }
+  }
 }

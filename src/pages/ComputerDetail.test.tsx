@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { ComputerDetail } from "./ComputerDetail";
 import type { DirectoryComputer } from "@/types/directory";
+import { mockPermissionLevel } from "@/test-utils/permissions";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
@@ -38,15 +39,23 @@ vi.mock("@/hooks/usePermissions", () => ({
   }),
 }));
 
+// Hoisted spies so individual E2E tests can assert against them after a
+// confirm-button click triggers the dialog's onSuccess callback.
+const { notifySpy, showCustomDialogSpy } = vi.hoisted(() => ({
+  notifySpy: vi.fn(),
+  showCustomDialogSpy: vi.fn(),
+}));
+
 vi.mock("@/contexts/DialogContext", () => ({
   useDialog: () => ({
     showConfirmation: vi.fn(),
+    showCustomDialog: showCustomDialogSpy,
   }),
 }));
 
 vi.mock("@/contexts/NotificationContext", () => ({
   useNotifications: () => ({
-    notify: vi.fn(),
+    notify: notifySpy,
   }),
 }));
 
@@ -75,6 +84,7 @@ function makeComputer(
       "CN=Domain Computers,CN=Users,DC=example,DC=com",
       "CN=IT Workstations,OU=Groups,DC=example,DC=com",
     ],
+    rawAttributes: {},
     ...overrides,
   };
 }
@@ -424,6 +434,400 @@ describe("ComputerDetail", () => {
     it("does not show delete button for ReadOnly users", () => {
       render(<ComputerDetail computer={makeComputer()} />);
       expect(screen.queryByTestId("computer-delete-btn")).not.toBeInTheDocument();
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Story 14.3 - Security indicator badges
+  // ---------------------------------------------------------------------------
+
+  describe("Security indicator badges (Story 14.3)", () => {
+    it("renders no badges when securityIndicators prop is undefined", () => {
+      render(<ComputerDetail computer={makeComputer()} />);
+      expect(
+        screen.queryByTestId(/^computer-security-indicator-badge-/),
+      ).not.toBeInTheDocument();
+    });
+
+    it("renders no badges when the indicator list is empty", () => {
+      render(
+        <ComputerDetail
+          computer={makeComputer()}
+          securityIndicators={{ indicators: [], highestSeverity: "Healthy" }}
+        />,
+      );
+      expect(
+        screen.queryByTestId(/^computer-security-indicator-badge-/),
+      ).not.toBeInTheDocument();
+    });
+
+    it("renders UnconstrainedDelegation badge as Critical (error variant)", () => {
+      render(
+        <ComputerDetail
+          computer={makeComputer()}
+          securityIndicators={{
+            indicators: [
+              {
+                kind: "UnconstrainedDelegation",
+                severity: "Critical",
+                descriptionKey: "securityIndicators.UnconstrainedDelegation",
+              },
+            ],
+            highestSeverity: "Critical",
+          }}
+        />,
+      );
+      const badge = screen.getByTestId(
+        "computer-security-indicator-badge-UnconstrainedDelegation",
+      );
+      expect(badge).toBeInTheDocument();
+      expect(badge.querySelector('[data-testid="status-badge"]')).toHaveAttribute(
+        "data-variant",
+        "error",
+      );
+      const title = badge.getAttribute("title") ?? "";
+      expect(title).toContain("TRUSTED_FOR_DELEGATION");
+    });
+
+    it("renders ConstrainedDelegation badge as Warning with target SPNs in tooltip", () => {
+      render(
+        <ComputerDetail
+          computer={makeComputer()}
+          securityIndicators={{
+            indicators: [
+              {
+                kind: "ConstrainedDelegation",
+                severity: "Warning",
+                descriptionKey: "securityIndicators.ConstrainedDelegation",
+                metadata: {
+                  target_spns: [
+                    "http/web1.corp.local",
+                    "http/web2.corp.local",
+                  ],
+                },
+              },
+            ],
+            highestSeverity: "Warning",
+          }}
+        />,
+      );
+      const badge = screen.getByTestId(
+        "computer-security-indicator-badge-ConstrainedDelegation",
+      );
+      expect(badge.querySelector('[data-testid="status-badge"]')).toHaveAttribute(
+        "data-variant",
+        "warning",
+      );
+      const title = badge.getAttribute("title") ?? "";
+      expect(title).toContain("http/web1.corp.local");
+      expect(title).toContain("http/web2.corp.local");
+      expect(title).toContain("msDS-AllowedToDelegateTo");
+    });
+
+    it("renders Rbcd badge as Warning with allowed principals in tooltip", () => {
+      render(
+        <ComputerDetail
+          computer={makeComputer()}
+          securityIndicators={{
+            indicators: [
+              {
+                kind: "Rbcd",
+                severity: "Warning",
+                descriptionKey: "securityIndicators.Rbcd",
+                metadata: {
+                  allowed_principals: [
+                    "S-1-5-21-1-2-3-1000",
+                    "S-1-5-21-1-2-3-1001",
+                  ],
+                },
+              },
+            ],
+            highestSeverity: "Warning",
+          }}
+        />,
+      );
+      const badge = screen.getByTestId(
+        "computer-security-indicator-badge-Rbcd",
+      );
+      expect(badge.querySelector('[data-testid="status-badge"]')).toHaveAttribute(
+        "data-variant",
+        "warning",
+      );
+      const title = badge.getAttribute("title") ?? "";
+      expect(title).toContain("S-1-5-21-1-2-3-1000");
+      expect(title).toContain("S-1-5-21-1-2-3-1001");
+      expect(title).toContain("msDS-AllowedToActOnBehalfOfOtherIdentity");
+    });
+
+    it("renders all 3 indicators side by side in declaration order", () => {
+      render(
+        <ComputerDetail
+          computer={makeComputer()}
+          securityIndicators={{
+            indicators: [
+              {
+                kind: "UnconstrainedDelegation",
+                severity: "Critical",
+                descriptionKey: "securityIndicators.UnconstrainedDelegation",
+              },
+              {
+                kind: "ConstrainedDelegation",
+                severity: "Warning",
+                descriptionKey: "securityIndicators.ConstrainedDelegation",
+                metadata: { target_spns: ["http/web1"] },
+              },
+              {
+                kind: "Rbcd",
+                severity: "Warning",
+                descriptionKey: "securityIndicators.Rbcd",
+                metadata: { allowed_principals: ["S-1-5-21-1-2-3-1000"] },
+              },
+            ],
+            highestSeverity: "Critical",
+          }}
+        />,
+      );
+      expect(
+        screen.getByTestId(
+          "computer-security-indicator-badge-UnconstrainedDelegation",
+        ),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByTestId(
+          "computer-security-indicator-badge-ConstrainedDelegation",
+        ),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByTestId("computer-security-indicator-badge-Rbcd"),
+      ).toBeInTheDocument();
+    });
+
+    it("handles ConstrainedDelegation with missing metadata gracefully", () => {
+      render(
+        <ComputerDetail
+          computer={makeComputer()}
+          securityIndicators={{
+            indicators: [
+              {
+                kind: "ConstrainedDelegation",
+                severity: "Warning",
+                descriptionKey: "securityIndicators.ConstrainedDelegation",
+              },
+            ],
+            highestSeverity: "Warning",
+          }}
+        />,
+      );
+      const badge = screen.getByTestId(
+        "computer-security-indicator-badge-ConstrainedDelegation",
+      );
+      expect(badge).toBeInTheDocument();
+      // Tooltip still renders, just with empty interpolation
+      expect(badge.getAttribute("title")).toContain("msDS-AllowedToDelegateTo");
+    });
+
+    it("handles Rbcd with missing metadata gracefully", () => {
+      // Parity test for QA-14.3-001 - Rbcd uses the same Array.isArray
+      // narrowing in tooltipParamsFor as ConstrainedDelegation; this test
+      // catches any future asymmetric refactor that breaks one path but
+      // leaves the other working.
+      render(
+        <ComputerDetail
+          computer={makeComputer()}
+          securityIndicators={{
+            indicators: [
+              {
+                kind: "Rbcd",
+                severity: "Warning",
+                descriptionKey: "securityIndicators.Rbcd",
+              },
+            ],
+            highestSeverity: "Warning",
+          }}
+        />,
+      );
+      const badge = screen.getByTestId(
+        "computer-security-indicator-badge-Rbcd",
+      );
+      expect(badge).toBeInTheDocument();
+      // Tooltip still renders, just with empty {{principals}} interpolation
+      expect(badge.getAttribute("title")).toContain(
+        "msDS-AllowedToActOnBehalfOfOtherIdentity",
+      );
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Story 14.6 - Quick-fix Disable Unconstrained Delegation button
+  // ---------------------------------------------------------------------------
+
+  describe("Disable Unconstrained Delegation Fix button (Story 14.6)", () => {
+    const unconstrainedSet = {
+      indicators: [
+        {
+          kind: "UnconstrainedDelegation" as const,
+          severity: "Critical" as const,
+          descriptionKey: "securityIndicators.UnconstrainedDelegation",
+        },
+      ],
+      highestSeverity: "Critical" as const,
+    };
+
+    it("does not render the Fix button at the default ReadOnly permission level", () => {
+      // Default mock at top of file returns hasPermission: () => false
+      render(
+        <ComputerDetail
+          computer={makeComputer()}
+          securityIndicators={unconstrainedSet}
+        />,
+      );
+      expect(
+        screen.queryByTestId("quick-fix-DisableUnconstrainedDelegation-btn"),
+      ).not.toBeInTheDocument();
+    });
+
+    it("does not render the Fix button at AccountOperator level (Admin gate is HIGHER)", async () => {
+      await mockPermissionLevel("AccountOperator");
+
+      render(
+        <ComputerDetail
+          computer={makeComputer()}
+          securityIndicators={unconstrainedSet}
+        />,
+      );
+      expect(
+        screen.queryByTestId("quick-fix-DisableUnconstrainedDelegation-btn"),
+      ).not.toBeInTheDocument();
+    });
+
+    it("renders the Fix button at Admin level", async () => {
+      await mockPermissionLevel("Admin");
+
+      render(
+        <ComputerDetail
+          computer={makeComputer()}
+          securityIndicators={unconstrainedSet}
+        />,
+      );
+      expect(
+        screen.getByTestId("quick-fix-DisableUnconstrainedDelegation-btn"),
+      ).toBeInTheDocument();
+    });
+
+    it("does not render the Fix button next to other indicator kinds", async () => {
+      await mockPermissionLevel("Admin");
+
+      render(
+        <ComputerDetail
+          computer={makeComputer()}
+          securityIndicators={{
+            indicators: [
+              {
+                kind: "ConstrainedDelegation",
+                severity: "Warning",
+                descriptionKey: "securityIndicators.ConstrainedDelegation",
+                metadata: { target_spns: ["http/web1"] },
+              },
+            ],
+            highestSeverity: "Warning",
+          }}
+        />,
+      );
+      expect(
+        screen.queryByTestId("quick-fix-DisableUnconstrainedDelegation-btn"),
+      ).not.toBeInTheDocument();
+    });
+
+    it("opens the DisableUnconstrainedDelegationDialog when the Fix button is clicked", async () => {
+      await mockPermissionLevel("Admin");
+
+      render(
+        <ComputerDetail
+          computer={makeComputer()}
+          securityIndicators={unconstrainedSet}
+        />,
+      );
+
+      expect(
+        screen.queryByTestId("disable-unconstrained-delegation-dialog"),
+      ).not.toBeInTheDocument();
+
+      fireEvent.click(
+        screen.getByTestId("quick-fix-DisableUnconstrainedDelegation-btn"),
+      );
+
+      await waitFor(() => {
+        expect(
+          screen.getByTestId("disable-unconstrained-delegation-dialog"),
+        ).toBeInTheDocument();
+      });
+    });
+
+    // -------------------------------------------------------------------------
+    // E2E success-path test for the 14.6 quick-fix flow (QA-14.4-002)
+    // Click Fix -> dialog -> ack checkbox -> Confirm -> invoke -> notify -> onRefresh
+    // -------------------------------------------------------------------------
+
+    it("E2E: disable unconstrained delegation runs invoke, fires notify, and calls onRefresh", async () => {
+      await mockPermissionLevel("Admin");
+
+      mockInvoke.mockImplementation(((cmd: string) => {
+        if (cmd === "resolve_dns") return Promise.resolve(["10.0.0.1"]);
+        if (cmd === "ping_host") return Promise.resolve("Reachable (1ms)");
+        if (cmd === "mfa_is_configured") return Promise.resolve(false);
+        if (cmd === "disable_unconstrained_delegation")
+          return Promise.resolve(null);
+        return Promise.resolve(null);
+      }) as typeof invoke);
+
+      const onRefresh = vi.fn();
+
+      render(
+        <ComputerDetail
+          computer={makeComputer({ name: "SRV01" })}
+          securityIndicators={unconstrainedSet}
+          onRefresh={onRefresh}
+        />,
+      );
+
+      fireEvent.click(
+        screen.getByTestId("quick-fix-DisableUnconstrainedDelegation-btn"),
+      );
+
+      await waitFor(() => {
+        expect(
+          screen.getByTestId("disable-unconstrained-delegation-dialog"),
+        ).toBeInTheDocument();
+      });
+
+      const ackCheckbox = screen.getByTestId("acknowledge-checkbox");
+      expect(screen.getByTestId("confirm-btn")).toBeDisabled();
+      fireEvent.click(ackCheckbox);
+      expect(screen.getByTestId("confirm-btn")).not.toBeDisabled();
+
+      fireEvent.click(screen.getByTestId("confirm-btn"));
+
+      await waitFor(() => {
+        const calls = mockInvoke.mock.calls.filter(
+          (c) => c[0] === "disable_unconstrained_delegation",
+        );
+        expect(calls.length).toBe(1);
+        expect(calls[0][1]).toEqual({
+          computerDn: "CN=WS001,OU=Computers,DC=example,DC=com",
+        });
+      });
+
+      await waitFor(() => {
+        expect(
+          screen.queryByTestId("disable-unconstrained-delegation-dialog"),
+        ).not.toBeInTheDocument();
+      });
+
+      expect(notifySpy).toHaveBeenCalledWith(
+        expect.stringContaining("Unconstrained delegation disabled on SRV01"),
+        "success",
+      );
+      expect(onRefresh).toHaveBeenCalledTimes(1);
     });
   });
 });

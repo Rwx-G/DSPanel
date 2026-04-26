@@ -3,6 +3,10 @@ use tauri::State;
 
 use crate::error::AppError;
 use crate::models::{DirectoryEntry, OUNode};
+use crate::services::{
+    ComputerIndicatorInput, SecurityIndicatorSet, UserIndicatorInput, evaluate_computer_indicators,
+    evaluate_user_indicators,
+};
 use crate::state::AppState;
 
 use super::{BrowseResult, DomainInfo, validate_search_input};
@@ -548,6 +552,47 @@ pub fn get_authenticated_identity(state: State<'_, AppState>) -> String {
     // Keep audit operator in sync with the resolved identity
     state.audit_service.set_operator(name.clone());
     name
+}
+
+/// Evaluates per-object security indicators for a user from a typed projection
+/// of its relevant attributes (Story 14.1 - Epic 14).
+///
+/// Returns an ordered list of detected indicators (kerberoastable, password
+/// not required, etc.) with their severity and i18n description keys, plus
+/// the highest severity across the set so the UI can render a single dot
+/// color without re-iterating.
+///
+/// Pure computation - no LDAP round-trip, no permission gate (read-only on
+/// data the operator already received).
+#[tauri::command]
+pub fn evaluate_user_security_indicators(input: UserIndicatorInput) -> SecurityIndicatorSet {
+    evaluate_user_indicators(&input)
+}
+
+/// Batch variant of `evaluate_user_security_indicators` for the user lookup
+/// list, where badges must be computed for every visible row in one IPC call
+/// rather than per-user. Returns results in the same order as inputs.
+#[tauri::command]
+pub fn evaluate_user_security_indicators_batch(
+    inputs: Vec<UserIndicatorInput>,
+) -> Vec<SecurityIndicatorSet> {
+    inputs.iter().map(evaluate_user_indicators).collect()
+}
+
+/// Evaluates per-object security indicators for a computer (Story 14.1).
+#[tauri::command]
+pub fn evaluate_computer_security_indicators(
+    input: ComputerIndicatorInput,
+) -> SecurityIndicatorSet {
+    evaluate_computer_indicators(&input)
+}
+
+/// Batch variant of `evaluate_computer_security_indicators`.
+#[tauri::command]
+pub fn evaluate_computer_security_indicators_batch(
+    inputs: Vec<ComputerIndicatorInput>,
+) -> Vec<SecurityIndicatorSet> {
+    inputs.iter().map(evaluate_computer_indicators).collect()
 }
 
 /// Searches for contacts matching a query string.

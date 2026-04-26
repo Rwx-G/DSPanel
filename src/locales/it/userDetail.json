@@ -24,5 +24,33 @@
   "unsavedChanges": "{{count}} modifica/e non salvata/e",
   "scrollToActionBar": "Scorri alla barra azioni",
   "viewGroupMembers": "Visualizza membri del gruppo",
-  "openInGroupManagement": "Apri in Gestione gruppi"
+  "openInGroupManagement": "Apri in Gestione gruppi",
+  "quickFix": {
+    "clearPasswordNotRequired": {
+      "fixButton": "Correggi",
+      "fixButtonAriaLabel": "Rimuovi flag PasswordNotRequired",
+      "title": "Rimuovi flag PasswordNotRequired",
+      "body": "Questo account consente attualmente una password vuota (PASSWORD_NOT_REQUIRED è impostato su userAccountControl). Un attaccante che conosce il nome utente può autenticarsi senza credenziali.\n\nRimuovere questo flag disattiva il bit 0x0020 di userAccountControl. L'account sarà quindi soggetto alla policy delle password del dominio al prossimo cambio password.",
+      "checkboxLabel": "Comprendo che questo utente dovrà rispettare la policy delle password del dominio al prossimo accesso",
+      "confirmButton": "Rimuovi flag",
+      "successNotification": "PasswordNotRequired rimosso da {{name}}",
+      "failureNotification": "Rimozione di PasswordNotRequired non riuscita: {{error}}"
+    },
+    "removeUserSpns": {
+      "manageButton": "Gestisci SPN",
+      "manageButtonAriaLabel": "Gestisci i Service Principal Names",
+      "title": "Gestisci i Service Principal Names",
+      "body": "I Service Principal Names (SPN) registrati su un account utente espongono l'account al Kerberoasting: qualsiasi utente autenticato del dominio può richiedere un ticket di servizio Kerberos per l'SPN e violare la password dell'account offline.\n\nEsamina l'elenco sottostante e rimuovi qualsiasi SPN che non corrisponda più a un servizio in esecuzione. Gli SPN di sistema (HOST, ldap, krbtgt, ecc.) non possono essere rimossi da questo dialogo perché la loro rimozione causerebbe un'interruzione del servizio.",
+      "removableSectionHeader": "SPN rimovibili",
+      "systemSectionHeader": "SPN di sistema (sola lettura)",
+      "systemSpnTooltip": "SPN di sistema, non può essere rimosso in sicurezza da questo dialogo",
+      "noRemovableSpns": "Nessun SPN rimovibile su questo account",
+      "noSpnsAtAll": "Nessun SPN registrato su questo account",
+      "confirmButton": "Rimuovi selezionati",
+      "summary": "{{removed}} SPN rimossi, {{kept}} mantenuti, {{blocked}} SPN di sistema bloccati",
+      "successNotification_one": "{{count}} SPN rimosso da {{name}}",
+      "successNotification_other": "{{count}} SPN rimossi da {{name}}",
+      "failureNotification": "Rimozione degli SPN non riuscita: {{error}}"
+    }
+  }
 }

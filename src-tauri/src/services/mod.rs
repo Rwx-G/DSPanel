@@ -29,7 +29,9 @@ pub mod replication_status;
 pub mod resilience;
 pub mod resilient_directory;
 pub mod security;
+pub mod security_indicators;
 pub mod snapshot;
+pub mod spn;
 pub mod topology;
 pub mod update;
 pub mod workstation_monitor;
@@ -45,4 +47,9 @@ pub use permissions::{PermissionConfig, PermissionLevel, PermissionMappings, Per
 pub use preset::PresetService;
 pub use resilience::{CircuitBreaker, CircuitBreakerConfig, RetryConfig, TimeoutConfig};
 pub use resilient_directory::ResilientDirectoryProvider;
+pub use security_indicators::{
+    ComputerIndicatorInput, IndicatorSeverity, SecurityIndicator, SecurityIndicatorKind,
+    SecurityIndicatorSet, UserIndicatorInput, evaluate_computer_indicators,
+    evaluate_user_indicators,
+};
 pub use snapshot::SnapshotService;

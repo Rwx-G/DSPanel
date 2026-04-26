@@ -76,6 +76,16 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Cross-language SPN list parity (QA-14.5-002)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: bash scripts/check-spn-list-parity.sh
+
+      - name: Audit action-name uniqueness (QA-14.6-002)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: bash scripts/check-audit-action-names.sh
+
       - name: Check Rust formatting
         working-directory: src-tauri
         run: cargo fmt --check

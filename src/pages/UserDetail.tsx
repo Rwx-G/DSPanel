@@ -18,9 +18,18 @@ import { ExportToolbar, type ExportColumn } from "@/components/common/ExportTool
 import { FilterBar, type FilterChip } from "@/components/data/FilterBar";
 import { AdvancedAttributes } from "@/components/data/AdvancedAttributes";
 import { PasswordResetDialog } from "@/components/dialogs/PasswordResetDialog";
+import { ClearPasswordNotRequiredDialog } from "@/components/dialogs/ClearPasswordNotRequiredDialog";
+import {
+  ManageSpnsDialog,
+  type RemoveSpnsResult,
+} from "@/components/dialogs/ManageSpnsDialog";
 import { GroupMembersDialog } from "@/components/dialogs/GroupMembersDialog";
 import { type DirectoryUser } from "@/types/directory";
 import type { AccountHealthStatus, HealthLevel } from "@/types/health";
+import {
+  severityToBadgeVariant,
+  type SecurityIndicatorSet,
+} from "@/types/securityIndicators";
 import { parseCnFromDn } from "@/utils/dn";
 import { Users, FolderOpen, Save, ArrowUp, AlertTriangle, Trash2 } from "lucide-react";
 import { useNavigation } from "@/contexts/NavigationContext";
@@ -61,6 +70,12 @@ function toPropertySeverity(level: HealthLevel): PropertySeverity | undefined {
 export interface UserDetailProps {
   user: DirectoryUser;
   healthStatus?: AccountHealthStatus;
+  /**
+   * Set of security indicators detected for this user (Story 14.2). When
+   * undefined the security badge row is hidden, so the prop is optional
+   * for callers that have not yet wired the evaluator.
+   */
+  securityIndicators?: SecurityIndicatorSet;
   groupColumns: Column<{ name: string; dn: string }>[];
   groupRows: { name: string; dn: string }[];
   groupFilterText: string;
@@ -73,6 +88,7 @@ export interface UserDetailProps {
 export function UserDetail({
   user,
   healthStatus,
+  securityIndicators,
   groupColumns,
   groupRows,
   groupFilterText: _groupFilterText,
@@ -81,9 +97,22 @@ export function UserDetail({
   onDeleted,
   schemaAttributes,
 }: UserDetailProps) {
-  const { t } = useTranslation(["userDetail", "common", "sidebar"]);
+  const { t } = useTranslation([
+    "userDetail",
+    "common",
+    "sidebar",
+    "securityIndicators",
+  ]);
   const [groupFilters, setGroupFilters] = useState<FilterChip[]>([]);
   const [showPasswordReset, setShowPasswordReset] = useState(false);
+  /**
+   * Active quick-fix dialog (Story 14.4-14.6). Stores the indicator kind
+   * being fixed so the conditional render below picks the right dialog
+   * component. `null` hides all quick-fix dialogs.
+   */
+  const [activeQuickFix, setActiveQuickFix] = useState<
+    "PasswordNotRequired" | "RemoveUserSpns" | null
+  >(null);
   const [contextMenuPos, setContextMenuPos] = useState<{
     x: number;
     y: number;
@@ -436,6 +465,55 @@ export function UserDetail({
                   />
                 </span>
               )}
+              {securityIndicators?.indicators.map((indicator) => (
+                <span
+                  key={indicator.kind}
+                  className="inline-flex items-center gap-1"
+                  title={t(
+                    `securityIndicators:${indicator.kind}.tooltip`,
+                  )}
+                  data-testid={`security-indicator-badge-${indicator.kind}`}
+                >
+                  <StatusBadge
+                    text={t(`securityIndicators:${indicator.kind}.badge`)}
+                    variant={severityToBadgeVariant(indicator.severity)}
+                  />
+                  {indicator.kind === "Kerberoastable" && canEdit && (
+                    <button
+                      type="button"
+                      className="rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveQuickFix("RemoveUserSpns");
+                      }}
+                      aria-label={t(
+                        "userDetail:quickFix.removeUserSpns.manageButtonAriaLabel",
+                      )}
+                      data-testid="quick-fix-RemoveUserSpns-btn"
+                    >
+                      {t("userDetail:quickFix.removeUserSpns.manageButton")}
+                    </button>
+                  )}
+                  {indicator.kind === "PasswordNotRequired" && canEdit && (
+                    <button
+                      type="button"
+                      className="rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveQuickFix("PasswordNotRequired");
+                      }}
+                      aria-label={t(
+                        "userDetail:quickFix.clearPasswordNotRequired.fixButtonAriaLabel",
+                      )}
+                      data-testid="quick-fix-PasswordNotRequired-btn"
+                    >
+                      {t(
+                        "userDetail:quickFix.clearPasswordNotRequired.fixButton",
+                      )}
+                    </button>
+                  )}
+                </span>
+              ))}
             </div>
           </div>
 
@@ -602,6 +680,50 @@ export function UserDetail({
           displayName={user.displayName || user.samAccountName}
           onClose={() => setShowPasswordReset(false)}
           onSuccess={handleRefresh}
+        />
+      )}
+
+      {activeQuickFix === "PasswordNotRequired" && (
+        <ClearPasswordNotRequiredDialog
+          userDn={user.distinguishedName}
+          displayName={user.displayName || user.samAccountName}
+          onClose={() => setActiveQuickFix(null)}
+          onSuccess={() => {
+            setActiveQuickFix(null);
+            notify(
+              t(
+                "userDetail:quickFix.clearPasswordNotRequired.successNotification",
+                { name: user.displayName || user.samAccountName },
+              ),
+              "success",
+            );
+            handleRefresh();
+          }}
+        />
+      )}
+
+      {activeQuickFix === "RemoveUserSpns" && (
+        <ManageSpnsDialog
+          userDn={user.distinguishedName}
+          displayName={user.displayName || user.samAccountName}
+          currentSpns={user.rawAttributes?.servicePrincipalName ?? []}
+          onClose={() => setActiveQuickFix(null)}
+          onSuccess={(result: RemoveSpnsResult) => {
+            setActiveQuickFix(null);
+            if (result.removed.length > 0) {
+              notify(
+                t(
+                  "userDetail:quickFix.removeUserSpns.successNotification",
+                  {
+                    count: result.removed.length,
+                    name: user.displayName || user.samAccountName,
+                  },
+                ),
+                "success",
+              );
+              handleRefresh();
+            }
+          }}
         />
       )}
 

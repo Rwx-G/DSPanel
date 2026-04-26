@@ -70,8 +70,8 @@ async fn resolve_dc_fqdn_for_gssapi(host: &str) -> String {
 }
 
 /// Builds a DC FQDN by combining the NetBIOS name from `LOGONSERVER`
-/// (e.g. `\\AD2-INFORMADIS`) with `host` as the DNS suffix
-/// (e.g. `INFORMADIS.LECLERC.DMI`), yielding `AD2-INFORMADIS.INFORMADIS.LECLERC.DMI`.
+/// (e.g. `\\AD2-SUBSITE`) with `host` as the DNS suffix
+/// (e.g. `subsite.corp.example`), yielding `AD2-SUBSITE.subsite.corp.example`.
 ///
 /// Returns None if either input is empty after trimming, or if `host` is
 /// already FQDN-shaped *and* starts with the LOGONSERVER NetBIOS name (in
@@ -133,6 +133,13 @@ const COMPUTER_ATTRS: &[&str] = &[
     "userAccountControl",
     "memberOf",
     "objectClass",
+    // Kerberos delegation attributes used by the security_indicators service
+    // (Story 14.1) to surface ConstrainedDelegation and RBCD configurations on
+    // computer detail. Multi-valued string SPNs and binary security descriptor
+    // respectively. Adding them here is additive - existing callers just see
+    // extra entries in `entry.attributes`.
+    "msDS-AllowedToDelegateTo",
+    "msDS-AllowedToActOnBehalfOfOtherIdentity",
 ];
 
 /// LDAP attributes to retrieve for group searches.
@@ -1070,42 +1077,6 @@ impl LdapDirectoryProvider {
         Ok(ldap)
     }
 
-    /// Reads the current `userAccountControl` value for a user.
-    async fn get_user_account_control(&self, user_dn: &str) -> Result<u32> {
-        let dn = user_dn.to_string();
-        self.with_connection(|mut ldap| {
-            let dn = dn.clone();
-            async move {
-                let (rs, _) = ldap
-                    .search(
-                        &dn,
-                        Scope::Base,
-                        "(objectClass=*)",
-                        vec!["userAccountControl"],
-                    )
-                    .await
-                    .context("Failed to read userAccountControl")?
-                    .success()
-                    .context("userAccountControl read returned error")?;
-
-                let entry = rs
-                    .into_iter()
-                    .next()
-                    .context("User not found when reading userAccountControl")?;
-                let se = SearchEntry::construct(entry);
-                let uac_str = se
-                    .attrs
-                    .get("userAccountControl")
-                    .and_then(|v| v.first())
-                    .context("userAccountControl attribute not present")?;
-                uac_str
-                    .parse::<u32>()
-                    .context("Failed to parse userAccountControl value")
-            }
-        })
-        .await
-    }
-
     /// Performs an LDAP search and maps results to `DirectoryEntry` objects.
     ///
     /// Uses LDAP paged results control to retrieve results in pages of 500,
@@ -1309,7 +1280,7 @@ impl LdapDirectoryProvider {
 /// - Byte 1: sub-authority count
 /// - Bytes 2-7: identifier authority (big-endian 48-bit)
 /// - Bytes 8+: sub-authorities (4 bytes each, little-endian)
-fn sid_bytes_to_string(bytes: &[u8]) -> String {
+pub fn sid_bytes_to_string(bytes: &[u8]) -> String {
     if bytes.len() < 8 {
         return String::new();
     }
@@ -1628,6 +1599,20 @@ async fn set_cannot_change_password_with_ldap(
 }
 
 /// Converts an `ldap3::SearchEntry` to a `DirectoryEntry`.
+/// AD attributes whose values are **binary** (`octet-string` syntax) but that
+/// the security_indicators service (Story 14.1) needs to inspect to render
+/// per-object risk badges. ldap3 puts these into `SearchEntry::bin_attrs`
+/// rather than `attrs`, which strips them from the standard
+/// `DirectoryEntry.attributes` payload sent to the frontend. We surface them
+/// here as **base64-encoded strings** under the original attribute name so
+/// downstream consumers can decode and parse them without an extra LDAP
+/// round-trip.
+const BINARY_ATTRS_TO_SURFACE: &[&str] = &[
+    // Resource-Based Constrained Delegation: binary security descriptor
+    // listing principals that can impersonate users to this computer.
+    "msDS-AllowedToActOnBehalfOfOtherIdentity",
+];
+
 fn search_entry_to_directory_entry(se: SearchEntry) -> DirectoryEntry {
     let sam = se
         .attrs
@@ -1639,6 +1624,23 @@ fn search_entry_to_directory_entry(se: SearchEntry) -> DirectoryEntry {
     let mut attributes: HashMap<String, Vec<String>> = HashMap::new();
     for (key, values) in se.attrs {
         attributes.insert(key, values);
+    }
+
+    // Surface specific binary attributes as base64 strings so the frontend
+    // can re-send them through `evaluate_computer_security_indicators` etc.
+    for binary_attr in BINARY_ATTRS_TO_SURFACE {
+        if let Some(values) = se.bin_attrs.get(*binary_attr) {
+            let encoded: Vec<String> = values
+                .iter()
+                .map(|bytes| {
+                    use base64::Engine;
+                    base64::engine::general_purpose::STANDARD.encode(bytes)
+                })
+                .collect();
+            if !encoded.is_empty() {
+                attributes.insert((*binary_attr).to_string(), encoded);
+            }
+        }
     }
 
     DirectoryEntry {
@@ -1970,6 +1972,123 @@ impl DirectoryProvider for LdapDirectoryProvider {
             }
         })
         .await
+    }
+
+    async fn get_user_spns(&self, user_dn: &str) -> Result<Vec<String>> {
+        let dn = user_dn.to_string();
+        self.with_connection(|mut ldap| {
+            let dn = dn.clone();
+            async move {
+                let (rs, _) = ldap
+                    .search(
+                        &dn,
+                        Scope::Base,
+                        "(objectClass=*)",
+                        vec!["servicePrincipalName"],
+                    )
+                    .await
+                    .context("Failed to read servicePrincipalName")?
+                    .success()
+                    .context("servicePrincipalName read returned error")?;
+
+                let entry = rs
+                    .into_iter()
+                    .next()
+                    .context("User not found when reading servicePrincipalName")?;
+                let se = SearchEntry::construct(entry);
+                Ok(se
+                    .attrs
+                    .get("servicePrincipalName")
+                    .cloned()
+                    .unwrap_or_default())
+            }
+        })
+        .await
+    }
+
+    async fn get_user_account_control(&self, user_dn: &str) -> Result<u32> {
+        let dn = user_dn.to_string();
+        self.with_connection(|mut ldap| {
+            let dn = dn.clone();
+            async move {
+                let (rs, _) = ldap
+                    .search(
+                        &dn,
+                        Scope::Base,
+                        "(objectClass=*)",
+                        vec!["userAccountControl"],
+                    )
+                    .await
+                    .context("Failed to read userAccountControl")?
+                    .success()
+                    .context("userAccountControl read returned error")?;
+
+                let entry = rs
+                    .into_iter()
+                    .next()
+                    .context("User not found when reading userAccountControl")?;
+                let se = SearchEntry::construct(entry);
+                let uac_str = se
+                    .attrs
+                    .get("userAccountControl")
+                    .and_then(|v| v.first())
+                    .context("userAccountControl attribute not present")?;
+                uac_str
+                    .parse::<u32>()
+                    .context("Failed to parse userAccountControl value")
+            }
+        })
+        .await
+    }
+
+    async fn clear_user_account_control_bits(
+        &self,
+        user_dn: &str,
+        bits_to_clear: u32,
+    ) -> Result<(u32, u32)> {
+        let previous = self.get_user_account_control(user_dn).await?;
+        let new = previous & !bits_to_clear;
+        if new == previous {
+            // Idempotent no-op - the bits were already clear, nothing to write.
+            tracing::debug!(
+                target_dn = %user_dn,
+                bits = format!("0x{:X}", bits_to_clear),
+                "clear_user_account_control_bits: bits already clear, no LDAP write"
+            );
+            return Ok((previous, previous));
+        }
+
+        let dn = user_dn.to_string();
+        let new_uac_str = new.to_string();
+        self.with_connection(|mut ldap| {
+            let dn = dn.clone();
+            let new_uac_str = new_uac_str.clone();
+            async move {
+                ldap.modify(
+                    &dn,
+                    vec![Mod::Replace(
+                        "userAccountControl".to_string(),
+                        HashSet::from([new_uac_str]),
+                    )],
+                )
+                .await
+                .context("Failed to clear userAccountControl bits")?
+                .success()
+                .context("clear_user_account_control_bits LDAP operation returned error")?;
+                Ok::<(), anyhow::Error>(())
+            }
+        })
+        .await?;
+
+        tracing::info!(
+            target_dn = %user_dn,
+            previous_uac = format!("0x{:X}", previous),
+            new_uac = format!("0x{:X}", new),
+            bits_cleared = format!("0x{:X}", bits_to_clear),
+            "userAccountControl bits cleared"
+        );
+
+        Ok((previous, new))
     }
 
     async fn get_cannot_change_password(&self, user_dn: &str) -> Result<bool> {
@@ -4310,14 +4429,14 @@ mod tests {
 
     #[test]
     fn test_fqdn_from_logonserver_three_level_domain() {
-        // The bug that motivated this: INFORMADIS.LECLERC.DMI is the AD
-        // domain, AD2-INFORMADIS is the DC NetBIOS name. The SPN must point
-        // at the DC's own FQDN, not the bare domain.
-        let fqdn = fqdn_from_logonserver("INFORMADIS.LECLERC.DMI", "\\\\AD2-INFORMADIS");
-        assert_eq!(
-            fqdn.as_deref(),
-            Some("AD2-INFORMADIS.INFORMADIS.LECLERC.DMI")
-        );
+        // The bug that motivated this: a three-label AD domain
+        // (e.g. `subsite.corp.example`) combined with a DC NetBIOS name
+        // (e.g. `AD2-SUBSITE`). The SPN must point at the DC's own FQDN,
+        // not the bare domain - older code short-circuited the SRV lookup
+        // when `host` had more than two dots, treating multi-level domain
+        // names as if they were already DC FQDNs.
+        let fqdn = fqdn_from_logonserver("subsite.corp.example", "\\\\AD2-SUBSITE");
+        assert_eq!(fqdn.as_deref(), Some("AD2-SUBSITE.subsite.corp.example"));
     }
 
     #[test]

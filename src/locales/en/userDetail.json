@@ -24,5 +24,33 @@
   "unsavedChanges": "{{count}} unsaved change(s)",
   "scrollToActionBar": "Scroll to action bar",
   "viewGroupMembers": "View group members",
-  "openInGroupManagement": "Open in Group Management"
+  "openInGroupManagement": "Open in Group Management",
+  "quickFix": {
+    "clearPasswordNotRequired": {
+      "fixButton": "Fix",
+      "fixButtonAriaLabel": "Clear PasswordNotRequired flag",
+      "title": "Clear PasswordNotRequired flag",
+      "body": "This account currently allows an empty password (PASSWORD_NOT_REQUIRED is set on userAccountControl). An attacker who learns the username can authenticate with no credential at all.\n\nClearing this flag turns userAccountControl bit 0x0020 off. The account will then be subject to the domain password policy at the next password change.",
+      "checkboxLabel": "I understand this user must comply with the domain password policy at the next logon",
+      "confirmButton": "Clear flag",
+      "successNotification": "PasswordNotRequired cleared on {{name}}",
+      "failureNotification": "Failed to clear PasswordNotRequired: {{error}}"
+    },
+    "removeUserSpns": {
+      "manageButton": "Manage SPNs",
+      "manageButtonAriaLabel": "Manage Service Principal Names",
+      "title": "Manage Service Principal Names",
+      "body": "Service Principal Names (SPNs) registered on a user account expose that account to Kerberoasting: any authenticated domain user can request a Kerberos service ticket for the SPN and crack the account password offline.\n\nReview the list below and remove any SPN that no longer corresponds to a running service. System SPNs (HOST, ldap, krbtgt, etc.) cannot be removed from this dialog because removing them would cause a service outage.",
+      "removableSectionHeader": "Removable SPNs",
+      "systemSectionHeader": "System SPNs (read-only)",
+      "systemSpnTooltip": "System SPN, cannot be removed safely from this dialog",
+      "noRemovableSpns": "No removable SPNs on this account",
+      "noSpnsAtAll": "No SPNs registered on this account",
+      "confirmButton": "Remove selected",
+      "summary": "Removed {{removed}} SPN(s), kept {{kept}}, blocked {{blocked}} system SPN(s)",
+      "successNotification_one": "Removed {{count}} SPN from {{name}}",
+      "successNotification_other": "Removed {{count}} SPNs from {{name}}",
+      "failureNotification": "Failed to remove SPNs: {{error}}"
+    }
+  }
 }
