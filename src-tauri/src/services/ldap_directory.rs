@@ -2010,6 +2010,56 @@ impl DirectoryProvider for LdapDirectoryProvider {
         .await
     }
 
+    async fn clear_user_account_control_bits(
+        &self,
+        user_dn: &str,
+        bits_to_clear: u32,
+    ) -> Result<(u32, u32)> {
+        let previous = self.get_user_account_control(user_dn).await?;
+        let new = previous & !bits_to_clear;
+        if new == previous {
+            // Idempotent no-op - the bits were already clear, nothing to write.
+            tracing::debug!(
+                target_dn = %user_dn,
+                bits = format!("0x{:X}", bits_to_clear),
+                "clear_user_account_control_bits: bits already clear, no LDAP write"
+            );
+            return Ok((previous, previous));
+        }
+
+        let dn = user_dn.to_string();
+        let new_uac_str = new.to_string();
+        self.with_connection(|mut ldap| {
+            let dn = dn.clone();
+            let new_uac_str = new_uac_str.clone();
+            async move {
+                ldap.modify(
+                    &dn,
+                    vec![Mod::Replace(
+                        "userAccountControl".to_string(),
+                        HashSet::from([new_uac_str]),
+                    )],
+                )
+                .await
+                .context("Failed to clear userAccountControl bits")?
+                .success()
+                .context("clear_user_account_control_bits LDAP operation returned error")?;
+                Ok::<(), anyhow::Error>(())
+            }
+        })
+        .await?;
+
+        tracing::info!(
+            target_dn = %user_dn,
+            previous_uac = format!("0x{:X}", previous),
+            new_uac = format!("0x{:X}", new),
+            bits_cleared = format!("0x{:X}", bits_to_clear),
+            "userAccountControl bits cleared"
+        );
+
+        Ok((previous, new))
+    }
+
     async fn get_cannot_change_password(&self, user_dn: &str) -> Result<bool> {
         let dn = user_dn.to_string();
         self.with_connection(|mut ldap| {

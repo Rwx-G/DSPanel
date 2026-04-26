@@ -288,6 +288,23 @@ where
         resilient_call!(self, dn, |inner, d| inner.disable_account(&d).await)
     }
 
+    async fn clear_user_account_control_bits(
+        &self,
+        user_dn: &str,
+        bits_to_clear: u32,
+    ) -> Result<(u32, u32)> {
+        let dn = user_dn.to_string();
+        let bits = bits_to_clear;
+        let inner_ref = self.inner.clone();
+        self.execute_with_resilience(|| {
+            let inner = inner_ref.clone();
+            let d = dn.clone();
+            async move { inner.clear_user_account_control_bits(&d, bits).await }
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!(e))
+    }
+
     async fn get_cannot_change_password(&self, user_dn: &str) -> Result<bool> {
         let dn = user_dn.to_string();
         resilient_call!(self, dn, |inner, d| inner
