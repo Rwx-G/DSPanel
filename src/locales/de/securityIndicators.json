@@ -19,6 +19,18 @@
     "badge": "AS-REP-roastable",
     "tooltip": "Die Kerberos-Vorauthentifizierung ist fur dieses Konto deaktiviert. Ein nicht authentifizierter Angreifer kann eine AS-REP anfordern und das Kennwort offline knacken. (userAccountControl-Bit DONT_REQUIRE_PREAUTH 0x400000)"
   },
+  "UnconstrainedDelegation": {
+    "badge": "Unbeschrankte Delegierung",
+    "tooltip": "Dieser Computer kann jeden Benutzer imitieren, der sich gegen ihn authentifiziert. Eine Kompromittierung dieses Hosts kompromittiert jedes Konto, das sich jemals angemeldet hat. (userAccountControl-Bit TRUSTED_FOR_DELEGATION 0x80000)"
+  },
+  "ConstrainedDelegation": {
+    "badge": "Beschrankte Delegierung",
+    "tooltip": "Dieser Computer kann Benutzer beim Authentifizieren gegen folgende Ziele imitieren: {{targets}}. Stellen Sie sicher, dass jeder Ziel-SPN noch erforderlich und minimal ist. (msDS-AllowedToDelegateTo)"
+  },
+  "Rbcd": {
+    "badge": "RBCD",
+    "tooltip": "Diese Prinzipale konnen Benutzer auf diesen Computer imitieren: {{principals}}. Oft legitim (z.B. SQL Server-Delegierung), aber wenn ein niedrig privilegiertes Konto Schreibzugriff auf dieses Attribut hat, ermoglicht es einen Relay-Angriff. (msDS-AllowedToActOnBehalfOfOtherIdentity)"
+  },
   "dot": {
     "ariaLabel": "Sicherheitsindikatoren: {{count}}",
     "popoverHeader": "Sicherheitsindikatoren",

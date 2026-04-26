@@ -19,6 +19,18 @@
     "badge": "AS-REP roastable",
     "tooltip": "Kerberos pre-authentication is disabled for this account. An unauthenticated attacker can request an AS-REP and crack the account password offline. (userAccountControl bit DONT_REQUIRE_PREAUTH 0x400000)"
   },
+  "UnconstrainedDelegation": {
+    "badge": "Unconstrained delegation",
+    "tooltip": "This computer can impersonate any user that authenticates against it. A compromise of this host compromises every account that ever logged on. (userAccountControl bit TRUSTED_FOR_DELEGATION 0x80000)"
+  },
+  "ConstrainedDelegation": {
+    "badge": "Constrained delegation",
+    "tooltip": "This computer can impersonate users when authenticating to: {{targets}}. Verify each target SPN is still required and minimal. (msDS-AllowedToDelegateTo)"
+  },
+  "Rbcd": {
+    "badge": "RBCD",
+    "tooltip": "These principals can impersonate users to this computer: {{principals}}. Often legitimate (e.g. SQL Server delegation), but if a low-privilege account has write access to this attribute it enables a relay attack. (msDS-AllowedToActOnBehalfOfOtherIdentity)"
+  },
   "dot": {
     "ariaLabel": "Security indicators: {{count}}",
     "popoverHeader": "Security indicators",

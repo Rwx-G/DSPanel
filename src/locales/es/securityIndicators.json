@@ -19,6 +19,18 @@
     "badge": "AS-REP roastable",
     "tooltip": "La preautenticacion Kerberos esta deshabilitada para esta cuenta. Un atacante no autenticado puede solicitar un AS-REP y descifrar la contrasena sin conexion. (bit userAccountControl DONT_REQUIRE_PREAUTH 0x400000)"
   },
+  "UnconstrainedDelegation": {
+    "badge": "Delegacion sin restricciones",
+    "tooltip": "Este equipo puede suplantar a cualquier usuario que se autentique contra el. Un compromiso de este host compromete todas las cuentas que iniciaron sesion alguna vez. (bit userAccountControl TRUSTED_FOR_DELEGATION 0x80000)"
+  },
+  "ConstrainedDelegation": {
+    "badge": "Delegacion restringida",
+    "tooltip": "Este equipo puede suplantar a usuarios al autenticarse contra: {{targets}}. Verifique que cada SPN destino siga siendo necesario y minimo. (msDS-AllowedToDelegateTo)"
+  },
+  "Rbcd": {
+    "badge": "RBCD",
+    "tooltip": "Estos principales pueden suplantar usuarios hacia este equipo: {{principals}}. A menudo es legitimo (por ejemplo delegacion de SQL Server), pero si una cuenta de bajo privilegio tiene acceso de escritura a este atributo, habilita un ataque de relay. (msDS-AllowedToActOnBehalfOfOtherIdentity)"
+  },
   "dot": {
     "ariaLabel": "Indicadores de seguridad: {{count}}",
     "popoverHeader": "Indicadores de seguridad",

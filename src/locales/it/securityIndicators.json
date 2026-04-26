@@ -19,6 +19,18 @@
     "badge": "AS-REP roastable",
     "tooltip": "La pre-autenticazione Kerberos e disabilitata per questo account. Un attaccante non autenticato puo richiedere un AS-REP e violare la password offline. (bit userAccountControl DONT_REQUIRE_PREAUTH 0x400000)"
   },
+  "UnconstrainedDelegation": {
+    "badge": "Delega non vincolata",
+    "tooltip": "Questo computer puo impersonare qualsiasi utente che si autentica contro di esso. La compromissione di questo host compromette ogni account che vi ha mai effettuato l'accesso. (bit userAccountControl TRUSTED_FOR_DELEGATION 0x80000)"
+  },
+  "ConstrainedDelegation": {
+    "badge": "Delega vincolata",
+    "tooltip": "Questo computer puo impersonare gli utenti durante l'autenticazione verso: {{targets}}. Verifica che ogni SPN di destinazione sia ancora necessario e minimo. (msDS-AllowedToDelegateTo)"
+  },
+  "Rbcd": {
+    "badge": "RBCD",
+    "tooltip": "Questi principal possono impersonare utenti verso questo computer: {{principals}}. Spesso legittimo (per esempio delega SQL Server), ma se un account a basso privilegio ha accesso in scrittura a questo attributo, abilita un attacco di relay. (msDS-AllowedToActOnBehalfOfOtherIdentity)"
+  },
   "dot": {
     "ariaLabel": "Indicatori di sicurezza: {{count}}",
     "popoverHeader": "Indicatori di sicurezza",

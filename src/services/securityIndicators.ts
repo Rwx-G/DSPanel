@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { DirectoryUser } from "@/types/directory";
+import type { DirectoryUser, DirectoryComputer } from "@/types/directory";
 import type { SecurityIndicatorSet } from "@/types/securityIndicators";
 
 /**
@@ -61,6 +61,75 @@ export async function evaluateUserSecurityIndicatorsBatch(
   const map = new Map<string, SecurityIndicatorSet>();
   users.forEach((user, i) => {
     map.set(user.samAccountName, results[i]);
+  });
+  return map;
+}
+
+// ---------------------------------------------------------------------------
+// Computer side (Story 14.3)
+// ---------------------------------------------------------------------------
+
+/**
+ * Input sent to the Rust `evaluate_computer_security_indicators` Tauri command.
+ * Mirrors the Rust `ComputerIndicatorInput` struct (camelCase via serde rename_all).
+ */
+interface ComputerIndicatorInput {
+  userAccountControl: number;
+  allowedToDelegateTo: string[];
+  /** Base64-encoded RBCD security descriptor blob, or null when absent. */
+  allowedToActOnBehalfOfB64: string | null;
+}
+
+/**
+ * Extracts the security-indicator-relevant fields from a DirectoryComputer.
+ * Reads raw `userAccountControl`, `msDS-AllowedToDelegateTo`, and the
+ * base64-encoded `msDS-AllowedToActOnBehalfOfOtherIdentity` blob from
+ * `rawAttributes`. The base64 surfacing of the binary RBCD attribute is done
+ * server-side by `BINARY_ATTRS_TO_SURFACE` in the LDAP provider (Story 14.1).
+ */
+function toComputerIndicatorInput(
+  computer: DirectoryComputer,
+): ComputerIndicatorInput {
+  const uacRaw = computer.rawAttributes?.["userAccountControl"]?.[0] ?? "0";
+  const userAccountControl = Number.parseInt(uacRaw, 10) || 0;
+  const allowedToDelegateTo =
+    computer.rawAttributes?.["msDS-AllowedToDelegateTo"] ?? [];
+  const allowedToActOnBehalfOfB64 =
+    computer.rawAttributes?.["msDS-AllowedToActOnBehalfOfOtherIdentity"]?.[0] ??
+    null;
+
+  return {
+    userAccountControl,
+    allowedToDelegateTo,
+    allowedToActOnBehalfOfB64,
+  };
+}
+
+/** Evaluates per-object security indicators for a computer via the Rust backend. */
+export async function evaluateComputerSecurityIndicators(
+  computer: DirectoryComputer,
+): Promise<SecurityIndicatorSet> {
+  return invoke<SecurityIndicatorSet>("evaluate_computer_security_indicators", {
+    input: toComputerIndicatorInput(computer),
+  });
+}
+
+/**
+ * Batch-evaluates indicators for many computers in a single IPC call. Returns a
+ * Map keyed by `distinguishedName` (computers do not have a guaranteed
+ * samAccountName the way users do).
+ */
+export async function evaluateComputerSecurityIndicatorsBatch(
+  computers: DirectoryComputer[],
+): Promise<Map<string, SecurityIndicatorSet>> {
+  const inputs = computers.map(toComputerIndicatorInput);
+  const results = await invoke<SecurityIndicatorSet[]>(
+    "evaluate_computer_security_indicators_batch",
+    { inputs },
+  );
+  const map = new Map<string, SecurityIndicatorSet>();
+  computers.forEach((computer, i) => {
+    map.set(computer.distinguishedName, results[i]);
   });
   return map;
 }

@@ -75,6 +75,7 @@ function makeComputer(
       "CN=Domain Computers,CN=Users,DC=example,DC=com",
       "CN=IT Workstations,OU=Groups,DC=example,DC=com",
     ],
+    rawAttributes: {},
     ...overrides,
   };
 }

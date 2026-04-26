@@ -19,6 +19,18 @@
     "badge": "AS-REP roastable",
     "tooltip": "La pre-authentification Kerberos est desactivee pour ce compte. Un attaquant non authentifie peut demander un AS-REP et casser le mot de passe hors ligne. (bit userAccountControl DONT_REQUIRE_PREAUTH 0x400000)"
   },
+  "UnconstrainedDelegation": {
+    "badge": "Delegation non contrainte",
+    "tooltip": "Cet ordinateur peut usurper l'identite de tout utilisateur qui s'authentifie contre lui. La compromission de cet hote compromet tous les comptes qui s'y sont connectes. (bit userAccountControl TRUSTED_FOR_DELEGATION 0x80000)"
+  },
+  "ConstrainedDelegation": {
+    "badge": "Delegation contrainte",
+    "tooltip": "Cet ordinateur peut usurper l'identite des utilisateurs lors de l'authentification vers : {{targets}}. Verifiez que chaque SPN cible est toujours necessaire et minimal. (msDS-AllowedToDelegateTo)"
+  },
+  "Rbcd": {
+    "badge": "RBCD",
+    "tooltip": "Ces principaux peuvent usurper l'identite d'utilisateurs vers cet ordinateur : {{principals}}. Souvent legitime (par exemple delegation SQL Server), mais si un compte peu privilegie a un acces en ecriture a cet attribut, cela permet une attaque par relais. (msDS-AllowedToActOnBehalfOfOtherIdentity)"
+  },
   "dot": {
     "ariaLabel": "Indicateurs de securite : {{count}}",
     "popoverHeader": "Indicateurs de securite",

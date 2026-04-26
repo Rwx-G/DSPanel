@@ -110,6 +110,14 @@ export interface DirectoryComputer {
   organizationalUnit: string;
   enabled: boolean;
   memberOf: string[];
+  /**
+   * Pass-through of the LDAP entry's `attributes` map. Mirrors the
+   * `DirectoryUser.rawAttributes` field so consumers (e.g. the security
+   * indicator service) can read the raw `userAccountControl` integer,
+   * delegation attribute lists, and the base64-encoded RBCD blob without
+   * an extra LDAP round-trip.
+   */
+  rawAttributes: Record<string, string[]>;
 }
 
 export function mapEntryToComputer(entry: DirectoryEntry): DirectoryComputer {
@@ -127,6 +135,7 @@ export function mapEntryToComputer(entry: DirectoryEntry): DirectoryComputer {
     organizationalUnit: parseOuFromDn(entry.distinguishedName),
     enabled: (uac & 0x0002) === 0,
     memberOf: attrList("memberOf"),
+    rawAttributes: entry.attributes,
   };
 }
 
