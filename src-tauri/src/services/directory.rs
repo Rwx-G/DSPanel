@@ -42,6 +42,15 @@ pub trait DirectoryProvider: Send + Sync {
         None
     }
 
+    /// Returns true when the last search/browse call returned partial results
+    /// because the server hit `sizeLimitExceeded` or our `max_results` cap was
+    /// reached with more pages available. The UI uses this to render a
+    /// truncation banner instead of presenting a possibly incomplete list as
+    /// authoritative.
+    fn last_search_was_truncated(&self) -> bool {
+        false
+    }
+
     /// Searches for user accounts matching the filter.
     async fn search_users(&self, filter: &str, max_results: usize) -> Result<Vec<DirectoryEntry>>;
 
@@ -374,6 +383,7 @@ pub mod tests {
         pub remove_photo_calls: Mutex<Vec<String>>,
         configuration_entries: Mutex<Vec<DirectoryEntry>>,
         connection_error: Mutex<Option<String>>,
+        truncated: Mutex<bool>,
     }
 
     impl Default for MockDirectoryProvider {
@@ -425,6 +435,7 @@ pub mod tests {
                 remove_photo_calls: Mutex::new(Vec::new()),
                 configuration_entries: Mutex::new(Vec::new()),
                 connection_error: Mutex::new(None),
+                truncated: Mutex::new(false),
             }
         }
 
@@ -470,6 +481,7 @@ pub mod tests {
                 remove_photo_calls: Mutex::new(Vec::new()),
                 configuration_entries: Mutex::new(Vec::new()),
                 connection_error: Mutex::new(Some("not_domain_joined".to_string())),
+                truncated: Mutex::new(false),
             }
         }
 
@@ -551,6 +563,11 @@ pub mod tests {
             self
         }
 
+        pub fn with_truncated(self) -> Self {
+            *self.truncated.lock().unwrap() = true;
+            self
+        }
+
         fn check_failure(&self) -> Result<()> {
             if *self.should_fail.lock().unwrap() {
                 anyhow::bail!("Mock directory provider failure");
@@ -584,6 +601,10 @@ pub mod tests {
 
         fn last_connection_error(&self) -> Option<String> {
             self.connection_error.lock().unwrap().clone()
+        }
+
+        fn last_search_was_truncated(&self) -> bool {
+            *self.truncated.lock().unwrap()
         }
 
         async fn search_users(

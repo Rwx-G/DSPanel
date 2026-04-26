@@ -166,6 +166,10 @@ where
         self.inner.last_connection_error()
     }
 
+    fn last_search_was_truncated(&self) -> bool {
+        self.inner.last_search_was_truncated()
+    }
+
     async fn search_users(&self, filter: &str, max_results: usize) -> Result<Vec<DirectoryEntry>> {
         let filter = filter.to_string();
         resilient_call!(self, filter, |inner, f| inner

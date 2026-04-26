@@ -43,12 +43,12 @@ pub struct AppState {
     pub graph_exchange: GraphExchangeService,
     /// Credential store for secure OS-native secret storage.
     pub credential_store: Box<dyn CredentialStore>,
-    /// Cache for browse_users: (fetch_time, sorted_entries). TTL: 60 seconds.
-    pub browse_cache: Mutex<Option<(Instant, Vec<DirectoryEntry>)>>,
-    /// Cache for browse_computers: (fetch_time, sorted_entries). TTL: 60 seconds.
-    pub browse_computers_cache: Mutex<Option<(Instant, Vec<DirectoryEntry>)>>,
-    /// Cache for browse_groups: (fetch_time, sorted_entries). TTL: 60 seconds.
-    pub browse_groups_cache: Mutex<Option<(Instant, Vec<DirectoryEntry>)>>,
+    /// Cache for browse_users: (fetch_time, sorted_entries, truncated). TTL: 60 seconds.
+    pub browse_cache: Mutex<Option<(Instant, Vec<DirectoryEntry>, bool)>>,
+    /// Cache for browse_computers: (fetch_time, sorted_entries, truncated). TTL: 60 seconds.
+    pub browse_computers_cache: Mutex<Option<(Instant, Vec<DirectoryEntry>, bool)>>,
+    /// Cache for browse_groups: (fetch_time, sorted_entries, truncated). TTL: 60 seconds.
+    pub browse_groups_cache: Mutex<Option<(Instant, Vec<DirectoryEntry>, bool)>>,
     /// Cache for GPO DN -> display name mapping. TTL: 5 minutes.
     pub gpo_name_cache: Mutex<Option<(Instant, std::collections::HashMap<String, String>)>>,
 }
@@ -245,7 +245,7 @@ mod tests {
     fn test_app_state_browse_cache_can_be_set() {
         let state = make_state();
         let now = Instant::now();
-        *state.browse_cache.lock().unwrap() = Some((now, Vec::new()));
+        *state.browse_cache.lock().unwrap() = Some((now, Vec::new(), false));
         assert!(state.browse_cache.lock().unwrap().is_some());
     }
 

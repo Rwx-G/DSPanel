@@ -84,18 +84,19 @@ pub(crate) async fn browse_users_inner(
         let cache = state.browse_cache.lock().expect("lock poisoned");
         cache
             .as_ref()
-            .filter(|(ts, _)| ts.elapsed() < CACHE_TTL)
-            .map(|(_, entries)| entries.clone())
+            .filter(|(ts, _, _)| ts.elapsed() < CACHE_TTL)
+            .map(|(_, entries, truncated)| (entries.clone(), *truncated))
     };
 
-    let entries = match cached {
-        Some(entries) => entries,
+    let (entries, truncated) = match cached {
+        Some(pair) => pair,
         None => {
             let provider = state.provider();
             let mut fresh = provider
                 .browse_users(MAX_BROWSE)
                 .await
                 .map_err(|e| AppError::Directory(e.to_string()))?;
+            let truncated = provider.last_search_was_truncated();
 
             // Sort by display name (case-insensitive)
             fresh.sort_by(|a, b| {
@@ -106,9 +107,9 @@ pub(crate) async fn browse_users_inner(
 
             // Update cache
             let mut cache = state.browse_cache.lock().expect("lock poisoned");
-            *cache = Some((Instant::now(), fresh.clone()));
+            *cache = Some((Instant::now(), fresh.clone(), truncated));
 
-            fresh
+            (fresh, truncated)
         }
     };
 
@@ -122,6 +123,7 @@ pub(crate) async fn browse_users_inner(
         entries: page_entries,
         total_count,
         has_more,
+        truncated,
     })
 }
 
@@ -138,18 +140,19 @@ pub(crate) async fn browse_computers_inner(
         let cache = state.browse_computers_cache.lock().expect("lock poisoned");
         cache
             .as_ref()
-            .filter(|(ts, _)| ts.elapsed() < CACHE_TTL)
-            .map(|(_, entries)| entries.clone())
+            .filter(|(ts, _, _)| ts.elapsed() < CACHE_TTL)
+            .map(|(_, entries, truncated)| (entries.clone(), *truncated))
     };
 
-    let entries = match cached {
-        Some(entries) => entries,
+    let (entries, truncated) = match cached {
+        Some(pair) => pair,
         None => {
             let provider = state.provider();
             let mut fresh = provider
                 .browse_computers(MAX_BROWSE)
                 .await
                 .map_err(|e| AppError::Directory(e.to_string()))?;
+            let truncated = provider.last_search_was_truncated();
 
             fresh.sort_by(|a, b| {
                 let da = a.display_name.as_deref().unwrap_or("").to_lowercase();
@@ -158,9 +161,9 @@ pub(crate) async fn browse_computers_inner(
             });
 
             let mut cache = state.browse_computers_cache.lock().expect("lock poisoned");
-            *cache = Some((Instant::now(), fresh.clone()));
+            *cache = Some((Instant::now(), fresh.clone(), truncated));
 
-            fresh
+            (fresh, truncated)
         }
     };
 
@@ -174,6 +177,7 @@ pub(crate) async fn browse_computers_inner(
         entries: page_entries,
         total_count,
         has_more,
+        truncated,
     })
 }
 
@@ -190,18 +194,19 @@ pub(crate) async fn browse_groups_inner(
         let cache = state.browse_groups_cache.lock().expect("lock poisoned");
         cache
             .as_ref()
-            .filter(|(ts, _)| ts.elapsed() < CACHE_TTL)
-            .map(|(_, entries)| entries.clone())
+            .filter(|(ts, _, _)| ts.elapsed() < CACHE_TTL)
+            .map(|(_, entries, truncated)| (entries.clone(), *truncated))
     };
 
-    let entries = match cached {
-        Some(entries) => entries,
+    let (entries, truncated) = match cached {
+        Some(pair) => pair,
         None => {
             let provider = state.provider();
             let mut fresh = provider
                 .browse_groups(MAX_BROWSE)
                 .await
                 .map_err(|e| AppError::Directory(e.to_string()))?;
+            let truncated = provider.last_search_was_truncated();
 
             fresh.sort_by(|a, b| {
                 let da = a.display_name.as_deref().unwrap_or("").to_lowercase();
@@ -210,9 +215,9 @@ pub(crate) async fn browse_groups_inner(
             });
 
             let mut cache = state.browse_groups_cache.lock().expect("lock poisoned");
-            *cache = Some((Instant::now(), fresh.clone()));
+            *cache = Some((Instant::now(), fresh.clone(), truncated));
 
-            fresh
+            (fresh, truncated)
         }
     };
 
@@ -226,6 +231,7 @@ pub(crate) async fn browse_groups_inner(
         entries: page_entries,
         total_count,
         has_more,
+        truncated,
     })
 }
 
@@ -480,6 +486,7 @@ pub async fn browse_contacts(
         .browse_contacts(5000)
         .await
         .map_err(|e| AppError::Directory(e.to_string()))?;
+    let truncated = provider.last_search_was_truncated();
     let total = all.len();
     let start = page * page_size;
     let entries: Vec<DirectoryEntry> = all.into_iter().skip(start).take(page_size).collect();
@@ -488,6 +495,7 @@ pub async fn browse_contacts(
         entries,
         total_count: total,
         has_more,
+        truncated,
     })
 }
 
@@ -503,6 +511,7 @@ pub async fn browse_printers(
         .browse_printers(5000)
         .await
         .map_err(|e| AppError::Directory(e.to_string()))?;
+    let truncated = provider.last_search_was_truncated();
     let total = all.len();
     let start = page * page_size;
     let entries: Vec<DirectoryEntry> = all.into_iter().skip(start).take(page_size).collect();
@@ -511,6 +520,7 @@ pub async fn browse_printers(
         entries,
         total_count: total,
         has_more,
+        truncated,
     })
 }
 
@@ -1172,11 +1182,13 @@ mod tests {
             entries: vec![],
             total_count: 42,
             has_more: true,
+            truncated: true,
         };
         let json = serde_json::to_string(&br).unwrap();
         assert!(json.contains("totalCount"));
         assert!(json.contains("hasMore"));
         assert!(json.contains("42"));
+        assert!(json.contains("\"truncated\":true"));
     }
 
     #[test]
@@ -1198,11 +1210,29 @@ mod tests {
             entries: vec![],
             total_count: 0,
             has_more: false,
+            truncated: false,
         };
         let json = serde_json::to_string(&br).unwrap();
         assert!(json.contains("\"entries\":[]"));
         assert!(json.contains("\"totalCount\":0"));
         assert!(json.contains("\"hasMore\":false"));
+        assert!(json.contains("\"truncated\":false"));
+    }
+
+    #[tokio::test]
+    async fn test_browse_users_inner_propagates_truncated_flag() {
+        let users = vec![make_user_entry("jdoe", "John Doe")];
+        let provider = Arc::new(
+            MockDirectoryProvider::new()
+                .with_users(users)
+                .with_truncated(),
+        );
+        let state = AppState::new_for_test(provider, PermissionConfig::default());
+        let result = browse_users_inner(&state, 0, 10).await.unwrap();
+        assert!(
+            result.truncated,
+            "BrowseResult.truncated should reflect provider.last_search_was_truncated()"
+        );
     }
 
     // -----------------------------------------------------------------------

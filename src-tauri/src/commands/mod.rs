@@ -104,6 +104,12 @@ pub struct BrowseResult {
     pub entries: Vec<DirectoryEntry>,
     pub total_count: usize,
     pub has_more: bool,
+    /// True when the underlying LDAP search returned partial data (server hit
+    /// `sizeLimitExceeded` or our `MAX_BROWSE` cap was reached with more
+    /// pages available). The UI should warn the operator that the list is
+    /// not authoritative.
+    #[serde(default)]
+    pub truncated: bool,
 }
 
 // ---------------------------------------------------------------------------
