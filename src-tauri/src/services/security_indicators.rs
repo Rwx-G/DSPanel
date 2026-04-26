@@ -60,10 +60,11 @@ pub enum SecurityIndicatorKind {
 
 /// One detected security indicator on an AD object.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SecurityIndicator {
     pub kind: SecurityIndicatorKind,
     pub severity: IndicatorSeverity,
-    /// i18n key. UI translates via `t(description_key)`. Never a translated
+    /// i18n key. UI translates via `t(descriptionKey)`. Never a translated
     /// string.
     pub description_key: String,
     /// Optional structured payload for indicators that carry extra context
