@@ -10,6 +10,7 @@ pub mod dc_health;
 pub mod demo_provider;
 pub mod directory;
 pub mod dns_validation;
+#[cfg(target_os = "windows")]
 pub mod dpapi;
 pub mod export;
 pub mod gpo;

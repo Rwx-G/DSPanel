@@ -95,6 +95,11 @@ pub struct DomainInfo {
     /// Maps to an i18n hint on the UI. Raw error text stays in the log.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub connection_error: Option<String>,
+    /// True when the connected DC advertised the RODC capability OID
+    /// in its rootDSE response. Omitted from the wire payload when false
+    /// to keep the common (writable DC) case compact.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub dc_is_rodc: bool,
 }
 
 /// Paginated browse result for user listing.
@@ -104,6 +109,12 @@ pub struct BrowseResult {
     pub entries: Vec<DirectoryEntry>,
     pub total_count: usize,
     pub has_more: bool,
+    /// True when the underlying LDAP search returned partial data (server hit
+    /// `sizeLimitExceeded` or our `MAX_BROWSE` cap was reached with more
+    /// pages available). The UI should warn the operator that the list is
+    /// not authoritative.
+    #[serde(default)]
+    pub truncated: bool,
 }
 
 // ---------------------------------------------------------------------------

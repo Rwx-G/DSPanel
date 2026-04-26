@@ -7,7 +7,7 @@ import {
   type PropertyGroup,
 } from "@/components/data/PropertyGrid";
 import { type DirectoryEntry, type DirectoryGroup } from "@/types/directory";
-import { parseCnFromDn } from "@/utils/dn";
+import { parseCnFromDn, extractForeignSidFromDn } from "@/utils/dn";
 import {
   type MemberChange,
   MemberChangePreviewDialog,
@@ -67,6 +67,7 @@ function NestedMemberItem({
   onRowContextMenu,
 }: NestedMemberItemProps) {
   const { t } = useTranslation(["groupDetail", "common", "sidebar"]);
+  const foreignSid = extractForeignSidFromDn(entry.distinguishedName);
   const name =
     entry.displayName ??
     entry.samAccountName ??
@@ -181,6 +182,15 @@ function NestedMemberItem({
         <span className={`flex-1 truncate text-[var(--color-text-primary)] ${depth === 0 ? "text-body" : "text-caption"}`}>
           {name}
         </span>
+        {foreignSid && (
+          <span
+            className="shrink-0 rounded border border-[var(--color-warning)] bg-[var(--color-warning-bg)] px-1.5 py-0.5 text-caption font-medium text-[var(--color-warning)]"
+            title={t("common:foreignPrincipalTooltip", { sid: foreignSid })}
+            data-testid="foreign-principal-badge"
+          >
+            {t("common:foreignPrincipalBadge")}
+          </span>
+        )}
         <span className="shrink-0 text-caption text-[var(--color-text-secondary)]">
           {isGroup ? "group" : entry.objectClass ?? "user"}
         </span>

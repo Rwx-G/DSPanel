@@ -48,3 +48,5 @@ DSPanel interacts directly with Active Directory and can perform privileged oper
 | Linux    | Secret Service | Stored via `keyring` crate (GNOME Keyring / KWallet) |
 
 On all platforms the TOTP shared secret is protected by the OS-native credential store. No plaintext secrets are written to disk.
+
+The internal `services::dpapi` module is intentionally **Windows-only** (gated with `#[cfg(target_os = "windows")]` at the parent module). There is no portable DPAPI equivalent and we deliberately do not ship a base64 "fallback" that would silently produce unencrypted bytes if invoked on non-Windows. Calling DPAPI from cross-platform code is a compile error, forcing developers onto the keyring path on macOS / Linux.

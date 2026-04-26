@@ -243,6 +243,21 @@ export function HomePage({ status }: HomePageProps) {
             )}
           </div>
         )}
+
+        {/* RODC warning - shown when connected to a Read-Only DC */}
+        {status.isConnected && status.dcIsRodc && (
+          <div
+            className="mt-4 rounded-lg border border-[var(--color-warning)] bg-[var(--color-warning-bg)] p-3"
+            data-testid="rodc-banner"
+          >
+            <p className="text-caption font-medium text-[var(--color-warning)]">
+              {t("common:rodcBannerTitle")}
+            </p>
+            <p className="mt-1 text-caption text-[var(--color-text-secondary)]">
+              {t("common:rodcBannerDetail")}
+            </p>
+          </div>
+        )}
       </div>
 
       {showMfaSetup && (

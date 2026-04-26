@@ -6,6 +6,7 @@ interface BrowseResult {
   entries: DirectoryEntry[];
   totalCount: number;
   hasMore: boolean;
+  truncated?: boolean;
 }
 
 type BrowseMode = "browse" | "search";
@@ -28,6 +29,10 @@ export interface UseBrowseReturn<T> {
   error: string | null;
   hasMore: boolean;
   totalCount: number;
+  /** True when the underlying LDAP search returned partial results because
+   * the server hit `sizeLimitExceeded` or the backend `MAX_BROWSE` cap was
+   * reached with more pages available on the directory. */
+  truncated: boolean;
   mode: BrowseMode;
   filterText: string;
   setFilterText: (text: string) => void;
@@ -56,6 +61,7 @@ export function useBrowse<T>({
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
+  const [truncated, setTruncated] = useState(false);
   const [mode, setMode] = useState<BrowseMode>("browse");
   const [filterText, setFilterTextState] = useState("");
   const [selectedItem, setSelectedItem] = useState<T | null>(null);
@@ -96,6 +102,7 @@ export function useBrowse<T>({
 
         setTotalCount(result.totalCount);
         setHasMore(result.hasMore);
+        setTruncated(result.truncated ?? false);
         setBrowsePageLoaded(page);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load items");
@@ -130,6 +137,9 @@ export function useBrowse<T>({
         setAllBrowseItems(allItems);
         setDisplayedItems(allItems);
         setTotalCount(result.totalCount);
+        if (result.truncated) {
+          setTruncated(true);
+        }
         more = result.hasMore;
         page++;
       }
@@ -241,6 +251,7 @@ export function useBrowse<T>({
     error,
     hasMore,
     totalCount,
+    truncated,
     mode,
     filterText,
     setFilterText,

@@ -27,6 +27,7 @@
     "no_credentials": "No Kerberos ticket available. Sign out and back in, or run `klist purge` then `kinit`.",
     "unknown_principal": "The LDAP service principal name (SPN) is unknown to Kerberos. DC hostname may be misresolved.",
     "ldap_signing": "The domain controller requires LDAP signing or sealing that the current bind cannot provide.",
+    "channel_binding_required": "The domain controller enforces LDAP channel binding (LdapEnforceChannelBinding=2) but the current connection is not over TLS. Enable TLS to provide the tls-server-end-point token.",
     "dns": "DNS resolution failed. The `_ldap._tcp.<domain>` SRV record could not be resolved.",
     "network": "Network connection to the domain controller failed (refused, unreachable, or timed out).",
     "tls": "TLS handshake with the domain controller failed. Check certificate trust and port 636.",

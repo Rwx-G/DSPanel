@@ -114,5 +114,14 @@
   "noData": "No hay datos disponibles",
   "result_one": "{{count}} resultado",
   "result_other": "{{count}} resultados",
-  "present": "Presente"
+  "present": "Presente",
+  "truncatedTitle": "Resultados parciales",
+  "truncatedDetail": "El directorio devolvió más entradas de las que pueden recuperarse en una sola solicitud. Refine el filtro para ver los elementos que faltan.",
+  "truncatedDetailWithCount": "Mostrando las primeras {{shown}} entradas devueltas por el directorio. Refine el filtro para ver los elementos que faltan.",
+  "foreignPrincipalBadge": "Externo",
+  "foreignPrincipalTooltip": "Foreign Security Principal de un dominio de confianza (SID: {{sid}}). DSPanel no resuelve nombres entre bosques.",
+  "rodcBannerTitle": "Conectado a un Controlador de Dominio de Solo Lectura (RODC)",
+  "rodcBannerDetail": "Este DC no acepta operaciones de escritura. Los restablecimientos de contraseña, los cambios de pertenencia a grupos y las modificaciones de cuenta se redirigirán a un DC con permisos de escritura si está disponible, o se rechazarán.",
+  "adminSdHolderBadge": "Protegido",
+  "adminSdHolderTooltip": "Este objeto está protegido por AdminSDHolder (adminCount=1). El proceso SDProp en el emulador PDC se ejecuta cada ~60 minutos y sobrescribirá cualquier cambio de DACL con la plantilla de AdminSDHolder."
 }

@@ -27,6 +27,7 @@
     "no_credentials": "Aucun ticket Kerberos disponible. Déconnectez-vous puis reconnectez la session, ou exécutez `klist purge` puis `kinit`.",
     "unknown_principal": "Le SPN LDAP est inconnu de Kerberos. Le nom d'hôte du DC est peut-être mal résolu.",
     "ldap_signing": "Le Domain Controller exige une signature ou un scellement LDAP que le bind actuel ne peut pas fournir.",
+    "channel_binding_required": "Le Domain Controller impose la liaison de canal LDAP (LdapEnforceChannelBinding=2) mais la connexion actuelle n'utilise pas TLS. Activez TLS pour fournir le jeton tls-server-end-point.",
     "dns": "Échec de la résolution DNS. L'enregistrement SRV `_ldap._tcp.<domaine>` n'a pas pu être résolu.",
     "network": "La connexion réseau vers le Domain Controller a échoué (refusée, injoignable ou expirée).",
     "tls": "Échec de la négociation TLS avec le Domain Controller. Vérifiez la confiance du certificat et le port 636.",

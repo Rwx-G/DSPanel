@@ -40,3 +40,27 @@ export function parseCnFromDn(dn: string): string {
 export function formatOuPath(dn: string): string {
   return parseOuBreadcrumb(dn).join(" > ");
 }
+
+/**
+ * Detects whether a DN refers to a Foreign Security Principal entry,
+ * and returns the SID encoded in the leaf RDN if so.
+ *
+ * AD stores SIDs from trusted external domains as objects under
+ * `CN=ForeignSecurityPrincipals,<domain>` with the literal SID string as
+ * their RDN. They appear in `member` attributes by their full DN, which
+ * leaves the UI showing `CN=S-1-5-...,CN=ForeignSecurityPrincipals,...`
+ * strings instead of resolved names.
+ *
+ * Mirrors the Rust helper `extract_foreign_sid_from_dn` in
+ * `src-tauri/src/services/ldap_directory.rs`.
+ */
+export function extractForeignSidFromDn(dn: string): string | null {
+  if (!dn) return null;
+  const lower = dn.toLowerCase();
+  if (!lower.includes(",cn=foreignsecurityprincipals,")) return null;
+  const firstRdn = dn.split(",")[0]?.trim() ?? "";
+  const value = firstRdn.replace(/^cn=/i, "");
+  if (value === firstRdn) return null;
+  if (!value.toUpperCase().startsWith("S-1-")) return null;
+  return value;
+}

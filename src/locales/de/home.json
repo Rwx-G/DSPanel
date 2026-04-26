@@ -27,6 +27,7 @@
     "no_credentials": "Kein Kerberos-Ticket verfügbar. Melden Sie sich ab und wieder an oder führen Sie `klist purge` und anschließend `kinit` aus.",
     "unknown_principal": "Der LDAP-SPN ist Kerberos unbekannt. Der DC-Hostname wird möglicherweise falsch aufgelöst.",
     "ldap_signing": "Der Domain Controller verlangt LDAP-Signierung oder -Versiegelung, die der aktuelle Bind nicht liefern kann.",
+    "channel_binding_required": "Der Domain Controller erzwingt die LDAP-Kanalbindung (LdapEnforceChannelBinding=2), aber die aktuelle Verbindung verwendet kein TLS. Aktivieren Sie TLS, um das tls-server-end-point-Token bereitzustellen.",
     "dns": "DNS-Auflösung fehlgeschlagen. Der SRV-Eintrag `_ldap._tcp.<Domäne>` konnte nicht aufgelöst werden.",
     "network": "Netzwerkverbindung zum Domain Controller fehlgeschlagen (abgelehnt, nicht erreichbar oder Zeitüberschreitung).",
     "tls": "TLS-Handshake mit dem Domain Controller fehlgeschlagen. Prüfen Sie Zertifikatsvertrauen und Port 636.",

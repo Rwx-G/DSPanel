@@ -4,6 +4,7 @@ import { SearchBar } from "@/components/common/SearchBar";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { EmptyState } from "@/components/common/EmptyState";
 import { HealthBadge } from "@/components/common/HealthBadge";
+import { TruncatedBanner } from "@/components/common/TruncatedBanner";
 import { VirtualizedList } from "@/components/data/VirtualizedList";
 import { type Column } from "@/components/data/DataTable";
 import {
@@ -39,6 +40,7 @@ export function UserLookup() {
     loadingMore,
     error,
     hasMore,
+    truncated,
     filterText,
     setFilterText,
     loadMore,
@@ -388,6 +390,12 @@ export function UserLookup() {
         {!loading && filteredUsers.length === 0 && !error && t("noUsersFound")}
         {error && `Error: ${error}`}
       </div>
+
+      {truncated && (
+        <div className="px-3 pt-2">
+          <TruncatedBanner truncated={truncated} />
+        </div>
+      )}
 
       <div className="flex flex-1 overflow-hidden">
         {loading && (
