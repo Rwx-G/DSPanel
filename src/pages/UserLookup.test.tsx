@@ -10,6 +10,7 @@ import {
 } from "@/contexts/NavigationContext";
 import type { DirectoryEntry } from "@/types/directory";
 import type { AccountHealthStatus } from "@/types/health";
+import type { SecurityIndicatorSet } from "@/types/securityIndicators";
 
 function TestProviders({ children }: { children: ReactNode }) {
   return (
@@ -138,9 +139,15 @@ function makeBrowseResult(entries: DirectoryEntry[], hasMore = false) {
   };
 }
 
+const EMPTY_INDICATORS: SecurityIndicatorSet = {
+  indicators: [],
+  highestSeverity: "Healthy",
+};
+
 function mockBrowseWith(
   entries: DirectoryEntry[],
   healthOverrides: Record<string, AccountHealthStatus> = {},
+  indicatorOverrides: Record<string, SecurityIndicatorSet> = {},
 ) {
   mockInvoke.mockImplementation(((
     cmd: string,
@@ -171,6 +178,24 @@ function mockBrowseWith(
         );
       }
       return Promise.resolve([]);
+    }
+    if (cmd === "evaluate_user_security_indicators") {
+      // Single-user invocation - first override or empty.
+      for (const [, set] of Object.entries(indicatorOverrides)) {
+        return Promise.resolve(set);
+      }
+      return Promise.resolve(EMPTY_INDICATORS);
+    }
+    if (cmd === "evaluate_user_security_indicators_batch") {
+      const inputs = args?.inputs as Array<unknown> | undefined;
+      if (!inputs) return Promise.resolve([]);
+      // Map by index to entries to pick the right override per sam.
+      return Promise.resolve(
+        entries.map(
+          (e) =>
+            indicatorOverrides[e.samAccountName ?? ""] ?? EMPTY_INDICATORS,
+        ),
+      );
     }
     return Promise.resolve(null);
   }) as typeof invoke);
@@ -1071,6 +1096,118 @@ describe("UserLookup", () => {
           expect(getUserCallCount).toBeGreaterThanOrEqual(1);
         });
       }
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Story 14.2 - SecurityIndicatorDot in lookup row
+  // ---------------------------------------------------------------------------
+
+  describe("security indicator dot", () => {
+    it("renders no dot for users with no detected indicators", async () => {
+      mockBrowseWith([makeEntry("jdoe", "John Doe")]);
+
+      render(<UserLookup />, { wrapper: TestProviders });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("user-result-jdoe")).toBeInTheDocument();
+      });
+      // Wait long enough for the indicators batch to resolve
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(
+        screen.queryByTestId("security-indicator-dot"),
+      ).not.toBeInTheDocument();
+    });
+
+    it("renders the dot for users that have indicators", async () => {
+      const entries = [makeEntry("jdoe", "John Doe")];
+      mockBrowseWith(entries, {}, {
+        jdoe: {
+          indicators: [
+            {
+              kind: "Kerberoastable",
+              severity: "Warning",
+              descriptionKey: "securityIndicators.Kerberoastable",
+            },
+          ],
+          highestSeverity: "Warning",
+        },
+      });
+
+      render(<UserLookup />, { wrapper: TestProviders });
+
+      await waitFor(() => {
+        expect(
+          screen.getByTestId("security-indicator-dot"),
+        ).toBeInTheDocument();
+      });
+      expect(screen.getByTestId("security-indicator-dot")).toHaveAttribute(
+        "data-severity",
+        "Warning",
+      );
+    });
+
+    it("dot color reflects highestSeverity (Critical wins over Warning)", async () => {
+      const entries = [makeEntry("jdoe", "John Doe")];
+      mockBrowseWith(entries, {}, {
+        jdoe: {
+          indicators: [
+            {
+              kind: "Kerberoastable",
+              severity: "Warning",
+              descriptionKey: "securityIndicators.Kerberoastable",
+            },
+            {
+              kind: "PasswordNotRequired",
+              severity: "Critical",
+              descriptionKey: "securityIndicators.PasswordNotRequired",
+            },
+          ],
+          highestSeverity: "Critical",
+        },
+      });
+
+      render(<UserLookup />, { wrapper: TestProviders });
+
+      await waitFor(() => {
+        expect(
+          screen.getByTestId("security-indicator-dot"),
+        ).toHaveAttribute("data-severity", "Critical");
+      });
+      expect(screen.getByTestId("security-indicator-dot")).toHaveAttribute(
+        "data-count",
+        "2",
+      );
+    });
+
+    it("propagates indicator set to UserDetail when a user is selected", async () => {
+      const entries = [makeEntry("jdoe", "John Doe")];
+      mockBrowseWith(entries, {}, {
+        jdoe: {
+          indicators: [
+            {
+              kind: "AsRepRoastable",
+              severity: "Critical",
+              descriptionKey: "securityIndicators.AsRepRoastable",
+            },
+          ],
+          highestSeverity: "Critical",
+        },
+      });
+
+      render(<UserLookup />, { wrapper: TestProviders });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("user-result-jdoe")).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByTestId("user-result-jdoe"));
+
+      await waitFor(() => {
+        expect(
+          screen.getByTestId("security-indicator-badge-AsRepRoastable"),
+        ).toBeInTheDocument();
+      });
     });
   });
 });
