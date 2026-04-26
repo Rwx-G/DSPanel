@@ -31,6 +31,7 @@ pub mod resilient_directory;
 pub mod security;
 pub mod security_indicators;
 pub mod snapshot;
+pub mod spn;
 pub mod topology;
 pub mod update;
 pub mod workstation_monitor;
