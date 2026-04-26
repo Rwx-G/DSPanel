@@ -121,5 +121,7 @@
   "foreignPrincipalBadge": "Extern",
   "foreignPrincipalTooltip": "Foreign Security Principal aus einer vertrauten Domäne (SID: {{sid}}). DSPanel löst keine Namen über Gesamtstrukturgrenzen hinweg auf.",
   "rodcBannerTitle": "Mit einem schreibgeschützten Domain Controller (RODC) verbunden",
-  "rodcBannerDetail": "Dieser DC akzeptiert keine Schreibvorgänge. Passwortzurücksetzungen, Änderungen der Gruppenmitgliedschaft und Kontoänderungen werden, falls verfügbar, an einen beschreibbaren DC weitergeleitet, andernfalls abgelehnt."
+  "rodcBannerDetail": "Dieser DC akzeptiert keine Schreibvorgänge. Passwortzurücksetzungen, Änderungen der Gruppenmitgliedschaft und Kontoänderungen werden, falls verfügbar, an einen beschreibbaren DC weitergeleitet, andernfalls abgelehnt.",
+  "adminSdHolderBadge": "Geschützt",
+  "adminSdHolderTooltip": "Dieses Objekt wird von AdminSDHolder geschützt (adminCount=1). Der SDProp-Prozess auf dem PDC-Emulator läuft etwa alle 60 Minuten und überschreibt jede DACL-Änderung mit der AdminSDHolder-Vorlage."
 }

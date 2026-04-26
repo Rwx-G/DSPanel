@@ -121,5 +121,7 @@
   "foreignPrincipalBadge": "Foreign",
   "foreignPrincipalTooltip": "Foreign Security Principal from a trusted domain (SID: {{sid}}). DSPanel does not resolve names across forest boundaries.",
   "rodcBannerTitle": "Connected to a Read-Only Domain Controller",
-  "rodcBannerDetail": "This DC does not accept write operations. Password resets, group membership changes, and account modifications will be referred to a writable DC if available, otherwise rejected."
+  "rodcBannerDetail": "This DC does not accept write operations. Password resets, group membership changes, and account modifications will be referred to a writable DC if available, otherwise rejected.",
+  "adminSdHolderBadge": "Protected",
+  "adminSdHolderTooltip": "This object is protected by AdminSDHolder (adminCount=1). The SDProp process on the PDC emulator runs every ~60 minutes and will overwrite any DACL change with the AdminSDHolder template."
 }

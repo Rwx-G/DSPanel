@@ -425,6 +425,17 @@ export function UserDetail({
                 variant={user.enabled ? "success" : "error"}
               />
               {user.lockedOut && <StatusBadge text={t("common:locked")} variant="warning" />}
+              {user.rawAttributes?.adminCount?.[0] === "1" && (
+                <span
+                  title={t("common:adminSdHolderTooltip")}
+                  data-testid="admin-sdholder-badge"
+                >
+                  <StatusBadge
+                    text={t("common:adminSdHolderBadge")}
+                    variant="warning"
+                  />
+                </span>
+              )}
             </div>
           </div>
 

@@ -121,5 +121,7 @@
   "foreignPrincipalBadge": "Esterno",
   "foreignPrincipalTooltip": "Foreign Security Principal proveniente da un dominio attendibile (SID: {{sid}}). DSPanel non risolve i nomi tra foreste.",
   "rodcBannerTitle": "Connesso a un Domain Controller di sola lettura (RODC)",
-  "rodcBannerDetail": "Questo DC non accetta operazioni di scrittura. Le reimpostazioni della password, le modifiche dell'appartenenza ai gruppi e le modifiche dell'account verranno reindirizzate a un DC scrivibile se disponibile, altrimenti respinte."
+  "rodcBannerDetail": "Questo DC non accetta operazioni di scrittura. Le reimpostazioni della password, le modifiche dell'appartenenza ai gruppi e le modifiche dell'account verranno reindirizzate a un DC scrivibile se disponibile, altrimenti respinte.",
+  "adminSdHolderBadge": "Protetto",
+  "adminSdHolderTooltip": "Questo oggetto è protetto da AdminSDHolder (adminCount=1). Il processo SDProp sull'emulatore PDC viene eseguito ogni ~60 minuti e sovrascriverà qualsiasi modifica DACL con il modello AdminSDHolder."
 }
