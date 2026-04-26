@@ -133,6 +133,13 @@ const COMPUTER_ATTRS: &[&str] = &[
     "userAccountControl",
     "memberOf",
     "objectClass",
+    // Kerberos delegation attributes used by the security_indicators service
+    // (Story 14.1) to surface ConstrainedDelegation and RBCD configurations on
+    // computer detail. Multi-valued string SPNs and binary security descriptor
+    // respectively. Adding them here is additive - existing callers just see
+    // extra entries in `entry.attributes`.
+    "msDS-AllowedToDelegateTo",
+    "msDS-AllowedToActOnBehalfOfOtherIdentity",
 ];
 
 /// LDAP attributes to retrieve for group searches.
@@ -1309,7 +1316,7 @@ impl LdapDirectoryProvider {
 /// - Byte 1: sub-authority count
 /// - Bytes 2-7: identifier authority (big-endian 48-bit)
 /// - Bytes 8+: sub-authorities (4 bytes each, little-endian)
-fn sid_bytes_to_string(bytes: &[u8]) -> String {
+pub fn sid_bytes_to_string(bytes: &[u8]) -> String {
     if bytes.len() < 8 {
         return String::new();
     }
@@ -1628,6 +1635,20 @@ async fn set_cannot_change_password_with_ldap(
 }
 
 /// Converts an `ldap3::SearchEntry` to a `DirectoryEntry`.
+/// AD attributes whose values are **binary** (`octet-string` syntax) but that
+/// the security_indicators service (Story 14.1) needs to inspect to render
+/// per-object risk badges. ldap3 puts these into `SearchEntry::bin_attrs`
+/// rather than `attrs`, which strips them from the standard
+/// `DirectoryEntry.attributes` payload sent to the frontend. We surface them
+/// here as **base64-encoded strings** under the original attribute name so
+/// downstream consumers can decode and parse them without an extra LDAP
+/// round-trip.
+const BINARY_ATTRS_TO_SURFACE: &[&str] = &[
+    // Resource-Based Constrained Delegation: binary security descriptor
+    // listing principals that can impersonate users to this computer.
+    "msDS-AllowedToActOnBehalfOfOtherIdentity",
+];
+
 fn search_entry_to_directory_entry(se: SearchEntry) -> DirectoryEntry {
     let sam = se
         .attrs
@@ -1639,6 +1660,23 @@ fn search_entry_to_directory_entry(se: SearchEntry) -> DirectoryEntry {
     let mut attributes: HashMap<String, Vec<String>> = HashMap::new();
     for (key, values) in se.attrs {
         attributes.insert(key, values);
+    }
+
+    // Surface specific binary attributes as base64 strings so the frontend
+    // can re-send them through `evaluate_computer_security_indicators` etc.
+    for binary_attr in BINARY_ATTRS_TO_SURFACE {
+        if let Some(values) = se.bin_attrs.get(*binary_attr) {
+            let encoded: Vec<String> = values
+                .iter()
+                .map(|bytes| {
+                    use base64::Engine;
+                    base64::engine::general_purpose::STANDARD.encode(bytes)
+                })
+                .collect();
+            if !encoded.is_empty() {
+                attributes.insert((*binary_attr).to_string(), encoded);
+            }
+        }
     }
 
     DirectoryEntry {

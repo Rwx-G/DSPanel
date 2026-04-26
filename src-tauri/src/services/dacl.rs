@@ -36,8 +36,14 @@ const SID_SELF: &[u8] = &[
     0x0a, 0x00, 0x00, 0x00, // SubAuthority[0] = 10
 ];
 
+/// ACE type for ACCESS_ALLOWED_ACE (0x00) - used by RBCD security descriptors.
+const ACCESS_ALLOWED_ACE_TYPE: u8 = 0x00;
+
 /// ACE type for ACCESS_DENIED_OBJECT_ACE (0x06)
 const ACCESS_DENIED_OBJECT_ACE_TYPE: u8 = 0x06;
+
+/// ACE type for ACCESS_ALLOWED_OBJECT_ACE (0x05)
+const ACCESS_ALLOWED_OBJECT_ACE_TYPE: u8 = 0x05;
 
 /// ADS_RIGHT_DS_CONTROL_ACCESS (0x00000100) - extended right access mask
 const ADS_RIGHT_DS_CONTROL_ACCESS: u32 = 0x00000100;
@@ -153,6 +159,110 @@ pub fn is_cannot_change_password(sd_bytes: &[u8]) -> Result<bool> {
     }
 
     Ok(false)
+}
+
+/// Walks the DACL of a binary security descriptor and returns the SID strings
+/// of every principal that has at least one Allow-type ACE.
+///
+/// Used to surface the trustee list of an attribute whose value is itself a
+/// binary security descriptor - notably `msDS-AllowedToActOnBehalfOfOtherIdentity`
+/// (RBCD), where the operator needs to see "who can impersonate users to this
+/// computer" without parsing the binary blob in the UI.
+///
+/// Recognized ACE types: ACCESS_ALLOWED_ACE (0x00), ACCESS_ALLOWED_OBJECT_ACE
+/// (0x05). Deny ACEs and audit ACEs are skipped. The returned list is
+/// deduplicated and preserves DACL order. SIDs are formatted as `S-1-...`.
+///
+/// Errors only on structural malformations (truncated header, invalid offsets);
+/// returns `Ok(vec![])` on a well-formed but ACE-empty DACL.
+pub fn extract_dacl_principals(sd_bytes: &[u8]) -> Result<Vec<String>> {
+    if sd_bytes.len() < 20 {
+        anyhow::bail!("Security descriptor too short ({} bytes)", sd_bytes.len());
+    }
+
+    let dacl_offset =
+        u32::from_le_bytes([sd_bytes[16], sd_bytes[17], sd_bytes[18], sd_bytes[19]]) as usize;
+
+    if dacl_offset == 0 {
+        return Ok(Vec::new()); // No DACL - no principals to extract
+    }
+
+    if dacl_offset >= sd_bytes.len() || dacl_offset + 8 > sd_bytes.len() {
+        anyhow::bail!("Invalid DACL offset {} in security descriptor", dacl_offset);
+    }
+
+    let acl_size =
+        u16::from_le_bytes([sd_bytes[dacl_offset + 2], sd_bytes[dacl_offset + 3]]) as usize;
+    let ace_count =
+        u16::from_le_bytes([sd_bytes[dacl_offset + 4], sd_bytes[dacl_offset + 5]]) as usize;
+
+    let acl_data_end = dacl_offset + acl_size;
+    if acl_data_end > sd_bytes.len() {
+        anyhow::bail!("DACL extends beyond security descriptor bounds");
+    }
+
+    let mut pos = dacl_offset + 8;
+    let mut principals: Vec<String> = Vec::with_capacity(ace_count);
+
+    for _ in 0..ace_count {
+        if pos + 4 > sd_bytes.len() {
+            break;
+        }
+        let ace_type = sd_bytes[pos];
+        let ace_size = u16::from_le_bytes([sd_bytes[pos + 2], sd_bytes[pos + 3]]) as usize;
+        if ace_size < 4 || pos + ace_size > sd_bytes.len() {
+            break;
+        }
+
+        // Compute the offset of the SID inside this ACE based on its type.
+        // ACE Header is always 4 bytes (type + flags + size).
+        let sid_offset_in_ace = match ace_type {
+            t if t == ACCESS_ALLOWED_ACE_TYPE => 4 + 4, // header + Mask
+            t if t == ACCESS_ALLOWED_OBJECT_ACE_TYPE => {
+                // header(4) + Mask(4) + ObjectFlags(4); ObjectType and
+                // InheritedObjectType GUIDs are conditionally present per the
+                // ObjectFlags bits. For the RBCD case all ACEs are typically
+                // simple ACCESS_ALLOWED_ACE, but we handle the OBJECT variant
+                // defensively.
+                let object_flags = u32::from_le_bytes([
+                    sd_bytes[pos + 8],
+                    sd_bytes[pos + 9],
+                    sd_bytes[pos + 10],
+                    sd_bytes[pos + 11],
+                ]);
+                let mut off = 4 + 4 + 4;
+                if object_flags & ACE_OBJECT_TYPE_PRESENT != 0 {
+                    off += 16; // ObjectType GUID
+                }
+                if object_flags & 0x02 != 0 {
+                    off += 16; // InheritedObjectType GUID
+                }
+                off
+            }
+            _ => {
+                // Deny / Audit / other ACE types - skip entirely
+                pos += ace_size;
+                continue;
+            }
+        };
+
+        if sid_offset_in_ace >= ace_size || pos + sid_offset_in_ace + 8 > sd_bytes.len() {
+            pos += ace_size;
+            continue;
+        }
+
+        let sid_start = pos + sid_offset_in_ace;
+        let sid_end = pos + ace_size;
+        let sid_bytes = &sd_bytes[sid_start..sid_end];
+        let sid_string = crate::services::ldap_directory::sid_bytes_to_string(sid_bytes);
+        if !sid_string.is_empty() && !principals.contains(&sid_string) {
+            principals.push(sid_string);
+        }
+
+        pos += ace_size;
+    }
+
+    Ok(principals)
 }
 
 /// Modifies a binary security descriptor to set or clear the "User Cannot Change Password" flag.
