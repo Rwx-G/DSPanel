@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - New common React component `<TruncatedBanner>` rendered at the top of the User, Computer, Group, Contact and Printer lookup pages whenever the underlying directory browse returned partial results. Translations added for en/fr/de/it/es.
 - `BrowseResult.truncated` field on the IPC contract (omitted as `false` by default) and `DirectoryProvider::last_search_was_truncated()` trait method backing it.
+- Foreign Security Principal detection: members coming from trusted external domains (stored under `CN=ForeignSecurityPrincipals,...` with their literal SID as RDN) are now flagged with a "Foreign" badge in the group member list, with the SID shown on hover. New `extractForeignSidFromDn` util on both Rust (`extract_foreign_sid_from_dn`) and TypeScript sides. Translations for en/fr/de/it/es.
+- Read-Only Domain Controller (RODC) detection: when the connected DC advertises `LDAP_CAP_ACTIVE_DIRECTORY_PARTIAL_SECRETS_OID` (1.2.840.113556.1.4.1920) in its rootDSE `supportedCapabilities`, the dashboard renders a localized warning banner explaining that write operations may be referred to a writable DC or rejected. New trait method `is_connected_to_rodc()` (default false), surfaced via `DomainInfo.dc_is_rodc` (omitted from the wire payload when false).
 
 ### Fixed
 
