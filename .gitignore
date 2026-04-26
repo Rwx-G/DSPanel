@@ -1,6 +1,9 @@
 # Rust
 target/
-Cargo.lock
+# Cargo.lock IS tracked - DSPanel is a binary application (Tauri app),
+# best practice per Cargo book: track Cargo.lock for reproducible builds
+# and to ensure security patches on transitive deps propagate to all
+# clones / CI runs.
 
 # Node
 node_modules/
