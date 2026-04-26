@@ -411,6 +411,65 @@ pub(crate) async fn modify_attribute_inner(
     }
 }
 
+/// Clears the PASSWORD_NOT_REQUIRED flag (`userAccountControl & 0x0020`) on a
+/// user account (Story 14.4 quick-fix from Epic 14).
+///
+/// Reads the current `userAccountControl`, clears bit 0x0020, and writes the
+/// result back when the value changed. When the bit is already clear, the
+/// command returns `Ok(())` early without writing or auditing - operators
+/// double-clicking "Fix" within seconds will not produce duplicate audit
+/// entries or duplicate LDAP writes.
+///
+/// Requires `AccountOperator` permission, may require MFA, and captures an
+/// object snapshot before the write for rollback.
+pub(crate) async fn clear_password_not_required_inner(
+    state: &AppState,
+    user_dn: &str,
+) -> Result<(), AppError> {
+    require_fresh_permission(
+        state,
+        PermissionLevel::AccountOperator,
+        "Clear PasswordNotRequired",
+    )
+    .await?;
+
+    state
+        .mfa_service
+        .check_mfa_for_action("ClearPasswordNotRequired")
+        .map_err(|e| AppError::PermissionDenied(e.to_string()))?;
+
+    capture_snapshot(state, user_dn, "ClearPasswordNotRequired").await;
+
+    let provider = state.provider();
+    match provider
+        .clear_user_account_control_bits(user_dn, 0x0020)
+        .await
+    {
+        Ok((previous, new)) if previous == new => {
+            // Idempotent no-op - the bit was already clear, nothing to audit.
+            // The snapshot capture above was wasted; accepted trade-off for
+            // simpler code (no extra trait peek round-trip).
+            Ok(())
+        }
+        Ok((previous, new)) => {
+            state.audit_service.log_success(
+                "ClearedPasswordNotRequired",
+                user_dn,
+                &format!("uac: 0x{:X} -> 0x{:X}", previous, new),
+            );
+            Ok(())
+        }
+        Err(e) => {
+            state.audit_service.log_failure(
+                "ClearPasswordNotRequiredFailed",
+                user_dn,
+                &e.to_string(),
+            );
+            Err(AppError::Directory(e.to_string()))
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Tauri commands - thin wrappers
 // ---------------------------------------------------------------------------
@@ -711,6 +770,17 @@ pub async fn modify_attribute(
     state: State<'_, AppState>,
 ) -> Result<(), AppError> {
     modify_attribute_inner(&state, &dn, &attribute_name, &values).await
+}
+
+/// Clears the PASSWORD_NOT_REQUIRED flag (`userAccountControl & 0x0020`) on a
+/// user account (Story 14.4 quick-fix). Requires AccountOperator+, may
+/// require MFA, captures snapshot, audits.
+#[tauri::command]
+pub async fn clear_password_not_required(
+    user_dn: String,
+    state: State<'_, AppState>,
+) -> Result<(), AppError> {
+    clear_password_not_required_inner(&state, &user_dn).await
 }
 
 #[allow(clippy::unwrap_used)]
@@ -1554,5 +1624,131 @@ mod tests {
         .unwrap();
 
         assert_eq!(state.snapshot_service.count(), 1);
+    }
+
+    // -----------------------------------------------------------------------
+    // clear_password_not_required_inner (Story 14.4)
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_clear_password_not_required_requires_account_operator() {
+        // ReadOnly default
+        let state = make_state();
+        let result = clear_password_not_required_inner(&state, "CN=User,DC=example,DC=com").await;
+        assert!(matches!(result.unwrap_err(), AppError::PermissionDenied(_)));
+
+        // HelpDesk also denied (gate is AccountOperator+)
+        let state = make_state_with_level(PermissionLevel::HelpDesk);
+        let result = clear_password_not_required_inner(&state, "CN=User,DC=example,DC=com").await;
+        assert!(matches!(result.unwrap_err(), AppError::PermissionDenied(_)));
+    }
+
+    #[tokio::test]
+    async fn test_clear_password_not_required_succeeds_for_account_operator() {
+        let (state, provider) =
+            make_state_with_level_and_provider(PermissionLevel::AccountOperator);
+        let dn = "CN=Alice,DC=example,DC=com";
+        // 0x0220 = PASSWORD_NOT_REQUIRED | ACCOUNTDISABLE
+        provider.set_user_account_control(dn, 0x0220);
+
+        let result = clear_password_not_required_inner(&state, dn).await;
+        assert!(result.is_ok());
+
+        let calls = provider.clear_uac_bits_calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+        // (dn, mask, previous, new)
+        assert_eq!(calls[0], (dn.to_string(), 0x0020, 0x0220, 0x0200));
+
+        let entries = state.audit_service.get_entries();
+        let cleared = entries
+            .iter()
+            .find(|e| e.action == "ClearedPasswordNotRequired")
+            .expect("audit entry recorded");
+        assert_eq!(cleared.target_dn, dn);
+        assert!(cleared.details.contains("0x220"));
+        assert!(cleared.details.contains("0x200"));
+        assert!(cleared.success);
+    }
+
+    #[tokio::test]
+    async fn test_clear_password_not_required_succeeds_for_admin() {
+        let (state, provider) = make_state_with_level_and_provider(PermissionLevel::Admin);
+        let dn = "CN=Alice,DC=example,DC=com";
+        provider.set_user_account_control(dn, 0x0020);
+
+        let result = clear_password_not_required_inner(&state, dn).await;
+        assert!(result.is_ok());
+
+        let entries = state.audit_service.get_entries();
+        assert!(
+            entries
+                .iter()
+                .any(|e| e.action == "ClearedPasswordNotRequired")
+        );
+    }
+
+    #[tokio::test]
+    async fn test_clear_password_not_required_idempotent_no_op() {
+        let (state, provider) =
+            make_state_with_level_and_provider(PermissionLevel::AccountOperator);
+        let dn = "CN=Bob,DC=example,DC=com";
+        // ACCOUNTDISABLE only - PASSWORD_NOT_REQUIRED already clear
+        provider.set_user_account_control(dn, 0x0200);
+
+        let result = clear_password_not_required_inner(&state, dn).await;
+        assert!(result.is_ok(), "idempotent no-op returns Ok");
+
+        let calls = provider.clear_uac_bits_calls.lock().unwrap();
+        assert!(calls.is_empty(), "no recorded state-change call on no-op");
+
+        let writes = provider.modify_attribute_calls.lock().unwrap();
+        assert!(writes.is_empty(), "no LDAP write on no-op");
+
+        let entries = state.audit_service.get_entries();
+        assert!(
+            !entries
+                .iter()
+                .any(|e| e.action == "ClearedPasswordNotRequired"),
+            "no audit entry on no-op"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_clear_password_not_required_captures_snapshot() {
+        let (state, provider) =
+            make_state_with_level_and_provider(PermissionLevel::AccountOperator);
+        let dn = "CN=Alice,DC=example,DC=com";
+        provider.set_user_account_control(dn, 0x0220);
+
+        clear_password_not_required_inner(&state, dn).await.unwrap();
+
+        assert_eq!(
+            state.snapshot_service.count(),
+            1,
+            "snapshot captured before write"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_clear_password_not_required_audit_on_directory_failure() {
+        let provider = Arc::new(MockDirectoryProvider::new().with_failure());
+        let provider_ref = Arc::clone(&provider);
+        let state = AppState::new_for_test(provider, PermissionConfig::default());
+        state
+            .permission_service
+            .set_level(PermissionLevel::AccountOperator);
+
+        let dn = "CN=Alice,DC=example,DC=com";
+        provider_ref.set_user_account_control(dn, 0x0020);
+
+        let result = clear_password_not_required_inner(&state, dn).await;
+        assert!(matches!(result.unwrap_err(), AppError::Directory(_)));
+
+        let entries = state.audit_service.get_entries();
+        let failed = entries
+            .iter()
+            .find(|e| e.action == "ClearPasswordNotRequiredFailed")
+            .expect("failure audit entry recorded");
+        assert!(!failed.success);
     }
 }
