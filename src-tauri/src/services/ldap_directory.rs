@@ -2010,6 +2010,38 @@ impl DirectoryProvider for LdapDirectoryProvider {
         .await
     }
 
+    async fn get_user_spns(&self, user_dn: &str) -> Result<Vec<String>> {
+        let dn = user_dn.to_string();
+        self.with_connection(|mut ldap| {
+            let dn = dn.clone();
+            async move {
+                let (rs, _) = ldap
+                    .search(
+                        &dn,
+                        Scope::Base,
+                        "(objectClass=*)",
+                        vec!["servicePrincipalName"],
+                    )
+                    .await
+                    .context("Failed to read servicePrincipalName")?
+                    .success()
+                    .context("servicePrincipalName read returned error")?;
+
+                let entry = rs
+                    .into_iter()
+                    .next()
+                    .context("User not found when reading servicePrincipalName")?;
+                let se = SearchEntry::construct(entry);
+                Ok(se
+                    .attrs
+                    .get("servicePrincipalName")
+                    .cloned()
+                    .unwrap_or_default())
+            }
+        })
+        .await
+    }
+
     async fn clear_user_account_control_bits(
         &self,
         user_dn: &str,

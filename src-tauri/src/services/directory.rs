@@ -133,6 +133,16 @@ pub trait DirectoryProvider: Send + Sync {
         bits_to_clear: u32,
     ) -> Result<(u32, u32)>;
 
+    /// Returns the multi-valued `servicePrincipalName` attribute on a user
+    /// object as a `Vec<String>`. Returns `Ok(vec![])` when the attribute is
+    /// absent.
+    ///
+    /// Used by Story 14.5 quick-fix `remove_user_spns` to read the current
+    /// SPN set before computing the new one. The write goes through the
+    /// existing `modify_attribute(dn, "servicePrincipalName", &new_set)`
+    /// path - no separate write trait method needed.
+    async fn get_user_spns(&self, user_dn: &str) -> Result<Vec<String>>;
+
     /// Reads the "User Cannot Change Password" flag from the DACL.
     async fn get_cannot_change_password(&self, user_dn: &str) -> Result<bool>;
 
@@ -400,6 +410,10 @@ pub mod tests {
         /// (idempotent no-ops are NOT recorded). Tuple is
         /// `(dn, bits_to_clear, previous_uac, new_uac)`.
         pub clear_uac_bits_calls: Mutex<Vec<(String, u32, u32, u32)>>,
+        /// Per-user-DN `servicePrincipalName` value lists. Used by
+        /// `get_user_spns` to simulate the multi-valued attribute. Defaults
+        /// to empty `Vec` when absent.
+        pub user_spns: Mutex<HashMap<String, Vec<String>>>,
         cannot_change_password: Mutex<bool>,
         replication_metadata: Mutex<Option<String>>,
         ou_tree: Mutex<Vec<OUNode>>,
@@ -455,6 +469,7 @@ pub mod tests {
                 modify_attribute_calls: Mutex::new(Vec::new()),
                 user_uac: Mutex::new(HashMap::new()),
                 clear_uac_bits_calls: Mutex::new(Vec::new()),
+                user_spns: Mutex::new(HashMap::new()),
                 cannot_change_password: Mutex::new(false),
                 replication_metadata: Mutex::new(None),
                 ou_tree: Mutex::new(Vec::new()),
@@ -504,6 +519,7 @@ pub mod tests {
                 modify_attribute_calls: Mutex::new(Vec::new()),
                 user_uac: Mutex::new(HashMap::new()),
                 clear_uac_bits_calls: Mutex::new(Vec::new()),
+                user_spns: Mutex::new(HashMap::new()),
                 cannot_change_password: Mutex::new(false),
                 replication_metadata: Mutex::new(None),
                 ou_tree: Mutex::new(Vec::new()),
@@ -605,6 +621,12 @@ pub mod tests {
         /// tests of the `clear_user_account_control_bits` flow.
         pub fn set_user_account_control(&self, dn: &str, uac: u32) {
             self.user_uac.lock().unwrap().insert(dn.to_string(), uac);
+        }
+
+        /// Sets the `servicePrincipalName` values for a specific user DN.
+        /// Used by tests of the `get_user_spns` and `remove_user_spns` flows.
+        pub fn set_user_spns(&self, dn: &str, spns: Vec<String>) {
+            self.user_spns.lock().unwrap().insert(dn.to_string(), spns);
         }
 
         pub fn with_connection_error(self, kind: &str) -> Self {
@@ -793,6 +815,17 @@ pub mod tests {
                 new,
             ));
             Ok((previous, new))
+        }
+
+        async fn get_user_spns(&self, user_dn: &str) -> Result<Vec<String>> {
+            self.check_failure()?;
+            Ok(self
+                .user_spns
+                .lock()
+                .unwrap()
+                .get(user_dn)
+                .cloned()
+                .unwrap_or_default())
         }
 
         async fn get_cannot_change_password(&self, _user_dn: &str) -> Result<bool> {
@@ -1494,6 +1527,45 @@ pub mod tests {
         let result = provider
             .clear_user_account_control_bits("CN=Alice,DC=example,DC=com", 0x0020)
             .await;
+        assert!(result.is_err());
+    }
+
+    // ------------------------------------------------------------------
+    // get_user_spns (Epic 14 Story 14.5)
+    // ------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_get_user_spns_returns_empty_for_unknown_dn() {
+        let provider = MockDirectoryProvider::new();
+        let spns = provider
+            .get_user_spns("CN=Unknown,DC=example,DC=com")
+            .await
+            .unwrap();
+        assert!(spns.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_get_user_spns_returns_set_values() {
+        let provider = MockDirectoryProvider::new();
+        let dn = "CN=SvcAccount,DC=example,DC=com";
+        provider.set_user_spns(
+            dn,
+            vec![
+                "MSSQLSvc/db.corp.local:1433".to_string(),
+                "HTTP/web1.corp.local".to_string(),
+            ],
+        );
+
+        let spns = provider.get_user_spns(dn).await.unwrap();
+        assert_eq!(spns.len(), 2);
+        assert!(spns.contains(&"MSSQLSvc/db.corp.local:1433".to_string()));
+        assert!(spns.contains(&"HTTP/web1.corp.local".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_get_user_spns_propagates_failure_flag() {
+        let provider = MockDirectoryProvider::new().with_failure();
+        let result = provider.get_user_spns("CN=Alice,DC=example,DC=com").await;
         assert!(result.is_err());
     }
 }

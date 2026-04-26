@@ -288,6 +288,11 @@ where
         resilient_call!(self, dn, |inner, d| inner.disable_account(&d).await)
     }
 
+    async fn get_user_spns(&self, user_dn: &str) -> Result<Vec<String>> {
+        let dn = user_dn.to_string();
+        resilient_call!(self, dn, |inner, d| inner.get_user_spns(&d).await)
+    }
+
     async fn clear_user_account_control_bits(
         &self,
         user_dn: &str,
