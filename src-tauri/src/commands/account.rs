@@ -470,6 +470,123 @@ pub(crate) async fn clear_password_not_required_inner(
     }
 }
 
+/// Result of a `remove_user_spns` invocation. Lists every SPN that was
+/// actually removed, every SPN kept on the user object after the call, and
+/// every SPN the operator requested but the system-SPN guard refused to
+/// remove. The three lists are sorted alphabetically so the audit chain
+/// hash and any UI rendering are deterministic regardless of input order.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoveSpnsResult {
+    pub removed: Vec<String>,
+    pub kept: Vec<String>,
+    pub blocked_system: Vec<String>,
+}
+
+/// Removes one or more values from a user's `servicePrincipalName` attribute
+/// (Story 14.5 quick-fix). System SPNs (HOST/, ldap/, krbtgt/, etc.) are
+/// blocked even if requested by the operator - those values would cause a
+/// service outage if removed and the policy is enforced server-side as a
+/// defense in depth (the dialog also hides them).
+///
+/// Idempotent no-op: when the requested removals do not change the SPN set
+/// (all already absent or all system-blocked), returns Ok without writing
+/// or auditing.
+///
+/// Requires `AccountOperator` permission, may require MFA, and captures an
+/// object snapshot before the write for rollback.
+pub(crate) async fn remove_user_spns_inner(
+    state: &AppState,
+    user_dn: &str,
+    spns_to_remove: &[String],
+) -> Result<RemoveSpnsResult, AppError> {
+    require_fresh_permission(state, PermissionLevel::AccountOperator, "Remove user SPNs").await?;
+
+    state
+        .mfa_service
+        .check_mfa_for_action("RemoveUserSpns")
+        .map_err(|e| AppError::PermissionDenied(e.to_string()))?;
+
+    let provider = state.provider();
+    let current = provider
+        .get_user_spns(user_dn)
+        .await
+        .map_err(|e| AppError::Directory(e.to_string()))?;
+
+    // Split requested removals: anything in the system list goes into
+    // blocked_system; the rest is approved (only if also present in current).
+    use std::collections::HashSet;
+    let current_set: HashSet<&String> = current.iter().collect();
+    let mut approved: Vec<String> = Vec::new();
+    let mut blocked_system: Vec<String> = Vec::new();
+    for spn in spns_to_remove {
+        if crate::services::spn::is_system_spn(spn) {
+            blocked_system.push(spn.clone());
+        } else if current_set.contains(spn) {
+            approved.push(spn.clone());
+        }
+        // SPN not in current set and not system: silently dropped (already
+        // removed - idempotent no-op for that value).
+    }
+
+    let approved_set: HashSet<&String> = approved.iter().collect();
+    let new_set: Vec<String> = current
+        .iter()
+        .filter(|s| !approved_set.contains(s))
+        .cloned()
+        .collect();
+
+    // Sort all result lists alphabetically for deterministic audit chain hash.
+    let mut removed_sorted = approved.clone();
+    removed_sorted.sort();
+    let mut kept_sorted = new_set.clone();
+    kept_sorted.sort();
+    let mut blocked_sorted = blocked_system.clone();
+    blocked_sorted.sort();
+
+    if new_set.len() == current.len() {
+        // Idempotent no-op - either nothing requested existed in current,
+        // or every requested removal was system-blocked. No state change,
+        // no snapshot, no audit entry.
+        return Ok(RemoveSpnsResult {
+            removed: Vec::new(),
+            kept: kept_sorted,
+            blocked_system: blocked_sorted,
+        });
+    }
+
+    capture_snapshot(state, user_dn, "RemoveUserSpns").await;
+
+    match provider
+        .modify_attribute(user_dn, "servicePrincipalName", &new_set)
+        .await
+    {
+        Ok(()) => {
+            state.audit_service.log_success(
+                "RemovedUserSpns",
+                user_dn,
+                &format!(
+                    "removed: [{}]; kept: [{}]; blocked_system: [{}]",
+                    removed_sorted.join(", "),
+                    kept_sorted.join(", "),
+                    blocked_sorted.join(", "),
+                ),
+            );
+            Ok(RemoveSpnsResult {
+                removed: removed_sorted,
+                kept: kept_sorted,
+                blocked_system: blocked_sorted,
+            })
+        }
+        Err(e) => {
+            state
+                .audit_service
+                .log_failure("RemoveUserSpnsFailed", user_dn, &e.to_string());
+            Err(AppError::Directory(e.to_string()))
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Tauri commands - thin wrappers
 // ---------------------------------------------------------------------------
@@ -781,6 +898,18 @@ pub async fn clear_password_not_required(
     state: State<'_, AppState>,
 ) -> Result<(), AppError> {
     clear_password_not_required_inner(&state, &user_dn).await
+}
+
+/// Removes one or more values from a user's `servicePrincipalName` attribute
+/// (Story 14.5 quick-fix). System SPNs are blocked even if requested.
+/// Requires AccountOperator+, may require MFA, captures snapshot, audits.
+#[tauri::command]
+pub async fn remove_user_spns(
+    user_dn: String,
+    spns_to_remove: Vec<String>,
+    state: State<'_, AppState>,
+) -> Result<RemoveSpnsResult, AppError> {
+    remove_user_spns_inner(&state, &user_dn, &spns_to_remove).await
 }
 
 #[allow(clippy::unwrap_used)]
@@ -1750,5 +1879,295 @@ mod tests {
             .find(|e| e.action == "ClearPasswordNotRequiredFailed")
             .expect("failure audit entry recorded");
         assert!(!failed.success);
+    }
+
+    // -----------------------------------------------------------------------
+    // remove_user_spns_inner (Story 14.5)
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_remove_user_spns_requires_account_operator() {
+        // ReadOnly default
+        let state = make_state();
+        let result = remove_user_spns_inner(
+            &state,
+            "CN=User,DC=example,DC=com",
+            &["MSSQLSvc/db.corp.local:1433".to_string()],
+        )
+        .await;
+        assert!(matches!(result.unwrap_err(), AppError::PermissionDenied(_)));
+
+        // HelpDesk also denied
+        let state = make_state_with_level(PermissionLevel::HelpDesk);
+        let result = remove_user_spns_inner(
+            &state,
+            "CN=User,DC=example,DC=com",
+            &["MSSQLSvc/db.corp.local:1433".to_string()],
+        )
+        .await;
+        assert!(matches!(result.unwrap_err(), AppError::PermissionDenied(_)));
+    }
+
+    #[tokio::test]
+    async fn test_remove_user_spns_succeeds_for_account_operator_single_removal() {
+        let (state, provider) =
+            make_state_with_level_and_provider(PermissionLevel::AccountOperator);
+        let dn = "CN=SvcSql,DC=example,DC=com";
+        provider.set_user_spns(
+            dn,
+            vec![
+                "MSSQLSvc/db.corp.local:1433".to_string(),
+                "HTTP/web1.corp.local".to_string(),
+                "FtpSvc/files.corp.local".to_string(),
+            ],
+        );
+
+        let result = remove_user_spns_inner(&state, dn, &["HTTP/web1.corp.local".to_string()])
+            .await
+            .unwrap();
+
+        assert_eq!(result.removed, vec!["HTTP/web1.corp.local"]);
+        assert_eq!(
+            result.kept,
+            vec![
+                "FtpSvc/files.corp.local".to_string(),
+                "MSSQLSvc/db.corp.local:1433".to_string(),
+            ]
+        );
+        assert!(result.blocked_system.is_empty());
+
+        // Verify the LDAP write happened with the correct new set
+        let writes = provider.modify_attribute_calls.lock().unwrap();
+        assert_eq!(writes.len(), 1);
+        assert_eq!(writes[0].1, "servicePrincipalName");
+        assert_eq!(writes[0].2.len(), 2);
+        assert!(writes[0].2.contains(&"FtpSvc/files.corp.local".to_string()));
+        assert!(
+            writes[0]
+                .2
+                .contains(&"MSSQLSvc/db.corp.local:1433".to_string())
+        );
+
+        // Verify the audit entry shape
+        let entries = state.audit_service.get_entries();
+        let entry = entries
+            .iter()
+            .find(|e| e.action == "RemovedUserSpns")
+            .expect("audit entry recorded");
+        assert_eq!(entry.target_dn, dn);
+        assert!(entry.details.contains("HTTP/web1.corp.local"));
+        assert!(entry.details.contains("FtpSvc/files.corp.local"));
+        assert!(entry.details.contains("MSSQLSvc/db.corp.local:1433"));
+        assert!(entry.success);
+    }
+
+    #[tokio::test]
+    async fn test_remove_user_spns_blocks_system_spns() {
+        let (state, provider) =
+            make_state_with_level_and_provider(PermissionLevel::AccountOperator);
+        let dn = "CN=DC01,DC=example,DC=com";
+        provider.set_user_spns(
+            dn,
+            vec![
+                "HOST/dc01.corp.local".to_string(),
+                "MSSQLSvc/db.corp.local:1433".to_string(),
+            ],
+        );
+
+        // Operator requests removal of both - HOST is blocked, MSSQLSvc removed
+        let result = remove_user_spns_inner(
+            &state,
+            dn,
+            &[
+                "HOST/dc01.corp.local".to_string(),
+                "MSSQLSvc/db.corp.local:1433".to_string(),
+            ],
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(result.removed, vec!["MSSQLSvc/db.corp.local:1433"]);
+        assert_eq!(result.kept, vec!["HOST/dc01.corp.local"]);
+        assert_eq!(result.blocked_system, vec!["HOST/dc01.corp.local"]);
+
+        // Audit details mention both removed and blocked
+        let entries = state.audit_service.get_entries();
+        let entry = entries
+            .iter()
+            .find(|e| e.action == "RemovedUserSpns")
+            .expect("audit entry recorded");
+        assert!(
+            entry
+                .details
+                .contains("removed: [MSSQLSvc/db.corp.local:1433]")
+        );
+        assert!(
+            entry
+                .details
+                .contains("blocked_system: [HOST/dc01.corp.local]")
+        );
+    }
+
+    #[tokio::test]
+    async fn test_remove_user_spns_idempotent_when_spn_not_present() {
+        let (state, provider) =
+            make_state_with_level_and_provider(PermissionLevel::AccountOperator);
+        let dn = "CN=Svc,DC=example,DC=com";
+        provider.set_user_spns(dn, vec!["MSSQLSvc/db.corp.local:1433".to_string()]);
+
+        // Request removal of an SPN that the user does not have
+        let result = remove_user_spns_inner(&state, dn, &["HTTP/web1.corp.local".to_string()])
+            .await
+            .unwrap();
+
+        assert!(result.removed.is_empty());
+        assert_eq!(result.kept, vec!["MSSQLSvc/db.corp.local:1433"]);
+        assert!(result.blocked_system.is_empty());
+
+        // No LDAP write, no audit entry
+        let writes = provider.modify_attribute_calls.lock().unwrap();
+        assert!(writes.is_empty(), "no LDAP write on idempotent no-op");
+
+        let entries = state.audit_service.get_entries();
+        assert!(
+            !entries.iter().any(|e| e.action == "RemovedUserSpns"),
+            "no audit entry on no-op"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_remove_user_spns_all_system_no_op() {
+        let (state, provider) =
+            make_state_with_level_and_provider(PermissionLevel::AccountOperator);
+        let dn = "CN=DC01,DC=example,DC=com";
+        provider.set_user_spns(
+            dn,
+            vec![
+                "HOST/dc01.corp.local".to_string(),
+                "ldap/dc01.corp.local".to_string(),
+            ],
+        );
+
+        // Request removal of only system SPNs - all blocked
+        let result = remove_user_spns_inner(
+            &state,
+            dn,
+            &[
+                "HOST/dc01.corp.local".to_string(),
+                "ldap/dc01.corp.local".to_string(),
+            ],
+        )
+        .await
+        .unwrap();
+
+        assert!(result.removed.is_empty());
+        assert_eq!(result.blocked_system.len(), 2);
+
+        // No LDAP write, no audit entry
+        let writes = provider.modify_attribute_calls.lock().unwrap();
+        assert!(writes.is_empty());
+
+        let entries = state.audit_service.get_entries();
+        assert!(!entries.iter().any(|e| e.action == "RemovedUserSpns"));
+    }
+
+    #[tokio::test]
+    async fn test_remove_user_spns_all_removed_writes_empty_set() {
+        let (state, provider) =
+            make_state_with_level_and_provider(PermissionLevel::AccountOperator);
+        let dn = "CN=Svc,DC=example,DC=com";
+        provider.set_user_spns(dn, vec!["MSSQLSvc/db.corp.local:1433".to_string()]);
+
+        let result =
+            remove_user_spns_inner(&state, dn, &["MSSQLSvc/db.corp.local:1433".to_string()])
+                .await
+                .unwrap();
+
+        assert_eq!(result.removed, vec!["MSSQLSvc/db.corp.local:1433"]);
+        assert!(result.kept.is_empty());
+
+        // modify_attribute called with an empty Vec - LDAP layer turns this
+        // into Mod::Replace with empty HashSet, deleting the attribute
+        let writes = provider.modify_attribute_calls.lock().unwrap();
+        assert_eq!(writes.len(), 1);
+        assert!(writes[0].2.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_remove_user_spns_captures_snapshot_before_write() {
+        let (state, provider) =
+            make_state_with_level_and_provider(PermissionLevel::AccountOperator);
+        let dn = "CN=Svc,DC=example,DC=com";
+        provider.set_user_spns(dn, vec!["MSSQLSvc/db.corp.local:1433".to_string()]);
+
+        remove_user_spns_inner(&state, dn, &["MSSQLSvc/db.corp.local:1433".to_string()])
+            .await
+            .unwrap();
+
+        assert_eq!(state.snapshot_service.count(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_remove_user_spns_audit_on_directory_failure() {
+        let provider = Arc::new(MockDirectoryProvider::new().with_failure());
+        let provider_ref = Arc::clone(&provider);
+        let state = AppState::new_for_test(provider, PermissionConfig::default());
+        state
+            .permission_service
+            .set_level(PermissionLevel::AccountOperator);
+
+        let dn = "CN=Svc,DC=example,DC=com";
+        provider_ref.set_user_spns(dn, vec!["MSSQLSvc/db.corp.local:1433".to_string()]);
+
+        let result =
+            remove_user_spns_inner(&state, dn, &["MSSQLSvc/db.corp.local:1433".to_string()]).await;
+        // get_user_spns will fail first since with_failure() short-circuits
+        // every method - the resulting error is still AppError::Directory
+        assert!(matches!(result.unwrap_err(), AppError::Directory(_)));
+    }
+
+    #[tokio::test]
+    async fn test_remove_user_spns_audit_details_sorted() {
+        let (state, provider) =
+            make_state_with_level_and_provider(PermissionLevel::AccountOperator);
+        let dn = "CN=Svc,DC=example,DC=com";
+        provider.set_user_spns(
+            dn,
+            vec![
+                "ZetaSvc/z.corp.local".to_string(),
+                "AlphaSvc/a.corp.local".to_string(),
+                "MidSvc/m.corp.local".to_string(),
+            ],
+        );
+
+        let result = remove_user_spns_inner(
+            &state,
+            dn,
+            // Pass in non-alphabetic order to verify sorting
+            &[
+                "ZetaSvc/z.corp.local".to_string(),
+                "AlphaSvc/a.corp.local".to_string(),
+            ],
+        )
+        .await
+        .unwrap();
+
+        // Removed list sorted alphabetically
+        assert_eq!(
+            result.removed,
+            vec!["AlphaSvc/a.corp.local", "ZetaSvc/z.corp.local"]
+        );
+
+        // Audit details have the sorted lists
+        let entries = state.audit_service.get_entries();
+        let entry = entries
+            .iter()
+            .find(|e| e.action == "RemovedUserSpns")
+            .expect("audit entry recorded");
+        assert!(
+            entry
+                .details
+                .contains("removed: [AlphaSvc/a.corp.local, ZetaSvc/z.corp.local]")
+        );
     }
 }
