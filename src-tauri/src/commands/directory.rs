@@ -251,6 +251,7 @@ pub(crate) fn get_domain_info_inner(state: &AppState) -> DomainInfo {
         domain_name: provider.domain_name().map(|s| s.to_string()),
         is_connected: provider.is_connected(),
         connection_error: provider.last_connection_error(),
+        dc_is_rodc: provider.is_connected_to_rodc(),
     }
 }
 
@@ -833,16 +834,38 @@ mod tests {
     }
 
     #[test]
+    fn test_get_domain_info_surfaces_rodc_flag() {
+        let provider = Arc::new(MockDirectoryProvider::new().with_rodc());
+        let state = AppState::new_for_test(provider, PermissionConfig::default());
+        let info = get_domain_info_inner(&state);
+        assert!(
+            info.dc_is_rodc,
+            "DomainInfo.dc_is_rodc should mirror provider.is_connected_to_rodc()"
+        );
+    }
+
+    #[test]
+    fn test_get_domain_info_rodc_false_by_default() {
+        let provider = Arc::new(MockDirectoryProvider::new());
+        let state = AppState::new_for_test(provider, PermissionConfig::default());
+        let info = get_domain_info_inner(&state);
+        assert!(!info.dc_is_rodc);
+    }
+
+    #[test]
     fn test_domain_info_serialization() {
         let info = DomainInfo {
             domain_name: Some("CORP.LOCAL".to_string()),
             is_connected: true,
             connection_error: None,
+            dc_is_rodc: false,
         };
         let json = serde_json::to_string(&info).unwrap();
         assert!(json.contains("domain_name"));
         assert!(json.contains("is_connected"));
         assert!(json.contains("CORP.LOCAL"));
+        // dc_is_rodc=false is omitted from the wire payload
+        assert!(!json.contains("dc_is_rodc"));
     }
 
     #[tokio::test]
@@ -1197,6 +1220,7 @@ mod tests {
             domain_name: None,
             is_connected: false,
             connection_error: Some("clock_skew".to_string()),
+            dc_is_rodc: false,
         };
         let json = serde_json::to_string(&info).unwrap();
         assert!(json.contains("null"));

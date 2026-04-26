@@ -170,6 +170,10 @@ where
         self.inner.last_search_was_truncated()
     }
 
+    fn is_connected_to_rodc(&self) -> bool {
+        self.inner.is_connected_to_rodc()
+    }
+
     async fn search_users(&self, filter: &str, max_results: usize) -> Result<Vec<DirectoryEntry>> {
         let filter = filter.to_string();
         resilient_call!(self, filter, |inner, f| inner

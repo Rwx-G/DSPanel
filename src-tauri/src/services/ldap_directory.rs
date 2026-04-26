@@ -387,7 +387,16 @@ pub struct LdapDirectoryProvider {
     /// the server (or our own `max_results` cap) cut the response short.
     /// Reset to `false` at the start of every `search()`.
     last_search_truncated: Mutex<bool>,
+    /// True when the connected DC advertised the RODC capability OID in its
+    /// rootDSE `supportedCapabilities`. Set during `create_connection`,
+    /// reset to `false` on every reconnect via `invalidate_connection`.
+    connected_dc_is_rodc: Mutex<bool>,
 }
+
+/// LDAP capability OID advertised in rootDSE `supportedCapabilities` only by
+/// Read-Only Domain Controllers per [MS-ADTS] section 3.1.1.3.4.1
+/// (`LDAP_CAP_ACTIVE_DIRECTORY_PARTIAL_SECRETS_OID`).
+const LDAP_CAP_RODC_OID: &str = "1.2.840.113556.1.4.1920";
 
 /// Strips common Latin-1/Latin-2 accents so multilingual keyword matching
 /// works against error texts produced by Windows `FormatMessageW` in French,
@@ -640,6 +649,7 @@ impl LdapDirectoryProvider {
             last_successful_op: Mutex::new(None),
             last_error_kind: Mutex::new(initial_error),
             last_search_truncated: Mutex::new(false),
+            connected_dc_is_rodc: Mutex::new(false),
         }
     }
 
@@ -682,6 +692,7 @@ impl LdapDirectoryProvider {
             last_successful_op: Mutex::new(None),
             last_error_kind: Mutex::new(None),
             last_search_truncated: Mutex::new(false),
+            connected_dc_is_rodc: Mutex::new(false),
         }
     }
 
@@ -744,6 +755,11 @@ impl LdapDirectoryProvider {
         let mut guard = self.pool.lock().await;
         *guard = None;
         *self.connected.lock().expect("lock poisoned") = false;
+        // The next reconnect may land on a different DC (DNS SRV round-robin,
+        // failover, etc.), so we cannot assume the new target has the same
+        // RODC status. Reset the flag and let `create_connection` set it
+        // again from the fresh rootDSE response.
+        *self.connected_dc_is_rodc.lock().expect("lock poisoned") = false;
         tracing::info!("LDAP connection pool invalidated - will reconnect on next operation");
     }
 
@@ -958,13 +974,20 @@ impl LdapDirectoryProvider {
             }
         }
 
-        // Discover base DN via rootDSE
+        // Discover base DN, DC FQDN, and detect RODC via rootDSE.
+        // The RODC indicator is the presence of `LDAP_CAP_ACTIVE_DIRECTORY_PARTIAL_SECRETS_OID`
+        // (1.2.840.113556.1.4.1920) in `supportedCapabilities` per
+        // [MS-ADTS] section 3.1.1.3.4.1.
         let (rs, _) = ldap
             .search(
                 "",
                 Scope::Base,
                 "(objectClass=*)",
-                vec!["defaultNamingContext", "dnsHostName"],
+                vec![
+                    "defaultNamingContext",
+                    "dnsHostName",
+                    "supportedCapabilities",
+                ],
             )
             .await
             .context("Failed to query rootDSE")?
@@ -984,6 +1007,17 @@ impl LdapDirectoryProvider {
             if let Some(fqdn) = se.attrs.get("dnsHostName").and_then(|v| v.first().cloned()) {
                 tracing::info!("DC FQDN resolved from rootDSE: {}", fqdn);
                 *self.dc_fqdn.lock().expect("lock poisoned") = Some(fqdn);
+            }
+            let is_rodc = se
+                .attrs
+                .get("supportedCapabilities")
+                .map(|caps| caps.iter().any(|c| c == LDAP_CAP_RODC_OID))
+                .unwrap_or(false);
+            *self.connected_dc_is_rodc.lock().expect("lock poisoned") = is_rodc;
+            if is_rodc {
+                tracing::warn!(
+                    "Connected to a Read-Only Domain Controller (RODC). Write operations may be referred or rejected."
+                );
             }
         }
 
@@ -1259,6 +1293,38 @@ fn sid_bytes_to_string(bytes: &[u8]) -> String {
         sid.push_str(&format!("-{}", sub));
     }
     sid
+}
+
+/// Detects whether a distinguished name refers to a Foreign Security
+/// Principal entry, and returns the SID encoded in the leaf RDN.
+///
+/// AD stores SIDs from trusted external domains as objects under
+/// `CN=ForeignSecurityPrincipals,<domain>` with the literal SID string
+/// as their RDN value (e.g.
+/// `CN=S-1-5-21-1234567890-987654321-1111111111-1234,CN=ForeignSecurityPrincipals,DC=corp,DC=local`).
+/// They appear in `member` attributes by their full DN, which leaves the UI
+/// showing `CN=S-1-5-...,CN=ForeignSecurityPrincipals,...` strings instead
+/// of resolved names.
+///
+/// Match is case-insensitive on both `CN=` and `ForeignSecurityPrincipals`,
+/// and rejects any DN whose leaf value does not start with `S-1-` so the
+/// FSP container itself does not produce a false positive.
+pub fn extract_foreign_sid_from_dn(dn: &str) -> Option<String> {
+    let lower = dn.to_lowercase();
+    if !lower.contains(",cn=foreignsecurityprincipals,") {
+        return None;
+    }
+    let first_rdn = dn.split(',').next()?.trim();
+    let value = first_rdn
+        .strip_prefix("CN=")
+        .or_else(|| first_rdn.strip_prefix("cn="))
+        .or_else(|| first_rdn.strip_prefix("Cn="))
+        .or_else(|| first_rdn.strip_prefix("cN="))?;
+    if value.to_uppercase().starts_with("S-1-") {
+        Some(value.to_string())
+    } else {
+        None
+    }
 }
 
 /// Creates a fresh LDAP connection without using the pool.
@@ -1563,6 +1629,10 @@ impl DirectoryProvider for LdapDirectoryProvider {
 
     fn last_search_was_truncated(&self) -> bool {
         *self.last_search_truncated.lock().expect("lock poisoned")
+    }
+
+    fn is_connected_to_rodc(&self) -> bool {
+        *self.connected_dc_is_rodc.lock().expect("lock poisoned")
     }
 
     async fn search_users(&self, filter: &str, max_results: usize) -> Result<Vec<DirectoryEntry>> {
@@ -4190,5 +4260,69 @@ mod tests {
         assert!(!matching_rule_unsupported(49)); // invalidCredentials
         assert!(!matching_rule_unsupported(50)); // insufficientAccessRights
         assert!(!matching_rule_unsupported(2)); // protocolError
+    }
+
+    // -----------------------------------------------------------------------
+    // extract_foreign_sid_from_dn - Foreign Security Principal detection
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_extract_foreign_sid_standard_dn() {
+        let dn = "CN=S-1-5-21-1234567890-987654321-1111111111-1234,CN=ForeignSecurityPrincipals,DC=corp,DC=local";
+        assert_eq!(
+            extract_foreign_sid_from_dn(dn).as_deref(),
+            Some("S-1-5-21-1234567890-987654321-1111111111-1234")
+        );
+    }
+
+    #[test]
+    fn test_extract_foreign_sid_lowercase_dn() {
+        let dn = "cn=S-1-5-21-1-2-3-1000,cn=foreignsecurityprincipals,dc=corp,dc=local";
+        assert_eq!(
+            extract_foreign_sid_from_dn(dn).as_deref(),
+            Some("S-1-5-21-1-2-3-1000")
+        );
+    }
+
+    #[test]
+    fn test_extract_foreign_sid_well_known_short_sid() {
+        let dn = "CN=S-1-5-11,CN=ForeignSecurityPrincipals,DC=corp,DC=local";
+        assert_eq!(extract_foreign_sid_from_dn(dn).as_deref(), Some("S-1-5-11"));
+    }
+
+    #[test]
+    fn test_extract_foreign_sid_regular_user_returns_none() {
+        let dn = "CN=John Doe,OU=Users,DC=corp,DC=local";
+        assert_eq!(extract_foreign_sid_from_dn(dn), None);
+    }
+
+    #[test]
+    fn test_extract_foreign_sid_fsp_container_itself_returns_none() {
+        // The container DN itself ("CN=ForeignSecurityPrincipals,DC=...") must
+        // not produce a false positive - it has no SID to report.
+        let dn = "CN=ForeignSecurityPrincipals,DC=corp,DC=local";
+        assert_eq!(extract_foreign_sid_from_dn(dn), None);
+    }
+
+    #[test]
+    fn test_extract_foreign_sid_named_object_in_fsp_container_returns_none() {
+        // Defensive: an object with a non-SID name inside the FSP container
+        // should not be misreported.
+        let dn = "CN=Alice,CN=ForeignSecurityPrincipals,DC=corp,DC=local";
+        assert_eq!(extract_foreign_sid_from_dn(dn), None);
+    }
+
+    #[test]
+    fn test_extract_foreign_sid_empty_input() {
+        assert_eq!(extract_foreign_sid_from_dn(""), None);
+    }
+
+    #[test]
+    fn test_extract_foreign_sid_multilevel_domain_suffix() {
+        let dn = "CN=S-1-5-21-9-9-9-500,CN=ForeignSecurityPrincipals,DC=ad,DC=corp,DC=local";
+        assert_eq!(
+            extract_foreign_sid_from_dn(dn).as_deref(),
+            Some("S-1-5-21-9-9-9-500")
+        );
     }
 }
