@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { ComputerLookup } from "./ComputerLookup";
 import type { DirectoryEntry } from "@/types/directory";
+import type { SecurityIndicatorSet } from "@/types/securityIndicators";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
@@ -82,12 +83,31 @@ function makeBrowseResult(entries: DirectoryEntry[], hasMore = false) {
   };
 }
 
-function mockBrowseWith(entries: DirectoryEntry[]) {
+const EMPTY_INDICATORS: SecurityIndicatorSet = {
+  indicators: [],
+  highestSeverity: "Healthy",
+};
+
+function mockBrowseWith(
+  entries: DirectoryEntry[],
+  indicatorOverrides: Record<string, SecurityIndicatorSet> = {},
+) {
   mockInvoke.mockImplementation(((cmd: string) => {
     if (cmd === "browse_computers")
       return Promise.resolve(makeBrowseResult(entries));
     if (cmd === "search_computers") return Promise.resolve(entries);
     if (cmd === "resolve_dns") return Promise.resolve(["10.0.0.1"]);
+    if (cmd === "evaluate_computer_security_indicators_batch") {
+      return Promise.resolve(
+        entries.map((e) => indicatorOverrides[e.displayName ?? ""] ?? EMPTY_INDICATORS),
+      );
+    }
+    if (cmd === "evaluate_computer_security_indicators") {
+      for (const [, set] of Object.entries(indicatorOverrides)) {
+        return Promise.resolve(set);
+      }
+      return Promise.resolve(EMPTY_INDICATORS);
+    }
     return Promise.resolve(null);
   }) as typeof invoke);
 }
@@ -747,11 +767,124 @@ describe("ComputerLookup", () => {
     });
 
     // Filter to Enabled only (should leave 2)
-    fireEvent.click(screen.getByText("Enabled", { selector: "button" }));
+    fireEvent.click(screen.getByText("Enabled", { selector: "button"}));
 
     await waitFor(() => {
       const status = screen.getByTestId("computer-lookup-status");
       expect(status).toHaveTextContent("2 computers found");
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Story 14.3 - SecurityIndicatorDot in computer lookup row
+  // ---------------------------------------------------------------------------
+
+  describe("security indicator dot", () => {
+    it("renders no dot for computers with no detected indicators", async () => {
+      mockBrowseWith([makeComputerEntry("WS001")]);
+
+      render(<ComputerLookup />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("computer-result-WS001")).toBeInTheDocument();
+      });
+      // Wait long enough for the indicators batch to resolve
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(
+        screen.queryByTestId("security-indicator-dot"),
+      ).not.toBeInTheDocument();
+    });
+
+    it("renders the dot for computers with indicators", async () => {
+      const entries = [makeComputerEntry("WS001")];
+      mockBrowseWith(entries, {
+        WS001: {
+          indicators: [
+            {
+              kind: "UnconstrainedDelegation",
+              severity: "Critical",
+              descriptionKey: "securityIndicators.UnconstrainedDelegation",
+            },
+          ],
+          highestSeverity: "Critical",
+        },
+      });
+
+      render(<ComputerLookup />);
+
+      await waitFor(() => {
+        expect(
+          screen.getByTestId("security-indicator-dot"),
+        ).toBeInTheDocument();
+      });
+      expect(screen.getByTestId("security-indicator-dot")).toHaveAttribute(
+        "data-severity",
+        "Critical",
+      );
+    });
+
+    it("dot color reflects highestSeverity (Critical wins over Warning)", async () => {
+      const entries = [makeComputerEntry("WS001")];
+      mockBrowseWith(entries, {
+        WS001: {
+          indicators: [
+            {
+              kind: "ConstrainedDelegation",
+              severity: "Warning",
+              descriptionKey: "securityIndicators.ConstrainedDelegation",
+              metadata: { target_spns: ["http/web1"] },
+            },
+            {
+              kind: "UnconstrainedDelegation",
+              severity: "Critical",
+              descriptionKey: "securityIndicators.UnconstrainedDelegation",
+            },
+          ],
+          highestSeverity: "Critical",
+        },
+      });
+
+      render(<ComputerLookup />);
+
+      await waitFor(() => {
+        expect(
+          screen.getByTestId("security-indicator-dot"),
+        ).toHaveAttribute("data-severity", "Critical");
+      });
+      expect(screen.getByTestId("security-indicator-dot")).toHaveAttribute(
+        "data-count",
+        "2",
+      );
+    });
+
+    it("propagates indicator set to ComputerDetail when a computer is selected", async () => {
+      const entries = [makeComputerEntry("WS001")];
+      mockBrowseWith(entries, {
+        WS001: {
+          indicators: [
+            {
+              kind: "Rbcd",
+              severity: "Warning",
+              descriptionKey: "securityIndicators.Rbcd",
+              metadata: { allowed_principals: ["S-1-5-21-1-2-3-1000"] },
+            },
+          ],
+          highestSeverity: "Warning",
+        },
+      });
+
+      render(<ComputerLookup />);
+
+      await waitFor(() => {
+        expect(screen.getByTestId("computer-result-WS001")).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByTestId("computer-result-WS001"));
+
+      await waitFor(() => {
+        expect(
+          screen.getByTestId("computer-security-indicator-badge-Rbcd"),
+        ).toBeInTheDocument();
+      });
     });
   });
 });
