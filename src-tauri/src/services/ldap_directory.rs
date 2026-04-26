@@ -423,8 +423,8 @@ fn fold_ascii(s: &str) -> String {
 /// The raw message is not exposed to the frontend - it is written to logs at
 /// ERROR level. This function only inspects `err.to_string()` (plus the chain)
 /// and returns one of: `clock_skew`, `no_credentials`, `unknown_principal`,
-/// `ldap_signing`, `dns`, `network`, `auth_denied`, `tls`, `kerberos_unknown`,
-/// `not_domain_joined`, `unknown`.
+/// `ldap_signing`, `channel_binding_required`, `dns`, `network`, `auth_denied`,
+/// `tls`, `kerberos_unknown`, `not_domain_joined`, `unknown`.
 ///
 /// On Windows, `cross-krb5` formats SSPI errors with `FormatMessageW` using
 /// `LANG_NEUTRAL`, so the text is localized in the OS UI language. The matches
@@ -531,6 +531,24 @@ fn classify_bind_error(err: &anyhow::Error) -> &'static str {
         || msg.contains("autenticacion mas segura")
     {
         return "ldap_signing";
+    }
+    // SEC_E_BAD_BINDINGS (0x80090346) - DC requires LDAP channel binding
+    // (LdapEnforceChannelBinding=2) but the bind context did not carry the
+    // tls-server-end-point token. Triggered when GSSAPI is attempted over
+    // plain port 389 against a hardened DC.
+    if msg.contains("channel binding")
+        || msg.contains("channel bindings")
+        || msg.contains("0x80090346")
+        || msg.contains("liaison de canal")
+        || msg.contains("liaisons de canal")
+        || msg.contains("kanalbindung")
+        || msg.contains("kanalbindungen")
+        || msg.contains("associazione del canale")
+        || msg.contains("associazioni del canale")
+        || msg.contains("enlace de canal")
+        || msg.contains("enlaces de canal")
+    {
+        return "channel_binding_required";
     }
     if msg.contains("name or service not known")
         || msg.contains("nodename nor servname")
@@ -954,13 +972,39 @@ impl LdapDirectoryProvider {
                     // not the domain name. Resolve DC FQDN via DNS SRV lookup.
                     let gssapi_host = resolve_dc_fqdn_for_gssapi(&host).await;
                     let logon_server = std::env::var("LOGONSERVER").unwrap_or_default();
-                    tracing::info!(
-                        original_host = %host,
-                        gssapi_host = %gssapi_host,
-                        spn = %format!("ldap/{}", gssapi_host),
-                        logonserver = %logon_server,
-                        "GSSAPI bind attempt"
-                    );
+                    let on_tls = self.tls_config.enabled || self.tls_config.starttls;
+                    if on_tls {
+                        // ldap3 v0.12 automatically forwards the tls-server-end-point
+                        // channel binding token from the TLS handshake into the
+                        // SASL/GSSAPI bind context (see ldap3 src/ldap.rs lines 320-326
+                        // for the TLS branch). DCs configured with
+                        // `LdapEnforceChannelBinding=2` (Microsoft hardening
+                        // recommendation post-2020 advisory ADV190023) require
+                        // that token; when TLS is enabled we satisfy them.
+                        tracing::info!(
+                            original_host = %host,
+                            gssapi_host = %gssapi_host,
+                            spn = %format!("ldap/{}", gssapi_host),
+                            logonserver = %logon_server,
+                            channel_binding = "tls-server-end-point",
+                            "GSSAPI bind attempt over TLS"
+                        );
+                    } else {
+                        // Without TLS there is no transport to bind into, so the
+                        // bind goes out without a CBT. DCs with
+                        // `LdapEnforceChannelBinding=2` will reject this with
+                        // SEC_E_BAD_BINDINGS (0x80090346); the operator should
+                        // enable TLS via the `DSPANEL_LDAP_USE_TLS=true` env or
+                        // `--tls` flag. We still try the bind because many
+                        // domains do not enforce channel binding.
+                        tracing::warn!(
+                            original_host = %host,
+                            gssapi_host = %gssapi_host,
+                            spn = %format!("ldap/{}", gssapi_host),
+                            logonserver = %logon_server,
+                            "GSSAPI bind attempt WITHOUT TLS - DCs that enforce LDAP channel binding (LdapEnforceChannelBinding=2) will reject this. Set DSPANEL_LDAP_USE_TLS=true to enable TLS."
+                        );
+                    }
                     ldap.sasl_gssapi_bind(&gssapi_host)
                         .await
                         .context("GSSAPI (Kerberos) authentication failed")?;
@@ -1295,6 +1339,24 @@ fn sid_bytes_to_string(bytes: &[u8]) -> String {
     sid
 }
 
+/// True when the AD object is protected by AdminSDHolder, i.e. its
+/// `adminCount` attribute is set to `1`.
+///
+/// AD's SDProp process (runs ~hourly on the PDC emulator) periodically
+/// rewrites the DACL of any object with `adminCount=1` from the
+/// `CN=AdminSDHolder,CN=System,<domain>` template. Any DACL or sensitive
+/// attribute change made by an operator on such an object will be
+/// overwritten silently within an hour, which is a confusing UX. Detecting
+/// the flag lets DSPanel warn the operator before or after the modification.
+fn is_admin_sdholder_protected(entry: &SearchEntry) -> bool {
+    entry
+        .attrs
+        .get("adminCount")
+        .and_then(|v| v.first())
+        .map(|s| s == "1")
+        .unwrap_or(false)
+}
+
 /// Detects whether a distinguished name refers to a Foreign Security
 /// Principal entry, and returns the SID encoded in the leaf RDN.
 ///
@@ -1456,6 +1518,22 @@ async fn nested_groups_via_memberof_bfs(
     Ok(groups.into_iter().collect())
 }
 
+/// Builds the LDAP `ShowDeletedControl` (OID 1.2.840.113556.1.4.417) which
+/// instructs Active Directory to include tombstoned objects in search results.
+/// Required to enumerate the contents of `CN=Deleted Objects,<domain>` for
+/// the Recycle Bin feature.
+///
+/// Per [MS-ADTS] section 3.1.1.3.4.1.4 the control carries no value;
+/// criticality is set so that servers without the extension reject the search
+/// outright rather than silently returning live objects only.
+fn show_deleted_control() -> RawControl {
+    RawControl {
+        ctype: "1.2.840.113556.1.4.417".to_string(),
+        crit: true,
+        val: None,
+    }
+}
+
 /// Builds the LDAP `SD_FLAGS` control (OID 1.2.840.113556.1.4.801) requesting
 /// only the parts of `nTSecurityDescriptor` that an unprivileged caller is
 /// allowed to read. Without this control, AD will return the full descriptor
@@ -1496,7 +1574,7 @@ async fn set_cannot_change_password_with_ldap(
             user_dn,
             Scope::Base,
             "(objectClass=*)",
-            vec!["nTSecurityDescriptor"],
+            vec!["nTSecurityDescriptor", "adminCount"],
         )
         .await
         .context("Failed to read nTSecurityDescriptor")?
@@ -1508,6 +1586,18 @@ async fn set_cannot_change_password_with_ldap(
         .next()
         .context("User not found when reading security descriptor")?;
     let se = ldap3::SearchEntry::construct(entry);
+
+    // Warn the operator that AD's SDProp process (runs ~hourly on the PDC
+    // emulator) will overwrite the DACL of objects flagged with
+    // `adminCount=1` from the AdminSDHolder template, undoing any DACL
+    // modification we are about to make. The operation still proceeds since
+    // the change is briefly visible and may be wanted in some scenarios.
+    if is_admin_sdholder_protected(&se) {
+        tracing::warn!(
+            target_dn = %user_dn,
+            "DACL modification on AdminSDHolder-protected object (adminCount=1): SDProp will overwrite this change within ~60 minutes"
+        );
+    }
 
     let sd_bytes = se
         .bin_attrs
@@ -2447,11 +2537,54 @@ impl DirectoryProvider for LdapDirectoryProvider {
         })
         .await?;
 
-        // Set password
-        self.reset_password(&dn, &password_owned, false).await?;
+        // The user object now exists on the DC. The next two steps
+        // (set password, enable account) can each fail and leave the
+        // object in a half-initialized state - typically a disabled
+        // user with no password, which an admin would have to clean up
+        // manually. To avoid that, we attempt the cleanup ourselves
+        // when either step fails: delete the object and return the
+        // original error. If the cleanup itself fails, log both DNs
+        // at ERROR so the operator can finish manually.
 
-        // Enable account
-        self.enable_account(&dn).await?;
+        if let Err(pwd_err) = self.reset_password(&dn, &password_owned, false).await {
+            tracing::error!(
+                dn = %dn,
+                error = ?pwd_err,
+                "Password reset failed after user creation, attempting cleanup"
+            );
+            if let Err(cleanup_err) = self.delete_object(&dn).await {
+                tracing::error!(
+                    dn = %dn,
+                    cleanup_error = ?cleanup_err,
+                    original_error = ?pwd_err,
+                    "Cleanup of half-created user FAILED - manual deletion required"
+                );
+            } else {
+                tracing::info!(dn = %dn, "Half-created user successfully deleted");
+            }
+            return Err(pwd_err.context(
+                "User creation rolled back: password reset failed (no password policy match?)",
+            ));
+        }
+
+        if let Err(enable_err) = self.enable_account(&dn).await {
+            tracing::error!(
+                dn = %dn,
+                error = ?enable_err,
+                "Enable account failed after password reset, attempting cleanup"
+            );
+            if let Err(cleanup_err) = self.delete_object(&dn).await {
+                tracing::error!(
+                    dn = %dn,
+                    cleanup_error = ?cleanup_err,
+                    original_error = ?enable_err,
+                    "Cleanup of half-created user FAILED - manual deletion required"
+                );
+            } else {
+                tracing::info!(dn = %dn, "Half-created user successfully deleted");
+            }
+            return Err(enable_err.context("User creation rolled back: enable account failed"));
+        }
 
         Ok(dn)
     }
@@ -2886,12 +3019,7 @@ impl DirectoryProvider for LdapDirectoryProvider {
         self.with_connection(|mut ldap| {
             let deleted_container = deleted_container.clone();
             async move {
-                let show_deleted = ldap3::controls::RawControl {
-                    ctype: "1.2.840.113556.1.4.417".to_string(),
-                    crit: true,
-                    val: None,
-                };
-                ldap.with_controls(vec![show_deleted]);
+                ldap.with_controls(vec![show_deleted_control()]);
 
                 let (rs, _) = ldap
                     .search(
@@ -3017,12 +3145,7 @@ impl DirectoryProvider for LdapDirectoryProvider {
             let target = target.clone();
             async move {
                 // ShowDeletedControl is required to access deleted objects
-                let show_deleted = ldap3::controls::RawControl {
-                    ctype: "1.2.840.113556.1.4.417".to_string(),
-                    crit: true,
-                    val: None,
-                };
-                ldap.with_controls(vec![show_deleted]);
+                ldap.with_controls(vec![show_deleted_control()]);
 
                 // AD restore: single modify that removes isDeleted and sets new DN
                 let mods = vec![
@@ -4030,6 +4153,24 @@ mod tests {
     }
 
     #[test]
+    fn test_classify_bind_error_channel_binding_en() {
+        let e = anyhow::anyhow!("The channel bindings provided do not match");
+        assert_eq!(classify_bind_error(&e), "channel_binding_required");
+    }
+
+    #[test]
+    fn test_classify_bind_error_channel_binding_hex_code() {
+        let e = anyhow::anyhow!("ClientCtx::step failed (0x80090346)");
+        assert_eq!(classify_bind_error(&e), "channel_binding_required");
+    }
+
+    #[test]
+    fn test_classify_bind_error_channel_binding_fr() {
+        let e = anyhow::anyhow!("Les liaisons de canal fournies ne correspondent pas");
+        assert_eq!(classify_bind_error(&e), "channel_binding_required");
+    }
+
+    #[test]
     fn test_classify_bind_error_dns() {
         let e = anyhow::anyhow!("getaddrinfo: Name or service not known");
         assert_eq!(classify_bind_error(&e), "dns");
@@ -4234,6 +4375,70 @@ mod tests {
     fn test_sd_flags_control_value_full_with_sacl() {
         let c = sd_flags_control(0x0F);
         assert_eq!(c.val.as_deref(), Some(&[0x30, 0x03, 0x02, 0x01, 0x0F][..]));
+    }
+
+    // -----------------------------------------------------------------------
+    // show_deleted_control - LDAP_SERVER_SHOW_DELETED_OID
+    // -----------------------------------------------------------------------
+
+    // -----------------------------------------------------------------------
+    // is_admin_sdholder_protected - AdminSDHolder detection
+    // -----------------------------------------------------------------------
+
+    fn make_search_entry(attrs: &[(&str, &[&str])]) -> SearchEntry {
+        let mut map = HashMap::new();
+        for (k, vs) in attrs {
+            map.insert(
+                k.to_string(),
+                vs.iter().map(|s| s.to_string()).collect::<Vec<_>>(),
+            );
+        }
+        SearchEntry {
+            dn: "CN=Test,DC=corp,DC=local".to_string(),
+            attrs: map,
+            bin_attrs: HashMap::new(),
+        }
+    }
+
+    #[test]
+    fn test_admin_sdholder_protected_when_admincount_one() {
+        let e = make_search_entry(&[("adminCount", &["1"])]);
+        assert!(is_admin_sdholder_protected(&e));
+    }
+
+    #[test]
+    fn test_admin_sdholder_not_protected_when_admincount_zero() {
+        let e = make_search_entry(&[("adminCount", &["0"])]);
+        assert!(!is_admin_sdholder_protected(&e));
+    }
+
+    #[test]
+    fn test_admin_sdholder_not_protected_when_attribute_absent() {
+        let e = make_search_entry(&[]);
+        assert!(!is_admin_sdholder_protected(&e));
+    }
+
+    #[test]
+    fn test_admin_sdholder_not_protected_when_admincount_other_value() {
+        // AD only sets adminCount=1 for protected objects; other values
+        // (rarely seen, e.g. left over from migrations) do not trigger
+        // SDProp rewrites.
+        let e = make_search_entry(&[("adminCount", &["2"])]);
+        assert!(!is_admin_sdholder_protected(&e));
+    }
+
+    #[test]
+    fn test_show_deleted_control_oid_and_criticality() {
+        let c = show_deleted_control();
+        assert_eq!(c.ctype, "1.2.840.113556.1.4.417");
+        assert!(
+            c.crit,
+            "ShowDeleted must be critical so non-AD servers reject the search rather than returning live-only results"
+        );
+        assert!(
+            c.val.is_none(),
+            "ShowDeleted carries no value per MS-ADTS 3.1.1.3.4.1.4"
+        );
     }
 
     // -----------------------------------------------------------------------
