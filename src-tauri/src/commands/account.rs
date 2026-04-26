@@ -576,10 +576,20 @@ pub(crate) async fn remove_user_spns_inner(
         .map_err(|e| AppError::PermissionDenied(e.to_string()))?;
 
     let provider = state.provider();
-    let current = provider
-        .get_user_spns(user_dn)
-        .await
-        .map_err(|e| AppError::Directory(e.to_string()))?;
+    let current = match provider.get_user_spns(user_dn).await {
+        Ok(spns) => spns,
+        Err(e) => {
+            // Audit-completeness: a transient AD outage on the read must
+            // be visible in the audit trail, not silently propagated as
+            // an Err only the IPC caller sees. Tracked as QA-14.5-001.
+            state.audit_service.log_failure(
+                "RemoveUserSpnsFailed",
+                user_dn,
+                &format!("get_user_spns: {}", e),
+            );
+            return Err(AppError::Directory(e.to_string()));
+        }
+    };
 
     // Split requested removals: anything in the system list goes into
     // blocked_system; the rest is approved (only if also present in current).
@@ -2204,6 +2214,22 @@ mod tests {
         // get_user_spns will fail first since with_failure() short-circuits
         // every method - the resulting error is still AppError::Directory
         assert!(matches!(result.unwrap_err(), AppError::Directory(_)));
+
+        // Audit-completeness (QA-14.5-001): the read failure must be
+        // recorded as an audit entry so SOC consumers see transient AD
+        // outages, not just IPC callers.
+        let entries = state.audit_service.get_entries();
+        let failed = entries
+            .iter()
+            .find(|e| e.action == "RemoveUserSpnsFailed")
+            .expect("read-failure audit entry recorded");
+        assert!(!failed.success);
+        assert_eq!(failed.target_dn, dn);
+        assert!(
+            failed.details.contains("get_user_spns:"),
+            "audit details should identify the failed read phase, got: {}",
+            failed.details
+        );
     }
 
     #[tokio::test]
