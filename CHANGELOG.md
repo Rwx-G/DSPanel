@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Changed
+
+### Fixed
+
+### Removed
+
+### Security
+
+## [1.1.1] - 2026-05-03
+
+### Added
+
 - **Themed `<Tooltip>` and `<InfoTooltip>` shared components** (`src/components/common/Tooltip.tsx`). Replacement for the native HTML `title=` attribute: floating card rendered through a portal so it escapes overflow ancestors (table cells, scroll containers), viewport-aware positioning that flips above when the bottom does not fit, and theme tokens (`--color-surface-card`, `--color-border-default`, `--color-text-primary`) so the popover follows the active theme. `Tooltip` wraps any element on hover/focus; `InfoTooltip` exposes the `HygieneSection` "i" icon + click-to-open popover pattern as a reusable component for richer helper text. 12 vitest cases plus Storybook stories.
 
 ### Fixed
