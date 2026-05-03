@@ -4,6 +4,7 @@ import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { EmptyState } from "@/components/common/EmptyState";
 import { DataTable, type Column } from "@/components/data/DataTable";
 import { ExportToolbar } from "@/components/common/ExportToolbar";
+import { Tooltip } from "@/components/common/Tooltip";
 import {
   type DirectoryEntry,
   type DirectoryGroup,
@@ -82,7 +83,9 @@ function HygieneSection({
                 <Info size={13} />
               </button>
               {showTip && (
-                <div className={`absolute left-0 z-50 w-80 rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-3 shadow-lg ${tooltipPosition === "above" ? "bottom-full mb-1" : "top-full mt-1"}`}>
+                <div
+                  className={`absolute left-0 z-50 w-80 rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-3 shadow-lg ${tooltipPosition === "above" ? "bottom-full mb-1" : "top-full mt-1"}`}
+                >
                   <p className="text-caption text-[var(--color-text-primary)]">
                     <strong>{t("what")}</strong> {tooltip.what}
                   </p>
@@ -419,15 +422,16 @@ export function GroupHygiene() {
         width: 70,
         resizable: false,
         render: (_value, row) => (
-          <button
-            className="btn btn-ghost btn-sm flex items-center gap-1 whitespace-nowrap"
-            onClick={() => handleGoToGroup(row.dn)}
-            data-testid={`go-to-group-${row.name}`}
-            title={t("openInGroupManagement")}
-          >
-            <ExternalLink size={12} />
-            {t("goTo")}
-          </button>
+          <Tooltip content={t("openInGroupManagement")}>
+            <button
+              className="btn btn-ghost btn-sm flex items-center gap-1 whitespace-nowrap"
+              onClick={() => handleGoToGroup(row.dn)}
+              data-testid={`go-to-group-${row.name}`}
+            >
+              <ExternalLink size={12} />
+              {t("goTo")}
+            </button>
+          </Tooltip>
         ),
       },
     );
@@ -466,15 +470,16 @@ export function GroupHygiene() {
         width: 70,
         resizable: false,
         render: (_value: string, row: SimpleGroupRow) => (
-          <button
-            className="btn btn-ghost btn-sm flex items-center gap-1 whitespace-nowrap"
-            onClick={() => handleGoToGroup(row.dn)}
-            data-testid={`go-to-group-${row.name}`}
-            title={t("openInGroupManagement")}
-          >
-            <ExternalLink size={12} />
-            {t("goTo")}
-          </button>
+          <Tooltip content={t("openInGroupManagement")}>
+            <button
+              className="btn btn-ghost btn-sm flex items-center gap-1 whitespace-nowrap"
+              onClick={() => handleGoToGroup(row.dn)}
+              data-testid={`go-to-group-${row.name}`}
+            >
+              <ExternalLink size={12} />
+              {t("goTo")}
+            </button>
+          </Tooltip>
         ),
       },
     ],
@@ -501,15 +506,16 @@ export function GroupHygiene() {
         width: 70,
         resizable: false,
         render: (_value: string, row: StaleGroupRow) => (
-          <button
-            className="btn btn-ghost btn-sm flex items-center gap-1 whitespace-nowrap"
-            onClick={() => handleGoToGroup(row.dn)}
-            data-testid={`go-to-group-${row.name}`}
-            title={t("openInGroupManagement")}
-          >
-            <ExternalLink size={12} />
-            {t("goTo")}
-          </button>
+          <Tooltip content={t("openInGroupManagement")}>
+            <button
+              className="btn btn-ghost btn-sm flex items-center gap-1 whitespace-nowrap"
+              onClick={() => handleGoToGroup(row.dn)}
+              data-testid={`go-to-group-${row.name}`}
+            >
+              <ExternalLink size={12} />
+              {t("goTo")}
+            </button>
+          </Tooltip>
         ),
       },
     ],
@@ -572,7 +578,12 @@ export function GroupHygiene() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <ExportToolbar<{ category: string; name: string; scope: string; detail: string }>
+          <ExportToolbar<{
+            category: string;
+            name: string;
+            scope: string;
+            detail: string;
+          }>
             columns={[
               { key: "category", header: t("exportColCategory") },
               { key: "name", header: t("exportColGroupName") },
@@ -580,13 +591,54 @@ export function GroupHygiene() {
               { key: "detail", header: t("exportColDetail") },
             ]}
             data={[
-              ...emptyGroups.map((g) => ({ category: t("exportCategoryEmpty"), name: g.displayName || g.samAccountName, scope: g.scope, detail: t("exportDetailNoMembers") })),
-              ...singleMemberGroups.map((g) => ({ category: t("exportCategorySingleMember"), name: g.displayName || g.samAccountName, scope: g.scope, detail: t("exportDetailOneMember") })),
-              ...staleGroups.map((g) => ({ category: t("exportCategoryStale"), name: g.displayName || g.samAccountName, scope: g.scope, detail: t("exportDetailLastModified", { date: formatWhenChanged(g) }) })),
-              ...undescribedGroups.map((g) => ({ category: t("exportCategoryNoDescription"), name: g.displayName || g.samAccountName, scope: g.scope, detail: "" })),
-              ...cycles.map((chain) => ({ category: t("exportCategoryCircularNesting"), name: chain.join(" -> "), scope: "-", detail: t("exportDetailGroupsInCycle", { count: chain.length }) })),
-              ...deeplyNested.map((d) => ({ category: t("exportCategoryExcessiveDepth"), name: d.groupName, scope: "-", detail: t("exportDetailDepthLevels", { depth: d.depth }) })),
-              ...duplicateGroups.map((pair) => ({ category: t("exportCategoryDuplicateMembers"), name: pair.map((g) => g.displayName || g.samAccountName).join(" = "), scope: pair[0]?.scope ?? "-", detail: t("exportDetailIdenticalMembers", { count: pair.length }) })),
+              ...emptyGroups.map((g) => ({
+                category: t("exportCategoryEmpty"),
+                name: g.displayName || g.samAccountName,
+                scope: g.scope,
+                detail: t("exportDetailNoMembers"),
+              })),
+              ...singleMemberGroups.map((g) => ({
+                category: t("exportCategorySingleMember"),
+                name: g.displayName || g.samAccountName,
+                scope: g.scope,
+                detail: t("exportDetailOneMember"),
+              })),
+              ...staleGroups.map((g) => ({
+                category: t("exportCategoryStale"),
+                name: g.displayName || g.samAccountName,
+                scope: g.scope,
+                detail: t("exportDetailLastModified", {
+                  date: formatWhenChanged(g),
+                }),
+              })),
+              ...undescribedGroups.map((g) => ({
+                category: t("exportCategoryNoDescription"),
+                name: g.displayName || g.samAccountName,
+                scope: g.scope,
+                detail: "",
+              })),
+              ...cycles.map((chain) => ({
+                category: t("exportCategoryCircularNesting"),
+                name: chain.join(" -> "),
+                scope: "-",
+                detail: t("exportDetailGroupsInCycle", { count: chain.length }),
+              })),
+              ...deeplyNested.map((d) => ({
+                category: t("exportCategoryExcessiveDepth"),
+                name: d.groupName,
+                scope: "-",
+                detail: t("exportDetailDepthLevels", { depth: d.depth }),
+              })),
+              ...duplicateGroups.map((pair) => ({
+                category: t("exportCategoryDuplicateMembers"),
+                name: pair
+                  .map((g) => g.displayName || g.samAccountName)
+                  .join(" = "),
+                scope: pair[0]?.scope ?? "-",
+                detail: t("exportDetailIdenticalMembers", {
+                  count: pair.length,
+                }),
+              })),
             ]}
             rowMapper={(row) => [row.category, row.name, row.scope, row.detail]}
             title={t("exportTitle")}
@@ -610,7 +662,10 @@ export function GroupHygiene() {
         <div className="space-y-4 opacity-50 pointer-events-none">
           {[
             { title: t("emptyGroups"), hint: t("emptyGroupsHint") },
-            { title: t("singleMemberGroups"), hint: t("singleMemberGroupsHint") },
+            {
+              title: t("singleMemberGroups"),
+              hint: t("singleMemberGroupsHint"),
+            },
             { title: t("staleGroups"), hint: t("staleGroupsHint") },
             { title: t("undescribedGroups"), hint: t("undescribedGroupsHint") },
             { title: t("circularNesting"), hint: t("circularNestingHint") },
@@ -677,16 +732,19 @@ export function GroupHygiene() {
                   />
                   {t("selectAll")}
                 </label>
-                <button
-                  className="btn btn-outline btn-sm flex items-center gap-1 tabular-nums"
-                  onClick={() => setShowDeletePreview(true)}
-                  disabled={!canDelete || selectedEmpty.size === 0 || deleting}
-                  title={!canDelete ? t("requiresAdmin") : undefined}
-                  data-testid="delete-selected-btn"
-                >
-                  <Trash2 size={14} />
-                  {t("deleteSelected", { count: selectedEmpty.size })}
-                </button>
+                <Tooltip content={!canDelete ? t("requiresAdmin") : ""}>
+                  <button
+                    className="btn btn-outline btn-sm flex items-center gap-1 tabular-nums"
+                    onClick={() => setShowDeletePreview(true)}
+                    disabled={
+                      !canDelete || selectedEmpty.size === 0 || deleting
+                    }
+                    data-testid="delete-selected-btn"
+                  >
+                    <Trash2 size={14} />
+                    {t("deleteSelected", { count: selectedEmpty.size })}
+                  </button>
+                </Tooltip>
               </div>
             }
           >
@@ -785,14 +843,15 @@ export function GroupHygiene() {
                     const isLast = dnIdx === cycle.length - 1;
                     return (
                       <span key={dnIdx} className="flex items-center gap-1">
-                        <button
-                          className="text-body font-medium text-[var(--color-primary)] hover:underline"
-                          onClick={() => handleGoToGroup(dn)}
-                          data-testid={`cycle-group-${cn}`}
-                          title={dn}
-                        >
-                          {cn}
-                        </button>
+                        <Tooltip content={dn}>
+                          <button
+                            className="text-body font-medium text-[var(--color-primary)] hover:underline"
+                            onClick={() => handleGoToGroup(dn)}
+                            data-testid={`cycle-group-${cn}`}
+                          >
+                            {cn}
+                          </button>
+                        </Tooltip>
                         {!isLast && (
                           <ArrowRight
                             size={14}
@@ -834,15 +893,16 @@ export function GroupHygiene() {
                       {t("depth", { depth: item.depth })}
                     </span>
                   </div>
-                  <button
-                    className="btn btn-ghost btn-sm flex items-center gap-1 whitespace-nowrap"
-                    onClick={() => handleGoToGroup(item.groupDn)}
-                    data-testid={`go-to-group-${item.groupName}`}
-                    title={t("openInGroupManagement")}
-                  >
-                    <ExternalLink size={12} />
-                    {t("goTo")}
-                  </button>
+                  <Tooltip content={t("openInGroupManagement")}>
+                    <button
+                      className="btn btn-ghost btn-sm flex items-center gap-1 whitespace-nowrap"
+                      onClick={() => handleGoToGroup(item.groupDn)}
+                      data-testid={`go-to-group-${item.groupName}`}
+                    >
+                      <ExternalLink size={12} />
+                      {t("goTo")}
+                    </button>
+                  </Tooltip>
                 </div>
               ))}
             </div>
@@ -894,7 +954,9 @@ export function GroupHygiene() {
         >
           <div className="max-h-96 w-full max-w-md overflow-auto rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-4 shadow-lg">
             <h3 className="mb-3 text-body font-semibold text-[var(--color-text-primary)]">
-              {t("deleteConfirmTitle", { count: selectedGroupsForPreview.length })}
+              {t("deleteConfirmTitle", {
+                count: selectedGroupsForPreview.length,
+              })}
             </h3>
             <p className="mb-3 text-caption text-[var(--color-text-secondary)]">
               {t("deleteConfirmMessage")}

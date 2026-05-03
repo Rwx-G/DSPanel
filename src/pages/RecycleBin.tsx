@@ -4,6 +4,7 @@ import { SearchBar } from "@/components/common/SearchBar";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { EmptyState } from "@/components/common/EmptyState";
 import { StatusBadge } from "@/components/common/StatusBadge";
+import { Tooltip } from "@/components/common/Tooltip";
 import { OUPicker } from "@/components/form/OUPicker";
 import { useOUTree } from "@/hooks/useOUTree";
 import { useErrorHandler } from "@/hooks/useErrorHandler";
@@ -30,7 +31,13 @@ interface DeletedObject {
   originalOu: string;
 }
 
-type ObjectTypeFilter = "all" | "user" | "computer" | "group" | "contact" | "printQueue";
+type ObjectTypeFilter =
+  | "all"
+  | "user"
+  | "computer"
+  | "group"
+  | "contact"
+  | "printQueue";
 
 const TYPE_LABEL_KEYS: Record<string, string> = {
   user: "common:user",
@@ -41,7 +48,10 @@ const TYPE_LABEL_KEYS: Record<string, string> = {
   other: "common:other",
 };
 
-const TYPE_BADGE_VARIANT: Record<string, "info" | "success" | "warning" | "error" | "neutral"> = {
+const TYPE_BADGE_VARIANT: Record<
+  string,
+  "info" | "success" | "warning" | "error" | "neutral"
+> = {
   user: "info",
   computer: "success",
   group: "warning",
@@ -112,7 +122,14 @@ export function RecycleBin() {
   }, [objects, typeFilter, filterText]);
 
   const typeCounts = useMemo(() => {
-    const counts = { user: 0, computer: 0, group: 0, contact: 0, printQueue: 0, other: 0 };
+    const counts = {
+      user: 0,
+      computer: 0,
+      group: 0,
+      contact: 0,
+      printQueue: 0,
+      other: 0,
+    };
     for (const o of objects) {
       const key = o.objectType as keyof typeof counts;
       if (key in counts) counts[key]++;
@@ -222,14 +239,15 @@ export function RecycleBin() {
             </button>
           ))}
         </div>
-        <button
-          className="btn btn-sm btn-ghost"
-          onClick={loadData}
-          title={t("common:refresh")}
-          data-testid="recycle-bin-refresh"
-        >
-          <RefreshCw size={14} />
-        </button>
+        <Tooltip content={t("common:refresh")}>
+          <button
+            className="btn btn-sm btn-ghost"
+            onClick={loadData}
+            data-testid="recycle-bin-refresh"
+          >
+            <RefreshCw size={14} />
+          </button>
+        </Tooltip>
       </div>
 
       <div className="flex-1 overflow-auto">
@@ -246,10 +264,7 @@ export function RecycleBin() {
             />
           </div>
         ) : (
-          <table
-            className="w-full text-body"
-            data-testid="recycle-bin-table"
-          >
+          <table className="w-full text-body" data-testid="recycle-bin-table">
             <thead className="sticky top-0 bg-[var(--color-surface-card)]">
               <tr className="border-b border-[var(--color-border-subtle)] text-left text-caption text-[var(--color-text-secondary)]">
                 <th className="px-3 py-2 font-medium">{t("common:name")}</th>
@@ -261,8 +276,7 @@ export function RecycleBin() {
             </thead>
             <tbody>
               {filteredObjects.map((obj) => {
-                const TypeIcon =
-                  TYPE_ICONS[obj.objectType] || TYPE_ICONS.other;
+                const TypeIcon = TYPE_ICONS[obj.objectType] || TYPE_ICONS.other;
                 return (
                   <tr
                     key={obj.distinguishedName}
@@ -282,18 +296,21 @@ export function RecycleBin() {
                     </td>
                     <td className="px-3 py-2">
                       <StatusBadge
-                        text={t(TYPE_LABEL_KEYS[obj.objectType] || obj.objectType)}
-                        variant={TYPE_BADGE_VARIANT[obj.objectType] || "neutral"}
+                        text={t(
+                          TYPE_LABEL_KEYS[obj.objectType] || obj.objectType,
+                        )}
+                        variant={
+                          TYPE_BADGE_VARIANT[obj.objectType] || "neutral"
+                        }
                       />
                     </td>
                     <td className="px-3 py-2 text-[var(--color-text-secondary)]">
                       {obj.deletionDate}
                     </td>
-                    <td
-                      className="max-w-[200px] truncate px-3 py-2 text-[var(--color-text-secondary)]"
-                      title={obj.originalOu}
-                    >
-                      {obj.originalOu}
+                    <td className="max-w-[200px] truncate px-3 py-2 text-[var(--color-text-secondary)]">
+                      <Tooltip content={obj.originalOu}>
+                        {obj.originalOu}
+                      </Tooltip>
                     </td>
                     <td className="px-3 py-2">
                       <button

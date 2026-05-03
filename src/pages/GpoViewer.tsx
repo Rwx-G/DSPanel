@@ -2,7 +2,11 @@ import { useState, useCallback, useEffect, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { EmptyState } from "@/components/common/EmptyState";
-import { ExportToolbar, type ExportColumn } from "@/components/common/ExportToolbar";
+import {
+  ExportToolbar,
+  type ExportColumn,
+} from "@/components/common/ExportToolbar";
+import { Tooltip } from "@/components/common/Tooltip";
 import { extractErrorMessage } from "@/utils/errorMapping";
 import {
   Search,
@@ -117,7 +121,6 @@ export function GpoViewer() {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
 
-
   // Load GPO list and OU tree on mount
   useEffect(() => {
     invoke<GpoInfo[]>("get_gpo_list")
@@ -187,12 +190,13 @@ export function GpoViewer() {
   };
 
   const currentLinks =
-    viewMode === "links"
-      ? linksResult?.links ?? []
-      : scopeLinks;
+    viewMode === "links" ? (linksResult?.links ?? []) : scopeLinks;
 
   return (
-    <div className="flex h-full flex-col gap-4 p-4" data-testid="gpo-viewer-page">
+    <div
+      className="flex h-full flex-col gap-4 p-4"
+      data-testid="gpo-viewer-page"
+    >
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -220,11 +224,18 @@ export function GpoViewer() {
       </div>
 
       {/* View mode tabs */}
-      <div className="flex gap-1 border-b border-[var(--color-border-default)]" data-testid="view-mode-tabs">
+      <div
+        className="flex gap-1 border-b border-[var(--color-border-default)]"
+        data-testid="view-mode-tabs"
+      >
         {(
           [
             { id: "links", label: t("tabLinks"), icon: <Shield size={14} /> },
-            { id: "scope", label: t("tabScope"), icon: <FolderTree size={14} /> },
+            {
+              id: "scope",
+              label: t("tabScope"),
+              icon: <FolderTree size={14} />,
+            },
           ] as const
         ).map((tab) => (
           <button
@@ -248,13 +259,19 @@ export function GpoViewer() {
         <div className="flex flex-col gap-4">
           <div className="flex flex-wrap items-start gap-4">
             {/* Search user/computer - autocomplete dropdown like UserComparison */}
-            <div className="flex flex-col gap-1.5 min-w-[280px]" data-testid="links-search-input">
+            <div
+              className="flex flex-col gap-1.5 min-w-[280px]"
+              data-testid="links-search-input"
+            >
               <label className="text-[11px] font-medium text-[var(--color-text-secondary)]">
                 {t("searchLabel")}
               </label>
               <div className="relative">
                 <div className="flex items-center gap-2 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2.5 py-1">
-                  <Search size={14} className="shrink-0 text-[var(--color-text-secondary)]" />
+                  <Search
+                    size={14}
+                    className="shrink-0 text-[var(--color-text-secondary)]"
+                  />
                   <input
                     type="text"
                     className="flex-1 bg-transparent text-caption text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-secondary)]"
@@ -273,7 +290,8 @@ export function GpoViewer() {
                       }
                     }}
                     onFocus={() => {
-                      if (searchResults.length > 0) setSearchResults((r) => [...r]);
+                      if (searchResults.length > 0)
+                        setSearchResults((r) => [...r]);
                     }}
                     onBlur={() => {
                       setTimeout(() => setSearchResults([]), 200);
@@ -290,14 +308,20 @@ export function GpoViewer() {
                         onMouseDown={(e) => {
                           e.preventDefault();
                           setObjectDn(entry.distinguishedName);
-                          setSearchQuery(entry.displayName || entry.samAccountName || "");
+                          setSearchQuery(
+                            entry.displayName || entry.samAccountName || "",
+                          );
                           setSearchResults([]);
                           // Auto-fetch GPO links
                           setLinksLoading(true);
                           setLinksError(null);
-                          invoke<GpoLinksResult>("get_gpo_links", { objectDn: entry.distinguishedName })
+                          invoke<GpoLinksResult>("get_gpo_links", {
+                            objectDn: entry.distinguishedName,
+                          })
                             .then(setLinksResult)
-                            .catch((err) => setLinksError(extractErrorMessage(err)))
+                            .catch((err) =>
+                              setLinksError(extractErrorMessage(err)),
+                            )
                             .finally(() => setLinksLoading(false));
                         }}
                         data-testid="links-object-dn"
@@ -319,11 +343,16 @@ export function GpoViewer() {
 
             {/* Separator */}
             <div className="flex items-end pb-2">
-              <span className="text-caption text-[var(--color-text-secondary)]">{t("or")}</span>
+              <span className="text-caption text-[var(--color-text-secondary)]">
+                {t("or")}
+              </span>
             </div>
 
             {/* OU picker */}
-            <div className="flex flex-col gap-1.5" data-testid="links-ou-select">
+            <div
+              className="flex flex-col gap-1.5"
+              data-testid="links-ou-select"
+            >
               <label className="text-[11px] font-medium text-[var(--color-text-secondary)]">
                 {t("ouSelectLabel")}
               </label>
@@ -339,7 +368,9 @@ export function GpoViewer() {
                   if (e.target.value) {
                     setLinksLoading(true);
                     setLinksError(null);
-                    invoke<GpoLinksResult>("get_gpo_links", { objectDn: e.target.value })
+                    invoke<GpoLinksResult>("get_gpo_links", {
+                      objectDn: e.target.value,
+                    })
                       .then(setLinksResult)
                       .catch((err) => setLinksError(extractErrorMessage(err)))
                       .finally(() => setLinksLoading(false));
@@ -364,7 +395,10 @@ export function GpoViewer() {
           {/* Selected object indicator */}
           {objectDn && (
             <div className="text-caption text-[var(--color-text-secondary)]">
-              {t("showingGposFor")}: <span className="font-medium text-[var(--color-text-primary)]">{formatDn(objectDn)}</span>
+              {t("showingGposFor")}:{" "}
+              <span className="font-medium text-[var(--color-text-primary)]">
+                {formatDn(objectDn)}
+              </span>
             </div>
           )}
 
@@ -396,7 +430,9 @@ export function GpoViewer() {
                     if (e.target.value) {
                       setScopeLoading(true);
                       setScopeError(null);
-                      invoke<GpoLink[]>("get_gpo_scope", { gpoDn: e.target.value })
+                      invoke<GpoLink[]>("get_gpo_scope", {
+                        gpoDn: e.target.value,
+                      })
                         .then(setScopeLinks)
                         .catch((err) => setScopeError(extractErrorMessage(err)))
                         .finally(() => setScopeLoading(false));
@@ -410,7 +446,8 @@ export function GpoViewer() {
                   <option value="">{t("chooseGpo")}</option>
                   {gpoList.map((gpo) => (
                     <option key={gpo.dn} value={gpo.dn}>
-                      {gpo.displayName}{gpo.wmiFilter ? ` [WMI: ${gpo.wmiFilter}]` : ""}
+                      {gpo.displayName}
+                      {gpo.wmiFilter ? ` [WMI: ${gpo.wmiFilter}]` : ""}
                     </option>
                   ))}
                 </select>
@@ -444,16 +481,18 @@ export function GpoViewer() {
           {!scopeLoading && scopeLinks.length > 0 && (
             <ScopeTable links={scopeLinks} />
           )}
-          {!scopeLoading && scopeLinks.length === 0 && scopeGpoDn && !scopeError && (
-            <EmptyState
-              icon={<FolderTree size={40} />}
-              title={t("scopeNoLinks")}
-              description={t("scopeNoLinksDescription")}
-            />
-          )}
+          {!scopeLoading &&
+            scopeLinks.length === 0 &&
+            scopeGpoDn &&
+            !scopeError && (
+              <EmptyState
+                icon={<FolderTree size={40} />}
+                title={t("scopeNoLinks")}
+                description={t("scopeNoLinksDescription")}
+              />
+            )}
         </div>
       )}
-
     </div>
   );
 }
@@ -550,11 +589,10 @@ function GpoLinksTable({
                     </span>
                   </div>
                 </td>
-                <td
-                  className="px-3 py-2 text-[var(--color-text-secondary)] truncate max-w-[300px]"
-                  title={link.linkedAt}
-                >
-                  {formatDn(link.linkedAt)}
+                <td className="px-3 py-2 text-[var(--color-text-secondary)] truncate max-w-[300px]">
+                  <Tooltip content={link.linkedAt}>
+                    {formatDn(link.linkedAt)}
+                  </Tooltip>
                 </td>
                 <td className="px-3 py-2 text-center">
                   {link.isEnforced ? (
@@ -563,7 +601,9 @@ function GpoLinksTable({
                       className="inline-block text-[var(--color-warning)]"
                     />
                   ) : (
-                    <span className="text-[var(--color-text-secondary)]">-</span>
+                    <span className="text-[var(--color-text-secondary)]">
+                      -
+                    </span>
                   )}
                 </td>
                 <td className="px-3 py-2 text-center">
@@ -614,11 +654,10 @@ function ScopeTable({ links }: { links: GpoLink[] }) {
                 className="border-t border-[var(--color-border-subtle)] hover:bg-[var(--color-surface-hover)] transition-colors"
                 data-testid="scope-row"
               >
-                <td
-                  className="px-3 py-2 font-medium text-[var(--color-text-primary)] truncate max-w-[400px]"
-                  title={link.linkedAt}
-                >
-                  {formatDn(link.linkedAt) || link.linkedAt}
+                <td className="px-3 py-2 font-medium text-[var(--color-text-primary)] truncate max-w-[400px]">
+                  <Tooltip content={link.linkedAt}>
+                    {formatDn(link.linkedAt) || link.linkedAt}
+                  </Tooltip>
                 </td>
                 <td className="px-3 py-2 text-center">
                   {link.isEnforced ? (
@@ -626,7 +665,9 @@ function ScopeTable({ links }: { links: GpoLink[] }) {
                       {t("statusEnforced")}
                     </span>
                   ) : (
-                    <span className="text-[var(--color-text-secondary)]">-</span>
+                    <span className="text-[var(--color-text-secondary)]">
+                      -
+                    </span>
                   )}
                 </td>
                 <td className="px-3 py-2 text-center">

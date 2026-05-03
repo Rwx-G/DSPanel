@@ -4,6 +4,7 @@ import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { EmptyState } from "@/components/common/EmptyState";
 import { ExportToolbar } from "@/components/common/ExportToolbar";
 import { SecurityDisclaimer } from "@/components/common/SecurityDisclaimer";
+import { Tooltip } from "@/components/common/Tooltip";
 import { extractErrorMessage } from "@/utils/errorMapping";
 import {
   Plus,
@@ -21,7 +22,10 @@ import { useTranslation } from "react-i18next";
 // Types (mirror Rust models)
 // ---------------------------------------------------------------------------
 
-type CleanupCondition = "inactiveDays" | "neverLoggedOnCreatedDays" | "disabledDays";
+type CleanupCondition =
+  | "inactiveDays"
+  | "neverLoggedOnCreatedDays"
+  | "disabledDays";
 type CleanupAction = "disable" | "move" | "delete";
 
 interface CleanupRule {
@@ -127,7 +131,10 @@ function RuleEditor({
             className="w-full rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2 py-1.5 text-caption text-[var(--color-text-primary)]"
             value={rule.condition}
             onChange={(e) =>
-              onChange({ ...rule, condition: e.target.value as CleanupCondition })
+              onChange({
+                ...rule,
+                condition: e.target.value as CleanupCondition,
+              })
             }
             data-testid="rule-condition-select"
           >
@@ -147,7 +154,10 @@ function RuleEditor({
             className="w-full rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2 py-1.5 text-caption text-[var(--color-text-primary)]"
             value={rule.thresholdDays}
             onChange={(e) =>
-              onChange({ ...rule, thresholdDays: Math.max(1, Number(e.target.value)) })
+              onChange({
+                ...rule,
+                thresholdDays: Math.max(1, Number(e.target.value)),
+              })
             }
             min={1}
             data-testid="rule-threshold-input"
@@ -202,7 +212,10 @@ function RuleEditor({
               onChange({
                 ...rule,
                 excludePatterns: val
-                  ? val.split(",").map((s) => s.trim()).filter(Boolean)
+                  ? val
+                      .split(",")
+                      .map((s) => s.trim())
+                      .filter(Boolean)
                   : null,
               });
             }}
@@ -222,7 +235,10 @@ function RuleEditor({
               onChange({
                 ...rule,
                 excludeOus: val
-                  ? val.split(",").map((s) => s.trim()).filter(Boolean)
+                  ? val
+                      .split(",")
+                      .map((s) => s.trim())
+                      .filter(Boolean)
                   : null,
               });
             }}
@@ -263,12 +279,16 @@ export function AutomatedCleanup() {
   const [editingRule, setEditingRule] = useState<CleanupRule | null>(null);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
-  const [dryRunResult, setDryRunResult] = useState<CleanupDryRunResult | null>(null);
+  const [dryRunResult, setDryRunResult] = useState<CleanupDryRunResult | null>(
+    null,
+  );
   const [dryRunLoading, setDryRunLoading] = useState(false);
   const [dryRunError, setDryRunError] = useState<string | null>(null);
 
   const [executing, setExecuting] = useState(false);
-  const [executionResults, setExecutionResults] = useState<CleanupExecutionResult[] | null>(null);
+  const [executionResults, setExecutionResults] = useState<
+    CleanupExecutionResult[] | null
+  >(null);
 
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -321,7 +341,9 @@ export function AutomatedCleanup() {
     setExecutionResults(null);
     setConfirmDelete(false);
     try {
-      const result = await invoke<CleanupDryRunResult>("cleanup_dry_run", { rule });
+      const result = await invoke<CleanupDryRunResult>("cleanup_dry_run", {
+        rule,
+      });
       setDryRunResult(result);
     } catch (err) {
       setDryRunError(extractErrorMessage(err));
@@ -355,9 +377,12 @@ export function AutomatedCleanup() {
 
     setExecuting(true);
     try {
-      const results = await invoke<CleanupExecutionResult[]>("cleanup_execute", {
-        matches: selected,
-      });
+      const results = await invoke<CleanupExecutionResult[]>(
+        "cleanup_execute",
+        {
+          matches: selected,
+        },
+      );
       setExecutionResults(results);
       setDryRunResult(null);
       setConfirmDelete(false);
@@ -368,7 +393,8 @@ export function AutomatedCleanup() {
     }
   };
 
-  const selectedCount = dryRunResult?.matches.filter((m) => m.selected).length ?? 0;
+  const selectedCount =
+    dryRunResult?.matches.filter((m) => m.selected).length ?? 0;
 
   return (
     <div className="flex h-full flex-col" data-testid="automated-cleanup">
@@ -433,13 +459,17 @@ export function AutomatedCleanup() {
                     {rule.name}
                   </div>
                   <div className="text-[11px] text-[var(--color-text-secondary)]">
-                    {t(CONDITION_KEYS[rule.condition])} ({rule.thresholdDays}d) - {t(ACTION_KEYS[rule.action])}
-                    {rule.action === "move" && rule.targetOu && ` to ${rule.targetOu}`}
-                    {rule.excludePatterns && rule.excludePatterns.length > 0 && (
-                      <span className="ml-2 text-[var(--color-text-disabled)]">
-                        {t("excl")}: {rule.excludePatterns.join(", ")}
-                      </span>
-                    )}
+                    {t(CONDITION_KEYS[rule.condition])} ({rule.thresholdDays}d)
+                    - {t(ACTION_KEYS[rule.action])}
+                    {rule.action === "move" &&
+                      rule.targetOu &&
+                      ` to ${rule.targetOu}`}
+                    {rule.excludePatterns &&
+                      rule.excludePatterns.length > 0 && (
+                        <span className="ml-2 text-[var(--color-text-disabled)]">
+                          {t("excl")}: {rule.excludePatterns.join(", ")}
+                        </span>
+                      )}
                     {rule.excludeOus && rule.excludeOus.length > 0 && (
                       <span className="ml-2 text-[var(--color-text-disabled)]">
                         {t("exclOus")}: {rule.excludeOus.join(", ")}
@@ -498,13 +528,11 @@ export function AutomatedCleanup() {
 
         {/* Dry-run results */}
         {dryRunResult && (
-          <div
-            className="space-y-3"
-            data-testid="dry-run-results"
-          >
+          <div className="space-y-3" data-testid="dry-run-results">
             <div className="flex items-center justify-between">
               <h3 className="text-body font-semibold text-[var(--color-text-primary)]">
-                {t("dryRunTitle")}: {dryRunResult.ruleName} ({dryRunResult.totalCount} {t("matches")})
+                {t("dryRunTitle")}: {dryRunResult.ruleName} (
+                {dryRunResult.totalCount} {t("matches")})
               </h3>
               <div className="flex items-center gap-2">
                 <ExportToolbar<CleanupMatch>
@@ -548,13 +576,14 @@ export function AutomatedCleanup() {
                 data-testid="delete-warning"
               >
                 <AlertTriangle size={14} />
-                <span>
-                  {t("deleteWarning")}
-                </span>
+                <span>{t("deleteWarning")}</span>
               </div>
             )}
 
-            <div className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)]" data-testid="matches-table">
+            <div
+              className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)]"
+              data-testid="matches-table"
+            >
               <table className="w-full text-caption">
                 <thead>
                   <tr className="border-b border-[var(--color-border-default)] text-left text-[var(--color-text-secondary)]">
@@ -574,10 +603,16 @@ export function AutomatedCleanup() {
                         }}
                       />
                     </th>
-                    <th className="px-3 py-2 font-medium">{t("common:displayName")}</th>
+                    <th className="px-3 py-2 font-medium">
+                      {t("common:displayName")}
+                    </th>
                     <th className="px-3 py-2 font-medium">{t("samAccount")}</th>
-                    <th className="px-3 py-2 font-medium">{t("currentState")}</th>
-                    <th className="px-3 py-2 font-medium">{t("proposedAction")}</th>
+                    <th className="px-3 py-2 font-medium">
+                      {t("currentState")}
+                    </th>
+                    <th className="px-3 py-2 font-medium">
+                      {t("proposedAction")}
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -635,12 +670,17 @@ export function AutomatedCleanup() {
                   <tr className="border-b border-[var(--color-border-default)] text-left text-[var(--color-text-secondary)]">
                     <th className="px-3 py-2 font-medium">{t("account")}</th>
                     <th className="px-3 py-2 font-medium">{t("action")}</th>
-                    <th className="px-3 py-2 text-center font-medium">{t("result")}</th>
+                    <th className="px-3 py-2 text-center font-medium">
+                      {t("result")}
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {executionResults.map((r) => (
-                    <tr key={r.dn} className="border-t border-[var(--color-border-subtle)]">
+                    <tr
+                      key={r.dn}
+                      className="border-t border-[var(--color-border-subtle)]"
+                    >
                       <td className="px-3 py-2 font-medium text-[var(--color-text-primary)]">
                         {r.displayName}
                       </td>
@@ -653,12 +693,12 @@ export function AutomatedCleanup() {
                             <CheckCircle size={12} /> {t("common:ok")}
                           </span>
                         ) : (
-                          <span
+                          <Tooltip
+                            content={r.error ?? ""}
                             className="inline-flex items-center gap-1 text-[var(--color-error)]"
-                            title={r.error ?? ""}
                           >
                             <XCircle size={12} /> {t("common:fail")}
-                          </span>
+                          </Tooltip>
                         )}
                       </td>
                     </tr>
@@ -667,7 +707,8 @@ export function AutomatedCleanup() {
               </table>
             </div>
             <div className="text-caption text-[var(--color-text-secondary)]">
-              {executionResults.filter((r) => r.success).length} / {executionResults.length} succeeded
+              {executionResults.filter((r) => r.success).length} /{" "}
+              {executionResults.length} succeeded
             </div>
           </div>
         )}

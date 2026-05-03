@@ -89,11 +89,13 @@ describe("ManageSpnsDialog", () => {
     ).toBeInTheDocument();
   });
 
-  it("system SPN row has the system-spn tooltip", () => {
+  it("system SPN row reveals the system-spn tooltip on hover", () => {
     render(<ManageSpnsDialog {...defaultProps} />, { wrapper: TestProviders });
     const row = screen.getByTestId("system-spn-row-HOST/dc01.corp.local");
-    const title = row.getAttribute("title") ?? "";
-    expect(title.toLowerCase()).toContain("system");
+    const trigger = row.firstElementChild as HTMLElement;
+    fireEvent.mouseEnter(trigger);
+    const card = screen.getByTestId("tooltip-card");
+    expect(card.textContent?.toLowerCase()).toContain("system");
   });
 
   it("disables Confirm until at least one removable SPN is checked", () => {
@@ -160,7 +162,8 @@ describe("ManageSpnsDialog", () => {
   it("displays an error message when the Tauri command fails", async () => {
     mockInvoke.mockImplementation(((cmd: string) => {
       if (cmd === "mfa_is_configured") return Promise.resolve(false);
-      if (cmd === "remove_user_spns") return Promise.reject("Permission denied");
+      if (cmd === "remove_user_spns")
+        return Promise.reject("Permission denied");
       return Promise.resolve(null);
     }) as typeof invoke);
 
@@ -205,10 +208,9 @@ describe("ManageSpnsDialog", () => {
   });
 
   it("renders empty state when the user has no SPNs at all", () => {
-    render(
-      <ManageSpnsDialog {...defaultProps} currentSpns={[]} />,
-      { wrapper: TestProviders },
-    );
+    render(<ManageSpnsDialog {...defaultProps} currentSpns={[]} />, {
+      wrapper: TestProviders,
+    });
     expect(screen.getByTestId("empty-spns")).toBeInTheDocument();
     expect(screen.getByTestId("confirm-btn")).toBeDisabled();
   });

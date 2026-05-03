@@ -14,6 +14,7 @@ import { useNotifications } from "@/contexts/NotificationContext";
 import { useDialog } from "@/contexts/DialogContext";
 import { extractErrorMessage } from "@/utils/errorMapping";
 import { ExportToolbar, type ExportColumn } from "./ExportToolbar";
+import { Tooltip } from "./Tooltip";
 import { useTranslation } from "react-i18next";
 
 interface ObjectSnapshot {
@@ -39,7 +40,12 @@ interface SnapshotHistoryProps {
   onRestored?: () => void;
 }
 
-export function SnapshotHistory({ objectDn, canRestore, refreshTrigger = 0, onRestored }: SnapshotHistoryProps) {
+export function SnapshotHistory({
+  objectDn,
+  canRestore,
+  refreshTrigger = 0,
+  onRestored,
+}: SnapshotHistoryProps) {
   const { t } = useTranslation(["components", "common"]);
   const [snapshots, setSnapshots] = useState<ObjectSnapshot[]>([]);
   const [loading, setLoading] = useState(true);
@@ -93,10 +99,15 @@ export function SnapshotHistory({ objectDn, canRestore, refreshTrigger = 0, onRe
 
   const handleRestore = useCallback(
     async (snapshot: ObjectSnapshot) => {
-      const objectName = snapshot.objectDn.split(",")[0]?.replace("CN=", "") || snapshot.objectDn;
+      const objectName =
+        snapshot.objectDn.split(",")[0]?.replace("CN=", "") ||
+        snapshot.objectDn;
       const confirmed = await showConfirmation(
         t("components:snapshotHistory.restoreTitle"),
-        t("components:snapshotHistory.restoreConfirm", { name: objectName, timestamp: formatTimestamp(snapshot.timestamp) }),
+        t("components:snapshotHistory.restoreConfirm", {
+          name: objectName,
+          timestamp: formatTimestamp(snapshot.timestamp),
+        }),
         t("components:snapshotHistory.restoreNote"),
       );
 
@@ -176,9 +187,15 @@ export function SnapshotHistory({ objectDn, canRestore, refreshTrigger = 0, onRe
                 data-testid={`snapshot-toggle-${snap.id}`}
               >
                 {expandedId === snap.id ? (
-                  <ChevronUp size={14} className="text-[var(--color-text-secondary)]" />
+                  <ChevronUp
+                    size={14}
+                    className="text-[var(--color-text-secondary)]"
+                  />
                 ) : (
-                  <ChevronDown size={14} className="text-[var(--color-text-secondary)]" />
+                  <ChevronDown
+                    size={14}
+                    className="text-[var(--color-text-secondary)]"
+                  />
                 )}
                 <span className="text-caption font-medium text-[var(--color-text-primary)]">
                   {snap.operationType}
@@ -194,38 +211,50 @@ export function SnapshotHistory({ objectDn, canRestore, refreshTrigger = 0, onRe
               </button>
               <div className="flex items-center gap-1">
                 {canRestore && (
+                  <Tooltip
+                    content={t("components:snapshotHistory.restoreButton")}
+                  >
+                    <button
+                      className="btn btn-sm btn-ghost"
+                      onClick={() => handleRestore(snap)}
+                      disabled={restoring}
+                      data-testid={`snapshot-restore-${snap.id}`}
+                    >
+                      <RotateCcw size={14} />
+                    </button>
+                  </Tooltip>
+                )}
+                <Tooltip content={t("components:snapshotHistory.deleteButton")}>
                   <button
                     className="btn btn-sm btn-ghost"
-                    onClick={() => handleRestore(snap)}
-                    disabled={restoring}
-                    title={t("components:snapshotHistory.restoreButton")}
-                    data-testid={`snapshot-restore-${snap.id}`}
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      const confirmed = await showConfirmation(
+                        t("components:snapshotHistory.deleteTitle"),
+                        t("components:snapshotHistory.deleteConfirm", {
+                          operation: snap.operationType,
+                          timestamp: formatTimestamp(snap.timestamp),
+                        }),
+                        t("components:snapshotHistory.deleteNote"),
+                      );
+                      if (!confirmed) return;
+                      try {
+                        await invoke("delete_snapshot", {
+                          snapshotId: snap.id,
+                        });
+                        await fetchHistory();
+                      } catch {
+                        notify(
+                          t("components:snapshotHistory.deleteFailed"),
+                          "error",
+                        );
+                      }
+                    }}
+                    data-testid={`snapshot-delete-${snap.id}`}
                   >
-                    <RotateCcw size={14} />
+                    <Trash2 size={14} />
                   </button>
-                )}
-                <button
-                  className="btn btn-sm btn-ghost"
-                  onClick={async (e) => {
-                    e.stopPropagation();
-                    const confirmed = await showConfirmation(
-                      t("components:snapshotHistory.deleteTitle"),
-                      t("components:snapshotHistory.deleteConfirm", { operation: snap.operationType, timestamp: formatTimestamp(snap.timestamp) }),
-                      t("components:snapshotHistory.deleteNote"),
-                    );
-                    if (!confirmed) return;
-                    try {
-                      await invoke("delete_snapshot", { snapshotId: snap.id });
-                      await fetchHistory();
-                    } catch {
-                      notify(t("components:snapshotHistory.deleteFailed"), "error");
-                    }
-                  }}
-                  title={t("components:snapshotHistory.deleteButton")}
-                  data-testid={`snapshot-delete-${snap.id}`}
-                >
-                  <Trash2 size={14} />
-                </button>
+                </Tooltip>
               </div>
             </div>
 
@@ -235,7 +264,9 @@ export function SnapshotHistory({ objectDn, canRestore, refreshTrigger = 0, onRe
                 data-testid={`snapshot-details-${snap.id}`}
               >
                 {diffLoading ? (
-                  <LoadingSpinner message={t("components:snapshotHistory.computingDiff")} />
+                  <LoadingSpinner
+                    message={t("components:snapshotHistory.computingDiff")}
+                  />
                 ) : diffs ? (
                   <div className="space-y-1">
                     {diffs.filter((d) => d.changed).length === 0 ? (
@@ -247,15 +278,23 @@ export function SnapshotHistory({ objectDn, canRestore, refreshTrigger = 0, onRe
                         <div className="flex items-center gap-1 text-caption text-[var(--color-warning)]">
                           <AlertTriangle size={12} />
                           <span>
-                            {t("components:snapshotHistory.attributesDiffer", { count: diffs.filter((d) => d.changed).length })}
+                            {t("components:snapshotHistory.attributesDiffer", {
+                              count: diffs.filter((d) => d.changed).length,
+                            })}
                           </span>
                         </div>
                         <table className="w-full text-caption">
                           <thead>
                             <tr className="text-left text-[var(--color-text-secondary)]">
-                              <th className="py-1 pr-2">{t("components:snapshotHistory.attribute")}</th>
-                              <th className="py-1 pr-2">{t("components:snapshotHistory.snapshot")}</th>
-                              <th className="py-1">{t("components:snapshotHistory.current")}</th>
+                              <th className="py-1 pr-2">
+                                {t("components:snapshotHistory.attribute")}
+                              </th>
+                              <th className="py-1 pr-2">
+                                {t("components:snapshotHistory.snapshot")}
+                              </th>
+                              <th className="py-1">
+                                {t("components:snapshotHistory.current")}
+                              </th>
                             </tr>
                           </thead>
                           <tbody>

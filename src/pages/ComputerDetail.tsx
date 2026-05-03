@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { CopyButton } from "@/components/common/CopyButton";
+import { Tooltip } from "@/components/common/Tooltip";
 import {
   ContextMenu,
   type ContextMenuItem,
@@ -11,7 +12,10 @@ import {
   type PropertyGroup,
 } from "@/components/data/PropertyGrid";
 import { DataTable, type Column } from "@/components/data/DataTable";
-import { ExportToolbar, type ExportColumn } from "@/components/common/ExportToolbar";
+import {
+  ExportToolbar,
+  type ExportColumn,
+} from "@/components/common/ExportToolbar";
 import { FilterBar, type FilterChip } from "@/components/data/FilterBar";
 import { GroupMembersDialog } from "@/components/dialogs/GroupMembersDialog";
 import { type DirectoryComputer } from "@/types/directory";
@@ -80,7 +84,9 @@ export function ComputerDetail({
   >(null);
 
   useEffect(() => {
-    invoke<string>("get_platform").then(setPlatform).catch(() => {});
+    invoke<string>("get_platform")
+      .then(setPlatform)
+      .catch(() => {});
   }, []);
   const { showConfirmation } = useDialog();
   const { notify } = useNotifications();
@@ -206,7 +212,10 @@ export function ComputerDetail({
           label: t("common:status"),
           value: computer.enabled ? t("common:enabled") : t("common:disabled"),
         },
-        { label: t("lastLogon"), value: computer.lastLogon ?? t("common:never") },
+        {
+          label: t("lastLogon"),
+          value: computer.lastLogon ?? t("common:never"),
+        },
       ],
     },
     {
@@ -285,7 +294,10 @@ export function ComputerDetail({
           {canDelete && (
             <button
               className="btn btn-sm flex items-center gap-1"
-              style={{ color: "var(--color-error)", borderColor: "var(--color-error)" }}
+              style={{
+                color: "var(--color-error)",
+                borderColor: "var(--color-error)",
+              }}
               onClick={handleDeleteComputer}
               data-testid="computer-delete-btn"
             >
@@ -298,38 +310,39 @@ export function ComputerDetail({
             variant={computer.enabled ? "success" : "error"}
           />
           {securityIndicators?.indicators.map((indicator) => (
-            <span
+            <Tooltip
               key={indicator.kind}
-              className="inline-flex items-center gap-1"
-              title={t(
+              content={t(
                 `securityIndicators:${indicator.kind}.tooltip`,
                 tooltipParamsFor(indicator),
               )}
-              data-testid={`computer-security-indicator-badge-${indicator.kind}`}
+              className="inline-flex items-center gap-1"
+              testId={`computer-security-indicator-badge-${indicator.kind}`}
             >
               <StatusBadge
                 text={t(`securityIndicators:${indicator.kind}.badge`)}
                 variant={severityToBadgeVariant(indicator.severity)}
               />
-              {indicator.kind === "UnconstrainedDelegation" && canEditCritical && (
-                <button
-                  type="button"
-                  className="rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setActiveQuickFix("DisableUnconstrainedDelegation");
-                  }}
-                  aria-label={t(
-                    "computerDetail:quickFix.disableUnconstrainedDelegation.fixButtonAriaLabel",
-                  )}
-                  data-testid="quick-fix-DisableUnconstrainedDelegation-btn"
-                >
-                  {t(
-                    "computerDetail:quickFix.disableUnconstrainedDelegation.fixButton",
-                  )}
-                </button>
-              )}
-            </span>
+              {indicator.kind === "UnconstrainedDelegation" &&
+                canEditCritical && (
+                  <button
+                    type="button"
+                    className="rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActiveQuickFix("DisableUnconstrainedDelegation");
+                    }}
+                    aria-label={t(
+                      "computerDetail:quickFix.disableUnconstrainedDelegation.fixButtonAriaLabel",
+                    )}
+                    data-testid="quick-fix-DisableUnconstrainedDelegation-btn"
+                  >
+                    {t(
+                      "computerDetail:quickFix.disableUnconstrainedDelegation.fixButton",
+                    )}
+                  </button>
+                )}
+            </Tooltip>
           ))}
         </div>
       </div>
@@ -368,7 +381,9 @@ export function ComputerDetail({
             {t("groupMemberships")} ({computer.memberOf.length})
           </h3>
           <ExportToolbar<{ name: string; dn: string }>
-            columns={groupColumns.map((c): ExportColumn => ({ key: c.key, header: c.header }))}
+            columns={groupColumns.map(
+              (c): ExportColumn => ({ key: c.key, header: c.header }),
+            )}
             data={groupRows}
             rowMapper={(row) => [row.name, row.dn]}
             title={`${computer.name} - Group Memberships`}

@@ -5,6 +5,7 @@ import { type PermissionLevel, PERMISSION_LEVELS } from "@/types/permissions";
 import { usePermissions } from "@/hooks/usePermissions";
 import type { DirectoryEntry } from "@/types/directory";
 import { LoadingSpinner } from "./LoadingSpinner";
+import { Tooltip } from "./Tooltip";
 import { useTranslation } from "react-i18next";
 
 /** Maps each PermissionLevel to a list of AD group DNs. */
@@ -39,7 +40,9 @@ function extractCn(dn: string): string {
 export function PermissionMappingSettings() {
   const { t } = useTranslation(["components", "common"]);
   const { hasPermission } = usePermissions();
-  const [mappings, setMappings] = useState<PermissionMappings>({ mappings: {} });
+  const [mappings, setMappings] = useState<PermissionMappings>({
+    mappings: {},
+  });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -53,7 +56,9 @@ export function PermissionMappingSettings() {
   const [searching, setSearching] = useState(false);
 
   // Validation warnings (group DN -> exists)
-  const [validationWarnings, setValidationWarnings] = useState<Record<string, boolean>>({});
+  const [validationWarnings, setValidationWarnings] = useState<
+    Record<string, boolean>
+  >({});
 
   const isDomainAdmin = hasPermission("DomainAdmin");
 
@@ -93,38 +98,32 @@ export function PermissionMappingSettings() {
     }
   }, [mappings]);
 
-  const addGroup = useCallback(
-    (level: PermissionLevel, groupDn: string) => {
-      setMappings((prev) => {
-        const current = prev.mappings[level] ?? [];
-        if (current.includes(groupDn)) return prev;
-        return {
-          mappings: { ...prev.mappings, [level]: [...current, groupDn] },
-        };
-      });
-      setDirty(true);
-      setSearchLevel(null);
-      setSearchQuery("");
-      setSearchResults([]);
-    },
-    [],
-  );
+  const addGroup = useCallback((level: PermissionLevel, groupDn: string) => {
+    setMappings((prev) => {
+      const current = prev.mappings[level] ?? [];
+      if (current.includes(groupDn)) return prev;
+      return {
+        mappings: { ...prev.mappings, [level]: [...current, groupDn] },
+      };
+    });
+    setDirty(true);
+    setSearchLevel(null);
+    setSearchQuery("");
+    setSearchResults([]);
+  }, []);
 
-  const removeGroup = useCallback(
-    (level: PermissionLevel, groupDn: string) => {
-      setMappings((prev) => {
-        const current = prev.mappings[level] ?? [];
-        return {
-          mappings: {
-            ...prev.mappings,
-            [level]: current.filter((g) => g !== groupDn),
-          },
-        };
-      });
-      setDirty(true);
-    },
-    [],
-  );
+  const removeGroup = useCallback((level: PermissionLevel, groupDn: string) => {
+    setMappings((prev) => {
+      const current = prev.mappings[level] ?? [];
+      return {
+        mappings: {
+          ...prev.mappings,
+          [level]: current.filter((g) => g !== groupDn),
+        },
+      };
+    });
+    setDirty(true);
+  }, []);
 
   const handleSearch = useCallback(async () => {
     if (!searchQuery.trim()) return;
@@ -143,7 +142,9 @@ export function PermissionMappingSettings() {
 
   const validateGroup = useCallback(async (groupDn: string) => {
     try {
-      const exists = await invoke<boolean>("validate_group_exists", { groupDn });
+      const exists = await invoke<boolean>("validate_group_exists", {
+        groupDn,
+      });
       setValidationWarnings((prev) => ({ ...prev, [groupDn]: exists }));
     } catch {
       setValidationWarnings((prev) => ({ ...prev, [groupDn]: false }));
@@ -157,7 +158,9 @@ export function PermissionMappingSettings() {
         data-testid="permission-mapping-access-denied"
       >
         <AlertTriangle size={24} />
-        <p className="text-body">{t("components:permissionMapping.domainAdminRequired")}</p>
+        <p className="text-body">
+          {t("components:permissionMapping.domainAdminRequired")}
+        </p>
       </div>
     );
   }
@@ -217,7 +220,8 @@ export function PermissionMappingSettings() {
                   className="btn btn-sm rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2 py-1 text-caption text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors"
                   data-testid={`add-group-${level}`}
                 >
-                  <Plus size={14} className="inline" /> {t("components:permissionMapping.addGroup")}
+                  <Plus size={14} className="inline" />{" "}
+                  {t("components:permissionMapping.addGroup")}
                 </button>
               </div>
 
@@ -235,7 +239,9 @@ export function PermissionMappingSettings() {
                       onKeyDown={(e) => {
                         if (e.key === "Enter") handleSearch();
                       }}
-                      placeholder={t("components:permissionMapping.searchGroupsPlaceholder")}
+                      placeholder={t(
+                        "components:permissionMapping.searchGroupsPlaceholder",
+                      )}
                       className="flex-1 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2 py-1 text-caption text-[var(--color-text-primary)] placeholder-[var(--color-text-secondary)] focus:border-[var(--color-primary)] focus:outline-none"
                       data-testid={`group-search-input-${level}`}
                       autoFocus
@@ -252,11 +258,15 @@ export function PermissionMappingSettings() {
                   {searchResults.length > 0 && (
                     <div className="mt-2 max-h-32 overflow-y-auto">
                       {searchResults.map((group) => {
-                        const alreadyMapped = groups.includes(group.distinguishedName);
+                        const alreadyMapped = groups.includes(
+                          group.distinguishedName,
+                        );
                         return (
                           <button
                             key={group.distinguishedName}
-                            onClick={() => addGroup(level, group.distinguishedName)}
+                            onClick={() =>
+                              addGroup(level, group.distinguishedName)
+                            }
                             disabled={alreadyMapped}
                             className={`w-full rounded px-2 py-1 text-left text-caption ${
                               alreadyMapped
@@ -265,14 +275,18 @@ export function PermissionMappingSettings() {
                             }`}
                           >
                             <span className="font-medium">
-                              {group.displayName ?? group.samAccountName ?? extractCn(group.distinguishedName)}
+                              {group.displayName ??
+                                group.samAccountName ??
+                                extractCn(group.distinguishedName)}
                             </span>
                             <span className="ml-2 text-[var(--color-text-secondary)]">
                               {group.distinguishedName}
                             </span>
                             {alreadyMapped && (
                               <span className="ml-1 text-[var(--color-text-secondary)]">
-                                {t("components:permissionMapping.alreadyMapped")}
+                                {t(
+                                  "components:permissionMapping.alreadyMapped",
+                                )}
                               </span>
                             )}
                           </button>
@@ -297,12 +311,16 @@ export function PermissionMappingSettings() {
                     >
                       <div className="flex items-center gap-2 min-w-0">
                         {validationWarnings[groupDn] === false && (
-                          <span title={t("components:permissionMapping.groupNotFoundInAd")}>
+                          <Tooltip
+                            content={t(
+                              "components:permissionMapping.groupNotFoundInAd",
+                            )}
+                          >
                             <AlertTriangle
                               size={14}
                               className="shrink-0 text-[var(--color-warning)]"
                             />
-                          </span>
+                          </Tooltip>
                         )}
                         <span className="truncate text-caption text-[var(--color-text-primary)]">
                           {extractCn(groupDn)}
@@ -313,23 +331,33 @@ export function PermissionMappingSettings() {
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
                         {validationWarnings[groupDn] === undefined && (
-                          <button
-                            onClick={() => validateGroup(groupDn)}
-                            className="text-caption text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
-                            title={t("components:permissionMapping.validateGroupExists")}
-                            data-testid={`validate-group-btn`}
+                          <Tooltip
+                            content={t(
+                              "components:permissionMapping.validateGroupExists",
+                            )}
                           >
-                            <Search size={12} />
-                          </button>
+                            <button
+                              onClick={() => validateGroup(groupDn)}
+                              className="text-caption text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors"
+                              data-testid={`validate-group-btn`}
+                            >
+                              <Search size={12} />
+                            </button>
+                          </Tooltip>
                         )}
-                        <button
-                          onClick={() => removeGroup(level, groupDn)}
-                          className="text-[var(--color-text-secondary)] hover:text-[var(--color-error)] transition-colors"
-                          title={t("components:permissionMapping.removeGroup")}
-                          data-testid={`remove-group-btn`}
+                        <Tooltip
+                          content={t(
+                            "components:permissionMapping.removeGroup",
+                          )}
                         >
-                          <X size={14} />
-                        </button>
+                          <button
+                            onClick={() => removeGroup(level, groupDn)}
+                            className="text-[var(--color-text-secondary)] hover:text-[var(--color-error)] transition-colors"
+                            data-testid={`remove-group-btn`}
+                          >
+                            <X size={14} />
+                          </button>
+                        </Tooltip>
                       </div>
                     </div>
                   ))}
@@ -347,10 +375,14 @@ export function PermissionMappingSettings() {
           className="btn btn-sm btn-primary"
           data-testid="permission-mapping-save"
         >
-          {saving ? t("common:saving") : t("components:permissionMapping.saveMappings")}
+          {saving
+            ? t("common:saving")
+            : t("components:permissionMapping.saveMappings")}
         </button>
         {dirty && (
-          <span className="text-caption text-[var(--color-warning)]">{t("common:unsavedChanges")}</span>
+          <span className="text-caption text-[var(--color-warning)]">
+            {t("common:unsavedChanges")}
+          </span>
         )}
       </div>
     </div>

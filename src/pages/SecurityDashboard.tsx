@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { EmptyState } from "@/components/common/EmptyState";
 import { AlertBadge } from "@/components/common/AlertBadge";
+import { Tooltip } from "@/components/common/Tooltip";
 import {
   RefreshCw,
   ShieldAlert,
@@ -42,9 +43,15 @@ function AccountRow({
         <td className="px-3 py-2">
           <div className="flex items-center gap-1.5">
             {isExpanded ? (
-              <ChevronDown size={14} className="shrink-0 text-[var(--color-text-secondary)]" />
+              <ChevronDown
+                size={14}
+                className="shrink-0 text-[var(--color-text-secondary)]"
+              />
             ) : (
-              <ChevronRight size={14} className="shrink-0 text-[var(--color-text-secondary)]" />
+              <ChevronRight
+                size={14}
+                className="shrink-0 text-[var(--color-text-secondary)]"
+              />
             )}
             <span className="font-medium text-[var(--color-text-primary)]">
               {account.samAccountName}
@@ -63,18 +70,25 @@ function AccountRow({
             : t("common:never")}
         </td>
         <td className="px-3 py-2 text-center text-[var(--color-text-secondary)]">
-          {account.passwordAgeDays != null ? `${account.passwordAgeDays}d` : "-"}
+          {account.passwordAgeDays != null
+            ? `${account.passwordAgeDays}d`
+            : "-"}
         </td>
         <td className="px-3 py-2 text-center">
-          <span
-            className="inline-block h-2 w-2 rounded-full"
-            style={{
-              backgroundColor: account.enabled
-                ? "var(--color-success)"
-                : "var(--color-error)",
-            }}
-            title={account.enabled ? t("common:enabled") : t("common:disabled")}
-          />
+          <Tooltip
+            content={
+              account.enabled ? t("common:enabled") : t("common:disabled")
+            }
+          >
+            <span
+              className="inline-block h-2 w-2 rounded-full"
+              style={{
+                backgroundColor: account.enabled
+                  ? "var(--color-success)"
+                  : "var(--color-error)",
+              }}
+            />
+          </Tooltip>
         </td>
         <td className="px-3 py-2">
           <AlertBadge alerts={account.alerts} compact={!hasAlerts} />
@@ -88,15 +102,51 @@ function AccountRow({
                 <strong>{t("dn")}</strong> {account.distinguishedName}
               </div>
               <div className="flex flex-wrap gap-x-4 gap-y-1 text-caption text-[var(--color-text-secondary)]">
-                <span><strong>{t("pwdNeverExpires")}</strong> {account.passwordNeverExpires ? t("common:yes") : t("common:no")}</span>
-                <span><strong>{t("kerberoastable")}</strong> {account.kerberoastable ? t("common:yes") : t("common:no")}</span>
-                <span><strong>{t("asRepRoastable")}</strong> {account.asrepRoastable ? t("common:yes") : t("common:no")}</span>
-                <span><strong>{t("protectedUsers")}</strong> {account.inProtectedUsers ? t("common:yes") : t("common:no")}</span>
-                {account.reversibleEncryption && <span><strong>{t("reversibleEncryption")}</strong> {t("common:yes")}</span>}
-                {account.desOnly && <span><strong>{t("desOnly")}</strong> {t("common:yes")}</span>}
-                {account.constrainedDelegationTransition && <span><strong>{t("constrainedDelegTransition")}</strong> {t("common:yes")}</span>}
-                {account.hasSidHistory && <span><strong>{t("sidHistory")}</strong> {t("common:present")}</span>}
-                {account.isServiceAccount && <span><strong>{t("serviceAccount")}</strong> {t("common:yes")}</span>}
+                <span>
+                  <strong>{t("pwdNeverExpires")}</strong>{" "}
+                  {account.passwordNeverExpires
+                    ? t("common:yes")
+                    : t("common:no")}
+                </span>
+                <span>
+                  <strong>{t("kerberoastable")}</strong>{" "}
+                  {account.kerberoastable ? t("common:yes") : t("common:no")}
+                </span>
+                <span>
+                  <strong>{t("asRepRoastable")}</strong>{" "}
+                  {account.asrepRoastable ? t("common:yes") : t("common:no")}
+                </span>
+                <span>
+                  <strong>{t("protectedUsers")}</strong>{" "}
+                  {account.inProtectedUsers ? t("common:yes") : t("common:no")}
+                </span>
+                {account.reversibleEncryption && (
+                  <span>
+                    <strong>{t("reversibleEncryption")}</strong>{" "}
+                    {t("common:yes")}
+                  </span>
+                )}
+                {account.desOnly && (
+                  <span>
+                    <strong>{t("desOnly")}</strong> {t("common:yes")}
+                  </span>
+                )}
+                {account.constrainedDelegationTransition && (
+                  <span>
+                    <strong>{t("constrainedDelegTransition")}</strong>{" "}
+                    {t("common:yes")}
+                  </span>
+                )}
+                {account.hasSidHistory && (
+                  <span>
+                    <strong>{t("sidHistory")}</strong> {t("common:present")}
+                  </span>
+                )}
+                {account.isServiceAccount && (
+                  <span>
+                    <strong>{t("serviceAccount")}</strong> {t("common:yes")}
+                  </span>
+                )}
               </div>
               {account.alerts.length > 0 && (
                 <div className="mt-2">
@@ -116,12 +166,16 @@ export function SecurityDashboard() {
   const [report, setReport] = useState<PrivilegedAccountsReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set());
+  const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(
+    new Set(),
+  );
 
   const fetchReport = useCallback(async () => {
     try {
       setError(null);
-      const data = await invoke<PrivilegedAccountsReport>("get_privileged_accounts");
+      const data = await invoke<PrivilegedAccountsReport>(
+        "get_privileged_accounts",
+      );
       setReport(data);
     } catch (e: unknown) {
       setError(extractErrorMessage(e));
@@ -164,18 +218,30 @@ export function SecurityDashboard() {
           {report && (
             <div className="flex items-center gap-1.5 text-caption">
               {report.summary.critical > 0 && (
-                <span className="flex items-center gap-1 rounded-full bg-[var(--color-error-bg)] px-2 py-0.5 font-medium" style={{ color: "var(--color-error)" }}>
-                  <AlertCircle size={12} /> {report.summary.critical} {t("common:critical")}
+                <span
+                  className="flex items-center gap-1 rounded-full bg-[var(--color-error-bg)] px-2 py-0.5 font-medium"
+                  style={{ color: "var(--color-error)" }}
+                >
+                  <AlertCircle size={12} /> {report.summary.critical}{" "}
+                  {t("common:critical")}
                 </span>
               )}
               {report.summary.high > 0 && (
-                <span className="flex items-center gap-1 rounded-full bg-[var(--color-warning-bg)] px-2 py-0.5 font-medium" style={{ color: "var(--color-warning)" }}>
-                  <AlertTriangle size={12} /> {report.summary.high} {t("common:high")}
+                <span
+                  className="flex items-center gap-1 rounded-full bg-[var(--color-warning-bg)] px-2 py-0.5 font-medium"
+                  style={{ color: "var(--color-warning)" }}
+                >
+                  <AlertTriangle size={12} /> {report.summary.high}{" "}
+                  {t("common:high")}
                 </span>
               )}
               {report.summary.medium > 0 && (
-                <span className="flex items-center gap-1 rounded-full bg-[var(--color-info-bg)] px-2 py-0.5 font-medium" style={{ color: "var(--color-info)" }}>
-                  <AlertTriangle size={12} /> {report.summary.medium} {t("common:medium")}
+                <span
+                  className="flex items-center gap-1 rounded-full bg-[var(--color-info-bg)] px-2 py-0.5 font-medium"
+                  style={{ color: "var(--color-info)" }}
+                >
+                  <AlertTriangle size={12} /> {report.summary.medium}{" "}
+                  {t("common:medium")}
                 </span>
               )}
               <span className="ml-1 text-[var(--color-text-secondary)]">
@@ -241,90 +307,138 @@ export function SecurityDashboard() {
           />
         ) : (
           <>
-          <div className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)]">
-            <table className="w-full text-caption" data-testid="privileged-accounts-table">
-              <thead>
-                <tr className="border-b border-[var(--color-border-default)] text-left text-[var(--color-text-secondary)]">
-                  <th className="px-3 py-2 font-medium">{t("username")}</th>
-                  <th className="px-3 py-2 font-medium">{t("common:displayName")}</th>
-                  <th className="px-3 py-2 font-medium">{t("groups")}</th>
-                  <th className="px-3 py-2 font-medium">{t("common:lastLogon")}</th>
-                  <th className="px-3 py-2 text-center font-medium">{t("pwdAge")}</th>
-                  <th className="px-3 py-2 text-center font-medium">{t("common:status")}</th>
-                  <th className="px-3 py-2 font-medium">{t("alerts")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {report.accounts.map((account) => (
-                  <AccountRow
-                    key={account.distinguishedName}
-                    account={account}
-                    isExpanded={expandedAccounts.has(account.distinguishedName)}
-                    onToggle={() => handleToggleAccount(account.distinguishedName)}
-                  />
-                ))}
-              </tbody>
-            </table>
-            <div className="border-t border-[var(--color-border-default)] px-3 py-2 text-[10px] text-[var(--color-text-secondary)]">
-              {t("lastScanned")} {new Date(report.scannedAt).toLocaleString()}
+            <div className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)]">
+              <table
+                className="w-full text-caption"
+                data-testid="privileged-accounts-table"
+              >
+                <thead>
+                  <tr className="border-b border-[var(--color-border-default)] text-left text-[var(--color-text-secondary)]">
+                    <th className="px-3 py-2 font-medium">{t("username")}</th>
+                    <th className="px-3 py-2 font-medium">
+                      {t("common:displayName")}
+                    </th>
+                    <th className="px-3 py-2 font-medium">{t("groups")}</th>
+                    <th className="px-3 py-2 font-medium">
+                      {t("common:lastLogon")}
+                    </th>
+                    <th className="px-3 py-2 text-center font-medium">
+                      {t("pwdAge")}
+                    </th>
+                    <th className="px-3 py-2 text-center font-medium">
+                      {t("common:status")}
+                    </th>
+                    <th className="px-3 py-2 font-medium">{t("alerts")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {report.accounts.map((account) => (
+                    <AccountRow
+                      key={account.distinguishedName}
+                      account={account}
+                      isExpanded={expandedAccounts.has(
+                        account.distinguishedName,
+                      )}
+                      onToggle={() =>
+                        handleToggleAccount(account.distinguishedName)
+                      }
+                    />
+                  ))}
+                </tbody>
+              </table>
+              <div className="border-t border-[var(--color-border-default)] px-3 py-2 text-[10px] text-[var(--color-text-secondary)]">
+                {t("lastScanned")} {new Date(report.scannedAt).toLocaleString()}
+              </div>
             </div>
-          </div>
 
-          {/* Domain-level findings */}
-          {report.domainFindings && (
-            <div className="mt-4 rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-4" data-testid="domain-findings">
-              <h3 className="mb-3 text-body font-semibold text-[var(--color-text-primary)]">
-                {t("domainSecurityFindings")}
-              </h3>
-              <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-caption">
-                {report.domainFindings.krbtgtPasswordAgeDays != null && (
-                  <div className="text-[var(--color-text-secondary)]">
-                    <strong>{t("krbtgtPasswordAge")}</strong>{" "}
-                    <span style={{ color: report.domainFindings.krbtgtPasswordAgeDays > 180 ? "var(--color-error)" : "var(--color-success)" }}>
-                      {report.domainFindings.krbtgtPasswordAgeDays} {t("days")}
-                    </span>
-                  </div>
-                )}
-                {report.domainFindings.lapsCoveragePercent != null && (
-                  <div className="text-[var(--color-text-secondary)]">
-                    <strong>{t("lapsCoverage")}</strong>{" "}
-                    <span style={{ color: report.domainFindings.lapsCoveragePercent < 80 ? "var(--color-warning)" : "var(--color-success)" }}>
-                      {report.domainFindings.lapsCoveragePercent.toFixed(0)}% ({report.domainFindings.lapsDeployedCount}/{report.domainFindings.totalComputerCount})
-                    </span>
-                  </div>
-                )}
-                {report.domainFindings.domainFunctionalLevel && (
-                  <div className="text-[var(--color-text-secondary)]">
-                    <strong>{t("domainLevel")}</strong> {report.domainFindings.domainFunctionalLevel}
-                  </div>
-                )}
-                {report.domainFindings.psoCount > 0 && (
-                  <div className="text-[var(--color-text-secondary)]">
-                    <strong>{t("passwordPolicies")}</strong> {report.domainFindings.psoCount}
-                  </div>
-                )}
-                {report.domainFindings.rbcdConfiguredCount > 0 && (
-                  <div className="text-[var(--color-text-secondary)]">
-                    <strong>{t("rbcdConfigured")}</strong>{" "}
-                    <span style={{ color: "var(--color-warning)" }}>{report.domainFindings.rbcdConfiguredCount} {t("objects")}</span>
-                  </div>
-                )}
-                {report.domainFindings.recycleBinEnabled != null && (
-                  <div className="text-[var(--color-text-secondary)]">
-                    <strong>{t("recycleBin")}</strong>{" "}
-                    <span style={{ color: report.domainFindings.recycleBinEnabled ? "var(--color-success)" : "var(--color-warning)" }}>
-                      {report.domainFindings.recycleBinEnabled ? t("common:enabled") : t("common:disabled")}
-                    </span>
+            {/* Domain-level findings */}
+            {report.domainFindings && (
+              <div
+                className="mt-4 rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-4"
+                data-testid="domain-findings"
+              >
+                <h3 className="mb-3 text-body font-semibold text-[var(--color-text-primary)]">
+                  {t("domainSecurityFindings")}
+                </h3>
+                <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-caption">
+                  {report.domainFindings.krbtgtPasswordAgeDays != null && (
+                    <div className="text-[var(--color-text-secondary)]">
+                      <strong>{t("krbtgtPasswordAge")}</strong>{" "}
+                      <span
+                        style={{
+                          color:
+                            report.domainFindings.krbtgtPasswordAgeDays > 180
+                              ? "var(--color-error)"
+                              : "var(--color-success)",
+                        }}
+                      >
+                        {report.domainFindings.krbtgtPasswordAgeDays}{" "}
+                        {t("days")}
+                      </span>
+                    </div>
+                  )}
+                  {report.domainFindings.lapsCoveragePercent != null && (
+                    <div className="text-[var(--color-text-secondary)]">
+                      <strong>{t("lapsCoverage")}</strong>{" "}
+                      <span
+                        style={{
+                          color:
+                            report.domainFindings.lapsCoveragePercent < 80
+                              ? "var(--color-warning)"
+                              : "var(--color-success)",
+                        }}
+                      >
+                        {report.domainFindings.lapsCoveragePercent.toFixed(0)}%
+                        ({report.domainFindings.lapsDeployedCount}/
+                        {report.domainFindings.totalComputerCount})
+                      </span>
+                    </div>
+                  )}
+                  {report.domainFindings.domainFunctionalLevel && (
+                    <div className="text-[var(--color-text-secondary)]">
+                      <strong>{t("domainLevel")}</strong>{" "}
+                      {report.domainFindings.domainFunctionalLevel}
+                    </div>
+                  )}
+                  {report.domainFindings.psoCount > 0 && (
+                    <div className="text-[var(--color-text-secondary)]">
+                      <strong>{t("passwordPolicies")}</strong>{" "}
+                      {report.domainFindings.psoCount}
+                    </div>
+                  )}
+                  {report.domainFindings.rbcdConfiguredCount > 0 && (
+                    <div className="text-[var(--color-text-secondary)]">
+                      <strong>{t("rbcdConfigured")}</strong>{" "}
+                      <span style={{ color: "var(--color-warning)" }}>
+                        {report.domainFindings.rbcdConfiguredCount}{" "}
+                        {t("objects")}
+                      </span>
+                    </div>
+                  )}
+                  {report.domainFindings.recycleBinEnabled != null && (
+                    <div className="text-[var(--color-text-secondary)]">
+                      <strong>{t("recycleBin")}</strong>{" "}
+                      <span
+                        style={{
+                          color: report.domainFindings.recycleBinEnabled
+                            ? "var(--color-success)"
+                            : "var(--color-warning)",
+                        }}
+                      >
+                        {report.domainFindings.recycleBinEnabled
+                          ? t("common:enabled")
+                          : t("common:disabled")}
+                      </span>
+                    </div>
+                  )}
+                </div>
+                {report.domainFindings.alerts.length > 0 && (
+                  <div className="mt-3">
+                    <AlertBadge alerts={report.domainFindings.alerts} />
                   </div>
                 )}
               </div>
-              {report.domainFindings.alerts.length > 0 && (
-                <div className="mt-3">
-                  <AlertBadge alerts={report.domainFindings.alerts} />
-                </div>
-              )}
-            </div>
-          )}
+            )}
           </>
         )}
       </div>

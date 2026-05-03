@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Themed `<Tooltip>` and `<InfoTooltip>` shared components** (`src/components/common/Tooltip.tsx`). Replacement for the native HTML `title=` attribute: floating card rendered through a portal so it escapes overflow ancestors (table cells, scroll containers), viewport-aware positioning that flips above when the bottom does not fit, and theme tokens (`--color-surface-card`, `--color-border-default`, `--color-text-primary`) so the popover follows the active theme. `Tooltip` wraps any element on hover/focus; `InfoTooltip` exposes the `HygieneSection` "i" icon + click-to-open popover pattern as a reusable component for richer helper text. 12 vitest cases plus Storybook stories.
+
+### Fixed
+
+- **Helper popovers ignored the active theme**. Many `title=` helpers introduced across recent releases were rendered by the user agent (white-on-black) and bypassed DSPanel's theme tokens. Migrated every native HTML `title=` occurrence to wrap the element in `<Tooltip>` (31 sites across 33 source files); component-prop `title=` on `EmptyState`, `ExportToolbar`, `DialogShell`, `HygieneSection`, `ConfirmationDialog`, `DashboardCard`, and `PropertyRow` stays as-is (props, not DOM attributes). Two redundant cases dropped along the way: the `Sidebar` collapsed-mode `title=` duplicated an existing themed sibling popover, and the `AuditLog` sort-toggle `title=` duplicated the visible button label.
+
 ## [1.1.0] - 2026-04-27
 
 ### Added

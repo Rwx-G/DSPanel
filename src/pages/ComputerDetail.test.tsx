@@ -301,7 +301,9 @@ describe("ComputerDetail", () => {
     it("renders export toolbar in groups section", () => {
       render(<ComputerDetail computer={makeComputer()} />);
       const groupsSection = screen.getByTestId("computer-groups-section");
-      const exportToolbar = groupsSection.querySelector('[data-testid="export-toolbar"]');
+      const exportToolbar = groupsSection.querySelector(
+        '[data-testid="export-toolbar"]',
+      );
       expect(exportToolbar).toBeInTheDocument();
     });
 
@@ -341,7 +343,8 @@ describe("ComputerDetail", () => {
 
       // Find "IT Workstations" text and locate the parent row element
       const itText = screen.getByText("IT Workstations");
-      const groupRow = itText.closest("tr") ?? itText.closest("[data-testid]")?.parentElement;
+      const groupRow =
+        itText.closest("tr") ?? itText.closest("[data-testid]")?.parentElement;
       expect(groupRow).not.toBeNull();
       fireEvent.contextMenu(groupRow!);
 
@@ -360,7 +363,8 @@ describe("ComputerDetail", () => {
       render(<ComputerDetail computer={makeComputer()} />);
 
       const itText = screen.getByText("IT Workstations");
-      const groupRow = itText.closest("tr") ?? itText.closest("[data-testid]")?.parentElement;
+      const groupRow =
+        itText.closest("tr") ?? itText.closest("[data-testid]")?.parentElement;
       fireEvent.contextMenu(groupRow!);
 
       await waitFor(() => {
@@ -376,16 +380,16 @@ describe("ComputerDetail", () => {
       fireEvent.click(screen.getByTestId("close-group-dialog"));
 
       await waitFor(() => {
-        expect(screen.queryByTestId("group-members-dialog")).not.toBeInTheDocument();
+        expect(
+          screen.queryByTestId("group-members-dialog"),
+        ).not.toBeInTheDocument();
       });
     });
   });
 
   describe("DNS cache and timeout indicator", () => {
     it("uses DNS cache on re-render with same hostname", async () => {
-      const { rerender } = render(
-        <ComputerDetail computer={makeComputer()} />,
-      );
+      const { rerender } = render(<ComputerDetail computer={makeComputer()} />);
 
       // Wait for initial DNS resolution
       await waitFor(() => {
@@ -397,9 +401,7 @@ describe("ComputerDetail", () => {
       ).length;
 
       // Re-render with same hostname - should use cache
-      rerender(
-        <ComputerDetail computer={makeComputer()} />,
-      );
+      rerender(<ComputerDetail computer={makeComputer()} />);
 
       // Wait a tick and verify no additional resolve_dns call
       await waitFor(() => {
@@ -433,7 +435,9 @@ describe("ComputerDetail", () => {
   describe("Delete computer", () => {
     it("does not show delete button for ReadOnly users", () => {
       render(<ComputerDetail computer={makeComputer()} />);
-      expect(screen.queryByTestId("computer-delete-btn")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("computer-delete-btn"),
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -481,11 +485,11 @@ describe("ComputerDetail", () => {
         "computer-security-indicator-badge-UnconstrainedDelegation",
       );
       expect(badge).toBeInTheDocument();
-      expect(badge.querySelector('[data-testid="status-badge"]')).toHaveAttribute(
-        "data-variant",
-        "error",
-      );
-      const title = badge.getAttribute("title") ?? "";
+      expect(
+        badge.querySelector('[data-testid="status-badge"]'),
+      ).toHaveAttribute("data-variant", "error");
+      fireEvent.mouseEnter(badge);
+      const title = screen.getByTestId("tooltip-card").textContent ?? "";
       expect(title).toContain("TRUSTED_FOR_DELEGATION");
     });
 
@@ -500,10 +504,7 @@ describe("ComputerDetail", () => {
                 severity: "Warning",
                 descriptionKey: "securityIndicators.ConstrainedDelegation",
                 metadata: {
-                  target_spns: [
-                    "http/web1.corp.local",
-                    "http/web2.corp.local",
-                  ],
+                  target_spns: ["http/web1.corp.local", "http/web2.corp.local"],
                 },
               },
             ],
@@ -514,11 +515,11 @@ describe("ComputerDetail", () => {
       const badge = screen.getByTestId(
         "computer-security-indicator-badge-ConstrainedDelegation",
       );
-      expect(badge.querySelector('[data-testid="status-badge"]')).toHaveAttribute(
-        "data-variant",
-        "warning",
-      );
-      const title = badge.getAttribute("title") ?? "";
+      expect(
+        badge.querySelector('[data-testid="status-badge"]'),
+      ).toHaveAttribute("data-variant", "warning");
+      fireEvent.mouseEnter(badge);
+      const title = screen.getByTestId("tooltip-card").textContent ?? "";
       expect(title).toContain("http/web1.corp.local");
       expect(title).toContain("http/web2.corp.local");
       expect(title).toContain("msDS-AllowedToDelegateTo");
@@ -549,11 +550,11 @@ describe("ComputerDetail", () => {
       const badge = screen.getByTestId(
         "computer-security-indicator-badge-Rbcd",
       );
-      expect(badge.querySelector('[data-testid="status-badge"]')).toHaveAttribute(
-        "data-variant",
-        "warning",
-      );
-      const title = badge.getAttribute("title") ?? "";
+      expect(
+        badge.querySelector('[data-testid="status-badge"]'),
+      ).toHaveAttribute("data-variant", "warning");
+      fireEvent.mouseEnter(badge);
+      const title = screen.getByTestId("tooltip-card").textContent ?? "";
       expect(title).toContain("S-1-5-21-1-2-3-1000");
       expect(title).toContain("S-1-5-21-1-2-3-1001");
       expect(title).toContain("msDS-AllowedToActOnBehalfOfOtherIdentity");
@@ -623,7 +624,10 @@ describe("ComputerDetail", () => {
       );
       expect(badge).toBeInTheDocument();
       // Tooltip still renders, just with empty interpolation
-      expect(badge.getAttribute("title")).toContain("msDS-AllowedToDelegateTo");
+      fireEvent.mouseEnter(badge);
+      expect(screen.getByTestId("tooltip-card").textContent).toContain(
+        "msDS-AllowedToDelegateTo",
+      );
     });
 
     it("handles Rbcd with missing metadata gracefully", () => {
@@ -651,7 +655,8 @@ describe("ComputerDetail", () => {
       );
       expect(badge).toBeInTheDocument();
       // Tooltip still renders, just with empty {{principals}} interpolation
-      expect(badge.getAttribute("title")).toContain(
+      fireEvent.mouseEnter(badge);
+      expect(screen.getByTestId("tooltip-card").textContent).toContain(
         "msDS-AllowedToActOnBehalfOfOtherIdentity",
       );
     });

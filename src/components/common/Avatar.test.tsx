@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { Avatar } from "./Avatar";
 
 describe("Avatar", () => {
@@ -38,9 +38,11 @@ describe("Avatar", () => {
     });
   });
 
-  it("should have title with display name", () => {
+  it("reveals the display name in a themed tooltip on hover", () => {
     render(<Avatar displayName="John Doe" />);
-    expect(screen.getByTestId("avatar")).toHaveAttribute("title", "John Doe");
+    const trigger = screen.getByTestId("avatar").parentElement as HTMLElement;
+    fireEvent.mouseEnter(trigger);
+    expect(screen.getByTestId("tooltip-card")).toHaveTextContent("John Doe");
   });
 
   it("should show ? for empty display name", () => {

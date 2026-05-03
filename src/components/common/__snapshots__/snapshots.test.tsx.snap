@@ -1,18 +1,21 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`Common controls - visual snapshots > Avatar renders with initials fallback 1`] = `
-<div
-  class="flex shrink-0 items-center justify-center overflow-hidden rounded-full text-[var(--color-text-inverse)] font-medium"
-  data-testid="avatar"
-  style="width: 40px; height: 40px; font-size: 16px; background-color: rgb(52, 178, 108);"
-  title="John Doe"
+<span
+  tabindex="0"
 >
-  <span
-    data-testid="avatar-initials"
+  <div
+    class="flex shrink-0 items-center justify-center overflow-hidden rounded-full text-[var(--color-text-inverse)] font-medium"
+    data-testid="avatar"
+    style="width: 40px; height: 40px; font-size: 16px; background-color: rgb(52, 178, 108);"
   >
-    JD
-  </span>
-</div>
+    <span
+      data-testid="avatar-initials"
+    >
+      JD
+    </span>
+  </div>
+</span>
 `;
 
 exports[`Common controls - visual snapshots > CopyButton renders idle state 1`] = `
