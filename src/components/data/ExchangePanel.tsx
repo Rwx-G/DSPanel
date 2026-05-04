@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ChevronDown, ChevronRight, Mail } from "lucide-react";
 import { CopyButton } from "@/components/common/CopyButton";
+import { Tooltip } from "@/components/common/Tooltip";
 import { type ExchangeMailboxInfo } from "@/types/exchange";
 import { parseCnFromDn } from "@/utils/dn";
 import { useTranslation } from "react-i18next";
@@ -57,7 +58,9 @@ export function ExchangePanel({ exchangeInfo }: ExchangePanelProps) {
           {exchangeInfo.emailAliases.length > 0 && (
             <div className="border-t border-[var(--color-border-subtle)] px-3 py-2">
               <h4 className="mb-1 text-caption font-medium text-[var(--color-text-secondary)]">
-                {t("components:exchangePanel.emailAliases", { count: exchangeInfo.emailAliases.length })}
+                {t("components:exchangePanel.emailAliases", {
+                  count: exchangeInfo.emailAliases.length,
+                })}
               </h4>
               <ul className="space-y-0.5" data-testid="exchange-aliases-list">
                 {exchangeInfo.emailAliases.map((alias) => (
@@ -76,16 +79,17 @@ export function ExchangePanel({ exchangeInfo }: ExchangePanelProps) {
           {exchangeInfo.delegates.length > 0 && (
             <div className="border-t border-[var(--color-border-subtle)] px-3 py-2">
               <h4 className="mb-1 text-caption font-medium text-[var(--color-text-secondary)]">
-                {t("components:exchangePanel.delegates", { count: exchangeInfo.delegates.length })}
+                {t("components:exchangePanel.delegates", {
+                  count: exchangeInfo.delegates.length,
+                })}
               </h4>
               <ul className="space-y-0.5" data-testid="exchange-delegates-list">
                 {exchangeInfo.delegates.map((dn) => (
                   <li
                     key={dn}
                     className="text-caption text-[var(--color-text-primary)]"
-                    title={dn}
                   >
-                    {parseCnFromDn(dn)}
+                    <Tooltip content={dn}>{parseCnFromDn(dn)}</Tooltip>
                   </li>
                 ))}
               </ul>
@@ -113,10 +117,12 @@ function PropertyRow({
         {label}
       </td>
       <td className="px-3 py-1.5 text-[var(--color-text-primary)]">
-        <span className="flex items-center gap-1" title={title}>
-          <span className="font-mono">{value || t("common:na")}</span>
-          {value && <CopyButton text={value} />}
-        </span>
+        <Tooltip content={title ?? ""}>
+          <span className="flex items-center gap-1">
+            <span className="font-mono">{value || t("common:na")}</span>
+            {value && <CopyButton text={value} />}
+          </span>
+        </Tooltip>
       </td>
     </tr>
   );

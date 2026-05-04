@@ -1,0 +1,36 @@
+# Dependabot configuration. See:
+# https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: /src-tauri
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    ignore:
+      # glib 0.18.x (and the gtk-rs 0.18 family: atk, gtk, gdk, etc.) is
+      # pinned by Tauri 2 -> gtk 0.18.2 -> webkit2gtk 2.0.2. Tauri 3 is the
+      # next branch that bumps gtk-rs; we cannot bump independently without
+      # forking Tauri. Linux-only build target. The advisory targets an
+      # unsoundness in `Iterator` / `DoubleEndedIterator` for
+      # `glib::VariantStrIter`, a type DSPanel does not consume directly.
+      # Re-evaluate when Tauri ships a 2.x release that bumps gtk-rs to 0.20
+      # or when we migrate to Tauri 3.
+      - dependency-name: glib
+        versions: ["< 0.20"]
+      - dependency-name: gtk
+      - dependency-name: gdk
+      - dependency-name: gdk-pixbuf
+      - dependency-name: atk
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

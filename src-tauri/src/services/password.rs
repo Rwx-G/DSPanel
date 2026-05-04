@@ -120,7 +120,7 @@ pub fn generate_password(options: &PasswordOptions) -> Result<String> {
 pub async fn check_hibp(password: &str, http_client: &reqwest::Client) -> Result<HibpResult> {
     let mut hasher = Sha1::new();
     hasher.update(password.as_bytes());
-    let hash = format!("{:X}", hasher.finalize());
+    let hash = data_encoding::HEXUPPER.encode(&hasher.finalize());
 
     let prefix = &hash[..5];
     let suffix = &hash[5..];
@@ -350,7 +350,7 @@ mod tests {
         // Known SHA1 for "password"
         let mut hasher = Sha1::new();
         hasher.update(b"password");
-        let hash = format!("{:X}", hasher.finalize());
+        let hash = data_encoding::HEXUPPER.encode(&hasher.finalize());
         assert_eq!(hash, "5BAA61E4C9B93F3F0682250B6CF8331B7EE68FD8");
     }
 
@@ -358,7 +358,7 @@ mod tests {
     fn test_sha1_prefix_extraction() {
         let mut hasher = Sha1::new();
         hasher.update(b"password");
-        let hash = format!("{:X}", hasher.finalize());
+        let hash = data_encoding::HEXUPPER.encode(&hasher.finalize());
         let prefix = &hash[..5];
         let suffix = &hash[5..];
         assert_eq!(prefix, "5BAA6");

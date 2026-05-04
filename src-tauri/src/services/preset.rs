@@ -51,7 +51,7 @@ fn checksums_file_path() -> Option<PathBuf> {
 /// Computes the SHA-256 hex digest of a byte slice.
 fn compute_sha256(data: &[u8]) -> String {
     let hash = Sha256::digest(data);
-    format!("{:x}", hash)
+    data_encoding::HEXLOWER.encode(&hash)
 }
 
 /// Persisted preset settings.

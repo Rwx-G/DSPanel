@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-05-04
+
+### Added
+
+- **Themed `<Tooltip>` and `<InfoTooltip>` shared components** (`src/components/common/Tooltip.tsx`). Replacement for the native HTML `title=` attribute: floating card rendered through a portal so it escapes overflow ancestors (table cells, scroll containers), viewport-aware positioning that flips above when the bottom does not fit, and theme tokens (`--color-surface-card`, `--color-border-default`, `--color-text-primary`) so the popover follows the active theme. `Tooltip` wraps any element on hover/focus; `InfoTooltip` exposes the `HygieneSection` "i" icon + click-to-open popover pattern as a reusable component for richer helper text. 12 vitest cases plus Storybook stories.
+
+### Fixed
+
+- **Helper popovers ignored the active theme**. Many `title=` helpers introduced across recent releases were rendered by the user agent (white-on-black) and bypassed DSPanel's theme tokens. Migrated every native HTML `title=` occurrence to wrap the element in `<Tooltip>` (31 sites across 33 source files); component-prop `title=` on `EmptyState`, `ExportToolbar`, `DialogShell`, `HygieneSection`, `ConfirmationDialog`, `DashboardCard`, and `PropertyRow` stays as-is (props, not DOM attributes). Two redundant cases dropped along the way: the `Sidebar` collapsed-mode `title=` duplicated an existing themed sibling popover, and the `AuditLog` sort-toggle `title=` duplicated the visible button label.
+
+### Security
+
+- Bump `hickory-resolver` 0.25 -> 0.26 to clear `RUSTSEC-2026-0119` (CPU exhaustion via O(n^2) name compression during message encoding). Same major bump also clears `RUSTSEC-2026-0118` (NSEC3 closest-encloser proof unbounded loop on cross-zone responses). Adapted call sites in `services/dns_validation.rs`, `services/dc_health.rs`, `services/ldap_directory.rs`, and `services/topology.rs` to the new API: `NameServerConfigGroup::from_ips_clear` -> `vec![NameServerConfig::udp_and_tcp(ip)]`, `Resolver::build()` now returns `Result<Resolver, NetError>`, SRV lookup result iterates via `Lookup::answers().iter().filter_map(RData::SRV)` instead of the removed `SrvLookup::iter()`. The `create_ad_resolver` helper in `dns_validation.rs` now returns `Option<TokioResolver>` so the caller can degrade gracefully (logging a warning and treating SRV lookups as no-result) when every fallback path fails to build a resolver.
+- Patch transitive `cargo update` bumps to clear three GitHub Dependabot alerts: `grid` 1.0.0 -> 1.0.1 (`GHSA-38c5-483c-4qqp`, integer overflow in `Grid::expand_rows`), `rand` 0.10.0 -> 0.10.1 / 0.9.2 -> 0.9.4 / 0.8.5 -> 0.8.6 (`GHSA-cq8v-f236-94qc`, unsoundness with custom logger).
+- Add `src-tauri/audit.toml` to document the residual `cargo audit` warnings the project knowingly tolerates: the gtk-rs 0.18 family (`atk`, `gtk`, `gdk`, `gdk-pixbuf`, `glib`, `gdkx11`, `gdkx11-sys`, `gdk-sys`, `gtk-sys`, `atk-sys`, `gdk-pixbuf-sys`, `proc-macro-error`) is pinned by Tauri 2's `webkit2gtk 2.0.2` chain, Linux-only, with no runtime exposure to the unmaintained APIs from the DSPanel binary surface. Re-evaluate when Tauri ships a 2.x release that bumps gtk-rs to 0.20 or when the project migrates to Tauri 3.
+- Add `.github/dependabot.yml` with weekly cargo / npm / GitHub Actions schedules and a single ignore rationale for the only structurally non-upgradable transitive alert: the `glib` 0.18 family (and the rest of the gtk-rs 0.18 set: `atk`, `gtk`, `gdk`, `gdk-pixbuf`) is transitive via Tauri 2 / gtk 0.18, Linux only, and cannot be bumped without forking Tauri.
+- Drop the `printpdf` `default-features` (the `html` feature in particular) so the PDF export no longer pulls in the `kuchiki 0.8.1` -> `phf 0.8.0` -> `rand 0.7.3` build-dep chain. DSPanel only uses `BuiltinFont::Helvetica` plus the low-level `Op` / `PdfPage` / `PdfDocument` API, none of which need the HTML/CSS rendering pipeline. Removes the residual `rand 0.7.3` Dependabot alert (#13) and shrinks the build-dep graph.
+- Bump the Rust crypto stack to digest 0.11: `sha1` 0.10 -> 0.11, `sha2` 0.10 -> 0.11, `hmac` 0.12 -> 0.13. The new `Array` finalize type drops the `LowerHex` / `UpperHex` impls, so `format!("{:x}", ...)` is replaced by `data_encoding::HEXLOWER.encode(&...)` (or `HEXUPPER` for the HIBP path) in `services/audit.rs` (chain hash), `services/password.rs`, and `services/preset.rs`. `hmac::KeyInit` is now imported alongside `Mac` in `services/mfa.rs` for `Hmac::new_from_slice`. The audit chain hash is byte-for-byte identical so existing chains stay valid.
+- Bump `rust_xlsxwriter` 0.82 -> 0.94 (zip backend 2.x -> 7.x), surface API unchanged for DSPanel call sites.
+- Bump frontend deps in lockstep with the Tauri 2.11 toolchain: `@tauri-apps/api` and `@tauri-apps/cli` 2.10 -> 2.11, `@tanstack/react-virtual` 3.13.23 -> 3.13.24, `@tauri-apps/plugin-opener` 2.5.3 -> 2.5.4, `lucide-react` 1.0 -> 1.14, `react` / `react-dom` 19.2.4 -> 19.2.5, `tailwindcss` and `@tailwindcss/vite` 4.2.2 -> 4.2.4, `@storybook/*` 10.3.3 -> 10.3.6, `vitest` / `@vitest/coverage-v8` 4.1.1 -> 4.1.5, `eslint` 10.1 -> 10.3, `jsdom` 29.0 -> 29.1, `prettier` 3.8.1 -> 3.8.3, `typescript-eslint` 8.59.0 -> 8.59.2.
+- Bump `i18next` 25 -> 26 and `react-i18next` 16 -> 17. Both releases dropped CommonJS and IE-targeted polyfills; the public surface DSPanel uses (`init`, `useTranslation`, `Trans`, `Translation`, `i18n.changeLanguage`) is unchanged.
+
 ## [1.1.0] - 2026-04-27
 
 ### Added

@@ -4,7 +4,7 @@ use std::time::Instant;
 
 use anyhow::Result;
 use hickory_resolver::TokioResolver;
-use hickory_resolver::config::{NameServerConfigGroup, ResolverConfig, ResolverOpts};
+use hickory_resolver::config::{NameServerConfig, ResolverConfig, ResolverOpts};
 
 use crate::models::dc_health::{
     DcHealthCheck, DcHealthLevel, DcHealthResult, DomainControllerInfo, compute_overall_status,
@@ -992,16 +992,15 @@ pub async fn check_all_dc_health(
 fn create_ad_dns_resolver() -> Option<TokioResolver> {
     let dc_ip_str = resolve_fallback_ip()?;
     let ip = dc_ip_str.parse::<IpAddr>().ok()?;
-    let ns_group = NameServerConfigGroup::from_ips_clear(&[ip], 53, true);
-    let config = ResolverConfig::from_parts(None, vec![], ns_group);
+    let ns = vec![NameServerConfig::udp_and_tcp(ip)];
+    let config = ResolverConfig::from_parts(None, vec![], ns);
     let mut opts = ResolverOpts::default();
     opts.timeout = std::time::Duration::from_secs(3);
     opts.attempts = 1;
-    Some(
-        TokioResolver::builder_with_config(config, Default::default())
-            .with_options(opts)
-            .build(),
-    )
+    TokioResolver::builder_with_config(config, Default::default())
+        .with_options(opts)
+        .build()
+        .ok()
 }
 
 #[allow(clippy::unwrap_used)]

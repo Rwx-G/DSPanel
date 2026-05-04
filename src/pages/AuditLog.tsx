@@ -2,7 +2,11 @@ import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { EmptyState } from "@/components/common/EmptyState";
-import { ExportToolbar, type ExportColumn } from "@/components/common/ExportToolbar";
+import {
+  ExportToolbar,
+  type ExportColumn,
+} from "@/components/common/ExportToolbar";
+import { Tooltip } from "@/components/common/Tooltip";
 import { extractErrorMessage } from "@/utils/errorMapping";
 import {
   Search,
@@ -110,7 +114,9 @@ export function AuditLog() {
   const [operatorFilter, setOperatorFilter] = useState("");
   const [actionFilter, setActionFilter] = useState("");
   const [targetFilter, setTargetFilter] = useState("");
-  const [resultFilter, setResultFilter] = useState<"" | "success" | "failure">("");
+  const [resultFilter, setResultFilter] = useState<"" | "success" | "failure">(
+    "",
+  );
   const [sortAscending, setSortAscending] = useState(false);
 
   // Expanded row
@@ -125,9 +131,7 @@ export function AuditLog() {
       try {
         const filter: AuditFilter = {
           dateFrom: dateFrom ? new Date(dateFrom).toISOString() : null,
-          dateTo: dateTo
-            ? new Date(dateTo + "T23:59:59").toISOString()
-            : null,
+          dateTo: dateTo ? new Date(dateTo + "T23:59:59").toISOString() : null,
           operator: operatorFilter || null,
           action: actionFilter || null,
           targetDn: targetFilter || null,
@@ -154,7 +158,15 @@ export function AuditLog() {
         setLoading(false);
       }
     },
-    [dateFrom, dateTo, operatorFilter, actionFilter, targetFilter, resultFilter, sortAscending],
+    [
+      dateFrom,
+      dateTo,
+      operatorFilter,
+      actionFilter,
+      targetFilter,
+      resultFilter,
+      sortAscending,
+    ],
   );
 
   // Load action types for the dropdown
@@ -189,7 +201,10 @@ export function AuditLog() {
   };
 
   return (
-    <div className="flex h-full flex-col gap-4 p-4" data-testid="audit-log-page">
+    <div
+      className="flex h-full flex-col gap-4 p-4"
+      data-testid="audit-log-page"
+    >
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -345,7 +360,6 @@ export function AuditLog() {
               fetchEntries(0);
             }}
             data-testid="sort-toggle"
-            title={sortAscending ? t("oldestFirst") : t("newestFirst")}
           >
             <ArrowUpDown size={14} />
             {sortAscending ? t("oldestFirst") : t("newestFirst")}
@@ -393,7 +407,9 @@ export function AuditLog() {
                   <th className="px-3 py-2 w-[120px]">{t("operator")}</th>
                   <th className="px-3 py-2 w-[160px]">{t("action")}</th>
                   <th className="px-3 py-2">{t("target")}</th>
-                  <th className="px-3 py-2 w-[70px] text-center">{t("result")}</th>
+                  <th className="px-3 py-2 w-[70px] text-center">
+                    {t("result")}
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -413,7 +429,10 @@ export function AuditLog() {
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-center gap-2" data-testid="pagination">
+            <div
+              className="flex items-center justify-center gap-2"
+              data-testid="pagination"
+            >
               <button
                 className="btn btn-sm rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-1 hover:bg-[var(--color-surface-hover)] transition-colors disabled:opacity-40"
                 onClick={() => fetchEntries(page - 1)}
@@ -469,8 +488,8 @@ function AuditRow({
         <td className="px-3 py-2 text-[var(--color-text-primary)]">
           {entry.action}
         </td>
-        <td className="px-3 py-2 text-[var(--color-text-secondary)] truncate max-w-[300px]" title={entry.targetDn}>
-          {formatDn(entry.targetDn)}
+        <td className="px-3 py-2 text-[var(--color-text-secondary)] truncate max-w-[300px]">
+          <Tooltip content={entry.targetDn}>{formatDn(entry.targetDn)}</Tooltip>
         </td>
         <td className="px-3 py-2 text-center">
           {entry.success ? (

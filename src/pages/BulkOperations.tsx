@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { GroupPicker, type GroupOption } from "@/components/form/GroupPicker";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
+import { Tooltip } from "@/components/common/Tooltip";
 import { useGroupSearch } from "@/hooks/useGroupSearch";
 import { usePermissions } from "@/hooks/usePermissions";
 import { type PermissionLevel } from "@/types/permissions";
@@ -270,7 +271,10 @@ function OUPicker({
     };
   }, []);
 
-  const flattenOUs = (nodes: OUNode[], depth: number = 0): { dn: string; label: string; depth: number }[] => {
+  const flattenOUs = (
+    nodes: OUNode[],
+    depth: number = 0,
+  ): { dn: string; label: string; depth: number }[] => {
     const result: { dn: string; label: string; depth: number }[] = [];
     for (const node of nodes) {
       result.push({ dn: node.distinguishedName, label: node.name, depth });
@@ -292,10 +296,21 @@ function OUPicker({
         disabled={disabled || loading}
         type="button"
       >
-        <span className={value ? "text-[var(--color-text-primary)]" : "text-[var(--color-text-secondary)]"}>
-          {loading ? t("bulkOperations:loadingOus") : selectedLabel || value || t("bulkOperations:selectOu")}
+        <span
+          className={
+            value
+              ? "text-[var(--color-text-primary)]"
+              : "text-[var(--color-text-secondary)]"
+          }
+        >
+          {loading
+            ? t("bulkOperations:loadingOus")
+            : selectedLabel || value || t("bulkOperations:selectOu")}
         </span>
-        <ChevronDown size={14} className="shrink-0 text-[var(--color-text-secondary)]" />
+        <ChevronDown
+          size={14}
+          className="shrink-0 text-[var(--color-text-secondary)]"
+        />
       </button>
       {isOpen && flatOUs.length > 0 && (
         <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-48 overflow-auto rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-elevated)] shadow-lg">
@@ -388,7 +403,10 @@ function UserSearchPicker({
   return (
     <div className="relative" data-testid={testId}>
       <div className="flex items-center gap-2 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2 py-1">
-        <Search size={14} className="shrink-0 text-[var(--color-text-secondary)]" />
+        <Search
+          size={14}
+          className="shrink-0 text-[var(--color-text-secondary)]"
+        />
         <input
           type="text"
           value={query}
@@ -569,7 +587,9 @@ export function BulkOperations() {
         });
         if (!cancelled) {
           // Filter out already staged members
-          const stagedDNs = new Set(stagedMembers.map((m) => m.distinguishedName));
+          const stagedDNs = new Set(
+            stagedMembers.map((m) => m.distinguishedName),
+          );
           setAddMemberResults(
             results.filter((r) => !stagedDNs.has(r.distinguishedName)),
           );
@@ -677,7 +697,14 @@ export function BulkOperations() {
 
     setPlannedChanges(changes);
     setShowPreview(true);
-  }, [selectedOp, sourceGroups, targetGroups, selectedMembers, stagedMembers, getMemberName]);
+  }, [
+    selectedOp,
+    sourceGroups,
+    targetGroups,
+    selectedMembers,
+    stagedMembers,
+    getMemberName,
+  ]);
 
   // ---------------------------------------------------------------------------
   // Execute handler (for add/remove based operations)
@@ -703,9 +730,16 @@ export function BulkOperations() {
         current: i,
         total,
         status: "running",
-        message: change.action === "add"
-          ? t("progressAddingMember", { member: change.memberName, group: change.groupName })
-          : t("progressRemovingMember", { member: change.memberName, group: change.groupName }),
+        message:
+          change.action === "add"
+            ? t("progressAddingMember", {
+                member: change.memberName,
+                group: change.groupName,
+              })
+            : t("progressRemovingMember", {
+                member: change.memberName,
+                group: change.groupName,
+              }),
       });
 
       try {
@@ -754,7 +788,10 @@ export function BulkOperations() {
           current: i,
           total,
           status: "failed",
-          message: t("progressFailedRolledBack", { step: i + 1, count: completedOps.length }),
+          message: t("progressFailedRolledBack", {
+            step: i + 1,
+            count: completedOps.length,
+          }),
         });
         return;
       }
@@ -787,7 +824,11 @@ export function BulkOperations() {
 
   const handleExportCsv = useCallback(async () => {
     if (members.length === 0) return;
-    const headers = [t("headerDisplayName"), t("headerSamAccountName"), t("headerDistinguishedName")];
+    const headers = [
+      t("headerDisplayName"),
+      t("headerSamAccountName"),
+      t("headerDistinguishedName"),
+    ];
     const rows = members.map((m) => [
       m.displayName ?? "",
       m.samAccountName ?? "",
@@ -834,7 +875,12 @@ export function BulkOperations() {
     if (!targetUser || copyPreviewGroups.length === 0) return;
     const total = copyPreviewGroups.length;
     setShowPreview(false);
-    setProgress({ current: 0, total, status: "running", message: t("progressStarting") });
+    setProgress({
+      current: 0,
+      total,
+      status: "running",
+      message: t("progressStarting"),
+    });
 
     for (let i = 0; i < total; i++) {
       setProgress({
@@ -853,7 +899,10 @@ export function BulkOperations() {
           current: i,
           total,
           status: "failed",
-          message: t("progressFailedAtStep", { step: i + 1, error: extractErrorMessage(err) }),
+          message: t("progressFailedAtStep", {
+            step: i + 1,
+            error: extractErrorMessage(err),
+          }),
         });
         return;
       }
@@ -862,7 +911,10 @@ export function BulkOperations() {
       current: total,
       total,
       status: "completed",
-      message: t("progressAddedToGroups", { name: targetUser.displayName ?? targetUser.samAccountName, count: total }),
+      message: t("progressAddedToGroups", {
+        name: targetUser.displayName ?? targetUser.samAccountName,
+        count: total,
+      }),
     });
   }, [targetUser, copyPreviewGroups, t]);
 
@@ -917,14 +969,19 @@ export function BulkOperations() {
         current: total + 1,
         total: total + 1,
         status: "completed",
-        message: t("progressGroupCreated", { name: cloneNewName, count: total }),
+        message: t("progressGroupCreated", {
+          name: cloneNewName,
+          count: total,
+        }),
       });
     } catch (err) {
       setProgress({
         current: 0,
         total: 1,
         status: "failed",
-        message: t("progressFailedCreateGroup", { error: extractErrorMessage(err) }),
+        message: t("progressFailedCreateGroup", {
+          error: extractErrorMessage(err),
+        }),
       });
     }
   }, [sourceGroups, cloneNewName, cloneContainerDn, members, t]);
@@ -960,7 +1017,9 @@ export function BulkOperations() {
         "get_group_members",
         { groupDn: targetGroups[0].distinguishedName },
       );
-      const existingSet = new Set(targetMembers.map((m) => m.distinguishedName));
+      const existingSet = new Set(
+        targetMembers.map((m) => m.distinguishedName),
+      );
 
       const newMembers = Array.from(allMemberDns).filter(
         (dn) => !existingSet.has(dn),
@@ -972,7 +1031,11 @@ export function BulkOperations() {
           current: i,
           total,
           status: "running",
-          message: t("progressAddingMemberToGroup", { current: i + 1, total, group: targetGroups[0].name }),
+          message: t("progressAddingMemberToGroup", {
+            current: i + 1,
+            total,
+            group: targetGroups[0].name,
+          }),
         });
         try {
           await invoke("add_user_to_group", {
@@ -988,7 +1051,10 @@ export function BulkOperations() {
         current: total,
         total,
         status: "completed",
-        message: t("progressMerged", { count: total, group: targetGroups[0].name }),
+        message: t("progressMerged", {
+          count: total,
+          group: targetGroups[0].name,
+        }),
       });
     } catch (err) {
       setProgress({
@@ -1073,7 +1139,12 @@ export function BulkOperations() {
         current: i,
         total,
         status: "running",
-        message: t("progressImportingMember", { name: csvResolvedUsers[i].displayName ?? csvResolvedUsers[i].samAccountName, group: targetGroups[0].name }),
+        message: t("progressImportingMember", {
+          name:
+            csvResolvedUsers[i].displayName ??
+            csvResolvedUsers[i].samAccountName,
+          group: targetGroups[0].name,
+        }),
       });
       try {
         await invoke("add_user_to_group", {
@@ -1085,7 +1156,10 @@ export function BulkOperations() {
           current: i,
           total,
           status: "failed",
-          message: t("progressFailedAtStep", { step: i + 1, error: extractErrorMessage(err) }),
+          message: t("progressFailedAtStep", {
+            step: i + 1,
+            error: extractErrorMessage(err),
+          }),
         });
         return;
       }
@@ -1095,7 +1169,10 @@ export function BulkOperations() {
       current: total,
       total,
       status: "completed",
-      message: t("progressImported", { count: total, group: targetGroups[0].name }),
+      message: t("progressImported", {
+        count: total,
+        group: targetGroups[0].name,
+      }),
     });
   }, [csvResolvedUsers, targetGroups, t]);
 
@@ -1131,7 +1208,10 @@ export function BulkOperations() {
           current: i,
           total,
           status: "failed",
-          message: t("progressFailedMove", { name: sourceGroups[i].name, error: extractErrorMessage(err) }),
+          message: t("progressFailedMove", {
+            name: sourceGroups[i].name,
+            error: extractErrorMessage(err),
+          }),
         });
         return;
       }
@@ -1222,7 +1302,10 @@ export function BulkOperations() {
           current: i,
           total,
           status: "failed",
-          message: t("progressFailedCreate", { name, error: extractErrorMessage(err) }),
+          message: t("progressFailedCreate", {
+            name,
+            error: extractErrorMessage(err),
+          }),
         });
         return;
       }
@@ -1268,7 +1351,10 @@ export function BulkOperations() {
           current: i,
           total,
           status: "failed",
-          message: t("progressFailedUpdate", { name: sourceGroups[i].name, error: extractErrorMessage(err) }),
+          message: t("progressFailedUpdate", {
+            name: sourceGroups[i].name,
+            error: extractErrorMessage(err),
+          }),
         });
         return;
       }
@@ -1337,31 +1423,34 @@ export function BulkOperations() {
                   const Icon = card.icon;
                   const permitted = hasPermission(card.minPermission);
                   return (
-                    <button
+                    <Tooltip
                       key={card.id}
-                      onClick={() => setSelectedOp(card.id)}
-                      disabled={!permitted}
-                      title={!permitted ? t(card.minPermissionLabel) : undefined}
-                      className={`flex flex-col items-start gap-2 rounded-lg border p-3 text-left transition-colors ${
-                        permitted
-                          ? "border-[var(--color-border-default)] bg-[var(--color-surface-card)] hover:border-[var(--color-primary)] hover:bg-[var(--color-surface-hover)] cursor-pointer"
-                          : "border-[var(--color-border-subtle)] bg-[var(--color-surface-card)] opacity-50 cursor-not-allowed"
-                      }`}
-                      data-testid={`op-card-${card.id}`}
+                      content={!permitted ? t(card.minPermissionLabel) : ""}
                     >
-                      <div className="flex items-center gap-2">
-                        <Icon
-                          size={18}
-                          className="text-[var(--color-primary)]"
-                        />
-                        <span className="text-body font-medium text-[var(--color-text-primary)]">
-                          {t(card.labelKey)}
-                        </span>
-                      </div>
-                      <p className="text-caption text-[var(--color-text-secondary)]">
-                        {t(card.descriptionKey)}
-                      </p>
-                    </button>
+                      <button
+                        onClick={() => setSelectedOp(card.id)}
+                        disabled={!permitted}
+                        className={`flex flex-col items-start gap-2 rounded-lg border p-3 text-left transition-colors ${
+                          permitted
+                            ? "border-[var(--color-border-default)] bg-[var(--color-surface-card)] hover:border-[var(--color-primary)] hover:bg-[var(--color-surface-hover)] cursor-pointer"
+                            : "border-[var(--color-border-subtle)] bg-[var(--color-surface-card)] opacity-50 cursor-not-allowed"
+                        }`}
+                        data-testid={`op-card-${card.id}`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <Icon
+                            size={18}
+                            className="text-[var(--color-primary)]"
+                          />
+                          <span className="text-body font-medium text-[var(--color-text-primary)]">
+                            {t(card.labelKey)}
+                          </span>
+                        </div>
+                        <p className="text-caption text-[var(--color-text-secondary)]">
+                          {t(card.descriptionKey)}
+                        </p>
+                      </button>
+                    </Tooltip>
                   );
                 })}
               </div>
@@ -1400,7 +1489,9 @@ export function BulkOperations() {
         </button>
         <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">
           {(() => {
-            const card = OPERATION_CATEGORIES.flatMap((cat) => cat.cards).find((c) => c.id === selectedOp);
+            const card = OPERATION_CATEGORIES.flatMap((cat) => cat.cards).find(
+              (c) => c.id === selectedOp,
+            );
             return card ? t(card.labelKey) : t("pageTitle");
           })()}
         </h2>
@@ -1413,7 +1504,9 @@ export function BulkOperations() {
         <>
           {/* Group Selectors - adapted per operation */}
           <div
-            className={selectedOp === "transfer" ? "grid grid-cols-2 gap-4" : ""}
+            className={
+              selectedOp === "transfer" ? "grid grid-cols-2 gap-4" : ""
+            }
             data-testid="group-selectors"
           >
             {/* Source Group: shown for delete and transfer */}
@@ -1459,7 +1552,10 @@ export function BulkOperations() {
               </label>
               <div className="relative">
                 <div className="flex items-center gap-2 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2 py-1">
-                  <Search size={14} className="shrink-0 text-[var(--color-text-secondary)]" />
+                  <Search
+                    size={14}
+                    className="shrink-0 text-[var(--color-text-secondary)]"
+                  />
                   <input
                     type="text"
                     value={addMemberSearch}
@@ -1479,11 +1575,17 @@ export function BulkOperations() {
                         onClick={() => {
                           setStagedMembers((prev) => [...prev, entry]);
                           setAddMemberResults((prev) =>
-                            prev.filter((r) => r.distinguishedName !== entry.distinguishedName),
+                            prev.filter(
+                              (r) =>
+                                r.distinguishedName !== entry.distinguishedName,
+                            ),
                           );
                         }}
                       >
-                        <UserPlus size={14} className="shrink-0 text-[var(--color-success)]" />
+                        <UserPlus
+                          size={14}
+                          className="shrink-0 text-[var(--color-success)]"
+                        />
                         <span className="text-[var(--color-text-primary)]">
                           {entry.displayName || entry.samAccountName || "?"}
                         </span>
@@ -1519,12 +1621,18 @@ export function BulkOperations() {
                         key={entry.distinguishedName}
                         className="flex items-center justify-between rounded px-2 py-1 text-body hover:bg-[var(--color-surface-hover)]"
                       >
-                        <span>{entry.displayName || entry.samAccountName || "?"}</span>
+                        <span>
+                          {entry.displayName || entry.samAccountName || "?"}
+                        </span>
                         <button
                           className="text-[var(--color-text-secondary)] hover:text-[var(--color-error)]"
                           onClick={() =>
                             setStagedMembers((prev) =>
-                              prev.filter((m) => m.distinguishedName !== entry.distinguishedName),
+                              prev.filter(
+                                (m) =>
+                                  m.distinguishedName !==
+                                  entry.distinguishedName,
+                              ),
                             )
                           }
                         >
@@ -1618,7 +1726,10 @@ export function BulkOperations() {
           />
 
           {members.length > 0 && (
-            <div className="flex items-center gap-2" data-testid="bulk-action-buttons">
+            <div
+              className="flex items-center gap-2"
+              data-testid="bulk-action-buttons"
+            >
               <button
                 className="btn btn-primary btn-sm flex items-center gap-1.5"
                 onClick={handleExportCsv}
@@ -1665,7 +1776,10 @@ export function BulkOperations() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2" data-testid="bulk-action-buttons">
+          <div
+            className="flex items-center gap-2"
+            data-testid="bulk-action-buttons"
+          >
             <button
               className="btn btn-outline btn-sm flex items-center gap-1.5"
               onClick={handleCopyPreview}
@@ -1774,7 +1888,10 @@ export function BulkOperations() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2" data-testid="bulk-action-buttons">
+          <div
+            className="flex items-center gap-2"
+            data-testid="bulk-action-buttons"
+          >
             <button
               className="btn btn-primary btn-sm flex items-center gap-1.5"
               onClick={handleCloneExecute}
@@ -1799,7 +1916,10 @@ export function BulkOperations() {
       {selectedOp === "merge-groups" && (
         <>
           <div className="rounded-md border border-[var(--color-info)]/30 bg-[var(--color-info)]/5 px-3 py-2 text-caption text-[var(--color-text-secondary)]">
-            <strong className="text-[var(--color-info)]">{t("mergeHowItWorks")}</strong> {t("mergeExplanation")}
+            <strong className="text-[var(--color-info)]">
+              {t("mergeHowItWorks")}
+            </strong>{" "}
+            {t("mergeExplanation")}
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div data-testid="source-group-section">
@@ -1829,7 +1949,10 @@ export function BulkOperations() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2" data-testid="bulk-action-buttons">
+          <div
+            className="flex items-center gap-2"
+            data-testid="bulk-action-buttons"
+          >
             <button
               className="btn btn-primary btn-sm flex items-center gap-1.5"
               onClick={handleMergeExecute}
@@ -1885,7 +2008,10 @@ export function BulkOperations() {
             </p>
           )}
 
-          <div className="flex items-center gap-2" data-testid="bulk-action-buttons">
+          <div
+            className="flex items-center gap-2"
+            data-testid="bulk-action-buttons"
+          >
             <button
               className="btn btn-outline btn-sm flex items-center gap-1.5"
               onClick={handleCsvResolve}
@@ -1968,14 +2094,15 @@ export function BulkOperations() {
             />
           </div>
 
-          <div className="flex items-center gap-2" data-testid="bulk-action-buttons">
+          <div
+            className="flex items-center gap-2"
+            data-testid="bulk-action-buttons"
+          >
             <button
               className="btn btn-primary btn-sm flex items-center gap-1.5"
               onClick={handleMoveExecute}
               disabled={
-                sourceGroups.length === 0 ||
-                !moveTargetOu.trim() ||
-                isRunning
+                sourceGroups.length === 0 || !moveTargetOu.trim() || isRunning
               }
               data-testid="bulk-execute-btn"
             >
@@ -2011,9 +2138,12 @@ export function BulkOperations() {
               data-testid="bulk-preview-panel"
             >
               <h3 className="mb-2 text-body font-semibold text-[var(--color-text-primary)]">
-                {t("groupsToCreate", { count: createGroupsCsvData[0]?.[0]?.toLowerCase() === "name"
-                  ? createGroupsCsvData.length - 1
-                  : createGroupsCsvData.length })}
+                {t("groupsToCreate", {
+                  count:
+                    createGroupsCsvData[0]?.[0]?.toLowerCase() === "name"
+                      ? createGroupsCsvData.length - 1
+                      : createGroupsCsvData.length,
+                })}
               </h3>
               <div className="max-h-48 overflow-auto">
                 {createGroupsCsvData
@@ -2031,8 +2161,8 @@ export function BulkOperations() {
                         {row[0]}
                       </p>
                       <p className="text-caption text-[var(--color-text-secondary)]">
-                        {row[2] ?? "Global"} / {row[3] ?? "Security"} {t("previewIn")}{" "}
-                        {row[4] ?? "N/A"}
+                        {row[2] ?? "Global"} / {row[3] ?? "Security"}{" "}
+                        {t("previewIn")} {row[4] ?? "N/A"}
                       </p>
                     </div>
                   ))}
@@ -2040,7 +2170,10 @@ export function BulkOperations() {
             </div>
           )}
 
-          <div className="flex items-center gap-2" data-testid="bulk-action-buttons">
+          <div
+            className="flex items-center gap-2"
+            data-testid="bulk-action-buttons"
+          >
             <button
               className="btn btn-primary btn-sm flex items-center gap-1.5"
               onClick={handleCreateGroupsExecute}
@@ -2085,7 +2218,10 @@ export function BulkOperations() {
             />
           </div>
 
-          <div className="flex items-center gap-2" data-testid="bulk-action-buttons">
+          <div
+            className="flex items-center gap-2"
+            data-testid="bulk-action-buttons"
+          >
             <button
               className="btn btn-primary btn-sm flex items-center gap-1.5"
               onClick={handleUpdateManagerExecute}
@@ -2133,7 +2269,9 @@ export function BulkOperations() {
                     {change.memberName}
                   </p>
                   <p className="text-caption text-[var(--color-text-secondary)]">
-                    {change.action === "add" ? t("previewToGroup", { group: change.groupName }) : t("previewFromGroup", { group: change.groupName })}
+                    {change.action === "add"
+                      ? t("previewToGroup", { group: change.groupName })
+                      : t("previewFromGroup", { group: change.groupName })}
                   </p>
                 </div>
               </div>
@@ -2225,7 +2363,9 @@ function MemberList({
     <div data-testid="member-selection-section">
       <div className="mb-2 flex items-center justify-between">
         <label className="text-caption font-medium text-[var(--color-text-secondary)]">
-          {members.length > 0 ? t("membersCount", { count: members.length }) : t("members")}
+          {members.length > 0
+            ? t("membersCount", { count: members.length })
+            : t("members")}
         </label>
         <div className="flex items-center gap-2">
           {members.length > 0 && onExportCsv && (
@@ -2282,9 +2422,7 @@ function MemberList({
                 member.displayName ??
                 member.samAccountName ??
                 parseCnFromDn(member.distinguishedName);
-              const isSelected = selectedMembers.has(
-                member.distinguishedName,
-              );
+              const isSelected = selectedMembers.has(member.distinguishedName);
               return (
                 <label
                   key={member.distinguishedName}
@@ -2296,10 +2434,7 @@ function MemberList({
                     type="checkbox"
                     checked={isSelected}
                     onChange={(e) =>
-                      onMemberSelect(
-                        member.distinguishedName,
-                        e.target.checked,
-                      )
+                      onMemberSelect(member.distinguishedName, e.target.checked)
                     }
                     disabled={isRunning}
                     data-testid={`bulk-member-${name}`}

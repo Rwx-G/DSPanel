@@ -391,7 +391,7 @@ impl AuditService {
         hasher.update(entry.target_dn.as_bytes());
         hasher.update(entry.details.as_bytes());
         hasher.update(if entry.success { b"1" } else { b"0" });
-        format!("{:x}", hasher.finalize())
+        data_encoding::HEXLOWER.encode(&hasher.finalize())
     }
 
     fn insert_entry(&self, entry: &AuditEntry) {

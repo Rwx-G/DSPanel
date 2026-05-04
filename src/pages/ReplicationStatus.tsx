@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { EmptyState } from "@/components/common/EmptyState";
+import { Tooltip } from "@/components/common/Tooltip";
 import { extractErrorMessage } from "@/utils/errorMapping";
 import { useDialog } from "@/contexts/DialogContext";
 import { useNotifications } from "@/contexts/NotificationContext";
@@ -123,15 +124,20 @@ export function ReplicationStatus() {
   const { notify } = useNotifications();
 
   useEffect(() => {
-    invoke<string>("get_platform").then(setPlatform).catch(() => {});
-    invoke<boolean>("is_simple_bind").then(setSimpleBind).catch(() => {});
+    invoke<string>("get_platform")
+      .then(setPlatform)
+      .catch(() => {});
+    invoke<boolean>("is_simple_bind")
+      .then(setSimpleBind)
+      .catch(() => {});
   }, []);
 
   const fetchPartnerships = useCallback(async () => {
     try {
       setError(null);
-      const data =
-        await invoke<ReplicationPartnership[]>("get_replication_status");
+      const data = await invoke<ReplicationPartnership[]>(
+        "get_replication_status",
+      );
       setPartnerships(data);
     } catch (e: unknown) {
       setError(extractErrorMessage(e));
@@ -160,7 +166,11 @@ export function ReplicationStatus() {
   const handleForceReplication = async (p: ReplicationPartnership) => {
     const confirmed = await showConfirmation(
       t("forceReplication"),
-      t("forceReplicationDesc", { source: p.sourceDc, target: p.targetDc, context: p.namingContext }),
+      t("forceReplicationDesc", {
+        source: p.sourceDc,
+        target: p.targetDc,
+        context: p.namingContext,
+      }),
     );
     if (!confirmed) return;
 
@@ -190,10 +200,7 @@ export function ReplicationStatus() {
   ).length;
 
   return (
-    <div
-      className="flex h-full flex-col"
-      data-testid="replication-status-view"
-    >
+    <div className="flex h-full flex-col" data-testid="replication-status-view">
       {/* Toolbar */}
       <div className="flex items-center justify-between border-b border-[var(--color-border-default)] px-4 py-2">
         <h2 className="text-body font-semibold text-[var(--color-text-primary)]">
@@ -258,7 +265,9 @@ export function ReplicationStatus() {
               p.namingContext,
               p.status,
               p.lastSyncTime ?? "Never",
-              p.usnLastObjChangeSynced != null ? String(p.usnLastObjChangeSynced) : "",
+              p.usnLastObjChangeSynced != null
+                ? String(p.usnLastObjChangeSynced)
+                : "",
               p.transport ?? "",
               String(p.consecutiveFailures),
             ]}
@@ -299,121 +308,138 @@ export function ReplicationStatus() {
           />
         ) : (
           <>
-          {simpleBind && platform === "windows" && (
-            <div
-              className="mb-3 flex items-start gap-2 rounded-md border border-[var(--color-info)] bg-[var(--color-info-bg)] px-3 py-2"
-              data-testid="simple-bind-info"
-            >
-              <Info size={14} className="mt-0.5 shrink-0 text-[var(--color-info)]" />
-              <p className="text-caption text-[var(--color-text-primary)]">
-{t("simpleBindWarning")}
-              </p>
-            </div>
-          )}
-          <div className="overflow-x-auto">
-            <table className="w-full text-body" data-testid="replication-table">
-              <thead>
-                <tr className="border-b border-[var(--color-border-default)] text-left text-caption text-[var(--color-text-secondary)]">
-                  <th className="px-3 py-2 font-medium">{t("common:status")}</th>
-                  <th className="px-3 py-2 font-medium">{t("sourceDc")}</th>
-                  <th className="px-3 py-2 font-medium">{t("targetDc")}</th>
-                  <th className="px-3 py-2 font-medium">{t("namingContext")}</th>
-                  <th className="px-3 py-2 font-medium">{t("lastSync")}</th>
-                  <th className="px-3 py-2 font-medium">{t("usn")}</th>
-                  <th className="px-3 py-2 font-medium">{t("transport")}</th>
-                  <th className="px-3 py-2 font-medium">{t("failures")}</th>
-                  {platform === "windows" && (
-                    <th className="px-3 py-2 font-medium">{t("common:actions")}</th>
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {partnerships.map((p, i) => {
-                  const key = `${p.sourceDc}->${p.targetDc}-${i}`;
-                  const forceKey = `${p.sourceDc}->${p.targetDc}`;
-                  return (
-                    <tr
-                      key={key}
-                      className="border-b border-[var(--color-border-subtle)] hover:bg-[var(--color-surface-hover)]"
-                      style={
-                        p.status === "Failed"
-                          ? {
-                              backgroundColor:
-                                "color-mix(in srgb, var(--color-error) 8%, transparent)",
-                            }
-                          : undefined
-                      }
-                      data-testid={`replication-row-${i}`}
-                    >
-                      <td className="px-3 py-2">
-                        <StatusIcon status={p.status} />
-                      </td>
-                      <td className="px-3 py-2 font-mono text-caption text-[var(--color-text-primary)]">
-                        {p.sourceDc}
-                      </td>
-                      <td className="px-3 py-2 font-mono text-caption text-[var(--color-text-primary)]">
-                        {p.targetDc}
-                      </td>
-                      <td className="px-3 py-2 font-mono text-caption text-[var(--color-text-secondary)]">
-                        {p.namingContext}
-                      </td>
-                      <td className="px-3 py-2">
-                        <span
-                          className="text-caption font-medium"
-                          style={{ color: latencyColor(p.lastSyncTime) }}
-                        >
-                          {formatLatency(p.lastSyncTime)}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2 font-mono text-caption text-[var(--color-text-secondary)]">
-                        {p.usnLastObjChangeSynced != null ? p.usnLastObjChangeSynced.toLocaleString() : "-"}
-                      </td>
-                      <td className="px-3 py-2 text-caption text-[var(--color-text-secondary)]">
-                        {p.transport ?? "-"}
-                      </td>
-                      <td className="px-3 py-2">
-                        {p.consecutiveFailures > 0 ? (
+            {simpleBind && platform === "windows" && (
+              <div
+                className="mb-3 flex items-start gap-2 rounded-md border border-[var(--color-info)] bg-[var(--color-info-bg)] px-3 py-2"
+                data-testid="simple-bind-info"
+              >
+                <Info
+                  size={14}
+                  className="mt-0.5 shrink-0 text-[var(--color-info)]"
+                />
+                <p className="text-caption text-[var(--color-text-primary)]">
+                  {t("simpleBindWarning")}
+                </p>
+              </div>
+            )}
+            <div className="overflow-x-auto">
+              <table
+                className="w-full text-body"
+                data-testid="replication-table"
+              >
+                <thead>
+                  <tr className="border-b border-[var(--color-border-default)] text-left text-caption text-[var(--color-text-secondary)]">
+                    <th className="px-3 py-2 font-medium">
+                      {t("common:status")}
+                    </th>
+                    <th className="px-3 py-2 font-medium">{t("sourceDc")}</th>
+                    <th className="px-3 py-2 font-medium">{t("targetDc")}</th>
+                    <th className="px-3 py-2 font-medium">
+                      {t("namingContext")}
+                    </th>
+                    <th className="px-3 py-2 font-medium">{t("lastSync")}</th>
+                    <th className="px-3 py-2 font-medium">{t("usn")}</th>
+                    <th className="px-3 py-2 font-medium">{t("transport")}</th>
+                    <th className="px-3 py-2 font-medium">{t("failures")}</th>
+                    {platform === "windows" && (
+                      <th className="px-3 py-2 font-medium">
+                        {t("common:actions")}
+                      </th>
+                    )}
+                  </tr>
+                </thead>
+                <tbody>
+                  {partnerships.map((p, i) => {
+                    const key = `${p.sourceDc}->${p.targetDc}-${i}`;
+                    const forceKey = `${p.sourceDc}->${p.targetDc}`;
+                    return (
+                      <tr
+                        key={key}
+                        className="border-b border-[var(--color-border-subtle)] hover:bg-[var(--color-surface-hover)]"
+                        style={
+                          p.status === "Failed"
+                            ? {
+                                backgroundColor:
+                                  "color-mix(in srgb, var(--color-error) 8%, transparent)",
+                              }
+                            : undefined
+                        }
+                        data-testid={`replication-row-${i}`}
+                      >
+                        <td className="px-3 py-2">
+                          <StatusIcon status={p.status} />
+                        </td>
+                        <td className="px-3 py-2 font-mono text-caption text-[var(--color-text-primary)]">
+                          {p.sourceDc}
+                        </td>
+                        <td className="px-3 py-2 font-mono text-caption text-[var(--color-text-primary)]">
+                          {p.targetDc}
+                        </td>
+                        <td className="px-3 py-2 font-mono text-caption text-[var(--color-text-secondary)]">
+                          {p.namingContext}
+                        </td>
+                        <td className="px-3 py-2">
                           <span
                             className="text-caption font-medium"
-                            style={{ color: "var(--color-error)" }}
-                            title={p.lastSyncMessage ?? undefined}
+                            style={{ color: latencyColor(p.lastSyncTime) }}
                           >
-                            {p.consecutiveFailures} failures
+                            {formatLatency(p.lastSyncTime)}
                           </span>
-                        ) : (
-                          <span className="text-caption text-[var(--color-text-secondary)]">
-                            -
-                          </span>
-                        )}
-                      </td>
-                      {platform === "windows" && (
-                      <td className="px-3 py-2">
-                        <div className="group relative inline-block">
-                          <button
-                            className="btn btn-sm flex items-center gap-1 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2.5 py-1 text-caption font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                            onClick={() => handleForceReplication(p)}
-                            disabled={forcingReplication === forceKey || simpleBind}
-                            data-testid={`force-repl-${i}`}
-                          >
-                            <Play size={12} />
-                            {forcingReplication === forceKey
-                              ? t("syncing")
-                              : t("sync")}
-                          </button>
-                          {simpleBind && (
-                            <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-md bg-[var(--color-surface-elevated)] px-2.5 py-1.5 text-caption font-medium text-[var(--color-text-primary)] opacity-0 shadow-md transition-opacity duration-150 group-hover:opacity-100">
-{t("notAvailableSimpleBind")}
+                        </td>
+                        <td className="px-3 py-2 font-mono text-caption text-[var(--color-text-secondary)]">
+                          {p.usnLastObjChangeSynced != null
+                            ? p.usnLastObjChangeSynced.toLocaleString()
+                            : "-"}
+                        </td>
+                        <td className="px-3 py-2 text-caption text-[var(--color-text-secondary)]">
+                          {p.transport ?? "-"}
+                        </td>
+                        <td className="px-3 py-2">
+                          {p.consecutiveFailures > 0 ? (
+                            <Tooltip content={p.lastSyncMessage ?? ""}>
+                              <span
+                                className="text-caption font-medium"
+                                style={{ color: "var(--color-error)" }}
+                              >
+                                {p.consecutiveFailures} failures
+                              </span>
+                            </Tooltip>
+                          ) : (
+                            <span className="text-caption text-[var(--color-text-secondary)]">
+                              -
                             </span>
                           )}
-                        </div>
-                      </td>
-                      )}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                        </td>
+                        {platform === "windows" && (
+                          <td className="px-3 py-2">
+                            <div className="group relative inline-block">
+                              <button
+                                className="btn btn-sm flex items-center gap-1 rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2.5 py-1 text-caption font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                onClick={() => handleForceReplication(p)}
+                                disabled={
+                                  forcingReplication === forceKey || simpleBind
+                                }
+                                data-testid={`force-repl-${i}`}
+                              >
+                                <Play size={12} />
+                                {forcingReplication === forceKey
+                                  ? t("syncing")
+                                  : t("sync")}
+                              </button>
+                              {simpleBind && (
+                                <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-md bg-[var(--color-surface-elevated)] px-2.5 py-1.5 text-caption font-medium text-[var(--color-text-primary)] opacity-0 shadow-md transition-opacity duration-150 group-hover:opacity-100">
+                                  {t("notAvailableSimpleBind")}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </>
         )}
       </div>

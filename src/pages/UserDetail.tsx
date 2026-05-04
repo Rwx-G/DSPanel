@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { CopyButton } from "@/components/common/CopyButton";
+import { Tooltip } from "@/components/common/Tooltip";
 import { HealthBadge } from "@/components/common/HealthBadge";
 import { UserActions } from "@/components/common/UserActions";
 import { PasswordFlagsEditor } from "@/components/common/PasswordFlagsEditor";
@@ -14,7 +15,10 @@ import {
   type PropertySeverity,
 } from "@/components/data/PropertyGrid";
 import { DataTable, type Column } from "@/components/data/DataTable";
-import { ExportToolbar, type ExportColumn } from "@/components/common/ExportToolbar";
+import {
+  ExportToolbar,
+  type ExportColumn,
+} from "@/components/common/ExportToolbar";
 import { FilterBar, type FilterChip } from "@/components/data/FilterBar";
 import { AdvancedAttributes } from "@/components/data/AdvancedAttributes";
 import { PasswordResetDialog } from "@/components/dialogs/PasswordResetDialog";
@@ -31,7 +35,14 @@ import {
   type SecurityIndicatorSet,
 } from "@/types/securityIndicators";
 import { parseCnFromDn } from "@/utils/dn";
-import { Users, FolderOpen, Save, ArrowUp, AlertTriangle, Trash2 } from "lucide-react";
+import {
+  Users,
+  FolderOpen,
+  Save,
+  ArrowUp,
+  AlertTriangle,
+  Trash2,
+} from "lucide-react";
 import { useNavigation } from "@/contexts/NavigationContext";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useModifyAttribute } from "@/hooks/useModifyAttribute";
@@ -140,7 +151,9 @@ export function UserDetail({
   const handleDeleteUser = useCallback(async () => {
     const confirmed = await showConfirmation(
       t("deleteUser"),
-      t("deleteConfirmation", { name: user.displayName || user.samAccountName }),
+      t("deleteConfirmation", {
+        name: user.displayName || user.samAccountName,
+      }),
       t("deleteNote"),
     );
     if (!confirmed) return;
@@ -178,7 +191,10 @@ export function UserDetail({
               </div>
               <div className="px-4 py-3 space-y-3">
                 <p className="text-body text-[var(--color-text-primary)]">
-                  {t("applyChangesTo", { count: pendingChanges.length, name: user.displayName || user.samAccountName })}
+                  {t("applyChangesTo", {
+                    count: pendingChanges.length,
+                    name: user.displayName || user.samAccountName,
+                  })}
                 </p>
                 <div className="flex items-start gap-2 rounded-md border border-[var(--color-warning)] bg-[var(--color-warning-bg)] px-3 py-2">
                   <AlertTriangle
@@ -222,14 +238,14 @@ export function UserDetail({
         ))) ?? false;
     } else {
       const detail = pendingChanges
-        .map(
-          (c) =>
-            `${c.attributeName}: "${c.oldValue}" -> "${c.newValue}"`,
-        )
+        .map((c) => `${c.attributeName}: "${c.oldValue}" -> "${c.newValue}"`)
         .join("\n");
       confirmed = await showConfirmation(
         t("confirmAttributeChanges"),
-        t("applyChangesTo", { count: pendingChanges.length, name: user.displayName || user.samAccountName }),
+        t("applyChangesTo", {
+          count: pendingChanges.length,
+          name: user.displayName || user.samAccountName,
+        }),
         detail,
       );
     }
@@ -320,14 +336,44 @@ export function UserDetail({
     {
       category: t("common:identity"),
       items: [
-        { label: t("common:displayName"), value: user.displayName, editable: canEdit, attributeName: "displayName" },
+        {
+          label: t("common:displayName"),
+          value: user.displayName,
+          editable: canEdit,
+          attributeName: "displayName",
+        },
         { label: t("common:samAccountName"), value: user.samAccountName },
         { label: t("userPrincipalName"), value: user.userPrincipalName },
-        { label: t("common:firstName"), value: user.givenName, editable: canEdit, attributeName: "givenName" },
-        { label: t("common:lastName"), value: user.surname, editable: canEdit, attributeName: "sn" },
-        { label: t("common:email"), value: user.email, editable: canEdit, attributeName: "mail" },
-        { label: t("common:department"), value: user.department, editable: canEdit, attributeName: "department" },
-        { label: t("common:title"), value: user.title, editable: canEdit, attributeName: "title" },
+        {
+          label: t("common:firstName"),
+          value: user.givenName,
+          editable: canEdit,
+          attributeName: "givenName",
+        },
+        {
+          label: t("common:lastName"),
+          value: user.surname,
+          editable: canEdit,
+          attributeName: "sn",
+        },
+        {
+          label: t("common:email"),
+          value: user.email,
+          editable: canEdit,
+          attributeName: "mail",
+        },
+        {
+          label: t("common:department"),
+          value: user.department,
+          editable: canEdit,
+          attributeName: "department",
+        },
+        {
+          label: t("common:title"),
+          value: user.title,
+          editable: canEdit,
+          attributeName: "title",
+        },
       ],
     },
     {
@@ -390,8 +436,14 @@ export function UserDetail({
           value: user.passwordNeverExpires ? t("common:yes") : t("common:no"),
           severity: s("Password Never Expires"),
         },
-        { label: t("common:created"), value: user.whenCreated || t("common:na") },
-        { label: t("common:modified"), value: user.whenChanged || t("common:na") },
+        {
+          label: t("common:created"),
+          value: user.whenCreated || t("common:na"),
+        },
+        {
+          label: t("common:modified"),
+          value: user.whenChanged || t("common:na"),
+        },
       ],
     },
   ];
@@ -453,26 +505,26 @@ export function UserDetail({
                 text={user.enabled ? t("common:enabled") : t("common:disabled")}
                 variant={user.enabled ? "success" : "error"}
               />
-              {user.lockedOut && <StatusBadge text={t("common:locked")} variant="warning" />}
+              {user.lockedOut && (
+                <StatusBadge text={t("common:locked")} variant="warning" />
+              )}
               {user.rawAttributes?.adminCount?.[0] === "1" && (
-                <span
-                  title={t("common:adminSdHolderTooltip")}
-                  data-testid="admin-sdholder-badge"
+                <Tooltip
+                  content={t("common:adminSdHolderTooltip")}
+                  testId="admin-sdholder-badge"
                 >
                   <StatusBadge
                     text={t("common:adminSdHolderBadge")}
                     variant="warning"
                   />
-                </span>
+                </Tooltip>
               )}
               {securityIndicators?.indicators.map((indicator) => (
-                <span
+                <Tooltip
                   key={indicator.kind}
                   className="inline-flex items-center gap-1"
-                  title={t(
-                    `securityIndicators:${indicator.kind}.tooltip`,
-                  )}
-                  data-testid={`security-indicator-badge-${indicator.kind}`}
+                  content={t(`securityIndicators:${indicator.kind}.tooltip`)}
+                  testId={`security-indicator-badge-${indicator.kind}`}
                 >
                   <StatusBadge
                     text={t(`securityIndicators:${indicator.kind}.badge`)}
@@ -512,7 +564,7 @@ export function UserDetail({
                       )}
                     </button>
                   )}
-                </span>
+                </Tooltip>
               ))}
             </div>
           </div>
@@ -539,7 +591,10 @@ export function UserDetail({
         {canEdit && (
           <button
             className="btn btn-sm flex items-center gap-1"
-            style={{ color: "var(--color-error)", borderColor: "var(--color-error)" }}
+            style={{
+              color: "var(--color-error)",
+              borderColor: "var(--color-error)",
+            }}
             onClick={handleDeleteUser}
             data-testid="user-delete-btn"
           >
@@ -620,7 +675,9 @@ export function UserDetail({
             {t("groupMemberships", { count: user.memberOf.length })}
           </h3>
           <ExportToolbar<{ name: string; dn: string }>
-            columns={groupColumns.map((c): ExportColumn => ({ key: c.key, header: c.header }))}
+            columns={groupColumns.map(
+              (c): ExportColumn => ({ key: c.key, header: c.header }),
+            )}
             data={groupRows}
             rowMapper={(row) => [row.name, row.dn]}
             title={`${user.displayName} - Group Memberships`}
@@ -643,7 +700,11 @@ export function UserDetail({
 
       <div className="border-t border-[var(--color-border-default)]" />
 
-      <AdvancedAttributes rawAttributes={user.rawAttributes} schemaAttributes={schemaAttributes} onEdit={canEdit ? handleAdvancedEdit : undefined} />
+      <AdvancedAttributes
+        rawAttributes={user.rawAttributes}
+        schemaAttributes={schemaAttributes}
+        onEdit={canEdit ? handleAdvancedEdit : undefined}
+      />
 
       <div className="border-t border-[var(--color-border-default)]" />
 
@@ -712,13 +773,10 @@ export function UserDetail({
             setActiveQuickFix(null);
             if (result.removed.length > 0) {
               notify(
-                t(
-                  "userDetail:quickFix.removeUserSpns.successNotification",
-                  {
-                    count: result.removed.length,
-                    name: user.displayName || user.samAccountName,
-                  },
-                ),
+                t("userDetail:quickFix.removeUserSpns.successNotification", {
+                  count: result.removed.length,
+                  name: user.displayName || user.samAccountName,
+                }),
                 "success",
               );
               handleRefresh();
@@ -753,16 +811,17 @@ export function UserDetail({
             <Save size={12} />
             {saving ? t("common:saving") : t("common:save")}
           </button>
-          <button
-            onClick={() =>
-              actionBarRef.current?.scrollIntoView({ behavior: "smooth" })
-            }
-            className="btn btn-sm btn-ghost"
-            title={t("scrollToActionBar")}
-            data-testid="floating-scroll-btn"
-          >
-            <ArrowUp size={12} />
-          </button>
+          <Tooltip content={t("scrollToActionBar")}>
+            <button
+              onClick={() =>
+                actionBarRef.current?.scrollIntoView({ behavior: "smooth" })
+              }
+              className="btn btn-sm btn-ghost"
+              data-testid="floating-scroll-btn"
+            >
+              <ArrowUp size={12} />
+            </button>
+          </Tooltip>
         </div>
       )}
     </div>

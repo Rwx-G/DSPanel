@@ -20,6 +20,7 @@ import {
 } from "@/types/ntfs";
 import { type DirectoryEntry } from "@/types/directory";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
+import { Tooltip } from "@/components/common/Tooltip";
 import { formatCsv, downloadCsv } from "@/utils/csvExport";
 
 function accessTooltip(
@@ -51,21 +52,21 @@ function AccessIcon({
   switch (indicator) {
     case "Allowed":
       return (
-        <span title={title} data-testid="access-allowed">
+        <Tooltip content={title} testId="access-allowed">
           <Shield size={14} className="text-[var(--color-success)]" />
-        </span>
+        </Tooltip>
       );
     case "Denied":
       return (
-        <span title={title} data-testid="access-denied">
+        <Tooltip content={title} testId="access-denied">
           <ShieldAlert size={14} className="text-[var(--color-error)]" />
-        </span>
+        </Tooltip>
       );
     case "NoMatch":
       return (
-        <span title={title} data-testid="access-nomatch">
+        <Tooltip content={title} testId="access-nomatch">
           <Minus size={14} className="text-[var(--color-text-secondary)]" />
-        </span>
+        </Tooltip>
       );
   }
 }
@@ -157,7 +158,9 @@ export function UncPermissionsAudit({
         <EmptyState
           icon={<Monitor size={40} />}
           title={t("components:uncPermissionsAudit.notAvailable")}
-          description={t("components:uncPermissionsAudit.notAvailableDescription")}
+          description={t(
+            "components:uncPermissionsAudit.notAvailableDescription",
+          )}
         />
       </div>
     );
@@ -186,9 +189,9 @@ export function UncPermissionsAudit({
               onKeyDown={(e) => {
                 if (e.key === "Enter" && uncPath.trim() && !isAuditing) {
                   audit();
-              }
-            }}
-            data-testid="unc-path-input"
+                }
+              }}
+              data-testid="unc-path-input"
             />
           </div>
         </div>
@@ -415,7 +418,9 @@ function AccessSummary({
             {userAName}
           </p>
           <p className="text-[var(--color-success)]">
-            {t("components:uncPermissionsAudit.rulesGrantAccess", { count: userAAllowed.length })}
+            {t("components:uncPermissionsAudit.rulesGrantAccess", {
+              count: userAAllowed.length,
+            })}
             {userAAllowed.length > 0 && (
               <span className="text-[var(--color-text-secondary)]">
                 {" "}
@@ -428,7 +433,9 @@ function AccessSummary({
           </p>
           {userADenied.length > 0 && (
             <p className="text-[var(--color-error)]">
-              {t("components:uncPermissionsAudit.rulesDenyAccess", { count: userADenied.length })}
+              {t("components:uncPermissionsAudit.rulesDenyAccess", {
+                count: userADenied.length,
+              })}
               <span className="text-[var(--color-text-secondary)]">
                 {" "}
                 via{" "}
@@ -444,7 +451,9 @@ function AccessSummary({
             {userBName}
           </p>
           <p className="text-[var(--color-success)]">
-            {t("components:uncPermissionsAudit.rulesGrantAccess", { count: userBAllowed.length })}
+            {t("components:uncPermissionsAudit.rulesGrantAccess", {
+              count: userBAllowed.length,
+            })}
             {userBAllowed.length > 0 && (
               <span className="text-[var(--color-text-secondary)]">
                 {" "}
@@ -457,7 +466,9 @@ function AccessSummary({
           </p>
           {userBDenied.length > 0 && (
             <p className="text-[var(--color-error)]">
-              {t("components:uncPermissionsAudit.rulesDenyAccess", { count: userBDenied.length })}
+              {t("components:uncPermissionsAudit.rulesDenyAccess", {
+                count: userBDenied.length,
+              })}
               <span className="text-[var(--color-text-secondary)]">
                 {" "}
                 via{" "}

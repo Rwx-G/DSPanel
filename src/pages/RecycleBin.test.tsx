@@ -29,11 +29,12 @@ vi.mock("@/hooks/useOUTree", () => ({
   }),
 }));
 
-vi.mock("@/hooks/useErrorHandler", () => ({
-  useErrorHandler: () => ({
-    handleError: vi.fn(),
-  }),
-}));
+vi.mock("@/hooks/useErrorHandler", () => {
+  const handleError = vi.fn();
+  return {
+    useErrorHandler: () => ({ handleError }),
+  };
+});
 
 function Wrapper({ children }: { children: ReactNode }) {
   return <NotificationProvider>{children}</NotificationProvider>;
@@ -41,14 +42,16 @@ function Wrapper({ children }: { children: ReactNode }) {
 
 const mockDeletedObjects = [
   {
-    distinguishedName: "CN=John\\0ADEL:abc,CN=Deleted Objects,DC=example,DC=com",
+    distinguishedName:
+      "CN=John\\0ADEL:abc,CN=Deleted Objects,DC=example,DC=com",
     name: "John Doe",
     objectType: "user",
     deletionDate: "2026-03-15",
     originalOu: "OU=Users,DC=example,DC=com",
   },
   {
-    distinguishedName: "CN=PC01\\0ADEL:def,CN=Deleted Objects,DC=example,DC=com",
+    distinguishedName:
+      "CN=PC01\\0ADEL:def,CN=Deleted Objects,DC=example,DC=com",
     name: "PC01",
     objectType: "computer",
     deletionDate: "2026-03-14",
@@ -61,7 +64,11 @@ function setupMock(opts: {
   objects?: typeof mockDeletedObjects;
   restoreResult?: unknown;
 }) {
-  const { enabled = true, objects = mockDeletedObjects, restoreResult = null } = opts;
+  const {
+    enabled = true,
+    objects = mockDeletedObjects,
+    restoreResult = null,
+  } = opts;
   mockInvoke.mockImplementation((cmd: string) => {
     switch (cmd) {
       case "is_recycle_bin_enabled":
@@ -112,9 +119,9 @@ describe("RecycleBin", () => {
     await waitFor(() => {
       expect(screen.getByTestId("recycle-bin-table")).toBeInTheDocument();
     });
-    const usersBtn = screen.getAllByRole("button").find(
-      (btn) => btn.textContent?.startsWith("Users"),
-    );
+    const usersBtn = screen
+      .getAllByRole("button")
+      .find((btn) => btn.textContent?.startsWith("Users"));
     expect(usersBtn).toBeDefined();
     fireEvent.click(usersBtn!);
     await waitFor(() => {
@@ -160,16 +167,12 @@ describe("RecycleBin", () => {
     const restoreButtons = screen.getAllByTestId("restore-btn");
     fireEvent.click(restoreButtons[0]);
 
-    await waitFor(() => {
-      expect(screen.getByTestId("restore-confirm")).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByTestId("restore-confirm"));
+    const confirmBtn = await screen.findByTestId("restore-confirm");
+    fireEvent.click(confirmBtn);
 
     await waitFor(() => {
       expect(mockInvoke).toHaveBeenCalledWith("restore_deleted_object", {
-        deletedDn:
-          "CN=John\\0ADEL:abc,CN=Deleted Objects,DC=example,DC=com",
+        deletedDn: "CN=John\\0ADEL:abc,CN=Deleted Objects,DC=example,DC=com",
         targetOuDn: "OU=Users,DC=example,DC=com",
       });
     });

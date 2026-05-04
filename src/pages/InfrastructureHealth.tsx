@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { EmptyState } from "@/components/common/EmptyState";
+import { Tooltip } from "@/components/common/Tooltip";
 import {
   RefreshCw,
   Server,
@@ -128,30 +129,37 @@ function DcHealthCard({
           </div>
           <span className="text-caption text-[var(--color-text-secondary)]">
             {t("site")}: {result.dc.siteName}
-            {result.dc.functionalLevel && (
-              <> - {result.dc.functionalLevel}</>
-            )}
+            {result.dc.functionalLevel && <> - {result.dc.functionalLevel}</>}
           </span>
         </div>
 
         {/* Summary badges */}
         <div className="flex items-center gap-1">
           {result.checks.map((check) => (
-            <span
+            <Tooltip
               key={check.name}
-              className="flex h-5 w-5 items-center justify-center rounded-full"
-              style={{ color: statusColor(check.status) }}
-              title={`${t(`checkNames.${check.name}`, { defaultValue: check.name })}: ${check.message}`}
+              content={`${t(`checkNames.${check.name}`, { defaultValue: check.name })}: ${check.message}`}
             >
-              {checkIcon(check.name, 12)}
-            </span>
+              <span
+                className="flex h-5 w-5 items-center justify-center rounded-full"
+                style={{ color: statusColor(check.status) }}
+              >
+                {checkIcon(check.name, 12)}
+              </span>
+            </Tooltip>
           ))}
         </div>
 
         {isExpanded ? (
-          <ChevronDown size={16} className="shrink-0 text-[var(--color-text-secondary)]" />
+          <ChevronDown
+            size={16}
+            className="shrink-0 text-[var(--color-text-secondary)]"
+          />
         ) : (
-          <ChevronRight size={16} className="shrink-0 text-[var(--color-text-secondary)]" />
+          <ChevronRight
+            size={16}
+            className="shrink-0 text-[var(--color-text-secondary)]"
+          />
         )}
       </button>
 
@@ -161,7 +169,10 @@ function DcHealthCard({
           className="border-t border-[var(--color-border-default)] px-4 py-3"
           data-testid={`dc-detail-${result.dc.hostname}`}
         >
-          <table className="w-full text-caption" style={{ tableLayout: "fixed" }}>
+          <table
+            className="w-full text-caption"
+            style={{ tableLayout: "fixed" }}
+          >
             <colgroup>
               <col style={{ width: "120px" }} />
               <col style={{ width: "60px" }} />
@@ -183,7 +194,8 @@ function DcHealthCard({
             </tbody>
           </table>
           <div className="mt-2 text-[10px] text-[var(--color-text-secondary)]">
-            {t("lastChecked")}: {new Date(result.checkedAt).toLocaleTimeString()}
+            {t("lastChecked")}:{" "}
+            {new Date(result.checkedAt).toLocaleTimeString()}
           </div>
         </div>
       )}
@@ -195,29 +207,85 @@ function DcHealthCard({
 function useTranslateCheckMessage() {
   const { t } = useTranslation("infrastructureHealth");
   return (msg: string): string => {
-    const patterns: [RegExp, string, (m: RegExpMatchArray) => Record<string, string>][] = [
-      [/^Resolved via AD DNS to (.+)$/, "checkMsg.dnsResolved", (m) => ({ ip: m[1] })],
+    const patterns: [
+      RegExp,
+      string,
+      (m: RegExpMatchArray) => Record<string, string>,
+    ][] = [
+      [
+        /^Resolved via AD DNS to (.+)$/,
+        "checkMsg.dnsResolved",
+        (m) => ({ ip: m[1] }),
+      ],
       [/^No SRV records/, "checkMsg.dnsNoRecords", () => ({})],
       [/^DNS resolution failed/, "checkMsg.dnsFailed", () => ({})],
-      [/^LDAP response: (\d+)ms$/, "checkMsg.ldapResponse", (m) => ({ ms: m[1] })],
-      [/^LDAP response slow: (\d+)ms$/, "checkMsg.ldapSlow", (m) => ({ ms: m[1] })],
-      [/^LDAP response very slow: (\d+)ms$/, "checkMsg.ldapVerySlow", (m) => ({ ms: m[1] })],
+      [
+        /^LDAP response: (\d+)ms$/,
+        "checkMsg.ldapResponse",
+        (m) => ({ ms: m[1] }),
+      ],
+      [
+        /^LDAP response slow: (\d+)ms$/,
+        "checkMsg.ldapSlow",
+        (m) => ({ ms: m[1] }),
+      ],
+      [
+        /^LDAP response very slow: (\d+)ms$/,
+        "checkMsg.ldapVerySlow",
+        (m) => ({ ms: m[1] }),
+      ],
       [/^LDAP connection failed/, "checkMsg.ldapFailed", () => ({})],
-      [/^All services registered: (.+)$/, "checkMsg.servicesAll", (m) => ({ list: m[1] })],
-      [/^Missing services: (.+)$/, "checkMsg.servicesMissing", (m) => ({ list: m[1] })],
+      [
+        /^All services registered: (.+)$/,
+        "checkMsg.servicesAll",
+        (m) => ({ list: m[1] }),
+      ],
+      [
+        /^Missing services: (.+)$/,
+        "checkMsg.servicesMissing",
+        (m) => ({ list: m[1] }),
+      ],
       [/^Service check failed/, "checkMsg.servicesFailed", () => ({})],
-      [/^(\d+) inbound replication link/, "checkMsg.replLinks", (m) => ({ count: m[1] })],
+      [
+        /^(\d+) inbound replication link/,
+        "checkMsg.replLinks",
+        (m) => ({ count: m[1] }),
+      ],
       [/^No inbound replication/, "checkMsg.replNone", () => ({})],
       [/^Replication check failed/, "checkMsg.replFailed", () => ({})],
-      [/^DFSR enabled, SMB reachable \((.+)\)$/, "checkMsg.sysvolOk", (m) => ({ state: m[1] })],
-      [/^DFSR enabled but SMB port 445 unreachable \((.+)\)$/, "checkMsg.sysvolSmbFail", (m) => ({ state: m[1] })],
+      [
+        /^DFSR enabled, SMB reachable \((.+)\)$/,
+        "checkMsg.sysvolOk",
+        (m) => ({ state: m[1] }),
+      ],
+      [
+        /^DFSR enabled but SMB port 445 unreachable \((.+)\)$/,
+        "checkMsg.sysvolSmbFail",
+        (m) => ({ state: m[1] }),
+      ],
       [/^SYSVOL check failed/, "checkMsg.sysvolFailed", () => ({})],
-      [/^(\d+)s skew - exceeds/, "checkMsg.clockCritical", (m) => ({ seconds: m[1] })],
-      [/^(\d+)s skew \(Kerberos/, "checkMsg.clockWarn", (m) => ({ seconds: m[1] })],
+      [
+        /^(\d+)s skew - exceeds/,
+        "checkMsg.clockCritical",
+        (m) => ({ seconds: m[1] }),
+      ],
+      [
+        /^(\d+)s skew \(Kerberos/,
+        "checkMsg.clockWarn",
+        (m) => ({ seconds: m[1] }),
+      ],
       [/^(\d+)s skew$/, "checkMsg.clockOk", (m) => ({ seconds: m[1] })],
       [/^Clock skew check failed/, "checkMsg.clockFailed", () => ({})],
-      [/^Machine account OK \((.+)\)$/, "checkMsg.accountOk", (m) => ({ info: m[1] })],
-      [/^Machine account: (.+)$/, "checkMsg.accountWarn", (m) => ({ issues: m[1] })],
+      [
+        /^Machine account OK \((.+)\)$/,
+        "checkMsg.accountOk",
+        (m) => ({ info: m[1] }),
+      ],
+      [
+        /^Machine account: (.+)$/,
+        "checkMsg.accountWarn",
+        (m) => ({ issues: m[1] }),
+      ],
       [/^Machine account check failed/, "checkMsg.accountFailed", () => ({})],
     ];
     for (const [re, key, extract] of patterns) {
@@ -231,7 +299,9 @@ function useTranslateCheckMessage() {
 function CheckRow({ check }: { check: DcHealthCheck }) {
   const { t } = useTranslation("infrastructureHealth");
   const translateMsg = useTranslateCheckMessage();
-  const translatedName = t(`checkNames.${check.name}`, { defaultValue: check.name });
+  const translatedName = t(`checkNames.${check.name}`, {
+    defaultValue: check.name,
+  });
   const translatedMsg = translateMsg(check.message);
   return (
     <tr className="border-t border-[var(--color-border-subtle)]">
@@ -246,11 +316,11 @@ function CheckRow({ check }: { check: DcHealthCheck }) {
           <StatusIcon level={check.status} size={14} />
         </span>
       </td>
-      <td className="truncate py-2 pr-4 text-[var(--color-text-secondary)]" title={translatedMsg}>
-        {translatedMsg}
+      <td className="truncate py-2 pr-4 text-[var(--color-text-secondary)]">
+        <Tooltip content={translatedMsg}>{translatedMsg}</Tooltip>
       </td>
-      <td className="truncate py-2 font-mono text-[var(--color-text-secondary)]" title={check.value ?? "-"}>
-        {check.value ?? "-"}
+      <td className="truncate py-2 font-mono text-[var(--color-text-secondary)]">
+        <Tooltip content={check.value ?? "-"}>{check.value ?? "-"}</Tooltip>
       </td>
     </tr>
   );
@@ -339,16 +409,25 @@ export function InfrastructureHealth() {
           {/* Summary badges */}
           {results.length > 0 && (
             <div className="flex items-center gap-2 text-caption">
-              <span className="flex items-center gap-1" style={{ color: "var(--color-success)" }}>
+              <span
+                className="flex items-center gap-1"
+                style={{ color: "var(--color-success)" }}
+              >
                 <CheckCircle size={12} /> {healthySummary}
               </span>
               {warningSummary > 0 && (
-                <span className="flex items-center gap-1" style={{ color: "var(--color-warning)" }}>
+                <span
+                  className="flex items-center gap-1"
+                  style={{ color: "var(--color-warning)" }}
+                >
                   <AlertTriangle size={12} /> {warningSummary}
                 </span>
               )}
               {criticalSummary > 0 && (
-                <span className="flex items-center gap-1" style={{ color: "var(--color-error)" }}>
+                <span
+                  className="flex items-center gap-1"
+                  style={{ color: "var(--color-error)" }}
+                >
                   <AlertCircle size={12} /> {criticalSummary}
                 </span>
               )}
@@ -369,7 +448,14 @@ export function InfrastructureHealth() {
             ))}
           </select>
 
-          <ExportToolbar<{ dc: string; site: string; status: string; check: string; checkStatus: string; message: string }>
+          <ExportToolbar<{
+            dc: string;
+            site: string;
+            status: string;
+            check: string;
+            checkStatus: string;
+            message: string;
+          }>
             columns={[
               { key: "dc", header: t("exportDc") },
               { key: "site", header: t("site") },
@@ -395,7 +481,14 @@ export function InfrastructureHealth() {
                 }),
               );
             })()}
-            rowMapper={(r) => [r.dc, r.site, r.status, r.check, r.checkStatus, r.message]}
+            rowMapper={(r) => [
+              r.dc,
+              r.site,
+              r.status,
+              r.check,
+              r.checkStatus,
+              r.message,
+            ]}
             title={t("exportTitle")}
             filenameBase="dc-health"
           />
@@ -435,11 +528,14 @@ export function InfrastructureHealth() {
         ) : (
           <div className="flex flex-col gap-6">
             {Object.entries(
-              results.reduce<Record<string, DcHealthResult[]>>((groups, result) => {
-                const site = result.dc.siteName || "Unknown Site";
-                (groups[site] ??= []).push(result);
-                return groups;
-              }, {}),
+              results.reduce<Record<string, DcHealthResult[]>>(
+                (groups, result) => {
+                  const site = result.dc.siteName || "Unknown Site";
+                  (groups[site] ??= []).push(result);
+                  return groups;
+                },
+                {},
+              ),
             ).map(([site, dcs]) => (
               <div key={site}>
                 <div className="mb-2 flex items-center gap-2">

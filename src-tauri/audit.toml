@@ -1,0 +1,29 @@
+# cargo-audit configuration. See:
+# https://github.com/rustsec/rustsec/blob/main/cargo-audit/audit.toml.example
+#
+# Ignores below mirror the Dependabot exclusions in `.github/dependabot.yml`.
+# Each ignore documents the dependency chain, runtime exposure, and the
+# trigger to revisit, per the rule in `.claude/rules/dspanel-tauri.md`
+# (`cargo audit` section).
+
+[advisories]
+ignore = [
+  # RUSTSEC-2024-0413, 2024-0416 etc.: gtk-rs 0.18 family (atk, gtk, gdk,
+  # gdk-pixbuf, glib, etc.) flagged unmaintained. Pinned by Tauri 2 ->
+  # webkit2gtk 2.0.2 -> gtk 0.18.2. Linux-only build target, no runtime
+  # exposure to the unmaintained APIs from the DSPanel binary surface.
+  # Revisit when Tauri ships a 2.x release that bumps gtk-rs to 0.20 or when
+  # we migrate to Tauri 3.
+  "RUSTSEC-2024-0411", # proc-macro-error - transitive via gtk-rs 0.18
+  "RUSTSEC-2024-0412", # gdkx11-sys
+  "RUSTSEC-2024-0413", # atk
+  "RUSTSEC-2024-0414", # gdkx11
+  "RUSTSEC-2024-0415", # gdk
+  "RUSTSEC-2024-0416", # atk-sys
+  "RUSTSEC-2024-0417", # gdk-sys
+  "RUSTSEC-2024-0418", # gdk-pixbuf
+  "RUSTSEC-2024-0419", # gdk-pixbuf-sys
+  "RUSTSEC-2024-0420", # gtk
+  "RUSTSEC-2024-0421", # gtk-sys
+  "RUSTSEC-2024-0429", # glib
+]

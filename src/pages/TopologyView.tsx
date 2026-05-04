@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { EmptyState } from "@/components/common/EmptyState";
+import { Tooltip } from "@/components/common/Tooltip";
 import {
   RefreshCw,
   AlertCircle,
@@ -31,13 +32,16 @@ function DcEntry({ dc }: { dc: TopologyDcNode }) {
       >
         <div className="relative mt-0.5 shrink-0">
           <Server size={20} className="text-[var(--color-text-secondary)]" />
-          <span
-            className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[var(--color-surface-card)]"
-            style={{
-              backgroundColor: dc.isOnline ? "var(--color-success)" : "var(--color-error)",
-            }}
-            title={dc.isOnline ? t("online") : t("offline")}
-          />
+          <Tooltip content={dc.isOnline ? t("online") : t("offline")}>
+            <span
+              className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[var(--color-surface-card)]"
+              style={{
+                backgroundColor: dc.isOnline
+                  ? "var(--color-success)"
+                  : "var(--color-error)",
+              }}
+            />
+          </Tooltip>
         </div>
         <div className="min-w-0 flex-1">
           <div className="font-mono text-body font-medium text-[var(--color-text-primary)]">
@@ -54,14 +58,16 @@ function DcEntry({ dc }: { dc: TopologyDcNode }) {
                 <Globe size={10} /> GC
               </span>
             )}
-            {dc.fsmoRoles.filter((r) => r !== "PDC").map((role) => (
-              <span
-                key={role}
-                className="rounded bg-[var(--color-text-secondary)] px-1.5 py-0.5 text-[10px] font-medium text-white"
-              >
-                {role}
-              </span>
-            ))}
+            {dc.fsmoRoles
+              .filter((r) => r !== "PDC")
+              .map((role) => (
+                <span
+                  key={role}
+                  className="rounded bg-[var(--color-text-secondary)] px-1.5 py-0.5 text-[10px] font-medium text-white"
+                >
+                  {role}
+                </span>
+              ))}
           </div>
         </div>
         <ChevronDown
@@ -74,35 +80,64 @@ function DcEntry({ dc }: { dc: TopologyDcNode }) {
           <table className="w-full text-caption">
             <tbody>
               <tr>
-                <td className="py-0.5 pr-3 font-medium text-[var(--color-text-secondary)]">{t("common:status")}</td>
-                <td className="py-0.5" style={{ color: dc.isOnline ? "var(--color-success)" : "var(--color-error)" }}>
+                <td className="py-0.5 pr-3 font-medium text-[var(--color-text-secondary)]">
+                  {t("common:status")}
+                </td>
+                <td
+                  className="py-0.5"
+                  style={{
+                    color: dc.isOnline
+                      ? "var(--color-success)"
+                      : "var(--color-error)",
+                  }}
+                >
                   {dc.isOnline ? t("online") : t("offline")}
                 </td>
               </tr>
               {dc.ipAddress && (
                 <tr>
-                  <td className="py-0.5 pr-3 font-medium text-[var(--color-text-secondary)]">{t("ipAddress")}</td>
-                  <td className="py-0.5 font-mono text-[var(--color-text-primary)]">{dc.ipAddress}</td>
+                  <td className="py-0.5 pr-3 font-medium text-[var(--color-text-secondary)]">
+                    {t("ipAddress")}
+                  </td>
+                  <td className="py-0.5 font-mono text-[var(--color-text-primary)]">
+                    {dc.ipAddress}
+                  </td>
                 </tr>
               )}
               {dc.osVersion && (
                 <tr>
-                  <td className="py-0.5 pr-3 font-medium text-[var(--color-text-secondary)]">{t("os")}</td>
-                  <td className="py-0.5 text-[var(--color-text-primary)]">{dc.osVersion}</td>
+                  <td className="py-0.5 pr-3 font-medium text-[var(--color-text-secondary)]">
+                    {t("os")}
+                  </td>
+                  <td className="py-0.5 text-[var(--color-text-primary)]">
+                    {dc.osVersion}
+                  </td>
                 </tr>
               )}
               <tr>
-                <td className="py-0.5 pr-3 font-medium text-[var(--color-text-secondary)]">{t("site")}</td>
-                <td className="py-0.5 text-[var(--color-text-primary)]">{dc.siteName}</td>
+                <td className="py-0.5 pr-3 font-medium text-[var(--color-text-secondary)]">
+                  {t("site")}
+                </td>
+                <td className="py-0.5 text-[var(--color-text-primary)]">
+                  {dc.siteName}
+                </td>
               </tr>
               <tr>
-                <td className="py-0.5 pr-3 font-medium text-[var(--color-text-secondary)]">{t("globalCatalog")}</td>
-                <td className="py-0.5 text-[var(--color-text-primary)]">{dc.isGc ? t("common:yes") : t("common:no")}</td>
+                <td className="py-0.5 pr-3 font-medium text-[var(--color-text-secondary)]">
+                  {t("globalCatalog")}
+                </td>
+                <td className="py-0.5 text-[var(--color-text-primary)]">
+                  {dc.isGc ? t("common:yes") : t("common:no")}
+                </td>
               </tr>
               {dc.fsmoRoles.length > 0 && (
                 <tr>
-                  <td className="py-0.5 pr-3 font-medium text-[var(--color-text-secondary)]">{t("fsmoRoles")}</td>
-                  <td className="py-0.5 text-[var(--color-text-primary)]">{dc.fsmoRoles.join(", ")}</td>
+                  <td className="py-0.5 pr-3 font-medium text-[var(--color-text-secondary)]">
+                    {t("fsmoRoles")}
+                  </td>
+                  <td className="py-0.5 text-[var(--color-text-primary)]">
+                    {dc.fsmoRoles.join(", ")}
+                  </td>
                 </tr>
               )}
             </tbody>
@@ -115,10 +150,14 @@ function DcEntry({ dc }: { dc: TopologyDcNode }) {
 
 function replLinkStatusColor(status: string): string {
   switch (status) {
-    case "Healthy": return "var(--color-success)";
-    case "Warning": return "var(--color-warning)";
-    case "Failed": return "var(--color-error)";
-    default: return "var(--color-text-secondary)";
+    case "Healthy":
+      return "var(--color-success)";
+    case "Warning":
+      return "var(--color-warning)";
+    case "Failed":
+      return "var(--color-error)";
+    default:
+      return "var(--color-text-secondary)";
   }
 }
 
@@ -183,7 +222,10 @@ function SimpleTopologyView({ data }: { data: TopologyData }) {
         {data.replicationLinks.length > 0 && (
           <div className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)]">
             <div className="flex items-center gap-3 border-b border-[var(--color-border-default)] px-4 py-3">
-              <RefreshCw size={18} className="text-[var(--color-text-secondary)]" />
+              <RefreshCw
+                size={18}
+                className="text-[var(--color-text-secondary)]"
+              />
               <h3 className="text-body font-semibold text-[var(--color-text-primary)]">
                 {t("replicationLinks")}
               </h3>
@@ -191,16 +233,21 @@ function SimpleTopologyView({ data }: { data: TopologyData }) {
             <div className="divide-y divide-[var(--color-border-subtle)]">
               {data.replicationLinks.map((link, i) => (
                 <div key={i} className="flex items-center gap-4 px-4 py-2.5">
-                  <span
-                    className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
-                    style={{ backgroundColor: replLinkStatusColor(link.status) }}
-                    title={link.status}
-                  />
+                  <Tooltip content={link.status}>
+                    <span
+                      className="inline-block h-2.5 w-2.5 shrink-0 rounded-full"
+                      style={{
+                        backgroundColor: replLinkStatusColor(link.status),
+                      }}
+                    />
+                  </Tooltip>
                   <div className="min-w-0 flex-1">
                     <span className="font-mono text-caption text-[var(--color-text-primary)]">
                       {link.sourceDc}
                     </span>
-                    <span className="mx-2 text-[var(--color-text-secondary)]">{"-->"}</span>
+                    <span className="mx-2 text-[var(--color-text-secondary)]">
+                      {"-->"}
+                    </span>
                     <span className="font-mono text-caption text-[var(--color-text-primary)]">
                       {link.targetDc}
                     </span>
@@ -223,14 +270,20 @@ function SimpleTopologyView({ data }: { data: TopologyData }) {
         {data.siteLinks.length > 0 && (
           <div className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)]">
             <div className="flex items-center gap-3 border-b border-[var(--color-border-default)] px-4 py-3">
-              <GitBranch size={18} className="text-[var(--color-text-secondary)]" />
+              <GitBranch
+                size={18}
+                className="text-[var(--color-text-secondary)]"
+              />
               <h3 className="text-body font-semibold text-[var(--color-text-primary)]">
                 {t("siteLinks")}
               </h3>
             </div>
             <div className="divide-y divide-[var(--color-border-subtle)]">
               {data.siteLinks.map((sl) => (
-                <div key={sl.name} className="flex items-center justify-between px-4 py-2.5">
+                <div
+                  key={sl.name}
+                  className="flex items-center justify-between px-4 py-2.5"
+                >
                   <div>
                     <span className="text-body font-medium text-[var(--color-text-primary)]">
                       {sl.name}
@@ -240,8 +293,12 @@ function SimpleTopologyView({ data }: { data: TopologyData }) {
                     </span>
                   </div>
                   <div className="flex items-center gap-4 text-caption text-[var(--color-text-secondary)]">
-                    <span>{t("cost")} {sl.cost}</span>
-                    <span>{t("interval")} {sl.replInterval} {t("min")}</span>
+                    <span>
+                      {t("cost")} {sl.cost}
+                    </span>
+                    <span>
+                      {t("interval")} {sl.replInterval} {t("min")}
+                    </span>
                   </div>
                 </div>
               ))}
@@ -255,8 +312,10 @@ function SimpleTopologyView({ data }: { data: TopologyData }) {
             <CheckCircle size={14} className="text-[var(--color-success)]" />
             {data.sites.length} site{data.sites.length > 1 ? "s" : ""},{" "}
             {totalDcs} DC{totalDcs > 1 ? "s" : ""},{" "}
-            {data.replicationLinks.length} replication link{data.replicationLinks.length !== 1 ? "s" : ""},{" "}
-            {data.siteLinks.length} site link{data.siteLinks.length !== 1 ? "s" : ""}
+            {data.replicationLinks.length} replication link
+            {data.replicationLinks.length !== 1 ? "s" : ""},{" "}
+            {data.siteLinks.length} site link
+            {data.siteLinks.length !== 1 ? "s" : ""}
           </div>
         </div>
       </div>
@@ -299,7 +358,10 @@ export function TopologyView() {
             <>
               <span className="text-caption text-[var(--color-text-secondary)]">
                 {data.sites.length} site{data.sites.length > 1 ? "s" : ""},{" "}
-                {data.sites.reduce((n, s) => n + s.dcs.length, 0)} DC{data.sites.reduce((n, s) => n + s.dcs.length, 0) > 1 ? "s" : ""}
+                {data.sites.reduce((n, s) => n + s.dcs.length, 0)} DC
+                {data.sites.reduce((n, s) => n + s.dcs.length, 0) > 1
+                  ? "s"
+                  : ""}
               </span>
             </>
           )}

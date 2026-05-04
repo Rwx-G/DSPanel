@@ -31,6 +31,7 @@ import { useNavigation } from "@/contexts/NavigationContext";
 import { usePermissions } from "@/hooks/usePermissions";
 import { type SidebarModule } from "@/types/navigation";
 import { About } from "@/pages/About";
+import { Tooltip } from "@/components/common/Tooltip";
 
 const ICON_MAP: Record<string, LucideIcon> = {
   home: Home,
@@ -310,7 +311,9 @@ export function Sidebar({ expanded, onToggle }: SidebarProps) {
     about: "about",
   };
 
-  const groups = MODULES.filter((mod) => hasPermission(mod.requiredLevel)).reduce(
+  const groups = MODULES.filter((mod) =>
+    hasPermission(mod.requiredLevel),
+  ).reduce(
     (acc, mod) => {
       if (!acc[mod.group]) acc[mod.group] = [];
       acc[mod.group].push(mod);
@@ -334,18 +337,21 @@ export function Sidebar({ expanded, onToggle }: SidebarProps) {
         className={`flex h-12 items-center border-b border-[var(--color-border-default)] px-2 ${!expanded ? "justify-center" : ""}`}
       >
         {expanded && (
-          <button
-            className="flex-1 truncate px-2 text-left text-body font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)] transition-colors duration-150"
-            onClick={goHome}
-            title={t("sidebar:goToHome")}
-          >
-            {t("sidebar:appTitle")}
-          </button>
+          <Tooltip content={t("sidebar:goToHome")} className="flex-1">
+            <button
+              className="block w-full truncate px-2 text-left text-body font-semibold text-[var(--color-text-primary)] hover:text-[var(--color-primary)] transition-colors duration-150"
+              onClick={goHome}
+            >
+              {t("sidebar:appTitle")}
+            </button>
+          </Tooltip>
         )}
         <button
           className="btn btn-ghost flex h-8 w-8 shrink-0 items-center justify-center rounded-md p-0"
           onClick={onToggle}
-          aria-label={expanded ? t("sidebar:collapseSidebar") : t("sidebar:expandSidebar")}
+          aria-label={
+            expanded ? t("sidebar:collapseSidebar") : t("sidebar:expandSidebar")
+          }
           data-testid="sidebar-toggle"
         >
           <span className="text-[16px] leading-none text-[var(--color-text-secondary)]">
@@ -364,11 +370,15 @@ export function Sidebar({ expanded, onToggle }: SidebarProps) {
             key={groupName}
             className="mb-1"
             role="group"
-            aria-label={t(`sidebar:${GROUP_LABEL_KEYS[groupName] ?? groupName.toLowerCase()}`)}
+            aria-label={t(
+              `sidebar:${GROUP_LABEL_KEYS[groupName] ?? groupName.toLowerCase()}`,
+            )}
           >
             {expanded && (
               <div className="px-4 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-sidebar-group-label)]">
-                {t(`sidebar:${GROUP_LABEL_KEYS[groupName] ?? groupName.toLowerCase()}`)}
+                {t(
+                  `sidebar:${GROUP_LABEL_KEYS[groupName] ?? groupName.toLowerCase()}`,
+                )}
               </div>
             )}
             {/* Separator in collapsed mode - skip for first group (header border-b is enough) */}
@@ -391,17 +401,24 @@ export function Sidebar({ expanded, onToggle }: SidebarProps) {
                     if (mod.id === "about") {
                       setShowAbout(true);
                     } else {
-                      openTab(t(`sidebar:${MODULE_LABEL_KEYS[mod.id] ?? mod.id}`), mod.id, mod.icon);
+                      openTab(
+                        t(`sidebar:${MODULE_LABEL_KEYS[mod.id] ?? mod.id}`),
+                        mod.id,
+                        mod.icon,
+                      );
                     }
                   }}
-                  title={expanded ? undefined : t(`sidebar:${MODULE_LABEL_KEYS[mod.id] ?? mod.id}`)}
                   data-testid={`sidebar-item-${mod.id}`}
                 >
                   {isActive && (
                     <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-[var(--color-primary)]" />
                   )}
                   <IconComp size={18} className="shrink-0" />
-                  {expanded && <span className="truncate">{t(`sidebar:${MODULE_LABEL_KEYS[mod.id] ?? mod.id}`)}</span>}
+                  {expanded && (
+                    <span className="truncate">
+                      {t(`sidebar:${MODULE_LABEL_KEYS[mod.id] ?? mod.id}`)}
+                    </span>
+                  )}
                   {/* Tooltip for collapsed mode */}
                   {!expanded && (
                     <span className="pointer-events-none absolute left-full z-50 ml-2 whitespace-nowrap rounded-md bg-[var(--color-surface-elevated)] px-2.5 py-1.5 text-caption font-medium text-[var(--color-text-primary)] opacity-0 shadow-md transition-opacity duration-150 group-hover:opacity-100">

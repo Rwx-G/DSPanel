@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { EmptyState } from "@/components/common/EmptyState";
+import { Tooltip } from "@/components/common/Tooltip";
 import {
   RefreshCw,
   ShieldCheck,
@@ -65,26 +66,98 @@ function useTranslateRiskText() {
   const { t } = useTranslation("riskScore");
   return {
     explanation: (msg: string): string => {
-      const patterns: [RegExp, string, (m: RegExpMatchArray) => Record<string, string>][] = [
-        [/^(\d+)\/(\d+) privileged accounts have security alerts$/, "explanations.privAlerts", (m) => ({ count: m[1], total: m[2] })],
-        [/^All privileged accounts pass security checks$/, "explanations.privOk", () => ({})],
-        [/^No privileged accounts found to assess$/, "explanations.privNone", () => ({})],
-        [/^Could not assess privileged accounts$/, "explanations.privError", () => ({})],
-        [/^Password policy meets all recommended thresholds$/, "explanations.passwordOk", () => ({})],
-        [/^Issues found: (.+)$/, "explanations.issuesFound", (m) => ({ issues: m[1] })],
-        [/^Issues: (.+)$/, "explanations.issuesFound", (m) => ({ issues: m[1] })],
-        [/^(\d+)\/(\d+) accounts are stale/, "explanations.staleAccounts", (m) => ({ count: m[1], total: m[2] })],
-        [/^Account hygiene meets best practices$/, "explanations.staleOk", () => ({})],
-        [/^Could not assess stale accounts$/, "explanations.staleError", () => ({})],
-        [/^Kerberos configuration meets security best practices$/, "explanations.kerberosOk", () => ({})],
-        [/^Infrastructure hardening meets security best practices$/, "explanations.infraOk", () => ({})],
+      const patterns: [
+        RegExp,
+        string,
+        (m: RegExpMatchArray) => Record<string, string>,
+      ][] = [
+        [
+          /^(\d+)\/(\d+) privileged accounts have security alerts$/,
+          "explanations.privAlerts",
+          (m) => ({ count: m[1], total: m[2] }),
+        ],
+        [
+          /^All privileged accounts pass security checks$/,
+          "explanations.privOk",
+          () => ({}),
+        ],
+        [
+          /^No privileged accounts found to assess$/,
+          "explanations.privNone",
+          () => ({}),
+        ],
+        [
+          /^Could not assess privileged accounts$/,
+          "explanations.privError",
+          () => ({}),
+        ],
+        [
+          /^Password policy meets all recommended thresholds$/,
+          "explanations.passwordOk",
+          () => ({}),
+        ],
+        [
+          /^Issues found: (.+)$/,
+          "explanations.issuesFound",
+          (m) => ({ issues: m[1] }),
+        ],
+        [
+          /^Issues: (.+)$/,
+          "explanations.issuesFound",
+          (m) => ({ issues: m[1] }),
+        ],
+        [
+          /^(\d+)\/(\d+) accounts are stale/,
+          "explanations.staleAccounts",
+          (m) => ({ count: m[1], total: m[2] }),
+        ],
+        [
+          /^Account hygiene meets best practices$/,
+          "explanations.staleOk",
+          () => ({}),
+        ],
+        [
+          /^Could not assess stale accounts$/,
+          "explanations.staleError",
+          () => ({}),
+        ],
+        [
+          /^Kerberos configuration meets security best practices$/,
+          "explanations.kerberosOk",
+          () => ({}),
+        ],
+        [
+          /^Infrastructure hardening meets security best practices$/,
+          "explanations.infraOk",
+          () => ({}),
+        ],
         [/^No GPO security issues detected$/, "explanations.gpoOk", () => ({})],
-        [/^No external trusts configured$/, "explanations.noExternalTrusts", () => ({})],
-        [/^No AD CS security issues detected$/, "explanations.certOk", () => ({})],
-        [/^Could not assess AD CS security$/, "explanations.certError", () => ({})],
+        [
+          /^No external trusts configured$/,
+          "explanations.noExternalTrusts",
+          () => ({}),
+        ],
+        [
+          /^No AD CS security issues detected$/,
+          "explanations.certOk",
+          () => ({}),
+        ],
+        [
+          /^Could not assess AD CS security$/,
+          "explanations.certError",
+          () => ({}),
+        ],
         [/^AD CS not detected/, "explanations.certNone", () => ({})],
-        [/^(\d+) GPO\(s\) found - audit SYSVOL/, "explanations.gpoAudit", (m) => ({ count: m[1] })],
-        [/^AD CS issues: (.+)$/, "explanations.certIssues", (m) => ({ details: m[1] })],
+        [
+          /^(\d+) GPO\(s\) found - audit SYSVOL/,
+          "explanations.gpoAudit",
+          (m) => ({ count: m[1] }),
+        ],
+        [
+          /^AD CS issues: (.+)$/,
+          "explanations.certIssues",
+          (m) => ({ details: m[1] }),
+        ],
       ];
       for (const [re, key, extract] of patterns) {
         const m = msg.match(re);
@@ -93,23 +166,83 @@ function useTranslateRiskText() {
       return msg;
     },
     recommendation: (msg: string): string => {
-      const patterns: [RegExp, string, (m: RegExpMatchArray) => Record<string, string>][] = [
-        [/^Review (\d+) high-severity alert/, "recommendations_tpl.reviewHighAlerts", (m) => ({ count: m[1] })],
-        [/^Address (\d+) critical alert/, "recommendations_tpl.addressCriticalAlerts", (m) => ({ count: m[1] })],
-        [/^Disable or remove (\d+) inactive admin/, "recommendations_tpl.disableInactiveAdmins", (m) => ({ count: m[1] })],
-        [/^Reduce privileged accounts from (\d+)/, "recommendations_tpl.reducePrivAccounts", (m) => ({ count: m[1] })],
-        [/^Increase minimum password length/, "recommendations_tpl.increaseMinPwdLength", () => ({})],
-        [/^Enable account lockout/, "recommendations_tpl.enableLockout", () => ({})],
-        [/^Review and disable\/remove (\d+) stale account/, "recommendations_tpl.reviewStaleAccounts", (m) => ({ count: m[1] })],
-        [/^Review (\d+) stale machine account/, "recommendations_tpl.reviewStaleMachines", (m) => ({ count: m[1] })],
-        [/^Add all privileged accounts to the Protected Users/, "recommendations_tpl.addProtectedUsers", () => ({})],
-        [/^Configure msDS-SupportedEncryptionTypes/, "recommendations_tpl.configureAes", () => ({})],
-        [/^Enable AES encryption on all service accounts/, "recommendations_tpl.enableAesSpn", () => ({})],
+      const patterns: [
+        RegExp,
+        string,
+        (m: RegExpMatchArray) => Record<string, string>,
+      ][] = [
+        [
+          /^Review (\d+) high-severity alert/,
+          "recommendations_tpl.reviewHighAlerts",
+          (m) => ({ count: m[1] }),
+        ],
+        [
+          /^Address (\d+) critical alert/,
+          "recommendations_tpl.addressCriticalAlerts",
+          (m) => ({ count: m[1] }),
+        ],
+        [
+          /^Disable or remove (\d+) inactive admin/,
+          "recommendations_tpl.disableInactiveAdmins",
+          (m) => ({ count: m[1] }),
+        ],
+        [
+          /^Reduce privileged accounts from (\d+)/,
+          "recommendations_tpl.reducePrivAccounts",
+          (m) => ({ count: m[1] }),
+        ],
+        [
+          /^Increase minimum password length/,
+          "recommendations_tpl.increaseMinPwdLength",
+          () => ({}),
+        ],
+        [
+          /^Enable account lockout/,
+          "recommendations_tpl.enableLockout",
+          () => ({}),
+        ],
+        [
+          /^Review and disable\/remove (\d+) stale account/,
+          "recommendations_tpl.reviewStaleAccounts",
+          (m) => ({ count: m[1] }),
+        ],
+        [
+          /^Review (\d+) stale machine account/,
+          "recommendations_tpl.reviewStaleMachines",
+          (m) => ({ count: m[1] }),
+        ],
+        [
+          /^Add all privileged accounts to the Protected Users/,
+          "recommendations_tpl.addProtectedUsers",
+          () => ({}),
+        ],
+        [
+          /^Configure msDS-SupportedEncryptionTypes/,
+          "recommendations_tpl.configureAes",
+          () => ({}),
+        ],
+        [
+          /^Enable AES encryption on all service accounts/,
+          "recommendations_tpl.enableAesSpn",
+          () => ({}),
+        ],
         [/^Deploy LAPS/, "recommendations_tpl.deployLaps", () => ({})],
         [/^Create PSOs/, "recommendations_tpl.createPsos", () => ({})],
-        [/^Remove CT_FLAG_ENROLLEE_SUPPLIES_SUBJECT from: (.+)$/, "recommendations_tpl.removeCTFlag", (m) => ({ templates: m[1] })],
-        [/^Remove Certificate Request Agent EKU.*from: (.+)$/, "recommendations_tpl.removeCertReqAgent", (m) => ({ templates: m[1] })],
-        [/^Upgrade schema V1 templates to V2\+: (.+)$/, "recommendations_tpl.upgradeV1", (m) => ({ templates: m[1] })],
+        [
+          /^Remove CT_FLAG_ENROLLEE_SUPPLIES_SUBJECT from: (.+)$/,
+          "recommendations_tpl.removeCTFlag",
+          (m) => ({ templates: m[1] }),
+        ],
+        [
+          /^Remove Certificate Request Agent EKU.*from: (.+)$/,
+          "recommendations_tpl.removeCertReqAgent",
+          (m) => ({ templates: m[1] }),
+        ],
+        [
+          /^Upgrade schema V1 templates to V2\+: (.+)$/,
+          "recommendations_tpl.upgradeV1",
+          (m) => ({ templates: m[1] }),
+        ],
       ];
       for (const [re, key, extract] of patterns) {
         const m = msg.match(re);
@@ -143,7 +276,15 @@ function ZoneIcon({ zone, size = 16 }: { zone: RiskZone; size?: number }) {
 }
 
 /** Semi-circle gauge SVG showing score 0-100 with color zones. */
-function ScoreGauge({ score, zone, t }: { score: number; zone: RiskZone; t: (key: string) => string }) {
+function ScoreGauge({
+  score,
+  zone,
+  t,
+}: {
+  score: number;
+  zone: RiskZone;
+  t: (key: string) => string;
+}) {
   const size = 200;
   const strokeWidth = 16;
   const radius = (size - strokeWidth) / 2;
@@ -296,7 +437,9 @@ function RadarChart({ factors }: { factors: RiskFactor[] }) {
   const refLevels = [0.33, 0.66, 1];
 
   // Score fractions (0-1)
-  const scoreFractions = factors.map((f) => Math.max(0, Math.min(1, f.score / 100)));
+  const scoreFractions = factors.map((f) =>
+    Math.max(0, Math.min(1, f.score / 100)),
+  );
 
   return (
     <div className="flex flex-col items-center" data-testid="radar-chart">
@@ -396,7 +539,9 @@ function ScoreBar({ score }: { score: number }) {
   return (
     <div
       className="h-2 w-full rounded-full"
-      style={{ backgroundColor: `color-mix(in srgb, ${color} 20%, transparent)` }}
+      style={{
+        backgroundColor: `color-mix(in srgb, ${color} 20%, transparent)`,
+      }}
     >
       <div
         className="h-full rounded-full transition-all"
@@ -424,7 +569,9 @@ function FindingRow({ finding }: { finding: RiskFinding }) {
             backgroundColor: `color-mix(in srgb, ${severityColor(finding.severity)} 12%, transparent)`,
           }}
         >
-          {t(`severityLabels.${finding.severity}`, { defaultValue: finding.severity })}
+          {t(`severityLabels.${finding.severity}`, {
+            defaultValue: finding.severity,
+          })}
         </span>
         <span className="text-[11px] text-[var(--color-text-primary)] flex-1">
           {finding.description}
@@ -438,7 +585,9 @@ function FindingRow({ finding }: { finding: RiskFinding }) {
           }}
           data-testid="finding-complexity"
         >
-          {t(`complexityLabels.${finding.complexity}`, { defaultValue: finding.complexity })}
+          {t(`complexityLabels.${finding.complexity}`, {
+            defaultValue: finding.complexity,
+          })}
         </span>
       </div>
       <div className="text-[10px] text-[var(--color-text-secondary)] pl-1">
@@ -458,7 +607,8 @@ function FactorCard({ factor }: { factor: RiskFactor }) {
   const { t } = useTranslation(["riskScore", "common"]);
   const riskText = useTranslateRiskText();
   const [findingsOpen, setFindingsOpen] = useState(false);
-  const showRecommendations = factor.score < 70 && factor.recommendations.length > 0;
+  const showRecommendations =
+    factor.score < 70 && factor.recommendations.length > 0;
   const findings = factor.findings ?? [];
   const impactIfFixed = factor.impactIfFixed ?? 0;
 
@@ -472,8 +622,12 @@ function FactorCard({ factor }: { factor: RiskFactor }) {
           {t(`factorNames.${factor.id}`, { defaultValue: factor.name })}
         </span>
         <div className="flex items-center gap-2 text-[11px] text-[var(--color-text-secondary)]">
-          <span>{t("score")} {Math.round(factor.score)}</span>
-          <span>{t("weight")} {factor.weight}%</span>
+          <span>
+            {t("score")} {Math.round(factor.score)}
+          </span>
+          <span>
+            {t("weight")} {factor.weight}%
+          </span>
         </div>
       </div>
 
@@ -504,7 +658,11 @@ function FactorCard({ factor }: { factor: RiskFactor }) {
             onClick={() => setFindingsOpen(!findingsOpen)}
             data-testid={`findings-toggle-${factor.id}`}
           >
-            {findingsOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+            {findingsOpen ? (
+              <ChevronDown size={12} />
+            ) : (
+              <ChevronRight size={12} />
+            )}
             {t("findings", { count: findings.length })}
           </button>
 
@@ -561,13 +719,21 @@ function TrendSparkline({ history }: { history: RiskScoreHistory[] }) {
         {days.map((day, i) => {
           if (day.score == null) {
             return (
-              <div
+              <Tooltip
                 key={i}
-                className="flex-1 rounded-t-sm"
-                style={{ height: 2, backgroundColor: "var(--color-border-default)", minWidth: 4 }}
-                title={`${day.date}: ${t("noDataShort")}`}
-                data-testid="trend-bar"
-              />
+                content={`${day.date}: ${t("noDataShort")}`}
+                className="flex-1"
+                testId="trend-bar"
+              >
+                <div
+                  className="block rounded-t-sm"
+                  style={{
+                    height: 2,
+                    backgroundColor: "var(--color-border-default)",
+                    minWidth: 4,
+                  }}
+                />
+              </Tooltip>
             );
           }
           const height = Math.max(14, (day.score / maxScore) * barHeight);
@@ -578,17 +744,24 @@ function TrendSparkline({ history }: { history: RiskScoreHistory[] }) {
                 ? "var(--color-warning)"
                 : "var(--color-error)";
           return (
-            <div
+            <Tooltip
               key={i}
-              className="flex-1 rounded-t-sm transition-all flex items-end justify-center"
-              style={{ height, backgroundColor: color, minWidth: 4 }}
-              title={`${day.date}: ${Math.round(day.score)}`}
-              data-testid="trend-bar"
+              content={`${day.date}: ${Math.round(day.score)}`}
+              className="flex-1"
+              testId="trend-bar"
             >
-              <span className="text-[8px] font-medium leading-none pb-0.5" style={{ color: "white" }}>
-                {Math.round(day.score)}
-              </span>
-            </div>
+              <div
+                className="rounded-t-sm transition-all flex items-end justify-center"
+                style={{ height, backgroundColor: color, minWidth: 4 }}
+              >
+                <span
+                  className="text-[8px] font-medium leading-none pb-0.5"
+                  style={{ color: "white" }}
+                >
+                  {Math.round(day.score)}
+                </span>
+              </div>
+            </Tooltip>
           );
         })}
       </div>
@@ -614,7 +787,10 @@ export function RiskScoreDashboard() {
       // Sequential: score first (stores today's entry), then history (reads it back)
       const scoreResult = await invoke<RiskScoreResult>("get_risk_score");
       setResult(scoreResult);
-      const historyResult = await invoke<RiskScoreHistory[]>("get_risk_score_history", { days: 30 });
+      const historyResult = await invoke<RiskScoreHistory[]>(
+        "get_risk_score_history",
+        { days: 30 },
+      );
       setHistory(historyResult);
     } catch (e: unknown) {
       setError(extractErrorMessage(e));
@@ -651,7 +827,15 @@ export function RiskScoreDashboard() {
               {Math.round(result.totalScore)}/100 - {zoneLabel(result.zone, t)}
             </span>
           )}
-          <ExportToolbar<{ factor: string; finding: string; severity: string; points: string; remediation: string; complexity: string; ref: string }>
+          <ExportToolbar<{
+            factor: string;
+            finding: string;
+            severity: string;
+            points: string;
+            remediation: string;
+            complexity: string;
+            ref: string;
+          }>
             columns={[
               { key: "factor", header: t("factor") },
               { key: "finding", header: t("finding") },
@@ -661,18 +845,28 @@ export function RiskScoreDashboard() {
               { key: "complexity", header: t("complexity") },
               { key: "ref", header: t("frameworkRef") },
             ]}
-            data={result?.factors.flatMap((f) =>
-              f.findings.map((fi) => ({
-                factor: f.name,
-                finding: fi.description,
-                severity: fi.severity,
-                points: String(Math.round(fi.pointsDeducted * 100) / 100),
-                remediation: fi.remediation,
-                complexity: fi.complexity,
-                ref: fi.frameworkRef ?? "",
-              })),
-            ) ?? []}
-            rowMapper={(r) => [r.factor, r.finding, r.severity, r.points, r.remediation, r.complexity, r.ref]}
+            data={
+              result?.factors.flatMap((f) =>
+                f.findings.map((fi) => ({
+                  factor: f.name,
+                  finding: fi.description,
+                  severity: fi.severity,
+                  points: String(Math.round(fi.pointsDeducted * 100) / 100),
+                  remediation: fi.remediation,
+                  complexity: fi.complexity,
+                  ref: fi.frameworkRef ?? "",
+                })),
+              ) ?? []
+            }
+            rowMapper={(r) => [
+              r.factor,
+              r.finding,
+              r.severity,
+              r.points,
+              r.remediation,
+              r.complexity,
+              r.ref,
+            ]}
             title={`${t("pageTitle")} - ${result ? Math.round(result.totalScore) : 0}/100`}
             filenameBase="risk-score"
           />
@@ -720,25 +914,45 @@ export function RiskScoreDashboard() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Gauge */}
               <div className="flex flex-col items-center justify-center rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-6">
-                <ScoreGauge score={result.totalScore} zone={result.zone} t={t} />
+                <ScoreGauge
+                  score={result.totalScore}
+                  zone={result.zone}
+                  t={t}
+                />
                 {result.worstFactorScore < 70 && (
                   <div
                     className="mt-3 flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-medium"
                     style={{
-                      color: result.worstFactorScore <= 40 ? "var(--color-error)" : "var(--color-warning)",
-                      backgroundColor: result.worstFactorScore <= 40 ? "var(--color-error-bg)" : "var(--color-warning-bg)",
+                      color:
+                        result.worstFactorScore <= 40
+                          ? "var(--color-error)"
+                          : "var(--color-warning)",
+                      backgroundColor:
+                        result.worstFactorScore <= 40
+                          ? "var(--color-error-bg)"
+                          : "var(--color-warning-bg)",
                     }}
                     data-testid="worst-factor-badge"
                   >
                     <AlertTriangle size={12} />
-                    {t("weakest")} {(() => {
-                      const worstFactor = result.factors.find(f => f.name === result.worstFactorName);
-                      return worstFactor ? t(`factorNames.${worstFactor.id}`, { defaultValue: result.worstFactorName }) : result.worstFactorName;
-                    })()} ({Math.round(result.worstFactorScore)}/100)
+                    {t("weakest")}{" "}
+                    {(() => {
+                      const worstFactor = result.factors.find(
+                        (f) => f.name === result.worstFactorName,
+                      );
+                      return worstFactor
+                        ? t(`factorNames.${worstFactor.id}`, {
+                            defaultValue: result.worstFactorName,
+                          })
+                        : result.worstFactorName;
+                    })()}{" "}
+                    ({Math.round(result.worstFactorScore)}/100)
                   </div>
                 )}
                 <span className="mt-2 text-[11px] text-[var(--color-text-secondary)]">
-                  {t("computedAt", { date: new Date(result.computedAt).toLocaleString() })}
+                  {t("computedAt", {
+                    date: new Date(result.computedAt).toLocaleString(),
+                  })}
                 </span>
               </div>
 

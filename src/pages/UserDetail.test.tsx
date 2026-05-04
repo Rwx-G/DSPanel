@@ -643,9 +643,7 @@ describe("UserDetail", () => {
     render(<UserDetail {...makeProps()} />, { wrapper: TestProviders });
 
     await waitFor(() => {
-      expect(
-        screen.getByTestId("exchange-online-panel"),
-      ).toBeInTheDocument();
+      expect(screen.getByTestId("exchange-online-panel")).toBeInTheDocument();
     });
   });
 
@@ -845,7 +843,9 @@ describe("UserDetail", () => {
     // Floating indicator should show save button and scroll button
     expect(screen.getByTestId("floating-save-btn")).toBeInTheDocument();
     expect(screen.getByTestId("floating-scroll-btn")).toBeInTheDocument();
-    expect(screen.getAllByText(/unsaved change/).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/unsaved change/).length).toBeGreaterThanOrEqual(
+      1,
+    );
 
     // Restore original mock
     globalThis.IntersectionObserver =
@@ -1010,7 +1010,8 @@ describe("UserDetail", () => {
                 descriptionKey: `securityIndicators.${kind}`,
               },
             ],
-            highestSeverity: expectedVariant === "error" ? "Critical" : "Warning",
+            highestSeverity:
+              expectedVariant === "error" ? "Critical" : "Warning",
           },
         })}
       />,
@@ -1099,7 +1100,8 @@ describe("UserDetail", () => {
       { wrapper: TestProviders },
     );
     const badge = screen.getByTestId("security-indicator-badge-AsRepRoastable");
-    const title = badge.getAttribute("title") ?? "";
+    fireEvent.mouseEnter(badge);
+    const title = screen.getByTestId("tooltip-card").textContent ?? "";
     expect(title).toContain("DONT_REQUIRE_PREAUTH");
   });
 
@@ -1277,9 +1279,7 @@ describe("UserDetail", () => {
       { wrapper: TestProviders },
     );
 
-    expect(
-      screen.queryByTestId("manage-spns-dialog"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("manage-spns-dialog")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId("quick-fix-RemoveUserSpns-btn"));
 

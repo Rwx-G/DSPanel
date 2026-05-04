@@ -31,9 +31,12 @@ async fn resolve_dc_fqdn_for_gssapi(host: &str) -> String {
     let srv_name = format!("_ldap._tcp.{}.", host);
     tracing::debug!(srv_name = %srv_name, "Resolving DC FQDN via DNS SRV for GSSAPI");
 
-    let resolver = hickory_resolver::TokioResolver::builder_tokio()
-        .map(|b| b.build())
-        .unwrap_or_else(|_| {
+    use hickory_resolver::proto::rr::RData;
+    use hickory_resolver::proto::rr::rdata::SRV;
+
+    let resolver_result = hickory_resolver::TokioResolver::builder_tokio()
+        .and_then(|b| b.build())
+        .or_else(|_| {
             hickory_resolver::TokioResolver::builder_with_config(
                 hickory_resolver::config::ResolverConfig::default(),
                 Default::default(),
@@ -41,10 +44,22 @@ async fn resolve_dc_fqdn_for_gssapi(host: &str) -> String {
             .build()
         });
 
+    let resolver = match resolver_result {
+        Ok(r) => r,
+        Err(e) => {
+            tracing::warn!(error = %e, "Failed to build DNS resolver, returning host as-is");
+            return host.to_string();
+        }
+    };
+
     match resolver.srv_lookup(&srv_name).await {
         Ok(lookup) => {
-            if let Some(srv) = lookup.iter().next() {
-                let fqdn = srv.target().to_string();
+            let first_srv: Option<&SRV> = lookup.answers().iter().find_map(|r| match &r.data {
+                RData::SRV(srv) => Some(srv),
+                _ => None,
+            });
+            if let Some(srv) = first_srv {
+                let fqdn = srv.target.to_string();
                 let fqdn = fqdn.trim_end_matches('.').to_string();
                 tracing::info!(domain = %host, fqdn = %fqdn, "DC FQDN resolved via DNS SRV");
                 return fqdn;

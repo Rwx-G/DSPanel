@@ -1,6 +1,6 @@
 [package]
 name = "dspanel"
-version = "1.1.0"
+version = "1.1.1"
 description = "DSPanel - Active Directory management tool"
 authors = ["Rwx-G"]
 license = "Apache-2.0"
@@ -30,11 +30,11 @@ thiserror = "2"
 async-trait = "0.1"
 chrono = { version = "0.4", features = ["serde"] }
 rand = "0.10"
-sha1 = "0.10"
-sha2 = "0.10"
+sha1 = "0.11"
+sha2 = "0.11"
 reqwest = { version = "0.13", features = ["rustls", "json", "form"], default-features = false }
-hickory-resolver = "0.25"
-hmac = "0.12"
+hickory-resolver = "0.26"
+hmac = "0.13"
 data-encoding = "2"
 qrcode = "0.14"
 base64 = "0.22"
@@ -42,8 +42,8 @@ uuid = { version = "1", features = ["v4"] }
 rfd = "0.17"
 quick-xml = "0.39"
 csv = "1"
-printpdf = "0.9"
-rust_xlsxwriter = "0.82"
+printpdf = { version = "0.9", default-features = false }
+rust_xlsxwriter = "0.94"
 rusqlite = { version = "0.39", features = ["bundled"] }
 zeroize = "1"
 notify = { version = "8", features = ["macos_fsevent"] }

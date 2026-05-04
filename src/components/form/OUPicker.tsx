@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo } from "react";
 import { TreeView, type TreeNode } from "@/components/data/TreeView";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
 import { EmptyState } from "@/components/common/EmptyState";
+import { Tooltip } from "@/components/common/Tooltip";
 import { useTranslation } from "react-i18next";
 
 export interface OUNode {
@@ -91,13 +92,14 @@ export function OUPicker({
       data-testid="ou-picker"
     >
       {selectedOU && (
-        <div
-          className="mb-2 rounded-md bg-[var(--color-surface-hover)] px-3 py-1.5 text-caption text-[var(--color-text-secondary)] truncate"
-          data-testid="ou-picker-selected"
-          title={selectedOU}
-        >
-          {t("components:ouPicker.selected", { ou: selectedOU })}
-        </div>
+        <Tooltip content={selectedOU}>
+          <div
+            className="mb-2 rounded-md bg-[var(--color-surface-hover)] px-3 py-1.5 text-caption text-[var(--color-text-secondary)] truncate"
+            data-testid="ou-picker-selected"
+          >
+            {t("components:ouPicker.selected", { ou: selectedOU })}
+          </div>
+        </Tooltip>
       )}
       <div className="max-h-64 overflow-auto">
         <TreeView

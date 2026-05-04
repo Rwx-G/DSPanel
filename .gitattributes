@@ -1,0 +1,5 @@
+# Enforce LF line endings for shell scripts. They are executed by bash inside
+# Linux containers (GitHub Actions ubuntu-latest runners, local `act` runs);
+# without this rule, Windows `core.autocrlf=true` converts the working copy to
+# CRLF and bash chokes on `$'\r'` in shebangs, `set -o pipefail`, etc.
+*.sh text eol=lf

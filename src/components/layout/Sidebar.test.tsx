@@ -160,15 +160,13 @@ describe("Sidebar", () => {
     expect(screen.getByLabelText("Collapse sidebar")).toBeInTheDocument();
   });
 
-  it("should have title attribute on module items when collapsed", () => {
+  it("renders the module label in the collapsed-mode hover popover", () => {
     render(
       <NavigationProvider>
         <Sidebar expanded={false} onToggle={vi.fn()} />
       </NavigationProvider>,
     );
-    expect(screen.getByTestId("sidebar-item-users")).toHaveAttribute(
-      "title",
-      "User Lookup",
-    );
+    const item = screen.getByTestId("sidebar-item-users");
+    expect(item.textContent).toContain("User Lookup");
   });
 });

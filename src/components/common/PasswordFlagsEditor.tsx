@@ -6,6 +6,7 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { type DirectoryUser } from "@/types/directory";
 import { extractErrorMessage } from "@/utils/errorMapping";
 import { type DryRunChange } from "@/components/dialogs/DryRunPreviewDialog";
+import { Tooltip } from "@/components/common/Tooltip";
 import { useTranslation } from "react-i18next";
 
 interface PasswordFlagsEditorProps {
@@ -162,15 +163,22 @@ export function PasswordFlagsEditor({
         )}
       </label>
 
-      <button
-        className="btn btn-sm btn-primary text-caption"
-        onClick={handleSave}
-        disabled={!canEdit || !isDirty || saving}
-        title={!canEdit ? t("components:passwordFlags.requiresAccountOperator") : undefined}
-        data-testid="save-flags-btn"
+      <Tooltip
+        content={
+          !canEdit ? t("components:passwordFlags.requiresAccountOperator") : ""
+        }
       >
-        {saving ? t("common:saving") : t("components:passwordFlags.saveChanges")}
-      </button>
+        <button
+          className="btn btn-sm btn-primary text-caption"
+          onClick={handleSave}
+          disabled={!canEdit || !isDirty || saving}
+          data-testid="save-flags-btn"
+        >
+          {saving
+            ? t("common:saving")
+            : t("components:passwordFlags.saveChanges")}
+        </button>
+      </Tooltip>
     </div>
   );
 }

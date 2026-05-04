@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { DialogShell } from "@/components/dialogs/DialogShell";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
+import { Tooltip } from "@/components/common/Tooltip";
 import { useMfaGate } from "@/hooks/useMfaGate";
 import { isSystemSpn } from "@/utils/spn";
 import { useTranslation } from "react-i18next";
@@ -90,7 +91,8 @@ export function ManageSpnsDialog({
     } catch (e) {
       const msg = typeof e === "string" ? e : "Operation failed";
       try {
-        const parsed: { userMessage?: string; message?: string } = JSON.parse(msg);
+        const parsed: { userMessage?: string; message?: string } =
+          JSON.parse(msg);
         setError(parsed.userMessage ?? parsed.message ?? msg);
       } catch {
         setError(msg);
@@ -175,21 +177,21 @@ export function ManageSpnsDialog({
             </h3>
             <ul className="space-y-1">
               {system.map((spn) => (
-                <li
-                  key={spn}
-                  className="flex items-center gap-2 opacity-60"
-                  title={t(
-                    "userDetail:quickFix.removeUserSpns.systemSpnTooltip",
-                  )}
-                  data-testid={`system-spn-row-${spn}`}
-                >
-                  <span
-                    className="inline-block h-3 w-3 shrink-0"
-                    aria-hidden="true"
-                  />
-                  <code className="text-caption font-mono text-[var(--color-text-secondary)] line-through-none">
-                    {spn}
-                  </code>
+                <li key={spn} data-testid={`system-spn-row-${spn}`}>
+                  <Tooltip
+                    content={t(
+                      "userDetail:quickFix.removeUserSpns.systemSpnTooltip",
+                    )}
+                    className="flex items-center gap-2 opacity-60"
+                  >
+                    <span
+                      className="inline-block h-3 w-3 shrink-0"
+                      aria-hidden="true"
+                    />
+                    <code className="text-caption font-mono text-[var(--color-text-secondary)] line-through-none">
+                      {spn}
+                    </code>
+                  </Tooltip>
                 </li>
               ))}
             </ul>

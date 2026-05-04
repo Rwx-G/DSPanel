@@ -16,6 +16,7 @@ import {
   type AttributeChangeDiff,
 } from "@/types/replication";
 import { LoadingSpinner } from "@/components/common/LoadingSpinner";
+import { Tooltip } from "@/components/common/Tooltip";
 import { useTranslation } from "react-i18next";
 
 interface ObjectSnapshot {
@@ -53,10 +54,15 @@ export function StateInTimeView({
     if (snapshots.length === 0) return null;
     // Latest snapshot is first (ordered by timestamp DESC from backend)
     try {
-      const parsed = JSON.parse(snapshots[0].attributesJson) as Record<string, string[]>;
+      const parsed = JSON.parse(snapshots[0].attributesJson) as Record<
+        string,
+        string[]
+      >;
       const flat: Record<string, string> = {};
       for (const [key, values] of Object.entries(parsed)) {
-        flat[key.toLowerCase()] = Array.isArray(values) ? values.join(", ") : String(values);
+        flat[key.toLowerCase()] = Array.isArray(values)
+          ? values.join(", ")
+          : String(values);
       }
       return flat;
     } catch {
@@ -170,8 +176,7 @@ export function StateInTimeView({
             size={14}
             className="mr-1 inline text-[var(--color-warning)]"
           />
-          {metadata.message ??
-            t("components:stateInTimeView.notAvailable")}
+          {metadata.message ?? t("components:stateInTimeView.notAvailable")}
         </div>
       )}
 
@@ -180,10 +185,16 @@ export function StateInTimeView({
         <>
           <div className="flex items-center justify-between gap-3">
             <div className="text-caption text-[var(--color-text-secondary)]">
-              {t("components:stateInTimeView.attributeCount", { filtered: filteredAttributes.length, total: metadata.attributes.length })}
+              {t("components:stateInTimeView.attributeCount", {
+                filtered: filteredAttributes.length,
+                total: metadata.attributes.length,
+              })}
             </div>
             <div className="relative">
-              <Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-[var(--color-text-secondary)]" />
+              <Search
+                size={14}
+                className="absolute left-2 top-1/2 -translate-y-1/2 text-[var(--color-text-secondary)]"
+              />
               <input
                 type="text"
                 value={attributeFilter}
@@ -248,10 +259,19 @@ export function StateInTimeView({
                       {attr.lastOriginatingDsaDn || "-"}
                     </td>
                     {snapshotValues && (
-                      <td className="px-3 py-1.5 text-caption text-[var(--color-text-primary)] truncate max-w-[250px]" title={snapshotValues[attr.attributeName.toLowerCase()] ?? ""}>
-                        {snapshotValues[attr.attributeName.toLowerCase()] || (
-                          <span className="text-[var(--color-text-secondary)]">-</span>
-                        )}
+                      <td className="px-3 py-1.5 text-caption text-[var(--color-text-primary)] truncate max-w-[250px]">
+                        <Tooltip
+                          content={
+                            snapshotValues[attr.attributeName.toLowerCase()] ??
+                            ""
+                          }
+                        >
+                          {snapshotValues[attr.attributeName.toLowerCase()] || (
+                            <span className="text-[var(--color-text-secondary)]">
+                              -
+                            </span>
+                          )}
+                        </Tooltip>
                       </td>
                     )}
                   </tr>
@@ -273,7 +293,9 @@ export function StateInTimeView({
                   onChange={(e) => setSelectedFrom(e.target.value)}
                   data-testid="diff-from-select"
                 >
-                  <option value="">{t("components:stateInTimeView.from")}</option>
+                  <option value="">
+                    {t("components:stateInTimeView.from")}
+                  </option>
                   {timestamps.map((ts) => (
                     <option key={ts} value={ts}>
                       {ts}
@@ -368,7 +390,9 @@ export function StateInTimeView({
             <div data-testid="value-metadata-section">
               <h3 className="mb-2 mt-4 text-body font-semibold text-[var(--color-text-primary)] flex items-center gap-1.5">
                 <Link size={14} />
-                {t("components:stateInTimeView.linkedAttributeChanges", { count: metadata.valueMetadata.length })}
+                {t("components:stateInTimeView.linkedAttributeChanges", {
+                  count: metadata.valueMetadata.length,
+                })}
               </h3>
               <div
                 className="max-h-[300px] overflow-y-auto rounded-lg border border-[var(--color-border-default)]"
@@ -404,12 +428,11 @@ export function StateInTimeView({
                         <td className="px-3 py-1.5 font-medium text-[var(--color-text-primary)]">
                           {vm.attributeName}
                         </td>
-                        <td
-                          className="px-3 py-1.5 text-caption text-[var(--color-text-primary)] truncate max-w-[250px]"
-                          title={vm.objectDn}
-                        >
-                          {vm.objectDn.match(/^CN=([^,]+)/i)?.[1] ??
-                            vm.objectDn}
+                        <td className="px-3 py-1.5 text-caption text-[var(--color-text-primary)] truncate max-w-[250px]">
+                          <Tooltip content={vm.objectDn}>
+                            {vm.objectDn.match(/^CN=([^,]+)/i)?.[1] ??
+                              vm.objectDn}
+                          </Tooltip>
                         </td>
                         <td className="px-3 py-1.5 text-[var(--color-text-primary)]">
                           {vm.lastOriginatingChangeTime || "Unknown"}
@@ -422,7 +445,9 @@ export function StateInTimeView({
                                 : "bg-[var(--color-success)]/10 text-[var(--color-success)]"
                             }`}
                           >
-                            {vm.isDeleted ? t("components:stateInTimeView.removed") : t("common:active")}
+                            {vm.isDeleted
+                              ? t("components:stateInTimeView.removed")
+                              : t("common:active")}
                           </span>
                         </td>
                       </tr>
