@@ -3,7 +3,8 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use hickory_resolver::TokioResolver;
-use hickory_resolver::config::{NameServerConfigGroup, ResolverConfig, ResolverOpts};
+use hickory_resolver::config::{NameServerConfig, ResolverConfig, ResolverOpts};
+use hickory_resolver::proto::rr::RData;
 
 use crate::models::dns_validation::{
     ClockSkewResult, ClockSkewStatus, DnsKerberosReport, DnsValidationResult, compare_dns_hosts,
@@ -43,29 +44,40 @@ fn base_dn_to_domain(base_dn: &str) -> String {
 /// Creates a DNS resolver targeting the AD DC's DNS server.
 ///
 /// Uses the LDAP server IP (from `DSPANEL_LDAP_SERVER`) as the DNS server.
-/// Falls back to the system resolver if no LDAP server is configured.
-fn create_ad_resolver() -> TokioResolver {
+/// Falls back to the system resolver if no LDAP server is configured. Returns
+/// `None` only when every fallback path (custom DC, system tokio config, and
+/// blank default config) fails to build a resolver - in which case the caller
+/// should treat DNS validation as unavailable.
+fn create_ad_resolver() -> Option<TokioResolver> {
     if let Some(dc_ip_str) = resolve_fallback_ip()
         && let Ok(ip) = dc_ip_str.parse::<IpAddr>()
     {
-        let ns_group = NameServerConfigGroup::from_ips_clear(&[ip], 53, true);
-        let config = ResolverConfig::from_parts(None, vec![], ns_group);
+        let ns = vec![NameServerConfig::udp_and_tcp(ip)];
+        let config = ResolverConfig::from_parts(None, vec![], ns);
         let mut opts = ResolverOpts::default();
         opts.timeout = std::time::Duration::from_secs(5);
         opts.attempts = 2;
         tracing::info!(dns_server = %ip, "Using AD DC as DNS server for SRV lookups");
-        return TokioResolver::builder_with_config(config, Default::default())
+        match TokioResolver::builder_with_config(config, Default::default())
             .with_options(opts)
-            .build();
+            .build()
+        {
+            Ok(r) => return Some(r),
+            Err(e) => {
+                tracing::warn!(error = %e, "Failed to build AD DC resolver, falling back");
+            }
+        }
     }
 
     tracing::info!("No LDAP server configured, using system DNS resolver");
-    TokioResolver::builder_tokio()
-        .map(|b| b.build())
-        .unwrap_or_else(|_| {
-            TokioResolver::builder_with_config(ResolverConfig::default(), Default::default())
-                .build()
-        })
+    if let Ok(builder) = TokioResolver::builder_tokio()
+        && let Ok(r) = builder.build()
+    {
+        return Some(r);
+    }
+    TokioResolver::builder_with_config(ResolverConfig::default(), Default::default())
+        .build()
+        .ok()
 }
 
 /// Resolves a DNS SRV record and returns the target hostnames.
@@ -84,11 +96,13 @@ async fn resolve_srv_hosts(srv_name: &str, resolver: &TokioResolver) -> Vec<Stri
     match resolver.srv_lookup(&fqdn).await {
         Ok(lookup) => {
             let mut hosts: Vec<String> = lookup
+                .answers()
                 .iter()
-                .map(|srv| {
-                    let target = srv.target().to_string();
-                    // Remove trailing dot from FQDN
-                    target.trim_end_matches('.').to_lowercase()
+                .filter_map(|record| match &record.data {
+                    RData::SRV(srv) => {
+                        Some(srv.target.to_string().trim_end_matches('.').to_lowercase())
+                    }
+                    _ => None,
                 })
                 .collect();
             hosts.sort();
@@ -122,7 +136,16 @@ pub async fn validate_dns_records(
     let mut results = Vec::new();
     for prefix in SRV_RECORD_PREFIXES {
         let record_name = format!("{}.{}", prefix, domain);
-        let actual_hosts = resolve_srv_hosts(&record_name, &resolver).await;
+        let actual_hosts = match &resolver {
+            Some(r) => resolve_srv_hosts(&record_name, r).await,
+            None => {
+                tracing::warn!(
+                    record = %record_name,
+                    "DNS resolver unavailable, treating SRV lookup as no-result"
+                );
+                Vec::new()
+            }
+        };
         let result = compare_dns_hosts(&record_name, &expected_hosts, &actual_hosts);
         results.push(result);
     }

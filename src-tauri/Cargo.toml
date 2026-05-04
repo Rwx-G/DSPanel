@@ -33,7 +33,7 @@ rand = "0.10"
 sha1 = "0.10"
 sha2 = "0.10"
 reqwest = { version = "0.13", features = ["rustls", "json", "form"], default-features = false }
-hickory-resolver = "0.25"
+hickory-resolver = "0.26"
 hmac = "0.12"
 data-encoding = "2"
 qrcode = "0.14"

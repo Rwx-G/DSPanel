@@ -78,20 +78,21 @@ pub async fn get_topology(provider: Arc<dyn DirectoryProvider>) -> Result<Topolo
     if let Some(ref fallback_ip_str) = resolve_fallback_ip()
         && let Ok(dns_ip) = fallback_ip_str.parse::<std::net::IpAddr>()
     {
-        let ns =
-            hickory_resolver::config::NameServerConfigGroup::from_ips_clear(&[dns_ip], 53, true);
+        let ns = vec![hickory_resolver::config::NameServerConfig::udp_and_tcp(
+            dns_ip,
+        )];
         let config = hickory_resolver::config::ResolverConfig::from_parts(None, vec![], ns);
-        let resolver =
-            hickory_resolver::TokioResolver::builder_with_config(config, Default::default())
-                .build();
-
-        for site in &mut topology.sites {
-            for dc in &mut site.dcs {
-                if dc.ip_address.is_none()
-                    && let Ok(lookup) = resolver.lookup_ip(dc.hostname.as_str()).await
-                    && let Some(addr) = lookup.iter().next()
-                {
-                    dc.ip_address = Some(addr.to_string());
+        if let Ok(resolver) =
+            hickory_resolver::TokioResolver::builder_with_config(config, Default::default()).build()
+        {
+            for site in &mut topology.sites {
+                for dc in &mut site.dcs {
+                    if dc.ip_address.is_none()
+                        && let Ok(lookup) = resolver.lookup_ip(dc.hostname.as_str()).await
+                        && let Some(addr) = lookup.iter().next()
+                    {
+                        dc.ip_address = Some(addr.to_string());
+                    }
                 }
             }
         }
