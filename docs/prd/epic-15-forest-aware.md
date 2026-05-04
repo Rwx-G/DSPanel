@@ -134,19 +134,31 @@ Story 15.5 depends on 15.4 (write routing reuses the read routing helper) and on
 Story 15.6 depends on 15.1 (banner reads `partition_status`), 15.2 (consumes `failedPartitions`), and 15.5 (audit `partition_dns_name` column). It is the last story in the train.
 
 ```
-15.1 ─┬─> 15.2 ─┬─> 15.6
-      ├─> 15.3 ─┤
-      └─> 15.4 ─> 15.5 ┘
+15.1 ─┬─> 15.2 ─┬─> 15.4 ─> 15.5 ─> 15.6
+      ├─> 15.3 ─┘
+      └─> (15.4 also reads partition_dns_name field introduced in 15.1)
 ```
+
+15.4 depends on 15.2 because the `partition_dns_name` field is *populated* by 15.2's fan-out paths even though it is *introduced* in 15.1. 15.5 depends on 15.4 (routing helper). 15.6 depends on 15.2 (failedPartitions), 15.5 (audit column), and 15.1 (banner consumes partition_status). 15.4 can start in parallel with 15.3 once 15.2 is merged for the wire field.
 
 ## Compatibility and rollback
 
 - Single-domain deployments see no behavior change: the `ForestProvider` discovers exactly one partition (the seed), the "Domain" column is hidden, the partial-failure banner never renders.
 - The new `partitionDnsName` field on `DirectoryEntry` is `Option<String>` on the wire and ignored by old frontend builds.
-- The audit column `partition_dns_name` is a nullable add-only schema migration; existing chain hashes stay valid because the column is excluded from the hash for entries that predate 1.2.0.
+- The audit column `partition_dns_name` is a nullable add-only schema migration. The chain hash excludes `partition_dns_name` **unconditionally** (not only for pre-1.2.0 NULLs), matching the Epic 14 `severity` precedent at `services/audit.rs:385-395` and the existing `test_severity_excluded_from_hash_chain` regression test. This guarantees that existing chains stay valid byte-for-byte across the upgrade and treats partition annotation as operational metadata, not audit truth.
 - Snapshot schema change for routing: nullable `partition_dns_name` column added by migration; old snapshots restore against the seed partition (legacy fallback).
 - Cross-partition move rejection (Story 15.5 AC #3) is a new typed error, not a regression of an existing flow - in 1.1.x, attempting such a move silently failed at the LDAP referral step with an opaque error.
 - `cargo deny` and `cargo audit` continue to gate the build; no new dependency is required (everything reuses `ldap3`, `tokio`, `serde`).
+
+## Risk register
+
+- Story 15.5 is the highest-blast-radius story of the epic: every write command + audit chain + snapshot + permissions cache. Plan as the longest story; consider further decomposition during InProgress phase.
+- Audit chain integrity is non-recoverable: a corrupted hash chain is a compliance liability. The chain regression test (Story 15.6 AC #8 + Story 15.5 AC #4a) is a hard gate before marking Story 15.5 Done.
+- Cross-partition permission gate (Story 15.5 AC #5) is privilege-escalation-critical if mis-implemented: the cache key change from `(identity)` to `(identity, partition_dns_name)` must be exercised by the audit-security skill on the implementing PR.
+- Startup cost in N-partition forests: Kerberos round-trip × N could breach NFR1 (3s startup). Mitigation: per-partition bind timeout 3s + concurrent `tokio::join_all` (Story 15.1 AC #11). Lazy-bind for non-seed partitions is a future optimization, not in this epic.
+- Forest discovery DoS: a maliciously configured `crossRef` list (1000+ entries) is mitigated by the 50-partition cap (Story 15.1 AC #11).
+- Demo provider drift: multi-domain UI is hidden in single-domain forests, and demo mode is single-domain. Risk: visual regressions on multi-domain ship unnoticed in CI. Mitigation: add a `DemoForestProvider::connect_multi_partition()` test fixture used in vitest stories (Story 15.1 task).
+- Snapshot restore against an unreachable partition (Story 15.5 AC #4b): hard-fail with a typed error rather than fall back, to avoid corrupting the audit trail.
 
 ## Definition of Done
 
@@ -160,6 +172,9 @@ Story 15.6 depends on 15.1 (banner reads `partition_status`), 15.2 (consumes `fa
 - `docs/architecture/components.md` (or the relevant architecture shard) updated to describe `ForestProvider` and DN-based routing.
 - `docs/release-smoke-test.md` extended with a multi-domain section.
 - Smoke test in a real multi-domain lab forest: every smoke checkpoint passes with both light and dark themes.
+- Audit chain integrity regression test (mixed pre-1.2.0 / post-1.2.0 entries with one tampered entry crossing the boundary) passes.
+- `MockDirectoryProvider` and `DemoDirectoryProvider` continue to compile and pass their existing tests without modification.
+- Multi-domain lab smoke test: root + child forest, operator with `DomainAdmin` only on root, exercise: browse-both, search-both, write-on-root, write-on-child-rejected (PermissionDenied), cross-partition group add succeeds, cross-partition move rejected, partial-failure banner with one DC offline, retry restores. Light + dark theme.
 
 ## Out of scope (deferred to future epics)
 
@@ -168,3 +183,6 @@ Story 15.6 depends on 15.1 (banner reads `partition_status`), 15.2 (consumes `fa
 - Per-domain "default OU" presets in `OnboardingWizard` / `Offboarding` (today the OU picker is forest-wide; future story could persist per-partition defaults).
 - Cross-partition group nesting integrity audit (group hygiene Story 4.4 already detects single-partition issues; cross-partition nesting requires the foreign security principal walk).
 - Forest functional level inspection / migration warnings (Epic 8 topology already shows DC functional level per DC; forest-level summary is a future enhancement).
+- Global Catalog (port 3268) optimization: this epic chose per-partition fan-out over GC search. GC-based search would be a future read-side optimization with attribute-set caveats; out of scope here.
+- Trust enumeration (the `trustedDomain` objects in `CN=System,<base_dn>`): operators may want to *see* the trust relationships their forest has. Out of scope; could be a future small story.
+- Per-site preferred DC selection: today connecting to any DC of partition X is fine; in a forest with sites, the operator may want the closest DC per site. Out of scope; documented as a known optimization.
