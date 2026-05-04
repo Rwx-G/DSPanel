@@ -28,6 +28,8 @@
 
 - **Epic 14: Security-Aware Admin** (6 stories) - Differentiate from generic AD admin tools (ManageEngine, Quest) and from standalone AD security auditors (PingCastle, BloodHound, Adalanche) with per-object inline security indicators (kerberoastable, password-not-required, password-never-expires, reversible encryption, AS-REP roastable, unconstrained delegation, constrained delegation, RBCD) and 1-click quick-fix actions (clear PasswordNotRequired, remove unused SPN, disable unconstrained delegation) that close the gap between "audit tool that reports a finding" and "admin tool where the operator actually fixes it".
 
+- **Epic 15: Forest-Aware Directory Access** (6 stories) - Lift the single-domain limitation. Discover every domain partition in the forest at connect time via `CN=Partitions,CN=Configuration,...`, hold one pooled LDAP connection per partition, fan out browse and search with a "Domain" column in the lookup pages, route detail reads and writes by DN suffix to the owning partition, and surface partial-failure (one domain unreachable) as a non-blocking banner with per-partition retry. Closes the two reported 1.1.0 multi-domain symptoms (read-only user in a child domain seeing `noUsersFound`, Domain Admin in the root not seeing child-domain objects).
+
 ---
 
 ## Summary
@@ -48,6 +50,7 @@
 | Epic 12   | 4       | RBAC + Settings + Polish           |
 | Epic 13   | 2       | Localization (i18n)                |
 | Epic 14   | 6       | Security-Aware Admin               |
-| **Total** | **64**  |                                    |
+| Epic 15   | 6       | Forest-Aware Directory Access      |
+| **Total** | **70**  |                                    |
 
 ---
