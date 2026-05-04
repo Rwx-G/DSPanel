@@ -42,7 +42,7 @@ uuid = { version = "1", features = ["v4"] }
 rfd = "0.17"
 quick-xml = "0.39"
 csv = "1"
-printpdf = "0.9"
+printpdf = { version = "0.9", default-features = false }
 rust_xlsxwriter = "0.82"
 rusqlite = { version = "0.39", features = ["bundled"] }
 zeroize = "1"

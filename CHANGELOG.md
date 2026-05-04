@@ -7,17 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-
-### Changed
-
-### Fixed
-
-### Removed
-
-### Security
-
-## [1.1.1] - 2026-05-03
+## [1.1.1] - 2026-05-04
 
 ### Added
 
@@ -33,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Patch transitive `cargo update` bumps to clear three GitHub Dependabot alerts: `grid` 1.0.0 -> 1.0.1 (`GHSA-38c5-483c-4qqp`, integer overflow in `Grid::expand_rows`), `rand` 0.10.0 -> 0.10.1 / 0.9.2 -> 0.9.4 / 0.8.5 -> 0.8.6 (`GHSA-cq8v-f236-94qc`, unsoundness with custom logger).
 - Add `src-tauri/audit.toml` to document the residual `cargo audit` warnings the project knowingly tolerates: the gtk-rs 0.18 family (`atk`, `gtk`, `gdk`, `gdk-pixbuf`, `glib`, `gdkx11`, `gdkx11-sys`, `gdk-sys`, `gtk-sys`, `atk-sys`, `gdk-pixbuf-sys`, `proc-macro-error`) is pinned by Tauri 2's `webkit2gtk 2.0.2` chain, Linux-only, with no runtime exposure to the unmaintained APIs from the DSPanel binary surface. Re-evaluate when Tauri ships a 2.x release that bumps gtk-rs to 0.20 or when the project migrates to Tauri 3.
 - Add `.github/dependabot.yml` with weekly cargo / npm / GitHub Actions schedules and matching ignore rationales for the two structurally non-upgradable transitive alerts: `rand` < 0.8 (build-dep via `phf_generator 0.8.0` -> `kuchiki 0.8.1` -> `printpdf 0.9.1`, runs at compile time only, no runtime exposure) and `glib` < 0.20 (transitive via Tauri 2 / gtk 0.18, Linux only).
+- Drop the `printpdf` `default-features` (the `html` feature in particular) so the PDF export no longer pulls in the `kuchiki 0.8.1` -> `phf 0.8.0` -> `rand 0.7.3` build-dep chain. DSPanel only uses `BuiltinFont::Helvetica` plus the low-level `Op` / `PdfPage` / `PdfDocument` API, none of which need the HTML/CSS rendering pipeline. Removes the residual `rand 0.7.3` Dependabot alert (#13) and shrinks the build-dep graph; eight gtk-rs `RUSTSEC` warnings remain, all Linux-only and pinned by Tauri 2.
 
 ## [1.1.0] - 2026-04-27
 
