@@ -9,15 +9,6 @@ updates:
       interval: weekly
     open-pull-requests-limit: 10
     ignore:
-      # rand 0.7.x is pinned by `phf_generator 0.8.0` -> `kuchiki 0.8.1` ->
-      # `printpdf 0.9.1`. printpdf has no published successor that drops the
-      # legacy phf chain, and the rand 0.7.x advisory (RUSTSEC unsoundness on
-      # custom logger with rand::rng()) is build-dep only - it ships in the
-      # phf code generator that runs at compile time, never at runtime in the
-      # DSPanel binary. Re-evaluate when printpdf publishes >=0.10 or when we
-      # replace the PDF stack.
-      - dependency-name: rand
-        versions: ["< 0.8"]
       # glib 0.18.x (and the gtk-rs 0.18 family: atk, gtk, gdk, etc.) is
       # pinned by Tauri 2 -> gtk 0.18.2 -> webkit2gtk 2.0.2. Tauri 3 is the
       # next branch that bumps gtk-rs; we cannot bump independently without
