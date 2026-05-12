@@ -40,7 +40,7 @@ qrcode = "0.14"
 base64 = "0.22"
 uuid = { version = "1", features = ["v4"] }
 rfd = "0.17"
-quick-xml = "0.39"
+quick-xml = "0.40"
 csv = "1"
 printpdf = { version = "0.9", default-features = false }
 rust_xlsxwriter = "0.94"
