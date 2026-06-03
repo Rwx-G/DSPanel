@@ -44,7 +44,7 @@ quick-xml = "0.39"
 csv = "1"
 printpdf = { version = "0.9", default-features = false }
 rust_xlsxwriter = "0.94"
-rusqlite = { version = "0.39", features = ["bundled"] }
+rusqlite = { version = "0.40", features = ["bundled"] }
 zeroize = "1"
 notify = { version = "8", features = ["macos_fsevent"] }
 notify-debouncer-mini = "0.7"
