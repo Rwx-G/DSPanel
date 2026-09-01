@@ -31,7 +31,13 @@ vi.mock("@/hooks/usePermissions", () => ({
     groups: [],
     loading: false,
     hasPermission: (required: string) => {
-      const levels = ["ReadOnly", "HelpDesk", "AccountOperator", "Admin", "DomainAdmin"];
+      const levels = [
+        "ReadOnly",
+        "HelpDesk",
+        "AccountOperator",
+        "Admin",
+        "DomainAdmin",
+      ];
       return levels.indexOf("AccountOperator") >= levels.indexOf(required);
     },
   }),
@@ -682,8 +688,7 @@ describe("UserComparison", () => {
         return null;
       }
       if (cmd === "compare_users") return MOCK_COMPARISON;
-      if (cmd === "add_user_to_group")
-        throw new Error("Access denied");
+      if (cmd === "add_user_to_group") throw new Error("Access denied");
       if (cmd === "analyze_ntfs")
         return {
           paths: [],

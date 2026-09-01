@@ -2,9 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { DialogShell } from "./DialogShell";
 
-function renderShell(
-  props: Partial<Parameters<typeof DialogShell>[0]> = {},
-) {
+function renderShell(props: Partial<Parameters<typeof DialogShell>[0]> = {}) {
   const defaultProps = {
     children: <p data-testid="child">Hello</p>,
     onClose: vi.fn(),

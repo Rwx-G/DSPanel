@@ -58,10 +58,9 @@ describe("DnsKerberosValidation", () => {
     expect(
       screen.getByText("Running DNS and Kerberos validation..."),
     ).toBeInTheDocument();
-    expect(mockInvoke).toHaveBeenCalledWith(
-      "get_dns_kerberos_validation",
-      { thresholdSeconds: 300 },
-    );
+    expect(mockInvoke).toHaveBeenCalledWith("get_dns_kerberos_validation", {
+      thresholdSeconds: 300,
+    });
   });
 
   it("shows loading state during validation", () => {
@@ -78,14 +77,15 @@ describe("DnsKerberosValidation", () => {
 
     fireEvent.click(screen.getByTestId("run-button"));
 
-    await waitFor(() => {
-      expect(
-        screen.getByText("_ldap._tcp.example.com"),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByText("_kerberos._tcp.example.com"),
-      ).toBeInTheDocument();
-    }, { timeout: 5000 });
+    await waitFor(
+      () => {
+        expect(screen.getByText("_ldap._tcp.example.com")).toBeInTheDocument();
+        expect(
+          screen.getByText("_kerberos._tcp.example.com"),
+        ).toBeInTheDocument();
+      },
+      { timeout: 5000 },
+    );
   });
 
   it("displays clock skew results", async () => {
@@ -94,11 +94,14 @@ describe("DnsKerberosValidation", () => {
 
     fireEvent.click(screen.getByTestId("run-button"));
 
-    await waitFor(() => {
-      expect(screen.getByTestId("clock-skew-table")).toBeInTheDocument();
-      expect(screen.getByText("2s")).toBeInTheDocument();
-      expect(screen.getByText("300s")).toBeInTheDocument();
-    }, { timeout: 5000 });
+    await waitFor(
+      () => {
+        expect(screen.getByTestId("clock-skew-table")).toBeInTheDocument();
+        expect(screen.getByText("2s")).toBeInTheDocument();
+        expect(screen.getByText("300s")).toBeInTheDocument();
+      },
+      { timeout: 5000 },
+    );
   });
 
   it("shows missing hosts for failed DNS records", async () => {
@@ -107,11 +110,14 @@ describe("DnsKerberosValidation", () => {
 
     fireEvent.click(screen.getByTestId("run-button"));
 
-    await waitFor(() => {
-      expect(
-        screen.getByText("Missing: DC2.example.com"),
-      ).toBeInTheDocument();
-    }, { timeout: 5000 });
+    await waitFor(
+      () => {
+        expect(
+          screen.getByText("Missing: DC2.example.com"),
+        ).toBeInTheDocument();
+      },
+      { timeout: 5000 },
+    );
   });
 
   it("shows error state when validation fails", async () => {
@@ -120,9 +126,12 @@ describe("DnsKerberosValidation", () => {
 
     fireEvent.click(screen.getByTestId("run-button"));
 
-    await waitFor(() => {
-      expect(screen.getByText("Validation Failed")).toBeInTheDocument();
-    }, { timeout: 5000 });
+    await waitFor(
+      () => {
+        expect(screen.getByText("Validation Failed")).toBeInTheDocument();
+      },
+      { timeout: 5000 },
+    );
   });
 
   it("calls invoke with threshold parameter", async () => {
@@ -131,12 +140,14 @@ describe("DnsKerberosValidation", () => {
 
     fireEvent.click(screen.getByTestId("run-button"));
 
-    await waitFor(() => {
-      expect(mockInvoke).toHaveBeenCalledWith(
-        "get_dns_kerberos_validation",
-        { thresholdSeconds: 300 },
-      );
-    }, { timeout: 5000 });
+    await waitFor(
+      () => {
+        expect(mockInvoke).toHaveBeenCalledWith("get_dns_kerberos_validation", {
+          thresholdSeconds: 300,
+        });
+      },
+      { timeout: 5000 },
+    );
   });
 
   it("shows default Kerberos threshold label", () => {
@@ -152,9 +163,12 @@ describe("DnsKerberosValidation", () => {
 
     fireEvent.click(screen.getByTestId("run-button"));
 
-    await waitFor(() => {
-      expect(screen.getByTestId("export-button")).toBeInTheDocument();
-    }, { timeout: 5000 });
+    await waitFor(
+      () => {
+        expect(screen.getByTestId("export-button")).toBeInTheDocument();
+      },
+      { timeout: 5000 },
+    );
   });
 
   it("shows summary counts after validation", async () => {
@@ -163,11 +177,14 @@ describe("DnsKerberosValidation", () => {
 
     fireEvent.click(screen.getByTestId("run-button"));
 
-    await waitFor(() => {
-      expect(screen.getByText(/1 pass/)).toBeInTheDocument();
-      expect(screen.getByText(/1 fail/)).toBeInTheDocument();
-      expect(screen.getByText(/1 ok/)).toBeInTheDocument();
-      expect(screen.getByText(/1 issues/)).toBeInTheDocument();
-    }, { timeout: 5000 });
+    await waitFor(
+      () => {
+        expect(screen.getByText(/1 pass/)).toBeInTheDocument();
+        expect(screen.getByText(/1 fail/)).toBeInTheDocument();
+        expect(screen.getByText(/1 ok/)).toBeInTheDocument();
+        expect(screen.getByText(/1 issues/)).toBeInTheDocument();
+      },
+      { timeout: 5000 },
+    );
   });
 });

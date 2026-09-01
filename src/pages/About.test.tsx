@@ -51,7 +51,10 @@ describe("About", () => {
     render(<About />);
     const link = screen.getByTestId("about-releases-link");
     expect(link).toBeInTheDocument();
-    expect(link).toHaveAttribute("href", "https://github.com/Rwx-G/DSPanel/releases");
+    expect(link).toHaveAttribute(
+      "href",
+      "https://github.com/Rwx-G/DSPanel/releases",
+    );
     expect(link).toHaveAttribute("target", "_blank");
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
     expect(link).toHaveTextContent("Releases & Changelog");

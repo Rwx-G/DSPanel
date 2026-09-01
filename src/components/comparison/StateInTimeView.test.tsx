@@ -80,7 +80,8 @@ describe("StateInTimeView", () => {
 
   it("loads and displays metadata", async () => {
     mockInvoke.mockImplementation((cmd: string) => {
-      if (cmd === "get_replication_metadata") return Promise.resolve(MOCK_METADATA);
+      if (cmd === "get_replication_metadata")
+        return Promise.resolve(MOCK_METADATA);
       if (cmd === "get_snapshot_history") return Promise.resolve([]);
       return Promise.resolve(null);
     });
@@ -106,7 +107,8 @@ describe("StateInTimeView", () => {
 
   it("displays unavailable message when metadata not available", async () => {
     mockInvoke.mockImplementation((cmd: string) => {
-      if (cmd === "get_replication_metadata") return Promise.resolve(MOCK_METADATA_UNAVAILABLE);
+      if (cmd === "get_replication_metadata")
+        return Promise.resolve(MOCK_METADATA_UNAVAILABLE);
       if (cmd === "get_snapshot_history") return Promise.resolve([]);
       return Promise.resolve(null);
     });
@@ -144,7 +146,8 @@ describe("StateInTimeView", () => {
 
   it("computes diff between timestamps", async () => {
     mockInvoke.mockImplementation((cmd: string) => {
-      if (cmd === "get_replication_metadata") return Promise.resolve(MOCK_METADATA);
+      if (cmd === "get_replication_metadata")
+        return Promise.resolve(MOCK_METADATA);
       if (cmd === "get_snapshot_history") return Promise.resolve([]);
       if (cmd === "compute_attribute_diff") return Promise.resolve(MOCK_DIFF);
       return Promise.resolve(null);
@@ -180,7 +183,8 @@ describe("StateInTimeView", () => {
 
   it("shows empty diff message when no changes", async () => {
     mockInvoke.mockImplementation((cmd: string) => {
-      if (cmd === "get_replication_metadata") return Promise.resolve(MOCK_METADATA);
+      if (cmd === "get_replication_metadata")
+        return Promise.resolve(MOCK_METADATA);
       if (cmd === "get_snapshot_history") return Promise.resolve([]);
       if (cmd === "compute_attribute_diff") return Promise.resolve([]);
       return Promise.resolve(null);

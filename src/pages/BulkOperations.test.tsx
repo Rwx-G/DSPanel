@@ -94,7 +94,10 @@ function setupMocks(options?: {
   const failAtStep = options?.failAtStep;
   let invokeCount = 0;
 
-  mockInvoke.mockImplementation(((cmd: string, args?: Record<string, unknown>) => {
+  mockInvoke.mockImplementation(((
+    cmd: string,
+    args?: Record<string, unknown>,
+  ) => {
     if (cmd === "get_permission_level") return Promise.resolve(permLevel);
     if (cmd === "get_user_groups") return Promise.resolve([]);
     if (cmd === "search_groups") return Promise.resolve(groupSearchResults);
@@ -325,7 +328,9 @@ describe("BulkOperations", () => {
     const searchInput = screen.getByTestId("group-picker-search");
     fireEvent.change(searchInput, { target: { value: "Finance" } });
     await waitFor(() => {
-      expect(screen.getByTestId("group-option-Finance-Analysts")).toBeInTheDocument();
+      expect(
+        screen.getByTestId("group-option-Finance-Analysts"),
+      ).toBeInTheDocument();
     });
     await act(async () => {
       fireEvent.click(screen.getByTestId("group-option-Finance-Analysts"));
@@ -333,14 +338,18 @@ describe("BulkOperations", () => {
 
     // Then search for users to add via the staging area
     // The user search picker needs 3+ chars to trigger search
-    const addSearchInput = screen.getByTestId("add-member-search-section").querySelector("input")!;
+    const addSearchInput = screen
+      .getByTestId("add-member-search-section")
+      .querySelector("input")!;
     await act(async () => {
       fireEvent.change(addSearchInput, { target: { value: "Source" } });
     });
 
     // Wait for debounced search results
     await waitFor(() => {
-      expect(mockInvoke).toHaveBeenCalledWith("search_users", { query: "Source" });
+      expect(mockInvoke).toHaveBeenCalledWith("search_users", {
+        query: "Source",
+      });
     });
 
     // Click to stage the user
@@ -427,14 +436,18 @@ describe("BulkOperations", () => {
     const searchInput = screen.getByTestId("group-picker-search");
     fireEvent.change(searchInput, { target: { value: "Finance" } });
     await waitFor(() => {
-      expect(screen.getByTestId("group-option-Finance-Analysts")).toBeInTheDocument();
+      expect(
+        screen.getByTestId("group-option-Finance-Analysts"),
+      ).toBeInTheDocument();
     });
     await act(async () => {
       fireEvent.click(screen.getByTestId("group-option-Finance-Analysts"));
     });
 
     // Search and stage a user
-    const addSearchInput = screen.getByTestId("add-member-search-section").querySelector("input")!;
+    const addSearchInput = screen
+      .getByTestId("add-member-search-section")
+      .querySelector("input")!;
     await act(async () => {
       fireEvent.change(addSearchInput, { target: { value: "Source" } });
     });
@@ -602,9 +615,7 @@ describe("BulkOperations", () => {
     fireEvent.change(searchInput, { target: { value: "Dev" } });
 
     await waitFor(() => {
-      expect(
-        screen.getByTestId("group-option-Developers"),
-      ).toBeInTheDocument();
+      expect(screen.getByTestId("group-option-Developers")).toBeInTheDocument();
     });
 
     await act(async () => {
@@ -627,9 +638,7 @@ describe("BulkOperations", () => {
     fireEvent.change(searchInput, { target: { value: "Dev" } });
 
     await waitFor(() => {
-      expect(
-        screen.getByTestId("group-option-Developers"),
-      ).toBeInTheDocument();
+      expect(screen.getByTestId("group-option-Developers")).toBeInTheDocument();
     });
 
     await act(async () => {
@@ -682,7 +691,9 @@ describe("BulkOperations", () => {
 
     // Wait for debounced search
     await waitFor(() => {
-      expect(mockInvoke).toHaveBeenCalledWith("search_users", { query: "srcuser" });
+      expect(mockInvoke).toHaveBeenCalledWith("search_users", {
+        query: "srcuser",
+      });
     });
 
     // Click the result to select it
@@ -695,7 +706,9 @@ describe("BulkOperations", () => {
 
     // After selection, the selected state should show the user name
     await waitFor(() => {
-      expect(screen.getByTestId("copy-source-user-selected")).toBeInTheDocument();
+      expect(
+        screen.getByTestId("copy-source-user-selected"),
+      ).toBeInTheDocument();
     });
   });
 
@@ -723,9 +736,7 @@ describe("BulkOperations", () => {
     const searchInput = screen.getByTestId("group-picker-search");
     fireEvent.change(searchInput, { target: { value: "Dev" } });
     await waitFor(() => {
-      expect(
-        screen.getByTestId("group-option-Developers"),
-      ).toBeInTheDocument();
+      expect(screen.getByTestId("group-option-Developers")).toBeInTheDocument();
     });
     await act(async () => {
       fireEvent.click(screen.getByTestId("group-option-Developers"));
@@ -740,7 +751,9 @@ describe("BulkOperations", () => {
     });
 
     // Select OU from the OUPicker dropdown
-    const ouPickerBtn = screen.getByTestId("clone-container-picker").querySelector("button")!;
+    const ouPickerBtn = screen
+      .getByTestId("clone-container-picker")
+      .querySelector("button")!;
     fireEvent.click(ouPickerBtn);
     await waitFor(() => {
       expect(screen.getByText("Groups")).toBeInTheDocument();
@@ -839,7 +852,9 @@ describe("BulkOperations", () => {
     });
 
     await waitFor(() => {
-      expect(mockInvoke).toHaveBeenCalledWith("search_users", { query: "srcuser" });
+      expect(mockInvoke).toHaveBeenCalledWith("search_users", {
+        query: "srcuser",
+      });
     });
 
     await waitFor(() => {
@@ -884,7 +899,8 @@ describe("BulkOperations", () => {
 
     let getGroupMembersCallCount = 0;
     mockInvoke.mockImplementation(((cmd: string) => {
-      if (cmd === "get_permission_level") return Promise.resolve("AccountOperator");
+      if (cmd === "get_permission_level")
+        return Promise.resolve("AccountOperator");
       if (cmd === "search_groups") return Promise.resolve(groupSearchResults);
       if (cmd === "get_user_groups") return Promise.resolve([]);
       if (cmd === "get_ou_tree") return Promise.resolve(ouTree);
@@ -892,9 +908,11 @@ describe("BulkOperations", () => {
         getGroupMembersCallCount++;
         // First call is from the useEffect when source group is selected (returns memberEntries).
         // During merge execute: source group members, then target group members.
-        if (getGroupMembersCallCount <= 1) return Promise.resolve(memberEntries);
+        if (getGroupMembersCallCount <= 1)
+          return Promise.resolve(memberEntries);
         // 2nd call = source in merge, 3rd call = target in merge
-        if (getGroupMembersCallCount === 2) return Promise.resolve(memberEntries);
+        if (getGroupMembersCallCount === 2)
+          return Promise.resolve(memberEntries);
         return Promise.resolve(targetMembers);
       }
       if (cmd === "add_user_to_group") return Promise.resolve(null);
@@ -919,7 +937,9 @@ describe("BulkOperations", () => {
     const targetInput = searchInputs2[1];
     fireEvent.change(targetInput, { target: { value: "Finance" } });
     await waitFor(() => {
-      expect(screen.getByTestId("group-option-Finance-Analysts")).toBeInTheDocument();
+      expect(
+        screen.getByTestId("group-option-Finance-Analysts"),
+      ).toBeInTheDocument();
     });
     await act(async () => {
       fireEvent.click(screen.getByTestId("group-option-Finance-Analysts"));
@@ -954,8 +974,12 @@ describe("BulkOperations", () => {
   // -----------------------------------------------------------------------
 
   it("copy-memberships execute adds target user to source user groups", async () => {
-    mockInvoke.mockImplementation(((cmd: string, args?: Record<string, unknown>) => {
-      if (cmd === "get_permission_level") return Promise.resolve("AccountOperator");
+    mockInvoke.mockImplementation(((
+      cmd: string,
+      args?: Record<string, unknown>,
+    ) => {
+      if (cmd === "get_permission_level")
+        return Promise.resolve("AccountOperator");
       if (cmd === "search_groups") return Promise.resolve(groupSearchResults);
       if (cmd === "get_user_groups") return Promise.resolve([]);
       if (cmd === "get_group_members") return Promise.resolve(memberEntries);
@@ -1033,7 +1057,9 @@ describe("BulkOperations", () => {
       fireEvent.click(screen.getByText("Source User"));
     });
     await waitFor(() => {
-      expect(screen.getByTestId("copy-source-user-selected")).toBeInTheDocument();
+      expect(
+        screen.getByTestId("copy-source-user-selected"),
+      ).toBeInTheDocument();
     });
 
     // Search and select target user via UserSearchPicker
@@ -1047,7 +1073,9 @@ describe("BulkOperations", () => {
       fireEvent.click(screen.getByText("Target User"));
     });
     await waitFor(() => {
-      expect(screen.getByTestId("copy-target-user-selected")).toBeInTheDocument();
+      expect(
+        screen.getByTestId("copy-target-user-selected"),
+      ).toBeInTheDocument();
     });
 
     // Preview
@@ -1088,7 +1116,8 @@ describe("BulkOperations", () => {
   it("import-csv parses CSV file and executes import", async () => {
     let searchCallCount = 0;
     mockInvoke.mockImplementation(((cmd: string) => {
-      if (cmd === "get_permission_level") return Promise.resolve("AccountOperator");
+      if (cmd === "get_permission_level")
+        return Promise.resolve("AccountOperator");
       if (cmd === "search_groups") return Promise.resolve(groupSearchResults);
       if (cmd === "get_user_groups") return Promise.resolve([]);
       if (cmd === "get_group_members") return Promise.resolve(memberEntries);
@@ -1117,7 +1146,9 @@ describe("BulkOperations", () => {
     const searchInput = screen.getByTestId("group-picker-search");
     fireEvent.change(searchInput, { target: { value: "Finance" } });
     await waitFor(() => {
-      expect(screen.getByTestId("group-option-Finance-Analysts")).toBeInTheDocument();
+      expect(
+        screen.getByTestId("group-option-Finance-Analysts"),
+      ).toBeInTheDocument();
     });
     await act(async () => {
       fireEvent.click(screen.getByTestId("group-option-Finance-Analysts"));
@@ -1190,7 +1221,9 @@ describe("BulkOperations", () => {
     });
 
     // Select OU from OUPicker
-    const ouPickerBtn = screen.getByTestId("move-target-ou-picker").querySelector("button")!;
+    const ouPickerBtn = screen
+      .getByTestId("move-target-ou-picker")
+      .querySelector("button")!;
     fireEvent.click(ouPickerBtn);
     await waitFor(() => {
       expect(screen.getByText("Archive")).toBeInTheDocument();

@@ -381,9 +381,10 @@ export function ComputerDetail({
             {t("groupMemberships")} ({computer.memberOf.length})
           </h3>
           <ExportToolbar<{ name: string; dn: string }>
-            columns={groupColumns.map(
-              (c): ExportColumn => ({ key: c.key, header: c.header }),
-            )}
+            columns={groupColumns.map((c): ExportColumn => ({
+              key: c.key,
+              header: c.header,
+            }))}
             data={groupRows}
             rowMapper={(row) => [row.name, row.dn]}
             title={`${computer.name} - Group Memberships`}

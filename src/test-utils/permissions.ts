@@ -1,8 +1,5 @@
 import { vi } from "vitest";
-import {
-  type PermissionLevel,
-  hasPermissionLevel,
-} from "@/types/permissions";
+import { type PermissionLevel, hasPermissionLevel } from "@/types/permissions";
 
 /**
  * Helper for vitest tests that need to control the `usePermissions` hook

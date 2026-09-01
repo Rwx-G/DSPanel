@@ -33,7 +33,8 @@ export function MoveObjectDialog({
 }: MoveObjectDialogProps) {
   const { t } = useTranslation(["dialogs", "common"]);
   // Pre-select the current parent OU of the first target
-  const currentOU = targets[0]?.distinguishedName.split(",").slice(1).join(",") || undefined;
+  const currentOU =
+    targets[0]?.distinguishedName.split(",").slice(1).join(",") || undefined;
   const [selectedOU, setSelectedOU] = useState<string | undefined>(currentOU);
   const [step, setStep] = useState<"pick" | "preview" | "moving">("pick");
   const [moving, setMoving] = useState(false);
@@ -44,7 +45,11 @@ export function MoveObjectDialog({
   const isBulk = targets.length > 1;
   const title = isBulk
     ? t("dialogs:moveObject.titleBulk", { count: targets.length })
-    : t("dialogs:moveObject.titleSingle", { name: targets[0]?.displayName || parseCnFromDn(targets[0]?.distinguishedName ?? "") });
+    : t("dialogs:moveObject.titleSingle", {
+        name:
+          targets[0]?.displayName ||
+          parseCnFromDn(targets[0]?.distinguishedName ?? ""),
+      });
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -179,10 +184,14 @@ export function MoveObjectDialog({
                     parseCnFromDn(target.distinguishedName)}
                 </span>
                 <span className="text-caption text-[var(--color-text-secondary)]">
-                  {t("dialogs:moveObject.from", { path: formatOuPath(target.distinguishedName) })}
+                  {t("dialogs:moveObject.from", {
+                    path: formatOuPath(target.distinguishedName),
+                  })}
                 </span>
                 <span className="text-caption text-[var(--color-info)]">
-                  {t("dialogs:moveObject.to", { path: formatOuPath(selectedOU) })}
+                  {t("dialogs:moveObject.to", {
+                    path: formatOuPath(selectedOU),
+                  })}
                 </span>
               </div>
             ))}

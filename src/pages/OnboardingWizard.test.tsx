@@ -47,9 +47,7 @@ function setupMocks(level = "AccountOperator") {
       case "get_ou_tree":
         return Promise.resolve([]);
       case "create_user":
-        return Promise.resolve(
-          "CN=John Smith,OU=Devs,DC=example,DC=com",
-        );
+        return Promise.resolve("CN=John Smith,OU=Devs,DC=example,DC=com");
       case "add_user_to_group":
         return Promise.resolve(undefined);
       case "get_user_by_identity":
@@ -428,7 +426,9 @@ describe("OnboardingWizard", () => {
     expect(screen.getByText("User created successfully")).toBeDefined();
     expect(screen.getByTestId("onboarding-summary")).toBeDefined();
     expect(screen.getByText(/Login: jsmith/)).toBeDefined();
-    expect(screen.getByText(/DN: CN=John Smith,OU=Devs,DC=example,DC=com/)).toBeDefined();
+    expect(
+      screen.getByText(/DN: CN=John Smith,OU=Devs,DC=example,DC=com/),
+    ).toBeDefined();
   });
 
   it("shows error state when user creation fails", async () => {
@@ -636,7 +636,9 @@ describe("OnboardingWizard", () => {
       expect(screen.getByTestId("step-details")).toBeDefined();
     });
     // Fields should be cleared
-    const firstNameInput = screen.getByTestId("input-firstname") as HTMLInputElement;
+    const firstNameInput = screen.getByTestId(
+      "input-firstname",
+    ) as HTMLInputElement;
     expect(firstNameInput.value).toBe("");
   });
 
@@ -741,7 +743,9 @@ describe("OnboardingWizard", () => {
       target: { value: "Doe" },
     });
 
-    const displayInput = screen.getByTestId("input-displayname") as HTMLInputElement;
+    const displayInput = screen.getByTestId(
+      "input-displayname",
+    ) as HTMLInputElement;
     expect(displayInput.placeholder).toBe("Jane Doe");
   });
 
@@ -816,7 +820,9 @@ describe("OnboardingWizard", () => {
       expect(screen.getByTestId("step-preset")).toBeDefined();
     });
 
-    expect(screen.getByText("Modified outside DSPanel - review before use")).toBeDefined();
+    expect(
+      screen.getByText("Modified outside DSPanel - review before use"),
+    ).toBeDefined();
     expect(screen.getByLabelText("Preset modified externally")).toBeDefined();
   });
 

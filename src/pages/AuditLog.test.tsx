@@ -41,14 +41,19 @@ const mockQueryResult = {
   totalCount: 3,
 };
 
-const mockActionTypes = ["AccountDisabled", "PasswordReset", "PasswordResetFailed"];
+const mockActionTypes = [
+  "AccountDisabled",
+  "PasswordReset",
+  "PasswordResetFailed",
+];
 
 describe("AuditLog", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockInvoke.mockImplementation((cmd: string) => {
       if (cmd === "query_audit_log") return Promise.resolve(mockQueryResult);
-      if (cmd === "get_audit_action_types") return Promise.resolve(mockActionTypes);
+      if (cmd === "get_audit_action_types")
+        return Promise.resolve(mockActionTypes);
       return Promise.resolve(null);
     });
   });
@@ -97,7 +102,10 @@ describe("AuditLog", () => {
   it("calls query_audit_log with filters on search", async () => {
     render(<AuditLog />);
     await waitFor(() => {
-      expect(mockInvoke).toHaveBeenCalledWith("query_audit_log", expect.anything());
+      expect(mockInvoke).toHaveBeenCalledWith(
+        "query_audit_log",
+        expect.anything(),
+      );
     });
 
     // Type in operator filter
@@ -109,9 +117,13 @@ describe("AuditLog", () => {
     fireEvent.click(screen.getByTestId("search-button"));
 
     await waitFor(() => {
-      const calls = mockInvoke.mock.calls.filter((c) => c[0] === "query_audit_log");
+      const calls = mockInvoke.mock.calls.filter(
+        (c) => c[0] === "query_audit_log",
+      );
       const lastCall = calls[calls.length - 1];
-      expect((lastCall[1] as { filter: { operator: string } }).filter.operator).toBe("admin");
+      expect(
+        (lastCall[1] as { filter: { operator: string } }).filter.operator,
+      ).toBe("admin");
     });
   });
 
@@ -131,8 +143,7 @@ describe("AuditLog", () => {
 
   it("shows error message on fetch failure", async () => {
     mockInvoke.mockImplementation((cmd: string) => {
-      if (cmd === "query_audit_log")
-        return Promise.reject("Connection failed");
+      if (cmd === "query_audit_log") return Promise.reject("Connection failed");
       if (cmd === "get_audit_action_types") return Promise.resolve([]);
       return Promise.resolve(null);
     });
@@ -152,7 +163,9 @@ describe("AuditLog", () => {
     fireEvent.click(screen.getAllByTestId("audit-row")[0]);
 
     await waitFor(() => {
-      expect(screen.getByText("Password reset by operator")).toBeInTheDocument();
+      expect(
+        screen.getByText("Password reset by operator"),
+      ).toBeInTheDocument();
     });
   });
 
@@ -177,7 +190,9 @@ describe("AuditLog", () => {
     // Click reset
     fireEvent.click(screen.getByTestId("reset-button"));
 
-    const operatorInput = screen.getByTestId("filter-operator") as HTMLInputElement;
+    const operatorInput = screen.getByTestId(
+      "filter-operator",
+    ) as HTMLInputElement;
     expect(operatorInput.value).toBe("");
   });
 
@@ -387,7 +402,8 @@ describe("AuditLog", () => {
           entries: mockEntries,
           totalCount: 150, // 3 pages
         });
-      if (cmd === "get_audit_action_types") return Promise.resolve(mockActionTypes);
+      if (cmd === "get_audit_action_types")
+        return Promise.resolve(mockActionTypes);
       return Promise.resolve(null);
     });
 
@@ -405,7 +421,8 @@ describe("AuditLog", () => {
           entries: mockEntries,
           totalCount: 150,
         });
-      if (cmd === "get_audit_action_types") return Promise.resolve(mockActionTypes);
+      if (cmd === "get_audit_action_types")
+        return Promise.resolve(mockActionTypes);
       return Promise.resolve(null);
     });
 
@@ -415,7 +432,9 @@ describe("AuditLog", () => {
     });
 
     // Click next page
-    const nextBtn = screen.getByTestId("pagination").querySelectorAll("button")[1];
+    const nextBtn = screen
+      .getByTestId("pagination")
+      .querySelectorAll("button")[1];
     fireEvent.click(nextBtn);
 
     await waitFor(() => {
@@ -439,7 +458,8 @@ describe("AuditLog", () => {
           totalCount: 150,
         });
       }
-      if (cmd === "get_audit_action_types") return Promise.resolve(mockActionTypes);
+      if (cmd === "get_audit_action_types")
+        return Promise.resolve(mockActionTypes);
       return Promise.resolve(null);
     });
 
@@ -449,7 +469,9 @@ describe("AuditLog", () => {
     });
 
     // Navigate to page 2 first
-    const nextBtn = screen.getByTestId("pagination").querySelectorAll("button")[1];
+    const nextBtn = screen
+      .getByTestId("pagination")
+      .querySelectorAll("button")[1];
     fireEvent.click(nextBtn);
 
     await waitFor(() => {
@@ -457,7 +479,9 @@ describe("AuditLog", () => {
     });
 
     // Then navigate back
-    const prevBtn = screen.getByTestId("pagination").querySelectorAll("button")[0];
+    const prevBtn = screen
+      .getByTestId("pagination")
+      .querySelectorAll("button")[0];
     fireEvent.click(prevBtn);
 
     await waitFor(() => {
@@ -472,7 +496,8 @@ describe("AuditLog", () => {
           entries: mockEntries,
           totalCount: 150,
         });
-      if (cmd === "get_audit_action_types") return Promise.resolve(mockActionTypes);
+      if (cmd === "get_audit_action_types")
+        return Promise.resolve(mockActionTypes);
       return Promise.resolve(null);
     });
 
@@ -481,7 +506,9 @@ describe("AuditLog", () => {
       expect(screen.getByTestId("pagination")).toBeInTheDocument();
     });
 
-    const prevBtn = screen.getByTestId("pagination").querySelectorAll("button")[0];
+    const prevBtn = screen
+      .getByTestId("pagination")
+      .querySelectorAll("button")[0];
     expect(prevBtn).toBeDisabled();
   });
 
@@ -713,7 +740,8 @@ describe("AuditLog", () => {
           entries: [mockEntries[0]],
           totalCount: 1,
         });
-      if (cmd === "get_audit_action_types") return Promise.resolve(mockActionTypes);
+      if (cmd === "get_audit_action_types")
+        return Promise.resolve(mockActionTypes);
       return Promise.resolve(null);
     });
 

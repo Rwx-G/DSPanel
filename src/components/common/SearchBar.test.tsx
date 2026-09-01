@@ -13,7 +13,9 @@ describe("SearchBar", () => {
 
   it("should render with placeholder and shortcut hint", () => {
     render(<SearchBar value="" onChange={vi.fn()} onSearch={vi.fn()} />);
-    expect(screen.getByPlaceholderText("Search... (Ctrl+F)")).toBeInTheDocument();
+    expect(
+      screen.getByPlaceholderText("Search... (Ctrl+F)"),
+    ).toBeInTheDocument();
   });
 
   it("should render with custom placeholder and shortcut hint", () => {
@@ -25,7 +27,9 @@ describe("SearchBar", () => {
         placeholder="Find user..."
       />,
     );
-    expect(screen.getByPlaceholderText("Find user... (Ctrl+F)")).toBeInTheDocument();
+    expect(
+      screen.getByPlaceholderText("Find user... (Ctrl+F)"),
+    ).toBeInTheDocument();
   });
 
   it("should display the current value", () => {

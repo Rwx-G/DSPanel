@@ -93,7 +93,11 @@ describe("AttackDetection", () => {
   });
 
   it("calls detect_ad_attacks with default time window on mount", async () => {
-    mockInvoke.mockImplementation((cmd: string) => cmd === "get_platform" ? Promise.resolve("windows") : Promise.resolve(mockReport));
+    mockInvoke.mockImplementation((cmd: string) =>
+      cmd === "get_platform"
+        ? Promise.resolve("windows")
+        : Promise.resolve(mockReport),
+    );
     render(<AttackDetection />);
 
     await waitFor(() => {
@@ -104,7 +108,11 @@ describe("AttackDetection", () => {
   });
 
   it("renders alert cards after loading", async () => {
-    mockInvoke.mockImplementation((cmd: string) => cmd === "get_platform" ? Promise.resolve("windows") : Promise.resolve(mockReport));
+    mockInvoke.mockImplementation((cmd: string) =>
+      cmd === "get_platform"
+        ? Promise.resolve("windows")
+        : Promise.resolve(mockReport),
+    );
     render(<AttackDetection />);
 
     await waitFor(() => {
@@ -124,7 +132,11 @@ describe("AttackDetection", () => {
   });
 
   it("displays attack type badges including new types", async () => {
-    mockInvoke.mockImplementation((cmd: string) => cmd === "get_platform" ? Promise.resolve("windows") : Promise.resolve(mockReport));
+    mockInvoke.mockImplementation((cmd: string) =>
+      cmd === "get_platform"
+        ? Promise.resolve("windows")
+        : Promise.resolve(mockReport),
+    );
     render(<AttackDetection />);
 
     await waitFor(() => {
@@ -138,7 +150,11 @@ describe("AttackDetection", () => {
   });
 
   it("displays severity summary badges", async () => {
-    mockInvoke.mockImplementation((cmd: string) => cmd === "get_platform" ? Promise.resolve("windows") : Promise.resolve(mockReport));
+    mockInvoke.mockImplementation((cmd: string) =>
+      cmd === "get_platform"
+        ? Promise.resolve("windows")
+        : Promise.resolve(mockReport),
+    );
     render(<AttackDetection />);
 
     await waitFor(() => {
@@ -151,7 +167,11 @@ describe("AttackDetection", () => {
   });
 
   it("displays MITRE ATT&CK reference badges", async () => {
-    mockInvoke.mockImplementation((cmd: string) => cmd === "get_platform" ? Promise.resolve("windows") : Promise.resolve(mockReport));
+    mockInvoke.mockImplementation((cmd: string) =>
+      cmd === "get_platform"
+        ? Promise.resolve("windows")
+        : Promise.resolve(mockReport),
+    );
     render(<AttackDetection />);
 
     await waitFor(() => {
@@ -166,12 +186,16 @@ describe("AttackDetection", () => {
   });
 
   it("shows all checks as clear when no alerts", async () => {
-    mockInvoke.mockImplementation((cmd: string) => cmd === "get_platform" ? Promise.resolve("windows") : Promise.resolve({
-      alerts: [],
-      timeWindowHours: 24,
-      scannedAt: "2026-03-23T10:00:00Z",
-      eventLogAccessible: true,
-    }));
+    mockInvoke.mockImplementation((cmd: string) =>
+      cmd === "get_platform"
+        ? Promise.resolve("windows")
+        : Promise.resolve({
+            alerts: [],
+            timeWindowHours: 24,
+            scannedAt: "2026-03-23T10:00:00Z",
+            eventLogAccessible: true,
+          }),
+    );
     render(<AttackDetection />);
 
     await waitFor(() => {
@@ -184,7 +208,11 @@ describe("AttackDetection", () => {
   });
 
   it("shows error state on failure", async () => {
-    mockInvoke.mockImplementation((cmd: string) => cmd === "get_platform" ? Promise.resolve("windows") : Promise.reject("Connection failed"));
+    mockInvoke.mockImplementation((cmd: string) =>
+      cmd === "get_platform"
+        ? Promise.resolve("windows")
+        : Promise.reject("Connection failed"),
+    );
     render(<AttackDetection />);
 
     await waitFor(() => {
@@ -193,13 +221,17 @@ describe("AttackDetection", () => {
   });
 
   it("expands alert card to show recommendation", async () => {
-    mockInvoke.mockImplementation((cmd: string) => cmd === "get_platform" ? Promise.resolve("windows") : Promise.resolve(mockReport));
+    mockInvoke.mockImplementation((cmd: string) =>
+      cmd === "get_platform"
+        ? Promise.resolve("windows")
+        : Promise.resolve(mockReport),
+    );
     render(<AttackDetection />);
 
     await waitFor(() => {
-      expect(
-        screen.getAllByTestId("alert-card-toggle").length,
-      ).toBeGreaterThan(0);
+      expect(screen.getAllByTestId("alert-card-toggle").length).toBeGreaterThan(
+        0,
+      );
     });
 
     fireEvent.click(screen.getAllByTestId("alert-card-toggle")[0]);
@@ -214,7 +246,11 @@ describe("AttackDetection", () => {
   });
 
   it("changes time window and re-fetches", async () => {
-    mockInvoke.mockImplementation((cmd: string) => cmd === "get_platform" ? Promise.resolve("windows") : Promise.resolve(mockReport));
+    mockInvoke.mockImplementation((cmd: string) =>
+      cmd === "get_platform"
+        ? Promise.resolve("windows")
+        : Promise.resolve(mockReport),
+    );
     render(<AttackDetection />);
 
     await waitFor(() => {
@@ -233,7 +269,11 @@ describe("AttackDetection", () => {
   });
 
   it("scan button triggers re-fetch", async () => {
-    mockInvoke.mockImplementation((cmd: string) => cmd === "get_platform" ? Promise.resolve("windows") : Promise.resolve(mockReport));
+    mockInvoke.mockImplementation((cmd: string) =>
+      cmd === "get_platform"
+        ? Promise.resolve("windows")
+        : Promise.resolve(mockReport),
+    );
     render(<AttackDetection />);
 
     await waitFor(() => {
@@ -252,7 +292,11 @@ describe("AttackDetection", () => {
   });
 
   it("displays source and event ID on alert cards", async () => {
-    mockInvoke.mockImplementation((cmd: string) => cmd === "get_platform" ? Promise.resolve("windows") : Promise.resolve(mockReport));
+    mockInvoke.mockImplementation((cmd: string) =>
+      cmd === "get_platform"
+        ? Promise.resolve("windows")
+        : Promise.resolve(mockReport),
+    );
     render(<AttackDetection />);
 
     await waitFor(() => {
@@ -305,7 +349,9 @@ describe("AttackDetection", () => {
     await waitFor(() => {
       expect(screen.getByTestId("event-log-warning")).toBeInTheDocument();
     });
-    expect(screen.getByText(/Cannot read Security Event Log/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Cannot read Security Event Log/),
+    ).toBeInTheDocument();
     // All checks should show N/A instead of Clear
     const naLabels = screen.getAllByText("N/A");
     expect(naLabels.length).toBeGreaterThan(0);

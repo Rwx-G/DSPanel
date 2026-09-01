@@ -22,10 +22,18 @@ export const namespaces = Object.keys(en) as (keyof typeof en)[];
 // Use localStorage as fast cache for language preference (survives Vite hot reload)
 const LANG_STORAGE_KEY = "dspanel-language";
 function getLangCache(): string {
-  try { return localStorage.getItem(LANG_STORAGE_KEY) || "en"; } catch { return "en"; }
+  try {
+    return localStorage.getItem(LANG_STORAGE_KEY) || "en";
+  } catch {
+    return "en";
+  }
 }
 function setLangCache(lang: string): void {
-  try { localStorage.setItem(LANG_STORAGE_KEY, lang); } catch { /* noop */ }
+  try {
+    localStorage.setItem(LANG_STORAGE_KEY, lang);
+  } catch {
+    /* noop */
+  }
 }
 const cachedLang = getLangCache();
 

@@ -49,7 +49,13 @@ export function UserActions({
       setLoading(action);
       try {
         await invoke(command, { userDn: user.distinguishedName });
-        notify(t("components:userActions.actionSuccess", { action, name: user.displayName }), "success");
+        notify(
+          t("components:userActions.actionSuccess", {
+            action,
+            name: user.displayName,
+          }),
+          "success",
+        );
         onRefresh();
       } catch (e) {
         notify(extractErrorMessage(e), "error");
@@ -65,7 +71,10 @@ export function UserActions({
       handleAction(
         t("components:userActions.unlockAccount"),
         "unlock_account",
-        t("components:userActions.unlockConfirm", { name: user.displayName, sam: user.samAccountName }),
+        t("components:userActions.unlockConfirm", {
+          name: user.displayName,
+          sam: user.samAccountName,
+        }),
       ),
     [handleAction, user],
   );
@@ -75,7 +84,10 @@ export function UserActions({
       handleAction(
         t("components:userActions.enableAccount"),
         "enable_account",
-        t("components:userActions.enableConfirm", { name: user.displayName, sam: user.samAccountName }),
+        t("components:userActions.enableConfirm", {
+          name: user.displayName,
+          sam: user.samAccountName,
+        }),
       ),
     [handleAction, user],
   );
@@ -85,7 +97,10 @@ export function UserActions({
       handleAction(
         t("components:userActions.disableAccount"),
         "disable_account",
-        t("components:userActions.disableConfirm", { name: user.displayName, sam: user.samAccountName }),
+        t("components:userActions.disableConfirm", {
+          name: user.displayName,
+          sam: user.samAccountName,
+        }),
         "AccountDisable",
       ),
     [handleAction, user],

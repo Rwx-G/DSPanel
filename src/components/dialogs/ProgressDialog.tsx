@@ -73,7 +73,9 @@ export function ProgressDialog({
             className="mt-1 text-right text-caption text-[var(--color-text-secondary)]"
             data-testid="progress-percentage"
           >
-            {t("dialogs:progress.percentage", { value: Math.round(percentage) })}
+            {t("dialogs:progress.percentage", {
+              value: Math.round(percentage),
+            })}
           </p>
         )}
 

@@ -386,10 +386,10 @@ fn parse_single_repl_neighbor_xml(xml: &str) -> Option<ReplNeighborXml> {
     loop {
         match reader.read_event() {
             Ok(Event::Start(e)) => {
-                current_tag = String::from_utf8_lossy(e.name().as_ref()).to_string();
+                current_tag = e.name().as_ref().to_string();
             }
             Ok(Event::Text(e)) => {
-                let text = String::from_utf8_lossy(&e).trim().to_string();
+                let text = e.trim().to_string();
                 match current_tag.as_str() {
                     "oszNamingContext" => neighbor.naming_context = text,
                     "oszSourceDsaAddress" => neighbor.source_dsa_address = text,

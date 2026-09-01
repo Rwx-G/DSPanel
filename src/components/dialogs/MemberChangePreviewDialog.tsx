@@ -57,9 +57,13 @@ export function MemberChangePreviewDialog({
 
   const summaryParts: string[] = [];
   if (addCount > 0)
-    summaryParts.push(t("dialogs:memberChangePreview.toAdd", { count: addCount }));
+    summaryParts.push(
+      t("dialogs:memberChangePreview.toAdd", { count: addCount }),
+    );
   if (removeCount > 0)
-    summaryParts.push(t("dialogs:memberChangePreview.toRemove", { count: removeCount }));
+    summaryParts.push(
+      t("dialogs:memberChangePreview.toRemove", { count: removeCount }),
+    );
   const summary = summaryParts.join(", ");
 
   return (
@@ -127,7 +131,9 @@ export function MemberChangePreviewDialog({
           disabled={loading}
           data-testid="member-change-apply"
         >
-          {loading ? t("dialogs:memberChangePreview.applying") : t("common:apply")}
+          {loading
+            ? t("dialogs:memberChangePreview.applying")
+            : t("common:apply")}
         </button>
       </div>
     </DialogShell>

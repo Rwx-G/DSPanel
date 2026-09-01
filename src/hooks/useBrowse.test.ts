@@ -382,10 +382,7 @@ describe("useBrowse", () => {
       result.current.setSelectedItem({ id: "a", name: "Alice" });
     });
 
-    const refreshEntries = [
-      makeEntry("a", "Alice"),
-      makeEntry("d", "Dave"),
-    ];
+    const refreshEntries = [makeEntry("a", "Alice"), makeEntry("d", "Dave")];
     mockInvoke.mockResolvedValueOnce(makeBrowseResult(refreshEntries));
 
     await act(async () => {
@@ -405,10 +402,7 @@ describe("useBrowse", () => {
 
   // 12. Mode transitions (browse -> search -> browse)
   it("transitions correctly from browse to search and back to browse", async () => {
-    const entries = [
-      makeEntry("alice", "Alice"),
-      makeEntry("bob", "Bob"),
-    ];
+    const entries = [makeEntry("alice", "Alice"), makeEntry("bob", "Bob")];
     mockInvoke.mockResolvedValueOnce(makeBrowseResult(entries));
 
     const { result } = renderHook(() => useBrowse(defaultOptions()));
@@ -513,10 +507,7 @@ describe("useBrowse", () => {
   });
 
   it("client-side filter with 1 char works", async () => {
-    const entries = [
-      makeEntry("a", "Alice"),
-      makeEntry("b", "Bob"),
-    ];
+    const entries = [makeEntry("a", "Alice"), makeEntry("b", "Bob")];
     mockInvoke.mockImplementation((() =>
       Promise.resolve(makeBrowseResult(entries))) as typeof invoke);
 

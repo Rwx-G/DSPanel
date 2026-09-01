@@ -116,7 +116,9 @@ export function SecurityIndicatorDot({
     >
       <span
         className="inline-flex items-center justify-center rounded-full p-1"
-        style={{ backgroundColor: `color-mix(in srgb, ${color} 12%, transparent)` }}
+        style={{
+          backgroundColor: `color-mix(in srgb, ${color} 12%, transparent)`,
+        }}
       >
         <Icon size={12} style={{ color }} />
       </span>
@@ -138,7 +140,8 @@ export function SecurityIndicatorDot({
               {indicators.indicators.map((indicator) => {
                 const indicatorColor = SEVERITY_COLOR[indicator.severity];
                 const metadata = metadataItemsFor(indicator);
-                const preview = metadata?.slice(0, METADATA_PREVIEW_LIMIT) ?? [];
+                const preview =
+                  metadata?.slice(0, METADATA_PREVIEW_LIMIT) ?? [];
                 const overflow = (metadata?.length ?? 0) - preview.length;
                 return (
                   <li
@@ -162,8 +165,7 @@ export function SecurityIndicatorDot({
                         >
                           {preview.join(", ")}
                           {overflow > 0 &&
-                            " " +
-                              t("dot.metadataMore", { count: overflow })}
+                            " " + t("dot.metadataMore", { count: overflow })}
                         </span>
                       )}
                     </div>

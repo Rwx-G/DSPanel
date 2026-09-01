@@ -156,7 +156,9 @@ export function ComboBox({
               : "text-[var(--color-text-secondary)]"
           }
         >
-          {selectedOption?.label ?? (placeholder ?? t("components:comboBox.placeholder"))}
+          {selectedOption?.label ??
+            placeholder ??
+            t("components:comboBox.placeholder")}
         </span>
         <ChevronDown
           size={16}

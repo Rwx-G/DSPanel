@@ -39,7 +39,11 @@ vi.mock("@/contexts/DialogContext", () => ({
   }),
 }));
 
-const mockPendingChanges: { attributeName: string; oldValue: string; newValue: string }[] = [];
+const mockPendingChanges: {
+  attributeName: string;
+  oldValue: string;
+  newValue: string;
+}[] = [];
 const mockStageChange = vi.fn();
 const mockClearChanges = vi.fn();
 const mockSubmitChanges = vi.fn().mockResolvedValue(true);
@@ -119,16 +123,12 @@ describe("PrinterLookup", () => {
     expect(screen.getByTestId("search-bar")).toBeInTheDocument();
 
     await waitFor(() => {
-      expect(
-        screen.getByText("No printers available."),
-      ).toBeInTheDocument();
+      expect(screen.getByText("No printers available.")).toBeInTheDocument();
     });
   });
 
   it("shows loading state during search", async () => {
-    mockInvoke.mockImplementation(
-      () => new Promise(() => {}),
-    );
+    mockInvoke.mockImplementation(() => new Promise(() => {}));
 
     render(<PrinterLookup />, { wrapper: Wrapper });
 
@@ -393,7 +393,9 @@ describe("PrinterLookup", () => {
     });
 
     fireEvent.click(
-      screen.getByTestId("printer-result-CN=HP-LaserJet,OU=Printers,DC=example,DC=com"),
+      screen.getByTestId(
+        "printer-result-CN=HP-LaserJet,OU=Printers,DC=example,DC=com",
+      ),
     );
 
     await waitFor(() => {
@@ -435,7 +437,9 @@ describe("PrinterLookup", () => {
     });
 
     fireEvent.click(
-      screen.getByTestId("printer-result-CN=HP-LaserJet,OU=Printers,DC=example,DC=com"),
+      screen.getByTestId(
+        "printer-result-CN=HP-LaserJet,OU=Printers,DC=example,DC=com",
+      ),
     );
 
     await waitFor(() => {
@@ -474,7 +478,9 @@ describe("PrinterLookup", () => {
     });
 
     fireEvent.click(
-      screen.getByTestId("printer-result-CN=HP-LaserJet,OU=Printers,DC=example,DC=com"),
+      screen.getByTestId(
+        "printer-result-CN=HP-LaserJet,OU=Printers,DC=example,DC=com",
+      ),
     );
 
     await waitFor(() => {
@@ -484,7 +490,10 @@ describe("PrinterLookup", () => {
     fireEvent.click(screen.getByTestId("printer-delete-btn"));
 
     await waitFor(() => {
-      expect(mockInvoke).toHaveBeenCalledWith("delete_printer", expect.anything());
+      expect(mockInvoke).toHaveBeenCalledWith(
+        "delete_printer",
+        expect.anything(),
+      );
     });
 
     await waitFor(() => {
@@ -514,7 +523,9 @@ describe("PrinterLookup", () => {
     });
 
     fireEvent.click(
-      screen.getByTestId("printer-result-CN=HP-LaserJet,OU=Printers,DC=example,DC=com"),
+      screen.getByTestId(
+        "printer-result-CN=HP-LaserJet,OU=Printers,DC=example,DC=com",
+      ),
     );
 
     await waitFor(() => {
@@ -547,7 +558,9 @@ describe("PrinterLookup", () => {
     });
 
     fireEvent.click(
-      screen.getByTestId("printer-result-CN=HP-LaserJet,OU=Printers,DC=example,DC=com"),
+      screen.getByTestId(
+        "printer-result-CN=HP-LaserJet,OU=Printers,DC=example,DC=com",
+      ),
     );
 
     await waitFor(() => {
@@ -581,7 +594,9 @@ describe("PrinterLookup", () => {
     });
 
     fireEvent.click(
-      screen.getByTestId("printer-result-CN=HP-LaserJet,OU=Printers,DC=example,DC=com"),
+      screen.getByTestId(
+        "printer-result-CN=HP-LaserJet,OU=Printers,DC=example,DC=com",
+      ),
     );
 
     await waitFor(() => {
@@ -628,7 +643,9 @@ describe("PrinterLookup", () => {
     });
 
     fireEvent.click(
-      screen.getByTestId("printer-result-CN=HP-LaserJet,OU=Printers,DC=example,DC=com"),
+      screen.getByTestId(
+        "printer-result-CN=HP-LaserJet,OU=Printers,DC=example,DC=com",
+      ),
     );
 
     await waitFor(() => {
@@ -711,7 +728,9 @@ describe("PrinterLookup", () => {
     });
 
     fireEvent.click(
-      screen.getByTestId("printer-result-CN=HP-LaserJet,OU=Printers,DC=example,DC=com"),
+      screen.getByTestId(
+        "printer-result-CN=HP-LaserJet,OU=Printers,DC=example,DC=com",
+      ),
     );
 
     await waitFor(() => {

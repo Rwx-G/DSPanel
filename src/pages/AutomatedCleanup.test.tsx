@@ -187,7 +187,9 @@ describe("AutomatedCleanup", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("execute-btn")).toBeInTheDocument();
-      expect(screen.getByTestId("execute-btn")).toHaveTextContent("Execute (2)");
+      expect(screen.getByTestId("execute-btn")).toHaveTextContent(
+        "Execute (2)",
+      );
     });
   });
 
@@ -288,7 +290,9 @@ describe("AutomatedCleanup", () => {
     fireEvent.click(screen.getByTestId("execute-btn"));
     await waitFor(() => {
       expect(screen.getByTestId("delete-warning")).toBeInTheDocument();
-      expect(screen.getByTestId("execute-btn")).toHaveTextContent("Confirm DELETE");
+      expect(screen.getByTestId("execute-btn")).toHaveTextContent(
+        "Confirm DELETE",
+      );
     });
   });
 
@@ -333,7 +337,9 @@ describe("AutomatedCleanup", () => {
       target: { value: "neverLoggedOnCreatedDays" },
     });
 
-    const select = screen.getByTestId("rule-condition-select") as HTMLSelectElement;
+    const select = screen.getByTestId(
+      "rule-condition-select",
+    ) as HTMLSelectElement;
     expect(select.value).toBe("neverLoggedOnCreatedDays");
   });
 
@@ -349,7 +355,9 @@ describe("AutomatedCleanup", () => {
       target: { value: "90" },
     });
 
-    const input = screen.getByTestId("rule-threshold-input") as HTMLInputElement;
+    const input = screen.getByTestId(
+      "rule-threshold-input",
+    ) as HTMLInputElement;
     expect(input.value).toBe("90");
   });
 
@@ -365,7 +373,9 @@ describe("AutomatedCleanup", () => {
       target: { value: "svc_*, admin*" },
     });
 
-    const input = screen.getByTestId("rule-exclude-patterns") as HTMLInputElement;
+    const input = screen.getByTestId(
+      "rule-exclude-patterns",
+    ) as HTMLInputElement;
     expect(input.value).toBe("svc_*, admin*");
   });
 
@@ -421,13 +431,17 @@ describe("AutomatedCleanup", () => {
     });
 
     // Default action is "disable" - target OU should not be visible
-    expect(screen.queryByTestId("rule-target-ou-input")).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("rule-target-ou-input"),
+    ).not.toBeInTheDocument();
 
     // Change to delete - still should not show target OU
     fireEvent.change(screen.getByTestId("rule-action-select"), {
       target: { value: "delete" },
     });
-    expect(screen.queryByTestId("rule-target-ou-input")).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("rule-target-ou-input"),
+    ).not.toBeInTheDocument();
   });
 
   it("target OU input accepts value when action is move", async () => {
@@ -450,7 +464,9 @@ describe("AutomatedCleanup", () => {
       target: { value: "OU=Disabled,DC=example,DC=com" },
     });
 
-    const input = screen.getByTestId("rule-target-ou-input") as HTMLInputElement;
+    const input = screen.getByTestId(
+      "rule-target-ou-input",
+    ) as HTMLInputElement;
     expect(input.value).toBe("OU=Disabled,DC=example,DC=com");
   });
 
@@ -486,13 +502,19 @@ describe("AutomatedCleanup", () => {
     const nameInput = screen.getByTestId("rule-name-input") as HTMLInputElement;
     expect(nameInput.value).toBe("Old Rule");
 
-    const conditionSelect = screen.getByTestId("rule-condition-select") as HTMLSelectElement;
+    const conditionSelect = screen.getByTestId(
+      "rule-condition-select",
+    ) as HTMLSelectElement;
     expect(conditionSelect.value).toBe("disabledDays");
 
-    const thresholdInput = screen.getByTestId("rule-threshold-input") as HTMLInputElement;
+    const thresholdInput = screen.getByTestId(
+      "rule-threshold-input",
+    ) as HTMLInputElement;
     expect(thresholdInput.value).toBe("60");
 
-    const actionSelect = screen.getByTestId("rule-action-select") as HTMLSelectElement;
+    const actionSelect = screen.getByTestId(
+      "rule-action-select",
+    ) as HTMLSelectElement;
     expect(actionSelect.value).toBe("delete");
   });
 
@@ -552,16 +574,18 @@ describe("AutomatedCleanup", () => {
     });
 
     // Both matches are selected by default - uncheck the first one
-    const checkboxes = screen.getByTestId("matches-table").querySelectorAll(
-      "tbody input[type='checkbox']",
-    );
+    const checkboxes = screen
+      .getByTestId("matches-table")
+      .querySelectorAll("tbody input[type='checkbox']");
     expect(checkboxes).toHaveLength(2);
 
     fireEvent.click(checkboxes[0]);
 
     // Execute button should now show (1) instead of (2)
     await waitFor(() => {
-      expect(screen.getByTestId("execute-btn")).toHaveTextContent("Execute (1)");
+      expect(screen.getByTestId("execute-btn")).toHaveTextContent(
+        "Execute (1)",
+      );
     });
   });
 
@@ -591,21 +615,25 @@ describe("AutomatedCleanup", () => {
     });
 
     // Uncheck all via header checkbox
-    const headerCheckbox = screen.getByTestId("matches-table").querySelector(
-      "thead input[type='checkbox']",
-    ) as HTMLInputElement;
+    const headerCheckbox = screen
+      .getByTestId("matches-table")
+      .querySelector("thead input[type='checkbox']") as HTMLInputElement;
 
     fireEvent.click(headerCheckbox);
 
     await waitFor(() => {
-      expect(screen.getByTestId("execute-btn")).toHaveTextContent("Execute (0)");
+      expect(screen.getByTestId("execute-btn")).toHaveTextContent(
+        "Execute (0)",
+      );
     });
 
     // Re-check all
     fireEvent.click(headerCheckbox);
 
     await waitFor(() => {
-      expect(screen.getByTestId("execute-btn")).toHaveTextContent("Execute (2)");
+      expect(screen.getByTestId("execute-btn")).toHaveTextContent(
+        "Execute (2)",
+      );
     });
   });
 
@@ -654,7 +682,8 @@ describe("AutomatedCleanup", () => {
     ];
     mockInvoke.mockImplementation((cmd) => {
       if (cmd === "get_cleanup_rules") return Promise.resolve(existingRules);
-      if (cmd === "cleanup_dry_run") return Promise.reject("LDAP search failed");
+      if (cmd === "cleanup_dry_run")
+        return Promise.reject("LDAP search failed");
       return Promise.resolve(null);
     });
 
@@ -803,7 +832,9 @@ describe("AutomatedCleanup", () => {
 
     expect(screen.getByText(/svc_\*, admin\*/)).toBeInTheDocument();
     expect(screen.getByText(/OU=VIP/)).toBeInTheDocument();
-    expect(screen.getByText(/to OU=Archive,DC=test,DC=com/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/to OU=Archive,DC=test,DC=com/),
+    ).toBeInTheDocument();
   });
 
   it("editing an existing rule updates it in place", async () => {

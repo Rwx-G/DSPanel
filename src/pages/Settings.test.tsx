@@ -31,10 +31,18 @@ const localStorageMock = (() => {
   let store: Record<string, string> = {};
   return {
     getItem: vi.fn((key: string) => store[key] ?? null),
-    setItem: vi.fn((key: string, value: string) => { store[key] = value; }),
-    removeItem: vi.fn((key: string) => { delete store[key]; }),
-    clear: vi.fn(() => { store = {}; }),
-    get length() { return Object.keys(store).length; },
+    setItem: vi.fn((key: string, value: string) => {
+      store[key] = value;
+    }),
+    removeItem: vi.fn((key: string) => {
+      delete store[key];
+    }),
+    clear: vi.fn(() => {
+      store = {};
+    }),
+    get length() {
+      return Object.keys(store).length;
+    },
     key: vi.fn((_i: number) => null),
   };
 })();
@@ -102,7 +110,11 @@ describe("Settings", () => {
 
   it("renders the settings page with tabs", async () => {
     setupMocks();
-    render(<Wrapper><Settings /></Wrapper>);
+    render(
+      <Wrapper>
+        <Settings />
+      </Wrapper>,
+    );
 
     await waitFor(() => {
       expect(screen.getByTestId("settings-page")).toBeDefined();
@@ -118,7 +130,11 @@ describe("Settings", () => {
 
   it("defaults to connection tab", async () => {
     setupMocks();
-    render(<Wrapper><Settings /></Wrapper>);
+    render(
+      <Wrapper>
+        <Settings />
+      </Wrapper>,
+    );
 
     await waitFor(() => {
       expect(screen.getByTestId("tab-content-connection")).toBeDefined();
@@ -127,7 +143,11 @@ describe("Settings", () => {
 
   it("shows connection fields", async () => {
     setupMocks();
-    render(<Wrapper><Settings /></Wrapper>);
+    render(
+      <Wrapper>
+        <Settings />
+      </Wrapper>,
+    );
 
     await waitFor(() => {
       expect(screen.getByTestId("setting-domain-override")).toBeDefined();
@@ -137,7 +157,11 @@ describe("Settings", () => {
 
   it("switches to security tab", async () => {
     setupMocks();
-    render(<Wrapper><Settings /></Wrapper>);
+    render(
+      <Wrapper>
+        <Settings />
+      </Wrapper>,
+    );
 
     await waitFor(() => {
       expect(screen.getByTestId("tab-security")).toBeDefined();
@@ -153,7 +177,11 @@ describe("Settings", () => {
 
   it("switches to reports tab", async () => {
     setupMocks();
-    render(<Wrapper><Settings /></Wrapper>);
+    render(
+      <Wrapper>
+        <Settings />
+      </Wrapper>,
+    );
 
     await waitFor(() => {
       expect(screen.getByTestId("tab-reports")).toBeDefined();
@@ -170,7 +198,11 @@ describe("Settings", () => {
 
   it("switches to appearance tab", async () => {
     setupMocks();
-    render(<Wrapper><Settings /></Wrapper>);
+    render(
+      <Wrapper>
+        <Settings />
+      </Wrapper>,
+    );
 
     await waitFor(() => {
       expect(screen.getByTestId("tab-appearance")).toBeDefined();
@@ -188,7 +220,11 @@ describe("Settings", () => {
 
   it("shows validation error for low audit retention", async () => {
     setupMocks();
-    render(<Wrapper><Settings /></Wrapper>);
+    render(
+      <Wrapper>
+        <Settings />
+      </Wrapper>,
+    );
 
     await waitFor(() => {
       expect(screen.getByTestId("tab-security")).toBeDefined();
@@ -214,7 +250,11 @@ describe("Settings", () => {
 
   it("save button is disabled when no changes", async () => {
     setupMocks();
-    render(<Wrapper><Settings /></Wrapper>);
+    render(
+      <Wrapper>
+        <Settings />
+      </Wrapper>,
+    );
 
     await waitFor(() => {
       expect(screen.getByTestId("settings-save")).toBeDefined();
@@ -227,7 +267,11 @@ describe("Settings", () => {
 
   it("save button becomes enabled after a change", async () => {
     setupMocks();
-    render(<Wrapper><Settings /></Wrapper>);
+    render(
+      <Wrapper>
+        <Settings />
+      </Wrapper>,
+    );
 
     await waitFor(() => {
       expect(screen.getByTestId("setting-domain-override")).toBeDefined();
@@ -244,7 +288,11 @@ describe("Settings", () => {
 
   it("calls set_app_settings on save", async () => {
     setupMocks();
-    render(<Wrapper><Settings /></Wrapper>);
+    render(
+      <Wrapper>
+        <Settings />
+      </Wrapper>,
+    );
 
     await waitFor(() => {
       expect(screen.getByTestId("setting-domain-override")).toBeDefined();
@@ -257,13 +305,20 @@ describe("Settings", () => {
     fireEvent.click(screen.getByTestId("settings-save"));
 
     await waitFor(() => {
-      expect(mockInvoke).toHaveBeenCalledWith("set_app_settings", expect.any(Object));
+      expect(mockInvoke).toHaveBeenCalledWith(
+        "set_app_settings",
+        expect.any(Object),
+      );
     });
   });
 
   it("switches to presets tab", async () => {
     setupMocks();
-    render(<Wrapper><Settings /></Wrapper>);
+    render(
+      <Wrapper>
+        <Settings />
+      </Wrapper>,
+    );
 
     await waitFor(() => {
       expect(screen.getByTestId("tab-presets")).toBeDefined();
@@ -278,7 +333,11 @@ describe("Settings", () => {
 
   it("switches to permissions tab", async () => {
     setupMocks();
-    render(<Wrapper><Settings /></Wrapper>);
+    render(
+      <Wrapper>
+        <Settings />
+      </Wrapper>,
+    );
 
     await waitFor(() => {
       expect(screen.getByTestId("tab-permissions")).toBeDefined();
@@ -300,7 +359,10 @@ describe("Settings", () => {
     mockInvoke.mockImplementation(((cmd: string) => {
       if (cmd === "get_app_settings")
         return Promise.resolve({
-          connection: { domainOverride: "loaded.corp.com", preferredDc: "dc01.corp.com" },
+          connection: {
+            domainOverride: "loaded.corp.com",
+            preferredDc: "dc01.corp.com",
+          },
           auditRetentionDays: 365,
           reports: { defaultFormat: "CSV", defaultExportPath: "" },
           appearance: { theme: "system" },
@@ -308,22 +370,34 @@ describe("Settings", () => {
       return Promise.resolve(null);
     }) as typeof invoke);
 
-    render(<Wrapper><Settings /></Wrapper>);
+    render(
+      <Wrapper>
+        <Settings />
+      </Wrapper>,
+    );
 
     await waitFor(() => {
       expect(screen.getByTestId("setting-domain-override")).toBeDefined();
     });
 
-    const domainInput = screen.getByTestId("setting-domain-override") as HTMLInputElement;
+    const domainInput = screen.getByTestId(
+      "setting-domain-override",
+    ) as HTMLInputElement;
     expect(domainInput.value).toBe("loaded.corp.com");
 
-    const dcInput = screen.getByTestId("setting-preferred-dc") as HTMLInputElement;
+    const dcInput = screen.getByTestId(
+      "setting-preferred-dc",
+    ) as HTMLInputElement;
     expect(dcInput.value).toBe("dc01.corp.com");
   });
 
   it("preferred DC field change marks dirty", async () => {
     setupMocks();
-    render(<Wrapper><Settings /></Wrapper>);
+    render(
+      <Wrapper>
+        <Settings />
+      </Wrapper>,
+    );
 
     await waitFor(() => {
       expect(screen.getByTestId("setting-preferred-dc")).toBeDefined();
@@ -341,13 +415,19 @@ describe("Settings", () => {
 
   it("update frequency selector changes value", async () => {
     setupMocks();
-    render(<Wrapper><Settings /></Wrapper>);
+    render(
+      <Wrapper>
+        <Settings />
+      </Wrapper>,
+    );
 
     await waitFor(() => {
       expect(screen.getByTestId("setting-update-frequency")).toBeDefined();
     });
 
-    const select = screen.getByTestId("setting-update-frequency") as HTMLSelectElement;
+    const select = screen.getByTestId(
+      "setting-update-frequency",
+    ) as HTMLSelectElement;
     expect(select.value).toBe("startup");
 
     fireEvent.change(select, { target: { value: "weekly" } });
@@ -360,7 +440,11 @@ describe("Settings", () => {
 
   it("audit retention input updates value", async () => {
     setupMocks();
-    render(<Wrapper><Settings /></Wrapper>);
+    render(
+      <Wrapper>
+        <Settings />
+      </Wrapper>,
+    );
 
     await waitFor(() => {
       expect(screen.getByTestId("tab-security")).toBeDefined();
@@ -371,7 +455,9 @@ describe("Settings", () => {
       expect(screen.getByTestId("setting-audit-retention")).toBeDefined();
     });
 
-    const input = screen.getByTestId("setting-audit-retention") as HTMLInputElement;
+    const input = screen.getByTestId(
+      "setting-audit-retention",
+    ) as HTMLInputElement;
     expect(input.value).toBe("365");
 
     fireEvent.change(input, { target: { value: "90" } });
@@ -393,7 +479,11 @@ describe("Settings", () => {
       return Promise.resolve(null);
     }) as typeof invoke);
 
-    render(<Wrapper><Settings /></Wrapper>);
+    render(
+      <Wrapper>
+        <Settings />
+      </Wrapper>,
+    );
 
     await waitFor(() => {
       expect(screen.getByTestId("tab-security")).toBeDefined();
@@ -418,7 +508,11 @@ describe("Settings", () => {
 
   it("risk weight inputs render with default values and can be changed", async () => {
     setupMocks();
-    render(<Wrapper><Settings /></Wrapper>);
+    render(
+      <Wrapper>
+        <Settings />
+      </Wrapper>,
+    );
 
     await waitFor(() => {
       expect(screen.getByTestId("tab-security")).toBeDefined();
@@ -426,13 +520,19 @@ describe("Settings", () => {
     fireEvent.click(screen.getByTestId("tab-security"));
 
     await waitFor(() => {
-      expect(screen.getByTestId("setting-weight-privilegedHygiene")).toBeDefined();
+      expect(
+        screen.getByTestId("setting-weight-privilegedHygiene"),
+      ).toBeDefined();
     });
 
-    const privilegedInput = screen.getByTestId("setting-weight-privilegedHygiene") as HTMLInputElement;
+    const privilegedInput = screen.getByTestId(
+      "setting-weight-privilegedHygiene",
+    ) as HTMLInputElement;
     expect(privilegedInput.value).toBe("15");
 
-    const kerberosInput = screen.getByTestId("setting-weight-kerberosSecurity") as HTMLInputElement;
+    const kerberosInput = screen.getByTestId(
+      "setting-weight-kerberosSecurity",
+    ) as HTMLInputElement;
     expect(kerberosInput.value).toBe("20");
 
     // Change a weight
@@ -442,7 +542,11 @@ describe("Settings", () => {
 
   it("attack detection config fields render and update", async () => {
     setupMocks();
-    render(<Wrapper><Settings /></Wrapper>);
+    render(
+      <Wrapper>
+        <Settings />
+      </Wrapper>,
+    );
 
     await waitFor(() => {
       expect(screen.getByTestId("tab-security")).toBeDefined();
@@ -453,10 +557,14 @@ describe("Settings", () => {
       expect(screen.getByTestId("setting-brute-force-threshold")).toBeDefined();
     });
 
-    const bruteForce = screen.getByTestId("setting-brute-force-threshold") as HTMLInputElement;
+    const bruteForce = screen.getByTestId(
+      "setting-brute-force-threshold",
+    ) as HTMLInputElement;
     expect(bruteForce.value).toBe("10");
 
-    const kerberoasting = screen.getByTestId("setting-kerberoasting-threshold") as HTMLInputElement;
+    const kerberoasting = screen.getByTestId(
+      "setting-kerberoasting-threshold",
+    ) as HTMLInputElement;
     expect(kerberoasting.value).toBe("3");
 
     // Change values
@@ -469,7 +577,11 @@ describe("Settings", () => {
 
   it("excluded IPs and accounts fields work", async () => {
     setupMocks();
-    render(<Wrapper><Settings /></Wrapper>);
+    render(
+      <Wrapper>
+        <Settings />
+      </Wrapper>,
+    );
 
     await waitFor(() => {
       expect(screen.getByTestId("tab-security")).toBeDefined();
@@ -480,12 +592,18 @@ describe("Settings", () => {
       expect(screen.getByTestId("setting-excluded-ips")).toBeDefined();
     });
 
-    const ipsInput = screen.getByTestId("setting-excluded-ips") as HTMLInputElement;
+    const ipsInput = screen.getByTestId(
+      "setting-excluded-ips",
+    ) as HTMLInputElement;
     fireEvent.change(ipsInput, { target: { value: "10.0.0.1, 10.0.0.2" } });
     expect(ipsInput.value).toBe("10.0.0.1, 10.0.0.2");
 
-    const accountsInput = screen.getByTestId("setting-excluded-accounts") as HTMLInputElement;
-    fireEvent.change(accountsInput, { target: { value: "svc_backup, health_check" } });
+    const accountsInput = screen.getByTestId(
+      "setting-excluded-accounts",
+    ) as HTMLInputElement;
+    fireEvent.change(accountsInput, {
+      target: { value: "svc_backup, health_check" },
+    });
     expect(accountsInput.value).toBe("svc_backup, health_check");
   });
 
@@ -495,7 +613,11 @@ describe("Settings", () => {
 
   it("export format selector changes value", async () => {
     setupMocks();
-    render(<Wrapper><Settings /></Wrapper>);
+    render(
+      <Wrapper>
+        <Settings />
+      </Wrapper>,
+    );
 
     await waitFor(() => {
       expect(screen.getByTestId("tab-reports")).toBeDefined();
@@ -506,7 +628,9 @@ describe("Settings", () => {
       expect(screen.getByTestId("setting-export-format")).toBeDefined();
     });
 
-    const formatSelect = screen.getByTestId("setting-export-format") as HTMLSelectElement;
+    const formatSelect = screen.getByTestId(
+      "setting-export-format",
+    ) as HTMLSelectElement;
     expect(formatSelect.value).toBe("CSV");
 
     fireEvent.change(formatSelect, { target: { value: "PDF" } });
@@ -515,7 +639,11 @@ describe("Settings", () => {
 
   it("export path field and browse button render", async () => {
     setupMocks();
-    render(<Wrapper><Settings /></Wrapper>);
+    render(
+      <Wrapper>
+        <Settings />
+      </Wrapper>,
+    );
 
     await waitFor(() => {
       expect(screen.getByTestId("tab-reports")).toBeDefined();
@@ -551,7 +679,11 @@ describe("Settings", () => {
       return Promise.resolve(null);
     }) as typeof invoke);
 
-    render(<Wrapper><Settings /></Wrapper>);
+    render(
+      <Wrapper>
+        <Settings />
+      </Wrapper>,
+    );
 
     await waitFor(() => {
       expect(screen.getByTestId("tab-reports")).toBeDefined();
@@ -590,7 +722,11 @@ describe("Settings", () => {
       return Promise.resolve(null);
     }) as typeof invoke);
 
-    render(<Wrapper><Settings /></Wrapper>);
+    render(
+      <Wrapper>
+        <Settings />
+      </Wrapper>,
+    );
 
     await waitFor(() => {
       expect(screen.getByTestId("tab-reports")).toBeDefined();
@@ -618,7 +754,11 @@ describe("Settings", () => {
 
   it("reset defaults on connection tab clears domain and DC", async () => {
     setupMocks();
-    render(<Wrapper><Settings /></Wrapper>);
+    render(
+      <Wrapper>
+        <Settings />
+      </Wrapper>,
+    );
 
     await waitFor(() => {
       expect(screen.getByTestId("setting-domain-override")).toBeDefined();
@@ -634,14 +774,19 @@ describe("Settings", () => {
 
     await waitFor(() => {
       expect(
-        (screen.getByTestId("setting-domain-override") as HTMLInputElement).value,
+        (screen.getByTestId("setting-domain-override") as HTMLInputElement)
+          .value,
       ).toBe("");
     });
   });
 
   it("reset defaults on security tab resets retention to 365", async () => {
     setupMocks();
-    render(<Wrapper><Settings /></Wrapper>);
+    render(
+      <Wrapper>
+        <Settings />
+      </Wrapper>,
+    );
 
     await waitFor(() => {
       expect(screen.getByTestId("tab-security")).toBeDefined();
@@ -660,14 +805,19 @@ describe("Settings", () => {
 
     await waitFor(() => {
       expect(
-        (screen.getByTestId("setting-audit-retention") as HTMLInputElement).value,
+        (screen.getByTestId("setting-audit-retention") as HTMLInputElement)
+          .value,
       ).toBe("365");
     });
   });
 
   it("reset defaults on reports tab resets format to CSV", async () => {
     setupMocks();
-    render(<Wrapper><Settings /></Wrapper>);
+    render(
+      <Wrapper>
+        <Settings />
+      </Wrapper>,
+    );
 
     await waitFor(() => {
       expect(screen.getByTestId("tab-reports")).toBeDefined();
@@ -686,14 +836,19 @@ describe("Settings", () => {
 
     await waitFor(() => {
       expect(
-        (screen.getByTestId("setting-export-format") as HTMLSelectElement).value,
+        (screen.getByTestId("setting-export-format") as HTMLSelectElement)
+          .value,
       ).toBe("CSV");
     });
   });
 
   it("reset defaults on appearance tab resets to system theme", async () => {
     setupMocks();
-    render(<Wrapper><Settings /></Wrapper>);
+    render(
+      <Wrapper>
+        <Settings />
+      </Wrapper>,
+    );
 
     await waitFor(() => {
       expect(screen.getByTestId("tab-appearance")).toBeDefined();
@@ -720,7 +875,11 @@ describe("Settings", () => {
 
   it("save is blocked when validation fails", async () => {
     setupMocks();
-    render(<Wrapper><Settings /></Wrapper>);
+    render(
+      <Wrapper>
+        <Settings />
+      </Wrapper>,
+    );
 
     await waitFor(() => {
       expect(screen.getByTestId("tab-security")).toBeDefined();
@@ -739,11 +898,16 @@ describe("Settings", () => {
     fireEvent.click(screen.getByTestId("settings-save"));
 
     await waitFor(() => {
-      expect(screen.getByTestId("validation-audit-retention")).toBeInTheDocument();
+      expect(
+        screen.getByTestId("validation-audit-retention"),
+      ).toBeInTheDocument();
     });
 
     // set_app_settings should NOT have been called
-    expect(mockInvoke).not.toHaveBeenCalledWith("set_app_settings", expect.any(Object));
+    expect(mockInvoke).not.toHaveBeenCalledWith(
+      "set_app_settings",
+      expect.any(Object),
+    );
   });
 
   // -----------------------------------------------------------------------
@@ -752,7 +916,11 @@ describe("Settings", () => {
 
   it("dirty indicator shows after change and hides after save", async () => {
     setupMocks();
-    render(<Wrapper><Settings /></Wrapper>);
+    render(
+      <Wrapper>
+        <Settings />
+      </Wrapper>,
+    );
 
     await waitFor(() => {
       expect(screen.getByTestId("setting-domain-override")).toBeDefined();
@@ -795,7 +963,11 @@ describe("Settings", () => {
       return Promise.resolve(null);
     }) as typeof invoke);
 
-    render(<Wrapper><Settings /></Wrapper>);
+    render(
+      <Wrapper>
+        <Settings />
+      </Wrapper>,
+    );
 
     await waitFor(() => {
       expect(screen.getByTestId("setting-domain-override")).toBeDefined();
@@ -819,7 +991,11 @@ describe("Settings", () => {
 
   it("shows loading spinner while settings are being fetched", () => {
     mockInvoke.mockImplementation(() => new Promise(() => {})); // never resolves
-    render(<Wrapper><Settings /></Wrapper>);
+    render(
+      <Wrapper>
+        <Settings />
+      </Wrapper>,
+    );
     expect(screen.getByText("Loading settings...")).toBeInTheDocument();
   });
 });

@@ -33,7 +33,9 @@ describe("UpdateNotificationBar", () => {
       expect(mockInvoke).toHaveBeenCalledWith("check_for_update");
     });
 
-    expect(container.querySelector('[data-testid="update-notification-bar"]')).toBeNull();
+    expect(
+      container.querySelector('[data-testid="update-notification-bar"]'),
+    ).toBeNull();
   });
 
   it("renders notification bar when update available", async () => {
@@ -153,6 +155,8 @@ describe("UpdateNotificationBar", () => {
       expect(mockInvoke).toHaveBeenCalledWith("check_for_update");
     });
 
-    expect(container.querySelector('[data-testid="update-notification-bar"]')).toBeNull();
+    expect(
+      container.querySelector('[data-testid="update-notification-bar"]'),
+    ).toBeNull();
   });
 });

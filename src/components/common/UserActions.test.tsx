@@ -398,7 +398,12 @@ describe("UserActions", () => {
 
   it("shows parsed JSON error message when error is backend JSON", async () => {
     mockInvoke.mockRejectedValueOnce(
-      JSON.stringify({ kind: "permission_denied", message: "Access denied", user_message: "Access denied by policy", retryable: false }) as never,
+      JSON.stringify({
+        kind: "permission_denied",
+        message: "Access denied",
+        user_message: "Access denied by policy",
+        retryable: false,
+      }) as never,
     );
 
     render(

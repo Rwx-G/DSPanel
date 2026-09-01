@@ -24,7 +24,9 @@ export function ValidationSummary({
       <div className="flex items-center gap-2 text-body font-medium text-[var(--color-error)]">
         <AlertCircle size={16} />
         <span>
-          {t("components:validationSummary.error", { count: errorEntries.length })}
+          {t("components:validationSummary.error", {
+            count: errorEntries.length,
+          })}
         </span>
       </div>
       <ul className="mt-2 space-y-1 pl-6">

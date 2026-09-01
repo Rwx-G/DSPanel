@@ -7,7 +7,9 @@ export function About() {
   return (
     <div className="space-y-4 p-4" data-testid="about-page">
       <div className="space-y-2 text-center">
-        <h2 className="text-heading font-bold text-[var(--color-text-primary)]">DSPanel</h2>
+        <h2 className="text-heading font-bold text-[var(--color-text-primary)]">
+          DSPanel
+        </h2>
         <p className="text-body text-[var(--color-text-secondary)]">
           {t("subtitle")}
         </p>
@@ -21,11 +23,15 @@ export function About() {
 
       <div className="space-y-2 rounded-md bg-[var(--color-surface-hover)] p-3">
         <div className="flex justify-between text-caption">
-          <span className="text-[var(--color-text-secondary)]">{t("license")}</span>
+          <span className="text-[var(--color-text-secondary)]">
+            {t("license")}
+          </span>
           <span className="text-[var(--color-text-primary)]">Apache-2.0</span>
         </div>
         <div className="flex justify-between text-caption">
-          <span className="text-[var(--color-text-secondary)]">{t("author")}</span>
+          <span className="text-[var(--color-text-secondary)]">
+            {t("author")}
+          </span>
           <span className="text-[var(--color-text-primary)]">Rwx-G</span>
         </div>
       </div>

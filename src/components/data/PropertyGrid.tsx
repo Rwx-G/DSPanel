@@ -187,7 +187,8 @@ export function PropertyGrid({ groups, onEdit }: PropertyGridProps) {
                           ? CheckCircle
                           : null;
 
-                  const isEditable = item.editable && item.attributeName && onEdit;
+                  const isEditable =
+                    item.editable && item.attributeName && onEdit;
 
                   return (
                     <div

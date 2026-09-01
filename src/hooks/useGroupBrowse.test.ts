@@ -10,10 +10,7 @@ vi.mock("@tauri-apps/api/core", () => ({
 import { invoke } from "@tauri-apps/api/core";
 const mockInvoke = vi.mocked(invoke);
 
-function makeGroupEntry(
-  name: string,
-  description = "desc",
-): DirectoryEntry {
+function makeGroupEntry(name: string, description = "desc"): DirectoryEntry {
   return {
     distinguishedName: `CN=${name},OU=Groups,DC=example,DC=com`,
     samAccountName: name.toLowerCase(),

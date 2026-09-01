@@ -63,7 +63,11 @@ describe("MoveObjectDialog", () => {
 
   function renderDialog(targets = defaultTargets) {
     return render(
-      <MoveObjectDialog targets={targets} onClose={onClose} onMoved={onMoved} />,
+      <MoveObjectDialog
+        targets={targets}
+        onClose={onClose}
+        onMoved={onMoved}
+      />,
       { wrapper: Wrapper },
     );
   }
@@ -134,8 +138,16 @@ describe("MoveObjectDialog", () => {
 
   it("calls bulk_move_objects for multiple targets", async () => {
     mockInvoke.mockResolvedValueOnce([
-      { objectDn: "CN=John Doe,OU=Users,DC=example,DC=com", success: true, error: null },
-      { objectDn: "CN=Jane,OU=Users,DC=example,DC=com", success: true, error: null },
+      {
+        objectDn: "CN=John Doe,OU=Users,DC=example,DC=com",
+        success: true,
+        error: null,
+      },
+      {
+        objectDn: "CN=Jane,OU=Users,DC=example,DC=com",
+        success: true,
+        error: null,
+      },
     ]);
     const targets = [
       ...defaultTargets,

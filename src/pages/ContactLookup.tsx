@@ -24,13 +24,7 @@ import { useDialog } from "@/contexts/DialogContext";
 import { useBrowse } from "@/hooks/useBrowse";
 import { useModifyAttribute } from "@/hooks/useModifyAttribute";
 import { type ContactInfo, mapEntryToContact } from "@/types/contact";
-import {
-  Contact,
-  AlertCircle,
-  UserX,
-  Trash2,
-  FolderInput,
-} from "lucide-react";
+import { Contact, AlertCircle, UserX, Trash2, FolderInput } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 function useContactBrowse() {
@@ -102,7 +96,14 @@ export function ContactLookup() {
         handleError(err, "deleting contact");
       }
     },
-    [selectedContact, setSelectedContact, handleError, notify, refresh, showConfirmation],
+    [
+      selectedContact,
+      setSelectedContact,
+      handleError,
+      notify,
+      refresh,
+      showConfirmation,
+    ],
   );
 
   const handleEdit = useCallback(
@@ -116,7 +117,10 @@ export function ContactLookup() {
     if (!selectedContact) return;
     const confirmed = await showConfirmation(
       t("common:save"),
-      t("common:pendingChanges", { count: pendingChanges.length, name: selectedContact.displayName || selectedContact.dn }),
+      t("common:pendingChanges", {
+        count: pendingChanges.length,
+        name: selectedContact.displayName || selectedContact.dn,
+      }),
       pendingChanges.map((c) => `${c.attributeName}: ${c.newValue}`).join("\n"),
     );
     if (!confirmed) return;
@@ -125,7 +129,14 @@ export function ContactLookup() {
       notify("Contact updated successfully", "success");
       refresh();
     }
-  }, [selectedContact, pendingChanges, showConfirmation, submitChanges, notify, refresh]);
+  }, [
+    selectedContact,
+    pendingChanges,
+    showConfirmation,
+    submitChanges,
+    notify,
+    refresh,
+  ]);
 
   const handleContextMenu = useCallback(
     (e: React.MouseEvent, contact: ContactInfo) => {
@@ -160,26 +171,71 @@ export function ContactLookup() {
         {
           category: t("common:identity"),
           items: [
-            { label: t("common:displayName"), value: contact.displayName, editable: isEditable, attributeName: "displayName" },
-            { label: t("common:firstName"), value: contact.firstName, editable: isEditable, attributeName: "givenName" },
-            { label: t("common:lastName"), value: contact.lastName, editable: isEditable, attributeName: "sn" },
+            {
+              label: t("common:displayName"),
+              value: contact.displayName,
+              editable: isEditable,
+              attributeName: "displayName",
+            },
+            {
+              label: t("common:firstName"),
+              value: contact.firstName,
+              editable: isEditable,
+              attributeName: "givenName",
+            },
+            {
+              label: t("common:lastName"),
+              value: contact.lastName,
+              editable: isEditable,
+              attributeName: "sn",
+            },
             { label: t("common:distinguishedName"), value: contact.dn },
           ],
         },
         {
           category: t("contactInfo"),
           items: [
-            { label: t("common:email"), value: contact.email, editable: isEditable, attributeName: "mail" },
-            { label: t("common:phone"), value: contact.phone, editable: isEditable, attributeName: "telephoneNumber" },
-            { label: t("common:mobile"), value: contact.mobile, editable: isEditable, attributeName: "mobile" },
+            {
+              label: t("common:email"),
+              value: contact.email,
+              editable: isEditable,
+              attributeName: "mail",
+            },
+            {
+              label: t("common:phone"),
+              value: contact.phone,
+              editable: isEditable,
+              attributeName: "telephoneNumber",
+            },
+            {
+              label: t("common:mobile"),
+              value: contact.mobile,
+              editable: isEditable,
+              attributeName: "mobile",
+            },
           ],
         },
         {
           category: t("organization"),
           items: [
-            { label: t("common:company"), value: contact.company, editable: isEditable, attributeName: "company" },
-            { label: t("common:department"), value: contact.department, editable: isEditable, attributeName: "department" },
-            { label: t("common:description"), value: contact.description, editable: isEditable, attributeName: "description" },
+            {
+              label: t("common:company"),
+              value: contact.company,
+              editable: isEditable,
+              attributeName: "company",
+            },
+            {
+              label: t("common:department"),
+              value: contact.department,
+              editable: isEditable,
+              attributeName: "department",
+            },
+            {
+              label: t("common:description"),
+              value: contact.description,
+              editable: isEditable,
+              attributeName: "description",
+            },
           ],
         },
       ];
@@ -205,7 +261,9 @@ export function ContactLookup() {
         />
         <div className="min-w-0 flex-1">
           <p className="truncate text-body font-medium text-[var(--color-text-primary)]">
-            {contact.displayName || `${contact.firstName} ${contact.lastName}`.trim() || contact.dn}
+            {contact.displayName ||
+              `${contact.firstName} ${contact.lastName}`.trim() ||
+              contact.dn}
           </p>
           <p className="truncate text-caption text-[var(--color-text-secondary)]">
             {contact.email || contact.company || t("noEmail")}
@@ -321,7 +379,10 @@ export function ContactLookup() {
                     {canEdit && (
                       <button
                         className="btn btn-sm flex items-center gap-1"
-                        style={{ color: "var(--color-error)", borderColor: "var(--color-error)" }}
+                        style={{
+                          color: "var(--color-error)",
+                          borderColor: "var(--color-error)",
+                        }}
                         onClick={() => handleDelete(selectedContact)}
                         data-testid="contact-delete-btn"
                       >
@@ -338,7 +399,9 @@ export function ContactLookup() {
                           data-testid="pending-changes-bar"
                         >
                           <span className="text-caption text-[var(--color-text-primary)]">
-                            {t("common:change", { count: pendingChanges.length })}
+                            {t("common:change", {
+                              count: pendingChanges.length,
+                            })}
                             {pendingChanges.map((c) => (
                               <span
                                 key={c.attributeName}

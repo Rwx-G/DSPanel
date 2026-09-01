@@ -201,9 +201,9 @@ describe("GroupManagement", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("group-management-empty")).toBeInTheDocument();
-      expect(
-        screen.getByTestId("empty-state-title"),
-      ).toHaveTextContent("No groups found");
+      expect(screen.getByTestId("empty-state-title")).toHaveTextContent(
+        "No groups found",
+      );
     });
   });
 
@@ -221,7 +221,9 @@ describe("GroupManagement", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("group-detail")).toBeInTheDocument();
-      expect(screen.getByTestId("group-detail").querySelector("h2")).toHaveTextContent("Developers");
+      expect(
+        screen.getByTestId("group-detail").querySelector("h2"),
+      ).toHaveTextContent("Developers");
     });
   });
 
@@ -297,8 +299,12 @@ describe("GroupManagement", () => {
     await waitFor(() => {
       expect(screen.getByTestId("group-detail")).toBeInTheDocument();
       // Scope and category are shown in the group detail (badge + PropertyGrid)
-      expect(screen.getAllByText("Domain Local").length).toBeGreaterThanOrEqual(1);
-      expect(screen.getAllByText("Distribution").length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText("Domain Local").length).toBeGreaterThanOrEqual(
+        1,
+      );
+      expect(screen.getAllByText("Distribution").length).toBeGreaterThanOrEqual(
+        1,
+      );
     });
   });
 
@@ -366,7 +372,9 @@ describe("GroupManagement", () => {
 
       await waitFor(() => {
         expect(screen.getByTestId("group-detail")).toBeInTheDocument();
-        expect(screen.getByTestId("group-detail").querySelector("h2")).toHaveTextContent("Finance-Analysts");
+        expect(
+          screen.getByTestId("group-detail").querySelector("h2"),
+        ).toHaveTextContent("Finance-Analysts");
       });
       unmount();
     });
@@ -384,8 +392,12 @@ describe("GroupManagement", () => {
         },
       };
 
-      mockInvoke.mockImplementation(((cmd: string, _args?: Record<string, unknown>) => {
-        if (cmd === "browse_groups") return Promise.resolve(makeBrowseResult(browseEntries));
+      mockInvoke.mockImplementation(((
+        cmd: string,
+        _args?: Record<string, unknown>,
+      ) => {
+        if (cmd === "browse_groups")
+          return Promise.resolve(makeBrowseResult(browseEntries));
         if (cmd === "search_groups") return Promise.resolve([searchEntry]);
         if (cmd === "get_group_members") return Promise.resolve([]);
         if (cmd === "get_permission_level") return Promise.resolve("ReadOnly");
@@ -402,12 +414,16 @@ describe("GroupManagement", () => {
       );
 
       await waitFor(() => {
-        expect(mockInvoke).toHaveBeenCalledWith("search_groups", { query: "Remote-Group" });
+        expect(mockInvoke).toHaveBeenCalledWith("search_groups", {
+          query: "Remote-Group",
+        });
       });
 
       await waitFor(() => {
         expect(screen.getByTestId("group-detail")).toBeInTheDocument();
-        expect(screen.getByTestId("group-detail").querySelector("h2")).toHaveTextContent("Remote-Group");
+        expect(
+          screen.getByTestId("group-detail").querySelector("h2"),
+        ).toHaveTextContent("Remote-Group");
       });
     });
 
@@ -427,7 +443,9 @@ describe("GroupManagement", () => {
       render(<GroupManagement />, { wrapper: TestProviders });
 
       await waitFor(() => {
-        expect(screen.getByTestId("group-result-Developers")).toBeInTheDocument();
+        expect(
+          screen.getByTestId("group-result-Developers"),
+        ).toBeInTheDocument();
       });
 
       fireEvent.click(screen.getByTestId("group-result-Developers"));
@@ -452,8 +470,12 @@ describe("GroupManagement", () => {
       await waitFor(() => {
         expect(screen.getByTestId("group-results-list")).toBeInTheDocument();
         // No group selected - should show placeholder
-        expect(screen.getByText("Select a group to view details")).toBeInTheDocument();
-        expect(screen.queryByTestId("group-members-section")).not.toBeInTheDocument();
+        expect(
+          screen.getByText("Select a group to view details"),
+        ).toBeInTheDocument();
+        expect(
+          screen.queryByTestId("group-members-section"),
+        ).not.toBeInTheDocument();
       });
     });
   });
@@ -494,7 +516,9 @@ describe("GroupManagement", () => {
 
       await waitFor(() => {
         expect(screen.getByTestId("group-result-SecGroup")).toBeInTheDocument();
-        expect(screen.getByTestId("group-result-DistGroup")).toBeInTheDocument();
+        expect(
+          screen.getByTestId("group-result-DistGroup"),
+        ).toBeInTheDocument();
       });
 
       // Click Security filter
@@ -502,7 +526,9 @@ describe("GroupManagement", () => {
 
       await waitFor(() => {
         expect(screen.getByTestId("group-result-SecGroup")).toBeInTheDocument();
-        expect(screen.queryByTestId("group-result-DistGroup")).not.toBeInTheDocument();
+        expect(
+          screen.queryByTestId("group-result-DistGroup"),
+        ).not.toBeInTheDocument();
       });
     });
 
@@ -523,15 +549,17 @@ describe("GroupManagement", () => {
       fireEvent.click(screen.getByText("Distribution"));
 
       await waitFor(() => {
-        expect(screen.queryByTestId("group-result-SecGroup")).not.toBeInTheDocument();
-        expect(screen.getByTestId("group-result-DistGroup")).toBeInTheDocument();
+        expect(
+          screen.queryByTestId("group-result-SecGroup"),
+        ).not.toBeInTheDocument();
+        expect(
+          screen.getByTestId("group-result-DistGroup"),
+        ).toBeInTheDocument();
       });
     });
 
     it("shows empty state with category-specific message when filter matches nothing", async () => {
-      const entries = [
-        makeGroupEntry("SecGroup", "Global", "Security"),
-      ];
+      const entries = [makeGroupEntry("SecGroup", "Global", "Security")];
       mockBrowseWith(entries);
 
       render(<GroupManagement />, { wrapper: TestProviders });
@@ -543,27 +571,37 @@ describe("GroupManagement", () => {
       fireEvent.click(screen.getByText("Distribution"));
 
       await waitFor(() => {
-        expect(screen.getByTestId("group-management-empty")).toBeInTheDocument();
-        expect(screen.getByText(/No Distribution groups found/)).toBeInTheDocument();
+        expect(
+          screen.getByTestId("group-management-empty"),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByText(/No Distribution groups found/),
+        ).toBeInTheDocument();
       });
     });
   });
 
   describe("GroupBadge tooltip", () => {
     it("shows tooltip on mouse enter with scope and category info", async () => {
-      const entries = [makeGroupEntry("TestGroup", "Universal", "Distribution", 5)];
+      const entries = [
+        makeGroupEntry("TestGroup", "Universal", "Distribution", 5),
+      ];
       mockBrowseWith(entries);
 
       render(<GroupManagement />, { wrapper: TestProviders });
 
       await waitFor(() => {
-        expect(screen.getByTestId("group-result-TestGroup")).toBeInTheDocument();
+        expect(
+          screen.getByTestId("group-result-TestGroup"),
+        ).toBeInTheDocument();
       });
 
       // The badge inside the result item - find the badge container with scope abbreviation "U"
       const groupItem = screen.getByTestId("group-result-TestGroup");
       // Find the badge container with aria-describedby logic
-      const badgeContainer = groupItem.querySelector('[class*="inline-flex shrink-0"]');
+      const badgeContainer = groupItem.querySelector(
+        '[class*="inline-flex shrink-0"]',
+      );
       expect(badgeContainer).not.toBeNull();
 
       fireEvent.mouseEnter(badgeContainer!);
@@ -580,7 +618,9 @@ describe("GroupManagement", () => {
       fireEvent.mouseLeave(badgeContainer!);
 
       await waitFor(() => {
-        expect(document.querySelector('[role="tooltip"]')).not.toBeInTheDocument();
+        expect(
+          document.querySelector('[role="tooltip"]'),
+        ).not.toBeInTheDocument();
       });
     });
 
@@ -603,11 +643,15 @@ describe("GroupManagement", () => {
       render(<GroupManagement />, { wrapper: TestProviders });
 
       await waitFor(() => {
-        expect(screen.getByTestId("group-result-SingleMember")).toBeInTheDocument();
+        expect(
+          screen.getByTestId("group-result-SingleMember"),
+        ).toBeInTheDocument();
       });
 
       const groupItem = screen.getByTestId("group-result-SingleMember");
-      const badgeContainer = groupItem.querySelector('[class*="inline-flex shrink-0"]');
+      const badgeContainer = groupItem.querySelector(
+        '[class*="inline-flex shrink-0"]',
+      );
       fireEvent.mouseEnter(badgeContainer!);
 
       await waitFor(() => {
@@ -627,7 +671,9 @@ describe("GroupManagement", () => {
       render(<GroupManagement />, { wrapper: TestProviders });
 
       await waitFor(() => {
-        expect(screen.getByTestId("group-result-Developers")).toBeInTheDocument();
+        expect(
+          screen.getByTestId("group-result-Developers"),
+        ).toBeInTheDocument();
       });
 
       fireEvent.contextMenu(screen.getByTestId("group-result-Developers"));
@@ -644,7 +690,9 @@ describe("GroupManagement", () => {
       render(<GroupManagement />, { wrapper: TestProviders });
 
       await waitFor(() => {
-        expect(screen.getByTestId("group-result-Developers")).toBeInTheDocument();
+        expect(
+          screen.getByTestId("group-result-Developers"),
+        ).toBeInTheDocument();
       });
 
       fireEvent.contextMenu(screen.getByTestId("group-result-Developers"));
@@ -674,7 +722,9 @@ describe("GroupManagement", () => {
       render(<GroupManagement />, { wrapper: TestProviders });
 
       await waitFor(() => {
-        expect(screen.getByTestId("group-result-Developers")).toBeInTheDocument();
+        expect(
+          screen.getByTestId("group-result-Developers"),
+        ).toBeInTheDocument();
       });
 
       fireEvent.click(screen.getByTestId("group-result-Developers"));
@@ -941,5 +991,4 @@ describe("GroupManagement", () => {
       });
     });
   });
-
 });

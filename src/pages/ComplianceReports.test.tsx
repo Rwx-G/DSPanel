@@ -16,9 +16,27 @@ const mockScan = {
   globalScore: 55,
   totalFindings: 150,
   frameworkScores: [
-    { standard: "GDPR", score: 55, totalChecks: 5, checksWithFindings: 3, controlRefs: ["Art. 32"] },
-    { standard: "HIPAA", score: 65, totalChecks: 5, checksWithFindings: 2, controlRefs: ["164.312"] },
-    { standard: "PCI-DSS v4.0", score: 40, totalChecks: 6, checksWithFindings: 4, controlRefs: ["Req. 7"] },
+    {
+      standard: "GDPR",
+      score: 55,
+      totalChecks: 5,
+      checksWithFindings: 3,
+      controlRefs: ["Art. 32"],
+    },
+    {
+      standard: "HIPAA",
+      score: 65,
+      totalChecks: 5,
+      checksWithFindings: 2,
+      controlRefs: ["164.312"],
+    },
+    {
+      standard: "PCI-DSS v4.0",
+      score: 40,
+      totalChecks: 6,
+      checksWithFindings: 4,
+      controlRefs: ["Req. 7"],
+    },
   ],
   checks: [
     {
@@ -28,7 +46,10 @@ const mockScan = {
       severity: "High",
       findingCount: 12,
       headers: ["Username", "Display Name"],
-      rows: [["admin", "Administrator"], ["svc_sql", "SQL Service"]],
+      rows: [
+        ["admin", "Administrator"],
+        ["svc_sql", "SQL Service"],
+      ],
       frameworks: [
         { standard: "GDPR", controlRef: "Art. 32(2)" },
         { standard: "HIPAA", controlRef: "164.312(a)(1)" },
@@ -47,7 +68,8 @@ const mockScan = {
         { standard: "GDPR", controlRef: "Art. 32(1)(b)" },
         { standard: "PCI-DSS v4.0", controlRef: "Req. 8.3.1" },
       ],
-      remediation: "Get-ADUser -Filter {PasswordNotRequired -eq $true} | Set-ADUser -PasswordNotRequired $false",
+      remediation:
+        "Get-ADUser -Filter {PasswordNotRequired -eq $true} | Set-ADUser -PasswordNotRequired $false",
     },
     {
       checkId: "reversible_encryption",
@@ -68,7 +90,8 @@ describe("ComplianceReports", () => {
     vi.clearAllMocks();
     mockInvoke.mockImplementation((cmd) => {
       if (cmd === "run_compliance_scan") return Promise.resolve(mockScan);
-      if (cmd === "export_compliance_framework_report") return Promise.resolve("/tmp/report.html");
+      if (cmd === "export_compliance_framework_report")
+        return Promise.resolve("/tmp/report.html");
       if (cmd === "export_table") return Promise.resolve(null);
       return Promise.resolve(null);
     });
@@ -113,7 +136,9 @@ describe("ComplianceReports", () => {
       expect(screen.getByTestId("checks-list")).toBeInTheDocument();
     });
     expect(screen.getByText("Privileged Accounts")).toBeInTheDocument();
-    expect(screen.getByText("Password Not Required (PASSWD_NOTREQD)")).toBeInTheDocument();
+    expect(
+      screen.getByText("Password Not Required (PASSWD_NOTREQD)"),
+    ).toBeInTheDocument();
   });
 
   it("shows finding count and severity on checks", async () => {
@@ -141,13 +166,17 @@ describe("ComplianceReports", () => {
     fireEvent.click(screen.getByTestId("scan-button"));
 
     await waitFor(() => {
-      expect(screen.getByTestId("check-privileged_accounts")).toBeInTheDocument();
+      expect(
+        screen.getByTestId("check-privileged_accounts"),
+      ).toBeInTheDocument();
     });
 
     fireEvent.click(screen.getByText("Privileged Accounts"));
 
     await waitFor(() => {
-      expect(screen.getByText("Accounts with admin privileges.")).toBeInTheDocument();
+      expect(
+        screen.getByText("Accounts with admin privileges."),
+      ).toBeInTheDocument();
       expect(screen.getByText("Art. 32(2)")).toBeInTheDocument();
       expect(screen.getByText("admin")).toBeInTheDocument();
     });

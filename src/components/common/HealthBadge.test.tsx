@@ -80,9 +80,9 @@ describe("HealthBadge", () => {
     fireEvent.mouseEnter(screen.getByTestId("health-badge"));
     await waitFor(() => {
       expect(screen.getByTestId("health-tooltip")).toBeInTheDocument();
-      expect(screen.getByTestId("health-flag-Inactive30Days")).toHaveTextContent(
-        "Inactive 30+ Days",
-      );
+      expect(
+        screen.getByTestId("health-flag-Inactive30Days"),
+      ).toHaveTextContent("Inactive 30+ Days");
     });
   });
 

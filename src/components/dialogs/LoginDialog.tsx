@@ -18,17 +18,16 @@ export function LoginDialog({ onSuccess }: LoginDialogProps) {
   const [bindDn, setBindDn] = useState("");
 
   useEffect(() => {
-    invoke<[string, string]>("get_bind_info").then(([s, d]) => {
-      setServer(s);
-      setBindDn(d);
-    }).catch(() => {});
+    invoke<[string, string]>("get_bind_info")
+      .then(([s, d]) => {
+        setServer(s);
+        setBindDn(d);
+      })
+      .catch(() => {});
   }, []);
 
   // Extract username from bind DN for display
-  const displayUser = bindDn
-    .split(",")[0]
-    ?.replace("CN=", "")
-    ?? bindDn;
+  const displayUser = bindDn.split(",")[0]?.replace("CN=", "") ?? bindDn;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,14 +68,28 @@ export function LoginDialog({ onSuccess }: LoginDialogProps) {
         {/* Connection info */}
         <div className="mb-5 rounded-md border border-[var(--color-border-subtle)] bg-[var(--color-surface-bg)] px-3 py-2.5 space-y-1.5">
           <div className="flex items-center gap-2 text-caption">
-            <Server size={13} className="shrink-0 text-[var(--color-text-secondary)]" />
-            <span className="font-medium text-[var(--color-text-secondary)]">{t("loginServer")}</span>
-            <span className="ml-auto truncate text-[var(--color-text-primary)]">{server || "-"}</span>
+            <Server
+              size={13}
+              className="shrink-0 text-[var(--color-text-secondary)]"
+            />
+            <span className="font-medium text-[var(--color-text-secondary)]">
+              {t("loginServer")}
+            </span>
+            <span className="ml-auto truncate text-[var(--color-text-primary)]">
+              {server || "-"}
+            </span>
           </div>
           <div className="flex items-center gap-2 text-caption">
-            <User size={13} className="shrink-0 text-[var(--color-text-secondary)]" />
-            <span className="font-medium text-[var(--color-text-secondary)]">{t("loginAccount")}</span>
-            <span className="ml-auto truncate text-[var(--color-text-primary)]">{displayUser || "-"}</span>
+            <User
+              size={13}
+              className="shrink-0 text-[var(--color-text-secondary)]"
+            />
+            <span className="font-medium text-[var(--color-text-secondary)]">
+              {t("loginAccount")}
+            </span>
+            <span className="ml-auto truncate text-[var(--color-text-primary)]">
+              {displayUser || "-"}
+            </span>
           </div>
         </div>
 

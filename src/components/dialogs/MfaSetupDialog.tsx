@@ -50,9 +50,7 @@ export function MfaSetupDialog({ onComplete, onCancel }: MfaSetupDialogProps) {
       if (valid) {
         setStep("backup");
       } else {
-        setVerifyError(
-          t("dialogs:mfaSetup.invalidCodeRetry"),
-        );
+        setVerifyError(t("dialogs:mfaSetup.invalidCodeRetry"));
         setVerifyCode("");
       }
     } catch (e) {
@@ -100,7 +98,11 @@ export function MfaSetupDialog({ onComplete, onCancel }: MfaSetupDialogProps) {
             disabled={loading}
             data-testid="setup-begin"
           >
-            {loading ? <LoadingSpinner size={16} /> : t("dialogs:mfaSetup.beginSetup")}
+            {loading ? (
+              <LoadingSpinner size={16} />
+            ) : (
+              t("dialogs:mfaSetup.beginSetup")
+            )}
           </button>
         </div>
       </DialogShell>

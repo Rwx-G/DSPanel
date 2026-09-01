@@ -64,9 +64,9 @@ describe("i18n", () => {
   });
 
   it("handles interpolation", () => {
-    expect(
-      i18n.t("userDetail:deleteConfirmation", { name: "John Doe" }),
-    ).toBe("Are you sure you want to delete John Doe?");
+    expect(i18n.t("userDetail:deleteConfirmation", { name: "John Doe" })).toBe(
+      "Are you sure you want to delete John Doe?",
+    );
   });
 
   it("handles pluralization", () => {

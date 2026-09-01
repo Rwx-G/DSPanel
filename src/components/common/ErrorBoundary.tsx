@@ -48,36 +48,39 @@ export class ErrorBoundary extends Component<
       return (
         <Translation ns={["components", "common"]}>
           {(t) => (
-        <div
-          className="flex h-full flex-col items-center justify-center gap-4 p-8"
-          data-testid="error-boundary-fallback"
-        >
-          <AlertCircle size={48} className="text-[var(--color-error)]" />
-          <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">
-            {t("components:errorBoundary.title")}
-          </h2>
-          <p className="max-w-md text-center text-body text-[var(--color-text-secondary)]">
-            {t("components:errorBoundary.description")}
-          </p>
-          {this.state.error && (
-            <details className="w-full max-w-lg" data-testid="error-boundary-details">
-              <summary className="cursor-pointer text-caption text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]">
-                {t("components:errorBoundary.showDetails")}
-              </summary>
-              <pre className="mt-2 max-h-48 overflow-auto rounded-md bg-[var(--color-surface-bg)] p-3 text-caption text-[var(--color-error)] font-mono whitespace-pre-wrap break-all">
-                {this.state.error.message}
-                {this.state.error.stack && `\n\n${this.state.error.stack}`}
-              </pre>
-            </details>
-          )}
-          <button
-            className="btn btn-primary"
-            onClick={this.handleRetry}
-            data-testid="error-boundary-retry"
-          >
-            {t("components:errorBoundary.tryAgain")}
-          </button>
-        </div>
+            <div
+              className="flex h-full flex-col items-center justify-center gap-4 p-8"
+              data-testid="error-boundary-fallback"
+            >
+              <AlertCircle size={48} className="text-[var(--color-error)]" />
+              <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">
+                {t("components:errorBoundary.title")}
+              </h2>
+              <p className="max-w-md text-center text-body text-[var(--color-text-secondary)]">
+                {t("components:errorBoundary.description")}
+              </p>
+              {this.state.error && (
+                <details
+                  className="w-full max-w-lg"
+                  data-testid="error-boundary-details"
+                >
+                  <summary className="cursor-pointer text-caption text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]">
+                    {t("components:errorBoundary.showDetails")}
+                  </summary>
+                  <pre className="mt-2 max-h-48 overflow-auto rounded-md bg-[var(--color-surface-bg)] p-3 text-caption text-[var(--color-error)] font-mono whitespace-pre-wrap break-all">
+                    {this.state.error.message}
+                    {this.state.error.stack && `\n\n${this.state.error.stack}`}
+                  </pre>
+                </details>
+              )}
+              <button
+                className="btn btn-primary"
+                onClick={this.handleRetry}
+                data-testid="error-boundary-retry"
+              >
+                {t("components:errorBoundary.tryAgain")}
+              </button>
+            </div>
           )}
         </Translation>
       );

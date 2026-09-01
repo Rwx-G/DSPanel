@@ -11,10 +11,10 @@ name = "dspanel_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
-tauri-build = { version = "2", features = [] }
+tauri-build = { version = "2.6.2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2.11.2", features = [] }
 tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -37,18 +37,18 @@ hickory-resolver = "0.26"
 hmac = "0.13"
 data-encoding = "2"
 qrcode = "0.14"
-base64 = "0.22"
+base64 = "0.23"
 uuid = { version = "1", features = ["v4"] }
 rfd = "0.17"
-quick-xml = "0.39"
+quick-xml = "0.42"
 csv = "1"
-printpdf = { version = "0.9", default-features = false }
-rust_xlsxwriter = "0.94"
-rusqlite = { version = "0.39", features = ["bundled"] }
+printpdf = { version = "0.12", default-features = false }
+rust_xlsxwriter = "0.99"
+rusqlite = { version = "0.40", features = ["bundled"] }
 zeroize = "1"
 notify = { version = "8", features = ["macos_fsevent"] }
 notify-debouncer-mini = "0.7"
-keyring = { version = "3", features = ["sync-secret-service"] }
+keyring = "4"
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.62", features = [
@@ -69,4 +69,4 @@ demo = []
 [dev-dependencies]
 tempfile = "3"
 mockito = "1"
-serial_test = "3"
+serial_test = "4"

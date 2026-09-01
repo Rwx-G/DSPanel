@@ -115,9 +115,7 @@ describe("extractForeignSidFromDn", () => {
 
   it("does not match the FSP container DN itself", () => {
     expect(
-      extractForeignSidFromDn(
-        "CN=ForeignSecurityPrincipals,DC=corp,DC=local",
-      ),
+      extractForeignSidFromDn("CN=ForeignSecurityPrincipals,DC=corp,DC=local"),
     ).toBeNull();
   });
 

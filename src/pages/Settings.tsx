@@ -14,11 +14,7 @@ import { GraphSettings } from "@/components/common/GraphSettings";
 import { PresetSettings } from "@/components/common/PresetSettings";
 import { PermissionMappingSettings } from "@/components/common/PermissionMappingSettings";
 import { useTheme, type ThemeMode } from "@/hooks/useTheme";
-import {
-  changeLanguage,
-  supportedLanguages,
-  type LanguageCode,
-} from "../i18n";
+import { changeLanguage, supportedLanguages, type LanguageCode } from "../i18n";
 import { useNavigation } from "@/contexts/NavigationContext";
 import { useNotifications } from "@/contexts/NotificationContext";
 import { OUPicker } from "@/components/form/OUPicker";
@@ -88,9 +84,15 @@ export function Settings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
-  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [validationErrors, setValidationErrors] = useState<
+    Record<string, string>
+  >({});
   const { notify } = useNotifications();
-  const { nodes: ouNodes, loading: ouLoading, error: ouError } = useOUTree({ silent: true });
+  const {
+    nodes: ouNodes,
+    loading: ouLoading,
+    error: ouError,
+  } = useOUTree({ silent: true });
 
   const { applyTheme } = useTheme();
 
@@ -120,19 +122,21 @@ export function Settings() {
     <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
       setSettings((prev) => ({ ...prev, [key]: value }));
       setDirty(true);
-
     },
     [],
   );
 
   const updateNested = useCallback(
-    (section: "connection" | "reports" | "appearance" | "update", key: string, value: string | null) => {
+    (
+      section: "connection" | "reports" | "appearance" | "update",
+      key: string,
+      value: string | null,
+    ) => {
       setSettings((prev) => ({
         ...prev,
         [section]: { ...(prev[section] ?? {}), [key]: value || null },
       }));
       setDirty(true);
-
     },
     [],
   );
@@ -146,9 +150,12 @@ export function Settings() {
     const exportPath = settings.reports?.defaultExportPath;
     if (exportPath) {
       try {
-        const valid = await invoke<boolean>("test_preset_path", { path: exportPath });
+        const valid = await invoke<boolean>("test_preset_path", {
+          path: exportPath,
+        });
         if (!valid) {
-          errors.defaultExportPath = "Directory does not exist or is not accessible";
+          errors.defaultExportPath =
+            "Directory does not exist or is not accessible";
         }
       } catch {
         errors.defaultExportPath = "Could not verify directory";
@@ -203,7 +210,8 @@ export function Settings() {
         }));
         // Apply system theme directly
         {
-          const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches
+          const systemTheme = window.matchMedia("(prefers-color-scheme: dark)")
+            .matches
             ? "dark"
             : "light";
           applyTheme(systemTheme as ThemeMode);
@@ -218,7 +226,8 @@ export function Settings() {
     (value: string) => {
       updateNested("appearance", "theme", value);
       if (value === "system") {
-        const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches
+        const systemTheme = window.matchMedia("(prefers-color-scheme: dark)")
+          .matches
           ? "dark"
           : "light";
         applyTheme(systemTheme as ThemeMode);
@@ -257,7 +266,9 @@ export function Settings() {
       {/* Header */}
       <div className="flex items-center gap-2">
         <SettingsIcon size={20} className="text-[var(--color-text-primary)]" />
-        <h1 className="text-heading font-semibold text-[var(--color-text-primary)]">{t("pageTitle")}</h1>
+        <h1 className="text-heading font-semibold text-[var(--color-text-primary)]">
+          {t("pageTitle")}
+        </h1>
       </div>
 
       {/* Tabs */}
@@ -299,7 +310,13 @@ export function Settings() {
                   <input
                     type="text"
                     value={settings.connection?.domainOverride ?? ""}
-                    onChange={(e) => updateNested("connection", "domainOverride", e.target.value)}
+                    onChange={(e) =>
+                      updateNested(
+                        "connection",
+                        "domainOverride",
+                        e.target.value,
+                      )
+                    }
                     placeholder={t("domainOverrideHint")}
                     className="w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5 text-body text-[var(--color-text-primary)] placeholder-[var(--color-text-secondary)] focus:border-[var(--color-primary)] focus:outline-none"
                     data-testid="setting-domain-override"
@@ -312,7 +329,9 @@ export function Settings() {
                   <input
                     type="text"
                     value={settings.connection?.preferredDc ?? ""}
-                    onChange={(e) => updateNested("connection", "preferredDc", e.target.value)}
+                    onChange={(e) =>
+                      updateNested("connection", "preferredDc", e.target.value)
+                    }
                     placeholder={t("preferredDcHint")}
                     className="w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5 text-body text-[var(--color-text-primary)] placeholder-[var(--color-text-secondary)] focus:border-[var(--color-primary)] focus:outline-none"
                     data-testid="setting-preferred-dc"
@@ -331,7 +350,9 @@ export function Settings() {
                 </label>
                 <select
                   value={settings.update?.checkFrequency ?? "startup"}
-                  onChange={(e) => updateNested("update", "checkFrequency", e.target.value)}
+                  onChange={(e) =>
+                    updateNested("update", "checkFrequency", e.target.value)
+                  }
                   className="w-48 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5 text-body text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
                   data-testid="setting-update-frequency"
                 >
@@ -401,7 +422,10 @@ export function Settings() {
                 </label>
                 {settings.disabledOu && (
                   <div className="mb-2 flex items-center gap-2">
-                    <span className="text-caption text-[var(--color-text-primary)]" data-testid="setting-disabled-ou-value">
+                    <span
+                      className="text-caption text-[var(--color-text-primary)]"
+                      data-testid="setting-disabled-ou-value"
+                    >
                       {settings.disabledOu}
                     </span>
                     <button
@@ -413,7 +437,10 @@ export function Settings() {
                     </button>
                   </div>
                 )}
-                <div className="max-h-48 overflow-y-auto rounded-md border border-[var(--color-border-default)]" data-testid="setting-disabled-ou">
+                <div
+                  className="max-h-48 overflow-y-auto rounded-md border border-[var(--color-border-default)]"
+                  data-testid="setting-disabled-ou"
+                >
                   <OUPicker
                     nodes={ouNodes}
                     selectedOU={settings.disabledOu ?? undefined}
@@ -437,19 +464,27 @@ export function Settings() {
                 {t("riskWeightsHint")}
               </p>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {([
-                  ["privilegedHygiene", t("privilegedHygiene"), 15],
-                  ["passwordPolicy", t("passwordPolicy"), 10],
-                  ["staleAccounts", t("staleAccounts"), 10],
-                  ["kerberosSecurity", t("kerberosSecurity"), 20],
-                  ["dangerousConfigs", t("dangerousConfigs"), 10],
-                  ["infrastructureHardening", t("infrastructureHardening"), 10],
-                  ["gpoSecurity", t("gpoSecurity"), 10],
-                  ["trustSecurity", t("trustSecurity"), 10],
-                  ["certificateSecurity", t("certificateSecurity"), 5],
-                ] as const).map(([key, label, defaultVal]) => (
+                {(
+                  [
+                    ["privilegedHygiene", t("privilegedHygiene"), 15],
+                    ["passwordPolicy", t("passwordPolicy"), 10],
+                    ["staleAccounts", t("staleAccounts"), 10],
+                    ["kerberosSecurity", t("kerberosSecurity"), 20],
+                    ["dangerousConfigs", t("dangerousConfigs"), 10],
+                    [
+                      "infrastructureHardening",
+                      t("infrastructureHardening"),
+                      10,
+                    ],
+                    ["gpoSecurity", t("gpoSecurity"), 10],
+                    ["trustSecurity", t("trustSecurity"), 10],
+                    ["certificateSecurity", t("certificateSecurity"), 5],
+                  ] as const
+                ).map(([key, label, defaultVal]) => (
                   <div key={key} className="flex items-center gap-2">
-                    <label className="w-44 text-caption text-[var(--color-text-secondary)]">{label}</label>
+                    <label className="w-44 text-caption text-[var(--color-text-secondary)]">
+                      {label}
+                    </label>
                     <input
                       type="number"
                       min={0}
@@ -462,9 +497,15 @@ export function Settings() {
                           ...prev,
                           riskWeights: {
                             ...{
-                              privilegedHygiene: 15, passwordPolicy: 10, staleAccounts: 10,
-                              kerberosSecurity: 20, dangerousConfigs: 10, infrastructureHardening: 10,
-                              gpoSecurity: 10, trustSecurity: 10, certificateSecurity: 5,
+                              privilegedHygiene: 15,
+                              passwordPolicy: 10,
+                              staleAccounts: 10,
+                              kerberosSecurity: 20,
+                              dangerousConfigs: 10,
+                              infrastructureHardening: 10,
+                              gpoSecurity: 10,
+                              trustSecurity: 10,
+                              certificateSecurity: 5,
                             },
                             ...prev.riskWeights,
                             [key]: isNaN(val) ? defaultVal : val,
@@ -487,17 +528,26 @@ export function Settings() {
               </h3>
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
-                  <label className="w-44 text-caption text-[var(--color-text-secondary)]">{t("bruteForceThreshold")}</label>
+                  <label className="w-44 text-caption text-[var(--color-text-secondary)]">
+                    {t("bruteForceThreshold")}
+                  </label>
                   <input
                     type="number"
                     min={1}
-                    value={settings.attackDetectionConfig?.bruteForceThreshold ?? 10}
+                    value={
+                      settings.attackDetectionConfig?.bruteForceThreshold ?? 10
+                    }
                     onChange={(e) => {
                       const val = parseInt(e.target.value, 10);
                       setSettings((prev) => ({
                         ...prev,
                         attackDetectionConfig: {
-                          ...{ bruteForceThreshold: 10, kerberoastingThreshold: 3, excludedIps: [], excludedAccounts: [] },
+                          ...{
+                            bruteForceThreshold: 10,
+                            kerberoastingThreshold: 3,
+                            excludedIps: [],
+                            excludedAccounts: [],
+                          },
                           ...prev.attackDetectionConfig,
                           bruteForceThreshold: isNaN(val) ? 10 : val,
                         },
@@ -507,20 +557,32 @@ export function Settings() {
                     className="w-20 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2 py-1 text-body text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
                     data-testid="setting-brute-force-threshold"
                   />
-                  <span className="text-caption text-[var(--color-text-secondary)]">{t("failedLoginsFromSameIp")}</span>
+                  <span className="text-caption text-[var(--color-text-secondary)]">
+                    {t("failedLoginsFromSameIp")}
+                  </span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <label className="w-44 text-caption text-[var(--color-text-secondary)]">{t("kerberoastingThreshold")}</label>
+                  <label className="w-44 text-caption text-[var(--color-text-secondary)]">
+                    {t("kerberoastingThreshold")}
+                  </label>
                   <input
                     type="number"
                     min={1}
-                    value={settings.attackDetectionConfig?.kerberoastingThreshold ?? 3}
+                    value={
+                      settings.attackDetectionConfig?.kerberoastingThreshold ??
+                      3
+                    }
                     onChange={(e) => {
                       const val = parseInt(e.target.value, 10);
                       setSettings((prev) => ({
                         ...prev,
                         attackDetectionConfig: {
-                          ...{ bruteForceThreshold: 10, kerberoastingThreshold: 3, excludedIps: [], excludedAccounts: [] },
+                          ...{
+                            bruteForceThreshold: 10,
+                            kerberoastingThreshold: 3,
+                            excludedIps: [],
+                            excludedAccounts: [],
+                          },
                           ...prev.attackDetectionConfig,
                           kerberoastingThreshold: isNaN(val) ? 3 : val,
                         },
@@ -530,7 +592,9 @@ export function Settings() {
                     className="w-20 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2 py-1 text-body text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
                     data-testid="setting-kerberoasting-threshold"
                   />
-                  <span className="text-caption text-[var(--color-text-secondary)]">{t("tgsRequestsWithRc4")}</span>
+                  <span className="text-caption text-[var(--color-text-secondary)]">
+                    {t("tgsRequestsWithRc4")}
+                  </span>
                 </div>
                 <div>
                   <label className="mb-1 block text-caption text-[var(--color-text-secondary)]">
@@ -538,13 +602,23 @@ export function Settings() {
                   </label>
                   <input
                     type="text"
-                    value={(settings.attackDetectionConfig?.excludedIps ?? []).join(", ")}
+                    value={(
+                      settings.attackDetectionConfig?.excludedIps ?? []
+                    ).join(", ")}
                     onChange={(e) => {
-                      const ips = e.target.value.split(",").map((s) => s.trim()).filter(Boolean);
+                      const ips = e.target.value
+                        .split(",")
+                        .map((s) => s.trim())
+                        .filter(Boolean);
                       setSettings((prev) => ({
                         ...prev,
                         attackDetectionConfig: {
-                          ...{ bruteForceThreshold: 10, kerberoastingThreshold: 3, excludedIps: [], excludedAccounts: [] },
+                          ...{
+                            bruteForceThreshold: 10,
+                            kerberoastingThreshold: 3,
+                            excludedIps: [],
+                            excludedAccounts: [],
+                          },
                           ...prev.attackDetectionConfig,
                           excludedIps: ips,
                         },
@@ -562,13 +636,23 @@ export function Settings() {
                   </label>
                   <input
                     type="text"
-                    value={(settings.attackDetectionConfig?.excludedAccounts ?? []).join(", ")}
+                    value={(
+                      settings.attackDetectionConfig?.excludedAccounts ?? []
+                    ).join(", ")}
                     onChange={(e) => {
-                      const accts = e.target.value.split(",").map((s) => s.trim()).filter(Boolean);
+                      const accts = e.target.value
+                        .split(",")
+                        .map((s) => s.trim())
+                        .filter(Boolean);
                       setSettings((prev) => ({
                         ...prev,
                         attackDetectionConfig: {
-                          ...{ bruteForceThreshold: 10, kerberoastingThreshold: 3, excludedIps: [], excludedAccounts: [] },
+                          ...{
+                            bruteForceThreshold: 10,
+                            kerberoastingThreshold: 3,
+                            excludedIps: [],
+                            excludedAccounts: [],
+                          },
                           ...prev.attackDetectionConfig,
                           excludedAccounts: accts,
                         },
@@ -598,7 +682,9 @@ export function Settings() {
                   </label>
                   <select
                     value={settings.reports?.defaultFormat ?? "CSV"}
-                    onChange={(e) => updateNested("reports", "defaultFormat", e.target.value)}
+                    onChange={(e) =>
+                      updateNested("reports", "defaultFormat", e.target.value)
+                    }
                     className="w-48 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5 text-body text-[var(--color-text-primary)] focus:border-[var(--color-primary)] focus:outline-none"
                     data-testid="setting-export-format"
                   >
@@ -617,7 +703,11 @@ export function Settings() {
                       type="text"
                       value={settings.reports?.defaultExportPath ?? ""}
                       onChange={(e) =>
-                        updateNested("reports", "defaultExportPath", e.target.value)
+                        updateNested(
+                          "reports",
+                          "defaultExportPath",
+                          e.target.value,
+                        )
                       }
                       placeholder={t("exportDirHint")}
                       className="flex-1 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5 text-body text-[var(--color-text-primary)] placeholder-[var(--color-text-secondary)] focus:border-[var(--color-primary)] focus:outline-none"
@@ -653,7 +743,8 @@ export function Settings() {
               </h3>
               <div className="flex gap-3">
                 {(["light", "dark", "system"] as const).map((mode) => {
-                  const selected = (settings.appearance?.theme ?? "system") === mode;
+                  const selected =
+                    (settings.appearance?.theme ?? "system") === mode;
                   return (
                     <button
                       key={mode}
@@ -665,7 +756,11 @@ export function Settings() {
                       }`}
                       data-testid={`theme-${mode}`}
                     >
-                      {mode === "light" ? t("light") : mode === "dark" ? t("dark") : t("system")}
+                      {mode === "light"
+                        ? t("light")
+                        : mode === "dark"
+                          ? t("dark")
+                          : t("system")}
                     </button>
                   );
                 })}
@@ -693,7 +788,6 @@ export function Settings() {
             </div>
           </div>
         )}
-
       </div>
 
       {/* Save bar - shown for tabs that use AppSettings (not presets/permissions which save independently) */}
@@ -718,7 +812,9 @@ export function Settings() {
             {t("resetToDefaults")}
           </button>
           {dirty && (
-            <span className="text-caption text-[var(--color-warning)]">{t("common:unsavedChanges")}</span>
+            <span className="text-caption text-[var(--color-warning)]">
+              {t("common:unsavedChanges")}
+            </span>
           )}
         </div>
       )}

@@ -64,9 +64,14 @@ function PresetEditorWrapper() {
 
 function PresetEditor() {
   const { t } = useTranslation(["presetManagement", "common"]);
-  const { presets, loading, savePreset, deletePreset, acceptChecksum } = usePresets();
+  const { presets, loading, savePreset, deletePreset, acceptChecksum } =
+    usePresets();
   const searchGroups = useGroupSearch();
-  const { nodes: ouNodes, loading: ouLoading, error: ouError } = useOUTree({ silent: true });
+  const {
+    nodes: ouNodes,
+    loading: ouLoading,
+    error: ouError,
+  } = useOUTree({ silent: true });
   const { showConfirmation } = useDialog();
 
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
@@ -285,29 +290,36 @@ function PresetEditor() {
         ) : (
           <div className="space-y-4" data-testid="preset-editor-form">
             {/* Integrity warning */}
-            {selectedIndex !== null && !isNew && presets[selectedIndex]?.integrityWarning && (
-              <div
-                className="flex items-start gap-2 rounded-md border border-[var(--color-warning)] bg-[var(--color-warning-bg)] p-3"
-                data-testid="preset-integrity-warning"
-              >
-                <AlertTriangle size={16} className="shrink-0 mt-0.5 text-[var(--color-warning)]" />
-                <div className="flex-1">
-                  <div className="text-caption font-semibold text-[var(--color-warning)]">
-                    {t("modifiedOutside")}
+            {selectedIndex !== null &&
+              !isNew &&
+              presets[selectedIndex]?.integrityWarning && (
+                <div
+                  className="flex items-start gap-2 rounded-md border border-[var(--color-warning)] bg-[var(--color-warning-bg)] p-3"
+                  data-testid="preset-integrity-warning"
+                >
+                  <AlertTriangle
+                    size={16}
+                    className="shrink-0 mt-0.5 text-[var(--color-warning)]"
+                  />
+                  <div className="flex-1">
+                    <div className="text-caption font-semibold text-[var(--color-warning)]">
+                      {t("modifiedOutside")}
+                    </div>
+                    <div className="mt-0.5 text-caption text-[var(--color-text-secondary)]">
+                      {t("modifiedOutsideDescription")}
+                    </div>
+                    <button
+                      className="btn btn-sm mt-2"
+                      onClick={() =>
+                        acceptChecksum(presets[selectedIndex].name)
+                      }
+                      data-testid="preset-accept-checksum"
+                    >
+                      {t("acceptChanges")}
+                    </button>
                   </div>
-                  <div className="mt-0.5 text-caption text-[var(--color-text-secondary)]">
-                    {t("modifiedOutsideDescription")}
-                  </div>
-                  <button
-                    className="btn btn-sm mt-2"
-                    onClick={() => acceptChecksum(presets[selectedIndex].name)}
-                    data-testid="preset-accept-checksum"
-                  >
-                    {t("acceptChanges")}
-                  </button>
                 </div>
-              </div>
-            )}
+              )}
 
             {/* Validation errors */}
             {errors.length > 0 && (

@@ -1,4 +1,11 @@
-import { useState, useCallback, useEffect, useRef, useMemo, useId } from "react";
+import {
+  useState,
+  useCallback,
+  useEffect,
+  useRef,
+  useMemo,
+  useId,
+} from "react";
 import { createPortal } from "react-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { SearchBar } from "@/components/common/SearchBar";
@@ -41,7 +48,8 @@ const CATEGORY_COLORS: Record<string, string> = {
 
 const SCOPE_COLORS: Record<string, string> = {
   Global: "bg-[var(--color-success)]/10 text-[var(--color-success)]",
-  DomainLocal: "bg-[var(--color-surface-hover)] text-[var(--color-text-primary)]",
+  DomainLocal:
+    "bg-[var(--color-surface-hover)] text-[var(--color-text-primary)]",
   Universal: "bg-[var(--color-primary-subtle)] text-[var(--color-primary)]",
   Unknown: "bg-[var(--color-surface-hover)] text-[var(--color-text-secondary)]",
 };
@@ -51,7 +59,10 @@ function GroupBadge({ group }: { group: DirectoryGroup }) {
   const [showTooltip, setShowTooltip] = useState(false);
   const tooltipId = useId();
   const badgeRef = useRef<HTMLDivElement>(null);
-  const [tooltipPos, setTooltipPos] = useState<{ top: number; left: number } | null>(null);
+  const [tooltipPos, setTooltipPos] = useState<{
+    top: number;
+    left: number;
+  } | null>(null);
 
   useEffect(() => {
     if (!showTooltip || !badgeRef.current) {
@@ -63,7 +74,8 @@ function GroupBadge({ group }: { group: DirectoryGroup }) {
     let left = rect.left + rect.width / 2 - tooltipWidth / 2;
     let top = rect.bottom + 4;
     if (left < 4) left = 4;
-    if (left + tooltipWidth > window.innerWidth - 4) left = window.innerWidth - tooltipWidth - 4;
+    if (left + tooltipWidth > window.innerWidth - 4)
+      left = window.innerWidth - tooltipWidth - 4;
     if (top + 80 > window.innerHeight) top = rect.top - 4;
     setTooltipPos({ top, left });
   }, [showTooltip]);
@@ -71,7 +83,11 @@ function GroupBadge({ group }: { group: DirectoryGroup }) {
   const isSecurity = group.category === "Security";
   const CategoryIcon = isSecurity ? Shield : Mail;
   const scopeAbbr =
-    group.scope === "DomainLocal" ? "DL" : group.scope === "Universal" ? "U" : "G";
+    group.scope === "DomainLocal"
+      ? "DL"
+      : group.scope === "Universal"
+        ? "U"
+        : "G";
 
   return (
     <>
@@ -82,10 +98,14 @@ function GroupBadge({ group }: { group: DirectoryGroup }) {
         className="inline-flex shrink-0 items-center gap-1"
         aria-describedby={showTooltip ? tooltipId : undefined}
       >
-        <span className={`inline-flex items-center rounded-full p-1 ${CATEGORY_COLORS[group.category] || ""}`}>
+        <span
+          className={`inline-flex items-center rounded-full p-1 ${CATEGORY_COLORS[group.category] || ""}`}
+        >
           <CategoryIcon size={10} />
         </span>
-        <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none ${SCOPE_COLORS[group.scope] || SCOPE_COLORS.Unknown}`}>
+        <span
+          className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none ${SCOPE_COLORS[group.scope] || SCOPE_COLORS.Unknown}`}
+        >
           {scopeAbbr}
         </span>
       </div>
@@ -100,19 +120,36 @@ function GroupBadge({ group }: { group: DirectoryGroup }) {
           >
             <ul className="space-y-1">
               <li className="flex items-center gap-1.5">
-                <CategoryIcon size={12} className={`mr-1 shrink-0 ${isSecurity ? "text-[var(--color-info)]" : "text-[var(--color-warning)]"}`} />
-                <span className="text-caption font-medium text-[var(--color-text-primary)]">{t(`common:${group.category.toLowerCase()}`)}</span>
+                <CategoryIcon
+                  size={12}
+                  className={`mr-1 shrink-0 ${isSecurity ? "text-[var(--color-info)]" : "text-[var(--color-warning)]"}`}
+                />
+                <span className="text-caption font-medium text-[var(--color-text-primary)]">
+                  {t(`common:${group.category.toLowerCase()}`)}
+                </span>
               </li>
               <li className="flex items-center gap-1.5">
-                <Users size={12} className="mr-1 shrink-0 text-[var(--color-text-secondary)]" />
+                <Users
+                  size={12}
+                  className="mr-1 shrink-0 text-[var(--color-text-secondary)]"
+                />
                 <div>
-                  <span className="text-caption font-medium text-[var(--color-text-primary)]">{t(SCOPE_KEYS[group.scope] || "scopeUnknown")}</span>
-                  <p className="text-[10px] text-[var(--color-text-secondary)]">{t("common:scope")}</p>
+                  <span className="text-caption font-medium text-[var(--color-text-primary)]">
+                    {t(SCOPE_KEYS[group.scope] || "scopeUnknown")}
+                  </span>
+                  <p className="text-[10px] text-[var(--color-text-secondary)]">
+                    {t("common:scope")}
+                  </p>
                 </div>
               </li>
               <li className="flex items-center gap-1.5">
-                <Users size={12} className="mr-1 shrink-0 text-[var(--color-text-secondary)]" />
-                <span className="text-caption font-medium text-[var(--color-text-primary)]">{t("common:member", { count: group.memberCount })}</span>
+                <Users
+                  size={12}
+                  className="mr-1 shrink-0 text-[var(--color-text-secondary)]"
+                />
+                <span className="text-caption font-medium text-[var(--color-text-primary)]">
+                  {t("common:member", { count: group.memberCount })}
+                </span>
               </li>
             </ul>
           </div>,
@@ -142,8 +179,7 @@ export function GroupManagement() {
   const { openTabs, activeTabId, clearTabData } = useNavigation();
   const activeTab = openTabs.find((t) => t.id === activeTabId);
   const selectedGroupDn = activeTab?.data?.selectedGroupDn as
-    | string
-    | undefined;
+    string | undefined;
 
   const { hasPermission } = usePermissions();
   const canManageMembers = hasPermission("AccountOperator");
@@ -159,7 +195,9 @@ export function GroupManagement() {
 
   const [members, setMembers] = useState<DirectoryEntry[]>([]);
   const [membersLoading, setMembersLoading] = useState(false);
-  const [categoryFilter, setCategoryFilter] = useState<"all" | "Security" | "Distribution">("all");
+  const [categoryFilter, setCategoryFilter] = useState<
+    "all" | "Security" | "Distribution"
+  >("all");
 
   const filteredGroups = useMemo(() => {
     if (categoryFilter === "all") return groups;
@@ -167,7 +205,8 @@ export function GroupManagement() {
   }, [groups, categoryFilter]);
 
   const categoryCounts = useMemo(() => {
-    let security = 0, distribution = 0;
+    let security = 0,
+      distribution = 0;
     for (const g of groups) {
       if (g.category === "Security") security++;
       else distribution++;
@@ -297,7 +336,8 @@ export function GroupManagement() {
             {group.displayName || group.samAccountName}
           </p>
           <p className="truncate text-caption text-[var(--color-text-secondary)]">
-            {group.scope} {group.category} - {t("common:member", { count: group.memberCount })}
+            {group.scope} {group.category} -{" "}
+            {t("common:member", { count: group.memberCount })}
           </p>
         </div>
         <GroupBadge group={group} />
@@ -336,7 +376,11 @@ export function GroupManagement() {
               {label}
               {key !== "all" && (
                 <span className="ml-1 opacity-70">
-                  ({key === "Security" ? categoryCounts.security : categoryCounts.distribution})
+                  (
+                  {key === "Security"
+                    ? categoryCounts.security
+                    : categoryCounts.distribution}
+                  )
                 </span>
               )}
             </button>
@@ -353,7 +397,10 @@ export function GroupManagement() {
         {!loading &&
           filteredGroups.length > 0 &&
           t("found", { count: filteredGroups.length })}
-        {!loading && filteredGroups.length === 0 && !error && t("noGroupsFound")}
+        {!loading &&
+          filteredGroups.length === 0 &&
+          !error &&
+          t("noGroupsFound")}
         {error && `${t("common:error")}: ${error}`}
       </div>
 
@@ -397,7 +444,9 @@ export function GroupManagement() {
               title={t("noGroupsFound")}
               description={
                 categoryFilter !== "all"
-                  ? categoryFilter === "Security" ? t("noSecurityGroups") : t("noDistributionGroups")
+                  ? categoryFilter === "Security"
+                    ? t("noSecurityGroups")
+                    : t("noDistributionGroups")
                   : filterText
                     ? t("noGroupsMatch", { filter: filterText })
                     : t("noGroupsFound")

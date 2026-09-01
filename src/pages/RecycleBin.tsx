@@ -32,12 +32,7 @@ interface DeletedObject {
 }
 
 type ObjectTypeFilter =
-  | "all"
-  | "user"
-  | "computer"
-  | "group"
-  | "contact"
-  | "printQueue";
+  "all" | "user" | "computer" | "group" | "contact" | "printQueue";
 
 const TYPE_LABEL_KEYS: Record<string, string> = {
   user: "common:user",

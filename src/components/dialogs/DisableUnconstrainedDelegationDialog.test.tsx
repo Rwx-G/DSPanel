@@ -42,10 +42,9 @@ describe("DisableUnconstrainedDelegationDialog", () => {
   });
 
   it("renders the dialog with title and computer name", () => {
-    render(
-      <DisableUnconstrainedDelegationDialog {...defaultProps} />,
-      { wrapper: TestProviders },
-    );
+    render(<DisableUnconstrainedDelegationDialog {...defaultProps} />, {
+      wrapper: TestProviders,
+    });
     expect(
       screen.getByTestId("disable-unconstrained-delegation-dialog"),
     ).toBeInTheDocument();
@@ -53,10 +52,9 @@ describe("DisableUnconstrainedDelegationDialog", () => {
   });
 
   it("body explains the attack vector (TGT capture / golden ticket)", () => {
-    render(
-      <DisableUnconstrainedDelegationDialog {...defaultProps} />,
-      { wrapper: TestProviders },
-    );
+    render(<DisableUnconstrainedDelegationDialog {...defaultProps} />, {
+      wrapper: TestProviders,
+    });
     const dialog = screen.getByTestId(
       "disable-unconstrained-delegation-dialog",
     );
@@ -66,10 +64,9 @@ describe("DisableUnconstrainedDelegationDialog", () => {
   });
 
   it("body recommends migration to constrained delegation via msDS-AllowedToDelegateTo", () => {
-    render(
-      <DisableUnconstrainedDelegationDialog {...defaultProps} />,
-      { wrapper: TestProviders },
-    );
+    render(<DisableUnconstrainedDelegationDialog {...defaultProps} />, {
+      wrapper: TestProviders,
+    });
     const dialog = screen.getByTestId(
       "disable-unconstrained-delegation-dialog",
     );
@@ -78,10 +75,9 @@ describe("DisableUnconstrainedDelegationDialog", () => {
   });
 
   it("body warns about risks to double-hop services", () => {
-    render(
-      <DisableUnconstrainedDelegationDialog {...defaultProps} />,
-      { wrapper: TestProviders },
-    );
+    render(<DisableUnconstrainedDelegationDialog {...defaultProps} />, {
+      wrapper: TestProviders,
+    });
     const dialog = screen.getByTestId(
       "disable-unconstrained-delegation-dialog",
     );
@@ -92,10 +88,9 @@ describe("DisableUnconstrainedDelegationDialog", () => {
   });
 
   it("disables the Confirm button until the acknowledgement checkbox is checked", () => {
-    render(
-      <DisableUnconstrainedDelegationDialog {...defaultProps} />,
-      { wrapper: TestProviders },
-    );
+    render(<DisableUnconstrainedDelegationDialog {...defaultProps} />, {
+      wrapper: TestProviders,
+    });
     const confirmBtn = screen.getByTestId("confirm-btn");
     expect(confirmBtn).toBeDisabled();
 
@@ -188,10 +183,9 @@ describe("DisableUnconstrainedDelegationDialog", () => {
       return Promise.resolve(null);
     }) as typeof invoke);
 
-    render(
-      <DisableUnconstrainedDelegationDialog {...defaultProps} />,
-      { wrapper: TestProviders },
-    );
+    render(<DisableUnconstrainedDelegationDialog {...defaultProps} />, {
+      wrapper: TestProviders,
+    });
 
     fireEvent.click(screen.getByTestId("acknowledge-checkbox"));
     fireEvent.click(screen.getByTestId("confirm-btn"));

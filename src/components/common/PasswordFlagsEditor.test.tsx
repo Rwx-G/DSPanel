@@ -16,10 +16,7 @@ let mockLevel = "AccountOperator";
 vi.mock("@/hooks/usePermissions", () => ({
   usePermissions: () => ({
     level: mockLevel as
-      | "ReadOnly"
-      | "HelpDesk"
-      | "AccountOperator"
-      | "DomainAdmin",
+      "ReadOnly" | "HelpDesk" | "AccountOperator" | "DomainAdmin",
     groups: [],
     loading: false,
     hasPermission: (required: string) => {
@@ -363,9 +360,7 @@ describe("PasswordFlagsEditor", () => {
     fireEvent.click(screen.getByTestId("dryrun-execute"));
 
     await waitFor(() => {
-      expect(
-        screen.getByText("fail"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("fail")).toBeInTheDocument();
     });
   });
 

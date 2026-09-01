@@ -1,5 +1,13 @@
 import { useState, useMemo, useCallback } from "react";
-import { Star, ChevronDown, ChevronRight, Filter, X, Pencil, Check } from "lucide-react";
+import {
+  Star,
+  ChevronDown,
+  ChevronRight,
+  Filter,
+  X,
+  Pencil,
+  Check,
+} from "lucide-react";
 import { CopyButton } from "@/components/common/CopyButton";
 import { useTranslation } from "react-i18next";
 
@@ -115,7 +123,9 @@ function EditableValue({
     <>
       <span className="flex-1 text-body text-[var(--color-text-primary)] break-all font-mono">
         {displayValue || (
-          <span className="text-[var(--color-text-disabled)]">{t("components:advancedAttributes.empty")}</span>
+          <span className="text-[var(--color-text-disabled)]">
+            {t("components:advancedAttributes.empty")}
+          </span>
         )}
       </span>
       <button
@@ -133,7 +143,11 @@ function EditableValue({
   );
 }
 
-export function AdvancedAttributes({ rawAttributes, schemaAttributes, onEdit }: AdvancedAttributesProps) {
+export function AdvancedAttributes({
+  rawAttributes,
+  schemaAttributes,
+  onEdit,
+}: AdvancedAttributesProps) {
   const { t } = useTranslation(["components"]);
   const [favorites, setFavorites] = useState<Set<string>>(loadFavorites);
   const [collapsed, setCollapsed] = useState(false);
@@ -157,8 +171,9 @@ export function AdvancedAttributes({ rawAttributes, schemaAttributes, onEdit }: 
   // Filter out already-displayed attributes, split into favorites and rest.
   // When showEmpty is on, merge in schema attributes that have no value.
   const allAdvanced = useMemo(() => {
-    const populated = Object.entries(rawAttributes)
-      .filter(([key]) => !DISPLAYED_ATTRS.has(key));
+    const populated = Object.entries(rawAttributes).filter(
+      ([key]) => !DISPLAYED_ATTRS.has(key),
+    );
 
     if (!showEmpty) {
       return populated
@@ -236,11 +251,17 @@ export function AdvancedAttributes({ rawAttributes, schemaAttributes, onEdit }: 
           {key}
         </span>
         {onEdit ? (
-          <EditableValue attrKey={key} displayValue={displayValue} onEdit={onEdit} />
+          <EditableValue
+            attrKey={key}
+            displayValue={displayValue}
+            onEdit={onEdit}
+          />
         ) : (
           <span className="flex-1 text-body text-[var(--color-text-primary)] break-all font-mono">
             {displayValue || (
-              <span className="text-[var(--color-text-disabled)]">{t("components:advancedAttributes.empty")}</span>
+              <span className="text-[var(--color-text-disabled)]">
+                {t("components:advancedAttributes.empty")}
+              </span>
             )}
           </span>
         )}
@@ -308,7 +329,9 @@ export function AdvancedAttributes({ rawAttributes, schemaAttributes, onEdit }: 
 
           {filteredCount === 0 && (
             <p className="py-3 text-center text-caption text-[var(--color-text-secondary)]">
-              {t("components:advancedAttributes.noMatch", { query: searchText })}
+              {t("components:advancedAttributes.noMatch", {
+                query: searchText,
+              })}
             </p>
           )}
 

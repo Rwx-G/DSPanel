@@ -410,13 +410,15 @@ export function NtfsAnalyzer() {
             {result.totalErrors > 0 && (
               <span className="text-body text-[var(--color-warning)]">
                 <AlertTriangle size={14} className="mr-1 inline" />
-                <strong>{result.totalErrors}</strong> {t("error", { count: result.totalErrors })}
+                <strong>{result.totalErrors}</strong>{" "}
+                {t("error", { count: result.totalErrors })}
               </span>
             )}
             {result.conflicts.length > 0 && (
               <span className="text-body text-[var(--color-error)]">
                 <ShieldX size={14} className="mr-1 inline" />
-                <strong>{result.conflicts.length}</strong> {t("conflict", { count: result.conflicts.length })}
+                <strong>{result.conflicts.length}</strong>{" "}
+                {t("conflict", { count: result.conflicts.length })}
               </span>
             )}
             <div className="ml-auto flex items-center gap-3">

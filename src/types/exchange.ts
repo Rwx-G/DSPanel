@@ -25,9 +25,10 @@ function mapRecipientType(value: number): string {
  * Parses proxyAddresses into a primary SMTP address and a list of aliases.
  * "SMTP:" (uppercase) = primary, "smtp:" (lowercase) = alias.
  */
-function parseProxyAddresses(
-  proxyAddresses: string[],
-): { primary: string; aliases: string[] } {
+function parseProxyAddresses(proxyAddresses: string[]): {
+  primary: string;
+  aliases: string[];
+} {
   let primary = "";
   const aliases: string[] = [];
 

@@ -99,7 +99,9 @@ function mockBrowseWith(
     if (cmd === "resolve_dns") return Promise.resolve(["10.0.0.1"]);
     if (cmd === "evaluate_computer_security_indicators_batch") {
       return Promise.resolve(
-        entries.map((e) => indicatorOverrides[e.displayName ?? ""] ?? EMPTY_INDICATORS),
+        entries.map(
+          (e) => indicatorOverrides[e.displayName ?? ""] ?? EMPTY_INDICATORS,
+        ),
       );
     }
     if (cmd === "evaluate_computer_security_indicators") {
@@ -246,7 +248,9 @@ describe("ComputerLookup", () => {
       expect(screen.getByTestId("empty-state-title")).toHaveTextContent(
         "No computers found",
       );
-      expect(screen.getAllByText("No computers found").length).toBeGreaterThanOrEqual(1);
+      expect(
+        screen.getAllByText("No computers found").length,
+      ).toBeGreaterThanOrEqual(1);
     });
   });
 
@@ -422,7 +426,9 @@ describe("ComputerLookup", () => {
     render(<ComputerLookup />);
 
     await waitFor(() => {
-      expect(screen.getByTestId("empty-state-title")).toHaveTextContent("No computers found");
+      expect(screen.getByTestId("empty-state-title")).toHaveTextContent(
+        "No computers found",
+      );
     });
   });
 
@@ -767,7 +773,7 @@ describe("ComputerLookup", () => {
     });
 
     // Filter to Enabled only (should leave 2)
-    fireEvent.click(screen.getByText("Enabled", { selector: "button"}));
+    fireEvent.click(screen.getByText("Enabled", { selector: "button" }));
 
     await waitFor(() => {
       const status = screen.getByTestId("computer-lookup-status");
@@ -847,9 +853,10 @@ describe("ComputerLookup", () => {
       render(<ComputerLookup />);
 
       await waitFor(() => {
-        expect(
-          screen.getByTestId("security-indicator-dot"),
-        ).toHaveAttribute("data-severity", "Critical");
+        expect(screen.getByTestId("security-indicator-dot")).toHaveAttribute(
+          "data-severity",
+          "Critical",
+        );
       });
       expect(screen.getByTestId("security-indicator-dot")).toHaveAttribute(
         "data-count",

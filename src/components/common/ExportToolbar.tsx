@@ -1,6 +1,12 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Download, FileSpreadsheet, FileText, Globe, ChevronDown } from "lucide-react";
+import {
+  Download,
+  FileSpreadsheet,
+  FileText,
+  Globe,
+  ChevronDown,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 export interface ExportColumn {
@@ -20,7 +26,12 @@ interface FormatOption {
 
 const FORMAT_OPTIONS: FormatOption[] = [
   { id: "csv", label: "CSV", icon: <FileText size={14} />, ext: "csv" },
-  { id: "xlsx", label: "Excel", icon: <FileSpreadsheet size={14} />, ext: "xlsx" },
+  {
+    id: "xlsx",
+    label: "Excel",
+    icon: <FileSpreadsheet size={14} />,
+    ext: "xlsx",
+  },
   { id: "pdf", label: "PDF", icon: <FileText size={14} />, ext: "pdf" },
   { id: "html", label: "HTML", icon: <Globe size={14} />, ext: "html" },
 ];
@@ -73,7 +84,10 @@ export function ExportToolbar<T>({
           format,
           title,
           defaultName,
-          csvOptions: format === "csv" ? { delimiter: "comma", includeHeaders: true } : null,
+          csvOptions:
+            format === "csv"
+              ? { delimiter: "comma", includeHeaders: true }
+              : null,
         });
       } catch (err) {
         console.error("Export failed:", err);
@@ -97,7 +111,11 @@ export function ExportToolbar<T>({
   }, [menuOpen]);
 
   return (
-    <div className="relative inline-flex" ref={menuRef} data-testid="export-toolbar">
+    <div
+      className="relative inline-flex"
+      ref={menuRef}
+      data-testid="export-toolbar"
+    >
       <button
         className="btn btn-sm rounded border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-2.5 py-1 text-caption font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors flex items-center gap-1"
         onClick={() => setMenuOpen((prev) => !prev)}
@@ -105,7 +123,9 @@ export function ExportToolbar<T>({
         data-testid="export-button"
       >
         <Download size={14} />
-        {exporting ? t("components:exportToolbar.exporting") : t("components:exportToolbar.export")}
+        {exporting
+          ? t("components:exportToolbar.exporting")
+          : t("components:exportToolbar.export")}
         <ChevronDown size={12} />
       </button>
 

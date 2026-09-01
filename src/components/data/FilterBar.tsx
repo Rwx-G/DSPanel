@@ -24,7 +24,8 @@ export function FilterBar({
   debounceMs = 300,
 }: FilterBarProps) {
   const { t } = useTranslation(["components"]);
-  const resolvedPlaceholder = placeholder ?? t("components:filterBar.placeholder");
+  const resolvedPlaceholder =
+    placeholder ?? t("components:filterBar.placeholder");
   const [textValue, setTextValue] = useState("");
 
   useEffect(() => {
@@ -65,7 +66,9 @@ export function FilterBar({
           <button
             onClick={() => removeFilter(chip.id)}
             className="rounded-sm p-0.5 hover:bg-[var(--color-surface-hover)] transition-colors"
-            aria-label={t("components:filterBar.removeFilter", { label: chip.label })}
+            aria-label={t("components:filterBar.removeFilter", {
+              label: chip.label,
+            })}
             data-testid={`filter-remove-${chip.id}`}
           >
             <X size={10} />

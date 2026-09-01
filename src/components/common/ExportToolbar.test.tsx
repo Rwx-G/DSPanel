@@ -91,11 +91,17 @@ describe("ExportToolbar", () => {
     fireEvent.click(screen.getByTestId("export-csv"));
 
     await waitFor(() => {
-      expect(mockInvoke).toHaveBeenCalledWith("export_table", expect.objectContaining({
-        format: "csv",
-        title: "Test Export",
-        rows: [["Alice", "alice@test.com"], ["Bob", "bob@test.com"]],
-      }));
+      expect(mockInvoke).toHaveBeenCalledWith(
+        "export_table",
+        expect.objectContaining({
+          format: "csv",
+          title: "Test Export",
+          rows: [
+            ["Alice", "alice@test.com"],
+            ["Bob", "bob@test.com"],
+          ],
+        }),
+      );
     });
   });
 
@@ -113,9 +119,12 @@ describe("ExportToolbar", () => {
     fireEvent.click(screen.getByTestId("export-xlsx"));
 
     await waitFor(() => {
-      expect(mockInvoke).toHaveBeenCalledWith("export_table", expect.objectContaining({
-        format: "xlsx",
-      }));
+      expect(mockInvoke).toHaveBeenCalledWith(
+        "export_table",
+        expect.objectContaining({
+          format: "xlsx",
+        }),
+      );
     });
   });
 
@@ -133,9 +142,12 @@ describe("ExportToolbar", () => {
     fireEvent.click(screen.getByTestId("export-pdf"));
 
     await waitFor(() => {
-      expect(mockInvoke).toHaveBeenCalledWith("export_table", expect.objectContaining({
-        format: "pdf",
-      }));
+      expect(mockInvoke).toHaveBeenCalledWith(
+        "export_table",
+        expect.objectContaining({
+          format: "pdf",
+        }),
+      );
     });
   });
 
@@ -153,9 +165,12 @@ describe("ExportToolbar", () => {
     fireEvent.click(screen.getByTestId("export-html"));
 
     await waitFor(() => {
-      expect(mockInvoke).toHaveBeenCalledWith("export_table", expect.objectContaining({
-        format: "html",
-      }));
+      expect(mockInvoke).toHaveBeenCalledWith(
+        "export_table",
+        expect.objectContaining({
+          format: "html",
+        }),
+      );
     });
   });
 
@@ -201,7 +216,11 @@ describe("ExportToolbar", () => {
 
   it("shows exporting state during export", async () => {
     let resolveExport: (value: unknown) => void;
-    mockInvoke.mockReturnValue(new Promise((resolve) => { resolveExport = resolve; }));
+    mockInvoke.mockReturnValue(
+      new Promise((resolve) => {
+        resolveExport = resolve;
+      }),
+    );
 
     render(
       <ExportToolbar

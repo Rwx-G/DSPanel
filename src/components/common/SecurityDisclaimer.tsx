@@ -36,15 +36,29 @@ export function SecurityDisclaimer({
       {show && (
         <div className="absolute left-0 top-full z-50 mt-1 w-96 rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-3 shadow-lg">
           <div className="flex items-start gap-2 mb-2">
-            <AlertTriangle size={14} className="mt-0.5 shrink-0 text-[var(--color-warning)]" />
+            <AlertTriangle
+              size={14}
+              className="mt-0.5 shrink-0 text-[var(--color-warning)]"
+            />
             <p className="text-caption font-medium text-[var(--color-text-primary)]">
               {t("components:securityDisclaimer.coverage", { coverage })}
             </p>
           </div>
           <div className="space-y-1.5 text-caption text-[var(--color-text-secondary)]">
-            <p><strong>{t("components:securityDisclaimer.whatWeCheck")}</strong> {checks}</p>
-            <p><strong>{t("components:securityDisclaimer.limitations")}</strong> {limitations}</p>
-            <p><strong>{t("components:securityDisclaimer.forCompleteAudit")}</strong> {tools}</p>
+            <p>
+              <strong>{t("components:securityDisclaimer.whatWeCheck")}</strong>{" "}
+              {checks}
+            </p>
+            <p>
+              <strong>{t("components:securityDisclaimer.limitations")}</strong>{" "}
+              {limitations}
+            </p>
+            <p>
+              <strong>
+                {t("components:securityDisclaimer.forCompleteAudit")}
+              </strong>{" "}
+              {tools}
+            </p>
           </div>
         </div>
       )}

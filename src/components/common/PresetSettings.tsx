@@ -61,8 +61,7 @@ export function PresetSettings({ onSaved }: PresetSettingsProps = {}) {
             setInputPath(e.target.value);
             setTestResult(null);
           }}
-          placeholder={"\\\\server\\share\\presets or C:\\presets"
-          }
+          placeholder={"\\\\server\\share\\presets or C:\\presets"}
           className="flex-1 rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5 text-body text-[var(--color-text-primary)] placeholder-[var(--color-text-secondary)] focus:border-[var(--color-primary)] focus:outline-none"
           data-testid="preset-path-input"
           disabled={loading}

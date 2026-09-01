@@ -192,8 +192,7 @@ function mockBrowseWith(
       // Map by index to entries to pick the right override per sam.
       return Promise.resolve(
         entries.map(
-          (e) =>
-            indicatorOverrides[e.samAccountName ?? ""] ?? EMPTY_INDICATORS,
+          (e) => indicatorOverrides[e.samAccountName ?? ""] ?? EMPTY_INDICATORS,
         ),
       );
     }
@@ -518,9 +517,7 @@ describe("UserLookup", () => {
     fireEvent.contextMenu(screen.getByTestId("user-result-jdoe"));
 
     await waitFor(() => {
-      expect(
-        screen.getByTestId("context-menu"),
-      ).toBeInTheDocument();
+      expect(screen.getByTestId("context-menu")).toBeInTheDocument();
     });
   });
 
@@ -740,7 +737,8 @@ describe("UserLookup", () => {
         if (cmd === "browse_users")
           return Promise.resolve(makeBrowseResult(browseEntries));
         if (cmd === "get_user") return Promise.resolve(remoteEntry);
-        if (cmd === "evaluate_health_cmd") return Promise.resolve(HEALTHY_STATUS);
+        if (cmd === "evaluate_health_cmd")
+          return Promise.resolve(HEALTHY_STATUS);
         return Promise.resolve(null);
       }) as typeof invoke);
 
@@ -812,7 +810,9 @@ describe("UserLookup", () => {
 
       await waitFor(() => {
         expect(screen.getByTestId("user-result-jdoe")).toBeInTheDocument();
-        expect(screen.queryByTestId("user-result-disabled")).not.toBeInTheDocument();
+        expect(
+          screen.queryByTestId("user-result-disabled"),
+        ).not.toBeInTheDocument();
       });
     });
 
@@ -835,7 +835,9 @@ describe("UserLookup", () => {
       // Wait for health evaluation
       await waitFor(() => {
         const disabledResult = screen.getByTestId("user-result-disabled");
-        const badge = disabledResult.querySelector('[data-testid="health-badge"]');
+        const badge = disabledResult.querySelector(
+          '[data-testid="health-badge"]',
+        );
         expect(badge).toBeInTheDocument();
       });
 
@@ -843,7 +845,9 @@ describe("UserLookup", () => {
       fireEvent.click(screen.getByText("Critical"));
 
       await waitFor(() => {
-        expect(screen.queryByTestId("user-result-jdoe")).not.toBeInTheDocument();
+        expect(
+          screen.queryByTestId("user-result-jdoe"),
+        ).not.toBeInTheDocument();
         expect(screen.getByTestId("user-result-disabled")).toBeInTheDocument();
       });
     });
@@ -869,7 +873,9 @@ describe("UserLookup", () => {
       fireEvent.click(screen.getByText("Critical"));
 
       await waitFor(() => {
-        expect(screen.getByText(/No users with critical health status/)).toBeInTheDocument();
+        expect(
+          screen.getByText(/No users with critical health status/),
+        ).toBeInTheDocument();
       });
     });
 
@@ -899,7 +905,9 @@ describe("UserLookup", () => {
       await waitFor(() => {
         // At least one count value should be visible (healthy or critical)
         const allButtons = screen.getAllByRole("button");
-        const countButtons = allButtons.filter((btn) => /\(\d+\)/.test(btn.textContent ?? ""));
+        const countButtons = allButtons.filter((btn) =>
+          /\(\d+\)/.test(btn.textContent ?? ""),
+        );
         expect(countButtons.length).toBeGreaterThan(0);
       });
     });
@@ -918,9 +926,11 @@ describe("UserLookup", () => {
       ) => {
         if (cmd === "browse_users")
           return Promise.resolve(makeBrowseResult(entries));
-        if (cmd === "get_permission_level") return Promise.resolve("AccountOperator");
+        if (cmd === "get_permission_level")
+          return Promise.resolve("AccountOperator");
         if (cmd === "get_user_groups") return Promise.resolve([]);
-        if (cmd === "evaluate_health_cmd") return Promise.resolve(HEALTHY_STATUS);
+        if (cmd === "evaluate_health_cmd")
+          return Promise.resolve(HEALTHY_STATUS);
         if (cmd === "evaluate_health_batch") {
           const inputs = args?.inputs as { enabled: boolean }[] | undefined;
           return Promise.resolve((inputs ?? []).map(() => HEALTHY_STATUS));
@@ -982,7 +992,9 @@ describe("UserLookup", () => {
       });
 
       // Type a 3-char filter to trigger health map reset
-      const searchInput = screen.getByTestId("search-bar").querySelector("input");
+      const searchInput = screen
+        .getByTestId("search-bar")
+        .querySelector("input");
       expect(searchInput).not.toBeNull();
       fireEvent.change(searchInput!, { target: { value: "joh" } });
 
@@ -1029,7 +1041,8 @@ describe("UserLookup", () => {
         if (cmd === "browse_users")
           return Promise.resolve(makeBrowseResult(browseEntries));
         if (cmd === "get_user") return Promise.resolve(remoteEntry);
-        if (cmd === "evaluate_health_cmd") return Promise.resolve(HEALTHY_STATUS);
+        if (cmd === "evaluate_health_cmd")
+          return Promise.resolve(HEALTHY_STATUS);
         return Promise.resolve(null);
       }) as typeof invoke);
 
@@ -1062,16 +1075,15 @@ describe("UserLookup", () => {
       const refreshedEntry = makeEntry("jdoe", "John Doe Updated");
 
       let getUserCallCount = 0;
-      mockInvoke.mockImplementation(((
-        cmd: string,
-      ) => {
+      mockInvoke.mockImplementation(((cmd: string) => {
         if (cmd === "browse_users")
           return Promise.resolve(makeBrowseResult(entries));
         if (cmd === "get_user") {
           getUserCallCount++;
           return Promise.resolve(refreshedEntry);
         }
-        if (cmd === "evaluate_health_cmd") return Promise.resolve(HEALTHY_STATUS);
+        if (cmd === "evaluate_health_cmd")
+          return Promise.resolve(HEALTHY_STATUS);
         return Promise.resolve(null);
       }) as typeof invoke);
 
@@ -1121,18 +1133,22 @@ describe("UserLookup", () => {
 
     it("renders the dot for users that have indicators", async () => {
       const entries = [makeEntry("jdoe", "John Doe")];
-      mockBrowseWith(entries, {}, {
-        jdoe: {
-          indicators: [
-            {
-              kind: "Kerberoastable",
-              severity: "Warning",
-              descriptionKey: "securityIndicators.Kerberoastable",
-            },
-          ],
-          highestSeverity: "Warning",
+      mockBrowseWith(
+        entries,
+        {},
+        {
+          jdoe: {
+            indicators: [
+              {
+                kind: "Kerberoastable",
+                severity: "Warning",
+                descriptionKey: "securityIndicators.Kerberoastable",
+              },
+            ],
+            highestSeverity: "Warning",
+          },
         },
-      });
+      );
 
       render(<UserLookup />, { wrapper: TestProviders });
 
@@ -1149,30 +1165,35 @@ describe("UserLookup", () => {
 
     it("dot color reflects highestSeverity (Critical wins over Warning)", async () => {
       const entries = [makeEntry("jdoe", "John Doe")];
-      mockBrowseWith(entries, {}, {
-        jdoe: {
-          indicators: [
-            {
-              kind: "Kerberoastable",
-              severity: "Warning",
-              descriptionKey: "securityIndicators.Kerberoastable",
-            },
-            {
-              kind: "PasswordNotRequired",
-              severity: "Critical",
-              descriptionKey: "securityIndicators.PasswordNotRequired",
-            },
-          ],
-          highestSeverity: "Critical",
+      mockBrowseWith(
+        entries,
+        {},
+        {
+          jdoe: {
+            indicators: [
+              {
+                kind: "Kerberoastable",
+                severity: "Warning",
+                descriptionKey: "securityIndicators.Kerberoastable",
+              },
+              {
+                kind: "PasswordNotRequired",
+                severity: "Critical",
+                descriptionKey: "securityIndicators.PasswordNotRequired",
+              },
+            ],
+            highestSeverity: "Critical",
+          },
         },
-      });
+      );
 
       render(<UserLookup />, { wrapper: TestProviders });
 
       await waitFor(() => {
-        expect(
-          screen.getByTestId("security-indicator-dot"),
-        ).toHaveAttribute("data-severity", "Critical");
+        expect(screen.getByTestId("security-indicator-dot")).toHaveAttribute(
+          "data-severity",
+          "Critical",
+        );
       });
       expect(screen.getByTestId("security-indicator-dot")).toHaveAttribute(
         "data-count",
@@ -1182,18 +1203,22 @@ describe("UserLookup", () => {
 
     it("propagates indicator set to UserDetail when a user is selected", async () => {
       const entries = [makeEntry("jdoe", "John Doe")];
-      mockBrowseWith(entries, {}, {
-        jdoe: {
-          indicators: [
-            {
-              kind: "AsRepRoastable",
-              severity: "Critical",
-              descriptionKey: "securityIndicators.AsRepRoastable",
-            },
-          ],
-          highestSeverity: "Critical",
+      mockBrowseWith(
+        entries,
+        {},
+        {
+          jdoe: {
+            indicators: [
+              {
+                kind: "AsRepRoastable",
+                severity: "Critical",
+                descriptionKey: "securityIndicators.AsRepRoastable",
+              },
+            ],
+            highestSeverity: "Critical",
+          },
         },
-      });
+      );
 
       render(<UserLookup />, { wrapper: TestProviders });
 

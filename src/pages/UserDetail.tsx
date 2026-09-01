@@ -675,9 +675,10 @@ export function UserDetail({
             {t("groupMemberships", { count: user.memberOf.length })}
           </h3>
           <ExportToolbar<{ name: string; dn: string }>
-            columns={groupColumns.map(
-              (c): ExportColumn => ({ key: c.key, header: c.header }),
-            )}
+            columns={groupColumns.map((c): ExportColumn => ({
+              key: c.key,
+              header: c.header,
+            }))}
             data={groupRows}
             rowMapper={(row) => [row.name, row.dn]}
             title={`${user.displayName} - Group Memberships`}
