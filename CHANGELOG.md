@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- Bump the Rust dependency graph to clear every open `cargo audit` vulnerability and GitHub Dependabot alert on `Cargo.lock`: `quick-xml` 0.39 -> 0.42 (`RUSTSEC-2026-0194` quadratic duplicate-attribute check, `RUSTSEC-2026-0195` unbounded namespace allocation in `NsReader`), `printpdf` 0.9 -> 0.12 so the transitive `lopdf` moves 0.39 -> 0.44 (`RUSTSEC-2026-0187` stack overflow on deeply nested PDF objects), `tauri` 2.11.0 -> 2.11.5 and `tauri-build` 2.6.0 -> 2.6.3 (`GHSA-7gmj-67g7-phm9`), plus transitive refreshes for `quinn-proto` 0.11.17 (`RUSTSEC-2026-0185`), `h2` 0.4.19 (`RUSTSEC-2026-0258`), `crossbeam-epoch` 0.9.20 (`RUSTSEC-2026-0204`), `serde_with` 3.22 (`GHSA-7gcf-g7xr-8hxj`) and `cmov` 0.5.4 (`GHSA-3rjw-m598-pq24`). The `quick-xml` 0.42 reader now yields `&str`-backed events for `Reader::from_str`, so `services/replication.rs` and `services/replication_status.rs` drop their `String::from_utf8_lossy` conversions. The `printpdf` 0.12 surface used by `services/export.rs` (`PdfDocument`, `PdfPage`, `Op`, `BuiltinFont`) is unchanged.
+- Bump the frontend dependency graph to clear every open `pnpm audit` finding and GitHub Dependabot alert on `pnpm-lock.yaml`: `vite` 8.0.10 -> 8.2.2 (`GHSA-fx2h-pf6j-xcff` `server.fs.deny` bypass on Windows, `GHSA-v6wh-96g9-6wx3`), and transitive refreshes for `undici` 7.29 (12 advisories), `postcss` 8.5.26, `brace-expansion` 5.0.9, `esbuild` 0.28.2, `@babel/core` 7.29.6, `nanoid` 3.3.18, `ws` 8.21.3 and `browserslist` 4.28.8. Dropped the `pnpm.overrides` block from `package.json`: pnpm 10.28 no longer reads it, and both pins (`postcss`, `@joshwooding/vite-plugin-react-docgen-typescript`) now resolve to patched versions without it.
+
+### Changed
+
+- Bump Rust majors with no call-site change: `base64` 0.22 -> 0.23, `rusqlite` 0.39 -> 0.40, `rust_xlsxwriter` 0.94 -> 0.99 (zip 7 -> 8), `serial_test` 3 -> 4 (dev), and `keyring` 3 -> 4. The `keyring` 4 default `v1` feature set (Windows native store, macOS keychain, zbus secret-service on Linux) replaces the former `sync-secret-service` feature flag and keeps the `Entry` / `Error::NoEntry` API DSPanel relies on.
+- Bump frontend deps to their latest in-range releases: `react` / `react-dom` 19.2.8, `i18next` 26.4, `react-i18next` 17.0.13, `lucide-react` 1.39, `tailwindcss` / `@tailwindcss/vite` 4.3.3, `@tanstack/react-virtual` 3.14, `@tauri-apps/api` 2.11.1, `@tauri-apps/cli` 2.11.4, `@storybook/*` 10.5.10, `vitest` / `@vitest/coverage-v8` 4.1.11, `eslint` 10.9, `typescript-eslint` 8.69, `prettier` 3.9.6, `@vitejs/plugin-react` 6.1.1. Majors: `jsdom` 29 -> 30 and `@testing-library/jest-dom` 6 -> 7 (test-only). `typescript` stays on 6.0.x because `typescript-eslint` 8.69 does not support the TypeScript 7.0 API yet.
+- Reformat 121 frontend source files with `prettier` so `pnpm format:check` passes again. The drift predates this change (the files already failed the check under prettier 3.8) and the CI build workflow does not run the format gate.
+
 ## [1.1.1] - 2026-05-04
 
 ### Added
