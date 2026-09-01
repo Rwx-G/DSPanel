@@ -230,7 +230,14 @@ function OnboardingContent() {
     } finally {
       setExecuting(false);
     }
-  }, [selectedPreset, currentLogin, currentDisplayName, details, handleError, showConfirmation]);
+  }, [
+    selectedPreset,
+    currentLogin,
+    currentDisplayName,
+    details,
+    handleError,
+    showConfirmation,
+  ]);
 
   const handleCopy = useCallback(
     async (text: string, label: string) => {
@@ -262,7 +269,10 @@ function OnboardingContent() {
   return (
     <div className="flex h-full flex-col p-4" data-testid="onboarding-wizard">
       {/* Step indicator */}
-      <div className="mb-4 flex items-center gap-2" data-testid="step-indicator">
+      <div
+        className="mb-4 flex items-center gap-2"
+        data-testid="step-indicator"
+      >
         {STEPS.map((s, i) => (
           <div key={s.id} className="flex items-center gap-2">
             <div
@@ -297,7 +307,10 @@ function OnboardingContent() {
       <div className="flex-1 overflow-auto rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-4">
         {/* Step 1: User Details */}
         {step === "details" && (
-          <div className="mx-auto max-w-lg space-y-4" data-testid="step-details">
+          <div
+            className="mx-auto max-w-lg space-y-4"
+            data-testid="step-details"
+          >
             <div>
               <label className="mb-1 block text-caption font-semibold text-[var(--color-text-secondary)]">
                 {t("firstName")} *
@@ -445,7 +458,10 @@ function OnboardingContent() {
 
         {/* Step 3: Preview */}
         {step === "preview" && selectedPreset && (
-          <div className="mx-auto max-w-lg space-y-3" data-testid="step-preview">
+          <div
+            className="mx-auto max-w-lg space-y-3"
+            data-testid="step-preview"
+          >
             <h3 className="text-body font-semibold text-[var(--color-text-primary)]">
               {t("changesToApply")}
             </h3>
@@ -505,16 +521,14 @@ function OnboardingContent() {
                     {t("attributes")}:
                   </span>
                   <ul className="ml-4 mt-1 space-y-0.5">
-                    {Object.entries(selectedPreset.attributes).map(
-                      ([k, v]) => (
-                        <li
-                          key={k}
-                          className="text-caption text-[var(--color-success)]"
-                        >
-                          + {k} = {v}
-                        </li>
-                      ),
-                    )}
+                    {Object.entries(selectedPreset.attributes).map(([k, v]) => (
+                      <li
+                        key={k}
+                        className="text-caption text-[var(--color-success)]"
+                      >
+                        + {k} = {v}
+                      </li>
+                    ))}
                   </ul>
                 </div>
               )}
@@ -525,9 +539,7 @@ function OnboardingContent() {
         {/* Step 4: Execute / Result */}
         {step === "execute" && (
           <div className="mx-auto max-w-lg" data-testid="step-execute">
-            {executing && (
-              <LoadingSpinner message={t("creatingUser")} />
-            )}
+            {executing && <LoadingSpinner message={t("creatingUser")} />}
             {result && !executing && (
               <div className="space-y-4">
                 {result.success ? (
@@ -542,12 +554,22 @@ function OnboardingContent() {
                       className="rounded-md bg-[var(--color-surface-hover)] p-4 font-mono text-caption space-y-1"
                       data-testid="onboarding-summary"
                     >
-                      <div>{t("summaryLogin")} {result.login}</div>
-                      <div>{t("summaryPassword")} {result.password}</div>
-                      <div>{t("dnLabel")} {result.userDn}</div>
-                      <div>{t("ouLabel")} {result.targetOu}</div>
+                      <div>
+                        {t("summaryLogin")} {result.login}
+                      </div>
+                      <div>
+                        {t("summaryPassword")} {result.password}
+                      </div>
+                      <div>
+                        {t("dnLabel")} {result.userDn}
+                      </div>
+                      <div>
+                        {t("ouLabel")} {result.targetOu}
+                      </div>
                       {result.groups.map((g) => (
-                        <div key={g}>{t("groupLabel")} {g}</div>
+                        <div key={g}>
+                          {t("groupLabel")} {g}
+                        </div>
                       ))}
                     </div>
                     <div className="flex gap-2">

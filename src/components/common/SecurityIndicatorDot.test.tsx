@@ -188,9 +188,7 @@ describe("SecurityIndicatorDot", () => {
     render(<SecurityIndicatorDot indicators={set()} />);
     fireEvent.mouseEnter(screen.getByTestId("security-indicator-dot"));
     await waitFor(() => {
-      expect(
-        screen.getByText("Security indicators"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("Security indicators")).toBeInTheDocument();
     });
   });
 

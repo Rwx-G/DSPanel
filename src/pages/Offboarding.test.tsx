@@ -268,9 +268,7 @@ describe("Offboarding", () => {
       expect(screen.getByTestId("offboard-search-btn")).toBeDefined();
     });
 
-    const btn = screen.getByTestId(
-      "offboard-search-btn",
-    ) as HTMLButtonElement;
+    const btn = screen.getByTestId("offboard-search-btn") as HTMLButtonElement;
     expect(btn.disabled).toBe(true);
   });
 
@@ -424,7 +422,13 @@ describe("Offboarding", () => {
         case "get_user":
           return Promise.resolve(mockUser);
         case "get_ou_tree":
-          return Promise.resolve([{ name: "Root", distinguishedName: "DC=example,DC=com", children: [] }]);
+          return Promise.resolve([
+            {
+              name: "Root",
+              distinguishedName: "DC=example,DC=com",
+              children: [],
+            },
+          ]);
         default:
           return Promise.resolve(null);
       }
@@ -449,7 +453,9 @@ describe("Offboarding", () => {
       expect(screen.getByTestId("action-moveToDisabledOU")).toBeDefined();
     });
 
-    const moveCheckbox = screen.getByTestId("action-moveToDisabledOU") as HTMLInputElement;
+    const moveCheckbox = screen.getByTestId(
+      "action-moveToDisabledOU",
+    ) as HTMLInputElement;
     expect(moveCheckbox.checked).toBe(false);
 
     fireEvent.click(moveCheckbox);
@@ -488,7 +494,9 @@ describe("Offboarding", () => {
     fireEvent.click(screen.getByTestId("action-removeGroups"));
     fireEvent.click(screen.getByTestId("action-setRandomPassword"));
 
-    const nextBtn = screen.getByTestId("offboard-btn-next") as HTMLButtonElement;
+    const nextBtn = screen.getByTestId(
+      "offboard-btn-next",
+    ) as HTMLButtonElement;
     expect(nextBtn.disabled).toBe(true);
   });
 
@@ -521,7 +529,9 @@ describe("Offboarding", () => {
     });
 
     expect(screen.getByText(/Account will be disabled/)).toBeDefined();
-    expect(screen.getByText(/Password will be reset to random value/)).toBeDefined();
+    expect(
+      screen.getByText(/Password will be reset to random value/),
+    ).toBeDefined();
     // Group removal entries
     expect(screen.getByText(/Remove from:.*Developers/)).toBeDefined();
     expect(screen.getByText(/Remove from:.*VPN-Users/)).toBeDefined();
@@ -811,7 +821,9 @@ describe("Offboarding", () => {
     });
 
     // Input should be cleared
-    const input = screen.getByTestId("offboard-search-input") as HTMLInputElement;
+    const input = screen.getByTestId(
+      "offboard-search-input",
+    ) as HTMLInputElement;
     expect(input.value).toBe("");
   });
 
@@ -896,7 +908,9 @@ describe("Offboarding", () => {
     fireEvent.click(infoBtn);
 
     await waitFor(() => {
-      expect(screen.getByText(/The sAMAccountName is the user login/)).toBeDefined();
+      expect(
+        screen.getByText(/The sAMAccountName is the user login/),
+      ).toBeDefined();
     });
   });
 
@@ -910,9 +924,17 @@ describe("Offboarding", () => {
         case "get_user":
           return Promise.resolve(mockUser);
         case "get_app_settings":
-          return Promise.resolve({ disabledOu: "OU=Disabled,DC=example,DC=com" });
+          return Promise.resolve({
+            disabledOu: "OU=Disabled,DC=example,DC=com",
+          });
         case "get_ou_tree":
-          return Promise.resolve([{ name: "Root", distinguishedName: "DC=example,DC=com", children: [] }]);
+          return Promise.resolve([
+            {
+              name: "Root",
+              distinguishedName: "DC=example,DC=com",
+              children: [],
+            },
+          ]);
         default:
           return Promise.resolve(null);
       }

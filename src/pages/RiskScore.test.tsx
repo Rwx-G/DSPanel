@@ -96,11 +96,13 @@ function setupMocks(
 ) {
   mockInvoke.mockImplementation((cmd: string) => {
     if (cmd === "get_risk_score") {
-      if (scoreResult instanceof Error) return Promise.reject(scoreResult.message);
+      if (scoreResult instanceof Error)
+        return Promise.reject(scoreResult.message);
       return Promise.resolve(scoreResult);
     }
     if (cmd === "get_risk_score_history") {
-      if (historyResult instanceof Error) return Promise.reject(historyResult.message);
+      if (historyResult instanceof Error)
+        return Promise.reject(historyResult.message);
       return Promise.resolve(historyResult);
     }
     if (cmd === "save_file_dialog") {
@@ -194,8 +196,12 @@ describe("RiskScoreDashboard", () => {
       expect(screen.getByTestId("factor-breakdown")).toBeInTheDocument();
     });
 
-    expect(screen.getByTestId("factor-card-password-policy")).toBeInTheDocument();
-    expect(screen.getByTestId("factor-card-privileged-accounts")).toBeInTheDocument();
+    expect(
+      screen.getByTestId("factor-card-password-policy"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId("factor-card-privileged-accounts"),
+    ).toBeInTheDocument();
     expect(screen.getByTestId("factor-card-replication")).toBeInTheDocument();
     expect(screen.getByTestId("factor-card-kerberos")).toBeInTheDocument();
   });
@@ -205,10 +211,14 @@ describe("RiskScoreDashboard", () => {
     render(<RiskScoreDashboard />);
 
     await waitFor(() => {
-      expect(screen.getByTestId("factor-card-password-policy")).toBeInTheDocument();
+      expect(
+        screen.getByTestId("factor-card-password-policy"),
+      ).toBeInTheDocument();
     });
 
-    expect(screen.getByTestId("factor-card-privileged-accounts")).toBeInTheDocument();
+    expect(
+      screen.getByTestId("factor-card-privileged-accounts"),
+    ).toBeInTheDocument();
     expect(
       screen.getByText("Several privileged accounts have stale passwords."),
     ).toBeInTheDocument();
@@ -220,7 +230,9 @@ describe("RiskScoreDashboard", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText("Rotate passwords for privileged accounts older than 90 days"),
+        screen.getByText(
+          "Rotate passwords for privileged accounts older than 90 days",
+        ),
       ).toBeInTheDocument();
     });
 
@@ -234,7 +246,9 @@ describe("RiskScoreDashboard", () => {
     render(<RiskScoreDashboard />);
 
     await waitFor(() => {
-      expect(screen.getByTestId("factor-card-password-policy")).toBeInTheDocument();
+      expect(
+        screen.getByTestId("factor-card-password-policy"),
+      ).toBeInTheDocument();
     });
 
     // Password Policy (score=85) should not have a recommendations section
@@ -285,7 +299,9 @@ describe("RiskScoreDashboard", () => {
       expect(mockInvoke).toHaveBeenCalledWith("get_risk_score");
     });
 
-    expect(mockInvoke).toHaveBeenCalledWith("get_risk_score_history", { days: 30 });
+    expect(mockInvoke).toHaveBeenCalledWith("get_risk_score_history", {
+      days: 30,
+    });
   });
 
   it("calls refresh on button click", async () => {
@@ -380,12 +396,14 @@ describe("RiskScoreDashboard", () => {
     render(<RiskScoreDashboard />);
 
     await waitFor(() => {
-      expect(screen.getByTestId("findings-toggle-privileged-accounts")).toBeInTheDocument();
+      expect(
+        screen.getByTestId("findings-toggle-privileged-accounts"),
+      ).toBeInTheDocument();
     });
 
-    expect(screen.getByTestId("findings-toggle-privileged-accounts")).toHaveTextContent(
-      "Findings (2)",
-    );
+    expect(
+      screen.getByTestId("findings-toggle-privileged-accounts"),
+    ).toHaveTextContent("Findings (2)");
   });
 
   it("expands findings section on toggle click", async () => {
@@ -393,15 +411,21 @@ describe("RiskScoreDashboard", () => {
     render(<RiskScoreDashboard />);
 
     await waitFor(() => {
-      expect(screen.getByTestId("findings-toggle-privileged-accounts")).toBeInTheDocument();
+      expect(
+        screen.getByTestId("findings-toggle-privileged-accounts"),
+      ).toBeInTheDocument();
     });
 
     // Findings list should not be visible yet
-    expect(screen.queryByTestId("findings-list-privileged-accounts")).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("findings-list-privileged-accounts"),
+    ).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId("findings-toggle-privileged-accounts"));
 
-    expect(screen.getByTestId("findings-list-privileged-accounts")).toBeInTheDocument();
+    expect(
+      screen.getByTestId("findings-list-privileged-accounts"),
+    ).toBeInTheDocument();
     expect(screen.getByTestId("finding-finding-stale-pw")).toBeInTheDocument();
     expect(screen.getByTestId("finding-finding-no-mfa")).toBeInTheDocument();
   });
@@ -411,12 +435,14 @@ describe("RiskScoreDashboard", () => {
     render(<RiskScoreDashboard />);
 
     await waitFor(() => {
-      expect(screen.getByTestId("impact-if-fixed-privileged-accounts")).toBeInTheDocument();
+      expect(
+        screen.getByTestId("impact-if-fixed-privileged-accounts"),
+      ).toBeInTheDocument();
     });
 
-    expect(screen.getByTestId("impact-if-fixed-privileged-accounts")).toHaveTextContent(
-      "Potential gain: +12 points",
-    );
+    expect(
+      screen.getByTestId("impact-if-fixed-privileged-accounts"),
+    ).toHaveTextContent("Potential gain: +12 points");
   });
 
   it("does not show findings section for factors without findings", async () => {
@@ -424,9 +450,13 @@ describe("RiskScoreDashboard", () => {
     render(<RiskScoreDashboard />);
 
     await waitFor(() => {
-      expect(screen.getByTestId("factor-card-password-policy")).toBeInTheDocument();
+      expect(
+        screen.getByTestId("factor-card-password-policy"),
+      ).toBeInTheDocument();
     });
 
-    expect(screen.queryByTestId("findings-toggle-password-policy")).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("findings-toggle-password-policy"),
+    ).not.toBeInTheDocument();
   });
 });

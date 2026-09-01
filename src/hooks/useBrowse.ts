@@ -147,9 +147,7 @@ export function useBrowse<T>({
       setHasMore(false);
       setBrowsePageLoaded(page - 1);
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to load items",
-      );
+      setError(err instanceof Error ? err.message : "Failed to load items");
     } finally {
       setLoading(false);
     }

@@ -75,10 +75,13 @@ describe("ReplicationStatus", () => {
       </Wrapper>,
     );
 
-    await waitFor(() => {
-      expect(screen.getByText("DC1.example.com")).toBeInTheDocument();
-      expect(screen.getByText("DC2.example.com")).toBeInTheDocument();
-    }, { timeout: 5000 });
+    await waitFor(
+      () => {
+        expect(screen.getByText("DC1.example.com")).toBeInTheDocument();
+        expect(screen.getByText("DC2.example.com")).toBeInTheDocument();
+      },
+      { timeout: 5000 },
+    );
   });
 
   it("shows error state when fetch fails", async () => {
@@ -89,11 +92,14 @@ describe("ReplicationStatus", () => {
       </Wrapper>,
     );
 
-    await waitFor(() => {
-      expect(
-        screen.getByText("Replication Check Failed"),
-      ).toBeInTheDocument();
-    }, { timeout: 5000 });
+    await waitFor(
+      () => {
+        expect(
+          screen.getByText("Replication Check Failed"),
+        ).toBeInTheDocument();
+      },
+      { timeout: 5000 },
+    );
   });
 
   it("shows empty state when no partnerships found", async () => {
@@ -104,11 +110,14 @@ describe("ReplicationStatus", () => {
       </Wrapper>,
     );
 
-    await waitFor(() => {
-      expect(
-        screen.getByText("No Replication Partnerships Found"),
-      ).toBeInTheDocument();
-    }, { timeout: 5000 });
+    await waitFor(
+      () => {
+        expect(
+          screen.getByText("No Replication Partnerships Found"),
+        ).toBeInTheDocument();
+      },
+      { timeout: 5000 },
+    );
   });
 
   it("highlights failed partnerships", async () => {
@@ -119,9 +128,12 @@ describe("ReplicationStatus", () => {
       </Wrapper>,
     );
 
-    await waitFor(() => {
-      expect(screen.getByText("5 failures")).toBeInTheDocument();
-    }, { timeout: 5000 });
+    await waitFor(
+      () => {
+        expect(screen.getByText("5 failures")).toBeInTheDocument();
+      },
+      { timeout: 5000 },
+    );
   });
 
   it("shows naming context in table", async () => {
@@ -132,9 +144,12 @@ describe("ReplicationStatus", () => {
       </Wrapper>,
     );
 
-    await waitFor(() => {
-      expect(screen.getByText("DC=example,DC=com")).toBeInTheDocument();
-    }, { timeout: 5000 });
+    await waitFor(
+      () => {
+        expect(screen.getByText("DC=example,DC=com")).toBeInTheDocument();
+      },
+      { timeout: 5000 },
+    );
   });
 
   it("shows sync button for each partnership", async () => {
@@ -145,10 +160,13 @@ describe("ReplicationStatus", () => {
       </Wrapper>,
     );
 
-    await waitFor(() => {
-      expect(screen.getByTestId("force-repl-0")).toBeInTheDocument();
-      expect(screen.getByText("Sync")).toBeInTheDocument();
-    }, { timeout: 5000 });
+    await waitFor(
+      () => {
+        expect(screen.getByTestId("force-repl-0")).toBeInTheDocument();
+        expect(screen.getByText("Sync")).toBeInTheDocument();
+      },
+      { timeout: 5000 },
+    );
   });
 
   it("manual refresh button triggers reload", async () => {
@@ -159,15 +177,21 @@ describe("ReplicationStatus", () => {
       </Wrapper>,
     );
 
-    await waitFor(() => {
-      expect(screen.getByText("DC1.example.com")).toBeInTheDocument();
-    }, { timeout: 5000 });
+    await waitFor(
+      () => {
+        expect(screen.getByText("DC1.example.com")).toBeInTheDocument();
+      },
+      { timeout: 5000 },
+    );
 
     fireEvent.click(screen.getByTestId("refresh-button"));
 
-    await waitFor(() => {
-      expect(mockInvoke).toHaveBeenCalledTimes(2);
-    }, { timeout: 5000 });
+    await waitFor(
+      () => {
+        expect(mockInvoke).toHaveBeenCalledTimes(2);
+      },
+      { timeout: 5000 },
+    );
   });
 
   it("auto-refresh triggers at interval", async () => {
@@ -178,16 +202,22 @@ describe("ReplicationStatus", () => {
       </Wrapper>,
     );
 
-    await waitFor(() => {
-      expect(screen.getByText("DC1.example.com")).toBeInTheDocument();
-    }, { timeout: 5000 });
+    await waitFor(
+      () => {
+        expect(screen.getByText("DC1.example.com")).toBeInTheDocument();
+      },
+      { timeout: 5000 },
+    );
 
     // Default is 120s
     vi.advanceTimersByTime(120_000);
 
-    await waitFor(() => {
-      expect(mockInvoke).toHaveBeenCalledTimes(2);
-    }, { timeout: 5000 });
+    await waitFor(
+      () => {
+        expect(mockInvoke).toHaveBeenCalledTimes(2);
+      },
+      { timeout: 5000 },
+    );
   });
 
   it("calls invoke with correct command name", async () => {
@@ -198,9 +228,12 @@ describe("ReplicationStatus", () => {
       </Wrapper>,
     );
 
-    await waitFor(() => {
-      expect(mockInvoke).toHaveBeenCalledWith("get_replication_status");
-    }, { timeout: 5000 });
+    await waitFor(
+      () => {
+        expect(mockInvoke).toHaveBeenCalledWith("get_replication_status");
+      },
+      { timeout: 5000 },
+    );
   });
 
   it("displays USN value in the table row", async () => {
@@ -215,9 +248,12 @@ describe("ReplicationStatus", () => {
       </Wrapper>,
     );
 
-    await waitFor(() => {
-      expect(screen.getByText("42")).toBeInTheDocument();
-    }, { timeout: 5000 });
+    await waitFor(
+      () => {
+        expect(screen.getByText("42")).toBeInTheDocument();
+      },
+      { timeout: 5000 },
+    );
   });
 
   it("displays transport column value", async () => {
@@ -232,9 +268,12 @@ describe("ReplicationStatus", () => {
       </Wrapper>,
     );
 
-    await waitFor(() => {
-      expect(screen.getByText("IP")).toBeInTheDocument();
-    }, { timeout: 5000 });
+    await waitFor(
+      () => {
+        expect(screen.getByText("IP")).toBeInTheDocument();
+      },
+      { timeout: 5000 },
+    );
   });
 
   it("shows dash when USN is null", async () => {
@@ -249,9 +288,12 @@ describe("ReplicationStatus", () => {
       </Wrapper>,
     );
 
-    await waitFor(() => {
-      expect(screen.getByTestId("replication-row-0")).toBeInTheDocument();
-    }, { timeout: 5000 });
+    await waitFor(
+      () => {
+        expect(screen.getByTestId("replication-row-0")).toBeInTheDocument();
+      },
+      { timeout: 5000 },
+    );
   });
 
   it("shows warning count in toolbar when warnings exist", async () => {
@@ -268,9 +310,12 @@ describe("ReplicationStatus", () => {
       </Wrapper>,
     );
 
-    await waitFor(() => {
-      expect(screen.getByTestId("replication-table")).toBeInTheDocument();
-    }, { timeout: 5000 });
+    await waitFor(
+      () => {
+        expect(screen.getByTestId("replication-table")).toBeInTheDocument();
+      },
+      { timeout: 5000 },
+    );
   });
 
   it("shows both healthy and failed counts in toolbar", async () => {
@@ -281,9 +326,12 @@ describe("ReplicationStatus", () => {
       </Wrapper>,
     );
 
-    await waitFor(() => {
-      expect(screen.getByTestId("replication-table")).toBeInTheDocument();
-    }, { timeout: 5000 });
+    await waitFor(
+      () => {
+        expect(screen.getByTestId("replication-table")).toBeInTheDocument();
+      },
+      { timeout: 5000 },
+    );
   });
 
   it("changes refresh interval via dropdown", async () => {
@@ -294,9 +342,12 @@ describe("ReplicationStatus", () => {
       </Wrapper>,
     );
 
-    await waitFor(() => {
-      expect(screen.getByTestId("refresh-interval")).toBeInTheDocument();
-    }, { timeout: 5000 });
+    await waitFor(
+      () => {
+        expect(screen.getByTestId("refresh-interval")).toBeInTheDocument();
+      },
+      { timeout: 5000 },
+    );
 
     const select = screen.getByTestId("refresh-interval") as HTMLSelectElement;
     expect(select.value).toBe("120");
@@ -313,9 +364,12 @@ describe("ReplicationStatus", () => {
       </Wrapper>,
     );
 
-    await waitFor(() => {
-      expect(screen.getByTestId("refresh-interval")).toBeInTheDocument();
-    }, { timeout: 5000 });
+    await waitFor(
+      () => {
+        expect(screen.getByTestId("refresh-interval")).toBeInTheDocument();
+      },
+      { timeout: 5000 },
+    );
 
     // Set to Off
     fireEvent.change(screen.getByTestId("refresh-interval"), {
@@ -327,9 +381,12 @@ describe("ReplicationStatus", () => {
     // Advance time - should NOT trigger additional fetches
     vi.advanceTimersByTime(300_000);
 
-    await waitFor(() => {
-      expect(mockInvoke.mock.calls.length).toBe(callCountAfterOff);
-    }, { timeout: 5000 });
+    await waitFor(
+      () => {
+        expect(mockInvoke.mock.calls.length).toBe(callCountAfterOff);
+      },
+      { timeout: 5000 },
+    );
   });
 
   it("force replication button triggers confirmation dialog", async () => {
@@ -340,16 +397,22 @@ describe("ReplicationStatus", () => {
       </Wrapper>,
     );
 
-    await waitFor(() => {
-      expect(screen.getByTestId("force-repl-0")).toBeInTheDocument();
-    }, { timeout: 5000 });
+    await waitFor(
+      () => {
+        expect(screen.getByTestId("force-repl-0")).toBeInTheDocument();
+      },
+      { timeout: 5000 },
+    );
 
     fireEvent.click(screen.getByTestId("force-repl-0"));
 
     // Confirmation dialog should appear
-    await waitFor(() => {
-      expect(screen.getByText("Force Replication")).toBeInTheDocument();
-    }, { timeout: 5000 });
+    await waitFor(
+      () => {
+        expect(screen.getByText("Force Replication")).toBeInTheDocument();
+      },
+      { timeout: 5000 },
+    );
   });
 
   it("displays error recovered after retry", async () => {
@@ -365,17 +428,25 @@ describe("ReplicationStatus", () => {
     );
 
     // Should show error
-    await waitFor(() => {
-      expect(screen.getByText("Replication Check Failed")).toBeInTheDocument();
-    }, { timeout: 5000 });
+    await waitFor(
+      () => {
+        expect(
+          screen.getByText("Replication Check Failed"),
+        ).toBeInTheDocument();
+      },
+      { timeout: 5000 },
+    );
 
     // Click refresh to retry
     fireEvent.click(screen.getByTestId("refresh-button"));
 
     // Should now show the data
-    await waitFor(() => {
-      expect(screen.getByText("DC1.example.com")).toBeInTheDocument();
-    }, { timeout: 5000 });
+    await waitFor(
+      () => {
+        expect(screen.getByText("DC1.example.com")).toBeInTheDocument();
+      },
+      { timeout: 5000 },
+    );
   });
 
   it("formats latency as N/A when lastSyncTime is null", async () => {
@@ -390,9 +461,12 @@ describe("ReplicationStatus", () => {
       </Wrapper>,
     );
 
-    await waitFor(() => {
-      expect(screen.getByText("N/A")).toBeInTheDocument();
-    }, { timeout: 5000 });
+    await waitFor(
+      () => {
+        expect(screen.getByText("N/A")).toBeInTheDocument();
+      },
+      { timeout: 5000 },
+    );
   });
 
   it("shows multiple rows for multiple partnerships", async () => {
@@ -403,10 +477,13 @@ describe("ReplicationStatus", () => {
       </Wrapper>,
     );
 
-    await waitFor(() => {
-      expect(screen.getByTestId("replication-row-0")).toBeInTheDocument();
-      expect(screen.getByTestId("replication-row-1")).toBeInTheDocument();
-    }, { timeout: 5000 });
+    await waitFor(
+      () => {
+        expect(screen.getByTestId("replication-row-0")).toBeInTheDocument();
+        expect(screen.getByTestId("replication-row-1")).toBeInTheDocument();
+      },
+      { timeout: 5000 },
+    );
 
     expect(screen.getByText("DC1.example.com")).toBeInTheDocument();
     expect(screen.getByText("DC3.example.com")).toBeInTheDocument();

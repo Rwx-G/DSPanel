@@ -246,7 +246,10 @@ export function PasswordResetDialog({
                   label={t("dialogs:passwordReset.lowercaseLetter")}
                   valid={validation.hasLowercase}
                 />
-                <ValidationItem label={t("dialogs:passwordReset.digit")} valid={validation.hasDigit} />
+                <ValidationItem
+                  label={t("dialogs:passwordReset.digit")}
+                  valid={validation.hasDigit}
+                />
                 <ValidationItem
                   label={t("dialogs:passwordReset.specialCharacter")}
                   valid={validation.hasSpecial}
@@ -300,7 +303,9 @@ export function PasswordResetDialog({
                       </span>
                     ) : hibpResult.isBreached ? (
                       <span className="text-caption text-[var(--color-error)]">
-                        {t("dialogs:passwordReset.foundInBreaches", { count: hibpResult.breachCount })}
+                        {t("dialogs:passwordReset.foundInBreaches", {
+                          count: hibpResult.breachCount,
+                        })}
                       </span>
                     ) : (
                       <span className="text-caption text-[var(--color-success)]">
@@ -351,7 +356,11 @@ export function PasswordResetDialog({
           disabled={!canReset || loading}
           data-testid="reset-btn"
         >
-          {loading ? <LoadingSpinner size={16} /> : t("dialogs:passwordReset.resetButton")}
+          {loading ? (
+            <LoadingSpinner size={16} />
+          ) : (
+            t("dialogs:passwordReset.resetButton")
+          )}
         </button>
       </div>
     </DialogShell>

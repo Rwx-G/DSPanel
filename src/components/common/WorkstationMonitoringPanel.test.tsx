@@ -31,9 +31,7 @@ const sampleMetrics: SystemMetrics = {
       startMode: "Manual",
     },
   ],
-  sessions: [
-    { username: "DOMAIN\\jdoe", logonTime: "2026-03-21T08:00:00Z" },
-  ],
+  sessions: [{ username: "DOMAIN\\jdoe", logonTime: "2026-03-21T08:00:00Z" }],
   timestamp: "2026-03-21T12:00:00Z",
   errorMessage: null,
 };
@@ -60,93 +58,123 @@ describe("WorkstationMonitoringPanel", () => {
     mockInvoke.mockResolvedValueOnce(sampleMetrics);
     render(<WorkstationMonitoringPanel hostname="PC001.example.com" />);
 
-    await waitFor(() => {
-      expect(
-        screen.getByText("Monitoring: PC001.example.com"),
-      ).toBeInTheDocument();
-    }, { timeout: 5000 });
+    await waitFor(
+      () => {
+        expect(
+          screen.getByText("Monitoring: PC001.example.com"),
+        ).toBeInTheDocument();
+      },
+      { timeout: 5000 },
+    );
   });
 
   it("shows CPU usage", async () => {
     mockInvoke.mockResolvedValueOnce(sampleMetrics);
     render(<WorkstationMonitoringPanel hostname="PC001.example.com" />);
 
-    await waitFor(() => {
-      expect(screen.getByTestId("cpu-section")).toBeInTheDocument();
-      expect(screen.getByText("46%")).toBeInTheDocument();
-    }, { timeout: 5000 });
+    await waitFor(
+      () => {
+        expect(screen.getByTestId("cpu-section")).toBeInTheDocument();
+        expect(screen.getByText("46%")).toBeInTheDocument();
+      },
+      { timeout: 5000 },
+    );
   });
 
   it("shows memory usage", async () => {
     mockInvoke.mockResolvedValueOnce(sampleMetrics);
     render(<WorkstationMonitoringPanel hostname="PC001.example.com" />);
 
-    await waitFor(() => {
-      expect(screen.getByTestId("memory-section")).toBeInTheDocument();
-    }, { timeout: 5000 });
+    await waitFor(
+      () => {
+        expect(screen.getByTestId("memory-section")).toBeInTheDocument();
+      },
+      { timeout: 5000 },
+    );
   });
 
   it("shows disk info", async () => {
     mockInvoke.mockResolvedValueOnce(sampleMetrics);
     render(<WorkstationMonitoringPanel hostname="PC001.example.com" />);
 
-    await waitFor(() => {
-      expect(screen.getByText("C:")).toBeInTheDocument();
-      expect(screen.getByText("D:")).toBeInTheDocument();
-    }, { timeout: 5000 });
+    await waitFor(
+      () => {
+        expect(screen.getByText("C:")).toBeInTheDocument();
+        expect(screen.getByText("D:")).toBeInTheDocument();
+      },
+      { timeout: 5000 },
+    );
   });
 
   it("shows services", async () => {
     mockInvoke.mockResolvedValueOnce(sampleMetrics);
     render(<WorkstationMonitoringPanel hostname="PC001.example.com" />);
 
-    await waitFor(() => {
-      expect(screen.getByText("Print Spooler")).toBeInTheDocument();
-      expect(screen.getByText("Running")).toBeInTheDocument();
-      expect(screen.getByText("Stopped")).toBeInTheDocument();
-    }, { timeout: 5000 });
+    await waitFor(
+      () => {
+        expect(screen.getByText("Print Spooler")).toBeInTheDocument();
+        expect(screen.getByText("Running")).toBeInTheDocument();
+        expect(screen.getByText("Stopped")).toBeInTheDocument();
+      },
+      { timeout: 5000 },
+    );
   });
 
   it("shows sessions", async () => {
     mockInvoke.mockResolvedValueOnce(sampleMetrics);
     render(<WorkstationMonitoringPanel hostname="PC001.example.com" />);
 
-    await waitFor(() => {
-      expect(screen.getByText("DOMAIN\\jdoe")).toBeInTheDocument();
-    }, { timeout: 5000 });
+    await waitFor(
+      () => {
+        expect(screen.getByText("DOMAIN\\jdoe")).toBeInTheDocument();
+      },
+      { timeout: 5000 },
+    );
   });
 
   it("shows error when workstation unreachable", async () => {
     mockInvoke.mockRejectedValueOnce("Host unreachable");
     render(<WorkstationMonitoringPanel hostname="PC001.example.com" />);
 
-    await waitFor(() => {
-      expect(screen.getByTestId("monitor-error")).toBeInTheDocument();
-    }, { timeout: 5000 });
+    await waitFor(
+      () => {
+        expect(screen.getByTestId("monitor-error")).toBeInTheDocument();
+      },
+      { timeout: 5000 },
+    );
   });
 
   it("auto-refreshes at default interval", async () => {
     mockInvoke.mockResolvedValue(sampleMetrics);
     render(<WorkstationMonitoringPanel hostname="PC001.example.com" />);
 
-    await waitFor(() => {
-      expect(screen.getByText("46%")).toBeInTheDocument();
-    }, { timeout: 5000 });
+    await waitFor(
+      () => {
+        expect(screen.getByText("46%")).toBeInTheDocument();
+      },
+      { timeout: 5000 },
+    );
 
     vi.advanceTimersByTime(5000);
 
-    await waitFor(() => {
-      expect(mockInvoke).toHaveBeenCalledTimes(2);
-    }, { timeout: 5000 });
+    await waitFor(
+      () => {
+        expect(mockInvoke).toHaveBeenCalledTimes(2);
+      },
+      { timeout: 5000 },
+    );
   });
 
   it("pause button stops auto-refresh", async () => {
     mockInvoke.mockResolvedValue(sampleMetrics);
     render(<WorkstationMonitoringPanel hostname="PC001.example.com" />);
 
-    await waitFor(() => {
-      expect(screen.getByText("46%")).toBeInTheDocument();
-    }, { timeout: 5000 });
+    await waitFor(
+      () => {
+        expect(screen.getByText("46%")).toBeInTheDocument();
+      },
+      { timeout: 5000 },
+    );
 
     fireEvent.click(screen.getByTestId("monitor-pause"));
 
@@ -158,10 +186,13 @@ describe("WorkstationMonitoringPanel", () => {
     mockInvoke.mockResolvedValueOnce(sampleMetrics);
     render(<WorkstationMonitoringPanel hostname="PC001.example.com" />);
 
-    await waitFor(() => {
-      expect(mockInvoke).toHaveBeenCalledWith("get_workstation_metrics", {
-        hostname: "PC001.example.com",
-      });
-    }, { timeout: 5000 });
+    await waitFor(
+      () => {
+        expect(mockInvoke).toHaveBeenCalledWith("get_workstation_metrics", {
+          hostname: "PC001.example.com",
+        });
+      },
+      { timeout: 5000 },
+    );
   });
 });

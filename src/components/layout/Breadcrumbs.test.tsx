@@ -92,9 +92,7 @@ describe("Breadcrumbs", () => {
 
     // After clicking Home, the module breadcrumb should no longer appear
     await waitFor(() => {
-      expect(
-        screen.queryByTestId("breadcrumb-users"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("breadcrumb-users")).not.toBeInTheDocument();
     });
   });
 });

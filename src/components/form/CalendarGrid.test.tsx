@@ -2,9 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { CalendarGrid } from "./CalendarGrid";
 
-function renderGrid(
-  props: Partial<Parameters<typeof CalendarGrid>[0]> = {},
-) {
+function renderGrid(props: Partial<Parameters<typeof CalendarGrid>[0]> = {}) {
   const defaultProps = {
     viewYear: 2025,
     viewMonth: 0, // January 2025

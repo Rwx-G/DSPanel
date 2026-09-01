@@ -156,7 +156,9 @@ export function DateTimePicker({
               : "text-[var(--color-text-secondary)]"
           }
         >
-          {value ? formatDate(value, includeTime) : (placeholder ?? t("components:dateTimePicker.placeholder"))}
+          {value
+            ? formatDate(value, includeTime)
+            : (placeholder ?? t("components:dateTimePicker.placeholder"))}
         </span>
         <div className="flex items-center gap-1">
           {value && !disabled && (

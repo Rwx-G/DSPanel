@@ -39,7 +39,11 @@ export function Pagination({
       <span data-testid="pagination-info">
         {totalItems === 0
           ? t("components:pagination.noItems")
-          : t("components:pagination.showing", { start: startItem, end: endItem, total: totalItems })}
+          : t("components:pagination.showing", {
+              start: startItem,
+              end: endItem,
+              total: totalItems,
+            })}
       </span>
 
       <div className="flex items-center gap-2">

@@ -98,7 +98,14 @@ export function PrinterLookup() {
       notify("Printer updated successfully", "success");
       refresh();
     }
-  }, [selectedPrinter, pendingChanges, showConfirmation, submitChanges, notify, refresh]);
+  }, [
+    selectedPrinter,
+    pendingChanges,
+    showConfirmation,
+    submitChanges,
+    notify,
+    refresh,
+  ]);
 
   const handleDelete = useCallback(
     async (printer: PrinterInfo) => {
@@ -119,7 +126,14 @@ export function PrinterLookup() {
         handleError(err, "deleting printer");
       }
     },
-    [selectedPrinter, setSelectedPrinter, handleError, notify, refresh, showConfirmation],
+    [
+      selectedPrinter,
+      setSelectedPrinter,
+      handleError,
+      notify,
+      refresh,
+      showConfirmation,
+    ],
   );
 
   const handleContextMenu = useCallback(
@@ -153,18 +167,48 @@ export function PrinterLookup() {
       {
         category: t("general"),
         items: [
-          { label: t("common:name"), value: printer.name, editable: canEdit, attributeName: "printerName" },
-          { label: t("common:location"), value: printer.location, editable: canEdit, attributeName: "location" },
-          { label: t("common:description"), value: printer.description, editable: canEdit, attributeName: "description" },
+          {
+            label: t("common:name"),
+            value: printer.name,
+            editable: canEdit,
+            attributeName: "printerName",
+          },
+          {
+            label: t("common:location"),
+            value: printer.location,
+            editable: canEdit,
+            attributeName: "location",
+          },
+          {
+            label: t("common:description"),
+            value: printer.description,
+            editable: canEdit,
+            attributeName: "description",
+          },
           { label: t("common:distinguishedName"), value: printer.dn },
         ],
       },
       {
         category: t("serverInfo"),
         items: [
-          { label: t("server"), value: printer.serverName, editable: canEdit, attributeName: "serverName" },
-          { label: t("sharePath"), value: printer.sharePath, editable: canEdit, attributeName: "uNCName" },
-          { label: t("driver"), value: printer.driverName, editable: canEdit, attributeName: "driverName" },
+          {
+            label: t("server"),
+            value: printer.serverName,
+            editable: canEdit,
+            attributeName: "serverName",
+          },
+          {
+            label: t("sharePath"),
+            value: printer.sharePath,
+            editable: canEdit,
+            attributeName: "uNCName",
+          },
+          {
+            label: t("driver"),
+            value: printer.driverName,
+            editable: canEdit,
+            attributeName: "driverName",
+          },
         ],
       },
     ],
@@ -304,7 +348,10 @@ export function PrinterLookup() {
                     {canDelete && (
                       <button
                         className="btn btn-sm flex items-center gap-1"
-                        style={{ color: "var(--color-error)", borderColor: "var(--color-error)" }}
+                        style={{
+                          color: "var(--color-error)",
+                          borderColor: "var(--color-error)",
+                        }}
                         onClick={() => handleDelete(selectedPrinter)}
                         data-testid="printer-delete-btn"
                       >
@@ -321,7 +368,9 @@ export function PrinterLookup() {
                           data-testid="pending-changes-bar"
                         >
                           <span className="text-caption text-[var(--color-text-primary)]">
-                            {t("common:change", { count: pendingChanges.length })}
+                            {t("common:change", {
+                              count: pendingChanges.length,
+                            })}
                             {pendingChanges.map((c) => (
                               <span
                                 key={c.attributeName}

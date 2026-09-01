@@ -32,7 +32,10 @@ function parseDnOu(dn: string): string {
   return ou || "-";
 }
 
-function formatAccountStatus(entry: DirectoryEntry, t: (key: string) => string): string {
+function formatAccountStatus(
+  entry: DirectoryEntry,
+  t: (key: string) => string,
+): string {
   const uac = parseInt(entry.attributes?.userAccountControl?.[0] ?? "0", 10);
   const disabled = (uac & 0x0002) !== 0;
   const locked =
@@ -185,10 +188,15 @@ function UserSearchField({
             {selectedUser.displayName ?? selectedUser.samAccountName}
           </div>
           <div className="mt-1 space-y-0.5 text-caption text-[var(--color-text-secondary)]">
-            <div>{t("sam")} {selectedUser.samAccountName}</div>
-            <div>{t("titleLabel")} {selectedUser.attributes?.title?.[0] ?? "-"}</div>
             <div>
-              {t("departmentLabel")} {selectedUser.attributes?.department?.[0] ?? "-"}
+              {t("sam")} {selectedUser.samAccountName}
+            </div>
+            <div>
+              {t("titleLabel")} {selectedUser.attributes?.title?.[0] ?? "-"}
+            </div>
+            <div>
+              {t("departmentLabel")}{" "}
+              {selectedUser.attributes?.department?.[0] ?? "-"}
             </div>
             <div>
               {t("ouLabel")}{" "}
@@ -197,10 +205,16 @@ function UserSearchField({
                 : "-"}
             </div>
             <div>
-              {t("lastLogonLabel")} {selectedUser.attributes?.lastLogon?.[0] ?? "-"}
+              {t("lastLogonLabel")}{" "}
+              {selectedUser.attributes?.lastLogon?.[0] ?? "-"}
             </div>
-            <div>{t("statusLabel")} {formatAccountStatus(selectedUser, t)}</div>
-            <div>{t("groupsLabel")} {selectedUser.attributes?.memberOf?.length ?? 0}</div>
+            <div>
+              {t("statusLabel")} {formatAccountStatus(selectedUser, t)}
+            </div>
+            <div>
+              {t("groupsLabel")}{" "}
+              {selectedUser.attributes?.memberOf?.length ?? 0}
+            </div>
           </div>
         </div>
       )}
@@ -324,7 +338,9 @@ export function UserComparison() {
 
       if (group.category === "onlyB" && userA) {
         items.push({
-          label: t("addToGroup", { name: userA.displayName ?? userA.samAccountName }),
+          label: t("addToGroup", {
+            name: userA.displayName ?? userA.samAccountName,
+          }),
           icon: <UserPlus size={14} />,
           disabled: !canModifyGroups,
           onClick: async () => {
@@ -347,7 +363,9 @@ export function UserComparison() {
 
       if (group.category === "onlyA" && userB) {
         items.push({
-          label: t("addToGroup", { name: userB.displayName ?? userB.samAccountName }),
+          label: t("addToGroup", {
+            name: userB.displayName ?? userB.samAccountName,
+          }),
           icon: <UserPlus size={14} />,
           disabled: !canModifyGroups,
           onClick: async () => {
@@ -453,7 +471,8 @@ export function UserComparison() {
             <div className="flex items-center gap-2">
               <span className="inline-block h-3 w-3 rounded-full bg-[var(--color-success)]" />
               <span className="text-body text-[var(--color-text-primary)]">
-                <strong>{comparisonResult.sharedGroups.length}</strong> {t("shared")}
+                <strong>{comparisonResult.sharedGroups.length}</strong>{" "}
+                {t("shared")}
               </span>
             </div>
             <div className="flex items-center gap-2">
@@ -471,7 +490,8 @@ export function UserComparison() {
               </span>
             </div>
             <div className="ml-auto text-caption text-[var(--color-text-secondary)]">
-              {userAName}: {t("groupCount", { count: comparisonResult.totalA })} | {userBName}:{" "}
+              {userAName}: {t("groupCount", { count: comparisonResult.totalA })}{" "}
+              | {userBName}:{" "}
               {t("groupCount", { count: comparisonResult.totalB })}
             </div>
           </div>
@@ -520,7 +540,15 @@ export function UserComparison() {
                 { key: "dn", header: t("common:distinguishedName") },
               ]}
               data={filteredGroups}
-              rowMapper={(g) => [g.name, g.category === "shared" ? t("shared") : g.category === "onlyA" ? t("onlyA", { name: userAName }) : t("onlyB", { name: userBName }), g.dn]}
+              rowMapper={(g) => [
+                g.name,
+                g.category === "shared"
+                  ? t("shared")
+                  : g.category === "onlyA"
+                    ? t("onlyA", { name: userAName })
+                    : t("onlyB", { name: userBName }),
+                g.dn,
+              ]}
               title={`User Comparison - ${userAName} vs ${userBName}`}
               filenameBase={`comparison_${userA?.samAccountName ?? "a"}_${userB?.samAccountName ?? "b"}`}
             />

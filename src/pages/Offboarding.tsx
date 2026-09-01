@@ -41,7 +41,11 @@ function OffboardingContent() {
   const { handleError } = useErrorHandler();
   const { showConfirmation } = useDialog();
   const { openTabs, activeTabId, clearTabData } = useNavigation();
-  const { nodes: ouNodes, loading: ouLoading, error: ouError } = useOUTree({ silent: true });
+  const {
+    nodes: ouNodes,
+    loading: ouLoading,
+    error: ouError,
+  } = useOUTree({ silent: true });
   const [step, setStep] = useState<OffboardStep>("search");
   const [searchQuery, setSearchQuery] = useState("");
   const [searching, setSearching] = useState(false);
@@ -64,7 +68,10 @@ function OffboardingContent() {
     invoke<{ disabledOu?: string | null }>("get_app_settings")
       .then((settings) => {
         if (settings.disabledOu) {
-          setActions((prev) => ({ ...prev, disabledOU: settings.disabledOu ?? "" }));
+          setActions((prev) => ({
+            ...prev,
+            disabledOU: settings.disabledOu ?? "",
+          }));
         }
       })
       .catch(() => {});
@@ -137,9 +144,11 @@ function OffboardingContent() {
     if (!user) return;
     const selectedActions: string[] = [];
     if (actions.disableAccount) selectedActions.push("Disable account");
-    if (actions.removeGroups) selectedActions.push(`Remove from ${userGroups.length} group(s)`);
+    if (actions.removeGroups)
+      selectedActions.push(`Remove from ${userGroups.length} group(s)`);
     if (actions.setRandomPassword) selectedActions.push("Set random password");
-    if (actions.moveToDisabledOU) selectedActions.push(`Move to ${actions.disabledOU}`);
+    if (actions.moveToDisabledOU)
+      selectedActions.push(`Move to ${actions.disabledOU}`);
 
     const confirmed = await showConfirmation(
       "Confirm Offboarding",
@@ -192,8 +201,9 @@ function OffboardingContent() {
       try {
         const pw = Array.from(crypto.getRandomValues(new Uint8Array(24)))
           .map((b) =>
-            "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%&"
-              .charAt(b % 62),
+            "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%&".charAt(
+              b % 62,
+            ),
           )
           .join("");
         await invoke("reset_password", {
@@ -276,37 +286,43 @@ function OffboardingContent() {
   return (
     <div className="flex h-full flex-col p-4" data-testid="offboarding-wizard">
       {/* Step indicator */}
-      <div className="mb-4 flex items-center gap-2" data-testid="offboard-step-indicator">
-        {[t("stepSearch"), t("stepActions"), t("stepPreview"), t("stepExecute")].map(
-          (label, i) => (
-            <div key={label} className="flex items-center gap-2">
-              <div
-                className={`flex h-7 w-7 items-center justify-center rounded-full text-caption font-semibold ${
-                  i <= stepIndex
-                    ? "bg-[var(--color-primary)] text-white"
-                    : "bg-[var(--color-surface-hover)] text-[var(--color-text-secondary)]"
-                }`}
-              >
-                {i + 1}
-              </div>
-              <span
-                className={`text-caption ${
-                  i === stepIndex
-                    ? "font-semibold text-[var(--color-text-primary)]"
-                    : "text-[var(--color-text-secondary)]"
-                }`}
-              >
-                {label}
-              </span>
-              {i < 3 && (
-                <ChevronRight
-                  size={14}
-                  className="text-[var(--color-text-secondary)]"
-                />
-              )}
+      <div
+        className="mb-4 flex items-center gap-2"
+        data-testid="offboard-step-indicator"
+      >
+        {[
+          t("stepSearch"),
+          t("stepActions"),
+          t("stepPreview"),
+          t("stepExecute"),
+        ].map((label, i) => (
+          <div key={label} className="flex items-center gap-2">
+            <div
+              className={`flex h-7 w-7 items-center justify-center rounded-full text-caption font-semibold ${
+                i <= stepIndex
+                  ? "bg-[var(--color-primary)] text-white"
+                  : "bg-[var(--color-surface-hover)] text-[var(--color-text-secondary)]"
+              }`}
+            >
+              {i + 1}
             </div>
-          ),
-        )}
+            <span
+              className={`text-caption ${
+                i === stepIndex
+                  ? "font-semibold text-[var(--color-text-primary)]"
+                  : "text-[var(--color-text-secondary)]"
+              }`}
+            >
+              {label}
+            </span>
+            {i < 3 && (
+              <ChevronRight
+                size={14}
+                className="text-[var(--color-text-secondary)]"
+              />
+            )}
+          </div>
+        ))}
       </div>
 
       <div className="flex-1 overflow-auto rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)] p-4">
@@ -361,7 +377,10 @@ function OffboardingContent() {
 
         {/* Step 2: Actions */}
         {step === "actions" && user && (
-          <div className="mx-auto max-w-lg space-y-4" data-testid="step-actions">
+          <div
+            className="mx-auto max-w-lg space-y-4"
+            data-testid="step-actions"
+          >
             <div className="rounded-md bg-[var(--color-surface-hover)] p-3">
               <div className="text-body font-semibold text-[var(--color-text-primary)]">
                 {user.displayName ?? user.samAccountName}
@@ -427,9 +446,7 @@ function OffboardingContent() {
                 <OUPicker
                   nodes={ouNodes}
                   selectedOU={actions.disabledOU}
-                  onSelect={(dn) =>
-                    setActions({ ...actions, disabledOU: dn })
-                  }
+                  onSelect={(dn) => setActions({ ...actions, disabledOU: dn })}
                   loading={ouLoading}
                   error={ouError}
                 />
@@ -440,9 +457,14 @@ function OffboardingContent() {
 
         {/* Step 3: Preview */}
         {step === "preview" && user && (
-          <div className="mx-auto max-w-lg space-y-3" data-testid="step-offboard-preview">
+          <div
+            className="mx-auto max-w-lg space-y-3"
+            data-testid="step-offboard-preview"
+          >
             <h3 className="text-body font-semibold text-[var(--color-text-primary)]">
-              {t("changesToApply", { name: user.displayName ?? user.samAccountName })}
+              {t("changesToApply", {
+                name: user.displayName ?? user.samAccountName,
+              })}
             </h3>
             <div className="space-y-2 rounded-md bg-[var(--color-surface-hover)] p-3">
               {actions.disableAccount && (
@@ -482,10 +504,7 @@ function OffboardingContent() {
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
                   {results.every((r) => r.success) ? (
-                    <Check
-                      size={20}
-                      className="text-[var(--color-success)]"
-                    />
+                    <Check size={20} className="text-[var(--color-success)]" />
                   ) : (
                     <AlertTriangle
                       size={20}

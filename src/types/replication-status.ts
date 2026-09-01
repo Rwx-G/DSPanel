@@ -1,8 +1,5 @@
 export type ReplicationPartnershipStatus =
-  | "Healthy"
-  | "Warning"
-  | "Failed"
-  | "Unknown";
+  "Healthy" | "Warning" | "Failed" | "Unknown";
 
 export interface ReplicationPartnership {
   sourceDc: string;

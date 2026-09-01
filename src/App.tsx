@@ -183,12 +183,29 @@ export function App() {
     return (
       <div className="flex h-screen w-screen flex-col items-center justify-center gap-4 bg-[var(--color-surface-bg)]">
         <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--color-primary)]/10">
-          <svg className="h-7 w-7 animate-spin text-[var(--color-primary)]" viewBox="0 0 24 24" fill="none">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          <svg
+            className="h-7 w-7 animate-spin text-[var(--color-primary)]"
+            viewBox="0 0 24 24"
+            fill="none"
+          >
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="3"
+            />
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+            />
           </svg>
         </div>
-        <span className="text-body font-medium text-[var(--color-text-secondary)]">DSPanel</span>
+        <span className="text-body font-medium text-[var(--color-text-secondary)]">
+          DSPanel
+        </span>
       </div>
     );
   }

@@ -23,9 +23,7 @@ import { useTranslation } from "react-i18next";
 // ---------------------------------------------------------------------------
 
 type CleanupCondition =
-  | "inactiveDays"
-  | "neverLoggedOnCreatedDays"
-  | "disabledDays";
+  "inactiveDays" | "neverLoggedOnCreatedDays" | "disabledDays";
 type CleanupAction = "disable" | "move" | "delete";
 
 interface CleanupRule {

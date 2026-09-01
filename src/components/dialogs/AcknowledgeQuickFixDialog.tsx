@@ -104,7 +104,8 @@ export function AcknowledgeQuickFixDialog({
     } catch (e) {
       const msg = typeof e === "string" ? e : "Operation failed";
       try {
-        const parsed: { userMessage?: string; message?: string } = JSON.parse(msg);
+        const parsed: { userMessage?: string; message?: string } =
+          JSON.parse(msg);
         setError(parsed.userMessage ?? parsed.message ?? msg);
       } catch {
         setError(msg);
@@ -112,7 +113,14 @@ export function AcknowledgeQuickFixDialog({
     } finally {
       setLoading(false);
     }
-  }, [acknowledged, invokeCommand, invokeArgs, mfaActionName, checkMfa, onSuccess]);
+  }, [
+    acknowledged,
+    invokeCommand,
+    invokeArgs,
+    mfaActionName,
+    checkMfa,
+    onSuccess,
+  ]);
 
   const bodyClassName = scrollableBody
     ? "px-4 py-3 space-y-3 max-h-[60vh] overflow-y-auto"

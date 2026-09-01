@@ -104,7 +104,8 @@ export function ComputerLookup() {
   }, [computers, statusFilter, osFilter]);
 
   const statusCounts = useMemo(() => {
-    let enabled = 0, disabled = 0;
+    let enabled = 0,
+      disabled = 0;
     for (const c of computers) {
       if (c.enabled) enabled++;
       else disabled++;
@@ -113,7 +114,8 @@ export function ComputerLookup() {
   }, [computers]);
 
   const osCounts = useMemo(() => {
-    let windows = 0, other = 0;
+    let windows = 0,
+      other = 0;
     for (const c of computers) {
       if (c.operatingSystem.toLowerCase().includes("windows")) windows++;
       else other++;
@@ -262,7 +264,10 @@ export function ComputerLookup() {
         {!loading &&
           filteredComputers.length > 0 &&
           t("found", { count: filteredComputers.length })}
-        {!loading && filteredComputers.length === 0 && !error && t("noComputersFound")}
+        {!loading &&
+          filteredComputers.length === 0 &&
+          !error &&
+          t("noComputersFound")}
         {error && `${t("common:error")}: ${error}`}
       </div>
 

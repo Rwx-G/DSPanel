@@ -62,7 +62,8 @@ const ATTACK_TYPE_KEYS: Record<AttackType, string> = {
 
 function SeverityBadge({ severity }: { severity: AlertSeverity }) {
   const { t } = useTranslation(["common"]);
-  const severityKey = severity.toLowerCase() as "critical" | "high" | "medium" | "info";
+  const severityKey = severity.toLowerCase() as
+    "critical" | "high" | "medium" | "info";
   return (
     <span
       className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium"
@@ -73,7 +74,9 @@ function SeverityBadge({ severity }: { severity: AlertSeverity }) {
       data-testid={`severity-badge-${severity.toLowerCase()}`}
     >
       {severity === "Critical" && <AlertCircle size={10} />}
-      {(severity === "High" || severity === "Medium") && <AlertTriangle size={10} />}
+      {(severity === "High" || severity === "Medium") && (
+        <AlertTriangle size={10} />
+      )}
       {t(`common:${severityKey}`)}
     </span>
   );
@@ -136,15 +139,23 @@ function AlertCard({
             {alert.description}
           </div>
           <div className="mt-0.5 flex items-center gap-3 text-[10px] text-[var(--color-text-secondary)]">
-            <span>{t("source")}: {alert.source}</span>
+            <span>
+              {t("source")}: {alert.source}
+            </span>
             <span>{new Date(alert.timestamp).toLocaleString()}</span>
           </div>
         </div>
 
         {isExpanded ? (
-          <ChevronDown size={16} className="shrink-0 text-[var(--color-text-secondary)]" />
+          <ChevronDown
+            size={16}
+            className="shrink-0 text-[var(--color-text-secondary)]"
+          />
         ) : (
-          <ChevronRight size={16} className="shrink-0 text-[var(--color-text-secondary)]" />
+          <ChevronRight
+            size={16}
+            className="shrink-0 text-[var(--color-text-secondary)]"
+          />
         )}
       </button>
 
@@ -237,9 +248,12 @@ export function AttackDetection() {
     `${alert.attackType}-${alert.timestamp}-${index}`;
 
   // Severity counts
-  const criticalCount = report?.alerts.filter((a) => a.severity === "Critical").length ?? 0;
-  const highCount = report?.alerts.filter((a) => a.severity === "High").length ?? 0;
-  const mediumCount = report?.alerts.filter((a) => a.severity === "Medium").length ?? 0;
+  const criticalCount =
+    report?.alerts.filter((a) => a.severity === "Critical").length ?? 0;
+  const highCount =
+    report?.alerts.filter((a) => a.severity === "High").length ?? 0;
+  const mediumCount =
+    report?.alerts.filter((a) => a.severity === "Medium").length ?? 0;
 
   // All checks performed with their metadata
   const allChecks: { type: AttackType; eventIds: string; mitre: string }[] = [
@@ -256,7 +270,11 @@ export function AttackDetection() {
     { type: "ShadowCredentials", eventIds: "5136", mitre: "T1556.006" },
     { type: "RbcdAbuse", eventIds: "5136", mitre: "T1134.001" },
     { type: "AdminSdHolderTamper", eventIds: "5136", mitre: "T1222.001" },
-    { type: "SuspiciousAccountActivity", eventIds: "4720/4738", mitre: "T1136/T1098" },
+    {
+      type: "SuspiciousAccountActivity",
+      eventIds: "4720/4738",
+      mitre: "T1136/T1098",
+    },
   ];
 
   return (
@@ -275,19 +293,32 @@ export function AttackDetection() {
         <div className="flex items-center gap-3">
           {/* Summary badges */}
           {report && report.alerts.length > 0 && (
-            <div className="flex items-center gap-2 text-caption" data-testid="alert-summary">
+            <div
+              className="flex items-center gap-2 text-caption"
+              data-testid="alert-summary"
+            >
               {criticalCount > 0 && (
-                <span className="flex items-center gap-1" style={{ color: "var(--color-error)" }}>
-                  <AlertCircle size={12} /> {criticalCount} {t("common:critical")}
+                <span
+                  className="flex items-center gap-1"
+                  style={{ color: "var(--color-error)" }}
+                >
+                  <AlertCircle size={12} /> {criticalCount}{" "}
+                  {t("common:critical")}
                 </span>
               )}
               {highCount > 0 && (
-                <span className="flex items-center gap-1" style={{ color: "var(--color-warning)" }}>
+                <span
+                  className="flex items-center gap-1"
+                  style={{ color: "var(--color-warning)" }}
+                >
                   <AlertTriangle size={12} /> {highCount} {t("common:high")}
                 </span>
               )}
               {mediumCount > 0 && (
-                <span className="flex items-center gap-1" style={{ color: "var(--color-text-secondary)" }}>
+                <span
+                  className="flex items-center gap-1"
+                  style={{ color: "var(--color-text-secondary)" }}
+                >
                   <AlertTriangle size={12} /> {mediumCount} {t("common:medium")}
                 </span>
               )}
@@ -340,30 +371,38 @@ export function AttackDetection() {
                 data-testid="event-log-warning"
               >
                 <AlertTriangle size={14} className="shrink-0" />
-                <span>
-                  {t("eventLogWarning")}
-                </span>
+                <span>{t("eventLogWarning")}</span>
               </div>
             )}
             {/* Checks grid - always shown */}
-            <div className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)]" data-testid="checks-grid">
+            <div
+              className="rounded-lg border border-[var(--color-border-default)] bg-[var(--color-surface-card)]"
+              data-testid="checks-grid"
+            >
               <table className="w-full text-caption">
                 <thead>
                   <tr className="border-b border-[var(--color-border-default)] text-left text-[var(--color-text-secondary)]">
                     <th className="px-3 py-2 font-medium">{t("check")}</th>
                     <th className="px-3 py-2 font-medium">{t("eventIds")}</th>
                     <th className="px-3 py-2 font-medium">{t("mitre")}</th>
-                    <th className="px-3 py-2 text-center font-medium">{t("result")}</th>
+                    <th className="px-3 py-2 text-center font-medium">
+                      {t("result")}
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {allChecks.map((check) => {
-                    const alertsForType = report?.alerts.filter((a) => a.attackType === check.type) ?? [];
+                    const alertsForType =
+                      report?.alerts.filter(
+                        (a) => a.attackType === check.type,
+                      ) ?? [];
                     const hasAlerts = alertsForType.length > 0;
                     const highestSeverity = hasAlerts
                       ? alertsForType.reduce((max, a) => {
                           const order = ["Info", "Medium", "High", "Critical"];
-                          return order.indexOf(a.severity) > order.indexOf(max) ? a.severity : max;
+                          return order.indexOf(a.severity) > order.indexOf(max)
+                            ? a.severity
+                            : max;
                         }, alertsForType[0].severity)
                       : null;
 
@@ -387,12 +426,19 @@ export function AttackDetection() {
                             <span
                               className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium"
                               style={{
-                                color: severityColor(highestSeverity as AlertSeverity),
+                                color: severityColor(
+                                  highestSeverity as AlertSeverity,
+                                ),
                                 backgroundColor: `color-mix(in srgb, ${severityColor(highestSeverity as AlertSeverity)} 12%, transparent)`,
                               }}
                             >
-                              {highestSeverity === "Critical" && <AlertCircle size={10} />}
-                              {(highestSeverity === "High" || highestSeverity === "Medium") && <AlertTriangle size={10} />}
+                              {highestSeverity === "Critical" && (
+                                <AlertCircle size={10} />
+                              )}
+                              {(highestSeverity === "High" ||
+                                highestSeverity === "Medium") && (
+                                <AlertTriangle size={10} />
+                              )}
                               {t("alert", { count: alertsForType.length })}
                             </span>
                           ) : report && !report.eventLogAccessible ? (
@@ -438,7 +484,9 @@ export function AttackDetection() {
 
             {report && (
               <div className="text-[10px] text-[var(--color-text-secondary)]">
-                {t("lastScanned")}: {new Date(report.scannedAt).toLocaleString()} - {t("timeWindow")}: {report.timeWindowHours}h
+                {t("lastScanned")}:{" "}
+                {new Date(report.scannedAt).toLocaleString()} -{" "}
+                {t("timeWindow")}: {report.timeWindowHours}h
               </div>
             )}
           </div>

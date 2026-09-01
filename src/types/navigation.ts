@@ -18,6 +18,12 @@ export interface SidebarModule {
   id: string;
   label: string;
   icon: string;
-  group: "Directory" | "Infrastructure" | "Security" | "Tools" | "Workflows" | "Settings";
+  group:
+    | "Directory"
+    | "Infrastructure"
+    | "Security"
+    | "Tools"
+    | "Workflows"
+    | "Settings";
   requiredLevel: PermissionLevel;
 }

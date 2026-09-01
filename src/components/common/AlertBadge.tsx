@@ -107,9 +107,7 @@ export function AlertBadge({ alerts, compact = false }: AlertBadgeProps) {
       >
         <Icon size={12} />
         {!compact &&
-          (count === 0
-            ? t("alertBadge.ok")
-            : t("alertBadge.alert", { count }))}
+          (count === 0 ? t("alertBadge.ok") : t("alertBadge.alert", { count }))}
       </span>
 
       {showTooltip &&
@@ -145,7 +143,9 @@ export function AlertBadge({ alerts, compact = false }: AlertBadgeProps) {
                         className={`shrink-0 ${SEVERITY_TEXT_COLOR[alert.severity]}`}
                       />
                       <div className="min-w-0">
-                        <span className={`text-caption font-medium ${SEVERITY_TEXT_COLOR[alert.severity]}`}>
+                        <span
+                          className={`text-caption font-medium ${SEVERITY_TEXT_COLOR[alert.severity]}`}
+                        >
                           {alert.severity}
                         </span>
                         <p className="text-[10px] text-[var(--color-text-secondary)]">

@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor, act } from "@testing-library/react";
+import {
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+  act,
+} from "@testing-library/react";
 import { GpoViewer } from "./GpoViewer";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -165,7 +171,12 @@ describe("GpoViewer", () => {
       if (cmd === "get_gpo_list") return Promise.resolve([]);
       if (cmd === "get_ou_tree")
         return Promise.resolve([
-          { distinguishedName: "OU=HR,DC=contoso,DC=com", name: "HR", children: [], hasChildren: false },
+          {
+            distinguishedName: "OU=HR,DC=contoso,DC=com",
+            name: "HR",
+            children: [],
+            hasChildren: false,
+          },
         ]);
       if (cmd === "get_gpo_links") return Promise.resolve(mockLinksResult);
       return Promise.resolve(null);
@@ -209,7 +220,12 @@ describe("GpoViewer", () => {
       if (cmd === "get_gpo_list") return Promise.resolve([]);
       if (cmd === "get_ou_tree")
         return Promise.resolve([
-          { distinguishedName: "OU=HR,DC=contoso,DC=com", name: "HR", children: [], hasChildren: false },
+          {
+            distinguishedName: "OU=HR,DC=contoso,DC=com",
+            name: "HR",
+            children: [],
+            hasChildren: false,
+          },
         ]);
       if (cmd === "get_gpo_links") return Promise.resolve(mockLinksResult);
       return Promise.resolve(null);
@@ -226,7 +242,9 @@ describe("GpoViewer", () => {
     fireEvent.change(select, { target: { value: "OU=HR,DC=contoso,DC=com" } });
 
     await waitFor(() => {
-      expect(screen.getByText(/blocks Group Policy inheritance/)).toBeInTheDocument();
+      expect(
+        screen.getByText(/blocks Group Policy inheritance/),
+      ).toBeInTheDocument();
     });
 
     // Verify enforced GPO row data
@@ -240,9 +258,15 @@ describe("GpoViewer", () => {
       if (cmd === "get_gpo_list") return Promise.resolve([]);
       if (cmd === "get_ou_tree")
         return Promise.resolve([
-          { distinguishedName: "OU=IT,DC=contoso,DC=com", name: "IT", children: [], hasChildren: false },
+          {
+            distinguishedName: "OU=IT,DC=contoso,DC=com",
+            name: "IT",
+            children: [],
+            hasChildren: false,
+          },
         ]);
-      if (cmd === "get_gpo_links") return Promise.reject("LDAP connection failed");
+      if (cmd === "get_gpo_links")
+        return Promise.reject("LDAP connection failed");
       return Promise.resolve(null);
     });
 
@@ -416,7 +440,12 @@ describe("GpoViewer", () => {
       if (cmd === "get_gpo_list") return Promise.resolve([]);
       if (cmd === "get_ou_tree")
         return Promise.resolve([
-          { distinguishedName: "OU=Dev,DC=contoso,DC=com", name: "Dev", children: [], hasChildren: false },
+          {
+            distinguishedName: "OU=Dev,DC=contoso,DC=com",
+            name: "Dev",
+            children: [],
+            hasChildren: false,
+          },
         ]);
       if (cmd === "get_gpo_links") return Promise.resolve(mockLinksResult);
       return Promise.resolve(null);
@@ -536,7 +565,9 @@ describe("GpoViewer", () => {
     fireEvent.keyDown(input, { key: "Enter" });
 
     await waitFor(() => {
-      expect(mockInvoke).toHaveBeenCalledWith("get_gpo_scope", { gpoDn: "CN={ENTER}" });
+      expect(mockInvoke).toHaveBeenCalledWith("get_gpo_scope", {
+        gpoDn: "CN={ENTER}",
+      });
     });
   });
 });

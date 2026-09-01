@@ -97,9 +97,7 @@ describe("NtfsAnalyzer", () => {
     expect(
       screen.getByText("Not available on this platform"),
     ).toBeInTheDocument();
-    expect(
-      screen.queryByTestId("analyzer-path-input"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("analyzer-path-input")).not.toBeInTheDocument();
   });
 
   it("shows platform unavailable message on Linux", () => {

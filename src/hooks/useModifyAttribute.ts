@@ -16,7 +16,12 @@ export interface UseModifyAttributeReturn {
   /** Whether a modification is in progress. */
   saving: boolean;
   /** Stages a change for later submission. */
-  stageChange: (attributeName: string, oldValue: string, newValue: string, advanced?: boolean) => void;
+  stageChange: (
+    attributeName: string,
+    oldValue: string,
+    newValue: string,
+    advanced?: boolean,
+  ) => void;
   /** Removes a staged change. */
   unstageChange: (attributeName: string) => void;
   /** Clears all staged changes. */
@@ -37,7 +42,12 @@ export function useModifyAttribute(): UseModifyAttributeReturn {
   const { handleError } = useErrorHandler();
 
   const stageChange = useCallback(
-    (attributeName: string, oldValue: string, newValue: string, advanced?: boolean) => {
+    (
+      attributeName: string,
+      oldValue: string,
+      newValue: string,
+      advanced?: boolean,
+    ) => {
       setPendingChanges((prev) => {
         const filtered = prev.filter((c) => c.attributeName !== attributeName);
         // Only add if value actually changed

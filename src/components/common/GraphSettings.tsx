@@ -99,7 +99,8 @@ export function GraphSettings() {
     }
   }, [handleSave]);
 
-  const isConfigured = config.tenantId.trim() !== "" && config.clientId.trim() !== "";
+  const isConfigured =
+    config.tenantId.trim() !== "" && config.clientId.trim() !== "";
 
   return (
     <div
@@ -160,7 +161,11 @@ export function GraphSettings() {
               setConfig((c) => ({ ...c, clientSecret: e.target.value }));
               setTestResult(null);
             }}
-            placeholder={hasStoredSecret && !secretTouched ? t("components:graphSettings.clientSecretStored") : t("components:graphSettings.clientSecretPlaceholder")}
+            placeholder={
+              hasStoredSecret && !secretTouched
+                ? t("components:graphSettings.clientSecretStored")
+                : t("components:graphSettings.clientSecretPlaceholder")
+            }
             className="w-full rounded-md border border-[var(--color-border-default)] bg-[var(--color-surface-card)] px-3 py-1.5 text-body text-[var(--color-text-primary)] placeholder-[var(--color-text-secondary)] focus:border-[var(--color-primary)] focus:outline-none"
             data-testid="graph-client-secret"
           />
@@ -174,7 +179,9 @@ export function GraphSettings() {
           className="btn btn-sm btn-secondary"
           data-testid="graph-test-btn"
         >
-          {testing ? t("common:testing") : t("components:graphSettings.testConnection")}
+          {testing
+            ? t("common:testing")
+            : t("components:graphSettings.testConnection")}
         </button>
         <button
           onClick={handleSave}

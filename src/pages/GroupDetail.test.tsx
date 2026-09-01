@@ -102,7 +102,9 @@ describe("GroupDetail", () => {
     });
     // Badges are inline spans in the group detail header (may also appear in PropertyGrid)
     expect(screen.getAllByText("Universal").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText("Distribution").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Distribution").length).toBeGreaterThanOrEqual(
+      1,
+    );
   });
 
   it("shows scope badge for Global", () => {
@@ -120,8 +122,10 @@ describe("GroupDetail", () => {
     const badges = screen.getAllByText("Distribution");
     expect(badges.length).toBeGreaterThanOrEqual(1);
     // At least one badge element should contain "warning" in its class
-    const hasBadgeWithWarning = badges.some((el) =>
-      el.className.includes("warning") || el.closest("[class*='warning']") !== null,
+    const hasBadgeWithWarning = badges.some(
+      (el) =>
+        el.className.includes("warning") ||
+        el.closest("[class*='warning']") !== null,
     );
     expect(hasBadgeWithWarning).toBe(true);
   });
@@ -346,7 +350,9 @@ describe("GroupDetail", () => {
     fireEvent.click(screen.getByTestId("expand-SubGroup"));
 
     await waitFor(() => {
-      expect(screen.getByTestId("nested-group-members-SubGroup")).toBeInTheDocument();
+      expect(
+        screen.getByTestId("nested-group-members-SubGroup"),
+      ).toBeInTheDocument();
     });
 
     await waitFor(() => {
@@ -372,7 +378,9 @@ describe("GroupDetail", () => {
 
     renderGroupDetail({ members: membersWithGroup });
     const list = screen.getByTestId("member-list");
-    const items = list.querySelectorAll("[data-testid^='nested-group-'], [data-testid^='member-row-']");
+    const items = list.querySelectorAll(
+      "[data-testid^='nested-group-'], [data-testid^='member-row-']",
+    );
     // First item should be the group
     expect(items[0]).toHaveAttribute("data-testid", "nested-group-SubGroup");
     // Users follow
@@ -396,8 +404,13 @@ describe("GroupDetail", () => {
     });
 
     const input = screen.getByTestId("member-search-input");
-    expect(input).toHaveAttribute("placeholder", "Search users or groups to add...");
-    expect(screen.getByText("Type to search for users or groups")).toBeInTheDocument();
+    expect(input).toHaveAttribute(
+      "placeholder",
+      "Search users or groups to add...",
+    );
+    expect(
+      screen.getByText("Type to search for users or groups"),
+    ).toBeInTheDocument();
   });
 
   it("shows no results found when search returns empty", async () => {
@@ -465,9 +478,7 @@ describe("GroupDetail", () => {
       }
 
       await waitFor(() => {
-        expect(
-          screen.getByText("Open in User Lookup"),
-        ).toBeInTheDocument();
+        expect(screen.getByText("Open in User Lookup")).toBeInTheDocument();
       });
     });
   });

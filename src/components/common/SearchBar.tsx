@@ -18,7 +18,8 @@ export function SearchBar({
   debounceMs = 300,
 }: SearchBarProps) {
   const { t } = useTranslation(["components"]);
-  const resolvedPlaceholder = placeholder ?? t("components:searchBar.placeholder");
+  const resolvedPlaceholder =
+    placeholder ?? t("components:searchBar.placeholder");
   // Stabilize callbacks via refs so the debounce effect only fires
   // when `value` changes, not when the parent re-renders with a new
   // callback reference.
@@ -47,7 +48,9 @@ export function SearchBar({
 
   // Show shortcut hint in placeholder when not focused
   const [focused, setFocused] = useState(false);
-  const displayPlaceholder = focused ? resolvedPlaceholder : `${resolvedPlaceholder} (Ctrl+F)`;
+  const displayPlaceholder = focused
+    ? resolvedPlaceholder
+    : `${resolvedPlaceholder} (Ctrl+F)`;
 
   return (
     <div

@@ -39,7 +39,11 @@ vi.mock("@/contexts/DialogContext", () => ({
   }),
 }));
 
-const mockPendingChanges: { attributeName: string; oldValue: string; newValue: string }[] = [];
+const mockPendingChanges: {
+  attributeName: string;
+  oldValue: string;
+  newValue: string;
+}[] = [];
 const mockStageChange = vi.fn();
 const mockClearChanges = vi.fn();
 const mockSubmitChanges = vi.fn().mockResolvedValue(true);
@@ -122,16 +126,14 @@ describe("ContactLookup", () => {
     expect(screen.getByTestId("search-bar")).toBeInTheDocument();
 
     await waitFor(() => {
-      expect(
-        screen.getByTestId("empty-state-title"),
-      ).toHaveTextContent("No contacts found");
+      expect(screen.getByTestId("empty-state-title")).toHaveTextContent(
+        "No contacts found",
+      );
     });
   });
 
   it("shows loading state during search", async () => {
-    mockInvoke.mockImplementation(
-      () => new Promise(() => {}),
-    );
+    mockInvoke.mockImplementation(() => new Promise(() => {}));
 
     render(<ContactLookup />, { wrapper: Wrapper });
 
@@ -367,7 +369,9 @@ describe("ContactLookup", () => {
     });
 
     fireEvent.click(
-      screen.getByTestId("contact-result-CN=John Doe,OU=Contacts,DC=example,DC=com"),
+      screen.getByTestId(
+        "contact-result-CN=John Doe,OU=Contacts,DC=example,DC=com",
+      ),
     );
 
     await waitFor(() => {
@@ -409,7 +413,9 @@ describe("ContactLookup", () => {
     });
 
     fireEvent.click(
-      screen.getByTestId("contact-result-CN=John Doe,OU=Contacts,DC=example,DC=com"),
+      screen.getByTestId(
+        "contact-result-CN=John Doe,OU=Contacts,DC=example,DC=com",
+      ),
     );
 
     await waitFor(() => {
@@ -448,7 +454,9 @@ describe("ContactLookup", () => {
     });
 
     fireEvent.click(
-      screen.getByTestId("contact-result-CN=John Doe,OU=Contacts,DC=example,DC=com"),
+      screen.getByTestId(
+        "contact-result-CN=John Doe,OU=Contacts,DC=example,DC=com",
+      ),
     );
 
     await waitFor(() => {
@@ -458,7 +466,10 @@ describe("ContactLookup", () => {
     fireEvent.click(screen.getByTestId("contact-delete-btn"));
 
     await waitFor(() => {
-      expect(mockInvoke).toHaveBeenCalledWith("delete_contact", expect.anything());
+      expect(mockInvoke).toHaveBeenCalledWith(
+        "delete_contact",
+        expect.anything(),
+      );
     });
 
     // Error was handled, not thrown
@@ -489,7 +500,9 @@ describe("ContactLookup", () => {
     });
 
     fireEvent.click(
-      screen.getByTestId("contact-result-CN=John Doe,OU=Contacts,DC=example,DC=com"),
+      screen.getByTestId(
+        "contact-result-CN=John Doe,OU=Contacts,DC=example,DC=com",
+      ),
     );
 
     await waitFor(() => {
@@ -522,7 +535,9 @@ describe("ContactLookup", () => {
     });
 
     fireEvent.click(
-      screen.getByTestId("contact-result-CN=John Doe,OU=Contacts,DC=example,DC=com"),
+      screen.getByTestId(
+        "contact-result-CN=John Doe,OU=Contacts,DC=example,DC=com",
+      ),
     );
 
     await waitFor(() => {
@@ -556,7 +571,9 @@ describe("ContactLookup", () => {
     });
 
     fireEvent.click(
-      screen.getByTestId("contact-result-CN=John Doe,OU=Contacts,DC=example,DC=com"),
+      screen.getByTestId(
+        "contact-result-CN=John Doe,OU=Contacts,DC=example,DC=com",
+      ),
     );
 
     await waitFor(() => {
@@ -603,7 +620,9 @@ describe("ContactLookup", () => {
     });
 
     fireEvent.click(
-      screen.getByTestId("contact-result-CN=John Doe,OU=Contacts,DC=example,DC=com"),
+      screen.getByTestId(
+        "contact-result-CN=John Doe,OU=Contacts,DC=example,DC=com",
+      ),
     );
 
     await waitFor(() => {
@@ -704,7 +723,9 @@ describe("ContactLookup", () => {
     });
 
     fireEvent.click(
-      screen.getByTestId("contact-result-CN=John Doe,OU=Contacts,DC=example,DC=com"),
+      screen.getByTestId(
+        "contact-result-CN=John Doe,OU=Contacts,DC=example,DC=com",
+      ),
     );
 
     await waitFor(() => {

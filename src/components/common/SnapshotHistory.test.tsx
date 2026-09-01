@@ -165,9 +165,7 @@ describe("SnapshotHistory", () => {
       </TestProviders>,
     );
 
-    expect(
-      screen.getByText("Loading snapshot history..."),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Loading snapshot history...")).toBeInTheDocument();
   });
 
   it("handles fetch error gracefully", async () => {

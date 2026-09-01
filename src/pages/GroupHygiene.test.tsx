@@ -209,7 +209,9 @@ describe("GroupHygiene", () => {
 
     // All sections visible with 0 count and "All clear" message
     expect(screen.getByTestId("empty-groups-count")).toHaveTextContent("0");
-    expect(screen.getAllByText("All clear - no issues detected").length).toBe(7);
+    expect(screen.getAllByText("All clear - no issues detected").length).toBe(
+      7,
+    );
   });
 
   it("scan error shows error message", async () => {

@@ -112,7 +112,9 @@ describe("SecurityDashboard", () => {
   it("shows loading state initially", () => {
     mockInvoke.mockReturnValue(new Promise(() => {}));
     render(<SecurityDashboard />);
-    expect(screen.getByText("Scanning privileged accounts...")).toBeInTheDocument();
+    expect(
+      screen.getByText("Scanning privileged accounts..."),
+    ).toBeInTheDocument();
   });
 
   it("renders accounts table after loading", async () => {
@@ -120,7 +122,9 @@ describe("SecurityDashboard", () => {
     render(<SecurityDashboard />);
 
     await waitFor(() => {
-      expect(screen.getByTestId("privileged-accounts-table")).toBeInTheDocument();
+      expect(
+        screen.getByTestId("privileged-accounts-table"),
+      ).toBeInTheDocument();
     });
 
     expect(screen.getByText("admin")).toBeInTheDocument();
@@ -152,10 +156,16 @@ describe("SecurityDashboard", () => {
     mockInvoke.mockResolvedValue({
       accounts: [],
       domainFindings: {
-        krbtgtPasswordAgeDays: null, lapsCoveragePercent: null,
-        lapsDeployedCount: 0, totalComputerCount: 0, psoCount: 0,
-        domainFunctionalLevel: null, forestFunctionalLevel: null,
-        ldapSigningEnforced: null, recycleBinEnabled: null, rbcdConfiguredCount: 0,
+        krbtgtPasswordAgeDays: null,
+        lapsCoveragePercent: null,
+        lapsDeployedCount: 0,
+        totalComputerCount: 0,
+        psoCount: 0,
+        domainFunctionalLevel: null,
+        forestFunctionalLevel: null,
+        ldapSigningEnforced: null,
+        recycleBinEnabled: null,
+        rbcdConfiguredCount: 0,
         alerts: [],
       },
       summary: { critical: 0, high: 0, medium: 0, info: 0 },
@@ -164,7 +174,9 @@ describe("SecurityDashboard", () => {
     render(<SecurityDashboard />);
 
     await waitFor(() => {
-      expect(screen.getByText("No Privileged Accounts Found")).toBeInTheDocument();
+      expect(
+        screen.getByText("No Privileged Accounts Found"),
+      ).toBeInTheDocument();
     });
   });
 
@@ -218,7 +230,9 @@ describe("SecurityDashboard", () => {
     render(<SecurityDashboard />);
 
     await waitFor(() => {
-      expect(screen.getByTestId("privileged-accounts-table")).toBeInTheDocument();
+      expect(
+        screen.getByTestId("privileged-accounts-table"),
+      ).toBeInTheDocument();
     });
 
     // Each account with alerts gets an AlertBadge

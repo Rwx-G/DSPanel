@@ -80,7 +80,11 @@ const mockData: EscalationGraphResult = {
       hopCount: 3,
       isCritical: true,
       riskScore: 4.5,
-      edgeTypes: ["Member of", "Manages group", "Constrained delegation to CIFS/DC1"],
+      edgeTypes: [
+        "Member of",
+        "Manages group",
+        "Constrained delegation to CIFS/DC1",
+      ],
     },
     {
       nodes: [
@@ -114,7 +118,9 @@ describe("EscalationPaths", () => {
   it("shows loading state initially", () => {
     mockInvoke.mockReturnValue(new Promise(() => {}));
     render(<EscalationPaths />);
-    expect(screen.getByText("Analyzing group memberships...")).toBeInTheDocument();
+    expect(
+      screen.getByText("Analyzing group memberships..."),
+    ).toBeInTheDocument();
   });
 
   it("calls get_escalation_paths on mount", async () => {

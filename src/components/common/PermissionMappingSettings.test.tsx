@@ -78,7 +78,9 @@ describe("PermissionMappingSettings", () => {
     render(<PermissionMappingSettings />);
 
     await waitFor(() => {
-      expect(screen.getByTestId("permission-mapping-access-denied")).toBeDefined();
+      expect(
+        screen.getByTestId("permission-mapping-access-denied"),
+      ).toBeDefined();
     });
   });
 
@@ -93,7 +95,9 @@ describe("PermissionMappingSettings", () => {
 
     expect(screen.getByTestId("permission-level-ReadOnly")).toBeDefined();
     expect(screen.getByTestId("permission-level-HelpDesk")).toBeDefined();
-    expect(screen.getByTestId("permission-level-AccountOperator")).toBeDefined();
+    expect(
+      screen.getByTestId("permission-level-AccountOperator"),
+    ).toBeDefined();
     expect(screen.getByTestId("permission-level-Admin")).toBeDefined();
     expect(screen.getByTestId("permission-level-DomainAdmin")).toBeDefined();
   });
@@ -167,7 +171,9 @@ describe("PermissionMappingSettings", () => {
     fireEvent.click(screen.getByTestId("remove-group-btn"));
 
     await waitFor(() => {
-      expect(screen.queryByText("CN=IT-Support,OU=Groups,DC=contoso,DC=com")).toBeNull();
+      expect(
+        screen.queryByText("CN=IT-Support,OU=Groups,DC=contoso,DC=com"),
+      ).toBeNull();
     });
   });
 
@@ -181,7 +187,8 @@ describe("PermissionMappingSettings", () => {
     });
 
     expect(
-      (screen.getByTestId("permission-mapping-save") as HTMLButtonElement).disabled,
+      (screen.getByTestId("permission-mapping-save") as HTMLButtonElement)
+        .disabled,
     ).toBe(true);
   });
 
@@ -199,14 +206,18 @@ describe("PermissionMappingSettings", () => {
 
     await waitFor(() => {
       expect(
-        (screen.getByTestId("permission-mapping-save") as HTMLButtonElement).disabled,
+        (screen.getByTestId("permission-mapping-save") as HTMLButtonElement)
+          .disabled,
       ).toBe(false);
     });
 
     fireEvent.click(screen.getByTestId("permission-mapping-save"));
 
     await waitFor(() => {
-      expect(mockInvoke).toHaveBeenCalledWith("set_permission_mappings", expect.any(Object));
+      expect(mockInvoke).toHaveBeenCalledWith(
+        "set_permission_mappings",
+        expect.any(Object),
+      );
     });
   });
 });

@@ -107,9 +107,7 @@ describe("useModifyAttribute", () => {
 
     let success = false;
     await act(async () => {
-      success = await result.current.submitChanges(
-        "CN=User,DC=example,DC=com",
-      );
+      success = await result.current.submitChanges("CN=User,DC=example,DC=com");
     });
 
     expect(success).toBe(true);
@@ -132,9 +130,7 @@ describe("useModifyAttribute", () => {
 
     let success = true;
     await act(async () => {
-      success = await result.current.submitChanges(
-        "CN=User,DC=example,DC=com",
-      );
+      success = await result.current.submitChanges("CN=User,DC=example,DC=com");
     });
 
     expect(success).toBe(false);
@@ -145,9 +141,7 @@ describe("useModifyAttribute", () => {
 
     let success = false;
     await act(async () => {
-      success = await result.current.submitChanges(
-        "CN=User,DC=example,DC=com",
-      );
+      success = await result.current.submitChanges("CN=User,DC=example,DC=com");
     });
 
     expect(success).toBe(true);
@@ -204,9 +198,7 @@ describe("useModifyAttribute", () => {
 
     let success = true;
     await act(async () => {
-      success = await result.current.submitChanges(
-        "CN=User,DC=example,DC=com",
-      );
+      success = await result.current.submitChanges("CN=User,DC=example,DC=com");
     });
 
     expect(success).toBe(false);

@@ -134,21 +134,14 @@ export function UserPhoto({
             />
           </div>
         ) : (
-          <Avatar
-            displayName={displayName}
-            imageUrl={imageUrl}
-            size={size}
-          />
+          <Avatar displayName={displayName} imageUrl={imageUrl} size={size} />
         )}
         {uploading && (
           <div
             className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40"
             data-testid="user-photo-uploading"
           >
-            <Loader2
-              size={size * 0.3}
-              className="animate-spin text-white"
-            />
+            <Loader2 size={size * 0.3} className="animate-spin text-white" />
           </div>
         )}
       </div>
@@ -161,11 +154,7 @@ export function UserPhoto({
             disabled={uploading}
             data-testid="upload-photo-btn"
           >
-            {photoBase64 ? (
-              <Camera size={12} />
-            ) : (
-              <Upload size={12} />
-            )}
+            {photoBase64 ? <Camera size={12} /> : <Upload size={12} />}
             {photoBase64 ? "Change" : "Upload"}
           </button>
           {photoBase64 && (

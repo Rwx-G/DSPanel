@@ -25,7 +25,9 @@ describe("UserPhoto", () => {
     );
 
     await waitFor(() => {
-      expect(screen.queryByTestId("user-photo-loading")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("user-photo-loading"),
+      ).not.toBeInTheDocument();
     });
 
     expect(screen.getByTestId("avatar")).toBeInTheDocument();
@@ -43,7 +45,9 @@ describe("UserPhoto", () => {
     );
 
     await waitFor(() => {
-      expect(screen.queryByTestId("user-photo-loading")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("user-photo-loading"),
+      ).not.toBeInTheDocument();
     });
 
     expect(screen.getByTestId("avatar-image")).toBeInTheDocument();
@@ -64,7 +68,9 @@ describe("UserPhoto", () => {
     );
 
     await waitFor(() => {
-      expect(screen.queryByTestId("user-photo-loading")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("user-photo-loading"),
+      ).not.toBeInTheDocument();
     });
 
     expect(screen.queryByTestId("upload-photo-btn")).not.toBeInTheDocument();
@@ -81,13 +87,13 @@ describe("UserPhoto", () => {
     );
 
     await waitFor(() => {
-      expect(screen.queryByTestId("user-photo-loading")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("user-photo-loading"),
+      ).not.toBeInTheDocument();
     });
 
     expect(screen.getByTestId("upload-photo-btn")).toBeInTheDocument();
-    expect(screen.getByTestId("upload-photo-btn")).toHaveTextContent(
-      "Upload",
-    );
+    expect(screen.getByTestId("upload-photo-btn")).toHaveTextContent("Upload");
   });
 
   it("shows remove button only when photo exists and canEdit", async () => {
@@ -101,13 +107,13 @@ describe("UserPhoto", () => {
     );
 
     await waitFor(() => {
-      expect(screen.queryByTestId("user-photo-loading")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("user-photo-loading"),
+      ).not.toBeInTheDocument();
     });
 
     expect(screen.getByTestId("remove-photo-btn")).toBeInTheDocument();
-    expect(screen.getByTestId("upload-photo-btn")).toHaveTextContent(
-      "Change",
-    );
+    expect(screen.getByTestId("upload-photo-btn")).toHaveTextContent("Change");
   });
 
   it("hides remove button when no photo exists", async () => {
@@ -121,7 +127,9 @@ describe("UserPhoto", () => {
     );
 
     await waitFor(() => {
-      expect(screen.queryByTestId("user-photo-loading")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("user-photo-loading"),
+      ).not.toBeInTheDocument();
     });
 
     expect(screen.queryByTestId("remove-photo-btn")).not.toBeInTheDocument();
@@ -151,7 +159,9 @@ describe("UserPhoto", () => {
     );
 
     await waitFor(() => {
-      expect(screen.queryByTestId("user-photo-loading")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("user-photo-loading"),
+      ).not.toBeInTheDocument();
     });
 
     mockInvoke.mockResolvedValueOnce(undefined); // remove
@@ -191,7 +201,9 @@ describe("UserPhoto", () => {
     );
 
     await waitFor(() => {
-      expect(screen.queryByTestId("user-photo-loading")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("user-photo-loading"),
+      ).not.toBeInTheDocument();
     });
 
     expect(screen.getByTestId("avatar")).toHaveStyle({

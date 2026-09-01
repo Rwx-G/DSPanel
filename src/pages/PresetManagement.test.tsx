@@ -283,9 +283,7 @@ describe("PresetManagement", () => {
 
     // The dialog should be rendered
     await waitFor(() => {
-      expect(
-        screen.getByText(/Are you sure you want to delete/),
-      ).toBeDefined();
+      expect(screen.getByText(/Are you sure you want to delete/)).toBeDefined();
     });
   });
 
@@ -338,9 +336,7 @@ describe("PresetManagement", () => {
     });
 
     const keyInput = screen.getByTestId("attr-key-input") as HTMLInputElement;
-    const valInput = screen.getByTestId(
-      "attr-value-input",
-    ) as HTMLInputElement;
+    const valInput = screen.getByTestId("attr-value-input") as HTMLInputElement;
 
     fireEvent.change(keyInput, { target: { value: "department" } });
     fireEvent.change(valInput, { target: { value: "IT" } });
@@ -414,14 +410,18 @@ describe("PresetManagement", () => {
 
     // The warning icon should be visible in the preset list item
     const presetItem = screen.getByTestId("preset-item-0");
-    expect(presetItem.querySelector('[aria-label="Preset modified externally"]')).toBeDefined();
+    expect(
+      presetItem.querySelector('[aria-label="Preset modified externally"]'),
+    ).toBeDefined();
 
     // Click the preset to open editor
     fireEvent.click(presetItem);
 
     await waitFor(() => {
       expect(screen.getByTestId("preset-integrity-warning")).toBeDefined();
-      expect(screen.getByText("This preset was modified outside DSPanel")).toBeDefined();
+      expect(
+        screen.getByText("This preset was modified outside DSPanel"),
+      ).toBeDefined();
     });
   });
 
@@ -460,10 +460,13 @@ describe("PresetManagement", () => {
       </Wrapper>,
     );
 
-    await waitFor(() => {
-      expect(screen.queryByText("Loading...")).toBeNull();
-      expect(screen.getByTestId("preset-item-0")).toBeDefined();
-    }, { timeout: 5000 });
+    await waitFor(
+      () => {
+        expect(screen.queryByText("Loading...")).toBeNull();
+        expect(screen.getByTestId("preset-item-0")).toBeDefined();
+      },
+      { timeout: 5000 },
+    );
 
     fireEvent.click(screen.getByTestId("preset-item-0"));
 
@@ -496,7 +499,9 @@ describe("PresetManagement", () => {
       expect(screen.getByTestId("preset-type-select")).toBeDefined();
     });
 
-    const typeSelect = screen.getByTestId("preset-type-select") as HTMLSelectElement;
+    const typeSelect = screen.getByTestId(
+      "preset-type-select",
+    ) as HTMLSelectElement;
     expect(typeSelect.value).toBe("Onboarding");
 
     fireEvent.change(typeSelect, { target: { value: "Offboarding" } });
@@ -519,7 +524,9 @@ describe("PresetManagement", () => {
       expect(screen.getByTestId("preset-description-input")).toBeDefined();
     });
 
-    const descInput = screen.getByTestId("preset-description-input") as HTMLTextAreaElement;
+    const descInput = screen.getByTestId(
+      "preset-description-input",
+    ) as HTMLTextAreaElement;
     fireEvent.change(descInput, { target: { value: "New description" } });
     expect(descInput.value).toBe("New description");
   });

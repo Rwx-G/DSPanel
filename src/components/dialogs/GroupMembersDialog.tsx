@@ -73,7 +73,11 @@ export function GroupMembersDialog({
             </h2>
             {!loading && !error && (
               <span className="text-caption text-[var(--color-text-secondary)]">
-                ({t("dialogs:groupMembers.memberCount", { count: members.length })})
+                (
+                {t("dialogs:groupMembers.memberCount", {
+                  count: members.length,
+                })}
+                )
               </span>
             )}
           </div>
@@ -92,13 +96,18 @@ export function GroupMembersDialog({
             className="flex justify-center py-8"
             data-testid="group-members-loading"
           >
-            <LoadingSpinner message={t("dialogs:groupMembers.loadingMembers")} />
+            <LoadingSpinner
+              message={t("dialogs:groupMembers.loadingMembers")}
+            />
           </div>
         )}
 
         {error && (
           <div data-testid="group-members-error">
-            <EmptyState title={t("dialogs:groupMembers.failedToLoad")} description={error} />
+            <EmptyState
+              title={t("dialogs:groupMembers.failedToLoad")}
+              description={error}
+            />
           </div>
         )}
 

@@ -1,8 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  hasExchangeAttributes,
-  extractExchangeInfo,
-} from "./exchange";
+import { hasExchangeAttributes, extractExchangeInfo } from "./exchange";
 
 describe("hasExchangeAttributes", () => {
   it("returns true when msExchMailboxGuid is present", () => {
@@ -52,9 +49,7 @@ describe("extractExchangeInfo", () => {
     expect(info!.recipientType).toBe("UserMailbox");
     expect(info!.primarySmtpAddress).toBe("john@example.com");
     expect(info!.emailAliases).toEqual(["j@example.com", "johnd@example.com"]);
-    expect(info!.forwardingAddress).toBe(
-      "CN=Jane,OU=Users,DC=example,DC=com",
-    );
+    expect(info!.forwardingAddress).toBe("CN=Jane,OU=Users,DC=example,DC=com");
     expect(info!.delegates).toHaveLength(2);
   });
 

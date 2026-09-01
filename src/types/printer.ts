@@ -14,7 +14,8 @@ export function mapEntryToPrinter(entry: DirectoryEntry): PrinterInfo {
   const attr = (name: string): string => entry.attributes[name]?.[0] ?? "";
   return {
     dn: entry.distinguishedName,
-    name: attr("printerName") || entry.displayName || entry.samAccountName || "",
+    name:
+      attr("printerName") || entry.displayName || entry.samAccountName || "",
     location: attr("location"),
     serverName: attr("serverName"),
     sharePath: attr("uNCName"),

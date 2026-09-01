@@ -102,14 +102,21 @@ export function HomePage({ status }: HomePageProps) {
           >
             <StatusRow
               label={t("common:status")}
-              value={status.isConnected ? t("common:connected") : t("common:disconnected")}
+              value={
+                status.isConnected
+                  ? t("common:connected")
+                  : t("common:disconnected")
+              }
               valueColor={
                 status.isConnected
                   ? "var(--color-success)"
                   : "var(--color-error)"
               }
             />
-            <StatusRow label={t("common:domain")} value={status.domainName ?? t("common:na")} />
+            <StatusRow
+              label={t("common:domain")}
+              value={status.domainName ?? t("common:na")}
+            />
           </DashboardCard>
 
           {/* Current Session */}
@@ -154,8 +161,14 @@ export function HomePage({ status }: HomePageProps) {
             title={t("environment")}
             iconColor="var(--color-info)"
           >
-            <StatusRow label={t("common:version")} value={`v${status.appVersion}`} />
-            <StatusRow label={t("common:platform")} value={`${formatPlatform(platform)} (Tauri v2)`} />
+            <StatusRow
+              label={t("common:version")}
+              value={`v${status.appVersion}`}
+            />
+            <StatusRow
+              label={t("common:platform")}
+              value={`${formatPlatform(platform)} (Tauri v2)`}
+            />
           </DashboardCard>
         </div>
 

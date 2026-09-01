@@ -24,7 +24,10 @@ interface HealthBadgeProps {
   compact?: boolean;
 }
 
-export function HealthBadge({ healthStatus, compact = false }: HealthBadgeProps) {
+export function HealthBadge({
+  healthStatus,
+  compact = false,
+}: HealthBadgeProps) {
   const { t } = useTranslation("components");
   const [showTooltip, setShowTooltip] = useState(false);
   const tooltipId = useId();
@@ -78,7 +81,11 @@ export function HealthBadge({ healthStatus, compact = false }: HealthBadgeProps)
       }}
       tabIndex={0}
       role="status"
-      aria-label={flagCount === 0 ? t("healthBadge.healthy") : t("healthBadge.issue", { count: flagCount })}
+      aria-label={
+        flagCount === 0
+          ? t("healthBadge.healthy")
+          : t("healthBadge.issue", { count: flagCount })
+      }
       aria-describedby={showTooltip ? tooltipId : undefined}
       data-testid="health-badge"
       data-level={healthStatus.level}
@@ -105,7 +112,10 @@ export function HealthBadge({ healthStatus, compact = false }: HealthBadgeProps)
           >
             {flagCount === 0 ? (
               <div className="flex items-center gap-1.5 text-caption text-[var(--color-text-secondary)]">
-                <CheckCircle size={12} className="shrink-0 text-[var(--color-success)]" />
+                <CheckCircle
+                  size={12}
+                  className="shrink-0 text-[var(--color-success)]"
+                />
                 {t("healthBadge.noIssues")}
               </div>
             ) : (
@@ -124,10 +134,14 @@ export function HealthBadge({ healthStatus, compact = false }: HealthBadgeProps)
                       />
                       <div>
                         <span className="text-caption font-medium text-[var(--color-text-primary)]">
-                          {t(`healthBadge.flags.${flag.name}`, { defaultValue: flag.name })}
+                          {t(`healthBadge.flags.${flag.name}`, {
+                            defaultValue: flag.name,
+                          })}
                         </span>
                         <p className="text-[10px] text-[var(--color-text-secondary)]">
-                          {t(`healthBadge.flagDesc.${flag.name}`, { defaultValue: flag.description })}
+                          {t(`healthBadge.flagDesc.${flag.name}`, {
+                            defaultValue: flag.description,
+                          })}
                         </p>
                       </div>
                     </li>

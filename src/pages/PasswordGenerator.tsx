@@ -269,19 +269,34 @@ export function PasswordGenerator() {
   );
 }
 
-function getStrengthLabel(length: number, t: (key: string) => string): { text: string; class: string } {
+function getStrengthLabel(
+  length: number,
+  t: (key: string) => string,
+): { text: string; class: string } {
   if (length >= 24)
     return {
       text: t("excellent"),
       class: "bg-[var(--color-success-bg)] text-[var(--color-success)]",
     };
   if (length >= 20)
-    return { text: t("strong"), class: "bg-[var(--color-info-bg)] text-[var(--color-info)]" };
+    return {
+      text: t("strong"),
+      class: "bg-[var(--color-info-bg)] text-[var(--color-info)]",
+    };
   if (length >= 16)
-    return { text: t("good"), class: "bg-[var(--color-success-bg)] text-[var(--color-success)]" };
+    return {
+      text: t("good"),
+      class: "bg-[var(--color-success-bg)] text-[var(--color-success)]",
+    };
   if (length >= 12)
-    return { text: t("fair"), class: "bg-[var(--color-warning-bg)] text-[var(--color-warning)]" };
-  return { text: t("weak"), class: "bg-[var(--color-error-bg)] text-[var(--color-error)]" };
+    return {
+      text: t("fair"),
+      class: "bg-[var(--color-warning-bg)] text-[var(--color-warning)]",
+    };
+  return {
+    text: t("weak"),
+    class: "bg-[var(--color-error-bg)] text-[var(--color-error)]",
+  };
 }
 
 function CheckboxOption({

@@ -35,7 +35,10 @@ export function ExchangeOnlinePanel({
         >
           <table className="w-full text-caption">
             <tbody>
-              <PropertyRow label="Primary SMTP" value={info.primarySmtpAddress} />
+              <PropertyRow
+                label="Primary SMTP"
+                value={info.primarySmtpAddress}
+              />
               <PropertyRow label="Auto-Reply" value={info.autoReplyStatus} />
               {info.forwardingSmtpAddress && (
                 <PropertyRow

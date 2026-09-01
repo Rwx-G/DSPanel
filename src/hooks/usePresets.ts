@@ -104,5 +104,13 @@ export function usePresets(): UsePresetsReturn {
     [handleError, load],
   );
 
-  return { presets, loading, error, savePreset, deletePreset, acceptChecksum, reload: load };
+  return {
+    presets,
+    loading,
+    error,
+    savePreset,
+    deletePreset,
+    acceptChecksum,
+    reload: load,
+  };
 }

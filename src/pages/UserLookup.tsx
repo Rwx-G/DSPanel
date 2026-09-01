@@ -28,7 +28,14 @@ import {
   type ContextMenuItem,
 } from "@/components/common/ContextMenu";
 import { UserDetail } from "@/pages/UserDetail";
-import { UserX, UserMinus, AlertCircle, User, GitCompareArrows, FolderInput } from "lucide-react";
+import {
+  UserX,
+  UserMinus,
+  AlertCircle,
+  User,
+  GitCompareArrows,
+  FolderInput,
+} from "lucide-react";
 import { usePermissions } from "@/hooks/usePermissions";
 import {
   MoveObjectDialog,
@@ -74,8 +81,7 @@ export function UserLookup() {
   const deepLinkHandled = useRef<string | null>(null);
   const activeTab = openTabs.find((t) => t.id === activeTabId);
   const selectedUserSam = activeTab?.data?.selectedUserSam as
-    | string
-    | undefined;
+    string | undefined;
 
   useEffect(() => {
     if (!selectedUserSam || deepLinkHandled.current === selectedUserSam) return;
@@ -340,9 +346,11 @@ export function UserLookup() {
           // Fetch full attributes for detail view
           invoke<DirectoryEntry | null>("get_user", {
             samAccountName: user.samAccountName,
-          }).then((entry) => {
-            if (entry) setSelectedUser(mapEntryToUser(entry));
-          }).catch(() => {});
+          })
+            .then((entry) => {
+              if (entry) setSelectedUser(mapEntryToUser(entry));
+            })
+            .catch(() => {});
         }}
         onContextMenu={(e) => handleUserContextMenu(e, user)}
         data-testid={`user-result-${user.samAccountName}`}

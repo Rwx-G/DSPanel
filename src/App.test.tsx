@@ -35,9 +35,7 @@ vi.mock("@/pages/GroupHygiene", () => ({
   GroupHygiene: () => <div data-testid="mock-group-hygiene">GroupHygiene</div>,
 }));
 vi.mock("@/pages/NtfsAnalyzer", () => ({
-  NtfsAnalyzer: () => (
-    <div data-testid="mock-ntfs-analyzer">NtfsAnalyzer</div>
-  ),
+  NtfsAnalyzer: () => <div data-testid="mock-ntfs-analyzer">NtfsAnalyzer</div>,
 }));
 vi.mock("@/pages/PasswordGenerator", () => ({
   PasswordGenerator: () => (
@@ -221,9 +219,7 @@ describe("App", () => {
       await waitFor(() => {
         expect(screen.getByText("Dashboard")).toBeInTheDocument();
       });
-      expect(
-        screen.queryByTestId("mock-user-lookup"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("mock-user-lookup")).not.toBeInTheDocument();
     });
 
     it("renders the correct module component when a tab is opened", async () => {
@@ -260,9 +256,7 @@ describe("App", () => {
       });
 
       // Open password-generator module
-      fireEvent.click(
-        screen.getByTestId("sidebar-item-password-generator"),
-      );
+      fireEvent.click(screen.getByTestId("sidebar-item-password-generator"));
       await waitFor(() => {
         expect(
           screen.getByTestId("mock-password-generator"),
@@ -270,8 +264,9 @@ describe("App", () => {
       });
 
       // Users module should still be in the DOM but hidden
-      const usersContainer =
-        screen.getByTestId("mock-user-lookup").closest(".h-full");
+      const usersContainer = screen
+        .getByTestId("mock-user-lookup")
+        .closest(".h-full");
       expect(usersContainer).toHaveStyle({ display: "none" });
 
       // Password generator should be visible

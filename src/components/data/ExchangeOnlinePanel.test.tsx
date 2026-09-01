@@ -3,9 +3,7 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { ExchangeOnlinePanel } from "./ExchangeOnlinePanel";
 import { type ExchangeOnlineInfo } from "@/types/exchange-online";
 
-function makeInfo(
-  overrides?: Partial<ExchangeOnlineInfo>,
-): ExchangeOnlineInfo {
+function makeInfo(overrides?: Partial<ExchangeOnlineInfo>): ExchangeOnlineInfo {
   return {
     primarySmtpAddress: "user@example.com",
     emailAliases: ["alias@example.com"],
@@ -73,9 +71,7 @@ describe("ExchangeOnlinePanel", () => {
 
   it("hides delegates when empty", () => {
     render(
-      <ExchangeOnlinePanel
-        exchangeOnlineInfo={makeInfo({ delegates: [] })}
-      />,
+      <ExchangeOnlinePanel exchangeOnlineInfo={makeInfo({ delegates: [] })} />,
     );
     expect(
       screen.queryByTestId("exchange-online-delegates-list"),

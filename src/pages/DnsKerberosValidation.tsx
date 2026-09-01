@@ -59,7 +59,10 @@ function DnsStatusIcon({
     }
   })();
   return (
-    <span className="flex items-center justify-center" style={{ color: dnsStatusColor(status) }}>
+    <span
+      className="flex items-center justify-center"
+      style={{ color: dnsStatusColor(status) }}
+    >
       {icon}
     </span>
   );
@@ -83,7 +86,10 @@ function ClockStatusIcon({
     }
   })();
   return (
-    <span className="flex items-center justify-center" style={{ color: clockStatusColor(status) }}>
+    <span
+      className="flex items-center justify-center"
+      style={{ color: clockStatusColor(status) }}
+    >
       {icon}
     </span>
   );
@@ -127,10 +133,7 @@ export function DnsKerberosValidation() {
     ).length ?? 0;
 
   return (
-    <div
-      className="flex h-full flex-col"
-      data-testid="dns-kerberos-validation"
-    >
+    <div className="flex h-full flex-col" data-testid="dns-kerberos-validation">
       {/* Toolbar */}
       <div className="flex items-center justify-between border-b border-[var(--color-border-default)] px-4 py-2">
         <h2 className="text-body font-semibold text-[var(--color-text-primary)]">
@@ -141,7 +144,12 @@ export function DnsKerberosValidation() {
             {t("kerberosThreshold")}
           </span>
 
-          <ExportToolbar<{ type: string; name: string; status: string; details: string }>
+          <ExportToolbar<{
+            type: string;
+            name: string;
+            status: string;
+            details: string;
+          }>
             columns={[
               { key: "type", header: t("common:type") },
               { key: "name", header: t("recordOrDc") },
@@ -216,7 +224,8 @@ export function DnsKerberosValidation() {
                 )}
               </span>
               <span className="text-[var(--color-text-secondary)]">
-                {t("checked")}: {new Date(report.checkedAt).toLocaleTimeString()}
+                {t("checked")}:{" "}
+                {new Date(report.checkedAt).toLocaleTimeString()}
               </span>
             </div>
 
@@ -232,9 +241,13 @@ export function DnsKerberosValidation() {
                 >
                   <thead>
                     <tr className="border-b border-[var(--color-border-default)] bg-[var(--color-surface-card)] text-left text-[var(--color-text-secondary)]">
-                      <th className="w-16 px-3 py-2.5 text-center font-medium">{t("common:status")}</th>
+                      <th className="w-16 px-3 py-2.5 text-center font-medium">
+                        {t("common:status")}
+                      </th>
                       <th className="px-4 py-2.5 font-medium">{t("record")}</th>
-                      <th className="px-4 py-2.5 font-medium">{t("expected")}</th>
+                      <th className="px-4 py-2.5 font-medium">
+                        {t("expected")}
+                      </th>
                       <th className="px-4 py-2.5 font-medium">{t("actual")}</th>
                       <th className="px-4 py-2.5 font-medium">{t("issues")}</th>
                     </tr>
@@ -294,10 +307,14 @@ export function DnsKerberosValidation() {
                 >
                   <thead>
                     <tr className="border-b border-[var(--color-border-default)] bg-[var(--color-surface-card)] text-left text-[var(--color-text-secondary)]">
-                      <th className="w-16 px-3 py-2.5 text-center font-medium">{t("common:status")}</th>
+                      <th className="w-16 px-3 py-2.5 text-center font-medium">
+                        {t("common:status")}
+                      </th>
                       <th className="px-4 py-2.5 font-medium">{t("dc")}</th>
                       <th className="px-4 py-2.5 font-medium">{t("dcTime")}</th>
-                      <th className="w-24 px-4 py-2.5 font-medium">{t("skew")}</th>
+                      <th className="w-24 px-4 py-2.5 font-medium">
+                        {t("skew")}
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
