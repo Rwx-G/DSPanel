@@ -5,6 +5,7 @@ use crate::models::replication_status::{
     ReplicationPartnership, ReplicationStatus, compute_replication_status,
 };
 use crate::services::DirectoryProvider;
+use crate::services::directory::configuration_dn_or_default;
 
 /// Parsed data from a single DS_REPL_NEIGHBORW XML element.
 #[derive(Debug, Default)]
@@ -28,9 +29,7 @@ pub async fn get_replication_partnerships(
     let base_dn = provider
         .base_dn()
         .ok_or_else(|| anyhow::anyhow!("Not connected - no base DN"))?;
-    let configuration_dn = provider
-        .configuration_dn()
-        .unwrap_or_else(|| format!("CN=Configuration,{}", base_dn));
+    let configuration_dn = configuration_dn_or_default(&*provider, &base_dn);
 
     let sites_dn = format!("CN=Sites,{}", configuration_dn);
 

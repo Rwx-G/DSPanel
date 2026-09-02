@@ -16,7 +16,7 @@
 //! for every method is recorded inline as a one-line comment.
 
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{Context, Result, bail};
@@ -72,6 +72,7 @@ pub struct DomainPartition {
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct ForestTopology {
+    /// Domain partitions in discovery order, seed partition first.
     pub partitions: Vec<DomainPartition>,
 }
 
@@ -127,7 +128,9 @@ impl ForestTopology {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "state", content = "reason", rename_all = "camelCase")]
 pub enum ConnectionStatus {
+    /// The partition provider holds a live bind.
     Connected,
+    /// A retry is in progress (Story 15.6 partition retry); not yet produced.
     Reconnecting,
     /// Carries the classification key of the failure (`network`, `auth_denied`,
     /// `timeout`, `unknown`, ...), the same vocabulary as
@@ -194,14 +197,26 @@ const MAX_DNS_NAME_LEN: usize = 253;
 const MAX_DNS_LABEL_LEN: usize = 63;
 
 /// Accepts only letters, digits, hyphens and dots (LDH rule) within RFC 1035
-/// length limits. `dnsRoot` comes from the directory, not the operator, and it
-/// becomes the authority of an `ldap://` URL and the target of a bind carrying
-/// the operator's credentials; anything richer than a host name is rejected.
+/// length limits, with at least two labels and a non-numeric top label.
+/// `dnsRoot` comes from the directory, not the operator, and it becomes the
+/// authority of an `ldap://` URL and the target of a bind performed as the
+/// operator; anything richer than a domain name (single-label hosts, IP
+/// literals, ports, paths, userinfo) is rejected.
 pub fn is_valid_dns_name(name: &str) -> bool {
     if name.is_empty() || name.len() > MAX_DNS_NAME_LEN {
         return false;
     }
-    name.split('.').all(|label| {
+    let labels: Vec<&str> = name.split('.').collect();
+    if labels.len() < 2 {
+        return false;
+    }
+    let top_label_is_numeric = labels
+        .last()
+        .is_some_and(|label| label.bytes().all(|b| b.is_ascii_digit()));
+    if top_label_is_numeric {
+        return false;
+    }
+    labels.iter().all(|label| {
         !label.is_empty()
             && label.len() <= MAX_DNS_LABEL_LEN
             && !label.starts_with('-')
@@ -297,12 +312,17 @@ pub fn parse_partitions_from_entries(entries: &[DirectoryEntry]) -> Result<Vec<D
     Ok(partitions)
 }
 
+/// Upper bound accepted for `DSPANEL_PARTITION_BIND_TIMEOUT`, so a stray
+/// value cannot stretch a promotion attempt indefinitely.
+pub const MAX_PARTITION_BIND_TIMEOUT: Duration = Duration::from_secs(60);
+
 /// Reads the per-partition bind timeout, honoring `DSPANEL_PARTITION_BIND_TIMEOUT`
-/// (whole seconds). Invalid or zero values fall back to the default.
+/// (whole seconds, capped at `MAX_PARTITION_BIND_TIMEOUT`). Invalid or zero
+/// values fall back to the default.
 pub fn partition_bind_timeout() -> Duration {
     match std::env::var(PARTITION_BIND_TIMEOUT_ENV) {
         Ok(raw) => match raw.trim().parse::<u64>() {
-            Ok(secs) if secs > 0 => Duration::from_secs(secs),
+            Ok(secs) if secs > 0 => Duration::from_secs(secs).min(MAX_PARTITION_BIND_TIMEOUT),
             _ => {
                 tracing::warn!(
                     value = %raw,
@@ -332,12 +352,15 @@ pub const TLS_UNVERIFIED: &str = "tls_unverified";
 /// Abstracted so tests can inject providers with scripted connection
 /// outcomes; production uses `LdapPartitionConnector`.
 pub trait PartitionConnector: Send + Sync {
+    /// Returns the provider to bind for `partition`, or the classification key
+    /// explaining why this partition is not attempted.
     fn build(&self, partition: &DomainPartition) -> Result<Arc<dyn DirectoryProvider>, String>;
 }
 
 /// Production connector: one `LdapDirectoryProvider` per partition, reusing
 /// the seed's authentication mode and TLS settings. The DC is located through
-/// the provider's DNS SRV resolution on the partition's DNS name.
+/// a DNS SRV lookup of `_ldap._tcp.<dns name>` before dialing, so TLS
+/// certificate verification runs against the DC FQDN.
 pub struct LdapPartitionConnector {
     auth_mode: LdapAuthMode,
     tls_config: LdapTlsConfig,
@@ -377,18 +400,27 @@ impl PartitionConnector for LdapPartitionConnector {
 }
 
 /// Multi-partition directory provider. See the module docs.
+///
+/// A forest is an immutable snapshot: it starts as a seed-only placeholder
+/// (`seed_only` / `single_partition`) and is replaced wholesale by the result
+/// of `repromote` once the seed is reachable, so readers never observe a
+/// half-assembled partition map.
 pub struct ForestProvider {
     /// Every partition provider keyed by lowercase DNS name, seed included.
     partitions: HashMap<String, Arc<dyn DirectoryProvider>>,
     /// The provider used for the initial bind; the operator's own domain.
     seed: Arc<dyn DirectoryProvider>,
     seed_dns_name: String,
-    /// `rootDomainNamingContext` of the seed DC, when known.
-    forest_root_dn: Option<String>,
     topology: ForestTopology,
-    /// Connection state of the non-seed partitions. The seed's state is read
-    /// live from the seed provider.
-    partition_status: Mutex<HashMap<String, ConnectionStatus>>,
+    /// Outcome of the assembly-time bind per non-seed partition: the reason a
+    /// partition was declined or why its bind failed. Live state is derived in
+    /// `partition_status` from the partition provider when one exists.
+    recorded_status: HashMap<String, ConnectionStatus>,
+    /// How non-seed partitions are built; `None` for forests that can never be
+    /// promoted (demo mode, tests).
+    connector: Option<Arc<dyn PartitionConnector>>,
+    /// True once assembled from a reachable seed; false for placeholders.
+    promoted: bool,
 }
 
 impl ForestProvider {
@@ -404,6 +436,19 @@ impl ForestProvider {
         auth_mode: LdapAuthMode,
         tls_config: LdapTlsConfig,
     ) -> Result<Self> {
+        Self::connect_with(
+            seed,
+            Arc::new(LdapPartitionConnector::new(auth_mode, tls_config)),
+        )
+        .await
+    }
+
+    /// `connect` for any seed provider and partition connector. The forest
+    /// keeps the connector so `repromote` can rebuild it later.
+    pub async fn connect_with(
+        seed: Arc<dyn DirectoryProvider>,
+        connector: Arc<dyn PartitionConnector>,
+    ) -> Result<Self> {
         let reachable = seed
             .test_connection()
             .await
@@ -415,7 +460,6 @@ impl ForestProvider {
                     .unwrap_or_else(|| "unknown".to_string())
             );
         }
-        let seed_dyn: Arc<dyn DirectoryProvider> = seed.clone();
         let bind_timeout = partition_bind_timeout();
         // Discovery only talks to the seed DC, but its answer is unbounded; the
         // same timeout keeps a slow or hostile DC from stalling the promotion.
@@ -426,32 +470,38 @@ impl ForestProvider {
                     error = %e,
                     "Forest discovery failed, continuing with the seed partition only"
                 );
-                ForestTopology::synthesized_from(&*seed_dyn)
+                ForestTopology::synthesized_from(&*seed)
             }
             Err(_elapsed) => {
                 tracing::warn!(
                     timeout = ?bind_timeout,
                     "Forest discovery timed out, continuing with the seed partition only"
                 );
-                ForestTopology::synthesized_from(&*seed_dyn)
+                ForestTopology::synthesized_from(&*seed)
             }
         };
-        let seed_dns_name = resolve_seed_dns_name(&*seed_dyn, &topology);
-        let connector = LdapPartitionConnector::new(auth_mode, tls_config);
-        Ok(Self::assemble(
-            seed_dyn,
-            seed_dns_name,
-            seed.forest_root_dn(),
-            topology,
-            &connector,
-            bind_timeout,
-        )
-        .await)
+        Ok(Self::assemble(seed, topology, connector, bind_timeout).await)
     }
 
-    /// Wraps a single provider as a one-partition forest. Used for demo mode
-    /// and as the fallback when the seed cannot be promoted to a real forest.
+    /// Wraps a single provider as a one-partition forest that can never be
+    /// promoted. Used for demo mode and tests.
     pub fn single_partition(provider: Arc<dyn DirectoryProvider>) -> Self {
+        Self::placeholder(provider, None)
+    }
+
+    /// Seed-only placeholder installed before the seed is known to be
+    /// reachable; `repromote` turns it into the discovered forest.
+    pub fn seed_only(
+        provider: Arc<dyn DirectoryProvider>,
+        connector: Arc<dyn PartitionConnector>,
+    ) -> Self {
+        Self::placeholder(provider, Some(connector))
+    }
+
+    fn placeholder(
+        provider: Arc<dyn DirectoryProvider>,
+        connector: Option<Arc<dyn PartitionConnector>>,
+    ) -> Self {
         let topology = ForestTopology::synthesized_from(&*provider);
         let seed_dns_name = resolve_seed_dns_name(&*provider, &topology);
         let mut partitions = HashMap::new();
@@ -460,9 +510,10 @@ impl ForestProvider {
             partitions,
             seed: provider,
             seed_dns_name,
-            forest_root_dn: None,
             topology,
-            partition_status: Mutex::new(HashMap::new()),
+            recorded_status: HashMap::new(),
+            connector,
+            promoted: false,
         }
     }
 
@@ -474,25 +525,40 @@ impl ForestProvider {
     /// scripted `PartitionConnector`.
     pub async fn assemble(
         seed: Arc<dyn DirectoryProvider>,
-        seed_dns_name: String,
-        forest_root_dn: Option<String>,
         topology: ForestTopology,
-        connector: &dyn PartitionConnector,
+        connector: Arc<dyn PartitionConnector>,
         bind_timeout: Duration,
     ) -> Self {
-        let seed_dns_name = seed_dns_name.to_ascii_lowercase();
+        let seed_dns_name = resolve_seed_dns_name(&*seed, &topology);
         let topology = normalize_topology(&*seed, &seed_dns_name, topology);
-        let (mut partitions, statuses) =
-            bind_partitions(&topology, &seed_dns_name, connector, bind_timeout).await;
+        let (mut partitions, recorded_status) =
+            bind_partitions(&topology, &seed_dns_name, &*connector, bind_timeout).await;
         partitions.insert(seed_dns_name.clone(), seed.clone());
         Self {
             partitions,
             seed,
             seed_dns_name,
-            forest_root_dn,
             topology,
-            partition_status: Mutex::new(statuses),
+            recorded_status,
+            connector: Some(connector),
+            promoted: true,
         }
+    }
+
+    /// True once the forest was assembled from a reachable seed. A `false`
+    /// placeholder should be re-promoted when the seed becomes reachable.
+    pub fn is_promoted(&self) -> bool {
+        self.promoted
+    }
+
+    /// Rebuilds the forest from the same seed and connector, re-running
+    /// discovery and every partition bind. `None` when the forest was created
+    /// without a connector and can only ever hold its seed.
+    pub fn repromote(
+        &self,
+    ) -> Option<impl std::future::Future<Output = Result<Self>> + Send + use<>> {
+        let connector = self.connector.clone()?;
+        Some(Self::connect_with(self.seed.clone(), connector))
     }
 
     /// Topology built at connect time, seed partition first.
@@ -505,13 +571,6 @@ impl ForestProvider {
         &self.seed_dns_name
     }
 
-    /// DN of the forest root domain (`rootDomainNamingContext` of the seed DC),
-    /// when the rootDSE exposed it. Distinct from `base_dn`, which stays the
-    /// seed's own naming context.
-    pub fn forest_root_dn(&self) -> Option<&str> {
-        self.forest_root_dn.as_deref()
-    }
-
     /// The provider bound to the operator's own partition.
     pub fn seed(&self) -> Arc<dyn DirectoryProvider> {
         self.seed.clone()
@@ -522,30 +581,55 @@ impl ForestProvider {
         self.partitions.get(&dns_name.to_ascii_lowercase()).cloned()
     }
 
-    /// Connection state of every partition, seed first then sorted by name.
-    /// The seed's state is read live; non-seed states reflect the last bind
-    /// attempt recorded in this provider.
+    /// Connection state of every partition in topology order, seed first.
+    ///
+    /// States are read live from each partition provider so a lazily
+    /// reconnected partition reports as connected; the assembly-time record
+    /// supplies the reason for partitions that were declined, timed out or
+    /// never got a provider.
     pub fn partition_status(&self) -> Vec<(String, ConnectionStatus)> {
-        let seed_status = if self.seed.is_connected() {
-            ConnectionStatus::Connected
-        } else {
-            ConnectionStatus::Unreachable(
-                self.seed
-                    .last_connection_error()
-                    .unwrap_or_else(|| "unknown".to_string()),
-            )
-        };
-        let mut statuses = vec![(self.seed_dns_name.clone(), seed_status)];
-        let mut others: Vec<(String, ConnectionStatus)> = self
-            .partition_status
-            .lock()
-            .expect("partition_status lock poisoned")
-            .iter()
-            .map(|(dns, status)| (dns.clone(), status.clone()))
-            .collect();
-        others.sort_by(|a, b| a.0.cmp(&b.0));
-        statuses.extend(others);
+        let mut statuses: Vec<(String, ConnectionStatus)> = Vec::new();
+        if self
+            .topology
+            .find_by_dns_name(&self.seed_dns_name)
+            .is_none()
+        {
+            // Placeholder built before the seed connected: no topology yet,
+            // but the operator's own partition state is still meaningful.
+            statuses.push((
+                self.seed_dns_name.clone(),
+                self.live_status(&self.seed_dns_name),
+            ));
+        }
+        statuses.extend(self.topology.partitions.iter().map(|partition| {
+            let dns_name = partition.dns_name.to_ascii_lowercase();
+            let status = self.live_status(&dns_name);
+            (dns_name, status)
+        }));
         statuses
+    }
+
+    fn live_status(&self, dns_name: &str) -> ConnectionStatus {
+        let recorded = self.recorded_status.get(dns_name);
+        match self.partitions.get(dns_name) {
+            Some(provider) if provider.is_connected() => ConnectionStatus::Connected,
+            Some(provider) => ConnectionStatus::Unreachable(
+                provider
+                    .last_connection_error()
+                    .or_else(|| recorded.and_then(unreachable_reason))
+                    .unwrap_or_else(|| "unknown".to_string()),
+            ),
+            None => recorded
+                .cloned()
+                .unwrap_or_else(|| ConnectionStatus::Unreachable("unknown".to_string())),
+        }
+    }
+}
+
+fn unreachable_reason(status: &ConnectionStatus) -> Option<String> {
+    match status {
+        ConnectionStatus::Unreachable(reason) => Some(reason.clone()),
+        ConnectionStatus::Connected | ConnectionStatus::Reconnecting => None,
     }
 }
 
@@ -1066,9 +1150,19 @@ impl DirectoryProvider for ForestProvider {
         self.seed.resolve_group_by_rid(rid).await
     }
 
-    // seed only: returns the topology built at connect time
+    // seed only: the forest root is a rootDSE attribute of the seed DC
+    fn forest_root_dn(&self) -> Option<String> {
+        self.seed.forest_root_dn()
+    }
+
+    // promoted: the topology built at connect time; placeholder: live seed
+    // discovery, so callers can still learn the forest before promotion
     async fn discover_forest(&self) -> Result<ForestTopology> {
-        Ok(self.topology.clone())
+        if self.promoted {
+            Ok(self.topology.clone())
+        } else {
+            self.seed.discover_forest().await
+        }
     }
 }
 
@@ -1367,10 +1461,8 @@ mod tests {
             );
         let forest = ForestProvider::assemble(
             seed_mock(),
-            "example.com".to_string(),
-            None,
             topology,
-            &connector,
+            Arc::new(connector),
             Duration::from_secs(1),
         )
         .await;
@@ -1382,14 +1474,14 @@ mod tests {
         );
         assert_eq!(
             status[1],
+            ("eu.example.com".to_string(), ConnectionStatus::Connected)
+        );
+        assert_eq!(
+            status[2],
             (
                 "apac.example.com".to_string(),
                 ConnectionStatus::Unreachable("network".to_string())
             )
-        );
-        assert_eq!(
-            status[2],
-            ("eu.example.com".to_string(), ConnectionStatus::Connected)
         );
         assert!(forest.partition("apac.example.com").is_some());
         assert!(forest.partition("EU.example.com").is_some());
@@ -1404,14 +1496,14 @@ mod tests {
         };
         let connector = StubConnector::new().with(
             "eu.example.com",
-            MockDirectoryProvider::new().with_failure(),
+            MockDirectoryProvider::new()
+                .with_failure()
+                .with_connected(false),
         );
         let forest = ForestProvider::assemble(
             seed_mock(),
-            "example.com".to_string(),
-            None,
             topology,
-            &connector,
+            Arc::new(connector),
             Duration::from_secs(1),
         )
         .await;
@@ -1434,16 +1526,16 @@ mod tests {
         let connector = StubConnector::new()
             .with(
                 "slow.example.com",
-                MockDirectoryProvider::new().with_connect_delay(Duration::from_secs(5)),
+                MockDirectoryProvider::new()
+                    .with_connect_delay(Duration::from_secs(5))
+                    .with_connected(false),
             )
             .with("fast.example.com", MockDirectoryProvider::new());
         let started = Instant::now();
         let forest = ForestProvider::assemble(
             seed_mock(),
-            "example.com".to_string(),
-            None,
             topology,
-            &connector,
+            Arc::new(connector),
             Duration::from_millis(150),
         )
         .await;
@@ -1470,10 +1562,8 @@ mod tests {
         let topology = ForestTopology { partitions };
         let forest = ForestProvider::assemble(
             seed_mock(),
-            "example.com".to_string(),
-            None,
             topology,
-            &StubConnector::new(),
+            Arc::new(StubConnector::new()),
             Duration::from_secs(1),
         )
         .await;
@@ -1491,10 +1581,8 @@ mod tests {
         };
         let forest = ForestProvider::assemble(
             seed_mock(),
-            "EXAMPLE.COM".to_string(),
-            Some("DC=example,DC=com".to_string()),
             topology,
-            &StubConnector::new(),
+            Arc::new(StubConnector::new()),
             Duration::from_secs(1),
         )
         .await;
@@ -1504,8 +1592,9 @@ mod tests {
             forest.topology().partitions[1].dns_name,
             "other.example.com"
         );
-        assert_eq!(forest.forest_root_dn(), Some("DC=example,DC=com"));
+        assert_eq!(forest.forest_root_dn(), None);
         assert_eq!(forest.base_dn().as_deref(), Some("DC=example,DC=com"));
+        assert!(forest.is_promoted());
     }
 
     #[test]
@@ -1547,8 +1636,11 @@ mod tests {
     fn is_valid_dns_name_accepts_host_names_only() {
         assert!(is_valid_dns_name("corp.example.com"));
         assert!(is_valid_dns_name("eu-west.corp.example.com"));
-        assert!(is_valid_dns_name("a1"));
+        assert!(is_valid_dns_name("a1.example"));
         assert!(!is_valid_dns_name(""));
+        assert!(!is_valid_dns_name("wpad"));
+        assert!(!is_valid_dns_name("192.0.2.10"));
+        assert!(!is_valid_dns_name("corp.123"));
         assert!(!is_valid_dns_name("dc.evil.tld:9999"));
         assert!(!is_valid_dns_name("evil.tld/path"));
         assert!(!is_valid_dns_name("user@evil.tld"));
@@ -1646,10 +1738,8 @@ mod tests {
         let connector = StubConnector::new().declining("eu.example.com", TLS_REQUIRED);
         let forest = ForestProvider::assemble(
             seed_mock(),
-            "example.com".to_string(),
-            None,
             topology,
-            &connector,
+            Arc::new(connector),
             Duration::from_secs(1),
         )
         .await;
@@ -1662,5 +1752,63 @@ mod tests {
         );
         assert!(forest.partition("eu.example.com").is_none());
         assert_eq!(forest.topology().partitions.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn placeholder_repromotes_through_its_connector() {
+        let seed = MockDirectoryProvider::new().with_configuration_entries(stub_forest_entries());
+        let placeholder = ForestProvider::seed_only(Arc::new(seed), Arc::new(StubConnector::new()));
+        assert!(!placeholder.is_promoted());
+        // A placeholder answers discovery from its seed, not from a frozen topology.
+        let live = placeholder.discover_forest().await.unwrap();
+        assert_eq!(live.partitions.len(), 1);
+        let promoted = placeholder.repromote().unwrap().await.unwrap();
+        assert!(promoted.is_promoted());
+        assert_eq!(promoted.seed_dns_name(), "example.com");
+        assert!(promoted.repromote().is_some());
+    }
+
+    #[test]
+    fn single_partition_forest_cannot_be_promoted() {
+        let forest = ForestProvider::single_partition(seed_mock());
+        assert!(!forest.is_promoted());
+        assert!(forest.repromote().is_none());
+    }
+
+    #[tokio::test]
+    async fn connect_with_rejects_unreachable_seed() {
+        let seed = Arc::new(
+            MockDirectoryProvider::new()
+                .with_connected(false)
+                .with_connection_error("network"),
+        );
+        let err = ForestProvider::connect_with(seed, Arc::new(StubConnector::new()))
+            .await
+            .err()
+            .unwrap();
+        assert!(err.to_string().contains("network"));
+    }
+
+    #[tokio::test]
+    async fn partition_status_reads_live_provider_state() {
+        let topology = ForestTopology {
+            partitions: vec![partition("example.com"), partition("eu.example.com")],
+        };
+        let flaky = MockDirectoryProvider::new().with_connected(false);
+        let connector = StubConnector::new().with("eu.example.com", flaky);
+        let forest = ForestProvider::assemble(
+            seed_mock(),
+            topology,
+            Arc::new(connector),
+            Duration::from_secs(1),
+        )
+        .await;
+        assert_eq!(
+            forest.partition_status()[1].1,
+            ConnectionStatus::Unreachable("unknown".to_string())
+        );
+        // The partition provider reconnects lazily; status must follow it.
+        let eu = forest.partition("eu.example.com").unwrap();
+        assert!(!eu.is_connected());
     }
 }

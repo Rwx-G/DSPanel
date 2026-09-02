@@ -9,6 +9,21 @@ use std::collections::HashMap;
 /// All AD queries must go through this trait - never use ldap3 or reqwest directly
 /// in command handlers. Implementations include `LdapDirectoryProvider` for on-prem
 /// AD and (future) `GraphDirectoryProvider` for Entra ID.
+/// Configuration partition DN assumed when the directory does not report one:
+/// correct only for a forest-root domain.
+pub fn default_configuration_dn(base_dn: &str) -> String {
+    format!("CN=Configuration,{}", base_dn)
+}
+
+/// The provider's Configuration partition DN, or the forest-root assumption
+/// derived from an already-known `base_dn`. Call sites that hold a base DN use
+/// this instead of repeating the fallback.
+pub fn configuration_dn_or_default(provider: &dyn DirectoryProvider, base_dn: &str) -> String {
+    provider
+        .configuration_dn()
+        .unwrap_or_else(|| default_configuration_dn(base_dn))
+}
+
 #[async_trait]
 pub trait DirectoryProvider: Send + Sync {
     /// Whether a connection is currently established.
@@ -400,8 +415,15 @@ pub trait DirectoryProvider: Send + Sync {
     /// that query `CN=Sites`, `CN=Partitions` or PKI containers use this,
     /// never `CN=Configuration,<base_dn>`.
     fn configuration_dn(&self) -> Option<String> {
-        self.base_dn()
-            .map(|base| format!("CN=Configuration,{}", base))
+        self.base_dn().map(|base| default_configuration_dn(&base))
+    }
+
+    /// DN of the forest root domain (rootDSE `rootDomainNamingContext`).
+    ///
+    /// `None` for providers that do not expose the rootDSE; the LDAP provider
+    /// overrides it. Distinct from `base_dn`, which is the bound domain.
+    fn forest_root_dn(&self) -> Option<String> {
+        None
     }
 }
 

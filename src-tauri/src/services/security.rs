@@ -8,6 +8,7 @@ use crate::models::security::{
     PrivilegedAccountsReport, SecurityAlert,
 };
 use crate::services::DirectoryProvider;
+use crate::services::directory::configuration_dn_or_default;
 
 /// Password age threshold in days before raising a Critical alert.
 const PASSWORD_AGE_THRESHOLD_DAYS: i64 = 90;
@@ -2542,9 +2543,7 @@ async fn compute_certificate_security_factor(provider: Arc<dyn DirectoryProvider
         }
     };
 
-    let configuration_dn = provider
-        .configuration_dn()
-        .unwrap_or_else(|| format!("CN=Configuration,{}", base_dn));
+    let configuration_dn = configuration_dn_or_default(&*provider, &base_dn);
     let pki_base = format!("CN=Public Key Services,CN=Services,{}", configuration_dn);
 
     // Check if CA exists
@@ -4302,9 +4301,7 @@ pub async fn build_escalation_graph(
         }
 
         // G. ADCS Certificate Template edges
-        let configuration_dn = provider
-            .configuration_dn()
-            .unwrap_or_else(|| format!("CN=Configuration,{}", base_dn));
+        let configuration_dn = configuration_dn_or_default(&*provider, &base_dn);
         let cert_search_base = format!(
             "CN=Certificate Templates,CN=Public Key Services,CN=Services,{}",
             configuration_dn

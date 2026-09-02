@@ -29,16 +29,7 @@ pub const DEFAULT_THRESHOLD_SECONDS: u32 = 300;
 ///
 /// Converts "DC=example,DC=com" to "example.com".
 fn base_dn_to_domain(base_dn: &str) -> String {
-    base_dn
-        .split(',')
-        .filter_map(|part| {
-            let trimmed = part.trim();
-            trimmed
-                .strip_prefix("DC=")
-                .or_else(|| trimmed.strip_prefix("dc="))
-        })
-        .collect::<Vec<&str>>()
-        .join(".")
+    crate::services::forest::dns_domain_from_dn(base_dn).unwrap_or_default()
 }
 
 /// Creates a DNS resolver targeting the AD DC's DNS server.

@@ -179,6 +179,10 @@ where
         self.inner.configuration_dn()
     }
 
+    fn forest_root_dn(&self) -> Option<String> {
+        self.inner.forest_root_dn()
+    }
+
     async fn search_users(&self, filter: &str, max_results: usize) -> Result<Vec<DirectoryEntry>> {
         let filter = filter.to_string();
         resilient_call!(self, filter, |inner, f| inner

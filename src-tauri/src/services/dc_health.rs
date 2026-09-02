@@ -10,6 +10,7 @@ use crate::models::dc_health::{
     DcHealthCheck, DcHealthLevel, DcHealthResult, DomainControllerInfo, compute_overall_status,
 };
 use crate::services::DirectoryProvider;
+use crate::services::directory::configuration_dn_or_default;
 
 /// Discovers domain controllers by querying the AD Configuration partition
 /// via the directory provider.
@@ -22,9 +23,7 @@ pub async fn discover_domain_controllers(
     let base_dn = provider
         .base_dn()
         .ok_or_else(|| anyhow::anyhow!("Not connected - no base DN"))?;
-    let configuration_dn = provider
-        .configuration_dn()
-        .unwrap_or_else(|| format!("CN=Configuration,{}", base_dn));
+    let configuration_dn = configuration_dn_or_default(provider, &base_dn);
 
     let sites_dn = format!("CN=Sites,{}", configuration_dn);
 
@@ -123,9 +122,7 @@ pub async fn discover_fsmo_roles(
 ) -> Vec<(&'static str, String)> {
     let mut roles = Vec::new();
 
-    let config_dn = provider
-        .configuration_dn()
-        .unwrap_or_else(|| format!("CN=Configuration,{}", base_dn));
+    let config_dn = configuration_dn_or_default(provider, base_dn);
 
     let fsmo_objects: &[(&str, String)] = &[
         ("PDC", base_dn.to_string()),
@@ -565,9 +562,7 @@ async fn check_replication_health(
             };
         }
     };
-    let configuration_dn = provider
-        .configuration_dn()
-        .unwrap_or_else(|| format!("CN=Configuration,{}", base_dn));
+    let configuration_dn = configuration_dn_or_default(provider, &base_dn);
 
     let sites_dn = format!("CN=Sites,{}", configuration_dn);
 

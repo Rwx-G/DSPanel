@@ -8,6 +8,7 @@ use crate::models::topology::{
 };
 use crate::services::DirectoryProvider;
 use crate::services::dc_health::{discover_fsmo_roles, resolve_fallback_ip};
+use crate::services::directory::configuration_dn_or_default;
 
 /// Queries the AD Configuration partition and assembles a complete topology
 /// view including sites, domain controllers, replication connections, and
@@ -16,9 +17,7 @@ pub async fn get_topology(provider: Arc<dyn DirectoryProvider>) -> Result<Topolo
     let base_dn = provider
         .base_dn()
         .ok_or_else(|| anyhow::anyhow!("Not connected - no base DN"))?;
-    let configuration_dn = provider
-        .configuration_dn()
-        .unwrap_or_else(|| format!("CN=Configuration,{}", base_dn));
+    let configuration_dn = configuration_dn_or_default(&*provider, &base_dn);
 
     let sites_dn = format!("CN=Sites,{}", configuration_dn);
 

@@ -7,10 +7,57 @@ use ldap3::controls::{self, RawControl};
 use ldap3::{LdapConnAsync, LdapConnSettings, Mod, Scope, SearchEntry};
 
 use crate::models::{ContactInfo, DirectoryEntry, OUNode, PrinterInfo};
-use crate::services::directory::DirectoryProvider;
+use crate::services::directory::{DirectoryProvider, default_configuration_dn};
 use crate::services::forest::{
-    ForestTopology, NTDS_DOMAIN_CROSSREF_FILTER, parse_partitions_from_entries,
+    ForestTopology, MAX_PARTITIONS, NTDS_DOMAIN_CROSSREF_FILTER, dns_domain_from_dn,
+    parse_partitions_from_entries,
 };
+
+/// Resolves the first `_ldap._tcp.<domain>` SRV target to a DC FQDN.
+///
+/// `None` when the resolver cannot be built, the lookup fails, or no record
+/// comes back; callers decide the fallback.
+async fn lookup_ldap_srv_target(domain: &str) -> Option<String> {
+    let srv_name = format!("_ldap._tcp.{}.", domain);
+    tracing::debug!(srv_name = %srv_name, "Resolving DC FQDN via DNS SRV");
+    use hickory_resolver::proto::rr::RData;
+    use hickory_resolver::proto::rr::rdata::SRV;
+    let resolver_result = hickory_resolver::TokioResolver::builder_tokio()
+        .and_then(|b| b.build())
+        .or_else(|_| {
+            hickory_resolver::TokioResolver::builder_with_config(
+                hickory_resolver::config::ResolverConfig::default(),
+                Default::default(),
+            )
+            .build()
+        });
+    let resolver = match resolver_result {
+        Ok(r) => r,
+        Err(e) => {
+            tracing::warn!(error = %e, "Failed to build DNS resolver");
+            return None;
+        }
+    };
+    match resolver.srv_lookup(&srv_name).await {
+        Ok(lookup) => {
+            let first_srv: Option<&SRV> = lookup.answers().iter().find_map(|r| match &r.data {
+                RData::SRV(srv) => Some(srv),
+                _ => None,
+            });
+            if let Some(srv) = first_srv {
+                let fqdn = srv.target.to_string();
+                let fqdn = fqdn.trim_end_matches('.').to_string();
+                tracing::info!(domain = %domain, fqdn = %fqdn, "DC FQDN resolved via DNS SRV");
+                return Some(fqdn);
+            }
+            tracing::warn!(domain = %domain, "DNS SRV lookup returned no records");
+        }
+        Err(e) => {
+            tracing::warn!(domain = %domain, error = %e, "DNS SRV lookup failed");
+        }
+    }
+    None
+}
 
 /// Resolves the DC FQDN from a domain name for the Kerberos SPN.
 ///
@@ -31,47 +78,8 @@ use crate::services::forest::{
 ///    `unknown_principal` but at least the user sees a clear log line.
 #[cfg(feature = "gssapi")]
 async fn resolve_dc_fqdn_for_gssapi(host: &str) -> String {
-    let srv_name = format!("_ldap._tcp.{}.", host);
-    tracing::debug!(srv_name = %srv_name, "Resolving DC FQDN via DNS SRV for GSSAPI");
-
-    use hickory_resolver::proto::rr::RData;
-    use hickory_resolver::proto::rr::rdata::SRV;
-
-    let resolver_result = hickory_resolver::TokioResolver::builder_tokio()
-        .and_then(|b| b.build())
-        .or_else(|_| {
-            hickory_resolver::TokioResolver::builder_with_config(
-                hickory_resolver::config::ResolverConfig::default(),
-                Default::default(),
-            )
-            .build()
-        });
-
-    let resolver = match resolver_result {
-        Ok(r) => r,
-        Err(e) => {
-            tracing::warn!(error = %e, "Failed to build DNS resolver, returning host as-is");
-            return host.to_string();
-        }
-    };
-
-    match resolver.srv_lookup(&srv_name).await {
-        Ok(lookup) => {
-            let first_srv: Option<&SRV> = lookup.answers().iter().find_map(|r| match &r.data {
-                RData::SRV(srv) => Some(srv),
-                _ => None,
-            });
-            if let Some(srv) = first_srv {
-                let fqdn = srv.target.to_string();
-                let fqdn = fqdn.trim_end_matches('.').to_string();
-                tracing::info!(domain = %host, fqdn = %fqdn, "DC FQDN resolved via DNS SRV");
-                return fqdn;
-            }
-            tracing::warn!(domain = %host, "DNS SRV lookup returned no records");
-        }
-        Err(e) => {
-            tracing::warn!(domain = %host, error = %e, "DNS SRV lookup failed");
-        }
+    if let Some(fqdn) = lookup_ldap_srv_target(host).await {
+        return fqdn;
     }
 
     // Fallback: try LOGONSERVER env var (Windows only). Combine its NetBIOS
@@ -109,6 +117,13 @@ fn fqdn_from_logonserver(host: &str, logon_server: &str) -> Option<String> {
     }
     Some(format!("{}.{}", netbios, host))
 }
+
+/// Upper bound on crossRef entries accepted from `CN=Partitions`: several
+/// times the partition cap, so a legitimate forest never trips it.
+const CROSSREF_SIZE_LIMIT: i32 = (MAX_PARTITIONS as i32) * 4;
+
+/// Server-side time limit for the partition discovery search, in seconds.
+const CROSSREF_TIME_LIMIT_SECS: i32 = 10;
 
 /// LDAP attributes to retrieve for user searches.
 const USER_ATTRS: &[&str] = &[
@@ -393,6 +408,12 @@ const CONNECTION_MAX_AGE: std::time::Duration = std::time::Duration::from_secs(8
 pub struct LdapDirectoryProvider {
     domain: Option<String>,
     server_override: Option<String>,
+    /// Resolve the DC FQDN through `_ldap._tcp` SRV before dialing. Set for
+    /// partition providers, whose `domain` is a DNS suffix rather than a host,
+    /// so TLS verification and the GSSAPI SPN target the DC itself.
+    locate_dc_via_srv: bool,
+    /// DC FQDN resolved through SRV, cached after the first lookup.
+    dial_host: Mutex<Option<String>>,
     auth_mode: LdapAuthMode,
     tls_config: LdapTlsConfig,
     base_dn: Mutex<Option<String>>,
@@ -686,6 +707,7 @@ impl LdapDirectoryProvider {
         Self {
             domain,
             server_override: None,
+            locate_dc_via_srv: false,
             auth_mode: LdapAuthMode::Gssapi,
             tls_config: LdapTlsConfig::default(),
             base_dn: Mutex::new(None),
@@ -693,6 +715,7 @@ impl LdapDirectoryProvider {
             pool: tokio::sync::Mutex::new(None),
             authenticated_user: Mutex::new(None),
             dc_fqdn: Mutex::new(None),
+            dial_host: Mutex::new(None),
             forest_root_dn: Mutex::new(None),
             configuration_dn: Mutex::new(None),
             last_successful_op: Mutex::new(None),
@@ -731,6 +754,7 @@ impl LdapDirectoryProvider {
         Self {
             domain: Some(host.clone()),
             server_override: Some(host),
+            locate_dc_via_srv: false,
             auth_mode: LdapAuthMode::SimpleBind { bind_dn, password },
             tls_config: effective_tls,
             base_dn: Mutex::new(None),
@@ -738,6 +762,7 @@ impl LdapDirectoryProvider {
             pool: tokio::sync::Mutex::new(None),
             authenticated_user: Mutex::new(None),
             dc_fqdn: Mutex::new(None),
+            dial_host: Mutex::new(None),
             forest_root_dn: Mutex::new(None),
             configuration_dn: Mutex::new(None),
             last_successful_op: Mutex::new(None),
@@ -755,12 +780,6 @@ impl LdapDirectoryProvider {
     /// Returns the TLS settings this provider connects with.
     pub fn tls_config(&self) -> &LdapTlsConfig {
         &self.tls_config
-    }
-
-    /// DN of the forest root domain (`rootDomainNamingContext`), known after
-    /// the first successful connection.
-    pub fn forest_root_dn(&self) -> Option<String> {
-        self.forest_root_dn.lock().expect("lock poisoned").clone()
     }
 
     /// Builds a provider bound to one forest partition identified by its DNS
@@ -781,6 +800,7 @@ impl LdapDirectoryProvider {
         Self {
             domain: Some(dns_name),
             server_override: None,
+            locate_dc_via_srv: true,
             auth_mode,
             tls_config,
             base_dn: Mutex::new(None),
@@ -788,6 +808,7 @@ impl LdapDirectoryProvider {
             pool: tokio::sync::Mutex::new(None),
             authenticated_user: Mutex::new(None),
             dc_fqdn: Mutex::new(None),
+            dial_host: Mutex::new(None),
             forest_root_dn: Mutex::new(None),
             configuration_dn: Mutex::new(None),
             last_successful_op: Mutex::new(None),
@@ -802,22 +823,7 @@ impl LdapDirectoryProvider {
     /// E.g. "DC=dspanel,DC=local" -> "dspanel.local"
     fn dns_domain_from_base_dn(&self) -> Option<String> {
         let base = self.base_dn.lock().expect("lock poisoned").clone()?;
-        let parts: Vec<&str> = base
-            .split(',')
-            .filter_map(|p| {
-                let trimmed = p.trim();
-                if trimmed.to_uppercase().starts_with("DC=") {
-                    Some(&trimmed[3..])
-                } else {
-                    None
-                }
-            })
-            .collect();
-        if parts.is_empty() {
-            None
-        } else {
-            Some(parts.join("."))
-        }
+        dns_domain_from_dn(&base)
     }
 
     /// Returns the authenticated user identity resolved via WhoAmI.
@@ -826,6 +832,31 @@ impl LdapDirectoryProvider {
             .lock()
             .expect("lock poisoned")
             .clone()
+    }
+
+    /// DC FQDN to dial for a partition provider: the cached SRV answer, else a
+    /// fresh lookup, else the domain name itself (DNS round-robin to the DCs).
+    async fn dial_host_for(&self, domain: &str) -> String {
+        if let Some(cached) = self.dial_host.lock().expect("lock poisoned").clone() {
+            return cached;
+        }
+        let resolved = lookup_ldap_srv_target(domain)
+            .await
+            .unwrap_or_else(|| domain.to_string());
+        *self.dial_host.lock().expect("lock poisoned") = Some(resolved.clone());
+        resolved
+    }
+
+    /// Host handed to dedicated (non-pooled) connections: the explicit server
+    /// override, else the SRV-resolved DC of a partition provider.
+    async fn dial_override(&self) -> Option<String> {
+        if let Some(server) = &self.server_override {
+            return Some(server.clone());
+        }
+        if !self.locate_dc_via_srv {
+            return None;
+        }
+        Some(self.dial_host_for(self.domain.as_deref()?).await)
     }
 
     /// Returns a pooled LDAP connection, creating one if needed.
@@ -984,11 +1015,18 @@ impl LdapDirectoryProvider {
     async fn create_connection(&self) -> Result<ldap3::Ldap> {
         let host = match &self.server_override {
             Some(server) => server.clone(),
-            None => self
-                .domain
-                .as_ref()
-                .context("No domain available - machine is not domain-joined")?
-                .clone(),
+            None => {
+                let domain = self
+                    .domain
+                    .as_ref()
+                    .context("No domain available - machine is not domain-joined")?
+                    .clone();
+                if self.locate_dc_via_srv {
+                    self.dial_host_for(&domain).await
+                } else {
+                    domain
+                }
+            }
         };
 
         let (scheme, port) = if self.tls_config.enabled {
@@ -1047,8 +1085,13 @@ impl LdapDirectoryProvider {
                 #[cfg(feature = "gssapi")]
                 {
                     // sasl_gssapi_bind needs the server FQDN for the SPN (ldap/<fqdn>),
-                    // not the domain name. Resolve DC FQDN via DNS SRV lookup.
-                    let gssapi_host = resolve_dc_fqdn_for_gssapi(&host).await;
+                    // not the domain name. Partition providers already dial the
+                    // SRV-resolved DC; everything else resolves it here.
+                    let gssapi_host = if self.locate_dc_via_srv {
+                        host.clone()
+                    } else {
+                        resolve_dc_fqdn_for_gssapi(&host).await
+                    };
                     let logon_server = std::env::var("LOGONSERVER").unwrap_or_default();
                     let on_tls = self.tls_config.enabled || self.tls_config.starttls;
                     if on_tls {
@@ -1261,9 +1304,10 @@ impl LdapDirectoryProvider {
             // Paged search: create a dedicated connection inside the retry
             // loop so stale connections are handled automatically.
             let domain = self.domain.clone();
-            let server_override = self.server_override.clone();
+            let server_override = self.dial_override().await;
             let auth_mode = self.auth_mode.clone();
             let tls_config = self.tls_config.clone();
+            let locate_dc_via_srv = self.locate_dc_via_srv;
 
             let truncated_flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
             let result = self
@@ -1284,6 +1328,7 @@ impl LdapDirectoryProvider {
                             &server_override,
                             &auth_mode,
                             &tls_config,
+                            locate_dc_via_srv,
                         )
                         .await?;
 
@@ -1458,6 +1503,7 @@ async fn create_fresh_connection(
     server_override: &Option<String>,
     auth_mode: &LdapAuthMode,
     tls_config: &LdapTlsConfig,
+    override_is_dc_fqdn: bool,
 ) -> Result<ldap3::Ldap> {
     let host = match server_override {
         Some(server) => server.clone(),
@@ -1499,7 +1545,11 @@ async fn create_fresh_connection(
         LdapAuthMode::Gssapi => {
             #[cfg(feature = "gssapi")]
             {
-                let gssapi_host = resolve_dc_fqdn_for_gssapi(&host).await;
+                let gssapi_host = if override_is_dc_fqdn {
+                    host.clone()
+                } else {
+                    resolve_dc_fqdn_for_gssapi(&host).await
+                };
                 ldap.sasl_gssapi_bind(&gssapi_host)
                     .await
                     .context("GSSAPI authentication failed")?;
@@ -3095,9 +3145,10 @@ impl DirectoryProvider for LdapDirectoryProvider {
         // Use a dedicated connection to avoid mutating shared base_dn
         let mut ldap = create_fresh_connection(
             &self.domain,
-            &self.server_override,
+            &self.dial_override().await,
             &self.auth_mode,
             &self.tls_config,
+            self.locate_dc_via_srv,
         )
         .await?;
 
@@ -3776,10 +3827,12 @@ impl DirectoryProvider for LdapDirectoryProvider {
             .lock()
             .expect("lock poisoned")
             .clone()
-            .or_else(|| {
-                self.base_dn()
-                    .map(|base| format!("CN=Configuration,{}", base))
-            })
+            .or_else(|| self.base_dn().map(|base| default_configuration_dn(&base)))
+    }
+
+    // `rootDomainNamingContext` from the rootDSE, known after the first bind
+    fn forest_root_dn(&self) -> Option<String> {
+        self.forest_root_dn.lock().expect("lock poisoned").clone()
     }
 
     async fn discover_forest(&self) -> Result<ForestTopology> {
@@ -3791,7 +3844,42 @@ impl DirectoryProvider for LdapDirectoryProvider {
             .context("Not connected - configuration DN unknown")?;
         let partitions_dn = format!("CN=Partitions,{}", configuration_dn);
         let entries = self
-            .search_configuration(&partitions_dn, NTDS_DOMAIN_CROSSREF_FILTER)
+            .with_connection(|mut ldap| {
+                let base = partitions_dn.clone();
+                async move {
+                    // A forest never has more domain crossRefs than the
+                    // partition cap allows in practice; the size limit keeps a
+                    // hostile DC from streaming an unbounded answer.
+                    let (rs, _) = ldap
+                        .with_search_options(
+                            ldap3::SearchOptions::new()
+                                .sizelimit(CROSSREF_SIZE_LIMIT)
+                                .timelimit(CROSSREF_TIME_LIMIT_SECS),
+                        )
+                        .search(
+                            &base,
+                            ldap3::Scope::Subtree,
+                            NTDS_DOMAIN_CROSSREF_FILTER,
+                            vec!["nCName", "dnsRoot", "nETBIOSName", "systemFlags"],
+                        )
+                        .await
+                        .context("Partition search failed")?
+                        .success()
+                        .context("Partition search returned error")?;
+                    let entries: Vec<DirectoryEntry> = rs
+                        .into_iter()
+                        .map(|re| {
+                            let se = ldap3::SearchEntry::construct(re);
+                            let mut entry = DirectoryEntry::new(se.dn);
+                            for (key, values) in se.attrs {
+                                entry.attributes.insert(key, values);
+                            }
+                            entry
+                        })
+                        .collect();
+                    Ok(entries)
+                }
+            })
             .await
             .context("Forest partition discovery failed")?;
         let mut partitions = parse_partitions_from_entries(&entries)?;
