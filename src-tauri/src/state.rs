@@ -1,6 +1,6 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use crate::models::DirectoryEntry;
 use crate::services::credential_store::CredentialStore;
@@ -28,6 +28,8 @@ pub struct AppState {
     /// Set while a forest promotion runs, so concurrent triggers (login
     /// prompt, connection checks, keepalive) do not stack bind fan-outs.
     pub forest_promotion_in_flight: AtomicBool,
+    /// When the last promotion failed, for the retry cooldown.
+    pub forest_promotion_failed_at: Mutex<Option<Instant>>,
     /// Whether the app is waiting for simple bind credentials from the user.
     pub needs_credentials: Mutex<bool>,
     /// Permission service for checking user authorization levels.
@@ -73,6 +75,7 @@ impl AppState {
             initialized: Mutex::new(false),
             directory_provider: RwLock::new(Arc::new(ForestProvider::single_partition(provider))),
             forest_promotion_in_flight: AtomicBool::new(false),
+            forest_promotion_failed_at: Mutex::new(None),
             needs_credentials: Mutex::new(false),
             permission_service: PermissionService::new(permission_config),
             audit_service: AuditService::new(),
@@ -141,11 +144,33 @@ impl AppState {
         }
     }
 
-    /// Claims the promotion slot. Returns false when one is already running.
+    /// Cooldown after a failed promotion before the next attempt is accepted,
+    /// so a webview looping on connection checks cannot drive back-to-back
+    /// partition bind fan-outs.
+    pub const FOREST_PROMOTION_RETRY_COOLDOWN: Duration = Duration::from_secs(30);
+
+    /// Claims the promotion slot. Returns false when one is already running
+    /// or the last attempt failed less than the cooldown ago.
     pub fn begin_forest_promotion(&self) -> bool {
+        let cooling_down = self
+            .forest_promotion_failed_at
+            .lock()
+            .expect("forest_promotion_failed_at lock poisoned")
+            .is_some_and(|failed_at| failed_at.elapsed() < Self::FOREST_PROMOTION_RETRY_COOLDOWN);
+        if cooling_down {
+            return false;
+        }
         self.forest_promotion_in_flight
             .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
             .is_ok()
+    }
+
+    /// Records a failed promotion so `begin_forest_promotion` applies the cooldown.
+    pub fn note_forest_promotion_failure(&self) {
+        *self
+            .forest_promotion_failed_at
+            .lock()
+            .expect("forest_promotion_failed_at lock poisoned") = Some(Instant::now());
     }
 
     /// Releases the promotion slot claimed by `begin_forest_promotion`.
@@ -166,6 +191,7 @@ impl AppState {
             initialized: Mutex::new(false),
             directory_provider: RwLock::new(Arc::new(ForestProvider::single_partition(provider))),
             forest_promotion_in_flight: AtomicBool::new(false),
+            forest_promotion_failed_at: Mutex::new(None),
             needs_credentials: Mutex::new(false),
             permission_service: PermissionService::new(permission_config),
             audit_service: AuditService::new_in_memory(),

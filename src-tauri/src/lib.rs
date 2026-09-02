@@ -42,16 +42,18 @@ pub fn spawn_forest_promotion(app: tauri::AppHandle, placeholder: Arc<services::
         return;
     };
     if !app.state::<AppState>().begin_forest_promotion() {
-        tracing::debug!("Forest promotion already in flight");
+        tracing::debug!("Forest promotion skipped: one is in flight or cooling down");
         return;
     }
     tauri::async_runtime::spawn(async move {
-        let outcome = promotion.await;
-        let state = app.state::<AppState>();
-        match outcome {
+        let slot = ForestPromotionSlot(app.clone());
+        match promotion.await {
             Ok(forest) => {
                 let forest = Arc::new(forest);
-                if state.install_promoted_forest(&placeholder, forest.clone()) {
+                if app
+                    .state::<AppState>()
+                    .install_promoted_forest(&placeholder, forest.clone())
+                {
                     tracing::info!(
                         partitions = forest.topology().partitions.len(),
                         seed = forest.seed_dns_name(),
@@ -64,10 +66,25 @@ pub fn spawn_forest_promotion(app: tauri::AppHandle, placeholder: Arc<services::
             }
             Err(e) => {
                 tracing::warn!(error = %e, "Forest promotion failed, keeping the current provider");
+                app.state::<AppState>().note_forest_promotion_failure();
             }
         }
-        state.end_forest_promotion();
+        drop(slot);
+        // A placeholder installed while this promotion ran (login prompt) was
+        // refused the slot; pick it up now instead of waiting for a tick.
+        promote_forest_if_needed(&app);
     });
+}
+
+/// Releases the single-flight promotion slot when the task ends, including
+/// when it panics, so a lost task can never block every later promotion.
+struct ForestPromotionSlot(tauri::AppHandle);
+
+impl Drop for ForestPromotionSlot {
+    fn drop(&mut self) {
+        use tauri::Manager;
+        self.0.state::<AppState>().end_forest_promotion();
+    }
 }
 
 /// Promotes the active forest when it is still a placeholder and its seed is
@@ -226,22 +243,20 @@ pub fn run() {
                 let interval = std::time::Duration::from_secs(300); // 5 minutes
                 loop {
                     tokio::time::sleep(interval).await;
+                    // Probed even while disconnected so a seed that was down at
+                    // launch is rebound and promoted without user action.
                     let provider = keepalive_app.state::<AppState>().provider();
-                    if provider.is_connected() {
-                        match provider.test_connection().await {
-                            Ok(true) => {
-                                tracing::debug!("LDAP keepalive: connection alive");
-                            }
-                            _ => {
-                                tracing::debug!("LDAP keepalive: connection lost, will reconnect on next operation");
-                            }
+                    match provider.test_connection().await {
+                        Ok(true) => {
+                            tracing::debug!("LDAP keepalive: connection alive");
+                        }
+                        _ => {
+                            tracing::debug!("LDAP keepalive: directory unreachable, will retry next tick");
                         }
                     }
                     promote_forest_if_needed(&keepalive_app);
                     let forest = keepalive_app.state::<AppState>().forest();
-                    if forest.is_promoted() {
-                        emit_forest_status(&keepalive_app, &forest);
-                    }
+                    emit_forest_status(&keepalive_app, &forest);
                 }
             });
 

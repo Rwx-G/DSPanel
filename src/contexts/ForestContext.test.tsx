@@ -133,6 +133,29 @@ describe("useForest", () => {
     });
   });
 
+  it("reads the topology only after the status subscription is armed", async () => {
+    const arm: { fire: (() => void) | null } = { fire: null };
+    mockListen.mockImplementationOnce((_name, handler) => {
+      statusHandler = handler as unknown as StatusHandler;
+      return new Promise((resolve) => {
+        arm.fire = () => resolve(() => unlistenSpy());
+      });
+    });
+    mockInvoke.mockResolvedValue(singleDomain as never);
+    const { result } = renderHook(() => useForest(), {
+      wrapper: wrapperWith(true),
+    });
+
+    expect(mockInvoke).not.toHaveBeenCalled();
+    act(() => {
+      arm.fire?.();
+    });
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(mockInvoke).toHaveBeenCalledTimes(1);
+    expect(result.current.seedDnsName).toBe("corp.example.com");
+  });
+
   it("re-fetches the topology when the forest status event fires", async () => {
     mockInvoke.mockResolvedValue(singleDomain as never);
     const { result } = renderHook(() => useForest(), {
