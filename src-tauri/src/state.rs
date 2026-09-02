@@ -335,4 +335,51 @@ mod tests {
         // Verify the HTTP client was created (no panic)
         let _ = &state.http_client;
     }
+
+    #[test]
+    fn forest_promotion_slot_is_single_flight() {
+        let state = make_state();
+        assert!(state.begin_forest_promotion());
+        assert!(!state.begin_forest_promotion());
+        state.end_forest_promotion();
+        assert!(state.begin_forest_promotion());
+        state.end_forest_promotion();
+    }
+
+    #[test]
+    fn failed_promotion_starts_a_cooldown() {
+        let state = make_state();
+        state.note_forest_promotion_failure();
+        assert!(!state.begin_forest_promotion());
+        // Backdate the failure past the cooldown: the slot opens again.
+        *state.forest_promotion_failed_at.lock().unwrap() =
+            Some(Instant::now() - AppState::FOREST_PROMOTION_RETRY_COOLDOWN * 2);
+        assert!(state.begin_forest_promotion());
+        state.end_forest_promotion();
+    }
+
+    #[test]
+    fn promoted_forest_installs_only_over_its_placeholder() {
+        let state = make_state();
+        let placeholder = state.forest();
+        let promoted = Arc::new(ForestProvider::single_partition(Arc::new(
+            MockDirectoryProvider::new(),
+        )));
+        let newer = Arc::new(ForestProvider::single_partition(Arc::new(
+            MockDirectoryProvider::new(),
+        )));
+        state.set_forest(newer.clone());
+        assert!(!state.install_promoted_forest(&placeholder, promoted.clone()));
+        assert!(Arc::ptr_eq(&state.forest(), &newer));
+        assert!(state.install_promoted_forest(&newer, promoted.clone()));
+        assert!(Arc::ptr_eq(&state.forest(), &promoted));
+    }
+
+    #[test]
+    fn bare_provider_is_wrapped_as_a_single_partition_forest() {
+        let state = make_state();
+        assert!(!state.forest().is_promoted());
+        assert!(state.forest().repromote().is_none());
+        assert_eq!(state.provider().domain_name(), Some("EXAMPLE.COM"));
+    }
 }
