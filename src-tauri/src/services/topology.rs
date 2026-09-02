@@ -16,8 +16,11 @@ pub async fn get_topology(provider: Arc<dyn DirectoryProvider>) -> Result<Topolo
     let base_dn = provider
         .base_dn()
         .ok_or_else(|| anyhow::anyhow!("Not connected - no base DN"))?;
+    let configuration_dn = provider
+        .configuration_dn()
+        .unwrap_or_else(|| format!("CN=Configuration,{}", base_dn));
 
-    let sites_dn = format!("CN=Sites,CN=Configuration,{}", base_dn);
+    let sites_dn = format!("CN=Sites,{}", configuration_dn);
 
     // 1. Query AD sites
     let site_entries = provider
@@ -36,15 +39,15 @@ pub async fn get_topology(provider: Arc<dyn DirectoryProvider>) -> Result<Topolo
 
     // 4. Query site link objects from inter-site transports
     let site_link_dn = format!(
-        "CN=IP,CN=Inter-Site Transports,CN=Sites,CN=Configuration,{}",
-        base_dn
+        "CN=IP,CN=Inter-Site Transports,CN=Sites,{}",
+        configuration_dn
     );
     let site_link_entries = provider
         .search_configuration(&site_link_dn, "(objectClass=siteLink)")
         .await?;
 
     // 5. Query subnets
-    let subnets_dn = format!("CN=Subnets,CN=Sites,CN=Configuration,{}", base_dn);
+    let subnets_dn = format!("CN=Subnets,CN=Sites,{}", configuration_dn);
     let subnet_entries = provider
         .search_configuration(&subnets_dn, "(objectClass=subnet)")
         .await

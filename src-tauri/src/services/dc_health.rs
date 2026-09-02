@@ -22,8 +22,11 @@ pub async fn discover_domain_controllers(
     let base_dn = provider
         .base_dn()
         .ok_or_else(|| anyhow::anyhow!("Not connected - no base DN"))?;
+    let configuration_dn = provider
+        .configuration_dn()
+        .unwrap_or_else(|| format!("CN=Configuration,{}", base_dn));
 
-    let sites_dn = format!("CN=Sites,CN=Configuration,{}", base_dn);
+    let sites_dn = format!("CN=Sites,{}", configuration_dn);
 
     // Use the provider's raw search to query server objects under Sites
     let entries = provider
@@ -120,7 +123,9 @@ pub async fn discover_fsmo_roles(
 ) -> Vec<(&'static str, String)> {
     let mut roles = Vec::new();
 
-    let config_dn = format!("CN=Configuration,{}", base_dn);
+    let config_dn = provider
+        .configuration_dn()
+        .unwrap_or_else(|| format!("CN=Configuration,{}", base_dn));
 
     let fsmo_objects: &[(&str, String)] = &[
         ("PDC", base_dn.to_string()),
@@ -560,8 +565,11 @@ async fn check_replication_health(
             };
         }
     };
+    let configuration_dn = provider
+        .configuration_dn()
+        .unwrap_or_else(|| format!("CN=Configuration,{}", base_dn));
 
-    let sites_dn = format!("CN=Sites,CN=Configuration,{}", base_dn);
+    let sites_dn = format!("CN=Sites,{}", configuration_dn);
 
     // Look for NTDS Connection objects (replication links) in the config
     let connections = provider

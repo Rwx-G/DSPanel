@@ -763,13 +763,6 @@ impl LdapDirectoryProvider {
         self.forest_root_dn.lock().expect("lock poisoned").clone()
     }
 
-    /// DN of the Configuration partition (`configurationNamingContext`),
-    /// known after the first successful connection. On a child-domain DC this
-    /// lives under the forest root, not under `defaultNamingContext`.
-    pub fn configuration_dn(&self) -> Option<String> {
-        self.configuration_dn.lock().expect("lock poisoned").clone()
-    }
-
     /// Builds a provider bound to one forest partition identified by its DNS
     /// name, reusing the seed's authentication mode and TLS settings.
     ///
@@ -3775,16 +3768,26 @@ impl DirectoryProvider for LdapDirectoryProvider {
         .await
     }
 
+    // `configurationNamingContext` from the rootDSE; on a child-domain DC it is
+    // rooted at the forest root, never at `defaultNamingContext`. Falls back to
+    // the base-DN form only when the rootDSE did not report it.
+    fn configuration_dn(&self) -> Option<String> {
+        self.configuration_dn
+            .lock()
+            .expect("lock poisoned")
+            .clone()
+            .or_else(|| {
+                self.base_dn()
+                    .map(|base| format!("CN=Configuration,{}", base))
+            })
+    }
+
     async fn discover_forest(&self) -> Result<ForestTopology> {
         // `CN=Partitions` lives in the Configuration partition, which on a
         // child-domain DC is rooted at the forest root, never at the seed's
         // `defaultNamingContext`.
         let configuration_dn = self
             .configuration_dn()
-            .or_else(|| {
-                self.base_dn()
-                    .map(|base| format!("CN=Configuration,{}", base))
-            })
             .context("Not connected - configuration DN unknown")?;
         let partitions_dn = format!("CN=Partitions,{}", configuration_dn);
         let entries = self

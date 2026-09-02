@@ -28,8 +28,11 @@ pub async fn get_replication_partnerships(
     let base_dn = provider
         .base_dn()
         .ok_or_else(|| anyhow::anyhow!("Not connected - no base DN"))?;
+    let configuration_dn = provider
+        .configuration_dn()
+        .unwrap_or_else(|| format!("CN=Configuration,{}", base_dn));
 
-    let sites_dn = format!("CN=Sites,CN=Configuration,{}", base_dn);
+    let sites_dn = format!("CN=Sites,{}", configuration_dn);
 
     // Query NTDS Connection objects (represent replication links)
     let connections = provider

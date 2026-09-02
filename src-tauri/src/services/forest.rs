@@ -49,6 +49,11 @@ pub const DEFAULT_PARTITION_BIND_TIMEOUT: Duration = Duration::from_secs(3);
 /// Environment variable overriding `DEFAULT_PARTITION_BIND_TIMEOUT`, in seconds.
 pub const PARTITION_BIND_TIMEOUT_ENV: &str = "DSPANEL_PARTITION_BIND_TIMEOUT";
 
+/// Tauri event carrying `ForestProvider::partition_status()` as a map keyed by
+/// partition DNS name. Emitted once the forest is (re)assembled in the
+/// background; the frontend refreshes the topology and the states on it.
+pub const FOREST_STATUS_EVENT: &str = "forest-status-changed";
+
 /// One domain naming context of the forest.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -182,6 +187,35 @@ pub fn dns_domain_from_dn(dn: &str) -> Option<String> {
     }
 }
 
+/// Longest DNS name accepted from the directory (RFC 1035 wire limit).
+const MAX_DNS_NAME_LEN: usize = 253;
+
+/// Longest DNS label accepted from the directory (RFC 1035).
+const MAX_DNS_LABEL_LEN: usize = 63;
+
+/// Accepts only letters, digits, hyphens and dots (LDH rule) within RFC 1035
+/// length limits. `dnsRoot` comes from the directory, not the operator, and it
+/// becomes the authority of an `ldap://` URL and the target of a bind carrying
+/// the operator's credentials; anything richer than a host name is rejected.
+pub fn is_valid_dns_name(name: &str) -> bool {
+    if name.is_empty() || name.len() > MAX_DNS_NAME_LEN {
+        return false;
+    }
+    name.split('.').all(|label| {
+        !label.is_empty()
+            && label.len() <= MAX_DNS_LABEL_LEN
+            && !label.starts_with('-')
+            && !label.ends_with('-')
+            && label
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b == b'-')
+    })
+}
+
+fn has_control_chars(value: &str) -> bool {
+    value.chars().any(char::is_control)
+}
+
 /// Case-insensitive first-value lookup in a `DirectoryEntry` attribute bag.
 /// LDAP attribute names are case-insensitive and servers return them in their
 /// schema casing (`nCName`, `nETBIOSName`), so exact-key lookups are brittle.
@@ -200,7 +234,9 @@ fn attribute_ci<'a>(entry: &'a DirectoryEntry, name: &str) -> Option<&'a str> {
 /// Only entries whose `systemFlags` carries `FLAG_CR_NTDS_DOMAIN` are kept,
 /// which re-applies the server-side filter defensively so callers that fetch
 /// `CN=Partitions` with a broader filter get the same result. `dnsRoot` is the
-/// DNS name; when it is absent the name is derived from the `nCName` DN.
+/// DNS name; when it is absent the name is derived from the `nCName` DN. The
+/// values are directory data: entries whose DNS name is not a plain host name
+/// or whose DN carries control characters are skipped (see `is_valid_dns_name`).
 /// Fails when no domain partition is present, since every forest has at least
 /// its root domain.
 pub fn parse_partitions_from_entries(entries: &[DirectoryEntry]) -> Result<Vec<DomainPartition>> {
@@ -213,20 +249,42 @@ pub fn parse_partitions_from_entries(entries: &[DirectoryEntry]) -> Result<Vec<D
             continue;
         }
         let Some(nc_name) = attribute_ci(entry, "nCName") else {
-            tracing::warn!(dn = %entry.distinguished_name, "crossRef without nCName skipped");
+            tracing::warn!(dn = ?entry.distinguished_name, "crossRef without nCName skipped");
             continue;
         };
+        if has_control_chars(nc_name) {
+            tracing::warn!(
+                dn = ?entry.distinguished_name,
+                "crossRef with control characters in nCName skipped"
+            );
+            continue;
+        }
         let dns_name = attribute_ci(entry, "dnsRoot")
             .map(|v| v.trim().to_ascii_lowercase())
             .or_else(|| dns_domain_from_dn(nc_name));
         let Some(dns_name) = dns_name else {
-            tracing::warn!(dn = %entry.distinguished_name, nc_name = %nc_name, "crossRef without resolvable DNS name skipped");
+            tracing::warn!(
+                dn = ?entry.distinguished_name,
+                nc_name = ?nc_name,
+                "crossRef without resolvable DNS name skipped"
+            );
             continue;
         };
+        if !is_valid_dns_name(&dns_name) {
+            tracing::warn!(
+                dn = ?entry.distinguished_name,
+                dns_root = ?dns_name,
+                "crossRef with invalid dnsRoot skipped"
+            );
+            continue;
+        }
+        let netbios_name = attribute_ci(entry, "nETBIOSName")
+            .map(|v| v.trim().to_string())
+            .filter(|v| !has_control_chars(v));
         partitions.push(DomainPartition {
             distinguished_name: nc_name.to_string(),
             dns_name,
-            netbios_name: attribute_ci(entry, "nETBIOSName").map(|v| v.trim().to_string()),
+            netbios_name,
             default_dc_fqdn: None,
         });
     }
@@ -259,12 +317,22 @@ pub fn partition_bind_timeout() -> Duration {
     }
 }
 
-/// Builds the provider bound to one non-seed partition.
+/// Classification recorded when a simple-bind fan-out is refused because the
+/// connection would carry the password in clear text.
+pub const TLS_REQUIRED: &str = "tls_required";
+
+/// Classification recorded when a simple-bind fan-out is refused because
+/// certificate verification is disabled.
+pub const TLS_UNVERIFIED: &str = "tls_unverified";
+
+/// Builds the provider bound to one non-seed partition, or declines with a
+/// classification key that is recorded as `ConnectionStatus::Unreachable`
+/// without any bind attempt.
 ///
 /// Abstracted so tests can inject providers with scripted connection
 /// outcomes; production uses `LdapPartitionConnector`.
 pub trait PartitionConnector: Send + Sync {
-    fn build(&self, partition: &DomainPartition) -> Arc<dyn DirectoryProvider>;
+    fn build(&self, partition: &DomainPartition) -> Result<Arc<dyn DirectoryProvider>, String>;
 }
 
 /// Production connector: one `LdapDirectoryProvider` per partition, reusing
@@ -286,12 +354,25 @@ impl LdapPartitionConnector {
 }
 
 impl PartitionConnector for LdapPartitionConnector {
-    fn build(&self, partition: &DomainPartition) -> Arc<dyn DirectoryProvider> {
-        Arc::new(LdapDirectoryProvider::new_for_partition(
+    // Simple-bind credentials only travel to partitions the seed DC named when
+    // the transport is TLS-protected and verified: `dnsRoot` is directory data,
+    // so a compromised DC could otherwise redirect the operator's password to a
+    // host of its choosing in clear text. GSSAPI authenticates the server
+    // through Kerberos and fans out regardless of TLS.
+    fn build(&self, partition: &DomainPartition) -> Result<Arc<dyn DirectoryProvider>, String> {
+        if matches!(self.auth_mode, LdapAuthMode::SimpleBind { .. }) {
+            if !(self.tls_config.enabled || self.tls_config.starttls) {
+                return Err(TLS_REQUIRED.to_string());
+            }
+            if self.tls_config.skip_verify {
+                return Err(TLS_UNVERIFIED.to_string());
+            }
+        }
+        Ok(Arc::new(LdapDirectoryProvider::new_for_partition(
             partition.dns_name.clone(),
             self.auth_mode.clone(),
             self.tls_config.clone(),
-        ))
+        )))
     }
 }
 
@@ -335,12 +416,22 @@ impl ForestProvider {
             );
         }
         let seed_dyn: Arc<dyn DirectoryProvider> = seed.clone();
-        let topology = match seed.discover_forest().await {
-            Ok(topology) => topology,
-            Err(e) => {
+        let bind_timeout = partition_bind_timeout();
+        // Discovery only talks to the seed DC, but its answer is unbounded; the
+        // same timeout keeps a slow or hostile DC from stalling the promotion.
+        let topology = match tokio::time::timeout(bind_timeout, seed.discover_forest()).await {
+            Ok(Ok(topology)) => topology,
+            Ok(Err(e)) => {
                 tracing::warn!(
                     error = %e,
                     "Forest discovery failed, continuing with the seed partition only"
+                );
+                ForestTopology::synthesized_from(&*seed_dyn)
+            }
+            Err(_elapsed) => {
+                tracing::warn!(
+                    timeout = ?bind_timeout,
+                    "Forest discovery timed out, continuing with the seed partition only"
                 );
                 ForestTopology::synthesized_from(&*seed_dyn)
             }
@@ -353,7 +444,7 @@ impl ForestProvider {
             seed.forest_root_dn(),
             topology,
             &connector,
-            partition_bind_timeout(),
+            bind_timeout,
         )
         .await)
     }
@@ -385,91 +476,15 @@ impl ForestProvider {
         seed: Arc<dyn DirectoryProvider>,
         seed_dns_name: String,
         forest_root_dn: Option<String>,
-        mut topology: ForestTopology,
+        topology: ForestTopology,
         connector: &dyn PartitionConnector,
         bind_timeout: Duration,
     ) -> Self {
         let seed_dns_name = seed_dns_name.to_ascii_lowercase();
-        if topology.find_by_dns_name(&seed_dns_name).is_none() {
-            let mut synthesized = ForestTopology::synthesized_from(&*seed).partitions;
-            if synthesized.is_empty() {
-                synthesized.push(DomainPartition {
-                    distinguished_name: seed.base_dn().unwrap_or_default(),
-                    dns_name: seed_dns_name.clone(),
-                    netbios_name: None,
-                    default_dc_fqdn: seed.connected_host(),
-                });
-            }
-            topology.partitions.splice(0..0, synthesized);
-        }
-        // Stable sort: the seed partition moves to the front, others keep order.
-        topology
-            .partitions
-            .sort_by_key(|p| !p.dns_name.eq_ignore_ascii_case(&seed_dns_name));
-        if let Some(seed_partition) = topology.partitions.first_mut()
-            && seed_partition.default_dc_fqdn.is_none()
-        {
-            seed_partition.default_dc_fqdn = seed.connected_host();
-        }
-        if topology.partitions.len() > MAX_PARTITIONS {
-            tracing::warn!(
-                discovered = topology.partitions.len(),
-                cap = MAX_PARTITIONS,
-                "Forest exposes more partitions than the safety cap, truncating"
-            );
-            topology.partitions.truncate(MAX_PARTITIONS);
-        }
-
-        let mut partitions: HashMap<String, Arc<dyn DirectoryProvider>> = HashMap::new();
+        let topology = normalize_topology(&*seed, &seed_dns_name, topology);
+        let (mut partitions, statuses) =
+            bind_partitions(&topology, &seed_dns_name, connector, bind_timeout).await;
         partitions.insert(seed_dns_name.clone(), seed.clone());
-        let mut statuses: HashMap<String, ConnectionStatus> = HashMap::new();
-
-        let mut binds = JoinSet::new();
-        for partition in topology
-            .partitions
-            .iter()
-            .filter(|p| !p.dns_name.eq_ignore_ascii_case(&seed_dns_name))
-        {
-            let provider = connector.build(partition);
-            let dns_name = partition.dns_name.to_ascii_lowercase();
-            binds.spawn(async move {
-                let outcome = tokio::time::timeout(bind_timeout, provider.test_connection()).await;
-                (dns_name, provider, outcome)
-            });
-        }
-        while let Some(joined) = binds.join_next().await {
-            let (dns_name, provider, outcome) = match joined {
-                Ok(result) => result,
-                Err(e) => {
-                    tracing::warn!(error = %e, "Partition bind task failed to complete");
-                    continue;
-                }
-            };
-            let status = match outcome {
-                Ok(Ok(true)) => ConnectionStatus::Connected,
-                Ok(Ok(false)) => ConnectionStatus::Unreachable(
-                    provider
-                        .last_connection_error()
-                        .unwrap_or_else(|| "unknown".to_string()),
-                ),
-                Ok(Err(e)) => {
-                    tracing::warn!(partition = %dns_name, error = %e, "Partition bind errored");
-                    ConnectionStatus::Unreachable("unknown".to_string())
-                }
-                Err(_elapsed) => ConnectionStatus::Unreachable("timeout".to_string()),
-            };
-            match &status {
-                ConnectionStatus::Connected => {
-                    tracing::info!(partition = %dns_name, "Forest partition connected");
-                }
-                other => {
-                    tracing::warn!(partition = %dns_name, status = ?other, "Forest partition unreachable");
-                }
-            }
-            statuses.insert(dns_name.clone(), status);
-            partitions.insert(dns_name, provider);
-        }
-
         Self {
             partitions,
             seed,
@@ -488,6 +503,13 @@ impl ForestProvider {
     /// Lowercase DNS name of the operator's own partition.
     pub fn seed_dns_name(&self) -> &str {
         &self.seed_dns_name
+    }
+
+    /// DN of the forest root domain (`rootDomainNamingContext` of the seed DC),
+    /// when the rootDSE exposed it. Distinct from `base_dn`, which stays the
+    /// seed's own naming context.
+    pub fn forest_root_dn(&self) -> Option<&str> {
+        self.forest_root_dn.as_deref()
     }
 
     /// The provider bound to the operator's own partition.
@@ -544,6 +566,115 @@ fn resolve_seed_dns_name(seed: &dyn DirectoryProvider, topology: &ForestTopology
         .unwrap_or_else(|| "unknown".to_string())
 }
 
+/// Puts the seed partition first (inserting a synthesized one when discovery
+/// omitted it), fills in its DC FQDN, and truncates to `MAX_PARTITIONS`.
+fn normalize_topology(
+    seed: &dyn DirectoryProvider,
+    seed_dns_name: &str,
+    mut topology: ForestTopology,
+) -> ForestTopology {
+    if topology.find_by_dns_name(seed_dns_name).is_none() {
+        let mut synthesized = ForestTopology::synthesized_from(seed).partitions;
+        if synthesized.is_empty() {
+            synthesized.push(DomainPartition {
+                distinguished_name: seed.base_dn().unwrap_or_default(),
+                dns_name: seed_dns_name.to_string(),
+                netbios_name: None,
+                default_dc_fqdn: seed.connected_host(),
+            });
+        }
+        topology.partitions.splice(0..0, synthesized);
+    }
+    // Stable sort: the seed partition moves to the front, others keep order.
+    topology
+        .partitions
+        .sort_by_key(|p| !p.dns_name.eq_ignore_ascii_case(seed_dns_name));
+    if let Some(seed_partition) = topology.partitions.first_mut()
+        && seed_partition.default_dc_fqdn.is_none()
+    {
+        seed_partition.default_dc_fqdn = seed.connected_host();
+    }
+    if topology.partitions.len() > MAX_PARTITIONS {
+        tracing::warn!(
+            discovered = topology.partitions.len(),
+            cap = MAX_PARTITIONS,
+            "Forest exposes more partitions than the safety cap, truncating"
+        );
+        topology.partitions.truncate(MAX_PARTITIONS);
+    }
+    topology
+}
+
+type PartitionMap = HashMap<String, Arc<dyn DirectoryProvider>>;
+
+/// Binds every non-seed partition concurrently, each attempt bounded by
+/// `bind_timeout`, and classifies the outcome per partition. Partitions the
+/// connector declines are recorded as unreachable without a bind attempt and
+/// get no provider entry.
+async fn bind_partitions(
+    topology: &ForestTopology,
+    seed_dns_name: &str,
+    connector: &dyn PartitionConnector,
+    bind_timeout: Duration,
+) -> (PartitionMap, HashMap<String, ConnectionStatus>) {
+    let mut partitions: PartitionMap = HashMap::new();
+    let mut statuses: HashMap<String, ConnectionStatus> = HashMap::new();
+
+    let mut binds = JoinSet::new();
+    for partition in topology
+        .partitions
+        .iter()
+        .filter(|p| !p.dns_name.eq_ignore_ascii_case(seed_dns_name))
+    {
+        let dns_name = partition.dns_name.to_ascii_lowercase();
+        let provider = match connector.build(partition) {
+            Ok(provider) => provider,
+            Err(reason) => {
+                tracing::warn!(partition = %dns_name, reason = %reason, "Forest partition skipped");
+                statuses.insert(dns_name, ConnectionStatus::Unreachable(reason));
+                continue;
+            }
+        };
+        binds.spawn(async move {
+            let outcome = tokio::time::timeout(bind_timeout, provider.test_connection()).await;
+            (dns_name, provider, outcome)
+        });
+    }
+    while let Some(joined) = binds.join_next().await {
+        let (dns_name, provider, outcome) = match joined {
+            Ok(result) => result,
+            Err(e) => {
+                tracing::warn!(error = %e, "Partition bind task failed to complete");
+                continue;
+            }
+        };
+        let status = match outcome {
+            Ok(Ok(true)) => ConnectionStatus::Connected,
+            Ok(Ok(false)) => ConnectionStatus::Unreachable(
+                provider
+                    .last_connection_error()
+                    .unwrap_or_else(|| "unknown".to_string()),
+            ),
+            Ok(Err(e)) => {
+                tracing::warn!(partition = %dns_name, error = %e, "Partition bind errored");
+                ConnectionStatus::Unreachable("unknown".to_string())
+            }
+            Err(_elapsed) => ConnectionStatus::Unreachable("timeout".to_string()),
+        };
+        match &status {
+            ConnectionStatus::Connected => {
+                tracing::info!(partition = %dns_name, "Forest partition connected");
+            }
+            other => {
+                tracing::warn!(partition = %dns_name, status = ?other, "Forest partition unreachable");
+            }
+        }
+        statuses.insert(dns_name.clone(), status);
+        partitions.insert(dns_name, provider);
+    }
+    (partitions, statuses)
+}
+
 #[async_trait]
 impl DirectoryProvider for ForestProvider {
     // seed only: the UI connection state tracks the operator's own domain;
@@ -567,11 +698,17 @@ impl DirectoryProvider for ForestProvider {
         self.seed.simple_bind_credentials()
     }
 
-    // forest root partition: callers query `CN=Configuration,<base_dn>`, which
-    // only exists under the forest root's naming context. Falls back to the
-    // seed base DN when the rootDSE did not expose `rootDomainNamingContext`.
+    // seed only: `base_dn` is the operator's own naming context. Callers that
+    // need the forest-shared Configuration partition use `configuration_dn`;
+    // the forest root DN is exposed through `ForestProvider::forest_root_dn`.
     fn base_dn(&self) -> Option<String> {
-        self.forest_root_dn.clone().or_else(|| self.seed.base_dn())
+        self.seed.base_dn()
+    }
+
+    // seed only: the Configuration partition is forest-shared and the seed DC
+    // reports its DN in the rootDSE, so it resolves correctly from a child domain
+    fn configuration_dn(&self) -> Option<String> {
+        self.seed.configuration_dn()
     }
 
     // seed only
@@ -994,12 +1131,14 @@ mod tests {
 
     struct StubConnector {
         providers: HashMap<String, Arc<dyn DirectoryProvider>>,
+        declined: HashMap<String, String>,
     }
 
     impl StubConnector {
         fn new() -> Self {
             Self {
                 providers: HashMap::new(),
+                declined: HashMap::new(),
             }
         }
 
@@ -1008,14 +1147,24 @@ mod tests {
                 .insert(dns_name.to_string(), Arc::new(provider));
             self
         }
+
+        fn declining(mut self, dns_name: &str, reason: &str) -> Self {
+            self.declined
+                .insert(dns_name.to_string(), reason.to_string());
+            self
+        }
     }
 
     impl PartitionConnector for StubConnector {
-        fn build(&self, partition: &DomainPartition) -> Arc<dyn DirectoryProvider> {
-            self.providers
+        fn build(&self, partition: &DomainPartition) -> Result<Arc<dyn DirectoryProvider>, String> {
+            if let Some(reason) = self.declined.get(&partition.dns_name) {
+                return Err(reason.clone());
+            }
+            Ok(self
+                .providers
                 .get(&partition.dns_name)
                 .cloned()
-                .unwrap_or_else(|| Arc::new(MockDirectoryProvider::new()))
+                .unwrap_or_else(|| Arc::new(MockDirectoryProvider::new())))
         }
     }
 
@@ -1355,6 +1504,7 @@ mod tests {
             forest.topology().partitions[1].dns_name,
             "other.example.com"
         );
+        assert_eq!(forest.forest_root_dn(), Some("DC=example,DC=com"));
         assert_eq!(forest.base_dn().as_deref(), Some("DC=example,DC=com"));
     }
 
@@ -1391,5 +1541,126 @@ mod tests {
         assert!(forest.test_connection().await.unwrap());
         assert_eq!(forest.discover_forest().await.unwrap(), *forest.topology());
         assert!(!forest.last_search_was_truncated());
+    }
+
+    #[test]
+    fn is_valid_dns_name_accepts_host_names_only() {
+        assert!(is_valid_dns_name("corp.example.com"));
+        assert!(is_valid_dns_name("eu-west.corp.example.com"));
+        assert!(is_valid_dns_name("a1"));
+        assert!(!is_valid_dns_name(""));
+        assert!(!is_valid_dns_name("dc.evil.tld:9999"));
+        assert!(!is_valid_dns_name("evil.tld/path"));
+        assert!(!is_valid_dns_name("user@evil.tld"));
+        assert!(!is_valid_dns_name("corp..example.com"));
+        assert!(!is_valid_dns_name("-corp.example.com"));
+        assert!(!is_valid_dns_name("corp-.example.com"));
+        assert!(!is_valid_dns_name("corp.example.com\n"));
+        assert!(!is_valid_dns_name(&"a".repeat(64)));
+        assert!(!is_valid_dns_name(&format!("{}.com", "a.".repeat(130))));
+    }
+
+    #[test]
+    fn parser_rejects_dns_roots_that_are_not_host_names() {
+        let entries = vec![
+            crossref_entry("DC=ok,DC=example,DC=com", "ok.example.com", "OK", 2),
+            crossref_entry("DC=port,DC=example,DC=com", "dc.evil.tld:9999/#", "PORT", 2),
+            crossref_entry("DC=path,DC=example,DC=com", "evil.tld/path", "PATH", 2),
+            crossref_entry(
+                "DC=ctrl,DC=example,DC=com",
+                "ctrl.example.com\u{0}",
+                "CTRL",
+                2,
+            ),
+            crossref_entry("DC=long,DC=example,DC=com", &"x".repeat(254), "LONG", 2),
+        ];
+        let parsed = parse_partitions_from_entries(&entries).unwrap();
+        let names: Vec<&str> = parsed.iter().map(|p| p.dns_name.as_str()).collect();
+        assert_eq!(names, vec!["ok.example.com"]);
+    }
+
+    #[test]
+    fn parser_rejects_nc_names_and_drops_netbios_with_control_chars() {
+        let bad_dn = crossref_entry("DC=bad\rDC=example,DC=com", "bad.example.com", "BAD", 2);
+        let bad_netbios =
+            crossref_entry("DC=fine,DC=example,DC=com", "fine.example.com", "FI\nNE", 2);
+        let parsed = parse_partitions_from_entries(&[bad_dn, bad_netbios]).unwrap();
+        assert_eq!(parsed.len(), 1);
+        assert_eq!(parsed[0].dns_name, "fine.example.com");
+        assert_eq!(parsed[0].netbios_name, None);
+    }
+
+    fn simple_bind() -> LdapAuthMode {
+        LdapAuthMode::SimpleBind {
+            bind_dn: "CN=admin,CN=Users,DC=example,DC=com".to_string(),
+            password: "secret".to_string(),
+        }
+    }
+
+    #[test]
+    fn ldap_connector_refuses_simple_bind_fan_out_without_tls() {
+        let connector = LdapPartitionConnector::new(simple_bind(), LdapTlsConfig::default());
+        let err = connector.build(&partition("eu.example.com")).err().unwrap();
+        assert_eq!(err, TLS_REQUIRED);
+    }
+
+    #[test]
+    fn ldap_connector_refuses_simple_bind_fan_out_with_unverified_tls() {
+        let tls = LdapTlsConfig {
+            enabled: true,
+            starttls: false,
+            skip_verify: true,
+            ca_cert_file: None,
+        };
+        let connector = LdapPartitionConnector::new(simple_bind(), tls);
+        let err = connector.build(&partition("eu.example.com")).err().unwrap();
+        assert_eq!(err, TLS_UNVERIFIED);
+    }
+
+    #[test]
+    fn ldap_connector_builds_simple_bind_partition_over_verified_tls() {
+        let tls = LdapTlsConfig {
+            enabled: true,
+            starttls: false,
+            skip_verify: false,
+            ca_cert_file: None,
+        };
+        let connector = LdapPartitionConnector::new(simple_bind(), tls);
+        let provider = connector.build(&partition("eu.example.com")).unwrap();
+        assert_eq!(provider.domain_name(), Some("eu.example.com"));
+        assert!(!provider.is_connected());
+    }
+
+    #[test]
+    fn ldap_connector_builds_gssapi_partition_regardless_of_tls() {
+        let connector = LdapPartitionConnector::new(LdapAuthMode::Gssapi, LdapTlsConfig::default());
+        let provider = connector.build(&partition("eu.example.com")).unwrap();
+        assert_eq!(provider.domain_name(), Some("eu.example.com"));
+    }
+
+    #[tokio::test]
+    async fn declined_partition_is_recorded_unreachable_without_provider() {
+        let topology = ForestTopology {
+            partitions: vec![partition("example.com"), partition("eu.example.com")],
+        };
+        let connector = StubConnector::new().declining("eu.example.com", TLS_REQUIRED);
+        let forest = ForestProvider::assemble(
+            seed_mock(),
+            "example.com".to_string(),
+            None,
+            topology,
+            &connector,
+            Duration::from_secs(1),
+        )
+        .await;
+        assert_eq!(
+            forest.partition_status()[1],
+            (
+                "eu.example.com".to_string(),
+                ConnectionStatus::Unreachable(TLS_REQUIRED.to_string())
+            )
+        );
+        assert!(forest.partition("eu.example.com").is_none());
+        assert_eq!(forest.topology().partitions.len(), 2);
     }
 }

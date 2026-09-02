@@ -391,6 +391,18 @@ pub trait DirectoryProvider: Send + Sync {
         }
         Ok(topology)
     }
+
+    /// DN of the forest-shared Configuration partition.
+    ///
+    /// The default derives it from `base_dn`, which is only right when the
+    /// bound DC belongs to the forest root domain. `LdapDirectoryProvider`
+    /// overrides it with the rootDSE `configurationNamingContext`. Callers
+    /// that query `CN=Sites`, `CN=Partitions` or PKI containers use this,
+    /// never `CN=Configuration,<base_dn>`.
+    fn configuration_dn(&self) -> Option<String> {
+        self.base_dn()
+            .map(|base| format!("CN=Configuration,{}", base))
+    }
 }
 
 #[allow(clippy::unwrap_used)]

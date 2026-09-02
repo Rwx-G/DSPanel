@@ -2542,10 +2542,10 @@ async fn compute_certificate_security_factor(provider: Arc<dyn DirectoryProvider
         }
     };
 
-    let pki_base = format!(
-        "CN=Public Key Services,CN=Services,CN=Configuration,{}",
-        base_dn
-    );
+    let configuration_dn = provider
+        .configuration_dn()
+        .unwrap_or_else(|| format!("CN=Configuration,{}", base_dn));
+    let pki_base = format!("CN=Public Key Services,CN=Services,{}", configuration_dn);
 
     // Check if CA exists
     let ca_base = format!("CN=Certification Authorities,{}", pki_base);
@@ -4302,9 +4302,12 @@ pub async fn build_escalation_graph(
         }
 
         // G. ADCS Certificate Template edges
+        let configuration_dn = provider
+            .configuration_dn()
+            .unwrap_or_else(|| format!("CN=Configuration,{}", base_dn));
         let cert_search_base = format!(
-            "CN=Certificate Templates,CN=Public Key Services,CN=Services,CN=Configuration,{}",
-            base_dn
+            "CN=Certificate Templates,CN=Public Key Services,CN=Services,{}",
+            configuration_dn
         );
         if let Ok(templates) = provider
             .search_configuration(&cert_search_base, "(objectClass=pKICertificateTemplate)")

@@ -7,6 +7,7 @@ use async_trait::async_trait;
 use crate::error::DirectoryError;
 use crate::models::{ContactInfo, DirectoryEntry, OUNode, PrinterInfo};
 use crate::services::directory::DirectoryProvider;
+use crate::services::forest::ForestTopology;
 use crate::services::resilience::{CircuitBreaker, RetryConfig, retry_with_backoff};
 
 /// Executes a directory operation with retry and circuit breaker protection.
@@ -172,6 +173,10 @@ where
 
     fn is_connected_to_rodc(&self) -> bool {
         self.inner.is_connected_to_rodc()
+    }
+
+    fn configuration_dn(&self) -> Option<String> {
+        self.inner.configuration_dn()
     }
 
     async fn search_users(&self, filter: &str, max_results: usize) -> Result<Vec<DirectoryEntry>> {
@@ -731,6 +736,12 @@ where
         })
         .await
         .map_err(|e| anyhow::anyhow!(e))
+    }
+
+    // Must delegate: the trait default would synthesize a single-partition
+    // topology from the wrapper and silently hide the forest.
+    async fn discover_forest(&self) -> Result<ForestTopology> {
+        resilient_call!(self, |inner| inner.discover_forest().await)
     }
 }
 
