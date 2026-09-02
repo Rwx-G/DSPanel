@@ -18,13 +18,12 @@ pub struct AppState {
     pub title: Mutex<String>,
     /// Whether the app has completed initialization.
     pub initialized: Mutex<bool>,
-    /// Directory provider for AD operations. Wrapped in RwLock to allow
-    /// runtime replacement (e.g., after login prompt provides credentials).
-    pub directory_provider: RwLock<Arc<dyn DirectoryProvider>>,
-    /// Typed view of `directory_provider` when it is a `ForestProvider`.
-    /// `None` until the forest is assembled (startup, or after a login prompt)
-    /// and in tests that install a bare provider.
-    pub forest_provider: RwLock<Option<Arc<ForestProvider>>>,
+    /// Directory provider for AD operations, always a `ForestProvider`: a bare
+    /// provider is wrapped as a single-partition forest on installation, so
+    /// forest-specific commands never need a downcast and never observe a
+    /// provider without its forest view. Wrapped in RwLock to allow runtime
+    /// replacement (e.g., after login prompt provides credentials).
+    pub directory_provider: RwLock<Arc<ForestProvider>>,
     /// Whether the app is waiting for simple bind credentials from the user.
     pub needs_credentials: Mutex<bool>,
     /// Permission service for checking user authorization levels.
@@ -68,8 +67,7 @@ impl AppState {
         Self {
             title: Mutex::new("DSPanel".to_string()),
             initialized: Mutex::new(false),
-            directory_provider: RwLock::new(provider),
-            forest_provider: RwLock::new(None),
+            directory_provider: RwLock::new(Arc::new(ForestProvider::single_partition(provider))),
             needs_credentials: Mutex::new(false),
             permission_service: PermissionService::new(permission_config),
             audit_service: AuditService::new(),
@@ -92,43 +90,29 @@ impl AppState {
 
     /// Returns a cloned Arc to the current directory provider.
     pub fn provider(&self) -> Arc<dyn DirectoryProvider> {
-        self.directory_provider
-            .read()
-            .expect("directory_provider lock poisoned")
-            .clone()
+        self.forest()
     }
 
-    /// Replaces the directory provider at runtime (e.g., after login prompt).
+    /// Replaces the directory provider at runtime (e.g., after login prompt),
+    /// wrapped as a single-partition forest. Use `set_forest` once the real
+    /// forest has been assembled.
     pub fn set_provider(&self, provider: Arc<dyn DirectoryProvider>) {
-        *self
-            .directory_provider
-            .write()
-            .expect("directory_provider lock poisoned") = provider;
-        *self
-            .forest_provider
-            .write()
-            .expect("forest_provider lock poisoned") = None;
+        self.set_forest(Arc::new(ForestProvider::single_partition(provider)));
     }
 
-    /// Installs a forest as the active directory provider and keeps the typed
-    /// handle so forest-specific commands (topology, partition status) can
-    /// reach it without downcasting.
+    /// Installs a forest as the active directory provider.
     pub fn set_forest(&self, forest: Arc<ForestProvider>) {
         *self
             .directory_provider
             .write()
-            .expect("directory_provider lock poisoned") = forest.clone();
-        *self
-            .forest_provider
-            .write()
-            .expect("forest_provider lock poisoned") = Some(forest);
+            .expect("directory_provider lock poisoned") = forest;
     }
 
-    /// The active `ForestProvider`, when one is installed.
-    pub fn forest(&self) -> Option<Arc<ForestProvider>> {
-        self.forest_provider
+    /// The active `ForestProvider`.
+    pub fn forest(&self) -> Arc<ForestProvider> {
+        self.directory_provider
             .read()
-            .expect("forest_provider lock poisoned")
+            .expect("directory_provider lock poisoned")
             .clone()
     }
 
@@ -142,8 +126,7 @@ impl AppState {
         Self {
             title: Mutex::new("DSPanel".to_string()),
             initialized: Mutex::new(false),
-            directory_provider: RwLock::new(provider),
-            forest_provider: RwLock::new(None),
+            directory_provider: RwLock::new(Arc::new(ForestProvider::single_partition(provider))),
             needs_credentials: Mutex::new(false),
             permission_service: PermissionService::new(permission_config),
             audit_service: AuditService::new_in_memory(),

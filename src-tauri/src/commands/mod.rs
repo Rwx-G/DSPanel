@@ -243,6 +243,7 @@ pub fn get_bind_info() -> (String, String) {
 pub async fn connect_simple_bind(
     password: String,
     state: State<'_, AppState>,
+    app: tauri::AppHandle,
 ) -> Result<bool, AppError> {
     use crate::services::ldap_directory::{LdapDirectoryProvider, LdapTlsConfig};
     use std::sync::Arc;
@@ -294,9 +295,10 @@ pub async fn connect_simple_bind(
                 tracing::info!(operator = %name, "Authenticated after login prompt");
             }
 
-            // Swap the provider for a forest built on the freshly bound seed
-            let forest = crate::connect_forest(seed).await;
-            state.set_forest(Arc::new(forest));
+            // Install the bound seed now; the forest promotion runs in the
+            // background and announces itself through the status event.
+            state.set_provider(provider.clone());
+            crate::spawn_forest_promotion(app, seed);
             *state.needs_credentials.lock().expect("lock poisoned") = false;
 
             tracing::info!("Simple bind connection established via login prompt");

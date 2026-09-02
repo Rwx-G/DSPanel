@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -81,16 +82,28 @@ export function ForestProvider({
 
   useEffect(() => {
     void refresh();
+  }, [refresh]);
+
+  const wasConnected = useRef(connected);
+  useEffect(() => {
+    // Only a false -> true transition (login prompt, reconnect) re-fetches;
+    // the mount fetch above already covers the initial state.
+    if (connected && !wasConnected.current) {
+      void refresh();
+    }
+    wasConnected.current = connected;
   }, [refresh, connected]);
 
   useEffect(() => {
-    // The event ships with Story 15.6. Until then no event arrives and every
-    // partition stays reported as connected; a rejected subscription is
-    // tolerated for the same reason.
+    // The backend emits this once the forest is (re)assembled in the
+    // background, so the event carries fresh partition states and signals
+    // that the topology itself may have grown. A rejected subscription is
+    // tolerated: every partition then stays reported as connected.
     const unlisten = listen<PartitionStatusMap>(
       FOREST_STATUS_EVENT,
       (event) => {
         setReportedStatus(event.payload ?? {});
+        void refresh();
       },
     ).catch((e) => {
       console.warn("Forest status subscription unavailable:", e);
@@ -99,7 +112,7 @@ export function ForestProvider({
     return () => {
       unlisten.then((fn) => fn());
     };
-  }, []);
+  }, [refresh]);
 
   const partitionStatus = useMemo<PartitionStatusMap>(() => {
     const status: PartitionStatusMap = {};

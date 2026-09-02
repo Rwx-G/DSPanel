@@ -33,6 +33,35 @@ pub async fn connect_forest(seed: Arc<LdapDirectoryProvider>) -> services::Fores
     }
 }
 
+/// Runs `connect_forest` off the caller's thread, installs the result as the
+/// active provider and notifies the webview through `FOREST_STATUS_EVENT`.
+/// Discovery and the per-partition binds (bounded by the bind timeout and the
+/// partition cap) therefore never delay startup or the login prompt.
+#[cfg(not(feature = "demo"))]
+pub fn spawn_forest_promotion(app: tauri::AppHandle, seed: Arc<LdapDirectoryProvider>) {
+    tauri::async_runtime::spawn(async move {
+        use tauri::Manager;
+        let forest = Arc::new(connect_forest(seed).await);
+        tracing::info!(
+            partitions = forest.topology().partitions.len(),
+            seed = forest.seed_dns_name(),
+            "Forest provider installed"
+        );
+        app.state::<AppState>().set_forest(forest.clone());
+        emit_forest_status(&app, &forest);
+    });
+}
+
+/// Emits the current per-partition connection states to the webview.
+pub fn emit_forest_status(app: &tauri::AppHandle, forest: &services::ForestProvider) {
+    use tauri::Emitter;
+    let payload: std::collections::HashMap<String, services::ConnectionStatus> =
+        forest.partition_status().into_iter().collect();
+    if let Err(e) = app.emit(services::forest::FOREST_STATUS_EVENT, payload) {
+        tracing::warn!(error = %e, "Failed to emit forest status event");
+    }
+}
+
 /// Installs a custom panic hook that logs panics via tracing before
 /// delegating to the default handler. This ensures panics in async tasks
 /// or background threads are always captured in the log file.
@@ -153,23 +182,14 @@ pub fn run() {
                     state.audit_service.set_operator(name.clone());
                     tracing::info!(operator = %name, "Audit operator set to authenticated identity");
                 }
-                // Promote the seed to a forest-aware provider. A failure here
-                // keeps the seed-only shape so the connection error UX is unchanged.
-                #[cfg(not(feature = "demo"))]
-                let forest = if *state.needs_credentials.lock().expect("lock poisoned") {
-                    services::ForestProvider::single_partition(provider.clone())
-                } else {
-                    connect_forest(seed.clone()).await
-                };
-                #[cfg(feature = "demo")]
-                let forest = services::ForestProvider::single_partition(provider.clone());
-                tracing::info!(
-                    partitions = forest.topology().partitions.len(),
-                    seed = forest.seed_dns_name(),
-                    "Forest provider installed"
-                );
-                state.set_forest(Arc::new(forest));
             });
+            // `AppState` already holds the seed as a single-partition forest; the
+            // real forest is assembled off the startup path and swapped in with
+            // an event, so discovery never delays the first paint.
+            #[cfg(not(feature = "demo"))]
+            if !*state.needs_credentials.lock().expect("lock poisoned") {
+                spawn_forest_promotion(app.handle().clone(), seed.clone());
+            }
             // Start LDAP keepalive background task (ping every 5 minutes)
             let keepalive_provider = state.provider();
             tauri::async_runtime::spawn(async move {

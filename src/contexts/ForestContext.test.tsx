@@ -133,6 +133,27 @@ describe("useForest", () => {
     });
   });
 
+  it("re-fetches the topology when the forest status event fires", async () => {
+    mockInvoke.mockResolvedValue(singleDomain as never);
+    const { result } = renderHook(() => useForest(), {
+      wrapper: wrapperWith(true),
+    });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(mockInvoke).toHaveBeenCalledTimes(1);
+
+    mockInvoke.mockResolvedValue(multiDomain as never);
+    act(() => {
+      statusHandler?.({
+        payload: { "eu.corp.example.com": { state: "connected" } },
+      });
+    });
+
+    await waitFor(() =>
+      expect(result.current.isSingleDomainForest).toBe(false),
+    );
+    expect(mockInvoke).toHaveBeenCalledTimes(2);
+  });
+
   it("falls back to an empty topology when the command fails", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     mockInvoke.mockRejectedValue(new Error("not connected"));
