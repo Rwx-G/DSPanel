@@ -13,6 +13,7 @@ pub mod dns_validation;
 #[cfg(target_os = "windows")]
 pub mod dpapi;
 pub mod export;
+pub mod forest;
 pub mod gpo;
 pub mod graph_exchange;
 pub mod health;
@@ -39,6 +40,7 @@ pub mod workstation_monitor;
 pub use app_settings::AppSettingsService;
 pub use audit::AuditService;
 pub use directory::DirectoryProvider;
+pub use forest::{ConnectionStatus, DomainPartition, ForestProvider, ForestTopology};
 pub use health::{AccountHealthStatus, HealthInput, HealthLevel, evaluate_health};
 pub use ldap_directory::LdapDirectoryProvider;
 pub use mfa::MfaService;

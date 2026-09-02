@@ -8,6 +8,9 @@ use ldap3::{LdapConnAsync, LdapConnSettings, Mod, Scope, SearchEntry};
 
 use crate::models::{ContactInfo, DirectoryEntry, OUNode, PrinterInfo};
 use crate::services::directory::DirectoryProvider;
+use crate::services::forest::{
+    ForestTopology, NTDS_DOMAIN_CROSSREF_FILTER, parse_partitions_from_entries,
+};
 
 /// Resolves the DC FQDN from a domain name for the Kerberos SPN.
 ///
@@ -400,6 +403,10 @@ pub struct LdapDirectoryProvider {
     authenticated_user: Mutex<Option<String>>,
     /// FQDN of the connected DC, resolved from rootDSE dNSHostName.
     dc_fqdn: Mutex<Option<String>>,
+    /// `rootDomainNamingContext` from the rootDSE: DN of the forest root domain.
+    forest_root_dn: Mutex<Option<String>>,
+    /// `configurationNamingContext` from the rootDSE: DN of the Configuration partition.
+    configuration_dn: Mutex<Option<String>>,
     /// Timestamp of the last successful LDAP operation.
     last_successful_op: Mutex<Option<std::time::Instant>>,
     /// Stable classification key for the last connection failure (no raw text).
@@ -686,6 +693,8 @@ impl LdapDirectoryProvider {
             pool: tokio::sync::Mutex::new(None),
             authenticated_user: Mutex::new(None),
             dc_fqdn: Mutex::new(None),
+            forest_root_dn: Mutex::new(None),
+            configuration_dn: Mutex::new(None),
             last_successful_op: Mutex::new(None),
             last_error_kind: Mutex::new(initial_error),
             last_search_truncated: Mutex::new(false),
@@ -729,6 +738,8 @@ impl LdapDirectoryProvider {
             pool: tokio::sync::Mutex::new(None),
             authenticated_user: Mutex::new(None),
             dc_fqdn: Mutex::new(None),
+            forest_root_dn: Mutex::new(None),
+            configuration_dn: Mutex::new(None),
             last_successful_op: Mutex::new(None),
             last_error_kind: Mutex::new(None),
             last_search_truncated: Mutex::new(false),
@@ -739,6 +750,58 @@ impl LdapDirectoryProvider {
     /// Returns the configured authentication mode.
     pub fn auth_mode(&self) -> &LdapAuthMode {
         &self.auth_mode
+    }
+
+    /// Returns the TLS settings this provider connects with.
+    pub fn tls_config(&self) -> &LdapTlsConfig {
+        &self.tls_config
+    }
+
+    /// DN of the forest root domain (`rootDomainNamingContext`), known after
+    /// the first successful connection.
+    pub fn forest_root_dn(&self) -> Option<String> {
+        self.forest_root_dn.lock().expect("lock poisoned").clone()
+    }
+
+    /// DN of the Configuration partition (`configurationNamingContext`),
+    /// known after the first successful connection. On a child-domain DC this
+    /// lives under the forest root, not under `defaultNamingContext`.
+    pub fn configuration_dn(&self) -> Option<String> {
+        self.configuration_dn.lock().expect("lock poisoned").clone()
+    }
+
+    /// Builds a provider bound to one forest partition identified by its DNS
+    /// name, reusing the seed's authentication mode and TLS settings.
+    ///
+    /// No server override is set: the DC is located through the DNS SRV
+    /// resolution the provider already performs on `domain`. With a
+    /// DN-shaped simple-bind identity the bind is rejected by DCs of other
+    /// domains (AD requires a UPN or NT name there); the failure is
+    /// classified by `test_connection` and reported through
+    /// `ForestProvider::partition_status` rather than propagated.
+    pub fn new_for_partition(
+        dns_name: String,
+        auth_mode: LdapAuthMode,
+        tls_config: LdapTlsConfig,
+    ) -> Self {
+        tracing::info!(partition = %dns_name, auth_mode = ?auth_mode, "Creating partition provider");
+        Self {
+            domain: Some(dns_name),
+            server_override: None,
+            auth_mode,
+            tls_config,
+            base_dn: Mutex::new(None),
+            connected: Mutex::new(false),
+            pool: tokio::sync::Mutex::new(None),
+            authenticated_user: Mutex::new(None),
+            dc_fqdn: Mutex::new(None),
+            forest_root_dn: Mutex::new(None),
+            configuration_dn: Mutex::new(None),
+            last_successful_op: Mutex::new(None),
+            last_error_kind: Mutex::new(None),
+            last_search_truncated: Mutex::new(false),
+            connected_dc_is_rodc: Mutex::new(false),
+        }
     }
 
     /// Derives the DNS domain name from the base DN.
@@ -1051,6 +1114,8 @@ impl LdapDirectoryProvider {
                 "(objectClass=*)",
                 vec![
                     "defaultNamingContext",
+                    "rootDomainNamingContext",
+                    "configurationNamingContext",
                     "dnsHostName",
                     "supportedCapabilities",
                 ],
@@ -1073,6 +1138,22 @@ impl LdapDirectoryProvider {
             if let Some(fqdn) = se.attrs.get("dnsHostName").and_then(|v| v.first().cloned()) {
                 tracing::info!("DC FQDN resolved from rootDSE: {}", fqdn);
                 *self.dc_fqdn.lock().expect("lock poisoned") = Some(fqdn);
+            }
+            if let Some(root_dn) = se
+                .attrs
+                .get("rootDomainNamingContext")
+                .and_then(|v| v.first().cloned())
+            {
+                tracing::debug!("Forest root DN discovered: {}", root_dn);
+                *self.forest_root_dn.lock().expect("lock poisoned") = Some(root_dn);
+            }
+            if let Some(config_dn) = se
+                .attrs
+                .get("configurationNamingContext")
+                .and_then(|v| v.first().cloned())
+            {
+                tracing::debug!("Configuration DN discovered: {}", config_dn);
+                *self.configuration_dn.lock().expect("lock poisoned") = Some(config_dn);
             }
             let is_rodc = se
                 .attrs
@@ -1659,6 +1740,7 @@ fn search_entry_to_directory_entry(se: SearchEntry) -> DirectoryEntry {
     }
 
     DirectoryEntry {
+        partition_dns_name: None,
         distinguished_name: se.dn,
         sam_account_name: sam,
         display_name: display,
@@ -3691,6 +3773,36 @@ impl DirectoryProvider for LdapDirectoryProvider {
             }
         })
         .await
+    }
+
+    async fn discover_forest(&self) -> Result<ForestTopology> {
+        // `CN=Partitions` lives in the Configuration partition, which on a
+        // child-domain DC is rooted at the forest root, never at the seed's
+        // `defaultNamingContext`.
+        let configuration_dn = self
+            .configuration_dn()
+            .or_else(|| {
+                self.base_dn()
+                    .map(|base| format!("CN=Configuration,{}", base))
+            })
+            .context("Not connected - configuration DN unknown")?;
+        let partitions_dn = format!("CN=Partitions,{}", configuration_dn);
+        let entries = self
+            .search_configuration(&partitions_dn, NTDS_DOMAIN_CROSSREF_FILTER)
+            .await
+            .context("Forest partition discovery failed")?;
+        let mut partitions = parse_partitions_from_entries(&entries)?;
+        if let Some(seed_base) = self.base_dn() {
+            let dc_fqdn = self.connected_host();
+            if let Some(seed_partition) = partitions
+                .iter_mut()
+                .find(|p| p.distinguished_name.eq_ignore_ascii_case(&seed_base))
+            {
+                seed_partition.default_dc_fqdn = dc_fqdn;
+            }
+        }
+        tracing::info!(count = partitions.len(), "Forest partitions discovered");
+        Ok(ForestTopology { partitions })
     }
 
     async fn resolve_group_by_rid(&self, rid: u32) -> Result<Option<DirectoryEntry>> {

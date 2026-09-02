@@ -5030,6 +5030,7 @@ mod tests {
         attrs.insert("trustDirection".to_string(), vec!["3".to_string()]); // bidirectional
         attrs.insert("trustAttributes".to_string(), vec!["0".to_string()]); // no SID filtering, no selective auth
         let trust_entry = crate::models::DirectoryEntry {
+            partition_dns_name: None,
             distinguished_name: "CN=PARTNER.COM,CN=System,DC=example,DC=com".to_string(),
             sam_account_name: None,
             display_name: None,
@@ -5062,6 +5063,7 @@ mod tests {
         let mut ca_attrs = HashMap::new();
         ca_attrs.insert("name".to_string(), vec!["RootCA".to_string()]);
         let ca_entry = crate::models::DirectoryEntry {
+            partition_dns_name: None,
             distinguished_name: "CN=RootCA,CN=Certification Authorities,CN=Public Key Services,CN=Services,CN=Configuration,DC=example,DC=com".to_string(),
             sam_account_name: None,
             display_name: None,
@@ -5129,6 +5131,7 @@ mod tests {
         let mut ca_attrs = HashMap::new();
         ca_attrs.insert("name".to_string(), vec!["RootCA".to_string()]);
         let ca_entry = crate::models::DirectoryEntry {
+            partition_dns_name: None,
             distinguished_name: "CN=RootCA,CN=Certification Authorities,CN=Public Key Services,CN=Services,CN=Configuration,DC=example,DC=com".to_string(),
             sam_account_name: None,
             display_name: None,
@@ -5153,6 +5156,7 @@ mod tests {
             vec!["2".to_string()],
         );
         let tpl_entry = crate::models::DirectoryEntry {
+            partition_dns_name: None,
             distinguished_name: "CN=VulnTemplate,CN=Certificate Templates,CN=Public Key Services,CN=Services,CN=Configuration,DC=example,DC=com".to_string(),
             sam_account_name: None,
             display_name: None,
@@ -5179,6 +5183,7 @@ mod tests {
         let mut ca_attrs = HashMap::new();
         ca_attrs.insert("name".to_string(), vec!["RootCA".to_string()]);
         let ca_entry = crate::models::DirectoryEntry {
+            partition_dns_name: None,
             distinguished_name: "CN=RootCA,CN=Certification Authorities,CN=Public Key Services,CN=Services,CN=Configuration,DC=example,DC=com".to_string(),
             sam_account_name: None,
             display_name: None,
@@ -5199,6 +5204,7 @@ mod tests {
         );
         tpl_attrs.insert("msPKI-Enrollment-Flag".to_string(), vec!["0".to_string()]);
         let tpl_entry = crate::models::DirectoryEntry {
+            partition_dns_name: None,
             distinguished_name: "CN=LegacyTemplate,CN=Certificate Templates,CN=Public Key Services,CN=Services,CN=Configuration,DC=example,DC=com".to_string(),
             sam_account_name: None,
             display_name: None,
@@ -5229,6 +5235,7 @@ mod tests {
             vec!["544".to_string()], // 512 (NORMAL_ACCOUNT) + 32 (PASSWD_NOTREQD)
         );
         let user = crate::models::DirectoryEntry {
+            partition_dns_name: None,
             distinguished_name: "CN=NoPass,OU=Users,DC=example,DC=com".to_string(),
             sam_account_name: Some("nopass".to_string()),
             display_name: Some("No Pass".to_string()),
@@ -5258,6 +5265,7 @@ mod tests {
             vec!["S-1-5-21-123456789-1234567890-1234567890-1001".to_string()],
         );
         let user = crate::models::DirectoryEntry {
+            partition_dns_name: None,
             distinguished_name: "CN=MigratedUser,OU=Users,DC=example,DC=com".to_string(),
             sam_account_name: Some("migrated".to_string()),
             display_name: Some("Migrated User".to_string()),
@@ -5291,6 +5299,7 @@ mod tests {
             vec!["cifs/server.example.com".to_string()],
         );
         let user = crate::models::DirectoryEntry {
+            partition_dns_name: None,
             distinguished_name: "CN=DelegUser,OU=Users,DC=example,DC=com".to_string(),
             sam_account_name: Some("deleguser".to_string()),
             display_name: Some("Deleg User".to_string()),
@@ -5320,6 +5329,7 @@ mod tests {
             vec![format!("{}", 0x80000 | 0x1000)], // TRUSTED_FOR_DELEGATION + WORKSTATION_TRUST_ACCOUNT
         );
         let computer = crate::models::DirectoryEntry {
+            partition_dns_name: None,
             distinguished_name: "CN=WORKSTATION1,OU=Computers,DC=example,DC=com".to_string(),
             sam_account_name: Some("WORKSTATION1$".to_string()),
             display_name: None,
@@ -5331,6 +5341,7 @@ mod tests {
         let mut user_attrs = HashMap::new();
         user_attrs.insert("userAccountControl".to_string(), vec!["512".to_string()]);
         let dummy_user = crate::models::DirectoryEntry {
+            partition_dns_name: None,
             distinguished_name: "CN=User1,OU=Users,DC=example,DC=com".to_string(),
             sam_account_name: Some("user1".to_string()),
             display_name: Some("User 1".to_string()),
@@ -5365,6 +5376,7 @@ mod tests {
         );
         user_attrs.insert("userAccountControl".to_string(), vec!["512".to_string()]);
         let user = crate::models::DirectoryEntry {
+            partition_dns_name: None,
             distinguished_name: "CN=User1,OU=Users,DC=example,DC=com".to_string(),
             sam_account_name: Some("user1".to_string()),
             display_name: Some("User 1".to_string()),
@@ -5380,6 +5392,7 @@ mod tests {
         comp_attrs.insert("pwdLastSet".to_string(), vec![old_filetime]);
         comp_attrs.insert("userAccountControl".to_string(), vec!["4096".to_string()]);
         let computer = crate::models::DirectoryEntry {
+            partition_dns_name: None,
             distinguished_name: "CN=OLDPC,OU=Computers,DC=example,DC=com".to_string(),
             sam_account_name: Some("OLDPC$".to_string()),
             display_name: None,
@@ -5413,6 +5426,7 @@ mod tests {
         attrs.insert("userAccountControl".to_string(), vec!["512".to_string()]);
         // msDS-SupportedEncryptionTypes not set (defaults to 0 = RC4 only)
         let user = crate::models::DirectoryEntry {
+            partition_dns_name: None,
             distinguished_name: "CN=SvcAcct,OU=Users,DC=example,DC=com".to_string(),
             sam_account_name: Some("svcacct".to_string()),
             display_name: Some("Service Account".to_string()),
@@ -5455,6 +5469,7 @@ mod tests {
         attrs.insert("adminCount".to_string(), vec!["1".to_string()]);
         // No msDS-SupportedEncryptionTypes = defaults to RC4
         let user = crate::models::DirectoryEntry {
+            partition_dns_name: None,
             distinguished_name: "CN=Admin,OU=Users,DC=example,DC=com".to_string(),
             sam_account_name: Some("admin".to_string()),
             display_name: Some("Admin".to_string()),
@@ -6588,6 +6603,7 @@ mod tests {
         attrs.insert("userAccountControl".to_string(), vec!["512".to_string()]);
         attrs.insert("pwdLastSet".to_string(), vec![recent_filetime]);
         let user = crate::models::DirectoryEntry {
+            partition_dns_name: None,
             distinguished_name: "CN=Active,OU=Users,DC=test".to_string(),
             sam_account_name: Some("active".to_string()),
             display_name: Some("Active User".to_string()),
@@ -6620,6 +6636,7 @@ mod tests {
             vec![format!("{}", 0x10 | 0x4)],
         );
         let trust_entry = crate::models::DirectoryEntry {
+            partition_dns_name: None,
             distinguished_name: "CN=SECURED.COM,CN=System,DC=example,DC=com".to_string(),
             sam_account_name: None,
             display_name: None,

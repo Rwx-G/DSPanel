@@ -1,0 +1,1395 @@
+//! Forest topology discovery and the multi-partition `ForestProvider`.
+//!
+//! Active Directory forests contain one directory partition per domain. The
+//! single-domain `LdapDirectoryProvider` binds to one domain controller and
+//! only sees the partition served by that DC. `ForestProvider` is a structural
+//! decorator: it holds one `DirectoryProvider` per partition (the seed
+//! provider used for the initial bind plus one `LdapDirectoryProvider` per
+//! additional partition discovered under `CN=Partitions,CN=Configuration`) and
+//! implements `DirectoryProvider` itself so the rest of the application keeps
+//! consuming a single `Arc<dyn DirectoryProvider>`.
+//!
+//! Story 15.1 ships the foundation: discovery, per-partition connection
+//! bookkeeping, and a delegating `DirectoryProvider` implementation whose
+//! methods all target the seed partition. Later stories (15.2 to 15.5) replace
+//! the seed-only bodies with fan-out or DN-based routing; the dispatch rule
+//! for every method is recorded inline as a one-line comment.
+
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
+
+use anyhow::{Context, Result, bail};
+use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
+use tokio::task::JoinSet;
+
+use crate::models::{ContactInfo, DeletedObject, DirectoryEntry, OUNode, PrinterInfo};
+use crate::services::directory::DirectoryProvider;
+use crate::services::ldap_directory::{LdapAuthMode, LdapDirectoryProvider, LdapTlsConfig};
+
+/// `FLAG_CR_NTDS_DOMAIN` bit of the `systemFlags` attribute on `crossRef`
+/// objects. Set only on crossRefs that describe a domain naming context, so it
+/// excludes the Schema, Configuration, and DNS application partitions.
+pub const FLAG_CR_NTDS_DOMAIN: i64 = 0x0000_0002;
+
+/// LDAP filter selecting domain partition crossRefs. The OID is the
+/// `LDAP_MATCHING_RULE_BIT_AND` extensible match, so the server evaluates the
+/// `FLAG_CR_NTDS_DOMAIN` bit test itself.
+pub const NTDS_DOMAIN_CROSSREF_FILTER: &str =
+    "(&(objectClass=crossRef)(systemFlags:1.2.840.113556.1.4.803:=2))";
+
+/// Upper bound on the number of partitions `ForestProvider` binds to. Keeps
+/// the seed-login latency bounded regardless of forest size (NFR1).
+pub const MAX_PARTITIONS: usize = 50;
+
+/// Default per-partition bind timeout applied during `ForestProvider::connect`.
+pub const DEFAULT_PARTITION_BIND_TIMEOUT: Duration = Duration::from_secs(3);
+
+/// Environment variable overriding `DEFAULT_PARTITION_BIND_TIMEOUT`, in seconds.
+pub const PARTITION_BIND_TIMEOUT_ENV: &str = "DSPANEL_PARTITION_BIND_TIMEOUT";
+
+/// One domain naming context of the forest.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct DomainPartition {
+    /// Partition DN (`nCName` of the crossRef), e.g. `DC=corp,DC=example,DC=com`.
+    pub distinguished_name: String,
+    /// DNS suffix of the domain (`dnsRoot`), lowercase, e.g. `corp.example.com`.
+    pub dns_name: String,
+    /// NetBIOS name of the domain (`nETBIOSName`), when published.
+    pub netbios_name: Option<String>,
+    /// FQDN of the DC the partition provider is bound to, when known.
+    pub default_dc_fqdn: Option<String>,
+}
+
+/// Every domain partition discovered in the forest, seed partition first.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ForestTopology {
+    pub partitions: Vec<DomainPartition>,
+}
+
+impl ForestTopology {
+    /// Builds a one-partition topology from a provider's own base DN and
+    /// identity. Used as the trait default for providers that do not expose
+    /// the real forest (demo, mocks) and as the fallback when discovery fails.
+    /// Returns an empty topology when the provider has no base DN yet.
+    pub fn synthesized_from<P: DirectoryProvider + ?Sized>(provider: &P) -> Self {
+        let Some(base_dn) = provider.base_dn() else {
+            return Self::default();
+        };
+        let dns_name = dns_domain_from_dn(&base_dn)
+            .or_else(|| provider.domain_name().map(|d| d.to_ascii_lowercase()));
+        let Some(dns_name) = dns_name else {
+            return Self::default();
+        };
+        Self {
+            partitions: vec![DomainPartition {
+                distinguished_name: base_dn,
+                dns_name,
+                netbios_name: None,
+                default_dc_fqdn: provider.connected_host(),
+            }],
+        }
+    }
+
+    /// True when the forest exposes at most one domain partition. Drives the
+    /// "hide multi-domain UI affordances" rule shared by stories 15.2 to 15.6.
+    pub fn is_single_domain(&self) -> bool {
+        self.partitions.len() <= 1
+    }
+
+    /// Finds the partition whose DN equals `dn` (case-insensitive).
+    pub fn find_by_dn(&self, dn: &str) -> Option<&DomainPartition> {
+        self.partitions
+            .iter()
+            .find(|p| p.distinguished_name.eq_ignore_ascii_case(dn))
+    }
+
+    /// Finds the partition whose DNS name equals `dns_name` (case-insensitive).
+    pub fn find_by_dns_name(&self, dns_name: &str) -> Option<&DomainPartition> {
+        self.partitions
+            .iter()
+            .find(|p| p.dns_name.eq_ignore_ascii_case(dns_name))
+    }
+}
+
+/// Connection state of one partition, as reported by `ForestProvider::partition_status`.
+///
+/// Serialized adjacently tagged (`{"state":"unreachable","reason":"timeout"}`)
+/// so the frontend can switch on `state` and read `reason` as a translation key.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "state", content = "reason", rename_all = "camelCase")]
+pub enum ConnectionStatus {
+    Connected,
+    Reconnecting,
+    /// Carries the classification key of the failure (`network`, `auth_denied`,
+    /// `timeout`, `unknown`, ...), the same vocabulary as
+    /// `DirectoryProvider::last_connection_error`.
+    Unreachable(String),
+}
+
+/// Splits a DN on unescaped commas, trimming each component.
+pub fn split_dn_components(dn: &str) -> Vec<String> {
+    let mut parts = Vec::new();
+    let mut current = String::new();
+    let mut escaped = false;
+    for c in dn.chars() {
+        if escaped {
+            current.push(c);
+            escaped = false;
+            continue;
+        }
+        match c {
+            '\\' => {
+                current.push(c);
+                escaped = true;
+            }
+            ',' => {
+                parts.push(current.trim().to_string());
+                current.clear();
+            }
+            _ => current.push(c),
+        }
+    }
+    if !current.trim().is_empty() {
+        parts.push(current.trim().to_string());
+    }
+    parts
+}
+
+/// Extracts the `DC=` components of a DN and joins them into a lowercase DNS
+/// suffix: `CN=jdoe,OU=Users,DC=Sub,DC=Example,DC=com` -> `sub.example.com`.
+/// Returns `None` when the DN carries no `DC=` component.
+pub fn dns_domain_from_dn(dn: &str) -> Option<String> {
+    let labels: Vec<String> = split_dn_components(dn)
+        .into_iter()
+        .filter_map(|component| {
+            let (key, value) = component.split_once('=')?;
+            if key.trim().eq_ignore_ascii_case("dc") {
+                let label = value.trim().to_ascii_lowercase();
+                (!label.is_empty()).then_some(label)
+            } else {
+                None
+            }
+        })
+        .collect();
+    if labels.is_empty() {
+        None
+    } else {
+        Some(labels.join("."))
+    }
+}
+
+/// Case-insensitive first-value lookup in a `DirectoryEntry` attribute bag.
+/// LDAP attribute names are case-insensitive and servers return them in their
+/// schema casing (`nCName`, `nETBIOSName`), so exact-key lookups are brittle.
+fn attribute_ci<'a>(entry: &'a DirectoryEntry, name: &str) -> Option<&'a str> {
+    entry
+        .attributes
+        .iter()
+        .find(|(key, _)| key.eq_ignore_ascii_case(name))
+        .and_then(|(_, values)| values.first())
+        .map(|s| s.as_str())
+        .filter(|s| !s.trim().is_empty())
+}
+
+/// Turns raw `crossRef` entries into domain partitions.
+///
+/// Only entries whose `systemFlags` carries `FLAG_CR_NTDS_DOMAIN` are kept,
+/// which re-applies the server-side filter defensively so callers that fetch
+/// `CN=Partitions` with a broader filter get the same result. `dnsRoot` is the
+/// DNS name; when it is absent the name is derived from the `nCName` DN.
+/// Fails when no domain partition is present, since every forest has at least
+/// its root domain.
+pub fn parse_partitions_from_entries(entries: &[DirectoryEntry]) -> Result<Vec<DomainPartition>> {
+    let mut partitions = Vec::new();
+    for entry in entries {
+        let flags = attribute_ci(entry, "systemFlags")
+            .and_then(|v| v.trim().parse::<i64>().ok())
+            .unwrap_or(0);
+        if flags & FLAG_CR_NTDS_DOMAIN == 0 {
+            continue;
+        }
+        let Some(nc_name) = attribute_ci(entry, "nCName") else {
+            tracing::warn!(dn = %entry.distinguished_name, "crossRef without nCName skipped");
+            continue;
+        };
+        let dns_name = attribute_ci(entry, "dnsRoot")
+            .map(|v| v.trim().to_ascii_lowercase())
+            .or_else(|| dns_domain_from_dn(nc_name));
+        let Some(dns_name) = dns_name else {
+            tracing::warn!(dn = %entry.distinguished_name, nc_name = %nc_name, "crossRef without resolvable DNS name skipped");
+            continue;
+        };
+        partitions.push(DomainPartition {
+            distinguished_name: nc_name.to_string(),
+            dns_name,
+            netbios_name: attribute_ci(entry, "nETBIOSName").map(|v| v.trim().to_string()),
+            default_dc_fqdn: None,
+        });
+    }
+    if partitions.is_empty() {
+        bail!(
+            "No domain partitions found among {} crossRef entries",
+            entries.len()
+        );
+    }
+    Ok(partitions)
+}
+
+/// Reads the per-partition bind timeout, honoring `DSPANEL_PARTITION_BIND_TIMEOUT`
+/// (whole seconds). Invalid or zero values fall back to the default.
+pub fn partition_bind_timeout() -> Duration {
+    match std::env::var(PARTITION_BIND_TIMEOUT_ENV) {
+        Ok(raw) => match raw.trim().parse::<u64>() {
+            Ok(secs) if secs > 0 => Duration::from_secs(secs),
+            _ => {
+                tracing::warn!(
+                    value = %raw,
+                    "Invalid {} value, using the {}s default",
+                    PARTITION_BIND_TIMEOUT_ENV,
+                    DEFAULT_PARTITION_BIND_TIMEOUT.as_secs()
+                );
+                DEFAULT_PARTITION_BIND_TIMEOUT
+            }
+        },
+        Err(_) => DEFAULT_PARTITION_BIND_TIMEOUT,
+    }
+}
+
+/// Builds the provider bound to one non-seed partition.
+///
+/// Abstracted so tests can inject providers with scripted connection
+/// outcomes; production uses `LdapPartitionConnector`.
+pub trait PartitionConnector: Send + Sync {
+    fn build(&self, partition: &DomainPartition) -> Arc<dyn DirectoryProvider>;
+}
+
+/// Production connector: one `LdapDirectoryProvider` per partition, reusing
+/// the seed's authentication mode and TLS settings. The DC is located through
+/// the provider's DNS SRV resolution on the partition's DNS name.
+pub struct LdapPartitionConnector {
+    auth_mode: LdapAuthMode,
+    tls_config: LdapTlsConfig,
+}
+
+impl LdapPartitionConnector {
+    /// Creates a connector reusing the seed's auth mode and TLS settings.
+    pub fn new(auth_mode: LdapAuthMode, tls_config: LdapTlsConfig) -> Self {
+        Self {
+            auth_mode,
+            tls_config,
+        }
+    }
+}
+
+impl PartitionConnector for LdapPartitionConnector {
+    fn build(&self, partition: &DomainPartition) -> Arc<dyn DirectoryProvider> {
+        Arc::new(LdapDirectoryProvider::new_for_partition(
+            partition.dns_name.clone(),
+            self.auth_mode.clone(),
+            self.tls_config.clone(),
+        ))
+    }
+}
+
+/// Multi-partition directory provider. See the module docs.
+pub struct ForestProvider {
+    /// Every partition provider keyed by lowercase DNS name, seed included.
+    partitions: HashMap<String, Arc<dyn DirectoryProvider>>,
+    /// The provider used for the initial bind; the operator's own domain.
+    seed: Arc<dyn DirectoryProvider>,
+    seed_dns_name: String,
+    /// `rootDomainNamingContext` of the seed DC, when known.
+    forest_root_dn: Option<String>,
+    topology: ForestTopology,
+    /// Connection state of the non-seed partitions. The seed's state is read
+    /// live from the seed provider.
+    partition_status: Mutex<HashMap<String, ConnectionStatus>>,
+}
+
+impl ForestProvider {
+    /// Connects to the whole forest starting from an already-configured seed.
+    ///
+    /// The seed must be reachable: its `test_connection` failure is returned
+    /// as an error so the caller keeps the existing single-domain connection
+    /// error UX. Discovery failure is not fatal (the seed becomes the only
+    /// partition), and neither is a bind failure on any non-seed partition,
+    /// which is recorded in `partition_status` instead.
+    pub async fn connect(
+        seed: Arc<LdapDirectoryProvider>,
+        auth_mode: LdapAuthMode,
+        tls_config: LdapTlsConfig,
+    ) -> Result<Self> {
+        let reachable = seed
+            .test_connection()
+            .await
+            .context("Seed partition connection test failed")?;
+        if !reachable {
+            bail!(
+                "Seed partition unreachable ({})",
+                seed.last_connection_error()
+                    .unwrap_or_else(|| "unknown".to_string())
+            );
+        }
+        let seed_dyn: Arc<dyn DirectoryProvider> = seed.clone();
+        let topology = match seed.discover_forest().await {
+            Ok(topology) => topology,
+            Err(e) => {
+                tracing::warn!(
+                    error = %e,
+                    "Forest discovery failed, continuing with the seed partition only"
+                );
+                ForestTopology::synthesized_from(&*seed_dyn)
+            }
+        };
+        let seed_dns_name = resolve_seed_dns_name(&*seed_dyn, &topology);
+        let connector = LdapPartitionConnector::new(auth_mode, tls_config);
+        Ok(Self::assemble(
+            seed_dyn,
+            seed_dns_name,
+            seed.forest_root_dn(),
+            topology,
+            &connector,
+            partition_bind_timeout(),
+        )
+        .await)
+    }
+
+    /// Wraps a single provider as a one-partition forest. Used for demo mode
+    /// and as the fallback when the seed cannot be promoted to a real forest.
+    pub fn single_partition(provider: Arc<dyn DirectoryProvider>) -> Self {
+        let topology = ForestTopology::synthesized_from(&*provider);
+        let seed_dns_name = resolve_seed_dns_name(&*provider, &topology);
+        let mut partitions = HashMap::new();
+        partitions.insert(seed_dns_name.clone(), provider.clone());
+        Self {
+            partitions,
+            seed: provider,
+            seed_dns_name,
+            forest_root_dn: None,
+            topology,
+            partition_status: Mutex::new(HashMap::new()),
+        }
+    }
+
+    /// Assembles the forest from a reachable seed and a discovered topology.
+    ///
+    /// Non-seed partitions are bound concurrently, each bounded by
+    /// `bind_timeout`. The topology is truncated to `MAX_PARTITIONS` with the
+    /// seed kept first. Exposed publicly so tests can drive the assembly with a
+    /// scripted `PartitionConnector`.
+    pub async fn assemble(
+        seed: Arc<dyn DirectoryProvider>,
+        seed_dns_name: String,
+        forest_root_dn: Option<String>,
+        mut topology: ForestTopology,
+        connector: &dyn PartitionConnector,
+        bind_timeout: Duration,
+    ) -> Self {
+        let seed_dns_name = seed_dns_name.to_ascii_lowercase();
+        if topology.find_by_dns_name(&seed_dns_name).is_none() {
+            let mut synthesized = ForestTopology::synthesized_from(&*seed).partitions;
+            if synthesized.is_empty() {
+                synthesized.push(DomainPartition {
+                    distinguished_name: seed.base_dn().unwrap_or_default(),
+                    dns_name: seed_dns_name.clone(),
+                    netbios_name: None,
+                    default_dc_fqdn: seed.connected_host(),
+                });
+            }
+            topology.partitions.splice(0..0, synthesized);
+        }
+        // Stable sort: the seed partition moves to the front, others keep order.
+        topology
+            .partitions
+            .sort_by_key(|p| !p.dns_name.eq_ignore_ascii_case(&seed_dns_name));
+        if let Some(seed_partition) = topology.partitions.first_mut()
+            && seed_partition.default_dc_fqdn.is_none()
+        {
+            seed_partition.default_dc_fqdn = seed.connected_host();
+        }
+        if topology.partitions.len() > MAX_PARTITIONS {
+            tracing::warn!(
+                discovered = topology.partitions.len(),
+                cap = MAX_PARTITIONS,
+                "Forest exposes more partitions than the safety cap, truncating"
+            );
+            topology.partitions.truncate(MAX_PARTITIONS);
+        }
+
+        let mut partitions: HashMap<String, Arc<dyn DirectoryProvider>> = HashMap::new();
+        partitions.insert(seed_dns_name.clone(), seed.clone());
+        let mut statuses: HashMap<String, ConnectionStatus> = HashMap::new();
+
+        let mut binds = JoinSet::new();
+        for partition in topology
+            .partitions
+            .iter()
+            .filter(|p| !p.dns_name.eq_ignore_ascii_case(&seed_dns_name))
+        {
+            let provider = connector.build(partition);
+            let dns_name = partition.dns_name.to_ascii_lowercase();
+            binds.spawn(async move {
+                let outcome = tokio::time::timeout(bind_timeout, provider.test_connection()).await;
+                (dns_name, provider, outcome)
+            });
+        }
+        while let Some(joined) = binds.join_next().await {
+            let (dns_name, provider, outcome) = match joined {
+                Ok(result) => result,
+                Err(e) => {
+                    tracing::warn!(error = %e, "Partition bind task failed to complete");
+                    continue;
+                }
+            };
+            let status = match outcome {
+                Ok(Ok(true)) => ConnectionStatus::Connected,
+                Ok(Ok(false)) => ConnectionStatus::Unreachable(
+                    provider
+                        .last_connection_error()
+                        .unwrap_or_else(|| "unknown".to_string()),
+                ),
+                Ok(Err(e)) => {
+                    tracing::warn!(partition = %dns_name, error = %e, "Partition bind errored");
+                    ConnectionStatus::Unreachable("unknown".to_string())
+                }
+                Err(_elapsed) => ConnectionStatus::Unreachable("timeout".to_string()),
+            };
+            match &status {
+                ConnectionStatus::Connected => {
+                    tracing::info!(partition = %dns_name, "Forest partition connected");
+                }
+                other => {
+                    tracing::warn!(partition = %dns_name, status = ?other, "Forest partition unreachable");
+                }
+            }
+            statuses.insert(dns_name.clone(), status);
+            partitions.insert(dns_name, provider);
+        }
+
+        Self {
+            partitions,
+            seed,
+            seed_dns_name,
+            forest_root_dn,
+            topology,
+            partition_status: Mutex::new(statuses),
+        }
+    }
+
+    /// Topology built at connect time, seed partition first.
+    pub fn topology(&self) -> &ForestTopology {
+        &self.topology
+    }
+
+    /// Lowercase DNS name of the operator's own partition.
+    pub fn seed_dns_name(&self) -> &str {
+        &self.seed_dns_name
+    }
+
+    /// The provider bound to the operator's own partition.
+    pub fn seed(&self) -> Arc<dyn DirectoryProvider> {
+        self.seed.clone()
+    }
+
+    /// The provider bound to the partition named `dns_name`, if discovered.
+    pub fn partition(&self, dns_name: &str) -> Option<Arc<dyn DirectoryProvider>> {
+        self.partitions.get(&dns_name.to_ascii_lowercase()).cloned()
+    }
+
+    /// Connection state of every partition, seed first then sorted by name.
+    /// The seed's state is read live; non-seed states reflect the last bind
+    /// attempt recorded in this provider.
+    pub fn partition_status(&self) -> Vec<(String, ConnectionStatus)> {
+        let seed_status = if self.seed.is_connected() {
+            ConnectionStatus::Connected
+        } else {
+            ConnectionStatus::Unreachable(
+                self.seed
+                    .last_connection_error()
+                    .unwrap_or_else(|| "unknown".to_string()),
+            )
+        };
+        let mut statuses = vec![(self.seed_dns_name.clone(), seed_status)];
+        let mut others: Vec<(String, ConnectionStatus)> = self
+            .partition_status
+            .lock()
+            .expect("partition_status lock poisoned")
+            .iter()
+            .map(|(dns, status)| (dns.clone(), status.clone()))
+            .collect();
+        others.sort_by(|a, b| a.0.cmp(&b.0));
+        statuses.extend(others);
+        statuses
+    }
+}
+
+/// Picks the seed partition's DNS name: the topology entry matching the seed
+/// base DN, else the DNS suffix derived from that DN, else the seed's reported
+/// domain name (which may be a bare host for simple-bind configurations).
+fn resolve_seed_dns_name(seed: &dyn DirectoryProvider, topology: &ForestTopology) -> String {
+    if let Some(base_dn) = seed.base_dn() {
+        if let Some(partition) = topology.find_by_dn(&base_dn) {
+            return partition.dns_name.to_ascii_lowercase();
+        }
+        if let Some(dns_name) = dns_domain_from_dn(&base_dn) {
+            return dns_name;
+        }
+    }
+    seed.domain_name()
+        .map(|d| d.to_ascii_lowercase())
+        .unwrap_or_else(|| "unknown".to_string())
+}
+
+#[async_trait]
+impl DirectoryProvider for ForestProvider {
+    // seed only: the UI connection state tracks the operator's own domain;
+    // non-seed states surface through `partition_status()`.
+    fn is_connected(&self) -> bool {
+        self.seed.is_connected()
+    }
+
+    // seed only
+    fn domain_name(&self) -> Option<&str> {
+        self.seed.domain_name()
+    }
+
+    // seed only
+    fn connected_host(&self) -> Option<String> {
+        self.seed.connected_host()
+    }
+
+    // seed only: auth state is per bind, the identity is reused per partition
+    fn simple_bind_credentials(&self) -> Option<(String, String)> {
+        self.seed.simple_bind_credentials()
+    }
+
+    // forest root partition: callers query `CN=Configuration,<base_dn>`, which
+    // only exists under the forest root's naming context. Falls back to the
+    // seed base DN when the rootDSE did not expose `rootDomainNamingContext`.
+    fn base_dn(&self) -> Option<String> {
+        self.forest_root_dn.clone().or_else(|| self.seed.base_dn())
+    }
+
+    // seed only
+    async fn test_connection(&self) -> Result<bool> {
+        self.seed.test_connection().await
+    }
+
+    // seed only
+    fn last_connection_error(&self) -> Option<String> {
+        self.seed.last_connection_error()
+    }
+
+    // OR across partitions: truncated if any partition truncated
+    fn last_search_was_truncated(&self) -> bool {
+        self.partitions
+            .values()
+            .any(|p| p.last_search_was_truncated())
+    }
+
+    // seed only: UI hint scoped to the bound DC
+    fn is_connected_to_rodc(&self) -> bool {
+        self.seed.is_connected_to_rodc()
+    }
+
+    // fan-out + merge (Story 15.3); seed only until then
+    async fn search_users(&self, filter: &str, max_results: usize) -> Result<Vec<DirectoryEntry>> {
+        self.seed.search_users(filter, max_results).await
+    }
+
+    // fan-out + merge (Story 15.3); seed only until then
+    async fn search_computers(
+        &self,
+        filter: &str,
+        max_results: usize,
+    ) -> Result<Vec<DirectoryEntry>> {
+        self.seed.search_computers(filter, max_results).await
+    }
+
+    // fan-out + merge (Story 15.3); seed only until then
+    async fn search_groups(&self, filter: &str, max_results: usize) -> Result<Vec<DirectoryEntry>> {
+        self.seed.search_groups(filter, max_results).await
+    }
+
+    // fan-out, first match wins with the seed first (Story 15.3); seed only until then
+    async fn get_user_by_identity(&self, sam_account_name: &str) -> Result<Option<DirectoryEntry>> {
+        self.seed.get_user_by_identity(sam_account_name).await
+    }
+
+    // route by group DN (Story 15.4); seed only until then
+    async fn get_group_members(
+        &self,
+        group_dn: &str,
+        max_results: usize,
+    ) -> Result<Vec<DirectoryEntry>> {
+        self.seed.get_group_members(group_dn, max_results).await
+    }
+
+    // fan-out + merge (Story 15.2); seed only until then
+    async fn browse_users(&self, max_results: usize) -> Result<Vec<DirectoryEntry>> {
+        self.seed.browse_users(max_results).await
+    }
+
+    // fan-out + merge (Story 15.2); seed only until then
+    async fn browse_computers(&self, max_results: usize) -> Result<Vec<DirectoryEntry>> {
+        self.seed.browse_computers(max_results).await
+    }
+
+    // seed only: the operator's own session
+    async fn get_current_user_groups(&self) -> Result<Vec<String>> {
+        self.seed.get_current_user_groups().await
+    }
+
+    // route by user DN (Story 15.5); seed only until then
+    async fn reset_password(
+        &self,
+        user_dn: &str,
+        new_password: &str,
+        must_change_at_next_logon: bool,
+    ) -> Result<()> {
+        self.seed
+            .reset_password(user_dn, new_password, must_change_at_next_logon)
+            .await
+    }
+
+    // route by user DN (Story 15.5); seed only until then
+    async fn unlock_account(&self, user_dn: &str) -> Result<()> {
+        self.seed.unlock_account(user_dn).await
+    }
+
+    // route by user DN (Story 15.5); seed only until then
+    async fn enable_account(&self, user_dn: &str) -> Result<()> {
+        self.seed.enable_account(user_dn).await
+    }
+
+    // route by user DN (Story 15.5); seed only until then
+    async fn disable_account(&self, user_dn: &str) -> Result<()> {
+        self.seed.disable_account(user_dn).await
+    }
+
+    // route by user DN (Story 15.5); seed only until then
+    async fn clear_user_account_control_bits(
+        &self,
+        user_dn: &str,
+        bits_to_clear: u32,
+    ) -> Result<(u32, u32)> {
+        self.seed
+            .clear_user_account_control_bits(user_dn, bits_to_clear)
+            .await
+    }
+
+    // route by user DN (Story 15.4); seed only until then
+    async fn get_user_account_control(&self, user_dn: &str) -> Result<u32> {
+        self.seed.get_user_account_control(user_dn).await
+    }
+
+    // route by user DN (Story 15.4); seed only until then
+    async fn get_user_spns(&self, user_dn: &str) -> Result<Vec<String>> {
+        self.seed.get_user_spns(user_dn).await
+    }
+
+    // route by user DN (Story 15.4); seed only until then
+    async fn get_cannot_change_password(&self, user_dn: &str) -> Result<bool> {
+        self.seed.get_cannot_change_password(user_dn).await
+    }
+
+    // route by user DN (Story 15.5); seed only until then
+    async fn set_password_flags(
+        &self,
+        user_dn: &str,
+        password_never_expires: bool,
+        user_cannot_change_password: bool,
+    ) -> Result<()> {
+        self.seed
+            .set_password_flags(user_dn, password_never_expires, user_cannot_change_password)
+            .await
+    }
+
+    // route by group DN (Story 15.5 group-membership rule); seed only until then
+    async fn add_user_to_group(&self, user_dn: &str, group_dn: &str) -> Result<()> {
+        self.seed.add_user_to_group(user_dn, group_dn).await
+    }
+
+    // route by object DN (Story 15.4); seed only until then
+    async fn get_replication_metadata(&self, object_dn: &str) -> Result<Option<String>> {
+        self.seed.get_replication_metadata(object_dn).await
+    }
+
+    // route by object DN (Story 15.4); seed only until then
+    async fn get_replication_value_metadata(&self, object_dn: &str) -> Result<Option<String>> {
+        self.seed.get_replication_value_metadata(object_dn).await
+    }
+
+    // route by user DN (Story 15.4); seed only until then
+    async fn get_nested_groups(&self, user_dn: &str) -> Result<Vec<String>> {
+        self.seed.get_nested_groups(user_dn).await
+    }
+
+    // fan-out + merge by partition (Story 15.2); seed only until then
+    async fn get_ou_tree(&self) -> Result<Vec<OUNode>> {
+        self.seed.get_ou_tree().await
+    }
+
+    // fan-out + merge (Story 15.2); seed only until then
+    async fn browse_groups(&self, max_results: usize) -> Result<Vec<DirectoryEntry>> {
+        self.seed.browse_groups(max_results).await
+    }
+
+    // route by group DN (Story 15.5); seed only until then
+    async fn remove_group_member(&self, group_dn: &str, member_dn: &str) -> Result<()> {
+        self.seed.remove_group_member(group_dn, member_dn).await
+    }
+
+    // route by object DN (Story 15.5); seed only until then
+    async fn delete_object(&self, dn: &str) -> Result<()> {
+        self.seed.delete_object(dn).await
+    }
+
+    // route by parent OU DN (Story 15.5); seed only until then
+    async fn create_group(
+        &self,
+        name: &str,
+        container_dn: &str,
+        scope: &str,
+        category: &str,
+        description: &str,
+    ) -> Result<String> {
+        self.seed
+            .create_group(name, container_dn, scope, category, description)
+            .await
+    }
+
+    // route by source DN, same partition only (Story 15.5); seed only until then
+    async fn move_object(&self, object_dn: &str, target_container_dn: &str) -> Result<()> {
+        self.seed.move_object(object_dn, target_container_dn).await
+    }
+
+    // route by group DN (Story 15.5); seed only until then
+    async fn update_managed_by(&self, group_dn: &str, manager_dn: &str) -> Result<()> {
+        self.seed.update_managed_by(group_dn, manager_dn).await
+    }
+
+    // route by parent OU DN (Story 15.5); seed only until then
+    async fn create_user(
+        &self,
+        cn: &str,
+        container_dn: &str,
+        sam_account_name: &str,
+        password: &str,
+        attributes: &std::collections::HashMap<String, Vec<String>>,
+    ) -> Result<String> {
+        self.seed
+            .create_user(cn, container_dn, sam_account_name, password, attributes)
+            .await
+    }
+
+    // route by object DN (Story 15.4); seed only until then
+    async fn get_all_attributes(
+        &self,
+        dn: &str,
+    ) -> Result<std::collections::HashMap<String, Vec<String>>> {
+        self.seed.get_all_attributes(dn).await
+    }
+
+    // route by object DN (Story 15.5); seed only until then
+    async fn modify_attribute(
+        &self,
+        dn: &str,
+        attribute_name: &str,
+        values: &[String],
+    ) -> Result<()> {
+        self.seed.modify_attribute(dn, attribute_name, values).await
+    }
+
+    // seed only
+    fn authenticated_user(&self) -> Option<String> {
+        self.seed.authenticated_user()
+    }
+
+    // per partition (Story 15.5 permission gate); seed only until then
+    async fn probe_effective_permissions(&self) -> Result<(bool, bool, bool)> {
+        self.seed.probe_effective_permissions().await
+    }
+
+    // seed only: the schema partition is forest-shared
+    async fn get_schema_attributes(&self) -> Result<Vec<String>> {
+        self.seed.get_schema_attributes().await
+    }
+
+    // fan-out + merge (Story 15.2); seed only until then
+    async fn browse_contacts(&self, max_results: usize) -> Result<Vec<DirectoryEntry>> {
+        self.seed.browse_contacts(max_results).await
+    }
+
+    // fan-out + merge (Story 15.2); seed only until then
+    async fn browse_printers(&self, max_results: usize) -> Result<Vec<DirectoryEntry>> {
+        self.seed.browse_printers(max_results).await
+    }
+
+    // seed only: forest-level feature flag
+    async fn is_recycle_bin_enabled(&self) -> Result<bool> {
+        self.seed.is_recycle_bin_enabled().await
+    }
+
+    // fan-out + merge (Story 15.2); seed only until then
+    async fn get_deleted_objects(&self) -> Result<Vec<DeletedObject>> {
+        self.seed.get_deleted_objects().await
+    }
+
+    // route by the source partition recorded in the snapshot (Story 15.5); seed only until then
+    async fn restore_deleted_object(&self, deleted_dn: &str, target_ou_dn: &str) -> Result<()> {
+        self.seed
+            .restore_deleted_object(deleted_dn, target_ou_dn)
+            .await
+    }
+
+    // fan-out + merge (Story 15.3); seed only until then
+    async fn search_contacts(&self, filter: &str, max_results: usize) -> Result<Vec<ContactInfo>> {
+        self.seed.search_contacts(filter, max_results).await
+    }
+
+    // fan-out + merge (Story 15.3); seed only until then
+    async fn search_printers(&self, filter: &str, max_results: usize) -> Result<Vec<PrinterInfo>> {
+        self.seed.search_printers(filter, max_results).await
+    }
+
+    // route by parent OU DN (Story 15.5); seed only until then
+    async fn create_contact(
+        &self,
+        container_dn: &str,
+        attrs: &HashMap<String, String>,
+    ) -> Result<String> {
+        self.seed.create_contact(container_dn, attrs).await
+    }
+
+    // route by object DN (Story 15.5); seed only until then
+    async fn update_contact(&self, dn: &str, attrs: &HashMap<String, String>) -> Result<()> {
+        self.seed.update_contact(dn, attrs).await
+    }
+
+    // route by object DN (Story 15.5); seed only until then
+    async fn delete_contact(&self, dn: &str) -> Result<()> {
+        self.seed.delete_contact(dn).await
+    }
+
+    // route by parent OU DN (Story 15.5); seed only until then
+    async fn create_printer(
+        &self,
+        container_dn: &str,
+        attrs: &HashMap<String, String>,
+    ) -> Result<String> {
+        self.seed.create_printer(container_dn, attrs).await
+    }
+
+    // route by object DN (Story 15.5); seed only until then
+    async fn update_printer(&self, dn: &str, attrs: &HashMap<String, String>) -> Result<()> {
+        self.seed.update_printer(dn, attrs).await
+    }
+
+    // route by object DN (Story 15.5); seed only until then
+    async fn delete_printer(&self, dn: &str) -> Result<()> {
+        self.seed.delete_printer(dn).await
+    }
+
+    // route by user DN (Story 15.4); seed only until then
+    async fn get_thumbnail_photo(&self, user_dn: &str) -> Result<Option<String>> {
+        self.seed.get_thumbnail_photo(user_dn).await
+    }
+
+    // route by user DN (Story 15.5); seed only until then
+    async fn set_thumbnail_photo(&self, user_dn: &str, photo_base64: &str) -> Result<()> {
+        self.seed.set_thumbnail_photo(user_dn, photo_base64).await
+    }
+
+    // route by user DN (Story 15.5); seed only until then
+    async fn remove_thumbnail_photo(&self, user_dn: &str) -> Result<()> {
+        self.seed.remove_thumbnail_photo(user_dn).await
+    }
+
+    // configuration partition only: forest-shared, reachable through the seed
+    async fn search_configuration(
+        &self,
+        search_base: &str,
+        filter: &str,
+    ) -> Result<Vec<DirectoryEntry>> {
+        self.seed.search_configuration(search_base, filter).await
+    }
+
+    // route by object DN (Story 15.4); seed only until then
+    async fn read_entry(&self, dn: &str) -> Result<Option<DirectoryEntry>> {
+        self.seed.read_entry(dn).await
+    }
+
+    // fan-out, first match wins (RID is partition-scoped); seed only until then
+    async fn resolve_group_by_rid(&self, rid: u32) -> Result<Option<DirectoryEntry>> {
+        self.seed.resolve_group_by_rid(rid).await
+    }
+
+    // seed only: returns the topology built at connect time
+    async fn discover_forest(&self) -> Result<ForestTopology> {
+        Ok(self.topology.clone())
+    }
+}
+
+#[allow(clippy::unwrap_used)]
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::services::directory::tests::MockDirectoryProvider;
+    use std::time::Instant;
+
+    fn crossref_entry(
+        nc_name: &str,
+        dns_root: &str,
+        netbios: &str,
+        system_flags: i64,
+    ) -> DirectoryEntry {
+        let mut entry = DirectoryEntry::new(format!(
+            "CN={},CN=Partitions,CN=Configuration,DC=corp,DC=example,DC=com",
+            netbios
+        ));
+        entry
+            .attributes
+            .insert("nCName".to_string(), vec![nc_name.to_string()]);
+        if !dns_root.is_empty() {
+            entry
+                .attributes
+                .insert("dnsRoot".to_string(), vec![dns_root.to_string()]);
+        }
+        if !netbios.is_empty() {
+            entry
+                .attributes
+                .insert("nETBIOSName".to_string(), vec![netbios.to_string()]);
+        }
+        entry
+            .attributes
+            .insert("systemFlags".to_string(), vec![system_flags.to_string()]);
+        entry
+    }
+
+    fn stub_forest_entries() -> Vec<DirectoryEntry> {
+        vec![
+            crossref_entry("DC=corp,DC=example,DC=com", "corp.example.com", "CORP", 3),
+            crossref_entry(
+                "DC=eu,DC=corp,DC=example,DC=com",
+                "eu.corp.example.com",
+                "CORPEU",
+                3,
+            ),
+            crossref_entry(
+                "CN=Schema,CN=Configuration,DC=corp,DC=example,DC=com",
+                "",
+                "",
+                1,
+            ),
+            crossref_entry("CN=Configuration,DC=corp,DC=example,DC=com", "", "", 1),
+            crossref_entry("DC=ForestDnsZones,DC=corp,DC=example,DC=com", "", "", 5),
+            crossref_entry("DC=DomainDnsZones,DC=corp,DC=example,DC=com", "", "", 5),
+        ]
+    }
+
+    struct StubConnector {
+        providers: HashMap<String, Arc<dyn DirectoryProvider>>,
+    }
+
+    impl StubConnector {
+        fn new() -> Self {
+            Self {
+                providers: HashMap::new(),
+            }
+        }
+
+        fn with(mut self, dns_name: &str, provider: MockDirectoryProvider) -> Self {
+            self.providers
+                .insert(dns_name.to_string(), Arc::new(provider));
+            self
+        }
+    }
+
+    impl PartitionConnector for StubConnector {
+        fn build(&self, partition: &DomainPartition) -> Arc<dyn DirectoryProvider> {
+            self.providers
+                .get(&partition.dns_name)
+                .cloned()
+                .unwrap_or_else(|| Arc::new(MockDirectoryProvider::new()))
+        }
+    }
+
+    fn partition(dns_name: &str) -> DomainPartition {
+        DomainPartition {
+            distinguished_name: format!(
+                "DC={}",
+                dns_name.split('.').collect::<Vec<_>>().join(",DC=")
+            ),
+            dns_name: dns_name.to_string(),
+            netbios_name: None,
+            default_dc_fqdn: None,
+        }
+    }
+
+    fn seed_mock() -> Arc<dyn DirectoryProvider> {
+        Arc::new(MockDirectoryProvider::new())
+    }
+
+    // AC #8a: stub crossRef list parses into the two domain partitions, in order.
+    #[test]
+    fn parses_domain_partitions_from_crossref_entries() {
+        let parsed = parse_partitions_from_entries(&stub_forest_entries()).unwrap();
+        assert_eq!(parsed.len(), 2);
+        assert_eq!(parsed[0].dns_name, "corp.example.com");
+        assert_eq!(parsed[0].distinguished_name, "DC=corp,DC=example,DC=com");
+        assert_eq!(parsed[0].netbios_name.as_deref(), Some("CORP"));
+        assert_eq!(parsed[1].dns_name, "eu.corp.example.com");
+        assert_eq!(parsed[1].netbios_name.as_deref(), Some("CORPEU"));
+        assert!(parsed.iter().all(|p| p.default_dc_fqdn.is_none()));
+    }
+
+    // AC #8b: only entries carrying FLAG_CR_NTDS_DOMAIN survive the bitwise filter.
+    #[test]
+    fn bitwise_filter_keeps_only_ntds_domain_crossrefs() {
+        let entries = vec![
+            crossref_entry("DC=none,DC=example,DC=com", "none.example.com", "NONE", 0),
+            crossref_entry("DC=ntds,DC=example,DC=com", "ntds.example.com", "NTDS", 2),
+            crossref_entry("DC=both,DC=example,DC=com", "both.example.com", "BOTH", 3),
+            crossref_entry(
+                "DC=writable,DC=example,DC=com",
+                "writable.example.com",
+                "WRITABLE",
+                1,
+            ),
+        ];
+        let parsed = parse_partitions_from_entries(&entries).unwrap();
+        let names: Vec<&str> = parsed.iter().map(|p| p.dns_name.as_str()).collect();
+        assert_eq!(names, vec!["ntds.example.com", "both.example.com"]);
+    }
+
+    #[test]
+    fn parser_rejects_entry_sets_without_domain_partitions() {
+        let entries = vec![crossref_entry(
+            "CN=Schema,CN=Configuration,DC=corp,DC=example,DC=com",
+            "",
+            "",
+            1,
+        )];
+        let err = parse_partitions_from_entries(&entries).unwrap_err();
+        assert!(err.to_string().contains("No domain partitions"));
+    }
+
+    #[test]
+    fn parser_derives_dns_name_from_nc_name_when_dns_root_missing() {
+        let mut entry = crossref_entry("DC=Fallback,DC=Example,DC=Com", "", "FB", 2);
+        entry.attributes.remove("dnsRoot");
+        let parsed = parse_partitions_from_entries(&[entry]).unwrap();
+        assert_eq!(parsed[0].dns_name, "fallback.example.com");
+    }
+
+    #[test]
+    fn parser_matches_attribute_names_case_insensitively() {
+        let mut entry = DirectoryEntry::new("CN=CORP,CN=Partitions".to_string());
+        entry
+            .attributes
+            .insert("ncname".to_string(), vec!["DC=corp,DC=local".to_string()]);
+        entry
+            .attributes
+            .insert("DNSROOT".to_string(), vec!["Corp.Local".to_string()]);
+        entry
+            .attributes
+            .insert("SYSTEMFLAGS".to_string(), vec!["3".to_string()]);
+        let parsed = parse_partitions_from_entries(&[entry]).unwrap();
+        assert_eq!(parsed[0].dns_name, "corp.local");
+        assert_eq!(parsed[0].distinguished_name, "DC=corp,DC=local");
+    }
+
+    #[test]
+    fn dns_domain_from_dn_handles_case_whitespace_and_escaped_commas() {
+        assert_eq!(
+            dns_domain_from_dn("CN=jdoe,OU=Users,DC=sub,DC=racine,DC=dmi").as_deref(),
+            Some("sub.racine.dmi")
+        );
+        assert_eq!(
+            dns_domain_from_dn(" cn=Doe\\, John , ou=Users , dc=Corp , DC=Example , dc=COM")
+                .as_deref(),
+            Some("corp.example.com")
+        );
+        assert_eq!(
+            dns_domain_from_dn("CN=Configuration,DC=root,DC=local").as_deref(),
+            Some("root.local")
+        );
+        assert_eq!(dns_domain_from_dn("CN=Schema,CN=Configuration"), None);
+        assert_eq!(dns_domain_from_dn(""), None);
+        assert_eq!(dns_domain_from_dn("DC=,DC=local").as_deref(), Some("local"));
+    }
+
+    #[test]
+    fn split_dn_components_keeps_escaped_commas_inside_a_component() {
+        let parts = split_dn_components("CN=Doe\\, John,OU=Sales,DC=corp,DC=local");
+        assert_eq!(
+            parts,
+            vec!["CN=Doe\\, John", "OU=Sales", "DC=corp", "DC=local"]
+        );
+    }
+
+    #[test]
+    fn synthesized_topology_uses_provider_base_dn() {
+        let mock = MockDirectoryProvider::new();
+        let topology = ForestTopology::synthesized_from(&mock);
+        assert_eq!(topology.partitions.len(), 1);
+        assert_eq!(
+            topology.partitions[0].distinguished_name,
+            mock.base_dn().unwrap()
+        );
+        assert_eq!(
+            topology.partitions[0].dns_name,
+            dns_domain_from_dn(&mock.base_dn().unwrap()).unwrap()
+        );
+        assert!(topology.is_single_domain());
+    }
+
+    #[test]
+    fn synthesized_topology_is_empty_without_base_dn() {
+        let mock = MockDirectoryProvider::disconnected();
+        assert!(
+            ForestTopology::synthesized_from(&mock)
+                .partitions
+                .is_empty()
+        );
+    }
+
+    #[tokio::test]
+    async fn trait_default_discover_forest_synthesizes_single_partition() {
+        let mock = MockDirectoryProvider::new();
+        let topology = mock.discover_forest().await.unwrap();
+        assert_eq!(topology.partitions.len(), 1);
+        assert_eq!(topology.partitions[0].dns_name, "example.com");
+    }
+
+    #[tokio::test]
+    async fn trait_default_discover_forest_fails_without_base_dn() {
+        let mock = MockDirectoryProvider::disconnected();
+        assert!(mock.discover_forest().await.is_err());
+    }
+
+    #[test]
+    fn connection_status_serializes_adjacently_tagged() {
+        let connected = serde_json::to_value(ConnectionStatus::Connected).unwrap();
+        assert_eq!(connected, serde_json::json!({ "state": "connected" }));
+        let unreachable =
+            serde_json::to_value(ConnectionStatus::Unreachable("timeout".into())).unwrap();
+        assert_eq!(
+            unreachable,
+            serde_json::json!({ "state": "unreachable", "reason": "timeout" })
+        );
+        let round_trip: ConnectionStatus = serde_json::from_value(unreachable).unwrap();
+        assert_eq!(round_trip, ConnectionStatus::Unreachable("timeout".into()));
+    }
+
+    #[test]
+    fn partition_bind_timeout_defaults_to_three_seconds() {
+        // The env override is exercised through `assemble`'s explicit timeout
+        // parameter; here only the default path is asserted to avoid mutating
+        // process-wide environment in parallel tests.
+        if std::env::var(PARTITION_BIND_TIMEOUT_ENV).is_err() {
+            assert_eq!(partition_bind_timeout(), DEFAULT_PARTITION_BIND_TIMEOUT);
+        }
+    }
+
+    // AC #8c: a non-seed partition that fails to bind is recorded as Unreachable
+    // with the provider's classification, while healthy partitions connect.
+    #[tokio::test]
+    async fn partition_status_records_failed_non_seed_bind() {
+        let topology = ForestTopology {
+            partitions: vec![
+                partition("example.com"),
+                partition("eu.example.com"),
+                partition("apac.example.com"),
+            ],
+        };
+        let connector = StubConnector::new()
+            .with("eu.example.com", MockDirectoryProvider::new())
+            .with(
+                "apac.example.com",
+                MockDirectoryProvider::new()
+                    .with_connected(false)
+                    .with_connection_error("network"),
+            );
+        let forest = ForestProvider::assemble(
+            seed_mock(),
+            "example.com".to_string(),
+            None,
+            topology,
+            &connector,
+            Duration::from_secs(1),
+        )
+        .await;
+
+        let status = forest.partition_status();
+        assert_eq!(
+            status[0],
+            ("example.com".to_string(), ConnectionStatus::Connected)
+        );
+        assert_eq!(
+            status[1],
+            (
+                "apac.example.com".to_string(),
+                ConnectionStatus::Unreachable("network".to_string())
+            )
+        );
+        assert_eq!(
+            status[2],
+            ("eu.example.com".to_string(), ConnectionStatus::Connected)
+        );
+        assert!(forest.partition("apac.example.com").is_some());
+        assert!(forest.partition("EU.example.com").is_some());
+        assert!(forest.partition("missing.example.com").is_none());
+        assert!(forest.is_connected());
+    }
+
+    #[tokio::test]
+    async fn partition_status_records_bind_errors_as_unknown() {
+        let topology = ForestTopology {
+            partitions: vec![partition("example.com"), partition("eu.example.com")],
+        };
+        let connector = StubConnector::new().with(
+            "eu.example.com",
+            MockDirectoryProvider::new().with_failure(),
+        );
+        let forest = ForestProvider::assemble(
+            seed_mock(),
+            "example.com".to_string(),
+            None,
+            topology,
+            &connector,
+            Duration::from_secs(1),
+        )
+        .await;
+        assert_eq!(
+            forest.partition_status()[1].1,
+            ConnectionStatus::Unreachable("unknown".to_string())
+        );
+    }
+
+    // AC #11: a slow non-seed bind times out without delaying its siblings.
+    #[tokio::test]
+    async fn slow_partition_bind_times_out_without_blocking_others() {
+        let topology = ForestTopology {
+            partitions: vec![
+                partition("example.com"),
+                partition("slow.example.com"),
+                partition("fast.example.com"),
+            ],
+        };
+        let connector = StubConnector::new()
+            .with(
+                "slow.example.com",
+                MockDirectoryProvider::new().with_connect_delay(Duration::from_secs(5)),
+            )
+            .with("fast.example.com", MockDirectoryProvider::new());
+        let started = Instant::now();
+        let forest = ForestProvider::assemble(
+            seed_mock(),
+            "example.com".to_string(),
+            None,
+            topology,
+            &connector,
+            Duration::from_millis(150),
+        )
+        .await;
+        assert!(
+            started.elapsed() < Duration::from_secs(2),
+            "assembly must be bounded by the per-partition timeout"
+        );
+        let status: HashMap<String, ConnectionStatus> =
+            forest.partition_status().into_iter().collect();
+        assert_eq!(
+            status["slow.example.com"],
+            ConnectionStatus::Unreachable("timeout".to_string())
+        );
+        assert_eq!(status["fast.example.com"], ConnectionStatus::Connected);
+    }
+
+    // AC #11: discovery output is truncated to MAX_PARTITIONS with the seed first.
+    #[tokio::test]
+    async fn assembly_truncates_to_partition_cap_with_seed_first() {
+        let mut partitions: Vec<DomainPartition> = (0..60)
+            .map(|i| partition(&format!("d{i:02}.example.com")))
+            .collect();
+        partitions.push(partition("example.com"));
+        let topology = ForestTopology { partitions };
+        let forest = ForestProvider::assemble(
+            seed_mock(),
+            "example.com".to_string(),
+            None,
+            topology,
+            &StubConnector::new(),
+            Duration::from_secs(1),
+        )
+        .await;
+        assert_eq!(forest.topology().partitions.len(), MAX_PARTITIONS);
+        assert_eq!(forest.topology().partitions[0].dns_name, "example.com");
+        assert_eq!(forest.topology().partitions[1].dns_name, "d00.example.com");
+        assert_eq!(forest.partition_status().len(), MAX_PARTITIONS);
+        assert!(forest.partition("d59.example.com").is_none());
+    }
+
+    #[tokio::test]
+    async fn assembly_inserts_seed_partition_when_discovery_omits_it() {
+        let topology = ForestTopology {
+            partitions: vec![partition("other.example.com")],
+        };
+        let forest = ForestProvider::assemble(
+            seed_mock(),
+            "EXAMPLE.COM".to_string(),
+            Some("DC=example,DC=com".to_string()),
+            topology,
+            &StubConnector::new(),
+            Duration::from_secs(1),
+        )
+        .await;
+        assert_eq!(forest.seed_dns_name(), "example.com");
+        assert_eq!(forest.topology().partitions[0].dns_name, "example.com");
+        assert_eq!(
+            forest.topology().partitions[1].dns_name,
+            "other.example.com"
+        );
+        assert_eq!(forest.base_dn().as_deref(), Some("DC=example,DC=com"));
+    }
+
+    #[test]
+    fn single_partition_forest_wraps_provider_identity() {
+        let forest = ForestProvider::single_partition(seed_mock());
+        assert_eq!(forest.seed_dns_name(), "example.com");
+        assert!(forest.topology().is_single_domain());
+        assert_eq!(forest.partition_status().len(), 1);
+        // `domain_name` delegates to the seed verbatim (status bar identity).
+        assert_eq!(forest.domain_name(), Some("EXAMPLE.COM"));
+        assert_eq!(forest.base_dn().as_deref(), Some("DC=example,DC=com"));
+    }
+
+    #[test]
+    fn seed_status_reflects_live_seed_connection_state() {
+        let seed = MockDirectoryProvider::disconnected();
+        let forest = ForestProvider::single_partition(Arc::new(seed));
+        assert!(!forest.is_connected());
+        assert_eq!(forest.seed_dns_name(), "unknown");
+        assert!(matches!(
+            forest.partition_status()[0].1,
+            ConnectionStatus::Unreachable(_)
+        ));
+    }
+
+    #[tokio::test]
+    async fn delegating_methods_target_the_seed() {
+        let user = DirectoryEntry::new("CN=jdoe,DC=example,DC=com".to_string());
+        let seed = MockDirectoryProvider::new().with_users(vec![user.clone()]);
+        let forest = ForestProvider::single_partition(Arc::new(seed));
+        let found = forest.search_users("jdoe", 10).await.unwrap();
+        assert_eq!(found, vec![user]);
+        assert!(forest.test_connection().await.unwrap());
+        assert_eq!(forest.discover_forest().await.unwrap(), *forest.topology());
+        assert!(!forest.last_search_was_truncated());
+    }
+}

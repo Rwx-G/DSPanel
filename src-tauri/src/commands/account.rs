@@ -1065,6 +1065,7 @@ mod tests {
         let mut attrs = HashMap::new();
         attrs.insert("mail".to_string(), vec![format!("{}@example.com", sam)]);
         DirectoryEntry {
+            partition_dns_name: None,
             distinguished_name: format!("CN={},OU=Users,DC=example,DC=com", display),
             sam_account_name: Some(sam.to_string()),
             display_name: Some(display.to_string()),
@@ -1115,6 +1116,7 @@ mod tests {
             groups.iter().map(|g| g.to_string()).collect(),
         );
         DirectoryEntry {
+            partition_dns_name: None,
             distinguished_name: format!("CN={},OU=Users,DC=example,DC=com", display),
             sam_account_name: Some(sam.to_string()),
             display_name: Some(display.to_string()),

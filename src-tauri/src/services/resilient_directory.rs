@@ -746,6 +746,7 @@ mod tests {
 
     fn make_entry(sam: &str) -> DirectoryEntry {
         DirectoryEntry {
+            partition_dns_name: None,
             distinguished_name: format!("CN={},DC=test", sam),
             sam_account_name: Some(sam.to_string()),
             display_name: Some(sam.to_string()),
@@ -1040,6 +1041,7 @@ mod tests {
     #[tokio::test]
     async fn test_resilient_search_computers() {
         let computers = vec![DirectoryEntry {
+            partition_dns_name: None,
             distinguished_name: "CN=WS01,DC=test".to_string(),
             sam_account_name: Some("WS01$".to_string()),
             display_name: Some("WS01".to_string()),
@@ -1107,6 +1109,7 @@ mod tests {
     #[tokio::test]
     async fn test_resilient_search_groups() {
         let groups = vec![DirectoryEntry {
+            partition_dns_name: None,
             distinguished_name: "CN=Admins,DC=test".to_string(),
             sam_account_name: Some("Admins".to_string()),
             display_name: Some("Admins".to_string()),
@@ -1175,6 +1178,7 @@ mod tests {
     #[tokio::test]
     async fn test_resilient_browse_computers() {
         let computers = vec![DirectoryEntry {
+            partition_dns_name: None,
             distinguished_name: "CN=WS01,DC=test".to_string(),
             sam_account_name: Some("WS01$".to_string()),
             display_name: Some("WS01".to_string()),
@@ -1601,6 +1605,7 @@ mod tests {
     #[tokio::test]
     async fn test_resilient_browse_groups() {
         let groups = vec![DirectoryEntry {
+            partition_dns_name: None,
             distinguished_name: "CN=Admins,DC=test".to_string(),
             sam_account_name: Some("Admins".to_string()),
             display_name: Some("Admins".to_string()),

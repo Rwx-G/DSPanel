@@ -470,6 +470,7 @@ fn make_group(name: &str, dept: &str, all_users: &[DirectoryEntry]) -> Directory
     );
 
     DirectoryEntry {
+        partition_dns_name: None,
         distinguished_name: group_dn,
         sam_account_name: Some(name.replace(' ', "-")),
         display_name: Some(name.to_string()),
@@ -505,6 +506,7 @@ fn make_subgroup(
     );
 
     DirectoryEntry {
+        partition_dns_name: None,
         distinguished_name: format!("CN={},OU=Groups,DC=contoso,DC=com", name),
         sam_account_name: Some(name.to_string()),
         display_name: Some(name.to_string()),
@@ -534,6 +536,7 @@ fn make_group_empty(name: &str) -> DirectoryEntry {
         vec!["2024-06-15T00:00:00Z".to_string()],
     );
     DirectoryEntry {
+        partition_dns_name: None,
         distinguished_name: format!("CN={},OU=Groups,DC=contoso,DC=com", name),
         sam_account_name: Some(name.to_string()),
         display_name: Some(name.to_string()),
@@ -551,6 +554,7 @@ fn make_group_no_description(name: &str, members: Vec<String>) -> DirectoryEntry
         vec!["2024-05-01T00:00:00Z".to_string()],
     );
     DirectoryEntry {
+        partition_dns_name: None,
         distinguished_name: format!("CN={},OU=Groups,DC=contoso,DC=com", name),
         sam_account_name: Some(name.to_string()),
         display_name: Some(name.to_string()),
@@ -899,6 +903,7 @@ fn make_user(
     );
 
     DirectoryEntry {
+        partition_dns_name: None,
         distinguished_name: format!("CN={},OU={},OU=Users,DC=contoso,DC=com", display, dept),
         sam_account_name: Some(sam.to_string()),
         display_name: Some(display.to_string()),
@@ -927,6 +932,7 @@ fn make_computer(name: &str, dns: &str, os: &str, os_ver: &str) -> DirectoryEntr
     );
 
     DirectoryEntry {
+        partition_dns_name: None,
         distinguished_name: format!("CN={},OU=Computers,DC=contoso,DC=com", name),
         sam_account_name: Some(format!("{}$", name)),
         display_name: Some(name.to_string()),

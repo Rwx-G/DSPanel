@@ -1,4 +1,5 @@
 use crate::models::{ContactInfo, DeletedObject, DirectoryEntry, OUNode, PrinterInfo};
+use crate::services::forest::ForestTopology;
 use anyhow::Result;
 use async_trait::async_trait;
 use std::collections::HashMap;
@@ -376,6 +377,20 @@ pub trait DirectoryProvider: Send + Sync {
     /// Searches security groups and matches the last sub-authority of `objectSid`.
     /// Returns the group entry if found, or None.
     async fn resolve_group_by_rid(&self, rid: u32) -> Result<Option<DirectoryEntry>>;
+
+    /// Discovers every domain partition of the forest the provider is bound to.
+    ///
+    /// The default synthesizes a single-partition topology from `base_dn()`
+    /// and `domain_name()`, so providers without forest awareness (demo, test
+    /// mocks) keep working. `LdapDirectoryProvider` overrides it with a real
+    /// `CN=Partitions` query. Fails when the provider has no base DN yet.
+    async fn discover_forest(&self) -> Result<ForestTopology> {
+        let topology = ForestTopology::synthesized_from(self);
+        if topology.partitions.is_empty() {
+            anyhow::bail!("Not connected - no base DN to derive the forest topology from");
+        }
+        Ok(topology)
+    }
 }
 
 #[allow(clippy::unwrap_used)]
@@ -443,6 +458,7 @@ pub mod tests {
         pub remove_photo_calls: Mutex<Vec<String>>,
         configuration_entries: Mutex<Vec<DirectoryEntry>>,
         connection_error: Mutex<Option<String>>,
+        connect_delay: Mutex<Option<std::time::Duration>>,
         truncated: Mutex<bool>,
         is_rodc: Mutex<bool>,
     }
@@ -499,6 +515,7 @@ pub mod tests {
                 remove_photo_calls: Mutex::new(Vec::new()),
                 configuration_entries: Mutex::new(Vec::new()),
                 connection_error: Mutex::new(None),
+                connect_delay: Mutex::new(None),
                 truncated: Mutex::new(false),
                 is_rodc: Mutex::new(false),
             }
@@ -549,6 +566,7 @@ pub mod tests {
                 remove_photo_calls: Mutex::new(Vec::new()),
                 configuration_entries: Mutex::new(Vec::new()),
                 connection_error: Mutex::new(Some("not_domain_joined".to_string())),
+                connect_delay: Mutex::new(None),
                 truncated: Mutex::new(false),
                 is_rodc: Mutex::new(false),
             }
@@ -643,6 +661,17 @@ pub mod tests {
             *self.connection_error.lock().unwrap() = Some(kind.to_string());
             self
         }
+        /// Overrides the connected flag reported by `is_connected` and
+        /// `test_connection` while keeping the mock's domain identity.
+        pub fn with_connected(self, connected: bool) -> Self {
+            *self.connected.lock().unwrap() = connected;
+            self
+        }
+        /// Makes `test_connection` sleep before answering, to simulate a slow bind.
+        pub fn with_connect_delay(self, delay: std::time::Duration) -> Self {
+            *self.connect_delay.lock().unwrap() = Some(delay);
+            self
+        }
 
         pub fn with_truncated(self) -> Self {
             *self.truncated.lock().unwrap() = true;
@@ -682,6 +711,10 @@ pub mod tests {
 
         async fn test_connection(&self) -> Result<bool> {
             self.check_failure()?;
+            let delay = *self.connect_delay.lock().unwrap();
+            if let Some(delay) = delay {
+                tokio::time::sleep(delay).await;
+            }
             Ok(self.is_connected())
         }
 
@@ -1188,6 +1221,7 @@ pub mod tests {
         attrs.insert("mail".to_string(), vec![format!("{}@example.com", sam)]);
 
         DirectoryEntry {
+            partition_dns_name: None,
             distinguished_name: format!("CN={},OU=Users,DC=example,DC=com", display),
             sam_account_name: Some(sam.to_string()),
             display_name: Some(display.to_string()),
@@ -1198,6 +1232,7 @@ pub mod tests {
 
     fn make_computer_entry(name: &str) -> DirectoryEntry {
         DirectoryEntry {
+            partition_dns_name: None,
             distinguished_name: format!("CN={},OU=Computers,DC=example,DC=com", name),
             sam_account_name: Some(format!("{}$", name)),
             display_name: Some(name.to_string()),
@@ -1208,6 +1243,7 @@ pub mod tests {
 
     fn make_group_entry(name: &str) -> DirectoryEntry {
         DirectoryEntry {
+            partition_dns_name: None,
             distinguished_name: format!("CN={},OU=Groups,DC=example,DC=com", name),
             sam_account_name: Some(name.to_string()),
             display_name: Some(name.to_string()),

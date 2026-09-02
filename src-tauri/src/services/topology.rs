@@ -484,6 +484,7 @@ mod tests {
             );
         }
         DirectoryEntry {
+            partition_dns_name: None,
             distinguished_name: dn.to_string(),
             sam_account_name: None,
             display_name: None,

@@ -1394,6 +1394,7 @@ mod tests {
         let mut attrs = HashMap::new();
         attrs.insert("mail".to_string(), vec![format!("{}@example.com", sam)]);
         DirectoryEntry {
+            partition_dns_name: None,
             distinguished_name: format!("CN={},OU=Users,DC=example,DC=com", display),
             sam_account_name: Some(sam.to_string()),
             display_name: Some(display.to_string()),
@@ -2421,6 +2422,7 @@ mod tests {
     #[tokio::test]
     async fn test_validate_group_exists_returns_true_for_existing() {
         let group = DirectoryEntry {
+            partition_dns_name: None,
             distinguished_name: "CN=IT-Support,OU=Groups,DC=example,DC=com".to_string(),
             sam_account_name: Some("IT-Support".to_string()),
             display_name: Some("IT Support".to_string()),
@@ -2508,6 +2510,7 @@ mod tests {
     async fn test_compute_snapshot_diff_detects_changes() {
         let users = vec![{
             let mut entry = DirectoryEntry {
+                partition_dns_name: None,
                 distinguished_name: "CN=John Doe,OU=Users,DC=example,DC=com".to_string(),
                 sam_account_name: Some("jdoe".to_string()),
                 display_name: Some("John Doe".to_string()),

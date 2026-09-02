@@ -809,6 +809,7 @@ mod tests {
     async fn test_get_gpo_list_returns_sorted_results() {
         let gpo_entries = vec![
             crate::models::DirectoryEntry {
+                partition_dns_name: None,
                 distinguished_name: "CN={B-GUID},CN=Policies,CN=System,DC=example,DC=com"
                     .to_string(),
                 sam_account_name: None,
@@ -821,6 +822,7 @@ mod tests {
                 },
             },
             crate::models::DirectoryEntry {
+                partition_dns_name: None,
                 distinguished_name: "CN={A-GUID},CN=Policies,CN=System,DC=example,DC=com"
                     .to_string(),
                 sam_account_name: None,
@@ -844,6 +846,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_gpo_list_fallback_display_name_from_cn() {
         let gpo_entries = vec![crate::models::DirectoryEntry {
+            partition_dns_name: None,
             distinguished_name: "CN={NO-NAME-GUID},CN=Policies,CN=System,DC=example,DC=com"
                 .to_string(),
             sam_account_name: None,
@@ -972,6 +975,7 @@ mod tests {
     #[tokio::test]
     async fn test_resolve_gpo_names_with_entries() {
         let entries = vec![crate::models::DirectoryEntry {
+            partition_dns_name: None,
             distinguished_name: "CN={GPO-GUID},CN=Policies,CN=System,DC=example,DC=com".to_string(),
             sam_account_name: None,
             display_name: None,
@@ -998,6 +1002,7 @@ mod tests {
     #[tokio::test]
     async fn test_resolve_gpo_names_fallback_to_cn() {
         let entries = vec![crate::models::DirectoryEntry {
+            partition_dns_name: None,
             distinguished_name: "CN={GPO-NO-NAME},CN=Policies,CN=System,DC=example,DC=com"
                 .to_string(),
             sam_account_name: None,
@@ -1023,6 +1028,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_gpo_list_extracts_wmi_filter() {
         let gpo_entries = vec![crate::models::DirectoryEntry {
+            partition_dns_name: None,
             distinguished_name: "CN={W-GUID},CN=Policies,CN=System,DC=example,DC=com".to_string(),
             sam_account_name: None,
             display_name: None,

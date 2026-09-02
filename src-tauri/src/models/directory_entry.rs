@@ -13,6 +13,11 @@ pub struct DirectoryEntry {
     pub display_name: Option<String>,
     pub object_class: Option<String>,
     pub attributes: HashMap<String, Vec<String>>,
+    /// DNS name of the forest partition the entry was read from. `None`
+    /// until a fan-out path (Story 15.2 / 15.3) tags the entry; omitted on
+    /// the wire when absent so single-domain payloads are unchanged.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub partition_dns_name: Option<String>,
 }
 
 impl DirectoryEntry {
@@ -24,6 +29,7 @@ impl DirectoryEntry {
             display_name: None,
             object_class: None,
             attributes: HashMap::new(),
+            partition_dns_name: None,
         }
     }
 
@@ -61,6 +67,7 @@ mod tests {
         );
 
         DirectoryEntry {
+            partition_dns_name: None,
             distinguished_name: "CN=John Doe,OU=Users,DC=example,DC=com".to_string(),
             sam_account_name: Some("jdoe".to_string()),
             display_name: Some("John Doe".to_string()),

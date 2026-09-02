@@ -631,6 +631,7 @@ mod tests {
         let mut attrs = HashMap::new();
         attrs.insert("mail".to_string(), vec![format!("{}@example.com", sam)]);
         DirectoryEntry {
+            partition_dns_name: None,
             distinguished_name: format!("CN={},OU=Users,DC=example,DC=com", display),
             sam_account_name: Some(sam.to_string()),
             display_name: Some(display.to_string()),
@@ -654,6 +655,7 @@ mod tests {
         attrs.insert("groupType".to_string(), vec!["-2147483646".to_string()]);
         attrs.insert("description".to_string(), vec![format!("{} group", name)]);
         DirectoryEntry {
+            partition_dns_name: None,
             distinguished_name: format!("CN={},OU=Groups,DC=example,DC=com", name),
             sam_account_name: Some(name.to_string()),
             display_name: Some(name.to_string()),
@@ -717,6 +719,7 @@ mod tests {
     #[tokio::test]
     async fn test_search_computers_inner_results() {
         let computers = vec![DirectoryEntry {
+            partition_dns_name: None,
             distinguished_name: "CN=WS01,OU=Computers,DC=example,DC=com".to_string(),
             sam_account_name: Some("WS01$".to_string()),
             display_name: Some("WS01".to_string()),
@@ -916,6 +919,7 @@ mod tests {
     #[tokio::test]
     async fn test_search_computers_returns_results() {
         let computers = vec![DirectoryEntry {
+            partition_dns_name: None,
             distinguished_name: "CN=WS01,OU=Computers,DC=example,DC=com".to_string(),
             sam_account_name: Some("WS01$".to_string()),
             display_name: Some("WS01".to_string()),
@@ -1067,6 +1071,7 @@ mod tests {
     #[tokio::test]
     async fn test_search_groups_inner_returns_results() {
         let groups = vec![DirectoryEntry {
+            partition_dns_name: None,
             distinguished_name: "CN=Admins,DC=example,DC=com".to_string(),
             sam_account_name: Some("Admins".to_string()),
             display_name: Some("Admins".to_string()),
@@ -1120,6 +1125,7 @@ mod tests {
     async fn test_browse_computers_inner_returns_sorted_page() {
         let computers = vec![
             DirectoryEntry {
+                partition_dns_name: None,
                 distinguished_name: "CN=WS03,DC=test".to_string(),
                 sam_account_name: Some("WS03$".to_string()),
                 display_name: Some("Zulu Workstation".to_string()),
@@ -1127,6 +1133,7 @@ mod tests {
                 attributes: HashMap::new(),
             },
             DirectoryEntry {
+                partition_dns_name: None,
                 distinguished_name: "CN=WS01,DC=test".to_string(),
                 sam_account_name: Some("WS01$".to_string()),
                 display_name: Some("Alpha Workstation".to_string()),
@@ -1155,6 +1162,7 @@ mod tests {
     async fn test_browse_computers_inner_pagination() {
         let computers = vec![
             DirectoryEntry {
+                partition_dns_name: None,
                 distinguished_name: "CN=A,DC=test".to_string(),
                 sam_account_name: Some("A$".to_string()),
                 display_name: Some("Alpha".to_string()),
@@ -1162,6 +1170,7 @@ mod tests {
                 attributes: HashMap::new(),
             },
             DirectoryEntry {
+                partition_dns_name: None,
                 distinguished_name: "CN=B,DC=test".to_string(),
                 sam_account_name: Some("B$".to_string()),
                 display_name: Some("Bravo".to_string()),
@@ -1169,6 +1178,7 @@ mod tests {
                 attributes: HashMap::new(),
             },
             DirectoryEntry {
+                partition_dns_name: None,
                 distinguished_name: "CN=C,DC=test".to_string(),
                 sam_account_name: Some("C$".to_string()),
                 display_name: Some("Charlie".to_string()),
@@ -1199,6 +1209,7 @@ mod tests {
     #[tokio::test]
     async fn test_browse_computers_inner_uses_cache() {
         let computers = vec![DirectoryEntry {
+            partition_dns_name: None,
             distinguished_name: "CN=WS01,DC=test".to_string(),
             sam_account_name: Some("WS01$".to_string()),
             display_name: Some("WS01".to_string()),
@@ -1311,6 +1322,7 @@ mod tests {
     #[tokio::test]
     async fn test_browse_computers_inner_page_beyond_range() {
         let computers = vec![DirectoryEntry {
+            partition_dns_name: None,
             distinguished_name: "CN=WS01,DC=test".to_string(),
             sam_account_name: Some("WS01$".to_string()),
             display_name: Some("WS01".to_string()),
