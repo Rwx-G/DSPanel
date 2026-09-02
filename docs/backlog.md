@@ -6,6 +6,21 @@ The Epic 14 backlog is now empty. Visual rendering verification before each
 release is documented in [`docs/release-smoke-test.md`](release-smoke-test.md)
 as a recurring checklist rather than a one-shot backlog item.
 
+## Open items (Epic 15, from Story 15.1 QA, 2026-09-02)
+
+None blocking. Medium items are scheduled on the story that owns the code path; Low items are logged.
+
+- **`seed_only()` / `route_for_dn()` dispatch helpers and a `partition` tracing field** (QA-15.1-ARCH-004, Medium, owner Story 15.4). The 62 delegating bodies in `services/forest.rs` carry their dispatch rule as a comment only. Story 15.4 introduces `route_for_dn` and should make the seed-only calls explicit (`grep seed_only` becomes the audit) and add `#[instrument(fields(partition))]` at the routing boundary before 15.2 multiplies the call sites.
+- **Per-partition retry needs an interior-mutable slot** (QA-15.1-ARCH-008, Medium, owner Story 15.6). `ForestProvider` is an immutable snapshot swapped wholesale; `ConnectionStatus::Reconnecting` is unreachable and a single-partition retry currently means a full `repromote()`. Plan a per-partition slot (`RwLock<Arc<dyn DirectoryProvider>>` per entry) when the retry command lands.
+- **Promotion policy lives in `lib.rs`** (QA-15.1-ARCH-007, Low). `commands/*` call upward into `crate::promote_forest_if_needed`; moving the policy into `services::forest` or `AppState` behind a small emitter trait would make it unit-testable.
+- **Table-driven delegation test** (QA-15.1-QUAL-004, Low). Only a handful of the 62 delegating methods are exercised; a spy provider asserting call forwarding per method would catch a wrong-field mistake cheaply.
+- **`LdapAuthMode` cloned per partition** (QA-15.1-SEC-INFO, Low). Each partition provider holds its own copy of the simple-bind password (zeroized on drop, reallocation residue not). Consider `Arc<Zeroizing<String>>` when the auth mode is next touched.
+- **`expect` on locks in IPC-reachable paths** (QA-15.1-SEC-LOW, Low). `services/forest.rs`, `state.rs` follow the crate convention (`expect("lock poisoned")`, enforced by the `lib.rs` header comment). Revisit only if the convention changes to `PoisonError::into_inner`.
+- **`skip_verify` inherited by GSSAPI partitions** (QA-15.1-SEC-003, Low, accepted). Kerberos authenticates the DC through the `ldap/<fqdn>` SPN, so no bind reaches an unauthenticated host; the TLS confidentiality residual with `DSPANEL_LDAP_TLS_SKIP_VERIFY` is the same as on the seed connection.
+- **Concurrent `refresh()` ordering in `ForestContext`** (QA-15.1-QUAL-LOW, Low). Repeated `forest-status-changed` events start overlapping `get_forest_topology` calls; an out-of-order resolution could briefly show a stale topology. Add a request token if 15.6 raises the event frequency.
+- **`demo` feature build broken on `main`** (pre-existing, found during 15.1 review). `cargo check --features demo` fails with `E0046` (missing trait items on `DemoDirectoryProvider`). Not introduced by Epic 15; fix when the demo mode is next exercised.
+- **`security::dn_to_domain_user` keeps its own DN parsing** (QA-15.1-REV-008, Info). It builds a `DOMAIN\user` label and preserves case, so it was left out of the `forest::dns_domain_from_dn` consolidation.
+
 ### Recently resolved
 
 - **`tooltipParamsFor` factor + SecurityIndicatorDot popover metadata enrichment** (QA-14.3-002 + QA-14.3-003) - resolved 2026-04-26 in commit `6b13e0e`. Moved `tooltipParamsFor` from `ComputerDetail` to `src/types/securityIndicators.ts` so `SecurityIndicatorDot` can share it. Enriched the dot popover with per-indicator metadata previews: ConstrainedDelegation lists the first 3 target SPNs, Rbcd lists the first 3 allowed-principal SIDs, with a `+N more` truncation suffix backed by the new `dot.metadataMore` i18n key (translated to en/fr/de/it/es). 5 new tests cover preview rendering, truncation, no-metadata fallback, and empty-array fallback.
