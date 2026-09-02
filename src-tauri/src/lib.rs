@@ -12,44 +12,72 @@ pub mod state;
 
 use std::sync::Arc;
 
+use services::DirectoryProvider;
 #[cfg(not(feature = "demo"))]
 use services::LdapDirectoryProvider;
 use services::PermissionConfig;
 use state::AppState;
 
-/// Promotes a reachable seed provider to a `ForestProvider`, falling back to
-/// a seed-only forest when the seed cannot be reached or discovery fails so
-/// startup never aborts on a directory problem.
+/// Wraps a freshly configured LDAP seed as the seed-only forest placeholder
+/// that `spawn_forest_promotion` later turns into the discovered forest.
 #[cfg(not(feature = "demo"))]
-pub async fn connect_forest(seed: Arc<LdapDirectoryProvider>) -> services::ForestProvider {
-    let auth_mode = seed.auth_mode().clone();
-    let tls_config = seed.tls_config().clone();
-    match services::ForestProvider::connect(seed.clone(), auth_mode, tls_config).await {
-        Ok(forest) => forest,
-        Err(e) => {
-            tracing::warn!(error = %e, "Forest connect failed, using the seed partition only");
-            services::ForestProvider::single_partition(seed)
-        }
-    }
+pub fn seed_only_forest(seed: &Arc<LdapDirectoryProvider>) -> services::ForestProvider {
+    let connector = services::forest::LdapPartitionConnector::new(
+        seed.auth_mode().clone(),
+        seed.tls_config().clone(),
+    );
+    let provider: Arc<dyn services::DirectoryProvider> = seed.clone();
+    services::ForestProvider::seed_only(provider, Arc::new(connector))
 }
 
-/// Runs `connect_forest` off the caller's thread, installs the result as the
-/// active provider and notifies the webview through `FOREST_STATUS_EVENT`.
-/// Discovery and the per-partition binds (bounded by the bind timeout and the
-/// partition cap) therefore never delay startup or the login prompt.
-#[cfg(not(feature = "demo"))]
-pub fn spawn_forest_promotion(app: tauri::AppHandle, seed: Arc<LdapDirectoryProvider>) {
+/// Promotes `placeholder` off the caller's thread: re-runs discovery and the
+/// per-partition binds (bounded by the bind timeout and the partition cap),
+/// installs the result if the placeholder is still active, and notifies the
+/// webview through `FOREST_STATUS_EVENT`. A failed promotion keeps the current
+/// provider so the connection error UX is unchanged. Only one promotion runs
+/// at a time; later triggers are dropped until it completes.
+pub fn spawn_forest_promotion(app: tauri::AppHandle, placeholder: Arc<services::ForestProvider>) {
+    use tauri::Manager;
+    let Some(promotion) = placeholder.repromote() else {
+        return;
+    };
+    if !app.state::<AppState>().begin_forest_promotion() {
+        tracing::debug!("Forest promotion already in flight");
+        return;
+    }
     tauri::async_runtime::spawn(async move {
-        use tauri::Manager;
-        let forest = Arc::new(connect_forest(seed).await);
-        tracing::info!(
-            partitions = forest.topology().partitions.len(),
-            seed = forest.seed_dns_name(),
-            "Forest provider installed"
-        );
-        app.state::<AppState>().set_forest(forest.clone());
-        emit_forest_status(&app, &forest);
+        let outcome = promotion.await;
+        let state = app.state::<AppState>();
+        match outcome {
+            Ok(forest) => {
+                let forest = Arc::new(forest);
+                if state.install_promoted_forest(&placeholder, forest.clone()) {
+                    tracing::info!(
+                        partitions = forest.topology().partitions.len(),
+                        seed = forest.seed_dns_name(),
+                        "Forest provider installed"
+                    );
+                    emit_forest_status(&app, &forest);
+                } else {
+                    tracing::info!("Forest promotion discarded: the seed was replaced meanwhile");
+                }
+            }
+            Err(e) => {
+                tracing::warn!(error = %e, "Forest promotion failed, keeping the current provider");
+            }
+        }
+        state.end_forest_promotion();
     });
+}
+
+/// Promotes the active forest when it is still a placeholder and its seed is
+/// now reachable (a DC that came back, a VPN that connected after launch).
+pub fn promote_forest_if_needed(app: &tauri::AppHandle) {
+    use tauri::Manager;
+    let forest = app.state::<AppState>().forest();
+    if !forest.is_promoted() && forest.is_connected() {
+        spawn_forest_promotion(app.clone(), forest);
+    }
 }
 
 /// Emits the current per-partition connection states to the webview.
@@ -158,6 +186,8 @@ pub fn run() {
         && std::env::var("DSPANEL_LDAP_BIND_PASSWORD").is_err();
 
     let app_state = AppState::new(provider, PermissionConfig::default());
+    #[cfg(not(feature = "demo"))]
+    app_state.set_forest(Arc::new(seed_only_forest(&seed)));
     if needs_creds {
         *app_state.needs_credentials.lock().expect("lock poisoned") = true;
     }
@@ -166,7 +196,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .manage(app_state)
-        .setup(move |app| {
+        .setup(|app| {
             // Detect permissions from AD groups on startup
             use tauri::Manager;
             let state = app.state::<AppState>();
@@ -183,21 +213,22 @@ pub fn run() {
                     tracing::info!(operator = %name, "Audit operator set to authenticated identity");
                 }
             });
-            // `AppState` already holds the seed as a single-partition forest; the
-            // real forest is assembled off the startup path and swapped in with
-            // an event, so discovery never delays the first paint.
-            #[cfg(not(feature = "demo"))]
-            if !*state.needs_credentials.lock().expect("lock poisoned") {
-                spawn_forest_promotion(app.handle().clone(), seed.clone());
-            }
-            // Start LDAP keepalive background task (ping every 5 minutes)
-            let keepalive_provider = state.provider();
+            // The seed-only forest is already installed; the discovered forest
+            // is assembled off the startup path and swapped in with an event,
+            // so discovery never delays the first paint.
+            promote_forest_if_needed(app.handle());
+            // Start LDAP keepalive background task (ping every 5 minutes). It
+            // reads the active provider each tick so a forest installed later is
+            // the one kept alive, promotes a placeholder once its seed answers,
+            // and republishes the partition states for the forest banner.
+            let keepalive_app = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 let interval = std::time::Duration::from_secs(300); // 5 minutes
                 loop {
                     tokio::time::sleep(interval).await;
-                    if keepalive_provider.is_connected() {
-                        match keepalive_provider.test_connection().await {
+                    let provider = keepalive_app.state::<AppState>().provider();
+                    if provider.is_connected() {
+                        match provider.test_connection().await {
                             Ok(true) => {
                                 tracing::debug!("LDAP keepalive: connection alive");
                             }
@@ -205,6 +236,11 @@ pub fn run() {
                                 tracing::debug!("LDAP keepalive: connection lost, will reconnect on next operation");
                             }
                         }
+                    }
+                    promote_forest_if_needed(&keepalive_app);
+                    let forest = keepalive_app.state::<AppState>().forest();
+                    if forest.is_promoted() {
+                        emit_forest_status(&keepalive_app, &forest);
                     }
                 }
             });

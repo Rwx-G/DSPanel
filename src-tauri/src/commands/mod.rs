@@ -297,8 +297,9 @@ pub async fn connect_simple_bind(
 
             // Install the bound seed now; the forest promotion runs in the
             // background and announces itself through the status event.
-            state.set_provider(provider.clone());
-            crate::spawn_forest_promotion(app, seed);
+            let placeholder = Arc::new(crate::seed_only_forest(&seed));
+            state.set_forest(placeholder.clone());
+            crate::spawn_forest_promotion(app, placeholder);
             *state.needs_credentials.lock().expect("lock poisoned") = false;
 
             tracing::info!("Simple bind connection established via login prompt");

@@ -444,8 +444,15 @@ pub async fn search_computers(
 /// Returns a boolean: `true` if connected, `false` otherwise.
 /// This performs a lightweight rootDSE query via `test_connection()`.
 #[tauri::command]
-pub async fn check_connection(state: State<'_, AppState>) -> Result<bool, AppError> {
-    check_connection_inner(&state).await
+pub async fn check_connection(
+    state: State<'_, AppState>,
+    app: tauri::AppHandle,
+) -> Result<bool, AppError> {
+    let connected = check_connection_inner(&state).await?;
+    // A seed that just became reachable (VPN, DC back online) promotes the
+    // placeholder forest; a no-op once promoted.
+    crate::promote_forest_if_needed(&app);
+    Ok(connected)
 }
 
 /// Returns the forest topology: every domain partition discovered at connect

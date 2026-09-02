@@ -1,3 +1,4 @@
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::Instant;
 
@@ -24,6 +25,9 @@ pub struct AppState {
     /// provider without its forest view. Wrapped in RwLock to allow runtime
     /// replacement (e.g., after login prompt provides credentials).
     pub directory_provider: RwLock<Arc<ForestProvider>>,
+    /// Set while a forest promotion runs, so concurrent triggers (login
+    /// prompt, connection checks, keepalive) do not stack bind fan-outs.
+    pub forest_promotion_in_flight: AtomicBool,
     /// Whether the app is waiting for simple bind credentials from the user.
     pub needs_credentials: Mutex<bool>,
     /// Permission service for checking user authorization levels.
@@ -68,6 +72,7 @@ impl AppState {
             title: Mutex::new("DSPanel".to_string()),
             initialized: Mutex::new(false),
             directory_provider: RwLock::new(Arc::new(ForestProvider::single_partition(provider))),
+            forest_promotion_in_flight: AtomicBool::new(false),
             needs_credentials: Mutex::new(false),
             permission_service: PermissionService::new(permission_config),
             audit_service: AuditService::new(),
@@ -116,6 +121,39 @@ impl AppState {
             .clone()
     }
 
+    /// Installs `promoted` only if `placeholder` is still the active forest,
+    /// so a promotion started for a superseded seed (a newer login prompt)
+    /// never overwrites the current one. Returns whether it was installed.
+    pub fn install_promoted_forest(
+        &self,
+        placeholder: &Arc<ForestProvider>,
+        promoted: Arc<ForestProvider>,
+    ) -> bool {
+        let mut current = self
+            .directory_provider
+            .write()
+            .expect("directory_provider lock poisoned");
+        if Arc::ptr_eq(&current, placeholder) {
+            *current = promoted;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Claims the promotion slot. Returns false when one is already running.
+    pub fn begin_forest_promotion(&self) -> bool {
+        self.forest_promotion_in_flight
+            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+            .is_ok()
+    }
+
+    /// Releases the promotion slot claimed by `begin_forest_promotion`.
+    pub fn end_forest_promotion(&self) {
+        self.forest_promotion_in_flight
+            .store(false, Ordering::Release);
+    }
+
     /// Creates an AppState with in-memory services (no file I/O) for testing.
     #[allow(clippy::unwrap_used)]
     #[cfg(test)]
@@ -127,6 +165,7 @@ impl AppState {
             title: Mutex::new("DSPanel".to_string()),
             initialized: Mutex::new(false),
             directory_provider: RwLock::new(Arc::new(ForestProvider::single_partition(provider))),
+            forest_promotion_in_flight: AtomicBool::new(false),
             needs_credentials: Mutex::new(false),
             permission_service: PermissionService::new(permission_config),
             audit_service: AuditService::new_in_memory(),

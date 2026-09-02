@@ -80,10 +80,6 @@ export function ForestProvider({
     }
   }, []);
 
-  useEffect(() => {
-    void refresh();
-  }, [refresh]);
-
   const wasConnected = useRef(connected);
   useEffect(() => {
     // Only a false -> true transition (login prompt, reconnect) re-fetches;
@@ -97,9 +93,12 @@ export function ForestProvider({
   useEffect(() => {
     // The backend emits this once the forest is (re)assembled in the
     // background, so the event carries fresh partition states and signals
-    // that the topology itself may have grown. A rejected subscription is
+    // that the topology itself may have grown. The initial read waits for
+    // the subscription to be armed: a promotion landing in between would
+    // otherwise be missed for the whole session. A rejected subscription is
     // tolerated: every partition then stays reported as connected.
-    const unlisten = listen<PartitionStatusMap>(
+    let active = true;
+    const subscription = listen<PartitionStatusMap>(
       FOREST_STATUS_EVENT,
       (event) => {
         setReportedStatus(event.payload ?? {});
@@ -109,8 +108,14 @@ export function ForestProvider({
       console.warn("Forest status subscription unavailable:", e);
       return () => {};
     });
+    void subscription.then(() => {
+      if (active) {
+        void refresh();
+      }
+    });
     return () => {
-      unlisten.then((fn) => fn());
+      active = false;
+      subscription.then((fn) => fn());
     };
   }, [refresh]);
 
