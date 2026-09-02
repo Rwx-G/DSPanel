@@ -7,18 +7,11 @@ import * as itLocale from "./it";
 import * as es from "./es";
 
 /** Recursively collect all leaf keys from a nested object. */
-function collectKeys(
-  obj: Record<string, unknown>,
-  prefix = "",
-): string[] {
+function collectKeys(obj: Record<string, unknown>, prefix = ""): string[] {
   const keys: string[] = [];
   for (const [key, value] of Object.entries(obj)) {
     const fullKey = prefix ? `${prefix}.${key}` : key;
-    if (
-      typeof value === "object" &&
-      value !== null &&
-      !Array.isArray(value)
-    ) {
+    if (typeof value === "object" && value !== null && !Array.isArray(value)) {
       keys.push(...collectKeys(value as Record<string, unknown>, fullKey));
     } else {
       keys.push(fullKey);
@@ -28,10 +21,7 @@ function collectKeys(
 }
 
 /** Recursively get a value from a nested object by dot-path. */
-function getNestedValue(
-  obj: Record<string, unknown>,
-  path: string,
-): unknown {
+function getNestedValue(obj: Record<string, unknown>, path: string): unknown {
   const parts = path.split(".");
   let current: unknown = obj;
   for (const part of parts) {
@@ -65,24 +55,18 @@ describe("Translation completeness", () => {
 
       for (const ns of namespaces) {
         test(`namespace "${ns}" has all keys from English`, () => {
-          const enBundle =
-            en[ns as keyof typeof en] as Record<string, unknown>;
-          const langBundle = (lang.data as Record<string, unknown>)[
-            ns
-          ] as Record<string, unknown> | undefined;
+          const enBundle = en[ns as keyof typeof en] as Record<string, unknown>;
+          const langBundle = (lang.data as Record<string, unknown>)[ns] as
+            Record<string, unknown> | undefined;
 
           if (!langBundle) {
-            throw new Error(
-              `Namespace "${ns}" missing in ${lang.code}`,
-            );
+            throw new Error(`Namespace "${ns}" missing in ${lang.code}`);
           }
 
           const enKeys = collectKeys(enBundle);
           const langKeys = collectKeys(langBundle);
 
-          const missingKeys = enKeys.filter(
-            (key) => !langKeys.includes(key),
-          );
+          const missingKeys = enKeys.filter((key) => !langKeys.includes(key));
           expect(
             missingKeys,
             `Missing keys in ${lang.code}/${ns}: ${missingKeys.join(", ")}`,
@@ -93,9 +77,8 @@ describe("Translation completeness", () => {
       test("has no empty string values", () => {
         const emptyPaths: string[] = [];
         for (const ns of namespaces) {
-          const bundle = (lang.data as Record<string, unknown>)[
-            ns
-          ] as Record<string, unknown> | undefined;
+          const bundle = (lang.data as Record<string, unknown>)[ns] as
+            Record<string, unknown> | undefined;
           if (!bundle) continue;
           const keys = collectKeys(bundle);
           for (const key of keys) {
@@ -114,19 +97,15 @@ describe("Translation completeness", () => {
       test("has no orphan keys (keys not present in English)", () => {
         const orphanPaths: string[] = [];
         for (const ns of namespaces) {
-          const enBundle =
-            en[ns as keyof typeof en] as Record<string, unknown>;
-          const langBundle = (lang.data as Record<string, unknown>)[
-            ns
-          ] as Record<string, unknown> | undefined;
+          const enBundle = en[ns as keyof typeof en] as Record<string, unknown>;
+          const langBundle = (lang.data as Record<string, unknown>)[ns] as
+            Record<string, unknown> | undefined;
           if (!langBundle) continue;
 
           const enKeys = collectKeys(enBundle);
           const langKeys = collectKeys(langBundle);
 
-          const orphans = langKeys.filter(
-            (key) => !enKeys.includes(key),
-          );
+          const orphans = langKeys.filter((key) => !enKeys.includes(key));
           for (const key of orphans) {
             orphanPaths.push(`${ns}:${key}`);
           }
@@ -142,11 +121,9 @@ describe("Translation completeness", () => {
         const issues: string[] = [];
 
         for (const ns of namespaces) {
-          const enBundle =
-            en[ns as keyof typeof en] as Record<string, unknown>;
-          const langBundle = (lang.data as Record<string, unknown>)[
-            ns
-          ] as Record<string, unknown> | undefined;
+          const enBundle = en[ns as keyof typeof en] as Record<string, unknown>;
+          const langBundle = (lang.data as Record<string, unknown>)[ns] as
+            Record<string, unknown> | undefined;
           if (!langBundle) continue;
 
           const enKeys = collectKeys(enBundle);
@@ -163,9 +140,7 @@ describe("Translation completeness", () => {
 
             for (const v of enVars) {
               if (!langValue.includes(`{{${v}}}`)) {
-                issues.push(
-                  `${ns}:${key} missing {{${v}}} in ${lang.code}`,
-                );
+                issues.push(`${ns}:${key} missing {{${v}}} in ${lang.code}`);
               }
             }
           }

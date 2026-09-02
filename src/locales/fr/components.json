@@ -227,7 +227,20 @@
     "increaseHours": "Augmenter les heures",
     "decreaseMinutes": "Diminuer les minutes",
     "increaseMinutes": "Augmenter les minutes",
-    "months": ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"]
+    "months": [
+      "Janvier",
+      "Février",
+      "Mars",
+      "Avril",
+      "Mai",
+      "Juin",
+      "Juillet",
+      "Août",
+      "Septembre",
+      "Octobre",
+      "Novembre",
+      "Décembre"
+    ]
   },
   "validationSummary": {
     "error_one": "{{count}} erreur de validation",
