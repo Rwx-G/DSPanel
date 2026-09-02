@@ -10,7 +10,7 @@ use crate::models::{ContactInfo, DirectoryEntry, OUNode, PrinterInfo};
 use crate::services::directory::{DirectoryProvider, default_configuration_dn};
 use crate::services::forest::{
     ForestTopology, MAX_PARTITIONS, NTDS_DOMAIN_CROSSREF_FILTER, dns_domain_from_dn,
-    parse_partitions_from_entries,
+    is_dc_target_within, parse_partitions_from_entries,
 };
 
 /// Resolves the first `_ldap._tcp.<domain>` SRV target to a DC FQDN.
@@ -689,6 +689,37 @@ impl LdapDirectoryProvider {
     ///
     /// Domain is auto-detected from the `USERDNSDOMAIN` environment variable.
     /// If the variable is not set, the provider operates in disconnected mode.
+    /// Field initializer shared by every constructor: connection state starts
+    /// empty and is filled by the first bind.
+    fn with_config(
+        domain: Option<String>,
+        server_override: Option<String>,
+        locate_dc_via_srv: bool,
+        auth_mode: LdapAuthMode,
+        tls_config: LdapTlsConfig,
+        initial_error: Option<String>,
+    ) -> Self {
+        Self {
+            domain,
+            server_override,
+            locate_dc_via_srv,
+            auth_mode,
+            tls_config,
+            base_dn: Mutex::new(None),
+            connected: Mutex::new(false),
+            pool: tokio::sync::Mutex::new(None),
+            authenticated_user: Mutex::new(None),
+            dc_fqdn: Mutex::new(None),
+            dial_host: Mutex::new(None),
+            forest_root_dn: Mutex::new(None),
+            configuration_dn: Mutex::new(None),
+            last_successful_op: Mutex::new(None),
+            last_error_kind: Mutex::new(initial_error),
+            last_search_truncated: Mutex::new(false),
+            connected_dc_is_rodc: Mutex::new(false),
+        }
+    }
+
     pub fn new() -> Self {
         let domain = std::env::var("USERDNSDOMAIN").ok();
         match &domain {
@@ -704,25 +735,14 @@ impl LdapDirectoryProvider {
             None
         };
 
-        Self {
+        Self::with_config(
             domain,
-            server_override: None,
-            locate_dc_via_srv: false,
-            auth_mode: LdapAuthMode::Gssapi,
-            tls_config: LdapTlsConfig::default(),
-            base_dn: Mutex::new(None),
-            connected: Mutex::new(false),
-            pool: tokio::sync::Mutex::new(None),
-            authenticated_user: Mutex::new(None),
-            dc_fqdn: Mutex::new(None),
-            dial_host: Mutex::new(None),
-            forest_root_dn: Mutex::new(None),
-            configuration_dn: Mutex::new(None),
-            last_successful_op: Mutex::new(None),
-            last_error_kind: Mutex::new(initial_error),
-            last_search_truncated: Mutex::new(false),
-            connected_dc_is_rodc: Mutex::new(false),
-        }
+            None,
+            false,
+            LdapAuthMode::Gssapi,
+            LdapTlsConfig::default(),
+            initial_error,
+        )
     }
 
     /// Creates a new `LdapDirectoryProvider` with simple bind authentication.
@@ -751,25 +771,14 @@ impl LdapDirectoryProvider {
             "Simple bind mode active - credentials-based authentication"
         );
 
-        Self {
-            domain: Some(host.clone()),
-            server_override: Some(host),
-            locate_dc_via_srv: false,
-            auth_mode: LdapAuthMode::SimpleBind { bind_dn, password },
-            tls_config: effective_tls,
-            base_dn: Mutex::new(None),
-            connected: Mutex::new(false),
-            pool: tokio::sync::Mutex::new(None),
-            authenticated_user: Mutex::new(None),
-            dc_fqdn: Mutex::new(None),
-            dial_host: Mutex::new(None),
-            forest_root_dn: Mutex::new(None),
-            configuration_dn: Mutex::new(None),
-            last_successful_op: Mutex::new(None),
-            last_error_kind: Mutex::new(None),
-            last_search_truncated: Mutex::new(false),
-            connected_dc_is_rodc: Mutex::new(false),
-        }
+        Self::with_config(
+            Some(host.clone()),
+            Some(host),
+            false,
+            LdapAuthMode::SimpleBind { bind_dn, password },
+            effective_tls,
+            None,
+        )
     }
 
     /// Returns the configured authentication mode.
@@ -797,25 +806,7 @@ impl LdapDirectoryProvider {
         tls_config: LdapTlsConfig,
     ) -> Self {
         tracing::info!(partition = %dns_name, auth_mode = ?auth_mode, "Creating partition provider");
-        Self {
-            domain: Some(dns_name),
-            server_override: None,
-            locate_dc_via_srv: true,
-            auth_mode,
-            tls_config,
-            base_dn: Mutex::new(None),
-            connected: Mutex::new(false),
-            pool: tokio::sync::Mutex::new(None),
-            authenticated_user: Mutex::new(None),
-            dc_fqdn: Mutex::new(None),
-            dial_host: Mutex::new(None),
-            forest_root_dn: Mutex::new(None),
-            configuration_dn: Mutex::new(None),
-            last_successful_op: Mutex::new(None),
-            last_error_kind: Mutex::new(None),
-            last_search_truncated: Mutex::new(false),
-            connected_dc_is_rodc: Mutex::new(false),
-        }
+        Self::with_config(Some(dns_name), None, true, auth_mode, tls_config, None)
     }
 
     /// Derives the DNS domain name from the base DN.
@@ -840,9 +831,18 @@ impl LdapDirectoryProvider {
         if let Some(cached) = self.dial_host.lock().expect("lock poisoned").clone() {
             return cached;
         }
-        let resolved = lookup_ldap_srv_target(domain)
-            .await
-            .unwrap_or_else(|| domain.to_string());
+        let resolved = match lookup_ldap_srv_target(domain).await {
+            Some(target) if is_dc_target_within(&target, domain) => target,
+            Some(target) => {
+                tracing::warn!(
+                    domain = %domain,
+                    target = ?target,
+                    "SRV target outside the partition domain ignored, dialing the domain name"
+                );
+                domain.to_string()
+            }
+            None => domain.to_string(),
+        };
         *self.dial_host.lock().expect("lock poisoned") = Some(resolved.clone());
         resolved
     }
@@ -885,8 +885,11 @@ impl LdapDirectoryProvider {
         // The next reconnect may land on a different DC (DNS SRV round-robin,
         // failover, etc.), so we cannot assume the new target has the same
         // RODC status. Reset the flag and let `create_connection` set it
-        // again from the fresh rootDSE response.
+        // again from the fresh rootDSE response. The SRV-resolved dial host
+        // is forgotten for the same reason: a partition whose DC went down
+        // must be able to fail over to another one.
         *self.connected_dc_is_rodc.lock().expect("lock poisoned") = false;
+        *self.dial_host.lock().expect("lock poisoned") = None;
         tracing::info!("LDAP connection pool invalidated - will reconnect on next operation");
     }
 

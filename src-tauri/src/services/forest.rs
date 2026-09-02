@@ -227,6 +227,19 @@ pub fn is_valid_dns_name(name: &str) -> bool {
     })
 }
 
+/// Accepts a DNS SRV target only when it is a valid host name inside `domain`
+/// (the domain itself or a host below it). A DNS answer steering a partition
+/// bind to a host outside the partition would otherwise choose the name TLS
+/// verifies the DC certificate against.
+pub fn is_dc_target_within(target: &str, domain: &str) -> bool {
+    if !is_valid_dns_name(target) {
+        return false;
+    }
+    let target = target.to_ascii_lowercase();
+    let domain = domain.to_ascii_lowercase();
+    target == domain || target.ends_with(&format!(".{domain}"))
+}
+
 fn has_control_chars(value: &str) -> bool {
     value.chars().any(char::is_control)
 }
@@ -1810,5 +1823,26 @@ mod tests {
         // The partition provider reconnects lazily; status must follow it.
         let eu = forest.partition("eu.example.com").unwrap();
         assert!(!eu.is_connected());
+    }
+
+    #[test]
+    fn dc_target_must_be_a_host_inside_the_partition_domain() {
+        assert!(is_dc_target_within("dc01.eu.example.com", "eu.example.com"));
+        assert!(is_dc_target_within("DC01.EU.EXAMPLE.COM", "eu.example.com"));
+        assert!(is_dc_target_within("eu.example.com", "eu.example.com"));
+        assert!(!is_dc_target_within("dc.attacker.tld", "eu.example.com"));
+        assert!(!is_dc_target_within("dc01.example.com", "eu.example.com"));
+        assert!(!is_dc_target_within(
+            "evil-eu.example.com",
+            "eu.example.com"
+        ));
+        assert!(!is_dc_target_within(
+            "dc01.eu.example.com:636",
+            "eu.example.com"
+        ));
+        assert!(!is_dc_target_within(
+            "user@dc01.eu.example.com",
+            "eu.example.com"
+        ));
     }
 }
