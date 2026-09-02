@@ -17,6 +17,22 @@ use services::LdapDirectoryProvider;
 use services::PermissionConfig;
 use state::AppState;
 
+/// Promotes a reachable seed provider to a `ForestProvider`, falling back to
+/// a seed-only forest when the seed cannot be reached or discovery fails so
+/// startup never aborts on a directory problem.
+#[cfg(not(feature = "demo"))]
+pub async fn connect_forest(seed: Arc<LdapDirectoryProvider>) -> services::ForestProvider {
+    let auth_mode = seed.auth_mode().clone();
+    let tls_config = seed.tls_config().clone();
+    match services::ForestProvider::connect(seed.clone(), auth_mode, tls_config).await {
+        Ok(forest) => forest,
+        Err(e) => {
+            tracing::warn!(error = %e, "Forest connect failed, using the seed partition only");
+            services::ForestProvider::single_partition(seed)
+        }
+    }
+}
+
 /// Installs a custom panic hook that logs panics via tracing before
 /// delegating to the default handler. This ensures panics in async tasks
 /// or background threads are always captured in the log file.
@@ -59,7 +75,7 @@ pub fn run() {
         Arc::new(services::demo_provider::DemoDirectoryProvider::new())
     };
     #[cfg(not(feature = "demo"))]
-    let provider: Arc<dyn services::DirectoryProvider> = {
+    let seed: Arc<LdapDirectoryProvider> = {
         use services::ldap_directory::LdapTlsConfig;
 
         let server = std::env::var("DSPANEL_LDAP_SERVER").ok();
@@ -104,6 +120,8 @@ pub fn run() {
             }
         }
     };
+    #[cfg(not(feature = "demo"))]
+    let provider: Arc<dyn services::DirectoryProvider> = seed.clone();
 
     // Mark as needing credentials if server + bind_dn are set but no password
     let needs_creds = std::env::var("DSPANEL_LDAP_SERVER").is_ok()
@@ -119,7 +137,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .manage(app_state)
-        .setup(|app| {
+        .setup(move |app| {
             // Detect permissions from AD groups on startup
             use tauri::Manager;
             let state = app.state::<AppState>();
@@ -135,6 +153,22 @@ pub fn run() {
                     state.audit_service.set_operator(name.clone());
                     tracing::info!(operator = %name, "Audit operator set to authenticated identity");
                 }
+                // Promote the seed to a forest-aware provider. A failure here
+                // keeps the seed-only shape so the connection error UX is unchanged.
+                #[cfg(not(feature = "demo"))]
+                let forest = if *state.needs_credentials.lock().expect("lock poisoned") {
+                    services::ForestProvider::single_partition(provider.clone())
+                } else {
+                    connect_forest(seed.clone()).await
+                };
+                #[cfg(feature = "demo")]
+                let forest = services::ForestProvider::single_partition(provider.clone());
+                tracing::info!(
+                    partitions = forest.topology().partitions.len(),
+                    seed = forest.seed_dns_name(),
+                    "Forest provider installed"
+                );
+                state.set_forest(Arc::new(forest));
             });
             // Start LDAP keepalive background task (ping every 5 minutes)
             let keepalive_provider = state.provider();
@@ -230,6 +264,7 @@ pub fn run() {
             commands::has_permission,
             commands::check_connection,
             commands::get_domain_info,
+            commands::get_forest_topology,
             commands::search_users,
             commands::get_user,
             commands::browse_users,

@@ -5,8 +5,8 @@ use crate::models::DirectoryEntry;
 use crate::services::credential_store::CredentialStore;
 use crate::services::graph_exchange::GraphExchangeService;
 use crate::services::{
-    AppSettingsService, AuditService, DirectoryProvider, MfaService, ObjectSnapshotService,
-    PermissionConfig, PermissionService, PresetService, SnapshotService,
+    AppSettingsService, AuditService, DirectoryProvider, ForestProvider, MfaService,
+    ObjectSnapshotService, PermissionConfig, PermissionService, PresetService, SnapshotService,
 };
 
 /// Global application state managed by Tauri.
@@ -21,6 +21,10 @@ pub struct AppState {
     /// Directory provider for AD operations. Wrapped in RwLock to allow
     /// runtime replacement (e.g., after login prompt provides credentials).
     pub directory_provider: RwLock<Arc<dyn DirectoryProvider>>,
+    /// Typed view of `directory_provider` when it is a `ForestProvider`.
+    /// `None` until the forest is assembled (startup, or after a login prompt)
+    /// and in tests that install a bare provider.
+    pub forest_provider: RwLock<Option<Arc<ForestProvider>>>,
     /// Whether the app is waiting for simple bind credentials from the user.
     pub needs_credentials: Mutex<bool>,
     /// Permission service for checking user authorization levels.
@@ -65,6 +69,7 @@ impl AppState {
             title: Mutex::new("DSPanel".to_string()),
             initialized: Mutex::new(false),
             directory_provider: RwLock::new(provider),
+            forest_provider: RwLock::new(None),
             needs_credentials: Mutex::new(false),
             permission_service: PermissionService::new(permission_config),
             audit_service: AuditService::new(),
@@ -99,6 +104,32 @@ impl AppState {
             .directory_provider
             .write()
             .expect("directory_provider lock poisoned") = provider;
+        *self
+            .forest_provider
+            .write()
+            .expect("forest_provider lock poisoned") = None;
+    }
+
+    /// Installs a forest as the active directory provider and keeps the typed
+    /// handle so forest-specific commands (topology, partition status) can
+    /// reach it without downcasting.
+    pub fn set_forest(&self, forest: Arc<ForestProvider>) {
+        *self
+            .directory_provider
+            .write()
+            .expect("directory_provider lock poisoned") = forest.clone();
+        *self
+            .forest_provider
+            .write()
+            .expect("forest_provider lock poisoned") = Some(forest);
+    }
+
+    /// The active `ForestProvider`, when one is installed.
+    pub fn forest(&self) -> Option<Arc<ForestProvider>> {
+        self.forest_provider
+            .read()
+            .expect("forest_provider lock poisoned")
+            .clone()
     }
 
     /// Creates an AppState with in-memory services (no file I/O) for testing.
@@ -112,6 +143,7 @@ impl AppState {
             title: Mutex::new("DSPanel".to_string()),
             initialized: Mutex::new(false),
             directory_provider: RwLock::new(provider),
+            forest_provider: RwLock::new(None),
             needs_credentials: Mutex::new(false),
             permission_service: PermissionService::new(permission_config),
             audit_service: AuditService::new_in_memory(),

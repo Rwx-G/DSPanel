@@ -3,6 +3,7 @@ use tauri::State;
 
 use crate::error::AppError;
 use crate::models::{DirectoryEntry, OUNode};
+use crate::services::ForestTopology;
 use crate::services::{
     ComputerIndicatorInput, SecurityIndicatorSet, UserIndicatorInput, evaluate_computer_indicators,
     evaluate_user_indicators,
@@ -248,6 +249,26 @@ pub(crate) async fn check_connection_inner(state: &AppState) -> Result<bool, App
         .map_err(|e| AppError::Network(e.to_string()))
 }
 
+/// Returns the forest topology built at connect time.
+///
+/// Without an installed `ForestProvider` (bare provider in tests, or the
+/// startup fallback) the provider's own `discover_forest` answers; when even
+/// that fails (not connected yet) an empty topology is returned so the UI
+/// treats the session as single-domain instead of erroring.
+pub(crate) async fn get_forest_topology_inner(state: &AppState) -> ForestTopology {
+    if let Some(forest) = state.forest() {
+        return forest.topology().clone();
+    }
+    let provider = state.provider();
+    match provider.discover_forest().await {
+        Ok(topology) => topology,
+        Err(e) => {
+            tracing::debug!(error = %e, "Forest topology unavailable, reporting empty topology");
+            ForestTopology::default()
+        }
+    }
+}
+
 /// Returns domain information from the directory provider.
 pub(crate) fn get_domain_info_inner(state: &AppState) -> DomainInfo {
     let provider = state.provider();
@@ -444,6 +465,11 @@ pub async fn check_connection(state: State<'_, AppState>) -> Result<bool, AppErr
 ///
 /// Returns a JSON object with `domain_name` (e.g. "CORP.LOCAL") and
 /// `is_connected` fields. Both may be null/false if not domain-joined.
+#[tauri::command]
+pub async fn get_forest_topology(state: State<'_, AppState>) -> Result<ForestTopology, AppError> {
+    Ok(get_forest_topology_inner(&state).await)
+}
+
 #[tauri::command]
 pub fn get_domain_info(state: State<'_, AppState>) -> DomainInfo {
     get_domain_info_inner(&state)

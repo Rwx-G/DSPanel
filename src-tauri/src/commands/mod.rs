@@ -270,9 +270,10 @@ pub async fn connect_simple_bind(
         ca_cert_file,
     };
 
-    let provider: Arc<dyn crate::services::DirectoryProvider> = Arc::new(
-        LdapDirectoryProvider::new_with_credentials(server, bind_dn, password, tls_config),
-    );
+    let seed = Arc::new(LdapDirectoryProvider::new_with_credentials(
+        server, bind_dn, password, tls_config,
+    ));
+    let provider: Arc<dyn crate::services::DirectoryProvider> = seed.clone();
 
     // Test the connection
     match provider.test_connection().await {
@@ -293,8 +294,9 @@ pub async fn connect_simple_bind(
                 tracing::info!(operator = %name, "Authenticated after login prompt");
             }
 
-            // Swap the provider
-            state.set_provider(provider);
+            // Swap the provider for a forest built on the freshly bound seed
+            let forest = crate::connect_forest(seed).await;
+            state.set_forest(Arc::new(forest));
             *state.needs_credentials.lock().expect("lock poisoned") = false;
 
             tracing::info!("Simple bind connection established via login prompt");
