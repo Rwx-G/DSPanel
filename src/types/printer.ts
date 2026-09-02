@@ -8,6 +8,7 @@ export interface PrinterInfo {
   sharePath: string;
   driverName: string;
   description: string;
+  partitionDnsName?: string;
 }
 
 export function mapEntryToPrinter(entry: DirectoryEntry): PrinterInfo {
@@ -21,5 +22,6 @@ export function mapEntryToPrinter(entry: DirectoryEntry): PrinterInfo {
     sharePath: attr("uNCName"),
     driverName: attr("driverName"),
     description: attr("description"),
+    partitionDnsName: entry.partitionDnsName,
   };
 }

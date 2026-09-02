@@ -11,6 +11,7 @@ export interface ContactInfo {
   company: string;
   department: string;
   description: string;
+  partitionDnsName?: string;
 }
 
 export function mapEntryToContact(entry: DirectoryEntry): ContactInfo {
@@ -26,5 +27,6 @@ export function mapEntryToContact(entry: DirectoryEntry): ContactInfo {
     company: attr("company"),
     department: attr("department"),
     description: attr("description"),
+    partitionDnsName: entry.partitionDnsName,
   };
 }

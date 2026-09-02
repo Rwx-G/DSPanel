@@ -4,6 +4,8 @@ export interface DirectoryEntry {
   displayName: string | null;
   objectClass: string | null;
   attributes: Record<string, string[]>;
+  /** DNS name of the forest partition the entry was read from (Epic 15). Absent on single-domain payloads. */
+  partitionDnsName?: string;
 }
 
 export interface DirectoryUser {
@@ -30,6 +32,7 @@ export interface DirectoryUser {
   whenChanged: string;
   memberOf: string[];
   rawAttributes: Record<string, string[]>;
+  partitionDnsName?: string;
 }
 
 /** Default empty rawAttributes for test helpers that build DirectoryUser manually. */
@@ -95,6 +98,7 @@ export function mapEntryToUser(entry: DirectoryEntry): DirectoryUser {
     whenChanged: formatGeneralizedTime(attr("whenChanged")),
     memberOf: attrList("memberOf"),
     rawAttributes: entry.attributes,
+    partitionDnsName: entry.partitionDnsName,
   };
 }
 
@@ -116,6 +120,7 @@ export interface DirectoryComputer {
    * an extra LDAP round-trip.
    */
   rawAttributes: Record<string, string[]>;
+  partitionDnsName?: string;
 }
 
 export function mapEntryToComputer(entry: DirectoryEntry): DirectoryComputer {
@@ -134,6 +139,7 @@ export function mapEntryToComputer(entry: DirectoryEntry): DirectoryComputer {
     enabled: (uac & 0x0002) === 0,
     memberOf: attrList("memberOf"),
     rawAttributes: entry.attributes,
+    partitionDnsName: entry.partitionDnsName,
   };
 }
 
@@ -146,6 +152,7 @@ export interface DirectoryGroup {
   category: "Security" | "Distribution";
   memberCount: number;
   organizationalUnit: string;
+  partitionDnsName?: string;
 }
 
 export function parseGroupScope(groupType: number): DirectoryGroup["scope"] {
@@ -176,6 +183,7 @@ export function mapEntryToGroup(entry: DirectoryEntry): DirectoryGroup {
     category: parseGroupCategory(groupType),
     memberCount: members.length,
     organizationalUnit: parseOuFromDn(entry.distinguishedName),
+    partitionDnsName: entry.partitionDnsName,
   };
 }
 

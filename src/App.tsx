@@ -10,6 +10,7 @@ import { NotificationProvider } from "@/contexts/NotificationContext";
 import { NotificationHost } from "@/components/common/NotificationHost";
 import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import { DialogProvider } from "@/contexts/DialogContext";
+import { ForestProvider } from "@/contexts/ForestContext";
 import { useTheme } from "@/hooks/useTheme";
 import { AppShell } from "@/components/layout/AppShell";
 import { UserLookup } from "@/pages/UserLookup";
@@ -226,17 +227,19 @@ export function App() {
       <NotificationProvider>
         <DialogProvider>
           <NavigationProvider>
-            <AppShell
-              statusBarProps={{
-                domainName: status.domainName,
-                domainController: null,
-                permissionLevel: status.permissionLevel,
-                isConnected: status.isConnected,
-                appVersion: APP_VERSION,
-              }}
-            >
-              <ModuleRouter status={status} />
-            </AppShell>
+            <ForestProvider connected={status.isConnected}>
+              <AppShell
+                statusBarProps={{
+                  domainName: status.domainName,
+                  domainController: null,
+                  permissionLevel: status.permissionLevel,
+                  isConnected: status.isConnected,
+                  appVersion: APP_VERSION,
+                }}
+              >
+                <ModuleRouter status={status} />
+              </AppShell>
+            </ForestProvider>
           </NavigationProvider>
         </DialogProvider>
         <NotificationHost />
