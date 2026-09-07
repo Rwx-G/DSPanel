@@ -43,7 +43,7 @@
     "@types/react-dom": "^19.2.5",
     "@vitejs/plugin-react": "^6.1.1",
     "@vitest/coverage-v8": "^4.1.11",
-    "eslint": "^10.9.1",
+    "eslint": "^10.10.0",
     "jsdom": "^30.0.1",
     "prettier": "^3.9.6",
     "storybook": "^10.5.10",
